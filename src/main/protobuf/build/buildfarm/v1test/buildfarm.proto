@@ -1,0 +1,141 @@
+syntax = "proto3";
+
+package build.buildfarm.v1test;
+
+import "google/api/annotations.proto";
+import "google/devtools/remoteexecution/v1test/remote_execution.proto";
+import "google/longrunning/operations.proto";
+import "google/protobuf/duration.proto";
+import "google/rpc/status.proto";
+
+option java_package = "build.buildfarm.v1test";
+option java_multiple_files = true;
+option java_outer_classname = "OperationQueueProto";
+
+// The OperationQueue API is used internally to communicate with Workers
+service OperationQueue {
+  rpc Take(TakeOperationRequest) returns (google.longrunning.Operation) {
+    option (google.api.http) = { get: "/v1test/{instance_name=**}/operation:take" };
+  }
+
+  rpc Put(google.longrunning.Operation) returns (google.rpc.Status) {
+    option (google.api.http) = { post: "/v1test/{instance_name=**}/operation:put" body: "*" };
+  }
+}
+
+message TakeOperationRequest {
+  // The instance of the execution system to operate against. A server may
+  // support multiple instances of the execution system (with their own workers,
+  // storage, caches, etc.). The server MAY require use of this field to select
+  // between them in an implementation-defined fashion, otherwise it can be
+  // omitted.
+  string instance_name = 1;
+
+  // The platform features available for the execution environment. The server MAY
+  // choose to execute the action on any worker satisfying the requirements, so
+  // the client SHOULD ensure that running the action on any such worker will
+  // have the same result.
+  google.devtools.remoteexecution.v1test.Platform platform = 5;
+}
+
+message BuildFarmServerConfig {
+  repeated InstanceConfig instances = 1;
+
+  string default_instance_name = 3; // must be present in instances list or empty
+
+  int32 port = 2;
+}
+
+message MemoryInstanceConfig {
+  int32 list_operations_default_page_size = 1;
+  int32 list_operations_max_page_size = 2;
+
+  int32 tree_default_page_size = 3;
+  int32 tree_max_page_size = 4;
+
+  // timeout after dispatch before which executing must
+  // be received, or the operation is considered lost on
+  // a worker and is requeued
+  google.protobuf.Duration operation_executing_timeout = 5;
+
+  // delay after timeout when executing before which
+  // completed must be received, or the operation is
+  // considered lost on a worker and is requeued
+  google.protobuf.Duration operation_completed_delay = 6;
+}
+
+message InstanceConfig {
+  string name = 1;
+
+  oneof type {
+    MemoryInstanceConfig memory_instance_config = 2;
+  }
+}
+
+message CASInsertionControl {
+  // the size limit of inline content
+  int64 limit = 1;
+
+  enum Policy {
+    UNKNOWN = 0;
+
+    ALWAYS_INSERT = 1;
+
+    INSERT_ABOVE_LIMIT = 2;
+
+    NEVER_INSERT = 3;
+  }
+
+  Policy policy = 2;
+};
+
+message WorkerConfig {
+  string instance_name = 1;
+
+  // server address for all buildfarm requests
+  // like actioncache or execution in bazel, this
+  // server is expected to provide all buildfarm
+  // service endpoints
+  string operation_queue = 2;
+
+  // base directory for all work being performed
+  string root = 3;
+
+  // path to cached files from CAS
+  // if relative, is made relative to root
+  string cas_cache_directory = 4;
+
+  // whether to stream stdout from processes
+  bool stream_stdout = 5;
+
+  // control for process stdout
+  CASInsertionControl stdout_cas_control = 6;
+
+  // whether to stream stderr from processes
+  bool stream_stderr = 7;
+
+  // control for process stdout
+  CASInsertionControl stderr_cas_control = 8;
+
+  // control for process output files
+  CASInsertionControl file_cas_control = 9;
+
+  // whether the worker should attempt to requeue
+  // an operation when an unexpected failure
+  // occurs during an execution
+  bool requeue_on_failure = 10;
+
+  // page size for getTree request
+  uint32 tree_page_size = 11;
+
+  // initial platform used to match operations
+  google.devtools.remoteexecution.v1test.Platform platform = 12;
+}
+
+message TreeIteratorToken {
+  repeated google.devtools.remoteexecution.v1test.Digest directories = 1;
+}
+
+message OperationIteratorToken {
+  string operation_name = 1;
+}
