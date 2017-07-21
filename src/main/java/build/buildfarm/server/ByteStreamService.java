@@ -262,7 +262,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
         String operationStream = parseOperationStream(resourceName);
 
         OutputStream outputStream = instance.getStreamOutput(operationStream);
-        outputStream.write(request.getData().toByteArray());
+        request.getData().writeTo(outputStream);
         if (request.getFinishWrite()) {
           outputStream.close();
         }
