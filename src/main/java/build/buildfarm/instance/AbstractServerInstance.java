@@ -281,11 +281,11 @@ public abstract class AbstractServerInstance implements Instance {
     ExecuteOperationMetadata metadata =
       expectExecuteOperationMetadata(operation);
 
+    putOperation(operation);
+
     if (!waitForCompletion) {
       onOperation.accept(operation);
     }
-
-    putOperation(operation);
 
     Operation.Builder operationBuilder = operation.toBuilder();
     ActionResult actionResult = null;
