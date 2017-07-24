@@ -114,7 +114,7 @@ java_library(
 java_binary(
     name = "buildfarm-worker",
     srcs = glob(["worker/**/*.java"]),
-    main_class = "build.buildfarm.Worker",
+    main_class = "build.buildfarm.worker.Worker",
     deps = [
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "//third_party:guava",
