@@ -401,7 +401,7 @@ public class StubInstance implements Instance {
   public boolean watchOperation(
       String operationName,
       boolean watchInitialState,
-      Consumer<Operation> watcher) {
+      Function<Operation, Boolean> watcher) {
     return false;
   }
 

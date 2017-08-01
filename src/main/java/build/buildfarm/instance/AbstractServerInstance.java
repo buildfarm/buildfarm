@@ -328,6 +328,7 @@ public abstract class AbstractServerInstance implements Instance {
           if (o.getDone()) {
             onOperation.accept(o);
           }
+          return true;
         });
       }
     }
