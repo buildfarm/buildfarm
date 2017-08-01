@@ -86,7 +86,13 @@ public class WatcherService extends WatcherGrpc.WatcherImplBase {
             if (ex.getStatus().getCode() != Status.Code.CANCELLED) {
               throw ex;
             }
+            return false;
+          } catch (IllegalStateException ex) {
+            ex.printStackTrace();
+            // check for 'call is closed'?
+            return false;
           }
+          return true;
         });
     if (!watching) {
       responseObserver.onCompleted();

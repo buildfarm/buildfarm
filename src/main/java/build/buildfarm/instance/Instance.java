@@ -76,5 +76,5 @@ public interface Instance {
   boolean watchOperation(
       String operationName,
       boolean watchInitialState,
-      Consumer<Operation> watcher);
+      Function<Operation, Boolean> watcher);
 }

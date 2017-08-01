@@ -48,7 +48,7 @@ import java.util.function.Function;
 
 public class MemoryInstance extends AbstractServerInstance {
   private final MemoryInstanceConfig config;
-  private final Map<String, List<Consumer<Operation>>> watchers;
+  private final Map<String, List<Function<Operation, Boolean>>> watchers;
   private final Map<String, ByteStringStreamSource> streams;
   private final List<Operation> queuedOperations;
   private final List<Worker> workers;
@@ -95,7 +95,7 @@ public class MemoryInstance extends AbstractServerInstance {
         actionCache,
         outstandingOperations);
     this.config = config;
-    watchers = new HashMap<String, List<Consumer<Operation>>>();
+    watchers = new HashMap<String, List<Function<Operation, Boolean>>>();
     streams = new HashMap<String, ByteStringStreamSource>();
     queuedOperations = new ArrayList<Operation>();
     workers = new ArrayList<Worker>();
@@ -153,15 +153,26 @@ public class MemoryInstance extends AbstractServerInstance {
 
   @Override
   protected void updateOperationWatchers(Operation operation) {
-    Iterable<Consumer<Operation>> operationWatchers =
+    List<Function<Operation, Boolean>> operationWatchers =
         watchers.get(operation.getName());
     if (operationWatchers != null) {
       if (operation.getDone()) {
         watchers.remove(operation.getName());
       }
+      long unfilteredWatcherCount = operationWatchers.size();
       super.updateOperationWatchers(operation);
-      for (Consumer<Operation> watcher : operationWatchers) {
-        watcher.accept(operation);
+      ImmutableList.Builder<Function<Operation, Boolean>> filteredWatchers = new ImmutableList.Builder<>();
+      long filteredWatcherCount = 0;
+      for (Function<Operation, Boolean> watcher : operationWatchers) {
+        if (watcher.apply(operation)) {
+          filteredWatchers.add(watcher);
+          filteredWatcherCount++;
+        }
+      }
+      if (!operation.getDone() && filteredWatcherCount != unfilteredWatcherCount) {
+        operationWatchers = new ArrayList<>();
+        Iterables.addAll(operationWatchers, filteredWatchers.build());
+        watchers.put(operation.getName(), operationWatchers);
       }
     } else {
       throw new IllegalStateException();
@@ -172,7 +183,7 @@ public class MemoryInstance extends AbstractServerInstance {
   protected Operation createOperation(Action action) {
     String name = createOperationName(UUID.randomUUID().toString());
 
-    watchers.put(name, new ArrayList<Consumer<Operation>>());
+    watchers.put(name, new ArrayList<Function<Operation, Boolean>>());
 
     Digest actionDigest = Digests.computeDigest(action.toByteString());
 
@@ -321,16 +332,14 @@ public class MemoryInstance extends AbstractServerInstance {
   public boolean watchOperation(
       String operationName,
       boolean watchInitialState,
-      Consumer<Operation> watcher) {
-    List<Consumer<Operation>> operationWatchers = watchers.get(operationName);
-    if (operationWatchers == null) {
-      if (watchInitialState) {
-        watcher.accept(null);
-      }
+      Function<Operation, Boolean> watcher) {
+    if (watchInitialState &&
+        !watcher.apply(getOperation(operationName))) {
       return false;
     }
-    if (watchInitialState) {
-      watcher.accept(getOperation(operationName));
+    List<Function<Operation, Boolean>> operationWatchers = watchers.get(operationName);
+    if (operationWatchers == null) {
+      return false;
     }
     operationWatchers.add(watcher);
     return true;
