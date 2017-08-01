@@ -84,7 +84,10 @@ public abstract class AbstractServerInstance implements Instance {
       return blob;
     }
 
-    if (offset >= blob.size() || limit < 0) {
+    if (offset < 0
+        || (blob.isEmpty() && offset > 0)
+        || (!blob.isEmpty() && offset >= blob.size())
+        || limit < 0) {
       throw new IndexOutOfBoundsException();
     }
 
@@ -96,10 +99,6 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public Digest putBlob(ByteString blob) throws IllegalArgumentException {
-    if (blob.size() == 0) {
-      throw new IllegalArgumentException();
-    }
-
     Digest blobDigest = Digests.computeDigest(blob);
     contentAddressableStorage.put(blobDigest, blob);
     return blobDigest;
