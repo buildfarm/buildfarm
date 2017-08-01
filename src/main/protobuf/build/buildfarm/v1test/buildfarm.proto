@@ -21,6 +21,10 @@ service OperationQueue {
   rpc Put(google.longrunning.Operation) returns (google.rpc.Status) {
     option (google.api.http) = { post: "/v1test/{instance_name=**}/operation:put" body: "*" };
   }
+
+  rpc Poll(PollOperationRequest) returns (google.rpc.Status) {
+    option (google.api.http) = { get: "/v1test/{instance_name=**}/operation:poll" };
+  }
 }
 
 message TakeOperationRequest {
@@ -38,6 +42,14 @@ message TakeOperationRequest {
   google.devtools.remoteexecution.v1test.Platform platform = 5;
 }
 
+message PollOperationRequest {
+  // The operation name in question
+  string operation_name = 2;
+
+  // The current state of the worker
+  google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage stage = 3;
+}
+
 message BuildFarmServerConfig {
   repeated InstanceConfig instances = 1;
 
@@ -53,10 +65,11 @@ message MemoryInstanceConfig {
   int32 tree_default_page_size = 3;
   int32 tree_max_page_size = 4;
 
-  // timeout after dispatch before which executing must
-  // be received, or the operation is considered lost on
-  // a worker and is requeued
-  google.protobuf.Duration operation_executing_timeout = 5;
+  // timeout after dispatch before which executing,
+  // complete or an operation poll must be received, or
+  // the operation is considered lost on a worker and is
+  // requeued
+  google.protobuf.Duration operation_poll_timeout = 5;
 
   // delay after timeout when executing before which
   // completed must be received, or the operation is
@@ -128,8 +141,11 @@ message WorkerConfig {
   // page size for getTree request
   uint32 tree_page_size = 11;
 
+  // period of poll requests during execution
+  google.protobuf.Duration operation_poll_period = 12;
+
   // initial platform used to match operations
-  google.devtools.remoteexecution.v1test.Platform platform = 12;
+  google.devtools.remoteexecution.v1test.Platform platform = 13;
 }
 
 message TreeIteratorToken {

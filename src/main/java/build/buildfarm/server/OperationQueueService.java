@@ -16,11 +16,13 @@ package build.buildfarm.server;
 
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.OperationQueueGrpc;
+import build.buildfarm.v1test.PollOperationRequest;
 import build.buildfarm.v1test.TakeOperationRequest;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.rpc.Code;
 import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
@@ -75,9 +77,27 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
     Instance instance =
         server.getInstanceFromOperationName(operation.getName());
 
-    instance.putOperation(operation);
+    boolean ok = instance.putOperation(operation);
+    Code code = ok ? Code.OK : Code.UNAVAILABLE;
     responseObserver.onNext(com.google.rpc.Status.newBuilder()
-        .setCode(com.google.rpc.Code.OK.getNumber())
+        .setCode(code.getNumber())
+        .build());
+    responseObserver.onCompleted();
+  }
+
+  @Override
+  public void poll(
+      PollOperationRequest request,
+      StreamObserver<com.google.rpc.Status> responseObserver) {
+    Instance instance =
+        server.getInstanceFromOperationName(request.getOperationName());
+
+    boolean ok = instance.pollOperation(
+        request.getOperationName(),
+        request.getStage());
+    Code code = ok ? Code.OK : Code.UNAVAILABLE;
+    responseObserver.onNext(com.google.rpc.Status.newBuilder()
+        .setCode(code.getNumber())
         .build());
     responseObserver.onCompleted();
   }

@@ -52,7 +52,8 @@ public class MemoryInstance extends AbstractServerInstance {
   private final Map<String, ByteStringStreamSource> streams;
   private final List<Operation> queuedOperations;
   private final List<Worker> workers;
-  private final Map<String, Requeuer> requeuers;
+  private final Map<String, Watchdog> requeuers;
+  private final Map<String, Watchdog> operationTimeoutDelays;
   private final Map<String, Operation> outstandingOperations;
 
   private static final class Worker {
@@ -98,7 +99,8 @@ public class MemoryInstance extends AbstractServerInstance {
     streams = new HashMap<String, ByteStringStreamSource>();
     queuedOperations = new ArrayList<Operation>();
     workers = new ArrayList<Worker>();
-    requeuers = new HashMap<String, Requeuer>();
+    requeuers = new HashMap<String, Watchdog>();
+    operationTimeoutDelays = new HashMap<String, Watchdog>();
     this.outstandingOperations = outstandingOperations;
   }
 
@@ -192,36 +194,58 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  public void putOperation(Operation operation) {
-    super.putOperation(operation);
+  public boolean pollOperation(
+      String operationName,
+      ExecuteOperationMetadata.Stage stage) {
+    if (!super.pollOperation(operationName, stage)) {
+      return false;
+    }
+    // pet the requeue watchdog
+    requeuers.get(operationName).pet();
+    return true;
+  }
+
+  @Override
+  public boolean putOperation(Operation operation) {
+    if (!super.putOperation(operation)) {
+      return false;
+    }
+    String operationName = operation.getName();
     if (isExecuting(operation)) {
+      requeuers.get(operationName).pet();
+
+      // Create a delayed fuse timed out failure
+      // This is in effect if the worker does not respond
+      // within a configured delay with operation action timeout results
       Action action = expectAction(operation);
-      Duration actionTimeout;
-      // FIXME maybe institute a heartbeat here, the worker
-      // has to check in once every X seconds.
       if (action.hasTimeout()) {
-        actionTimeout = action.getTimeout();
-      } else {
-        actionTimeout = Duration.newBuilder()
-            .setSeconds(30)
-            .setNanos(0)
+        Duration actionTimeout = action.getTimeout();
+        Duration delay = config.getOperationCompletedDelay();
+        Duration timeout = Duration.newBuilder()
+            .setSeconds(actionTimeout.getSeconds() + delay.getSeconds())
+            .setNanos(actionTimeout.getNanos() + delay.getNanos())
             .build();
+        // this is an overuse of Watchdog, we will never pet it
+        Watchdog operationTimeoutDelay = new Watchdog(timeout, () -> expireOperation(operation));
+        operationTimeoutDelays.put(operationName, operationTimeoutDelay);
+        new Thread(operationTimeoutDelay).start();
       }
-      Duration delay = config.getOperationCompletedDelay();
-      Duration timeout = Duration.newBuilder()
-          .setSeconds(actionTimeout.getSeconds() + delay.getSeconds())
-          .setNanos(actionTimeout.getNanos() + delay.getNanos())
-          .build();
-      requeuers.get(operation.getName()).reset(timeout);
     } else if (isComplete(operation)) {
       // destroy requeue timer
-      requeuers.remove(operation.getName()).stop();
+      requeuers.remove(operationName).stop();
+      // destroy action timed out failure
+      Watchdog operationTimeoutDelay =
+          operationTimeoutDelays.remove(operationName);
+      if (operationTimeoutDelay != null) {
+        operationTimeoutDelay.stop();
+      }
     }
+    return true;
   }
 
   private void onDispatched(Operation operation) {
-    Duration timeout = config.getOperationExecutingTimeout();
-    Requeuer requeuer = new Requeuer(operation, timeout, this);
+    Duration timeout = config.getOperationPollTimeout();
+    Watchdog requeuer = new Watchdog(timeout, () -> putOperation(operation));
     requeuers.put(operation.getName(), requeuer);
     new Thread(requeuer).start();
   }
