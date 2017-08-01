@@ -406,9 +406,13 @@ public abstract class AbstractServerInstance implements Instance {
   abstract protected void enqueueOperation(Operation operation);
 
   @Override
-  public void putOperation(Operation operation) {
+  public boolean putOperation(Operation operation) {
     if (isCancelled(operation)) {
       throw new IllegalStateException();
+    }
+    if (isExecuting(operation) &&
+        !outstandingOperations.containsKey(operation.getName())) {
+      return false;
     }
     if (isQueued(operation)) {
       if (!matchOperation(operation)) {
@@ -417,6 +421,7 @@ public abstract class AbstractServerInstance implements Instance {
     } else {
       updateOperationWatchers(operation);
     }
+    return true;
   }
 
   protected void updateOperationWatchers(Operation operation) {
@@ -469,5 +474,58 @@ public abstract class AbstractServerInstance implements Instance {
             .setCode(com.google.rpc.Code.CANCELLED.getNumber())
             .build())
         .build());
+  }
+
+  protected void expireOperation(Operation operation) {
+    Action action = expectAction(operation);
+    Digest actionDigest = Digests.computeDigest(action);
+    // one last chance to get partial information from worker
+    ActionResult actionResult = action.getDoNotCache()
+        ? null
+        : getActionResult(actionDigest);
+    boolean cachedResult = actionResult != null;
+    if (!cachedResult) {
+      actionResult = ActionResult.newBuilder()
+          .setExitCode(-1)
+          .setStderrRaw(ByteString.copyFromUtf8(
+              "[BUILDFARM]: Action timed out with no response from worker"))
+          .build();
+      if (!action.getDoNotCache()) {
+        putActionResult(actionDigest, actionResult);
+      }
+    }
+    putOperation(operation.newBuilder()
+        .setDone(true)
+        .setMetadata(Any.pack(ExecuteOperationMetadata.newBuilder()
+            .setStage(ExecuteOperationMetadata.Stage.COMPLETED)
+            .build()))
+        .setResponse(Any.pack(ExecuteResponse.newBuilder()
+            .setResult(actionResult)
+            .setCachedResult(cachedResult)
+            .build()))
+        .build());
+  }
+
+  @Override
+  public boolean pollOperation(
+      String operationName,
+      ExecuteOperationMetadata.Stage stage) {
+    if (stage != ExecuteOperationMetadata.Stage.QUEUED
+        && stage != ExecuteOperationMetadata.Stage.EXECUTING) {
+      return false;
+    }
+    Operation operation = getOperation(operationName);
+    if (operation == null) {
+      return false;
+    }
+    ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
+    if (metadata == null) {
+      return false;
+    }
+    // stage limitation to {QUEUED, EXECUTING} above is required
+    if (metadata.getStage() != stage) {
+      return false;
+    }
+    return true;
   }
 }

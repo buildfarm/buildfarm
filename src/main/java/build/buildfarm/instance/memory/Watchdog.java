@@ -18,23 +18,23 @@ import build.buildfarm.instance.Instance;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Duration;
 
-public class Requeuer implements Runnable {
-  private final Operation operation;
-  private final Instance instance;
-
+public class Watchdog implements Runnable {
+  private final Runnable runnable;
+  private Duration petTimeout;
   private long timeoutNanos;
   private boolean stopped;
+  private long start;
 
-  public Requeuer(Operation operation, Duration timeout, Instance instance) {
-    this.operation = operation;
-    this.instance = instance;
-    reset(timeout);
+  public Watchdog(Duration petTimeout, Runnable runnable) {
+    this.runnable = runnable;
+    this.petTimeout = petTimeout;
+    pet();
   }
 
   public void run() {
     try {
-      long start = System.nanoTime();
       synchronized(this) {
+        start = System.nanoTime();
         while (!stopped && timeoutNanos > 0) {
           this.wait(timeoutNanos / 1000000L, (int) (timeoutNanos % 1000000L));
           long now = System.nanoTime();
@@ -42,7 +42,7 @@ public class Requeuer implements Runnable {
           start = now;
         }
         if (!stopped) {
-          instance.putOperation(operation);
+          runnable.run();
         }
         stopped = true;
       }
@@ -50,8 +50,14 @@ public class Requeuer implements Runnable {
     }
   }
 
-  public synchronized void reset( Duration timeout ) {
+  public void pet() {
+    reset(petTimeout);
+  }
+
+  private synchronized void reset(Duration timeout) {
+    start = System.nanoTime();
     timeoutNanos = timeout.getSeconds() * 1000000000L + timeout.getNanos();
+    this.notify();
   }
 
   public synchronized void stop() {
@@ -59,4 +65,3 @@ public class Requeuer implements Runnable {
     this.notify();
   }
 }
-
