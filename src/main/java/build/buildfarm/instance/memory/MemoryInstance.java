@@ -43,6 +43,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -77,8 +78,8 @@ public class MemoryInstance extends AbstractServerInstance {
     this(
         name,
         config,
-        /*contentAddressableStorage=*/ new HashMap<Digest, ByteString>(),
-        /*actionCache=*/ new HashMap<Digest, ActionResult>(),
+        /*contentAddressableStorage=*/ new ConcurrentHashMap<Digest, ByteString>(),
+        /*actionCache=*/ new ConcurrentHashMap<Digest, ActionResult>(),
         /*outstandingOperations=*/ new TreeMap<String, Operation>());
   }
 
@@ -94,7 +95,7 @@ public class MemoryInstance extends AbstractServerInstance {
         actionCache,
         outstandingOperations);
     this.config = config;
-    watchers = new HashMap<String, List<Function<Operation, Boolean>>>();
+    watchers = new ConcurrentHashMap<String, List<Function<Operation, Boolean>>>();
     streams = new HashMap<String, ByteStringStreamSource>();
     queuedOperations = new ArrayList<Operation>();
     workers = new ArrayList<Worker>();
@@ -151,29 +152,31 @@ public class MemoryInstance extends AbstractServerInstance {
 
   @Override
   protected void updateOperationWatchers(Operation operation) {
-    List<Function<Operation, Boolean>> operationWatchers =
-        watchers.get(operation.getName());
-    if (operationWatchers != null) {
-      if (operation.getDone()) {
-        watchers.remove(operation.getName());
-      }
-      long unfilteredWatcherCount = operationWatchers.size();
-      super.updateOperationWatchers(operation);
-      ImmutableList.Builder<Function<Operation, Boolean>> filteredWatchers = new ImmutableList.Builder<>();
-      long filteredWatcherCount = 0;
-      for (Function<Operation, Boolean> watcher : operationWatchers) {
-        if (watcher.apply(operation)) {
-          filteredWatchers.add(watcher);
-          filteredWatcherCount++;
+    synchronized(watchers) {
+      List<Function<Operation, Boolean>> operationWatchers =
+          watchers.get(operation.getName());
+      if (operationWatchers != null) {
+        if (operation.getDone()) {
+          watchers.remove(operation.getName());
         }
+        long unfilteredWatcherCount = operationWatchers.size();
+        super.updateOperationWatchers(operation);
+        ImmutableList.Builder<Function<Operation, Boolean>> filteredWatchers = new ImmutableList.Builder<>();
+        long filteredWatcherCount = 0;
+        for (Function<Operation, Boolean> watcher : operationWatchers) {
+          if (watcher.apply(operation)) {
+            filteredWatchers.add(watcher);
+            filteredWatcherCount++;
+          }
+        }
+        if (!operation.getDone() && filteredWatcherCount != unfilteredWatcherCount) {
+          operationWatchers = new ArrayList<>();
+          Iterables.addAll(operationWatchers, filteredWatchers.build());
+          watchers.put(operation.getName(), operationWatchers);
+        }
+      } else {
+        throw new IllegalStateException();
       }
-      if (!operation.getDone() && filteredWatcherCount != unfilteredWatcherCount) {
-        operationWatchers = new ArrayList<>();
-        Iterables.addAll(operationWatchers, filteredWatchers.build());
-        watchers.put(operation.getName(), operationWatchers);
-      }
-    } else {
-      throw new IllegalStateException();
     }
   }
 
@@ -313,11 +316,13 @@ public class MemoryInstance extends AbstractServerInstance {
         !watcher.apply(getOperation(operationName))) {
       return false;
     }
-    List<Function<Operation, Boolean>> operationWatchers = watchers.get(operationName);
-    if (operationWatchers == null) {
-      return false;
+    synchronized(watchers) {
+      List<Function<Operation, Boolean>> operationWatchers = watchers.get(operationName);
+      if (operationWatchers == null) {
+        return false;
+      }
+      operationWatchers.add(watcher);
     }
-    operationWatchers.add(watcher);
     return true;
   }
 
