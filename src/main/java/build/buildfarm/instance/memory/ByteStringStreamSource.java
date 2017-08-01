@@ -23,6 +23,7 @@ class ByteStringStreamSource extends ByteSource {
   private final Runnable onClose;
   private final OutputStream outputStream;
 
+  private final Object bufferSync;
   private ByteString buffer;
   private boolean closed;
 
@@ -44,21 +45,22 @@ class ByteStringStreamSource extends ByteSource {
 
       @Override
       public void write(byte[] b, int off, int len) {
-        synchronized(buffer) {
+        synchronized(bufferSync) {
           buffer = buffer.concat(ByteString.copyFrom(b, off, len));
-          buffer.notifyAll();
+          bufferSync.notifyAll();
         }
       }
 
       @Override
       public void close() {
-        synchronized(buffer) {
+        synchronized(bufferSync) {
           closed = true;
-          buffer.notifyAll();
+          bufferSync.notifyAll();
         }
         onClose.run();
       }
     };
+    bufferSync = new Object();
     closed = false;
   }
 
@@ -77,7 +79,7 @@ class ByteStringStreamSource extends ByteSource {
 
       @Override
       public int available() {
-        synchronized(buffer) {
+        synchronized(bufferSync) {
           return availableUnsynchronized();
         }
       }
@@ -91,10 +93,10 @@ class ByteStringStreamSource extends ByteSource {
         if (n <= 0) {
           return 0;
         }
-        synchronized(buffer) {
+        synchronized(bufferSync) {
           try {
             while (!closed && availableUnsynchronized() == 0) {
-              buffer.wait();
+              bufferSync.wait();
             }
           } catch(InterruptedException ex) {
           }
@@ -123,16 +125,16 @@ class ByteStringStreamSource extends ByteSource {
           if (len == 0) {
             return 0;
           }
-          synchronized(buffer) {
+          synchronized(bufferSync) {
             while (availableUnsynchronized() == 0) {
               if (closed) {
                 return -1;
               }
-              buffer.wait();
+              bufferSync.wait();
             }
+            len = Math.min(available(), len);
+            buffer.copyTo(b, offset, off, len);
           }
-          len = Math.min(available(), len);
-          buffer.copyTo(b, offset, off, len);
           offset += len;
           return len;
         } catch(InterruptedException ex) {
