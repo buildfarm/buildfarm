@@ -54,6 +54,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 import java.util.logging.Logger;
 
 class Worker {
@@ -62,6 +63,40 @@ class Worker {
   private final WorkerConfig config;
   private final Path root;
   private final Path cacheDir;
+
+  private static class Poller implements Runnable {
+    private final Duration period;
+    private final BooleanSupplier poll;
+    private boolean running;
+
+    public Poller(Duration period, BooleanSupplier poll) {
+      this.period = period;
+      this.poll = poll;
+      running = true;
+    }
+
+    @Override
+    public synchronized void run() {
+      while (running) {
+        try {
+          this.wait(
+              period.getSeconds() * 1000 + period.getNanos() / 1000000,
+              period.getNanos() % 1000000);
+          if (running) {
+            // FP interface with distinct returns, do not memoize!
+            running = poll.getAsBoolean();
+          }
+        } catch (InterruptedException ex) {
+          running = false;
+        }
+      }
+    }
+
+    public synchronized void stop() {
+      running = false;
+      this.notify();
+    }
+  }
 
   private static ManagedChannel createChannel(String target) {
     NettyChannelBuilder builder =
@@ -103,6 +138,12 @@ class Worker {
   private void execute(Operation operation)
       throws InvalidProtocolBufferException, IOException,
       CacheNotFoundException, InterruptedException {
+    final String operationName = operation.getName();
+    Poller poller = new Poller(config.getOperationPollPeriod(), () -> instance.pollOperation(
+        operationName,
+        ExecuteOperationMetadata.Stage.QUEUED));
+    new Thread(poller).start();
+
     ExecuteOperationMetadata metadata =
         operation.getMetadata().unpack(ExecuteOperationMetadata.class);
     Action action = Action.parseFrom(instance.getBlob(metadata.getActionDigest()));
@@ -115,6 +156,7 @@ class Worker {
       /* we should update the operation status at this point to indicate input fetches have begun */
       if (!fetchInputs(execDir, action.getInputRootDigest()) ||
           !verifyOutputLocations(execDir, action.getOutputFilesList(), action.getOutputDirectoriesList())) {
+        poller.stop();
         return;
       }
 
@@ -125,7 +167,17 @@ class Worker {
       operation = operation.toBuilder()
           .setMetadata(Any.pack(executingMetadata))
           .build();
-      instance.putOperation(operation);
+
+      poller.stop();
+
+      if (!instance.putOperation(operation)) {
+        return;
+      }
+
+      poller = new Poller(config.getOperationPollPeriod(), () -> instance.pollOperation(
+          operationName,
+          ExecuteOperationMetadata.Stage.EXECUTING));
+      new Thread(poller).start();
 
       Command command = Command.parseFrom(instance.getBlob(action.getCommandDigest()));
 
@@ -189,8 +241,13 @@ class Worker {
               .build()))
           .build();
 
+      poller.stop();
+
       instance.putOperation(operation);
     } finally {
+      // guard against IOException in particular
+      poller.stop(); // no effect if already stopped
+
       /* cleanup */
       removeDirectory(execDir);
     }

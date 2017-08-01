@@ -21,6 +21,7 @@ import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.devtools.remoteexecution.v1test.Directory;
 import com.google.devtools.remoteexecution.v1test.Platform;
 import com.google.devtools.remoteexecution.v1test.UpdateBlobRequest;
+import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import java.io.InputStream;
@@ -60,7 +61,8 @@ public interface Instance {
       boolean waitForCompletion,
       Consumer<Operation> onOperation);
   void match(Platform platform, boolean requeueOnFailure, Function<Operation, Boolean> onMatch);
-  void putOperation(Operation operation);
+  boolean putOperation(Operation operation);
+  boolean pollOperation(String operationName, Stage stage);
   // returns nextPageToken suitable for list restart
   String listOperations(
       int pageSize,

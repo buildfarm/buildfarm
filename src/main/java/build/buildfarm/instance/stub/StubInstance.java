@@ -18,6 +18,7 @@ import build.buildfarm.common.Digests;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.OperationQueueGrpc.OperationQueueBlockingStub;
+import build.buildfarm.v1test.PollOperationRequest;
 import build.buildfarm.v1test.TakeOperationRequest;
 import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamBlockingStub;
@@ -49,6 +50,7 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.rpc.Code;
 import io.grpc.Channel;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -393,8 +395,24 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public void putOperation(Operation operation) {
-    operationQueueBlockingStub.get().put(operation);
+  public boolean putOperation(Operation operation) {
+    return operationQueueBlockingStub
+        .get()
+        .put(operation)
+        .getCode() == Code.OK.getNumber();
+  }
+
+  @Override
+  public boolean pollOperation(
+      String operationName,
+      ExecuteOperationMetadata.Stage stage) {
+    return operationQueueBlockingStub
+        .get()
+        .poll(PollOperationRequest.newBuilder()
+            .setOperationName(operationName)
+            .setStage(stage)
+            .build())
+        .getCode() == Code.OK.getNumber();
   }
 
   @Override
