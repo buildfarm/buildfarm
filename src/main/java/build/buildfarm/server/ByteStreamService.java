@@ -106,9 +106,20 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
       return;
     }
 
-    responseObserver.onNext(ReadResponse.newBuilder()
-        .setData(blob)
-        .build());
+    while (!blob.isEmpty()) {
+      ByteString chunk;
+      if (blob.size() < DEFAULT_CHUNK_SIZE) {
+        chunk = blob;
+        blob = ByteString.EMPTY;
+      } else {
+        chunk = blob.substring(0, (int) DEFAULT_CHUNK_SIZE);
+        blob = blob.substring((int) DEFAULT_CHUNK_SIZE);
+      }
+      responseObserver.onNext(ReadResponse.newBuilder()
+          .setData(chunk)
+          .build());
+    }
+
     responseObserver.onCompleted();
   }
 
