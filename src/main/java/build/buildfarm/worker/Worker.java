@@ -282,7 +282,7 @@ class Worker {
         }
         Files.setPosixFilePermissions(fileCachePath, perms.build());
       }
-      Files.createSymbolicLink(execDir.resolve(fileNode.getName()), fileCachePath);
+      Files.createLink(execDir.resolve(fileNode.getName()), fileCachePath);
     }
 
     for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
