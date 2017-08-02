@@ -206,35 +206,26 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
     return new StreamObserver<WriteRequest>() {
       long committed_size = 0;
       ByteString data = null;
+      boolean finished = false;
       boolean failed = false;
+      String writeResourceName = null;
 
       Digest digest;
 
       private void writeBlob(
           WriteRequest request, StreamObserver<WriteResponse> responseObserver)
           throws InterruptedException {
-        if (failed) {
-          return;
-        }
-
-        String resourceName = request.getResourceName();
-        if( data == null ) {
-          digest = parseUploadBlobDigest(resourceName);
+        if (data == null) {
+          digest = parseUploadBlobDigest(writeResourceName);
           if (digest == null) {
             responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
             failed = true;
             return;
           }
-          data = active_write_requests.get(resourceName);
+          data = active_write_requests.get(writeResourceName);
           if (data != null) {
             committed_size = data.size();
           }
-          /* should we support independent stream writes??
-        } else if (this.resourceName != resourceName) {
-          responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
-          failed = true;
-          return;
-          */
         }
         if (request.getWriteOffset() != committed_size) {
           responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
@@ -245,14 +236,14 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
         if (data == null) {
           data = chunk;
           committed_size = data.size();
-          active_write_requests.put(resourceName, data);
+          active_write_requests.put(writeResourceName, data);
         } else {
           data = data.concat(chunk);
           committed_size += chunk.size();
         }
         if (request.getFinishWrite()) {
-          active_write_requests.remove(resourceName);
-          Instance instance = server.getInstanceFromUploadBlob(resourceName);
+          active_write_requests.remove(writeResourceName);
+          Instance instance = server.getInstanceFromUploadBlob(writeResourceName);
           Digest blobDigest = Digests.computeDigest(data);
           if (!blobDigest.equals(digest)) {
             responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
@@ -270,11 +261,10 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
 
       private void writeOperationStream(
           WriteRequest request, StreamObserver<WriteResponse> responseObserver) throws IOException {
-        String resourceName = request.getResourceName();
         Instance instance =
-          server.getInstanceFromOperationStream(resourceName);
+          server.getInstanceFromOperationStream(writeResourceName);
 
-        String operationStream = parseOperationStream(resourceName);
+        String operationStream = parseOperationStream(writeResourceName);
 
         OutputStream outputStream = instance.getStreamOutput(operationStream);
         request.getData().writeTo(outputStream);
@@ -285,25 +275,52 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
 
       @Override
       public void onNext(WriteRequest request) {
-        String resourceName = request.getResourceName();
-
-        try {
-          if (isUploadBlob(resourceName)) {
-            writeBlob(request, responseObserver);
-          } else if (isOperationStream(resourceName)) {
-            writeOperationStream(request, responseObserver);
-          } else {
+        if (finished) {
+          // FIXME does bytestream have a standard status for this invalid request?
+          responseObserver.onError(new StatusException(Status.OUT_OF_RANGE));
+          failed = true;
+        } else {
+          String resourceName = request.getResourceName();
+          if (resourceName.isEmpty()) {
+            if (writeResourceName == null) {
+              responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
+              failed = true;
+            } else {
+              resourceName = writeResourceName;
+            }
+          } else if (writeResourceName == null) {
+            writeResourceName = resourceName;
+          } else if (!writeResourceName.equals(resourceName)) {
             responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
+            failed = true;
           }
-        } catch(InterruptedException ex) {
-          responseObserver.onError(new StatusException(Status.fromThrowable(ex)));
-        } catch(IOException ex) {
-          responseObserver.onError(new StatusException(Status.fromThrowable(ex)));
+        }
+
+        if (!failed) {
+          try {
+            if (isUploadBlob(writeResourceName)) {
+              writeBlob(request, responseObserver);
+              finished = request.getFinishWrite();
+            } else if (isOperationStream(writeResourceName)) {
+              writeOperationStream(request, responseObserver);
+              finished = request.getFinishWrite();
+            } else {
+              responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
+              failed = true;
+            }
+          } catch(InterruptedException ex) {
+            responseObserver.onError(new StatusException(Status.fromThrowable(ex)));
+            failed = true;
+          } catch(IOException ex) {
+            responseObserver.onError(new StatusException(Status.fromThrowable(ex)));
+            failed = true;
+          }
         }
       }
 
       @Override
       public void onError(Throwable t) {
+        // has the connection closed at this point?
         failed = true;
       }
 
