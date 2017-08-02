@@ -78,7 +78,15 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
   public void deleteOperation(
       DeleteOperationRequest request,
       StreamObserver<Empty> responseObserver) {
-    responseObserver.onError(new StatusException(Status.UNIMPLEMENTED));
+    Instance instance = server.getInstanceFromOperationName(request.getName());
+
+    try {
+      instance.deleteOperation(request.getName());
+      responseObserver.onNext(Empty.newBuilder().build());
+      responseObserver.onCompleted();
+    } catch (IllegalStateException ex) {
+      responseObserver.onError(new StatusException(Status.fromThrowable(ex)));
+    }
   }
 
   @Override

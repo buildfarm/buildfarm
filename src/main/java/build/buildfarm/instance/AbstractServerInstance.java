@@ -46,16 +46,19 @@ public abstract class AbstractServerInstance implements Instance {
   protected final Map<Digest, ByteString> contentAddressableStorage;
   protected final Map<Digest, ActionResult> actionCache;
   protected final Map<String, Operation> outstandingOperations;
+  protected final Map<String, Operation> completedOperations;
 
   public AbstractServerInstance(
       String name,
       Map<Digest, ByteString> contentAddressableStorage,
       Map<Digest, ActionResult> actionCache,
-      Map<String, Operation> outstandingOperations) {
+      Map<String, Operation> outstandingOperations,
+      Map<String, Operation> completedOperations) {
     this.name = name;
     this.contentAddressableStorage = contentAddressableStorage;
     this.actionCache = actionCache;
     this.outstandingOperations = outstandingOperations;
+    this.completedOperations = completedOperations;
   }
 
   @Override
@@ -424,9 +427,20 @@ public abstract class AbstractServerInstance implements Instance {
     return true;
   }
 
+  /**
+   * per-operation lock factory/indexer method
+   *
+   * the lock retrieved for an operation will guard against races
+   * during transfers/retrievals/removals
+   */
+  protected abstract Object operationLock(String operationName);
+
   protected void updateOperationWatchers(Operation operation) {
     if (operation.getDone()) {
-      outstandingOperations.remove(operation.getName());
+      synchronized(operationLock(operation.getName())) {
+        completedOperations.put(operation.getName(), operation);
+        outstandingOperations.remove(operation.getName());
+      }
     } else {
       outstandingOperations.put(operation.getName(), operation);
     }
@@ -434,7 +448,13 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public Operation getOperation(String name) {
-    return outstandingOperations.get(name);
+    synchronized(operationLock(name)) {
+      Operation operation = completedOperations.get(name);
+      if (operation == null) {
+        operation = outstandingOperations.get(name);
+      }
+      return operation;
+    }
   }
 
   protected abstract int getListOperationsDefaultPageSize();
@@ -463,6 +483,17 @@ public abstract class AbstractServerInstance implements Instance {
       }
     }
     return iter.toNextPageToken();
+  }
+
+  @Override
+  public void deleteOperation(String name) {
+    synchronized(operationLock(name)) {
+      Operation deletedOperation = completedOperations.remove(name);
+      if (deletedOperation == null &&
+          outstandingOperations.containsKey(name)) {
+        throw new IllegalStateException();
+      }
+    }
   }
 
   @Override
