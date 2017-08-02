@@ -21,6 +21,7 @@ import build.buildfarm.v1test.WorkerConfig;
 import build.buildfarm.v1test.CASInsertionControl;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.io.ByteStreams;
 import com.google.devtools.remoteexecution.v1test.Action;
@@ -51,6 +52,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -261,10 +263,25 @@ class Worker {
 
     for (FileNode fileNode : directory.getFilesList()) {
       Digest digest = fileNode.getDigest();
-      Path fileCachePath = cacheDir.resolve(String.format("%s_%d", digest.getHash(), digest.getSizeBytes()));
-      OutputStream outputStream = Files.newOutputStream(fileCachePath);
-      instance.getBlob(digest).writeTo(outputStream);
-      outputStream.close();
+      Path fileCachePath = cacheDir.resolve(String.format(
+          "%s_%d%s",
+          digest.getHash(),
+          digest.getSizeBytes(),
+          fileNode.getIsExecutable() ? "_exec" : ""));
+      boolean createFile = !Files.exists(fileCachePath);
+      if (createFile) {
+        OutputStream outputStream = Files.newOutputStream(fileCachePath);
+        instance.getBlob(digest).writeTo(outputStream);
+        outputStream.close();
+      }
+      if (createFile || Files.isExecutable(fileCachePath) != fileNode.getIsExecutable()) {
+        ImmutableSet.Builder<PosixFilePermission> perms = new ImmutableSet.Builder<PosixFilePermission>()
+          .add(PosixFilePermission.OWNER_READ);
+        if (fileNode.getIsExecutable()) {
+          perms.add(PosixFilePermission.OWNER_EXECUTE);
+        }
+        Files.setPosixFilePermissions(fileCachePath, perms.build());
+      }
       Files.createSymbolicLink(execDir.resolve(fileNode.getName()), fileCachePath);
     }
 
