@@ -311,7 +311,7 @@ public class StubInstance implements Instance {
       .get()
       .read(ReadRequest.newBuilder().setResourceName(resourceName).build());
     ByteString blob = ByteString.EMPTY;
-    while( replies.hasNext() ) {
+    while (replies.hasNext()) {
       blob = blob.concat(replies.next().getData());
     }
     return blob;
