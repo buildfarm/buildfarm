@@ -17,15 +17,18 @@ package build.buildfarm.instance;
 import build.buildfarm.common.Digests;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.devtools.remoteexecution.v1test.Action;
 import com.google.devtools.remoteexecution.v1test.ActionResult;
 import com.google.devtools.remoteexecution.v1test.Command;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.devtools.remoteexecution.v1test.Directory;
+import com.google.devtools.remoteexecution.v1test.DirectoryNode;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
 import com.google.devtools.remoteexecution.v1test.ExecutePreconditionViolationType;
 import com.google.devtools.remoteexecution.v1test.ExecuteResponse;
+import com.google.devtools.remoteexecution.v1test.FileNode;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -33,9 +36,9 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import io.grpc.Status;
 import java.util.HashSet;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Stack;
 import java.util.function.Consumer;
 
 public abstract class AbstractServerInstance implements Instance {
@@ -177,78 +180,91 @@ public abstract class AbstractServerInstance implements Instance {
         ExecutePreconditionViolationType.ENVIRONMENT_VARIABLES_NOT_SORTED);
   }
 
+  private void validateActionInputDirectory(
+      Directory directory,
+      Stack<Digest> path,
+      Set<Digest> visited,
+      ImmutableSet.Builder<Digest> inputDigests) {
+    Preconditions.checkState(
+        directory != null,
+        ExecutePreconditionViolationType.MISSING_INPUT);
+
+    Set<String> entryNames = new HashSet<>();
+
+    String lastFileName = "";
+    for (FileNode fileNode : directory.getFilesList()) {
+      String fileName = fileNode.getName();
+      Preconditions.checkState(
+          !entryNames.contains(fileName),
+          ExecutePreconditionViolationType.DUPLICATE_FILE_NODE);
+      /* FIXME serverside validity check? regex?
+      Preconditions.checkState(
+          fileName.isValidFilename(),
+          ExecutePreconditionViolationType.INVALID_FILE_NAME);
+      */
+      Preconditions.checkState(
+          lastFileName.compareTo(fileName) < 0,
+          ExecutePreconditionViolationType.DIRECTORY_NOT_SORTED);
+      lastFileName = fileName;
+      entryNames.add(fileName);
+
+      inputDigests.add(fileNode.getDigest());
+    }
+    String lastDirectoryName = "";
+    for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
+      String directoryName = directoryNode.getName();
+
+      Preconditions.checkState(
+          !entryNames.contains(directoryName),
+          ExecutePreconditionViolationType.DUPLICATE_FILE_NODE);
+      /* FIXME serverside validity check? regex?
+      Preconditions.checkState(
+          directoryName.isValidFilename(),
+          ExecutePreconditionViolationType.INVALID_FILE_NAME);
+      */
+      Preconditions.checkState(
+          lastDirectoryName.compareTo(directoryName) < 0,
+          ExecutePreconditionViolationType.DIRECTORY_NOT_SORTED);
+      lastDirectoryName = directoryName;
+      entryNames.add(directoryName);
+
+      Preconditions.checkState(
+          !path.contains(directoryNode.getDigest()),
+          ExecutePreconditionViolationType.DIRECTORY_CYCLE_DETECTED);
+
+      Digest directoryDigest = directoryNode.getDigest();
+      if (!visited.contains(directoryDigest)) {
+        path.push(directoryDigest);
+        validateActionInputDirectory(expectDirectory(directoryDigest), path, visited, inputDigests);
+        path.pop();
+        visited.add(directoryDigest);
+      }
+    }
+  }
+
+  private void validateActionInputs(Digest inputRootDigest, ImmutableSet.Builder<Digest> inputDigests) {
+    Stack<Digest> path = new Stack<>();
+    path.push(inputRootDigest);
+
+    Directory root = expectDirectory(inputRootDigest);
+    validateActionInputDirectory(root, path, new HashSet<>(), inputDigests);
+  }
+
   private void validateAction(Action action) {
     Digest commandDigest = action.getCommandDigest();
-    ImmutableList.Builder<Digest> inputDigests = new ImmutableList.Builder<>();
+    ImmutableSet.Builder<Digest> inputDigests = new ImmutableSet.Builder<>();
     inputDigests.add(commandDigest);
-    Iterator<Directory> directoriesIterator =
-      createTreeIterator(action.getInputRootDigest(), "");
 
-    Set<Digest> directoryDigests = new HashSet<Digest>();
+    validateActionInputs(action.getInputRootDigest(), inputDigests);
 
-    while (directoriesIterator.hasNext()) {
-      Directory directory = directoriesIterator.next();
-
-      // FIXME is this INVALID_DIGEST? we get this
-      // for both CAS misses and non-directories
-      Preconditions.checkState(
-          directory != null,
-          ExecutePreconditionViolationType.MISSING_INPUT);
-
-      Digest directoryDigest = Digests.computeDigest(directory);
-      Preconditions.checkState(
-          !directoryDigests.contains(directoryDigest),
-          ExecutePreconditionViolationType.DIRECTORY_CYCLE_DETECTED);
-      directoryDigests.add(directoryDigest);
-
-      Iterable<String> fileNames = Iterables.transform(
-          directory.getFilesList(),
-          fileNode -> fileNode.getName());
-      Iterable<String> directoryNames = Iterables.transform(
-          directory.getDirectoriesList(),
-          directoryNode -> directoryNode.getName());
-
-      String lastFileName = "";
-      Set<String> entryNames = new HashSet<String>();
-      for (String fileName : fileNames) {
-        Preconditions.checkState(
-            !entryNames.contains(fileName),
-            ExecutePreconditionViolationType.DUPLICATE_FILE_NODE);
-        /* FIXME serverside validity check? regex?
-        Preconditions.checkState(
-            fileName.isValidFilename(),
-            ExecutePreconditionViolationType.INVALID_FILE_NAME);
-        */
-        Preconditions.checkState(
-            lastFileName.compareTo(fileName) < 0,
-            ExecutePreconditionViolationType.DIRECTORY_NOT_SORTED);
-        lastFileName = fileName;
-        entryNames.add(fileName);
-      }
-      String lastDirectoryName = "";
-      for (String directoryName : directoryNames) {
-        Preconditions.checkState(
-            !entryNames.contains(directoryName),
-            ExecutePreconditionViolationType.DUPLICATE_FILE_NODE);
-        /* FIXME serverside validity check? regex?
-        Preconditions.checkState(
-            directoryName.isValidFilename(),
-            ExecutePreconditionViolationType.INVALID_FILE_NAME);
-        */
-        Preconditions.checkState(
-            lastDirectoryName.compareTo(directoryName) < 0,
-            ExecutePreconditionViolationType.DIRECTORY_NOT_SORTED);
-        lastDirectoryName = directoryName;
-        entryNames.add(directoryName);
-      }
-
-      inputDigests.addAll(Iterables.transform(directory.getFilesList(), fileNode -> fileNode.getDigest()));
-    }
     // A requested input (or the [Command][] of the [Action][]) was not found in
     // the [ContentAddressableStorage][].
-    Preconditions.checkState(
-        Iterables.isEmpty(findMissingBlobs(inputDigests.build())),
-        ExecutePreconditionViolationType.MISSING_INPUT);
+    Iterable<Digest> missingBlobDigests = findMissingBlobs(inputDigests.build());
+    if (!Iterables.isEmpty(missingBlobDigests)) {
+      Preconditions.checkState(
+          Iterables.isEmpty(missingBlobDigests),
+          ExecutePreconditionViolationType.MISSING_INPUT);
+    }
 
     // FIXME should input/output collisions (through directories) be another
     // invalid action?
@@ -352,6 +368,17 @@ public abstract class AbstractServerInstance implements Instance {
     } catch(InvalidProtocolBufferException ex) {
       return null;
     }
+  }
+
+  protected Directory expectDirectory(Digest directoryBlobDigest) {
+    try {
+      ByteString directoryBlob = getBlob(directoryBlobDigest);
+      if (directoryBlob != null) {
+        return Directory.parseFrom(directoryBlob);
+      }
+    } catch(InvalidProtocolBufferException ex) {
+    }
+    return null;
   }
 
   protected boolean isCancelled(Operation operation) {
