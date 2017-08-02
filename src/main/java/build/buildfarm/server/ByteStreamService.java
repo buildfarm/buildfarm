@@ -248,7 +248,12 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
             responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
             failed = true;
           } else {
-            instance.putBlob(data);
+            try {
+              instance.putBlob(data);
+            } catch (IOException ex) {
+              responseObserver.onError(new StatusException(Status.fromThrowable(ex)));
+              failed = true;
+            }
           }
         }
       }

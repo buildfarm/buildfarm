@@ -258,7 +258,7 @@ class Worker {
       Duration timeout,
       String stdoutStreamName,
       String stderrStreamName)
-      throws InterruptedException {
+      throws IOException, InterruptedException {
     ProcessBuilder processBuilder =
         new ProcessBuilder(command.getArgumentsList())
             .directory(execDir.toAbsolutePath().toFile());

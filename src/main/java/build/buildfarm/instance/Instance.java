@@ -23,6 +23,7 @@ import com.google.devtools.remoteexecution.v1test.Platform;
 import com.google.devtools.remoteexecution.v1test.UpdateBlobRequest;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.List;
@@ -38,12 +39,12 @@ public interface Instance {
   Iterable<Digest> findMissingBlobs(Iterable<Digest> digests);
 
   Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs)
-      throws IllegalArgumentException, InterruptedException;
+      throws IOException, IllegalArgumentException, InterruptedException;
 
   ByteString getBlob(Digest blobDigest);
   ByteString getBlob(Digest blobDigest, long offset, long limit);
   Digest putBlob(ByteString blob)
-      throws IllegalArgumentException, InterruptedException;
+      throws IOException, IllegalArgumentException, InterruptedException;
   String getTree(
       Digest rootDigest,
       int pageSize,
