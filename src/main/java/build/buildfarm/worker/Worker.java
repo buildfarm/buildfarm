@@ -142,7 +142,7 @@ class Worker {
       ImmutableList.Builder<ByteString> contents = new ImmutableList.Builder<>();
       if (resultBuilder.getExitCode() == 0) {
         CASInsertionControl control = config.getFileCasControl();
-        for( String outputFile : action.getOutputFilesList() ) {
+        for (String outputFile : action.getOutputFilesList()) {
           Path outputPath = execDir.resolve(outputFile);
           if (!Files.exists(outputPath)) {
             continue;
@@ -199,7 +199,7 @@ class Worker {
   private boolean linkInputs(Path execDir, Digest inputRoot, Map<Digest, Directory> directoriesIndex) throws IOException {
     Directory directory = directoriesIndex.get(inputRoot);
 
-    for( FileNode fileNode : directory.getFilesList() ) {
+    for (FileNode fileNode : directory.getFilesList()) {
       Digest digest = fileNode.getDigest();
       Path fileCachePath = cacheDir.resolve(String.format("%s_%d", digest.getHash(), digest.getSizeBytes()));
       OutputStream outputStream = Files.newOutputStream(fileCachePath);
@@ -208,7 +208,7 @@ class Worker {
       Files.createSymbolicLink(execDir.resolve(fileNode.getName()), fileCachePath);
     }
 
-    for( DirectoryNode directoryNode : directory.getDirectoriesList() ) {
+    for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
       Digest digest = directoryNode.getDigest();
       Path dirPath = execDir.resolve(directoryNode.getName());
       Files.createDirectory(dirPath);
@@ -239,12 +239,12 @@ class Worker {
       Path execDir,
       Iterable<String> outputFiles,
       Iterable<String> outputDirs) throws IOException {
-    for( String outputFile : outputFiles ) {
+    for (String outputFile : outputFiles) {
       Path outputFilePath = execDir.resolve(outputFile);
       Files.createDirectories(outputFilePath.getParent());
     }
 
-    for( String outputDir : outputDirs ) {
+    for (String outputDir : outputDirs) {
       logger.info("outputDir: " + outputDir);
       return false;
     }
@@ -378,7 +378,7 @@ class Worker {
     return resultBuilder;
   }
 
-  private void removeDirectory( Path directory ) throws IOException {
+  private void removeDirectory(Path directory) throws IOException {
     Files.walkFileTree(directory, new SimpleFileVisitor<Path>() {
       @Override
       public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {

@@ -69,7 +69,7 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
             .setCode(code.getNumber())
             .build();
     // FIXME do this validation through the instance interface
-    for( UpdateBlobRequest request : batchRequest.getRequestsList() ) {
+    for (UpdateBlobRequest request : batchRequest.getRequestsList()) {
       com.google.rpc.Status status;
       Digest digest = request.getContentDigest();
       if (!request.getData().isEmpty() &&
