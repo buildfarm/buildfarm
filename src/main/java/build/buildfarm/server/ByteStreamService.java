@@ -126,19 +126,14 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
   private void readOperationStream(
       ReadRequest request,
       StreamObserver<ReadResponse> responseObserver) throws IOException {
-    long readLimit = request.getReadLimit();
-    long readOffset = request.getReadOffset();
-    if (readLimit < 0 || readOffset < 0) {
-      responseObserver.onError(new StatusException(Status.OUT_OF_RANGE));
-      return;
-    }
-
     String resourceName = request.getResourceName();
 
     Instance instance = server.getInstanceFromBlob(resourceName);
     String operationStream = parseOperationStream(resourceName);
 
     InputStream input = instance.newStreamInput(operationStream);
+    long readLimit = request.getReadLimit();
+    long readOffset = request.getReadOffset();
     while (readOffset > 0) {
       long n = input.skip(readOffset);
       if (n == 0) {
@@ -148,9 +143,6 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
       readOffset -= n;
     }
     boolean unlimitedReadLimit = readLimit == 0;
-    if (unlimitedReadLimit) {
-      readLimit = DEFAULT_CHUNK_SIZE;
-    }
     byte[] buffer = new byte[(int) Math.min(readLimit, DEFAULT_CHUNK_SIZE)];
     int len;
     while ((unlimitedReadLimit || readLimit > 0) &&
@@ -172,6 +164,13 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
       ReadRequest request,
       StreamObserver<ReadResponse> responseObserver) {
     String resourceName = request.getResourceName();
+
+    long readLimit = request.getReadLimit();
+    long readOffset = request.getReadOffset();
+    if (readLimit < 0 || readOffset < 0) {
+      responseObserver.onError(new StatusException(Status.OUT_OF_RANGE));
+      return;
+    }
 
     try {
       if (isBlob(resourceName)) {
