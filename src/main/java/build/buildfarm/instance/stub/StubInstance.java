@@ -56,6 +56,7 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.UUID;
@@ -68,10 +69,13 @@ import java.util.function.Function;
 public class StubInstance implements Instance {
   private final String name;
   private final Channel channel;
+  private final ByteStreamUploader uploader;
 
   public StubInstance(String name, Channel channel) {
     this.name = name;
     this.channel = channel;
+
+    uploader = new ByteStreamUploader(name, channel, null, 60, new Retrier(), null);
   }
 
   private final Supplier<ActionCacheBlockingStub> actionCacheBlockingStub =
@@ -149,81 +153,17 @@ public class StubInstance implements Instance {
     return response.getMissingBlobDigestsList();
   }
 
-  private void uploadChunks(int numItems, Iterable<Chunker.Chunk> chunks)
-      throws InterruptedException {
-    final CountDownLatch finishLatch = new CountDownLatch(numItems);
-    final AtomicReference<RuntimeException> exception = new AtomicReference<>(null);
-    StreamObserver<WriteRequest> requestObserver = null;
-    for( Chunker.Chunk chunk : chunks ) {
-      final Digest digest = chunk.getDigest();
-      long offset = chunk.getOffset();
-      WriteRequest.Builder request = WriteRequest.newBuilder();
-      if (offset == 0) { // Beginning of new upload.
-        numItems--;
-        request.setResourceName(String.format(
-            "%s/uploads/%s/blobs/%s",
-            getName(),
-            UUID.randomUUID(),
-            Digests.toString(digest)));
-        // The batches execute simultaneously.
-        requestObserver =
-            bsStub
-                .get()
-                .write(
-                    new StreamObserver<WriteResponse>() {
-                      private long bytesLeft = digest.getSizeBytes();
-
-                      @Override
-                      public void onNext(WriteResponse reply) {
-                        bytesLeft -= reply.getCommittedSize();
-                      }
-
-                      @Override
-                      public void onError(Throwable t) {
-                        exception.compareAndSet(
-                            null, new StatusRuntimeException(Status.fromThrowable(t)));
-                        finishLatch.countDown();
-                      }
-
-                      @Override
-                      public void onCompleted() {
-                        if (bytesLeft != 0) {
-                          exception.compareAndSet(
-                              null, new RuntimeException("Server did not commit all data."));
-                        }
-                        finishLatch.countDown();
-                      }
-                    });
-      }
-      ByteString data = ByteString.copyFrom(chunk.getData());
-      boolean finishWrite = offset + data.size() == digest.getSizeBytes();
-      request.setData(data).setWriteOffset(offset).setFinishWrite(finishWrite);
-      requestObserver.onNext(request.build());
-      if (finishWrite) {
-        requestObserver.onCompleted();
-      }
-    }
-    finishLatch.await(60 /* FIXME options.remoteTimeout */, TimeUnit.SECONDS);
-    if (exception.get() != null) {
-      throw exception.get(); // Re-throw the first encountered exception.
-    }
-  }
-
   @Override
   public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs)
-      throws IllegalArgumentException, InterruptedException {
-    // comments in the chunker indicate this, all inputs are guaranteed to
-    // end up in the same order as they are inserted
-    Chunker chunker = new Chunker.Builder().addAllInputs(blobs).build();
-    List<Chunker.Chunk> chunks = new ImmutableList.Builder<Chunker.Chunk>()
-        .addAll(chunker)
+      throws IOException, IllegalArgumentException, InterruptedException {
+    // sort of a blatant misuse - one chunker per input, query digests before exhausting iterators
+    Iterable<Chunker> chunkers = Iterables.transform(
+        blobs, blob -> new Chunker(blob));
+    List<Digest> digests = new ImmutableList.Builder()
+        .addAll(Iterables.transform(chunkers, chunker -> chunker.digest()))
         .build();
-    uploadChunks(chunks.size(), chunks);
-    return new ImmutableList.Builder<Digest>()
-        .addAll(Iterables.transform(
-            Iterables.filter(chunks, (chunk) -> chunk.getOffset() == 0),
-            (chunk) -> chunk.getDigest()))
-        .build();
+    uploader.uploadBlobs(chunkers);
+    return digests;
   }
 
   @Override
@@ -324,13 +264,11 @@ public class StubInstance implements Instance {
 
   @Override
   public Digest putBlob(ByteString blob)
-      throws IllegalArgumentException, InterruptedException {
-    Chunker chunker = new Chunker.Builder().addInput(blob).build();
-    List<Chunker.Chunk> chunks = new ImmutableList.Builder<Chunker.Chunk>()
-        .addAll(chunker)
-        .build();
-    uploadChunks(chunks.size(), chunks);
-    return chunks.get(0).getDigest();
+      throws IOException, IllegalArgumentException, InterruptedException {
+    Chunker chunker = new Chunker(blob);
+    Digest digest = chunker.digest();
+    uploader.uploadBlobs(Collections.singleton(chunker));
+    return digest;
   }
 
   @Override

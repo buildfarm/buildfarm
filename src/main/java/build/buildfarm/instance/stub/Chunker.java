@@ -1,4 +1,4 @@
-// Copyright 2017 The Bazel Authors. All rights reserved.
+// Copyright 2016 The Bazel Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,40 +14,46 @@
 
 package build.buildfarm.instance.stub;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkState;
+
 import build.buildfarm.common.Digests;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.google.common.base.Predicate;
-import com.google.common.collect.Iterators;
+import com.google.common.base.Throwables;
+import com.google.common.io.ByteStreams;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.protobuf.ByteString;
 import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Objects;
-import java.util.Set;
+import java.util.function.Supplier;
 
-/** An iterator-type object that transforms byte sources into a stream of Chunks. */
-public final class Chunker implements Iterator {
-  // This is effectively final, should be changed only in unit-tests!
-  public static int DEFAULT_CHUNK_SIZE = 1024 * 16;
-  private static byte[] EMPTY_BLOB = new byte[0];
+/**
+ * Splits a data source into one or more {@link Chunk}s of at most {@code chunkSize} bytes.
+ *
+ * <p>After a data source has been fully consumed, that is until {@link #hasNext()} returns
+ * {@code false}, the chunker closes the underlying data source (i.e. file) itself. However, in
+ * case of error or when a data source does not get fully consumed, a user must call
+ * {@link #reset()} manually.
+ */
+public final class Chunker {
 
+  private static final Chunk EMPTY_CHUNK =
+      new Chunk(Digests.computeDigest(ByteString.EMPTY), ByteString.EMPTY, 0);
+
+  private static int defaultChunkSize = 1024 * 16;
+
+  /** This method must only be called in tests! */
   @VisibleForTesting
   static void setDefaultChunkSizeForTesting(int value) {
-    DEFAULT_CHUNK_SIZE = value;
+    defaultChunkSize = value;
   }
 
-  public static int getDefaultChunkSize() {
-    return DEFAULT_CHUNK_SIZE;
+  static int getDefaultChunkSize() {
+    return defaultChunkSize;
   }
 
   /** A piece of a byte[] blob. */
@@ -55,14 +61,24 @@ public final class Chunker implements Iterator {
 
     private final Digest digest;
     private final long offset;
-    // TODO(olaola): consider saving data in a different format that byte[].
-    private final byte[] data;
+    private final ByteString data;
 
-    @VisibleForTesting
-    public Chunk(Digest digest, byte[] data, long offset) {
+    private Chunk(Digest digest, ByteString data, long offset) {
       this.digest = digest;
       this.data = data;
       this.offset = offset;
+    }
+
+    public Digest getDigest() {
+      return digest;
+    }
+
+    public long getOffset() {
+      return offset;
+    }
+
+    public ByteString getData() {
+      return data;
     }
 
     @Override
@@ -76,163 +92,142 @@ public final class Chunker implements Iterator {
       Chunk other = (Chunk) o;
       return other.offset == offset
           && other.digest.equals(digest)
-          && Arrays.equals(other.data, data);
+          && other.data.equals(data);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(digest, offset, Arrays.hashCode(data));
-    }
-
-    public Digest getDigest() {
-      return digest;
-    }
-
-    public long getOffset() {
-      return offset;
-    }
-
-    // This returns a mutable copy, for efficiency.
-    public byte[] getData() {
-      return data;
+      return Objects.hash(digest, offset, data);
     }
   }
 
-  /** An Item is an opaque digestable source of bytes. */
-  interface Item {
-    Digest getDigest();
-
-    InputStream getInputStream();
-  }
-
-  private final Iterator<Item> inputIterator;
-  private InputStream currentStream;
-  private Digest digest;
-  private long bytesLeft;
+  private final Supplier<InputStream> dataSupplier;
+  private final Digest digest;
   private final int chunkSize;
 
-  Chunker(Iterator<Item> inputIterator, int chunkSize) {
-    Preconditions.checkArgument(chunkSize > 0, "Chunk size must be greater than 0");
-    this.inputIterator = inputIterator;
+  private InputStream data;
+  private long offset;
+  private byte[] chunkCache;
+
+  // Set to true on the first call to next(). This is so that the Chunker can open its data source
+  // lazily on the first call to next(), as opposed to opening it in the constructor or on reset().
+  private boolean initialized;
+
+  public Chunker(ByteString data) {
+    this(data, getDefaultChunkSize());
+  }
+
+  public Chunker(ByteString data, int chunkSize) {
+    this(() -> data.newInput(), Digests.computeDigest(data), chunkSize);
+  }
+
+  @VisibleForTesting
+  Chunker(Supplier<InputStream> dataSupplier, Digest digest, int chunkSize) {
+    this.dataSupplier = checkNotNull(dataSupplier);
+    this.digest = checkNotNull(digest);
     this.chunkSize = chunkSize;
-    advanceInput();
   }
 
-  public void advanceInput() {
-    if (inputIterator != null && inputIterator.hasNext()) {
-      Item input = inputIterator.next();
-      digest = input.getDigest();
-      currentStream = input.getInputStream();
-      bytesLeft = digest.getSizeBytes();
-    } else {
-      digest = null;
-      currentStream = null;
-      bytesLeft = 0;
-    }
-  }
-
-  /** True if the object has more Chunk elements. */
-  public boolean hasNext() {
-    return currentStream != null;
-  }
-
-  /** Consume the next Chunk element. */
-  public Chunk next() {
-    if (!hasNext()) {
-      throw new NoSuchElementException();
-    }
-    final long offset = digest.getSizeBytes() - bytesLeft;
-    byte[] blob = EMPTY_BLOB;
-    try {
-      if (bytesLeft > 0) {
-        blob = new byte[(int) Math.min(bytesLeft, chunkSize)];
-        currentStream.read(blob);
-        bytesLeft -= blob.length;
-      }
-      final Chunk result = new Chunk(digest, blob, offset);
-      if (bytesLeft == 0) {
-        currentStream.close();
-        advanceInput(); // Sets the current stream to null, if it was the last.
-      }
-      return result;
-    } catch(IOException ex) {
-      throw new NoSuchElementException();
-    }
-  }
-
-  static Item toItem(final ByteString blob) {
-    return new Item() {
-      Digest digest = null;
-
-      @Override
-      public Digest getDigest() {
-        if (digest == null) {
-          digest = Digests.computeDigest(blob);
-        }
-        return digest;
-      }
-
-      @Override
-      public InputStream getInputStream() {
-        return blob.newInput();
-      }
-    };
-  }
-
-  static class MemberOf implements Predicate<Item> {
-    private final Set<Digest> digests;
-
-    public MemberOf(Set<Digest> digests) {
-      this.digests = digests;
-    }
-
-    @Override
-    public boolean apply(Item item) {
-      return digests.contains(item.getDigest());
-    }
+  public Digest digest() {
+    return digest;
   }
 
   /**
-   * Create a Chunker from multiple input sources. The order of the sources provided to the Builder
-   * will be the same order they will be chunked by.
+   * Reset the {@link Chunker} state to when it was newly constructed.
+   *
+   * <p>Closes any open resources (file handles, ...).
    */
-  public static final class Builder {
-    private final ArrayList<Item> items = new ArrayList<>();
-    private Set<Digest> digests = null;
-    private int chunkSize = getDefaultChunkSize();
+  public void reset() throws IOException {
+    if (data != null) {
+      data.close();
+    }
+    data = null;
+    offset = 0;
+    initialized = false;
+    chunkCache = null;
+  }
 
-    public Chunker build() {
-      return new Chunker(
-          digests == null
-              ? items.iterator()
-              : Iterators.filter(items.iterator(), new MemberOf(digests)),
-          chunkSize);
+  /**
+   * Returns {@code true} if a subsequent call to {@link #next()} returns a {@link Chunk} object;
+   */
+  public boolean hasNext() {
+    return data != null || !initialized;
+  }
+
+  /**
+   * Returns the next {@link Chunk} or throws a {@link NoSuchElementException} if no data is left.
+   *
+   * <p>Always call {@link #hasNext()} before calling this method.
+   *
+   * <p>Zero byte inputs are treated special. Instead of throwing a {@link NoSuchElementException}
+   * on the first call to {@link #next()}, a {@link Chunk} with an empty {@link ByteString} is
+   * returned.
+   */
+  public Chunk next() throws IOException {
+    if (!hasNext()) {
+      throw new NoSuchElementException();
     }
 
-    public Builder chunkSize(int chunkSize) {
-      this.chunkSize = chunkSize;
-      return this;
+    maybeInitialize();
+
+    if (digest.getSizeBytes() == 0) {
+      data = null;
+      return EMPTY_CHUNK;
     }
 
-    /**
-     * Restricts the Chunker to use only inputs with these digests. This is an optimization for CAS
-     * uploads where a list of digests missing from the CAS is known.
-     */
-    public Builder onlyUseDigests(Set<Digest> digests) {
-      this.digests = digests;
-      return this;
+    // The cast to int is safe, because the return value is capped at chunkSize.
+    int bytesToRead = (int) Math.min(bytesLeft(), chunkSize);
+    if (bytesToRead == 0) {
+      chunkCache = null;
+      data = null;
+      throw new NoSuchElementException();
     }
 
-    public Builder addInput(ByteString blob) {
-      items.add(toItem(blob));
-      return this;
+    if (chunkCache == null) {
+      // Lazily allocate it in order to save memory on small data.
+      // 1) bytesToRead < chunkSize: There will only ever be one next() call.
+      // 2) bytesToRead == chunkSize: chunkCache will be set to its biggest possible value.
+      // 3) bytestoRead > chunkSize: Not possible, due to Math.min above.
+      chunkCache = new byte[bytesToRead];
     }
 
-    public Builder addAllInputs(Iterable<? extends ByteString> blobs) {
-      for (ByteString blob : blobs) {
-        items.add(toItem(blob));
-      }
-      return this;
+    long offsetBefore = offset;
+    try {
+      ByteStreams.readFully(data, chunkCache, 0, bytesToRead);
+    } catch (EOFException e) {
+      throw new IllegalStateException("Reached EOF, but expected "
+          + bytesToRead + " bytes.", e);
     }
+    offset += bytesToRead;
+
+    ByteString blob = ByteString.copyFrom(chunkCache, 0, bytesToRead);
+
+    if (bytesLeft() == 0) {
+      data.close();
+      data = null;
+      chunkCache = null;
+    }
+
+    return new Chunk(digest, blob, offsetBefore);
+  }
+
+  private long bytesLeft() {
+    return digest.getSizeBytes() - offset;
+  }
+
+  private void maybeInitialize() throws IOException {
+    if (initialized) {
+      return;
+    }
+    checkState(data == null);
+    checkState(offset == 0);
+    checkState(chunkCache == null);
+    try {
+      data = dataSupplier.get();
+    } catch (RuntimeException e) {
+      Throwables.propagateIfPossible(e.getCause(), IOException.class);
+      throw e;
+    }
+    initialized = true;
   }
 }

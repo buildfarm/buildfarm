@@ -31,8 +31,8 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.grpc.Status;
 import io.grpc.StatusException;
-import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
+import java.io.IOException;
 import java.util.function.Function;
 
 public class ContentAddressableStorageService extends ContentAddressableStorageGrpc.ContentAddressableStorageImplBase {
@@ -91,8 +91,10 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
           .addAllResponses(responses.build())
           .build());
       responseObserver.onCompleted();
-    } catch(InterruptedException ex) {
-      responseObserver.onError(ex);
+    } catch (InterruptedException ex) {
+      responseObserver.onError(new StatusException(Status.fromThrowable(ex)));
+    } catch (IOException ex) {
+      responseObserver.onError(new StatusException(Status.fromThrowable(ex)));
     }
   }
 
