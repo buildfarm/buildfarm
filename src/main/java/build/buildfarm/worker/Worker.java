@@ -20,6 +20,7 @@ import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.WorkerConfig;
 import build.buildfarm.v1test.CASInsertionControl;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.io.ByteStreams;
 import com.google.devtools.remoteexecution.v1test.Action;
@@ -52,7 +53,9 @@ import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
@@ -222,17 +225,21 @@ class Worker {
     ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
     String pageToken = "";
 
-    Map<Digest, Directory> directoriesIndex = new HashMap<Digest, Directory>();
-
     do {
       pageToken = instance.getTree(inputRoot, config.getTreePageSize(), pageToken, directories);
     } while (!pageToken.isEmpty());
 
-    directoriesIndex = Maps.uniqueIndex(
-        directories.build(),
-        directory -> Digests.computeDigest(directory));
+    Set<Digest> directoryDigests = new HashSet<>();
+    ImmutableMap.Builder<Digest, Directory> directoriesIndex = new ImmutableMap.Builder<>();
+    for (Directory directory : directories.build()) {
+      Digest directoryDigest = Digests.computeDigest(directory);
+      if (!directoryDigests.add(directoryDigest)) {
+        continue;
+      }
+      directoriesIndex.put(directoryDigest, directory);
+    }
 
-    return linkInputs(execDir, inputRoot, directoriesIndex);
+    return linkInputs(execDir, inputRoot, directoriesIndex.build());
   }
 
   private boolean verifyOutputLocations(
