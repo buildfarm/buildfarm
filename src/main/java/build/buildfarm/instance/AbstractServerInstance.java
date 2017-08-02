@@ -43,16 +43,19 @@ public abstract class AbstractServerInstance implements Instance {
   protected final Map<Digest, ByteString> contentAddressableStorage;
   protected final Map<Digest, ActionResult> actionCache;
   protected final Map<String, Operation> outstandingOperations;
+  protected final Map<String, Operation> completedOperations;
 
   public AbstractServerInstance(
       String name,
       Map<Digest, ByteString> contentAddressableStorage,
       Map<Digest, ActionResult> actionCache,
-      Map<String, Operation> outstandingOperations) {
+      Map<String, Operation> outstandingOperations,
+      Map<String, Operation> completedOperations) {
     this.name = name;
     this.contentAddressableStorage = contentAddressableStorage;
     this.actionCache = actionCache;
     this.outstandingOperations = outstandingOperations;
+    this.completedOperations = completedOperations;
   }
 
   @Override
@@ -399,6 +402,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   protected void updateOperationWatchers(Operation operation) {
     if (operation.getDone()) {
+      completedOperations.put(operation.getName(), operation);
       outstandingOperations.remove(operation.getName());
     } else {
       outstandingOperations.put(operation.getName(), operation);
@@ -407,7 +411,11 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public Operation getOperation(String name) {
-    return outstandingOperations.get(name);
+    Operation operation = completedOperations.get(name);
+    if (operation == null) {
+      operation = outstandingOperations.get(name);
+    }
+    return operation;
   }
 
   protected abstract int getListOperationsDefaultPageSize();
@@ -436,6 +444,14 @@ public abstract class AbstractServerInstance implements Instance {
       }
     }
     return iter.toNextPageToken();
+  }
+
+  @Override
+  public void deleteOperation(String name) {
+    if (completedOperations.remove(name) == null &&
+        outstandingOperations.containsKey(name)) {
+      throw new UnsupportedOperationException();
+    }
   }
 
   @Override

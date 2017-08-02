@@ -374,6 +374,11 @@ public class StubInstance implements Instance {
   }
 
   @Override
+  public void deleteOperation(String operationName) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public void cancelOperation(String operationName) {
     throw new UnsupportedOperationException();
   }

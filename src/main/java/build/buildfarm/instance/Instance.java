@@ -72,6 +72,7 @@ public interface Instance {
       ImmutableList.Builder<Operation> operations);
   Operation getOperation(String name);
   void cancelOperation(String name);
+  void deleteOperation(String name);
 
   boolean watchOperation(
       String operationName,

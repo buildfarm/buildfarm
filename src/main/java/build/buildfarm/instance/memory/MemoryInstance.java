@@ -56,6 +56,7 @@ public class MemoryInstance extends AbstractServerInstance {
   private final Map<String, Watchdog> requeuers;
   private final Map<String, Watchdog> operationTimeoutDelays;
   private final Map<String, Operation> outstandingOperations;
+  private final Map<String, Operation> completedOperations;
 
   private static final class Worker {
     private final Platform platform;
@@ -81,7 +82,8 @@ public class MemoryInstance extends AbstractServerInstance {
         config,
         /*contentAddressableStorage=*/ new ConcurrentHashMap<Digest, ByteString>(),
         /*actionCache=*/ new ConcurrentHashMap<Digest, ActionResult>(),
-        /*outstandingOperations=*/ new TreeMap<String, Operation>());
+        /*outstandingOperations=*/ new TreeMap<String, Operation>(),
+        /*completedOperations=*/ new ConcurrentHashMap<String, Operation>());
   }
 
   private MemoryInstance(
@@ -89,12 +91,14 @@ public class MemoryInstance extends AbstractServerInstance {
       MemoryInstanceConfig config,
       Map<Digest, ByteString> contentAddressableStorage,
       Map<Digest, ActionResult> actionCache,
-      Map<String, Operation> outstandingOperations) {
+      Map<String, Operation> outstandingOperations,
+      Map<String, Operation> completedOperations) {
     super(
         name,
         contentAddressableStorage,
         actionCache,
-        outstandingOperations);
+        outstandingOperations,
+        completedOperations);
     this.config = config;
     watchers = new ConcurrentHashMap<String, List<Function<Operation, Boolean>>>();
     streams = new HashMap<String, ByteStringStreamSource>();
@@ -103,6 +107,7 @@ public class MemoryInstance extends AbstractServerInstance {
     requeuers = new HashMap<String, Watchdog>();
     operationTimeoutDelays = new HashMap<String, Watchdog>();
     this.outstandingOperations = outstandingOperations;
+    this.completedOperations = completedOperations;
   }
 
   private ByteStringStreamSource getSource(String name) {
@@ -336,9 +341,14 @@ public class MemoryInstance extends AbstractServerInstance {
       String operationName,
       boolean watchInitialState,
       Function<Operation, Boolean> watcher) {
-    if (watchInitialState &&
-        !watcher.apply(getOperation(operationName))) {
-      return false;
+    if (watchInitialState) {
+      Operation operation = getOperation(operationName);
+      if (!watcher.apply(operation)) {
+        return false;
+      }
+      if (operation.getDone()) {
+        return true;
+      }
     }
     synchronized(watchers) {
       List<Function<Operation, Boolean>> operationWatchers = watchers.get(operationName);
