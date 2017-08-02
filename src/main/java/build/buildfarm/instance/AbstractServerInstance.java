@@ -124,7 +124,7 @@ public abstract class AbstractServerInstance implements Instance {
     TokenizableIterator<Directory> iter =
       createTreeIterator(rootDigest, pageToken);
 
-    while( iter.hasNext() && pageSize != 0 ) {
+    while (iter.hasNext() && pageSize != 0) {
       Directory directory = iter.next();
       // If part of the tree is missing from the CAS, the server will return the
       // portion present and omit the rest.

@@ -226,7 +226,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
           return;
           */
         }
-        if( request.getWriteOffset() != committed_size ) {
+        if (request.getWriteOffset() != committed_size) {
           responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
           failed = true;
           return;
@@ -240,7 +240,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
           data = data.concat(chunk);
           committed_size += chunk.size();
         }
-        if( request.getFinishWrite() ) {
+        if (request.getFinishWrite()) {
           active_write_requests.remove(resourceName);
           Instance instance = server.getInstanceFromUploadBlob(resourceName);
           Digest blobDigest = Digests.computeDigest(data);
