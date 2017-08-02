@@ -471,8 +471,10 @@ class Worker {
 
   public static void main(String[] args) throws Exception {
     Path configPath = Paths.get(args[0]);
-    InputStream configInputStream = Files.newInputStream(configPath);
-    Worker worker = new Worker(toWorkerConfig(configInputStream));
-    worker.start();
+    try (InputStream configInputStream = Files.newInputStream(configPath)) {
+      Worker worker = new Worker(toWorkerConfig(configInputStream));
+      configInputStream.close();
+      worker.start();
+    }
   }
 }
