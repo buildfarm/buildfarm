@@ -20,14 +20,17 @@ import com.google.protobuf.Duration;
 
 public class Watchdog implements Runnable {
   private final Runnable runnable;
-  private Duration petTimeout;
+  private final Duration petTimeout;
   private long timeoutNanos;
   private boolean stopped;
+  private boolean done;
   private long start;
 
   public Watchdog(Duration petTimeout, Runnable runnable) {
     this.runnable = runnable;
     this.petTimeout = petTimeout;
+    stopped = false;
+    done = false;
     pet();
   }
 
@@ -44,7 +47,8 @@ public class Watchdog implements Runnable {
         if (!stopped) {
           runnable.run();
         }
-        stopped = true;
+        done = true;
+        this.notify();
       }
     } catch (InterruptedException ex) {
     }
@@ -62,6 +66,12 @@ public class Watchdog implements Runnable {
 
   public synchronized void stop() {
     stopped = true;
-    this.notify();
+    try {
+      while (!done) {
+        this.notify();
+        this.wait();
+      }
+    } catch (InterruptedException ex) {
+    }
   }
 }
