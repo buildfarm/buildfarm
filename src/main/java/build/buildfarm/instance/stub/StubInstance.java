@@ -31,6 +31,7 @@ import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Iterators;
 import com.google.devtools.remoteexecution.v1test.Action;
 import com.google.devtools.remoteexecution.v1test.ActionCacheGrpc;
 import com.google.devtools.remoteexecution.v1test.ActionCacheGrpc.ActionCacheBlockingStub;
@@ -240,23 +241,27 @@ public class StubInstance implements Instance {
 
   @Override
   public InputStream newStreamInput(String name) {
-    throw new UnsupportedOperationException();
+    Iterator<ReadResponse> replies = bsBlockingStub
+        .get()
+        .read(ReadRequest.newBuilder().setResourceName(name).build());
+    return new ByteStringIteratorInputStream(Iterators.transform(replies, (reply) -> reply.getData()));
+  }
+
+  @Override
+  public String getBlobName(Digest blobDigest) {
+    return String.format(
+        "%s/blobs/%s",
+        getName(),
+        Digests.toString(blobDigest));
   }
 
   @Override
   public ByteString getBlob(Digest blobDigest) {
-    String resourceName = String.format(
-        "%s/blobs/%s",
-        getName(),
-        Digests.toString(blobDigest));
-    Iterator<ReadResponse> replies = bsBlockingStub
-      .get()
-      .read(ReadRequest.newBuilder().setResourceName(resourceName).build());
-    ByteString blob = ByteString.EMPTY;
-    while (replies.hasNext()) {
-      blob = blob.concat(replies.next().getData());
+    try (InputStream in = newStreamInput(getBlobName(blobDigest))) {
+      return ByteString.readFrom(in);
+    } catch (IOException ex) {
+      return null;
     }
-    return blob;
   }
 
   @Override

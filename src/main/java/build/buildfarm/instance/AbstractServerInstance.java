@@ -77,6 +77,14 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
+  public String getBlobName(Digest blobDigest) {
+    return String.format(
+        "%s/blobs/%s",
+        getName(),
+        Digests.toString(blobDigest));
+  }
+
+  @Override
   public ByteString getBlob(Digest blobDigest) {
     return getBlob(blobDigest, 0, 0);
   }

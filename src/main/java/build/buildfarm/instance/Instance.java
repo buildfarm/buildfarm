@@ -42,6 +42,7 @@ public interface Instance {
   Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs)
       throws IOException, IllegalArgumentException, InterruptedException;
 
+  String getBlobName(Digest blobDigest);
   ByteString getBlob(Digest blobDigest);
   ByteString getBlob(Digest blobDigest, long offset, long limit);
   Digest putBlob(ByteString blob)
