@@ -15,3 +15,14 @@ java_test(
       "@googleapis//:google_rpc_code_java_proto",
   ]
 )
+
+java_test(
+  name = "ByteStringIteratorInputStreamTest",
+  srcs = ["ByteStringIteratorInputStreamTest.java"],
+  deps = [
+      "//src/main/java/build/buildfarm:stub-instance",
+      "//third_party:guava",
+      "//third_party:truth",
+      "@com_google_protobuf//:protobuf_java",
+  ]
+)
