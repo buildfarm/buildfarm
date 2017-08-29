@@ -15,6 +15,8 @@
 package build.buildfarm.instance;
 
 import build.buildfarm.common.Digests;
+import build.buildfarm.common.ContentAddressableStorage;
+import build.buildfarm.common.ContentAddressableStorage.Blob;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -43,14 +45,14 @@ import java.util.function.Consumer;
 
 public abstract class AbstractServerInstance implements Instance {
   private final String name;
-  protected final Map<Digest, ByteString> contentAddressableStorage;
+  protected final ContentAddressableStorage contentAddressableStorage;
   protected final Map<Digest, ActionResult> actionCache;
   protected final Map<String, Operation> outstandingOperations;
   protected final Map<String, Operation> completedOperations;
 
   public AbstractServerInstance(
       String name,
-      Map<Digest, ByteString> contentAddressableStorage,
+      ContentAddressableStorage contentAddressableStorage,
       Map<Digest, ActionResult> actionCache,
       Map<String, Operation> outstandingOperations,
       Map<String, Operation> completedOperations) {
@@ -92,10 +94,10 @@ public abstract class AbstractServerInstance implements Instance {
   @Override
   public ByteString getBlob(Digest blobDigest, long offset, long limit)
       throws IndexOutOfBoundsException {
-    ByteString blob = contentAddressableStorage.get(blobDigest);
+    Blob blob = contentAddressableStorage.get(blobDigest);
 
     if (blob == null) {
-      return blob;
+      return null;
     }
 
     if (offset < 0
@@ -107,15 +109,15 @@ public abstract class AbstractServerInstance implements Instance {
 
     long endIndex = offset + (limit > 0 ? limit : (blob.size() - offset));
 
-    return blob.substring(
-        (int) offset, endIndex > blob.size() ? blob.size() : (int) endIndex);
+    return blob.getData().substring(
+        (int) offset, (int) (endIndex > blob.size() ? blob.size() : endIndex));
   }
 
   @Override
-  public Digest putBlob(ByteString blob) throws IllegalArgumentException {
-    Digest blobDigest = Digests.computeDigest(blob);
-    contentAddressableStorage.put(blobDigest, blob);
-    return blobDigest;
+  public Digest putBlob(ByteString content) throws IllegalArgumentException {
+    Blob blob = new Blob(content);
+    contentAddressableStorage.put(blob);
+    return blob.getDigest();
   }
 
   protected abstract int getTreeDefaultPageSize();

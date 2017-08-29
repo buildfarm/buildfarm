@@ -75,6 +75,9 @@ message MemoryInstanceConfig {
   // completed must be received, or the operation is
   // considered lost on a worker and is requeued
   google.protobuf.Duration operation_completed_delay = 6;
+
+  // limit for CAS total content size
+  int64 cas_max_size_bytes = 7;
 }
 
 message InstanceConfig {

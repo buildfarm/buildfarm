@@ -15,6 +15,7 @@
 package build.buildfarm.instance.memory;
 
 import build.buildfarm.common.Digests;
+import build.buildfarm.common.ContentAddressableStorage;
 import build.buildfarm.instance.TokenizableIterator;
 import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.v1test.MemoryInstanceConfig;
@@ -56,7 +57,6 @@ public class MemoryInstance extends AbstractServerInstance {
   private final Map<String, Watchdog> requeuers;
   private final Map<String, Watchdog> operationTimeoutDelays;
   private final Map<String, Operation> outstandingOperations;
-  private final Map<String, Operation> completedOperations;
 
   private static final class Worker {
     private final Platform platform;
@@ -80,25 +80,21 @@ public class MemoryInstance extends AbstractServerInstance {
     this(
         name,
         config,
-        /*contentAddressableStorage=*/ new ConcurrentHashMap<Digest, ByteString>(),
-        /*actionCache=*/ new ConcurrentHashMap<Digest, ActionResult>(),
-        /*outstandingOperations=*/ new TreeMap<String, Operation>(),
-        /*completedOperations=*/ new ConcurrentHashMap<String, Operation>());
+        /*contentAddressableStorage=*/ new MemoryLRUContentAddressableStorage(config.getCasMaxSizeBytes()),
+        /*outstandingOperations=*/ new TreeMap<String, Operation>());
   }
 
   private MemoryInstance(
       String name,
       MemoryInstanceConfig config,
-      Map<Digest, ByteString> contentAddressableStorage,
-      Map<Digest, ActionResult> actionCache,
-      Map<String, Operation> outstandingOperations,
-      Map<String, Operation> completedOperations) {
+      ContentAddressableStorage contentAddressableStorage,
+      Map<String, Operation> outstandingOperations) {
     super(
         name,
         contentAddressableStorage,
-        actionCache,
+        /*actionCache=*/ new DelegateCASMap<Digest, ActionResult>(contentAddressableStorage, ActionResult.parser()),
         outstandingOperations,
-        completedOperations);
+        /*completedOperations=*/ new DelegateCASMap<String, Operation>(contentAddressableStorage, Operation.parser()));
     this.config = config;
     watchers = new ConcurrentHashMap<String, List<Function<Operation, Boolean>>>();
     streams = new HashMap<String, ByteStringStreamSource>();
@@ -107,7 +103,6 @@ public class MemoryInstance extends AbstractServerInstance {
     requeuers = new HashMap<String, Watchdog>();
     operationTimeoutDelays = new HashMap<String, Watchdog>();
     this.outstandingOperations = outstandingOperations;
-    this.completedOperations = completedOperations;
   }
 
   private ByteStringStreamSource getSource(String name) {
@@ -132,7 +127,7 @@ public class MemoryInstance extends AbstractServerInstance {
   @Override
   public Iterable<Digest> findMissingBlobs(Iterable<Digest> digests) {
     return Iterables.filter(
-        digests, digest -> !contentAddressableStorage.containsKey(digest));
+        digests, digest -> !contentAddressableStorage.contains(digest));
   }
 
   @Override
