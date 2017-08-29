@@ -47,10 +47,18 @@ import com.google.devtools.remoteexecution.v1test.Directory;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
 import com.google.devtools.remoteexecution.v1test.FindMissingBlobsRequest;
 import com.google.devtools.remoteexecution.v1test.FindMissingBlobsResponse;
+import com.google.devtools.remoteexecution.v1test.GetActionResultRequest;
 import com.google.devtools.remoteexecution.v1test.GetTreeRequest;
 import com.google.devtools.remoteexecution.v1test.GetTreeResponse;
 import com.google.devtools.remoteexecution.v1test.Platform;
 import com.google.devtools.remoteexecution.v1test.UpdateActionResultRequest;
+import com.google.longrunning.CancelOperationRequest;
+import com.google.longrunning.DeleteOperationRequest;
+import com.google.longrunning.GetOperationRequest;
+import com.google.longrunning.ListOperationsRequest;
+import com.google.longrunning.ListOperationsResponse;
+import com.google.longrunning.OperationsGrpc;
+import com.google.longrunning.OperationsGrpc.OperationsBlockingStub;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -132,6 +140,15 @@ public class StubInstance implements Instance {
             }
           });
 
+  private final Supplier<OperationsBlockingStub> operationsBlockingStub =
+      Suppliers.memoize(
+          new Supplier<OperationsBlockingStub>() {
+            @Override
+            public OperationsBlockingStub get() {
+              return OperationsGrpc.newBlockingStub(channel);
+            }
+          });
+
   private final Supplier<OperationQueueBlockingStub> operationQueueBlockingStub =
       Suppliers.memoize(
           new Supplier<OperationQueueBlockingStub>() {
@@ -172,7 +189,19 @@ public class StubInstance implements Instance {
 
   @Override
   public ActionResult getActionResult(ActionKey actionKey) {
-    return null;
+    try {
+      return actionCacheBlockingStub.get()
+          .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
+          .getActionResult(GetActionResultRequest.newBuilder()
+              .setInstanceName(getName())
+              .setActionDigest(actionKey.getDigest())
+              .build());
+    } catch (StatusRuntimeException e) {
+      if (e.getStatus().equals(Status.NOT_FOUND)) {
+        return null;
+      }
+      throw e;
+    }
   }
 
   @Override
@@ -430,21 +459,44 @@ public class StubInstance implements Instance {
   public String listOperations(
       int pageSize, String pageToken, String filter,
       ImmutableList.Builder<Operation> operations) {
-    throw new UnsupportedOperationException();
+
+    ListOperationsResponse response =
+        operationsBlockingStub.get()
+            .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
+            .listOperations(ListOperationsRequest.newBuilder()
+            .setName(getName() + "/operations")
+            .setPageSize(pageSize)
+            .setPageToken(pageToken)
+            .setFilter(filter)
+            .build());
+    operations.addAll(response.getOperationsList());
+    return response.getNextPageToken();
   }
 
   @Override
   public Operation getOperation(String operationName) {
-    throw new UnsupportedOperationException();
+    return operationsBlockingStub.get()
+        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
+        .getOperation(GetOperationRequest.newBuilder()
+            .setName(operationName)
+            .build());
   }
 
   @Override
   public void deleteOperation(String operationName) {
-    throw new UnsupportedOperationException();
+    operationsBlockingStub.get()
+        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
+        .deleteOperation(DeleteOperationRequest.newBuilder()
+            .setName(operationName)
+            .build());
   }
 
   @Override
   public void cancelOperation(String operationName) {
-    throw new UnsupportedOperationException();
+    operationsBlockingStub.get()
+        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
+        .cancelOperation(CancelOperationRequest.newBuilder()
+        .setName(operationName)
+        .build());
   }
 }

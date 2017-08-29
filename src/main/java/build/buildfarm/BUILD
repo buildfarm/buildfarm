@@ -174,6 +174,7 @@ java_library(
         "@googleapis//:google_bytestream_bytestream_java_proto",
         "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_grpc",
         "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
+        "@googleapis//:google_longrunning_operations_java_grpc",
         "@googleapis//:google_longrunning_operations_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
     ],
@@ -287,5 +288,42 @@ container_image(
     cmd = [
         "buildfarm-operationqueue-worker_deploy.jar",
         "/config/worker.config",
+    ],
+)
+
+java_binary(
+    name = "bf-cat",
+    srcs = ["Cat.java"],
+    main_class = "build.buildfarm.Cat",
+    deps = [
+        ":common",
+        ":instance",
+        ":stub-instance",
+        "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java_util",
+        "//3rdparty/jvm/io/grpc:grpc_context",
+        "//3rdparty/jvm/io/grpc:grpc_core",
+        "//3rdparty/jvm/io/grpc:grpc_netty",
+        "//3rdparty/jvm/io/grpc:grpc_protobuf",
+        "//3rdparty/jvm/io/grpc:grpc_stub",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "@googleapis//:google_rpc_code_java_proto",
+    ],
+)
+
+java_binary(
+    name = "bf-cancel",
+    srcs = ["Cancel.java"],
+    main_class = "build.buildfarm.Cancel",
+    deps = [
+        ":common",
+        ":instance",
+        ":stub-instance",
+        "//3rdparty/jvm/io/grpc:grpc_context",
+        "//3rdparty/jvm/io/grpc:grpc_core",
+        "//3rdparty/jvm/io/grpc:grpc_netty",
+        "//3rdparty/jvm/io/grpc:grpc_protobuf",
+        "//3rdparty/jvm/io/grpc:grpc_stub",
     ],
 )
