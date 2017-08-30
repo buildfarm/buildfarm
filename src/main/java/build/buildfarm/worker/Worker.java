@@ -69,6 +69,20 @@ class Worker {
   private final Path root;
   private final Path cacheDir;
 
+  private static final OutputStream nullOutputStream = new OutputStream() {
+    @Override
+    public void write(int b) {
+    }
+
+    @Override
+    public void write(byte[] b) {
+    }
+
+    @Override
+    public void write(byte[] b, int off, int len) {
+    }
+  };
+
   private static class Poller implements Runnable {
     private final Duration period;
     private final BooleanSupplier poll;
@@ -350,20 +364,6 @@ class Worker {
       environment.put(environmentVariable.getName(), environmentVariable.getValue());
     }
 
-    OutputStream nullOutputStream = new OutputStream() {
-      @Override
-      public void write(int b) {
-      }
-
-      @Override
-      public void write(byte[] b) {
-      }
-
-      @Override
-      public void write(byte[] b, int off, int len) {
-      }
-    };
-    
     OutputStream stdoutSink = null, stderrSink = null;
 
     if (stdoutStreamName != null && !stdoutStreamName.isEmpty() && config.getStreamStdout()) {
