@@ -121,34 +121,38 @@ message WorkerConfig {
   // if relative, is made relative to root
   string cas_cache_directory = 4;
 
+  // limit for contents of files retained
+  // from CAS in the cache
+  int64 cas_cache_max_size_bytes = 5;
+
   // whether to stream stdout from processes
-  bool stream_stdout = 5;
+  bool stream_stdout = 6;
 
   // control for process stdout
-  CASInsertionControl stdout_cas_control = 6;
+  CASInsertionControl stdout_cas_control = 7;
 
   // whether to stream stderr from processes
-  bool stream_stderr = 7;
+  bool stream_stderr = 8;
 
   // control for process stdout
-  CASInsertionControl stderr_cas_control = 8;
+  CASInsertionControl stderr_cas_control = 9;
 
   // control for process output files
-  CASInsertionControl file_cas_control = 9;
+  CASInsertionControl file_cas_control = 10;
 
   // whether the worker should attempt to requeue
   // an operation when an unexpected failure
   // occurs during an execution
-  bool requeue_on_failure = 10;
+  bool requeue_on_failure = 11;
 
   // page size for getTree request
-  uint32 tree_page_size = 11;
+  uint32 tree_page_size = 12;
 
   // period of poll requests during execution
-  google.protobuf.Duration operation_poll_period = 12;
+  google.protobuf.Duration operation_poll_period = 13;
 
   // initial platform used to match operations
-  google.devtools.remoteexecution.v1test.Platform platform = 13;
+  google.devtools.remoteexecution.v1test.Platform platform = 14;
 }
 
 message TreeIteratorToken {
