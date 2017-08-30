@@ -134,6 +134,7 @@ public class MemoryInstance extends AbstractServerInstance {
   @Override
   protected void enqueueOperation(Operation operation) {
     synchronized(queuedOperations) {
+      Preconditions.checkState(!Iterables.any(queuedOperations, (queuedOperation) -> queuedOperation.getName().equals(operation.getName())));
       queuedOperations.add(operation);
     }
   }
