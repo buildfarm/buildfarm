@@ -153,6 +153,9 @@ message WorkerConfig {
 
   // initial platform used to match operations
   google.devtools.remoteexecution.v1test.Platform platform = 14;
+
+  // execute width
+  int32 execute_stage_width = 15;
 }
 
 message TreeIteratorToken {
