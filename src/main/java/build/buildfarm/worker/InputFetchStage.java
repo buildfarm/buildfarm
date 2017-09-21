@@ -28,9 +28,11 @@ import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.Stack;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ArrayBlockingQueue;
 
@@ -65,6 +67,10 @@ class InputFetchStage extends PipelineStage {
 
     Path execDir = operationContext.execDir;
 
+    OutputDirectory outputDirectory = parseOutputDirectories(
+        operationContext.action.getOutputFilesList(),
+        operationContext.action.getOutputDirectoriesList());
+
     boolean success = true;
     try {
       if (Files.exists(execDir)) {
@@ -75,7 +81,9 @@ class InputFetchStage extends PipelineStage {
       fetchInputs(
           execDir,
           operationContext.action.getInputRootDigest(),
-          operationContext.inputFiles);
+          outputDirectory,
+          operationContext.inputFiles,
+          operationContext.inputDirectories);
 
       verifyOutputLocations(
           execDir,
@@ -89,16 +97,63 @@ class InputFetchStage extends PipelineStage {
     poller.stop();
 
     if (!success) {
-      worker.fileCache.update(operationContext.inputFiles);
+      worker.fileCache.update(operationContext.inputFiles, operationContext.inputDirectories);
     }
 
     return success ? operationContext : null;
   }
 
+  class OutputDirectory {
+    public final Map<String, OutputDirectory> directories;
+
+    OutputDirectory() {
+      directories = new HashMap<>();
+    }
+  }
+
+  private OutputDirectory parseOutputDirectories(Iterable<String> outputFiles, Iterable<String> outputDirs) {
+    OutputDirectory outputDirectory = new OutputDirectory();
+    Stack<OutputDirectory> stack = new Stack<>();
+
+    OutputDirectory currentOutputDirectory = outputDirectory;
+    String prefix = "";
+    for (String outputFile : outputFiles) {
+      while (!outputFile.startsWith(prefix)) {
+        currentOutputDirectory = stack.pop();
+        int upPathSeparatorIndex = prefix.lastIndexOf(File.separator, prefix.length() - 2);
+        prefix = prefix.substring(0, upPathSeparatorIndex + 1);
+      }
+      String prefixedFile = outputFile.substring(prefix.length());
+      int separatorIndex = prefixedFile.indexOf(File.separator);
+      while (separatorIndex >= 0) {
+        if (separatorIndex == 0) {
+          throw new IllegalArgumentException("InputFetchStage: double separator in output file");
+        }
+
+        String directoryName = prefixedFile.substring(0, separatorIndex);
+        prefix += directoryName + File.separator;
+        prefixedFile = prefixedFile.substring(separatorIndex + 1);
+        stack.push(currentOutputDirectory);
+        OutputDirectory nextOutputDirectory = new OutputDirectory();
+        currentOutputDirectory.directories.put(directoryName, nextOutputDirectory);
+        currentOutputDirectory = nextOutputDirectory;
+        separatorIndex = prefixedFile.indexOf(File.separator);
+      }
+    }
+
+    if (!Iterables.isEmpty(outputDirs)) {
+      throw new IllegalArgumentException("InputFetchStage: outputDir specified: " + outputDirs);
+    }
+
+    return outputDirectory;
+  }
+
   private void fetchInputs(
       Path execDir,
       Digest inputRoot,
-      List<String> inputFiles) throws IOException, InterruptedException {
+      OutputDirectory outputDirectory,
+      List<String> inputFiles,
+      List<Digest> inputDirectories) throws IOException, InterruptedException {
     ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
     String pageToken = "";
 
@@ -118,14 +173,16 @@ class InputFetchStage extends PipelineStage {
       directoriesIndex.put(directoryDigest, directory);
     }
 
-    linkInputs(execDir, inputRoot, directoriesIndex.build(), inputFiles);
+    linkInputs(execDir, inputRoot, directoriesIndex.build(), outputDirectory, inputFiles, inputDirectories);
   }
 
   private void linkInputs(
       Path execDir,
       Digest inputRoot,
       Map<Digest, Directory> directoriesIndex,
-      List<String> inputFiles)
+      OutputDirectory outputDirectory,
+      List<String> inputFiles,
+      List<Digest> inputDirectories)
       throws IOException, InterruptedException {
     Directory directory = directoriesIndex.get(inputRoot);
 
@@ -142,10 +199,25 @@ class InputFetchStage extends PipelineStage {
     for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
       Digest digest = directoryNode.getDigest();
       String name = directoryNode.getName();
+      OutputDirectory childOutputDirectory = outputDirectory != null
+          ? outputDirectory.directories.get(name) : null;
       Path dirPath = execDir.resolve(name);
-      Files.createDirectories(dirPath);
-      linkInputs(dirPath, digest, directoriesIndex, inputFiles);
+      if (childOutputDirectory != null || !worker.config.getLinkInputDirectories()) {
+        Files.createDirectories(dirPath);
+        linkInputs(dirPath, digest, directoriesIndex, childOutputDirectory, inputFiles, inputDirectories);
+      } else {
+        inputDirectories.add(digest);
+        linkDirectory(dirPath, digest, directoriesIndex);
+      }
     }
+  }
+
+  private void linkDirectory(
+      Path execPath,
+      Digest digest,
+      Map<Digest, Directory> directoriesIndex) throws IOException, InterruptedException {
+    Path cachePath = worker.fileCache.putDirectory(digest, directoriesIndex);
+    Files.createSymbolicLink(execPath, cachePath);
   }
 
   private void verifyOutputLocations(

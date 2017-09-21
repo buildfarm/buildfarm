@@ -236,7 +236,8 @@ class ReportResultStage extends PipelineStage {
         operationContext.execDir,
         metadata,
         operationContext.action,
-        operationContext.inputFiles);
+        operationContext.inputFiles,
+        operationContext.inputDirectories);
   }
 
   @Override

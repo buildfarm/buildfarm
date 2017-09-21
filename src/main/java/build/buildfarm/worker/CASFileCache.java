@@ -19,7 +19,11 @@ import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 import build.buildfarm.common.DigestUtil;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import com.google.devtools.remoteexecution.v1test.Digest;
+import com.google.devtools.remoteexecution.v1test.Directory;
+import com.google.devtools.remoteexecution.v1test.DirectoryNode;
+import com.google.devtools.remoteexecution.v1test.FileNode;
 import io.grpc.StatusRuntimeException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -29,7 +33,10 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.PosixFilePermission;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 class CASFileCache {
@@ -38,6 +45,7 @@ class CASFileCache {
   private final long maxSizeInBytes;
   private final DigestUtil digestUtil;
   private final Map<String, Entry> storage;
+  private final Map<Digest, DirectoryEntry> directoryStorage;
 
   private transient long sizeInBytes;
   private transient Entry header;
@@ -52,6 +60,7 @@ class CASFileCache {
     header = new SentinelEntry();
     header.before = header.after = header;
     storage = new ConcurrentHashMap<>();
+    directoryStorage = new HashMap<>();
   }
 
   /**
@@ -108,13 +117,21 @@ class CASFileCache {
             key = parseFileEntryKey(file.getFileName().toString(), size);
           }
           if (key != null) {
-            Entry e = new Entry(key, size);
+            Entry e = new Entry(key, size, null);
             storage.put(e.key, e);
             e.decrementReference(header);
             sizeInBytes += size;
           } else {
             Files.delete(file);
           }
+        }
+        return FileVisitResult.CONTINUE;
+      }
+
+      @Override
+      public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+        if (!dir.equals(root)) {
+          Files.delete(dir);
         }
         return FileVisitResult.CONTINUE;
       }
@@ -132,11 +149,16 @@ class CASFileCache {
         (isExecutable ? "_exec" : ""));
   }
 
-  public synchronized void update(Iterable<String> inputs) {
+  public synchronized void update(Iterable<String> inputFiles, Iterable<Digest> inputDirectories) {
     // decrement references and notify if any dropped to 0
+    // insert after the last 0-reference count entry in list
     boolean entriesMadeAvailable = false;
 
-    for (String input : inputs) {
+    for (Digest inputDirectory : inputDirectories) {
+      inputFiles = Iterables.concat(inputFiles, directoryStorage.get(inputDirectory).inputs);
+    }
+
+    for (String input : inputFiles) {
       Entry e = storage.get(input);
       if (e == null) {
         throw new IllegalStateException(input + " has been removed with references");
@@ -154,8 +176,12 @@ class CASFileCache {
     }
   }
 
-  public Path getPath(String key) {
-    return root.resolve(key);
+  public Path getPath(String filename) {
+    return root.resolve(filename);
+  }
+
+  private Path getDirectoryPath(Digest digest) {
+    return root.resolve(digestFilename(digest));
   }
 
   /** must be called in synchronized context */
@@ -163,23 +189,101 @@ class CASFileCache {
     while (header.before == header.after) {
       wait();
     }
+    // should assert that e.referenceCount == 0
     Entry e = header.after;
     if (e.referenceCount != 0) {
       throw new RuntimeException("ERROR: Reference counts lru ordering has not been maintained correctly, attempting to expire referenced (or negatively counted) content");
     }
     storage.remove(e.key);
+    for (Digest containingDirectory : e.containingDirectories) {
+      expireDirectory(containingDirectory);
+    }
     e.remove();
     sizeInBytes -= e.size;
     return e.key;
   }
 
+  /** must be called in synchronized context */
+  private void expireDirectory(Digest digest) throws IOException {
+    DirectoryEntry e = directoryStorage.remove(digest);
+    Path path = getDirectoryPath(digest);
+
+    for (String input : e.inputs) {
+      Entry fileEntry = storage.get(input);
+
+      if (fileEntry != null) {
+        fileEntry.containingDirectories.remove(digest);
+      }
+    }
+    Worker.removeDirectory(path);
+  }
+
+  /** must be called in synchronized context */
+  private void incrementReferences(Iterable<String> inputs) {
+    for (String input : inputs) {
+      storage.get(input).incrementReference(header);
+    }
+  }
+
+  /** must be called in synchronized context */
+  private void fetchDirectory(
+      Digest containingDirectory,
+      Path path,
+      Digest digest,
+      Map<Digest, Directory> directoriesIndex,
+      ImmutableList.Builder<String> inputsBuilder) throws IOException, InterruptedException {
+    Directory directory = directoriesIndex.get(digest);
+    Files.createDirectory(path);
+    for (FileNode fileNode : directory.getFilesList()) {
+      String fileCacheKey = put(fileNode.getDigest(), fileNode.getIsExecutable(), containingDirectory);
+      Files.createLink(path.resolve(fileNode.getName()), getPath(fileCacheKey));
+      inputsBuilder.add(fileCacheKey);
+    }
+    for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
+      fetchDirectory(
+          containingDirectory,
+          path.resolve(directoryNode.getName()),
+          directoryNode.getDigest(),
+          directoriesIndex,
+          inputsBuilder);
+    }
+  }
+
+  public synchronized Path putDirectory(
+      Digest digest,
+      Map<Digest, Directory> directoriesIndex) throws IOException, InterruptedException {
+    Path path = getDirectoryPath(digest);
+
+    DirectoryEntry e = directoryStorage.get(digest);
+    if (e != null) {
+      incrementReferences(e.inputs);
+      return path;
+    }
+
+    ImmutableList.Builder<String> inputsBuilder = new ImmutableList.Builder<>();
+    fetchDirectory(digest, path, digest, directoriesIndex, inputsBuilder);
+
+    e = new DirectoryEntry(directoriesIndex.get(digest), inputsBuilder.build());
+
+    directoryStorage.put(digest, e);
+
+    return path;
+  }
+
   public String put(Digest digest, boolean isExecutable) throws InterruptedException {
+    return put(digest, isExecutable, null);
+  }
+
+  public String put(Digest digest, boolean isExecutable, Digest containingDirectory) throws InterruptedException {
     String key = toFileEntryKey(digest, isExecutable);
     ImmutableList.Builder<String> expiredKeys = null;
 
     synchronized(this) {
       Entry e = storage.get(key);
       if (e != null) {
+        if (containingDirectory != null) {
+          e.containingDirectories.add(containingDirectory);
+        }
         e.incrementReference(header);
         return key;
       }
@@ -226,7 +330,7 @@ class CASFileCache {
       return null;
     }
 
-    Entry e = new Entry(key, digest.getSizeBytes());
+    Entry e = new Entry(key, digest.getSizeBytes(), containingDirectory);
 
     storage.put(key, e);
 
@@ -246,18 +350,24 @@ class CASFileCache {
     Entry before, after;
     final String key;
     final long size;
+    final Set<Digest> containingDirectories;
     int referenceCount;
 
     private Entry() {
       key = null;
       size = -1;
       referenceCount = -1;
+      containingDirectories = null;
     }
 
-    public Entry(String key, long size) {
+    public Entry(String key, long size, Digest containingDirectory) {
       this.key = key;
       this.size = size;
       referenceCount = 1;
+      containingDirectories = new HashSet<>();
+      if (containingDirectory != null) {
+        containingDirectories.add(containingDirectory);
+      }
     }
 
     public void remove() {
@@ -318,6 +428,16 @@ class CASFileCache {
     @Override
     public void decrementReference(Entry header) {
       throw new UnsupportedOperationException("sentinal cannot be referenced");
+    }
+  }
+
+  private static class DirectoryEntry {
+    Directory directory;
+    Iterable<String> inputs;
+
+    public DirectoryEntry(Directory directory, Iterable<String> inputs) {
+      this.directory = directory;
+      this.inputs = inputs;
     }
   }
 }

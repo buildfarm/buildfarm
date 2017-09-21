@@ -164,6 +164,9 @@ message WorkerConfig {
 
   // execute width
   int32 execute_stage_width = 17;
+
+  // symlink cas input-only directories
+  bool link_input_directories = 18;
 }
 
 message TreeIteratorToken {
