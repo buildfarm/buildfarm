@@ -2,7 +2,7 @@ workspace(name = "build_buildfarm")
 
 new_local_repository(
     name = "com_google_protobuf",
-    build_file = "./third_party/protobuf/3.2.0/BUILD",
+    build_file = "./third_party/protobuf/3.2.0/BUILD.bazel",
     path = "./third_party/protobuf/3.2.0/",
 )
 
@@ -15,5 +15,5 @@ new_local_repository(
 new_local_repository(
     name = "googleapis",
     path = "./third_party/googleapis/",
-    build_file = "./third_party/googleapis/BUILD",
+    build_file = "./third_party/googleapis/BUILD.bazel",
 )
