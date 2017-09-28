@@ -16,7 +16,7 @@ licenses(["notice"])
 
 filegroup(
     name = "srcs",
-    srcs = glob(["**"]),
+    srcs = glob(["**"], exclude = ["BUILD.bazel"]),
     visibility = ["//visibility:public"],
 )
 
