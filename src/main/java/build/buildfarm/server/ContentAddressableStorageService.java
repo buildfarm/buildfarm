@@ -98,15 +98,15 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
 
     try {
       instance.putAllBlobs(validBlobsBuilder.build());
-      responseObserver.onNext(BatchUpdateBlobsResponse.newBuilder()
-          .addAllResponses(responses.build())
-          .build());
-      responseObserver.onCompleted();
-    } catch (InterruptedException ex) {
+    } catch (InterruptedException|IOException ex) {
       responseObserver.onError(new StatusException(Status.fromThrowable(ex)));
-    } catch (IOException ex) {
-      responseObserver.onError(new StatusException(Status.fromThrowable(ex)));
+      return;
     }
+
+    responseObserver.onNext(BatchUpdateBlobsResponse.newBuilder()
+        .addAllResponses(responses.build())
+        .build());
+    responseObserver.onCompleted();
   }
 
   @Override
