@@ -39,7 +39,13 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
   public void take(
       TakeOperationRequest request,
       StreamObserver<Operation> responseObserver) {
-    Instance instance = server.getInstance(request.getInstanceName());
+    Instance instance;
+    try {
+      instance = server.getInstance(request.getInstanceName());
+    } catch (InstanceNotFoundException ex) {
+      responseObserver.onError(new StatusException(Status.NOT_FOUND));
+      return;
+    }
 
     instance.match(request.getPlatform(), /*requeueOnFailure=*/ true, (final Operation operation) -> {
       // so this is interesting - the stdout injection belongs here, because
@@ -74,8 +80,13 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
   public void put(
       Operation operation,
       StreamObserver<com.google.rpc.Status> responseObserver) {
-    Instance instance =
-        server.getInstanceFromOperationName(operation.getName());
+    Instance instance;
+    try {
+      instance = server.getInstanceFromOperationName(operation.getName());
+    } catch (InstanceNotFoundException ex) {
+      responseObserver.onError(new StatusException(Status.NOT_FOUND));
+      return;
+    }
 
     boolean ok = instance.putOperation(operation);
     Code code = ok ? Code.OK : Code.UNAVAILABLE;
@@ -89,8 +100,14 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
   public void poll(
       PollOperationRequest request,
       StreamObserver<com.google.rpc.Status> responseObserver) {
-    Instance instance =
-        server.getInstanceFromOperationName(request.getOperationName());
+    Instance instance;
+    try {
+      instance = server.getInstanceFromOperationName(
+          request.getOperationName());
+    } catch (InstanceNotFoundException ex) {
+      responseObserver.onError(new StatusException(Status.NOT_FOUND));
+      return;
+    }
 
     boolean ok = instance.pollOperation(
         request.getOperationName(),

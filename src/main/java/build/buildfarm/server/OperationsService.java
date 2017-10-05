@@ -39,8 +39,14 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
   public void listOperations(
       ListOperationsRequest request,
       StreamObserver<ListOperationsResponse> responseObserver) {
-    Instance instance =
-        server.getInstanceFromOperationsCollectionName(request.getName());
+    Instance instance;
+    try {
+      instance = server.getInstanceFromOperationsCollectionName(
+          request.getName());
+    } catch (InstanceNotFoundException ex) {
+      responseObserver.onError(new StatusException(Status.NOT_FOUND));
+      return;
+    }
 
     int pageSize = request.getPageSize();
     if (pageSize < 0) {
@@ -68,7 +74,13 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
   public void getOperation(
       GetOperationRequest request,
       StreamObserver<Operation> responseObserver) {
-    Instance instance = server.getInstanceFromOperationName(request.getName());
+    Instance instance;
+    try {
+      instance = server.getInstanceFromOperationName(request.getName());
+    } catch (InstanceNotFoundException ex) {
+      responseObserver.onError(new StatusException(Status.NOT_FOUND));
+      return;
+    }
 
     responseObserver.onNext(instance.getOperation(request.getName()));
     responseObserver.onCompleted();
@@ -78,7 +90,13 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
   public void deleteOperation(
       DeleteOperationRequest request,
       StreamObserver<Empty> responseObserver) {
-    Instance instance = server.getInstanceFromOperationName(request.getName());
+    Instance instance;
+    try {
+      instance = server.getInstanceFromOperationName(request.getName());
+    } catch (InstanceNotFoundException ex) {
+      responseObserver.onError(new StatusException(Status.NOT_FOUND));
+      return;
+    }
 
     try {
       instance.deleteOperation(request.getName());
@@ -93,7 +111,13 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
   public void cancelOperation(
       CancelOperationRequest request,
       StreamObserver<Empty> responseObserver) {
-    Instance instance = server.getInstanceFromOperationName(request.getName());
+    Instance instance;
+    try {
+      instance = server.getInstanceFromOperationName(request.getName());
+    } catch (InstanceNotFoundException ex) {
+      responseObserver.onError(new StatusException(Status.NOT_FOUND));
+      return;
+    }
 
     instance.cancelOperation(request.getName());
     responseObserver.onCompleted();

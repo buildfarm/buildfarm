@@ -76,15 +76,22 @@ public class BuildFarmServer {
     return defaultInstance;
   }
 
-  public Instance getInstance(String name) {
+  public Instance getInstance(String name) throws InstanceNotFoundException {
+    Instance instance;
     if (name == null || name.isEmpty()) {
-      return getDefaultInstance();
+      instance = getDefaultInstance();
+    } else {
+      instance = instances.get(name);
     }
-    return instances.get(name);
+    if (instance == null) {
+      throw new InstanceNotFoundException(name);
+    }
+    return instance;
   }
 
   public Instance getInstanceFromOperationsCollectionName(
-      String operationsCollectionName) {
+      String operationsCollectionName) throws InstanceNotFoundException {
+    // {instance_name=**}/operations
     String[] components = operationsCollectionName.split("/");
     String instanceName = String.join(
         "/", Iterables.limit(
@@ -93,7 +100,9 @@ public class BuildFarmServer {
     return getInstance(instanceName);
   }
 
-  public Instance getInstanceFromOperationName(String operationName) {
+  public Instance getInstanceFromOperationName(String operationName)
+      throws InstanceNotFoundException {
+    // {instance_name=**}/operations/{uuid}
     String[] components = operationName.split("/");
     String instanceName = String.join(
         "/", Iterables.limit(
@@ -102,7 +111,9 @@ public class BuildFarmServer {
     return getInstance(instanceName);
   }
 
-  public Instance getInstanceFromOperationStream(String operationStream) {
+  public Instance getInstanceFromOperationStream(String operationStream)
+      throws InstanceNotFoundException {
+    // {instance_name=**}/operations/{uuid}/streams/{stream}
     String[] components = operationStream.split("/");
     String instanceName = String.join(
         "/", Iterables.limit(
@@ -111,7 +122,9 @@ public class BuildFarmServer {
     return getInstance(instanceName);
   }
 
-  public Instance getInstanceFromBlob(String blobName) {
+  public Instance getInstanceFromBlob(String blobName)
+      throws InstanceNotFoundException {
+    // {instance_name=**}/blobs/{hash}/{size}
     String[] components = blobName.split("/");
     String instanceName = String.join(
         "/", Iterables.limit(
@@ -120,7 +133,9 @@ public class BuildFarmServer {
     return getInstance(instanceName);
   }
 
-  public Instance getInstanceFromUploadBlob(String uploadBlobName) {
+  public Instance getInstanceFromUploadBlob(String uploadBlobName)
+      throws InstanceNotFoundException {
+    // {instance_name=**}/uploads/{uuid}/blobs/{hash}/{size}
     String[] components = uploadBlobName.split("/");
     String instanceName = String.join(
         "/", Iterables.limit(

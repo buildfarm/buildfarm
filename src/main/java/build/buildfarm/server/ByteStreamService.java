@@ -96,7 +96,14 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
       StreamObserver<ReadResponse> responseObserver) {
     String resourceName = request.getResourceName();
 
-    Instance instance = server.getInstanceFromBlob(resourceName);
+    Instance instance;
+    try {
+      instance = server.getInstanceFromBlob(resourceName);
+    } catch (InstanceNotFoundException ex) {
+      responseObserver.onError(new StatusException(Status.NOT_FOUND));
+      return;
+    }
+
     Digest digest = parseBlobDigest(resourceName);
 
     ByteString blob = instance.getBlob(
@@ -128,7 +135,14 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
       StreamObserver<ReadResponse> responseObserver) throws IOException {
     String resourceName = request.getResourceName();
 
-    Instance instance = server.getInstanceFromBlob(resourceName);
+    Instance instance;
+    try {
+      instance = server.getInstanceFromBlob(resourceName);
+    } catch (InstanceNotFoundException ex) {
+      responseObserver.onError(new StatusException(Status.NOT_FOUND));
+      return;
+    }
+
     String operationStream = parseOperationStream(resourceName);
 
     InputStream input = instance.newStreamInput(operationStream);
@@ -243,12 +257,21 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
         }
         if (request.getFinishWrite()) {
           active_write_requests.remove(writeResourceName);
-          Instance instance = server.getInstanceFromUploadBlob(writeResourceName);
           Digest blobDigest = Digests.computeDigest(data);
           if (!blobDigest.equals(digest)) {
             responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
             failed = true;
           } else {
+            Instance instance;
+
+            try {
+              instance = server.getInstanceFromUploadBlob(writeResourceName);
+            } catch (InstanceNotFoundException ex) {
+              responseObserver.onError(new StatusException(Status.NOT_FOUND));
+              failed = true;
+              return;
+            }
+
             try {
               instance.putBlob(data);
             } catch (IOException ex) {
@@ -261,8 +284,14 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
 
       private void writeOperationStream(
           WriteRequest request, StreamObserver<WriteResponse> responseObserver) throws IOException {
-        Instance instance =
-          server.getInstanceFromOperationStream(writeResourceName);
+        Instance instance;
+
+        try {
+          instance = server.getInstanceFromOperationStream(writeResourceName);
+        } catch (InstanceNotFoundException ex) {
+          responseObserver.onError(new StatusException(Status.NOT_FOUND));
+          return;
+        }
 
         String operationStream = parseOperationStream(writeResourceName);
 

@@ -33,7 +33,13 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
   @Override
   public void execute(
       ExecuteRequest request, StreamObserver<Operation> responseObserver) {
-    Instance instance = server.getInstance(request.getInstanceName());
+    Instance instance;
+    try {
+      instance = server.getInstance(request.getInstanceName());
+    } catch (InstanceNotFoundException ex) {
+      responseObserver.onError(new StatusException(Status.NOT_FOUND));
+      return;
+    }
 
     instance.execute(
         request.getAction(),

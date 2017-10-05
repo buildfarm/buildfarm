@@ -46,7 +46,13 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
   public void findMissingBlobs(
       FindMissingBlobsRequest request,
       StreamObserver<FindMissingBlobsResponse> responseObserver) {
-    Instance instance = server.getInstance(request.getInstanceName());
+    Instance instance;
+    try {
+      instance = server.getInstance(request.getInstanceName());
+    } catch (InstanceNotFoundException ex) {
+      responseObserver.onError(new StatusException(Status.NOT_FOUND));
+      return;
+    }
 
     responseObserver.onNext(FindMissingBlobsResponse.newBuilder()
         .addAllMissingBlobDigests(
@@ -59,7 +65,13 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
   public void batchUpdateBlobs(
       BatchUpdateBlobsRequest batchRequest,
       StreamObserver<BatchUpdateBlobsResponse> responseObserver) {
-    Instance instance = server.getInstance(batchRequest.getInstanceName());
+    Instance instance;
+    try {
+      instance = server.getInstance(batchRequest.getInstanceName());
+    } catch (InstanceNotFoundException ex) {
+      responseObserver.onError(new StatusException(Status.NOT_FOUND));
+      return;
+    }
 
     ImmutableList.Builder<ByteString> validBlobsBuilder = new ImmutableList.Builder<>();
     ImmutableList.Builder<BatchUpdateBlobsResponse.Response> responses =
@@ -101,7 +113,13 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
   public void getTree(
       GetTreeRequest request,
       StreamObserver<GetTreeResponse> responseObserver) {
-    Instance instance = server.getInstance(request.getInstanceName());
+    Instance instance;
+    try {
+      instance = server.getInstance(request.getInstanceName());
+    } catch (InstanceNotFoundException ex) {
+      responseObserver.onError(new StatusException(Status.NOT_FOUND));
+      return;
+    }
 
     int pageSize = request.getPageSize();
     if (pageSize < 0) {

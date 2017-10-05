@@ -39,8 +39,13 @@ public class WatcherService extends WatcherGrpc.WatcherImplBase {
       Request request, StreamObserver<ChangeBatch> responseObserver) {
     // FIXME url decode
     String operationName = request.getTarget();
-    Instance instance =
-      server.getInstanceFromOperationName(operationName);
+    Instance instance;
+    try {
+      instance = server.getInstanceFromOperationName(operationName);
+    } catch (InstanceNotFoundException ex) {
+      responseObserver.onError(new StatusException(Status.NOT_FOUND));
+      return;
+    }
 
     // FIXME watcher client implementation cannot handle full
     // watcher implementation (specifically with element changes)
