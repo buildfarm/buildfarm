@@ -115,7 +115,9 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public void putActionResult(ActionKey actionKey, ActionResult actionResult) {
-    actionCache.put(actionKey, actionResult);
+    if (actionResult.getExitCode() == 0) {
+      actionCache.put(actionKey, actionResult);
+    }
   }
 
   @Override
