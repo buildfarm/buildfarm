@@ -14,6 +14,7 @@
 
 package build.buildfarm.server;
 
+import build.buildfarm.common.Encoding;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.memory.MemoryInstance;
 import build.buildfarm.v1test.BuildFarmServerConfig;
@@ -61,20 +62,9 @@ public class BuildFarmServer {
         .build();
   }
 
-  /**
-   * Decodes the given byte array assumed to be encoded with ISO-8859-1 encoding (isolatin1).
-   */
-  private static char[] convertFromLatin1(byte[] content) {
-    char[] latin1 = new char[content.length];
-    for (int i = 0; i < latin1.length; i++) { // yeah, latin1 is this easy! :-)
-      latin1[i] = (char) (0xff & content[i]);
-    }
-    return latin1;
-  }
-
   private static BuildFarmServerConfig toBuildFarmServerConfig(InputStream inputStream, BuildFarmServerOptions options) throws IOException {
     BuildFarmServerConfig.Builder builder = BuildFarmServerConfig.newBuilder();
-    String data = new String(convertFromLatin1(ByteStreams.toByteArray(inputStream)));
+    String data = new String(Encoding.convertFromLatin1(ByteStreams.toByteArray(inputStream)));
     TextFormat.merge(data, builder);
     if (options.port > 0) {
         builder.setPort(options.port);

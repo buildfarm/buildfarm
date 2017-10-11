@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker;
 
+import build.buildfarm.common.Encoding;
 import build.buildfarm.common.Digests;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
@@ -484,20 +485,9 @@ public class Worker {
     });
   }
 
-  /**
-   * Decodes the given byte array assumed to be encoded with ISO-8859-1 encoding (isolatin1).
-   */
-  private static char[] convertFromLatin1(byte[] content) {
-    char[] latin1 = new char[content.length];
-    for (int i = 0; i < latin1.length; i++) { // yeah, latin1 is this easy! :-)
-      latin1[i] = (char) (0xff & content[i]);
-    }
-    return latin1;
-  }
-
   private static WorkerConfig toWorkerConfig(InputStream inputStream, WorkerOptions options) throws IOException {
     WorkerConfig.Builder builder = WorkerConfig.newBuilder();
-    String data = new String(convertFromLatin1(ByteStreams.toByteArray(inputStream)));
+    String data = new String(Encoding.convertFromLatin1(ByteStreams.toByteArray(inputStream)));
     TextFormat.merge(data, builder);
     return builder.build();
   }
