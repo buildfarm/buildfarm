@@ -20,6 +20,7 @@ import build.buildfarm.v1test.BuildFarmServerConfig;
 import build.buildfarm.v1test.InstanceConfig;
 import com.google.common.collect.Iterables;
 import com.google.common.io.ByteStreams;
+import com.google.devtools.common.options.OptionsParser;
 import com.google.protobuf.TextFormat;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
@@ -29,6 +30,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Logger;
@@ -185,8 +187,21 @@ public class BuildFarmServer {
     }
   }
 
+  private static void printUsage(OptionsParser parser) {
+    System.out.println("Usage: CONFIG_PATH");
+    System.out.println(parser.describeOptions(Collections.<String, String>emptyMap(),
+                                              OptionsParser.HelpVerbosity.LONG));
+  }
+
   public static void main(String[] args) throws Exception {
-    Path configPath = Paths.get(args[0]);
+    OptionsParser parser = OptionsParser.newOptionsParser(BuildFarmServerOptions.class);
+    parser.parseAndExitUponError(args);
+    java.util.List<java.lang.String> residue = parser.getResidue();
+    if (residue.isEmpty()) {
+      printUsage(parser);
+      return;
+    }
+    Path configPath = Paths.get(residue.get(0));
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
       BuildFarmServer server = new BuildFarmServer(toBuildFarmServerConfig(configInputStream));
       configInputStream.close();

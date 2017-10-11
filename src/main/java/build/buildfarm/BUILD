@@ -73,6 +73,7 @@ java_library(
         ":common",
         ":instance",
         ":memory-instance",
+        "@com_github_pcj_google_options//jar",
         "@googleapis//:google_bytestream_bytestream_java_grpc",
         "@googleapis//:google_bytestream_bytestream_java_proto",
         "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_grpc",
