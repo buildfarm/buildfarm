@@ -32,6 +32,7 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
@@ -196,7 +197,7 @@ public class BuildFarmServer {
   public static void main(String[] args) throws Exception {
     OptionsParser parser = OptionsParser.newOptionsParser(BuildFarmServerOptions.class);
     parser.parseAndExitUponError(args);
-    java.util.List<java.lang.String> residue = parser.getResidue();
+    List<java.lang.String> residue = parser.getResidue();
     if (residue.isEmpty()) {
       printUsage(parser);
       return;
