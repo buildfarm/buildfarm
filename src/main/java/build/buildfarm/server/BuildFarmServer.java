@@ -133,7 +133,7 @@ public class BuildFarmServer {
       switch (instanceConfig.getTypeCase()) {
         default:
         case TYPE_NOT_SET:
-          throw new IllegalArgumentException();
+          throw new IllegalArgumentException("Instance type not set in config");
         case MEMORY_INSTANCE_CONFIG:
           instances.put(name, new MemoryInstance(
               name,
