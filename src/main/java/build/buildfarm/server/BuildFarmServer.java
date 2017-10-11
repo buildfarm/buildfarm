@@ -172,10 +172,13 @@ public class BuildFarmServer {
     return latin1;
   }
 
-  private static BuildFarmServerConfig toBuildFarmServerConfig(InputStream inputStream) throws IOException {
+  private static BuildFarmServerConfig toBuildFarmServerConfig(InputStream inputStream, BuildFarmServerOptions options) throws IOException {
     BuildFarmServerConfig.Builder builder = BuildFarmServerConfig.newBuilder();
     String data = new String(convertFromLatin1(ByteStreams.toByteArray(inputStream)));
     TextFormat.merge(data, builder);
+    if (options.port > 0) {
+        builder.setPort(options.port);
+    }
     return builder.build();
   }
 
@@ -219,7 +222,7 @@ public class BuildFarmServer {
     }
     Path configPath = Paths.get(residue.get(0));
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
-      BuildFarmServer server = new BuildFarmServer(toBuildFarmServerConfig(configInputStream));
+      BuildFarmServer server = new BuildFarmServer(toBuildFarmServerConfig(configInputStream, parser.getOptions(BuildFarmServerOptions.class)));
       configInputStream.close();
       server.start();
       server.blockUntilShutdown();

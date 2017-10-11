@@ -29,4 +29,12 @@ public class BuildFarmServerOptions extends OptionsBase {
       defaultValue = "true"
     )
   public boolean help;
+
+  @Option(
+      name = "port",
+      abbrev = 'p',
+      help = "Port to use.",
+      defaultValue = "-1"
+  )
+  public int port;
 }
