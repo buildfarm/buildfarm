@@ -116,7 +116,7 @@ public class BuildFarmInstances {
     for (InstanceConfig instanceConfig : instanceConfigs) {
       String name = instanceConfig.getName();
       InstanceConfig.TypeCase typeCase = instanceConfig.getTypeCase();
-      switch (instanceConfig.getTypeCase()) {
+      switch (typeCase) {
         default:
         case TYPE_NOT_SET:
           throw new IllegalArgumentException("Instance type not set in config");
