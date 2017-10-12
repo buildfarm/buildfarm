@@ -17,6 +17,16 @@ java_test(
 )
 
 java_test(
+  name = "BuildFarmWorkerTest",
+  srcs = ["BuildFarmWorkerTest.java"],
+  deps = [
+      "//src/main/java/build/buildfarm:common",
+      "//src/main/java/build/buildfarm:buildfarm-worker-impl",
+      "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+  ],
+)
+
+java_test(
   name = "ByteStringIteratorInputStreamTest",
   srcs = ["ByteStringIteratorInputStreamTest.java"],
   deps = [

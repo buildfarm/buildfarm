@@ -19,6 +19,7 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.WorkerConfig;
 import build.buildfarm.v1test.CASInsertionControl;
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -61,8 +62,9 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 import java.util.logging.Logger;
+import javax.naming.ConfigurationException;
 
-class Worker {
+public class Worker {
   public static final Logger logger = Logger.getLogger(Worker.class.getName());
   private final Instance instance;
   private final WorkerConfig config;
@@ -124,10 +126,30 @@ class Worker {
     return builder.build();
   }
 
-  public Worker(WorkerConfig config) {
+  private static Path getValidRoot(WorkerConfig config) throws ConfigurationException {
+    String rootValue = config.getRoot();
+    // Have to handle empty string here because all later APIs happily ignore
+    // empty strings (WTF)
+    if (Strings.isNullOrEmpty(rootValue)) {
+        throw new ConfigurationException("root value in config missing");
+    }
+    return Paths.get(rootValue);
+  }
+
+  private static Path getValidCasCacheDirectory(WorkerConfig config, Path root) throws ConfigurationException {
+    String casCacheValue = config.getCasCacheDirectory();
+    // Have to handle empty string here because all later APIs happily ignore
+    // empty strings (WTF)
+    if (Strings.isNullOrEmpty(casCacheValue)) {
+        throw new ConfigurationException("root value in config missing");
+    }
+    return root.resolve(casCacheValue);
+  }
+
+  public Worker(WorkerConfig config) throws ConfigurationException{
     this.config = config;
-    root = Paths.get(config.getRoot());
-    cacheDir = root.resolve(config.getCasCacheDirectory());
+    root = getValidRoot(config);
+    cacheDir = getValidCasCacheDirectory(config, root);
     instance = new StubInstance(
         config.getInstanceName(),
         createChannel(config.getOperationQueue()));
