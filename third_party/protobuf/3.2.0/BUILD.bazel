@@ -18,7 +18,7 @@ filegroup(
             "protobuf.bzl",
             "python/google/protobuf/**/*.py",
             "src/google/protobuf/**/*.proto",
-        ],
+        ], exclude = ["BUILD.bazel", "util/python/BUILD.bazel"]
     ) + [
         "//third_party/protobuf/3.2.0/util/python:srcs",
     ],
