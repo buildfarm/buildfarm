@@ -29,10 +29,10 @@ import io.grpc.StatusException;
 import io.grpc.stub.StreamObserver;
 
 public class OperationsService extends OperationsGrpc.OperationsImplBase {
-  private final BuildFarmServer server;
+  private final BuildFarmInstances instances;
 
-  public OperationsService(BuildFarmServer server) {
-    this.server = server;
+  public OperationsService(BuildFarmInstances instances) {
+    this.instances = instances;
   }
 
   @Override
@@ -41,7 +41,7 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
       StreamObserver<ListOperationsResponse> responseObserver) {
     Instance instance;
     try {
-      instance = server.getInstanceFromOperationsCollectionName(
+      instance = instances.getInstanceFromOperationsCollectionName(
           request.getName());
     } catch (InstanceNotFoundException ex) {
       responseObserver.onError(new StatusException(Status.NOT_FOUND));
@@ -76,7 +76,7 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
       StreamObserver<Operation> responseObserver) {
     Instance instance;
     try {
-      instance = server.getInstanceFromOperationName(request.getName());
+      instance = instances.getInstanceFromOperationName(request.getName());
     } catch (InstanceNotFoundException ex) {
       responseObserver.onError(new StatusException(Status.NOT_FOUND));
       return;
@@ -92,7 +92,7 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
       StreamObserver<Empty> responseObserver) {
     Instance instance;
     try {
-      instance = server.getInstanceFromOperationName(request.getName());
+      instance = instances.getInstanceFromOperationName(request.getName());
     } catch (InstanceNotFoundException ex) {
       responseObserver.onError(new StatusException(Status.NOT_FOUND));
       return;
@@ -113,7 +113,7 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
       StreamObserver<Empty> responseObserver) {
     Instance instance;
     try {
-      instance = server.getInstanceFromOperationName(request.getName());
+      instance = instances.getInstanceFromOperationName(request.getName());
     } catch (InstanceNotFoundException ex) {
       responseObserver.onError(new StatusException(Status.NOT_FOUND));
       return;

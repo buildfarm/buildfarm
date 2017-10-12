@@ -40,11 +40,11 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
   private static final long DEFAULT_CHUNK_SIZE = 1024 * 16;
 
   private final Map<String, ByteString> active_write_requests;
-  private final BuildFarmServer server;
+  private final BuildFarmInstances instances;
 
-  public ByteStreamService(BuildFarmServer server) {
+  public ByteStreamService(BuildFarmInstances instances) {
     active_write_requests = new HashMap<String, ByteString>();
-    this.server = server;
+    this.instances = instances;
   }
 
   private static boolean isBlob(String resourceName) {
@@ -98,7 +98,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
 
     Instance instance;
     try {
-      instance = server.getInstanceFromBlob(resourceName);
+      instance = instances.getInstanceFromBlob(resourceName);
     } catch (InstanceNotFoundException ex) {
       responseObserver.onError(new StatusException(Status.NOT_FOUND));
       return;
@@ -137,7 +137,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
 
     Instance instance;
     try {
-      instance = server.getInstanceFromBlob(resourceName);
+      instance = instances.getInstanceFromBlob(resourceName);
     } catch (InstanceNotFoundException ex) {
       responseObserver.onError(new StatusException(Status.NOT_FOUND));
       return;
@@ -265,7 +265,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
             Instance instance;
 
             try {
-              instance = server.getInstanceFromUploadBlob(writeResourceName);
+              instance = instances.getInstanceFromUploadBlob(writeResourceName);
             } catch (InstanceNotFoundException ex) {
               responseObserver.onError(new StatusException(Status.NOT_FOUND));
               failed = true;
@@ -287,7 +287,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
         Instance instance;
 
         try {
-          instance = server.getInstanceFromOperationStream(writeResourceName);
+          instance = instances.getInstanceFromOperationStream(writeResourceName);
         } catch (InstanceNotFoundException ex) {
           responseObserver.onError(new StatusException(Status.NOT_FOUND));
           return;

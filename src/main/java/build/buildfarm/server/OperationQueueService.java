@@ -29,10 +29,10 @@ import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 
 public class OperationQueueService extends OperationQueueGrpc.OperationQueueImplBase {
-  private final BuildFarmServer server;
+  private final BuildFarmInstances instances;
 
-  public OperationQueueService(BuildFarmServer server) {
-    this.server = server;
+  public OperationQueueService(BuildFarmInstances instances) {
+    this.instances = instances;
   }
 
   @Override
@@ -41,7 +41,7 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
       StreamObserver<Operation> responseObserver) {
     Instance instance;
     try {
-      instance = server.getInstance(request.getInstanceName());
+      instance = instances.getInstance(request.getInstanceName());
     } catch (InstanceNotFoundException ex) {
       responseObserver.onError(new StatusException(Status.NOT_FOUND));
       return;
@@ -82,7 +82,7 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
       StreamObserver<com.google.rpc.Status> responseObserver) {
     Instance instance;
     try {
-      instance = server.getInstanceFromOperationName(operation.getName());
+      instance = instances.getInstanceFromOperationName(operation.getName());
     } catch (InstanceNotFoundException ex) {
       responseObserver.onError(new StatusException(Status.NOT_FOUND));
       return;
@@ -102,7 +102,7 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
       StreamObserver<com.google.rpc.Status> responseObserver) {
     Instance instance;
     try {
-      instance = server.getInstanceFromOperationName(
+      instance = instances.getInstanceFromOperationName(
           request.getOperationName());
     } catch (InstanceNotFoundException ex) {
       responseObserver.onError(new StatusException(Status.NOT_FOUND));

@@ -24,10 +24,10 @@ import io.grpc.StatusException;
 import io.grpc.stub.StreamObserver;
 
 public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
-  private final BuildFarmServer server;
+  private final BuildFarmInstances instances;
 
-  public ActionCacheService(BuildFarmServer server) {
-    this.server = server;
+  public ActionCacheService(BuildFarmInstances instances) {
+    this.instances = instances;
   }
 
   @Override
@@ -36,7 +36,7 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
       StreamObserver<ActionResult> responseObserver) {
     Instance instance;
     try {
-      instance = server.getInstance(request.getInstanceName());
+      instance = instances.getInstance(request.getInstanceName());
     } catch (InstanceNotFoundException ex) {
       responseObserver.onError(new StatusException(Status.NOT_FOUND));
       return;
@@ -59,7 +59,7 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
       StreamObserver<ActionResult> responseObserver) {
     Instance instance;
     try {
-      instance = server.getInstance(request.getInstanceName());
+      instance = instances.getInstance(request.getInstanceName());
     } catch (InstanceNotFoundException ex) {
       responseObserver.onError(new StatusException(Status.NOT_FOUND));
       return;

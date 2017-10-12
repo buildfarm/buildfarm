@@ -31,7 +31,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
@@ -41,8 +40,7 @@ public class BuildFarmServer {
     Logger.getLogger(BuildFarmServer.class.getName());
 
   private final BuildFarmServerConfig config;
-  private final Map<String, Instance> instances;
-  private final Instance defaultInstance;
+  private final BuildFarmInstances instances;
   private final Server server;
 
   public BuildFarmServer(BuildFarmServerConfig config) {
@@ -51,114 +49,16 @@ public class BuildFarmServer {
 
   public BuildFarmServer(ServerBuilder<?> serverBuilder, BuildFarmServerConfig config) {
     this.config = config;
-    instances = new HashMap<String, Instance>();
-    createInstances();
     String defaultInstanceName = config.getDefaultInstanceName();
-    if (!defaultInstanceName.isEmpty()) {
-      if (!instances.containsKey(defaultInstanceName)) {
-        throw new IllegalArgumentException();
-      }
-      defaultInstance = instances.get(defaultInstanceName);
-    } else {
-      defaultInstance = null;
-    }
+    instances = new BuildFarmInstances(config.getInstancesList(), defaultInstanceName);
     server = serverBuilder
-        .addService(new ActionCacheService(this))
-        .addService(new ContentAddressableStorageService(this))
-        .addService(new ByteStreamService(this))
-        .addService(new ExecutionService(this))
-        .addService(new OperationQueueService(this))
-        .addService(new WatcherService(this))
+        .addService(new ActionCacheService(instances))
+        .addService(new ContentAddressableStorageService(instances))
+        .addService(new ByteStreamService(instances))
+        .addService(new ExecutionService(instances))
+        .addService(new OperationQueueService(instances))
+        .addService(new WatcherService(instances))
         .build();
-  }
-
-  public Instance getDefaultInstance() {
-    return defaultInstance;
-  }
-
-  public Instance getInstance(String name) throws InstanceNotFoundException {
-    Instance instance;
-    if (name == null || name.isEmpty()) {
-      instance = getDefaultInstance();
-    } else {
-      instance = instances.get(name);
-    }
-    if (instance == null) {
-      throw new InstanceNotFoundException(name);
-    }
-    return instance;
-  }
-
-  public Instance getInstanceFromOperationsCollectionName(
-      String operationsCollectionName) throws InstanceNotFoundException {
-    // {instance_name=**}/operations
-    String[] components = operationsCollectionName.split("/");
-    String instanceName = String.join(
-        "/", Iterables.limit(
-            Arrays.asList(components),
-            components.length - 1));
-    return getInstance(instanceName);
-  }
-
-  public Instance getInstanceFromOperationName(String operationName)
-      throws InstanceNotFoundException {
-    // {instance_name=**}/operations/{uuid}
-    String[] components = operationName.split("/");
-    String instanceName = String.join(
-        "/", Iterables.limit(
-            Arrays.asList(components),
-            components.length - 2));
-    return getInstance(instanceName);
-  }
-
-  public Instance getInstanceFromOperationStream(String operationStream)
-      throws InstanceNotFoundException {
-    // {instance_name=**}/operations/{uuid}/streams/{stream}
-    String[] components = operationStream.split("/");
-    String instanceName = String.join(
-        "/", Iterables.limit(
-            Arrays.asList(components),
-            components.length - 4));
-    return getInstance(instanceName);
-  }
-
-  public Instance getInstanceFromBlob(String blobName)
-      throws InstanceNotFoundException {
-    // {instance_name=**}/blobs/{hash}/{size}
-    String[] components = blobName.split("/");
-    String instanceName = String.join(
-        "/", Iterables.limit(
-            Arrays.asList(components),
-            components.length - 3));
-    return getInstance(instanceName);
-  }
-
-  public Instance getInstanceFromUploadBlob(String uploadBlobName)
-      throws InstanceNotFoundException {
-    // {instance_name=**}/uploads/{uuid}/blobs/{hash}/{size}
-    String[] components = uploadBlobName.split("/");
-    String instanceName = String.join(
-        "/", Iterables.limit(
-            Arrays.asList(components),
-            components.length - 5));
-    return getInstance(instanceName);
-  }
-
-  private void createInstances() {
-    for (InstanceConfig instanceConfig : config.getInstancesList()) {
-      String name = instanceConfig.getName();
-      InstanceConfig.TypeCase typeCase = instanceConfig.getTypeCase();
-      switch (instanceConfig.getTypeCase()) {
-        default:
-        case TYPE_NOT_SET:
-          throw new IllegalArgumentException("Instance type not set in config");
-        case MEMORY_INSTANCE_CONFIG:
-          instances.put(name, new MemoryInstance(
-              name,
-              instanceConfig.getMemoryInstanceConfig()));
-          break;
-      }
-    }
   }
 
   /**
