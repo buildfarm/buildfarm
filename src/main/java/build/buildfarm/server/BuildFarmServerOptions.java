@@ -18,7 +18,7 @@ import com.google.devtools.common.options.Option;
 import com.google.devtools.common.options.OptionsBase;
 
 /**
- * Command-line options definition for example server.
+ * Command-line options definition for Server.
  */
 public class BuildFarmServerOptions extends OptionsBase {
 
