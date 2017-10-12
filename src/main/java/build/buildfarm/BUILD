@@ -110,13 +110,12 @@ java_library(
         "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
         "@googleapis//:google_longrunning_operations_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
-    ]
+    ],
 )
 
-java_binary(
-    name = "buildfarm-worker",
+java_library(
+    name = "buildfarm-worker-impl",
     srcs = glob(["worker/**/*.java"]),
-    main_class = "build.buildfarm.worker.Worker",
     deps = [
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "//third_party:guava",
@@ -127,3 +126,12 @@ java_binary(
         ":stub-instance",
     ],
 )
+
+java_binary(
+    name = "buildfarm-worker",
+    main_class = "build.buildfarm.worker.Worker",
+    runtime_deps = [
+      ":buildfarm-worker-impl",
+    ],
+)
+
