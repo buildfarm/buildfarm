@@ -129,7 +129,7 @@ public class Worker {
     // Have to handle empty string here because all later APIs happily ignore
     // empty strings (WTF)
     if (Strings.isNullOrEmpty(casCacheValue)) {
-        throw new ConfigurationException("root value in config missing");
+        throw new ConfigurationException("Cas cache directory value in config missing");
     }
     return root.resolve(casCacheValue);
   }
