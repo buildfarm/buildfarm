@@ -41,6 +41,12 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
       StreamObserver<Operation> responseObserver) {
     Instance instance = server.getInstance(request.getInstanceName());
 
+    if (instance == null) {
+        String errorMessage = String.format("Instance %s not known to Service", request.getInstanceName());
+        responseObserver.onError(new StatusException(Status.NOT_FOUND.withDescription(errorMessage)));
+        return;
+    }
+
     instance.match(request.getPlatform(), /*requeueOnFailure=*/ true, (final Operation operation) -> {
       // so this is interesting - the stdout injection belongs here, because
       // we use this criteria to select the format for stream/blob differentiation
