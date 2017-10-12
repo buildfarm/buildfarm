@@ -13,8 +13,13 @@ Get involved by joining the discussion on the [dedicated mailing list](https://g
 
 Run via
 
-    bazel run //src/main/java/build/buildfarm:buildfarm-server -- config_file
+    bazel run //src/main/java/build/buildfarm:buildfarm-server -- config_file [-p PORT] [--port PORT]
 
 - **`config_file`** has to be a (undocumented) Protocol Buffer text format.
   
   For format details see [here](https://stackoverflow.com/questions/18873924/what-does-the-protobuf-text-format-look-like). Protocol Buffer structure at [src/main/protobuf/build/buildfarm/v1test/buildfarm.proto](src/main/protobuf/build/buildfarm/v1test/buildfarm.proto)
+
+- **`PORT`** to expose service endpoints on
+
+  Overrides port setting in `config_file`.
+
