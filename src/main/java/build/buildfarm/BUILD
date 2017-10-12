@@ -124,6 +124,7 @@ java_library(
         ":common",
         ":instance",
         ":stub-instance",
+        "@com_github_pcj_google_options//jar",
     ],
 )
 

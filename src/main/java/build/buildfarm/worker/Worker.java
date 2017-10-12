@@ -25,6 +25,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.io.ByteStreams;
+import com.google.devtools.common.options.OptionsParser;
 import com.google.devtools.remoteexecution.v1test.Action;
 import com.google.devtools.remoteexecution.v1test.ActionResult;
 import com.google.devtools.remoteexecution.v1test.Command;
@@ -55,8 +56,10 @@ import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -492,17 +495,30 @@ public class Worker {
     return latin1;
   }
 
-  private static WorkerConfig toWorkerConfig(InputStream inputStream) throws IOException {
+  private static WorkerConfig toWorkerConfig(InputStream inputStream, WorkerOptions options) throws IOException {
     WorkerConfig.Builder builder = WorkerConfig.newBuilder();
     String data = new String(convertFromLatin1(ByteStreams.toByteArray(inputStream)));
     TextFormat.merge(data, builder);
     return builder.build();
   }
 
+  private static void printUsage(OptionsParser parser) {
+    System.out.println("Usage: CONFIG_PATH");
+    System.out.println(parser.describeOptions(Collections.<String, String>emptyMap(),
+                                              OptionsParser.HelpVerbosity.LONG));
+  }
+
   public static void main(String[] args) throws Exception {
-    Path configPath = Paths.get(args[0]);
+    OptionsParser parser = OptionsParser.newOptionsParser(WorkerOptions.class);
+    parser.parseAndExitUponError(args);
+    List<String> residue = parser.getResidue();
+    if (residue.isEmpty()) {
+      printUsage(parser);
+      return;
+    }
+    Path configPath = Paths.get(residue.get(0));
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
-      Worker worker = new Worker(toWorkerConfig(configInputStream));
+      Worker worker = new Worker(toWorkerConfig(configInputStream, parser.getOptions(WorkerOptions.class)));
       configInputStream.close();
       worker.start();
     }
