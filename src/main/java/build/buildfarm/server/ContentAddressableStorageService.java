@@ -36,10 +36,10 @@ import java.io.IOException;
 import java.util.function.Function;
 
 public class ContentAddressableStorageService extends ContentAddressableStorageGrpc.ContentAddressableStorageImplBase {
-  private final BuildFarmServer server;
+  private final BuildFarmInstances instances;
 
-  public ContentAddressableStorageService(BuildFarmServer server) {
-    this.server = server;
+  public ContentAddressableStorageService(BuildFarmInstances instances) {
+    this.instances = instances;
   }
 
   @Override
@@ -48,7 +48,7 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
       StreamObserver<FindMissingBlobsResponse> responseObserver) {
     Instance instance;
     try {
-      instance = server.getInstance(request.getInstanceName());
+      instance = instances.getInstance(request.getInstanceName());
     } catch (InstanceNotFoundException ex) {
       responseObserver.onError(new StatusException(Status.NOT_FOUND));
       return;
@@ -67,7 +67,7 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
       StreamObserver<BatchUpdateBlobsResponse> responseObserver) {
     Instance instance;
     try {
-      instance = server.getInstance(batchRequest.getInstanceName());
+      instance = instances.getInstance(batchRequest.getInstanceName());
     } catch (InstanceNotFoundException ex) {
       responseObserver.onError(new StatusException(Status.NOT_FOUND));
       return;
@@ -115,7 +115,7 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
       StreamObserver<GetTreeResponse> responseObserver) {
     Instance instance;
     try {
-      instance = server.getInstance(request.getInstanceName());
+      instance = instances.getInstance(request.getInstanceName());
     } catch (InstanceNotFoundException ex) {
       responseObserver.onError(new StatusException(Status.NOT_FOUND));
       return;

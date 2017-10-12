@@ -24,10 +24,10 @@ import io.grpc.stub.StreamObserver;
 import java.util.UUID;
 
 public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
-  private final BuildFarmServer server;
+  private final BuildFarmInstances instances;
 
-  public ExecutionService(BuildFarmServer server) {
-    this.server = server;
+  public ExecutionService(BuildFarmInstances instances) {
+    this.instances = instances;
   }
 
   @Override
@@ -35,7 +35,7 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
       ExecuteRequest request, StreamObserver<Operation> responseObserver) {
     Instance instance;
     try {
-      instance = server.getInstance(request.getInstanceName());
+      instance = instances.getInstance(request.getInstanceName());
     } catch (InstanceNotFoundException ex) {
       responseObserver.onError(new StatusException(Status.NOT_FOUND));
       return;

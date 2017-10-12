@@ -28,10 +28,10 @@ import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 
 public class WatcherService extends WatcherGrpc.WatcherImplBase {
-  private final BuildFarmServer server;
+  private final BuildFarmInstances instances;
 
-  public WatcherService(BuildFarmServer server) {
-    this.server = server;
+  public WatcherService(BuildFarmInstances instances) {
+    this.instances = instances;
   }
 
   @Override
@@ -41,7 +41,7 @@ public class WatcherService extends WatcherGrpc.WatcherImplBase {
     String operationName = request.getTarget();
     Instance instance;
     try {
-      instance = server.getInstanceFromOperationName(operationName);
+      instance = instances.getInstanceFromOperationName(operationName);
     } catch (InstanceNotFoundException ex) {
       responseObserver.onError(new StatusException(Status.NOT_FOUND));
       return;
