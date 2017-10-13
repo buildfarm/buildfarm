@@ -212,7 +212,7 @@ public class BuildFarmServer {
   public static void main(String[] args) throws Exception {
     OptionsParser parser = OptionsParser.newOptionsParser(BuildFarmServerOptions.class);
     parser.parseAndExitUponError(args);
-    List<java.lang.String> residue = parser.getResidue();
+    List<String> residue = parser.getResidue();
     if (residue.isEmpty()) {
       printUsage(parser);
       return;
