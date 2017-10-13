@@ -23,15 +23,18 @@ rm -rf .git .gitignore .gitmodules
 4) Copy `third_party/protobuf/<old_proto>/com_google_protobuf_java.BUILD` to the new
    directory.
    file in the new directory.
-5) For each file listed in `RELATIVE_WELL_KNOWN_PROTOS` in the `new_proto/BUILD` file
+5) Copy the `licenses` declaration and the `srcs` filegroup from
+   `third_party/protobuf/<old_proto>/util/python/BUILD` to the corresponding
+   file in the new directory.
+6) For each file listed in `RELATIVE_WELL_KNOWN_PROTOS` in the `new_proto/BUILD` file
    copy it from `new_proto/srcs/google/protobuf` to `new_proto/google/protobuf`.
-6) Name the `new_proto` directory according to the protobuf version number.
-7) In `third_party/protobuf/BUILD` update `PROTOBUF_VERSION` to the name of the
+7) Name the `new_proto` directory according to the protobuf version number.
+8) In `third_party/protobuf/BUILD` update `PROTOBUF_VERSION` to the name of the
 directory you just created.
-8) In the root `WORKSPACE` file update relative paths of protobuf to point to
+9) In the root `WORKSPACE` file update relative paths of protobuf to point to
 the new version.
-9) Delete the `third_party/protobuf/<old_proto>` directory.
-10) Update this file if you found the :instructions to be wrong or incomplete.
+10) Delete the `third_party/protobuf/<old_proto>` directory.
+11) Update this file if you found the :instructions to be wrong or incomplete.
 
 # Current protobuf version
 

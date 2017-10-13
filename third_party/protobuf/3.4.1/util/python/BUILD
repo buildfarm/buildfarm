@@ -12,6 +12,14 @@
 #   name = "python",
 #   path = __workspace_dir__ + "/util/python",
 # )
+licenses(["notice"])
+
+filegroup(
+    name = "srcs",
+    srcs = glob(["**"]),
+    visibility = ["//visibility:public"],
+)
+
 cc_library(
     name = "python_headers",
     visibility = ["//visibility:public"],
