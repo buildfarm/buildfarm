@@ -142,7 +142,7 @@ public class Worker {
     return root.resolve(casCacheValue);
   }
 
-  public Worker(WorkerConfig config) throws ConfigurationException{
+  public Worker(WorkerConfig config) throws ConfigurationException {
     this.config = config;
     root = getValidRoot(config);
     cacheDir = getValidCasCacheDirectory(config, root);
