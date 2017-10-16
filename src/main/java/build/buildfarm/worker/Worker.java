@@ -116,8 +116,6 @@ public class Worker {
 
   private static Path getValidRoot(WorkerConfig config) throws ConfigurationException {
     String rootValue = config.getRoot();
-    // Have to handle empty string here because all later APIs happily ignore
-    // empty strings (WTF)
     if (Strings.isNullOrEmpty(rootValue)) {
         throw new ConfigurationException("root value in config missing");
     }
@@ -126,8 +124,6 @@ public class Worker {
 
   private static Path getValidCasCacheDirectory(WorkerConfig config, Path root) throws ConfigurationException {
     String casCacheValue = config.getCasCacheDirectory();
-    // Have to handle empty string here because all later APIs happily ignore
-    // empty strings (WTF)
     if (Strings.isNullOrEmpty(casCacheValue)) {
         throw new ConfigurationException("Cas cache directory value in config missing");
     }
