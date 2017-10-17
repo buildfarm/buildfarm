@@ -118,7 +118,7 @@ public class BuildFarmServer {
     List<java.lang.String> residue = parser.getResidue();
     if (residue.isEmpty()) {
       printUsage(parser);
-      return;
+      throw new IllegalArgumentException("Missing CONFIG_PATH");
     }
     Path configPath = Paths.get(residue.get(0));
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
