@@ -43,7 +43,7 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
     try {
       instance = instances.getInstance(request.getInstanceName());
     } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(new StatusException(Status.NOT_FOUND));
+      BuildFarmInstances.respondFromException(responseObserver, ex);
       return;
     }
 
@@ -84,7 +84,7 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
     try {
       instance = instances.getInstanceFromOperationName(operation.getName());
     } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(new StatusException(Status.NOT_FOUND));
+      BuildFarmInstances.respondFromException(responseObserver, ex);
       return;
     }
 
@@ -105,7 +105,7 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
       instance = instances.getInstanceFromOperationName(
           request.getOperationName());
     } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(new StatusException(Status.NOT_FOUND));
+      BuildFarmInstances.respondFromException(responseObserver, ex);
       return;
     }
 

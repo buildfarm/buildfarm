@@ -18,12 +18,21 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.memory.MemoryInstance;
 import build.buildfarm.v1test.InstanceConfig;
 import com.google.common.collect.Iterables;
+import com.google.devtools.remoteexecution.v1test.ActionResult;
+import io.grpc.Status;
+import io.grpc.StatusException;
+import io.grpc.stub.StreamObserver;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 public class BuildFarmInstances {
+  public static void respondFromException(StreamObserver<?> responseObserver, InstanceNotFoundException ex) {
+    String errorMessage = String.format("Instance %s not known to Service", ex.instanceName);
+    responseObserver.onError(new StatusException(Status.NOT_FOUND.withDescription(errorMessage)));
+  }
+
   private final Map<String, Instance> instances;
   private final Instance defaultInstance;
 
