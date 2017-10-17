@@ -186,7 +186,8 @@ public class MemoryInstance extends AbstractServerInstance {
   protected Operation createOperation(Action action) {
     String name = createOperationName(UUID.randomUUID().toString());
 
-    watchers.put(name, new ArrayList<Function<Operation, Boolean>>());
+    List<Function<Operation, Boolean>> previous = watchers.put(name, new ArrayList<Function<Operation, Boolean>>());
+    assert previous != null : "Operation name " + previous + " expected to be unique - but seems like there were some collisions";
 
     Digest actionDigest = Digests.computeDigest(action.toByteString());
 
