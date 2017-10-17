@@ -69,19 +69,7 @@ class Worker {
   private final Path root;
   private final Path cacheDir;
 
-  private static final OutputStream nullOutputStream = new OutputStream() {
-    @Override
-    public void write(int b) {
-    }
-
-    @Override
-    public void write(byte[] b) {
-    }
-
-    @Override
-    public void write(byte[] b, int off, int len) {
-    }
-  };
+  private static final OutputStream nullOutputStream = ByteStreams.nullOutputStream();
 
   private static class Poller implements Runnable {
     private final Duration period;
