@@ -40,14 +40,14 @@ public class BuildFarmInstances {
     }
   }
 
-  public Instance getDefaultInstance() {
+  public Instance getDefault() {
     return defaultInstance;
   }
 
-  public Instance getInstance(String name) throws InstanceNotFoundException {
+  public Instance get(String name) throws InstanceNotFoundException {
     Instance instance;
     if (name == null || name.isEmpty()) {
-      instance = getDefaultInstance();
+      instance = getDefault();
     } else {
       instance = instances.get(name);
     }
@@ -57,7 +57,7 @@ public class BuildFarmInstances {
     return instance;
   }
 
-  public Instance getInstanceFromOperationsCollectionName(
+  public Instance getFromOperationsCollectionName(
       String operationsCollectionName) throws InstanceNotFoundException {
     // {instance_name=**}/operations
     String[] components = operationsCollectionName.split("/");
@@ -65,10 +65,10 @@ public class BuildFarmInstances {
         "/", Iterables.limit(
             Arrays.asList(components),
             components.length - 1));
-    return getInstance(instanceName);
+    return get(instanceName);
   }
 
-  public Instance getInstanceFromOperationName(String operationName)
+  public Instance getFromOperationName(String operationName)
       throws InstanceNotFoundException {
     // {instance_name=**}/operations/{uuid}
     String[] components = operationName.split("/");
@@ -76,10 +76,10 @@ public class BuildFarmInstances {
         "/", Iterables.limit(
             Arrays.asList(components),
             components.length - 2));
-    return getInstance(instanceName);
+    return get(instanceName);
   }
 
-  public Instance getInstanceFromOperationStream(String operationStream)
+  public Instance getFromOperationStream(String operationStream)
       throws InstanceNotFoundException {
     // {instance_name=**}/operations/{uuid}/streams/{stream}
     String[] components = operationStream.split("/");
@@ -87,10 +87,10 @@ public class BuildFarmInstances {
         "/", Iterables.limit(
             Arrays.asList(components),
             components.length - 4));
-    return getInstance(instanceName);
+    return get(instanceName);
   }
 
-  public Instance getInstanceFromBlob(String blobName)
+  public Instance getFromBlob(String blobName)
       throws InstanceNotFoundException {
     // {instance_name=**}/blobs/{hash}/{size}
     String[] components = blobName.split("/");
@@ -98,10 +98,10 @@ public class BuildFarmInstances {
         "/", Iterables.limit(
             Arrays.asList(components),
             components.length - 3));
-    return getInstance(instanceName);
+    return get(instanceName);
   }
 
-  public Instance getInstanceFromUploadBlob(String uploadBlobName)
+  public Instance getFromUploadBlob(String uploadBlobName)
       throws InstanceNotFoundException {
     // {instance_name=**}/uploads/{uuid}/blobs/{hash}/{size}
     String[] components = uploadBlobName.split("/");
@@ -109,7 +109,7 @@ public class BuildFarmInstances {
         "/", Iterables.limit(
             Arrays.asList(components),
             components.length - 5));
-    return getInstance(instanceName);
+    return get(instanceName);
   }
 
   private void createInstances(List<InstanceConfig> instanceConfigs) {
