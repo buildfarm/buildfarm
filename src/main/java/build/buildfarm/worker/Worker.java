@@ -499,6 +499,13 @@ public class Worker {
     WorkerConfig.Builder builder = WorkerConfig.newBuilder();
     String data = new String(convertFromLatin1(ByteStreams.toByteArray(inputStream)));
     TextFormat.merge(data, builder);
+    if (!Strings.isNullOrEmpty(options.root)) {
+      builder.setRoot(options.root);
+    }
+
+    if (!Strings.isNullOrEmpty(options.casCacheDirectory)) {
+      builder.setCasCacheDirectory(options.casCacheDirectory);
+    }
     return builder.build();
   }
 

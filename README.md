@@ -23,3 +23,18 @@ Run via
 
   Overrides port setting in `config_file`.
 
+### Bazel BuildFarmWorker
+
+Run via
+
+    bazel build //src/main/java/build/buildfarm:buildfarm-worker && \
+    bazel-bin/src/main/java/build/buildfarm/buildfarm-worker <configfile> [--root ROOT] [--cas_cache_directory CAS_CACHE_DIRECTORY]
+
+- **`configfile`** has to be in (undocumented) Protocol Buffer text format.
+
+  For format details see [here](https://stackoverflow.com/questions/18873924/what-does-the-protobuf-text-format-look-like). Protocol Buffer structure at [src/main/protobuf/build/buildfarm/v1test/buildfarm.proto](src/main/protobuf/build/buildfarm/v1test/buildfarm.proto)
+
+- **`ROOT`** base directory path for all work being performed.
+
+- **`CAS_CACHE_DIRECTORY`** is (absolute or relative) directory path to cached files from CAS.
+
