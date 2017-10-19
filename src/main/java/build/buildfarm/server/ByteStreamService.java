@@ -192,7 +192,8 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
       } else if (isOperationStream(resourceName)) {
         readOperationStream(request, responseObserver);
       } else {
-        responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
+        String description = "Invalid service";
+        responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
       }
     } catch(IOException ex) {
       responseObserver.onError(new StatusException(Status.fromThrowable(ex)));
@@ -210,7 +211,8 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
     } else if (isOperationStream(resourceName)) {
       responseObserver.onError(new StatusException(Status.UNIMPLEMENTED));
     } else {
-      responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
+      String description = "Invalid service";
+      responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
     }
   }
 
@@ -232,7 +234,8 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
         if (data == null) {
           digest = parseUploadBlobDigest(writeResourceName);
           if (digest == null) {
-            responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
+            String description = "Could not extract digest off: " + writeResourceName;
+            responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
             failed = true;
             return;
           }
@@ -242,7 +245,8 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
           }
         }
         if (request.getWriteOffset() != committed_size) {
-          responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
+          String description = "Write offset invalid: " + request.getWriteOffset();
+          responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
           failed = true;
           return;
         }
@@ -259,7 +263,8 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
           active_write_requests.remove(writeResourceName);
           Digest blobDigest = Digests.computeDigest(data);
           if (!blobDigest.equals(digest)) {
-            responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
+            String description = String.format("Digest mismatch %s <-> %s", blobDigest.getHash(), digest.getHash());
+            responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
             failed = true;
           } else {
             Instance instance;
@@ -312,7 +317,8 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
           String resourceName = request.getResourceName();
           if (resourceName.isEmpty()) {
             if (writeResourceName == null) {
-              responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
+              String description = "Missing resource name in request";
+              responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
               failed = true;
             } else {
               resourceName = writeResourceName;
@@ -320,7 +326,8 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
           } else if (writeResourceName == null) {
             writeResourceName = resourceName;
           } else if (!writeResourceName.equals(resourceName)) {
-            responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
+            String description = String.format("Previous resource name changed while handling request. %s -> %s", writeResourceName, resourceName);
+            responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
             failed = true;
           }
         }
@@ -334,7 +341,8 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
               writeOperationStream(request, responseObserver);
               finished = request.getFinishWrite();
             } else {
-              responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
+              String description = "Invalid service";
+              responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
               failed = true;
             }
           } catch(InterruptedException ex) {
