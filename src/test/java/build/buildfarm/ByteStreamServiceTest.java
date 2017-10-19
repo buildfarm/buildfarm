@@ -34,8 +34,8 @@ import static org.mockito.Mockito.verify;
 @RunWith(MockitoJUnitRunner.class)
 public class ByteStreamServiceTest {
 
-  private static byte[] generateFileData(Random random) {
-    byte[] data = new byte[1024 * 1024];
+  private static byte[] generateFileData(Random random, int length) {
+    byte[] data = new byte[length];
     random.nextBytes(data);
     return data;
   }
@@ -55,7 +55,7 @@ public class ByteStreamServiceTest {
     String uuid = "1d4e65cd-7c0d-44ca-b49b-b912988c8967"; // dummy value
 
     Random random = new Random(49);
-    byte[] data = generateFileData(random);
+    byte[] data = generateFileData(random, 1024 * 1024);
     ByteString bytes = ByteString.copyFrom(data);
     Digest digest = Digests.computeDigest(bytes);
     String hash = digest.toString();
