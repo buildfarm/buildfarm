@@ -29,4 +29,19 @@ public class WorkerOptions extends OptionsBase {
       defaultValue = "true"
     )
   public boolean help;
+
+  @Option(
+      name = "root",
+      help = "Root base directory for all work being performed.",
+      defaultValue = ""
+    )
+  public String root;
+
+  @Option(
+      name = "cas_cache_directory",
+      help = "(Absolute or relative to root) path to cached files from CAS.",
+      defaultValue = ""
+    )
+  public String casCacheDirectory;
 }
+
