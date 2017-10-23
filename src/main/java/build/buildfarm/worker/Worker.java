@@ -135,7 +135,12 @@ public class Worker {
 
   public Worker(WorkerConfig config) throws ConfigurationException {
     this.config = config;
+
+    /* configuration validation */
     root = getValidRoot(config);
+    Path casCacheDirectory = getValidCasCacheDirectory(config, root);
+
+    /* initialization */
     instance = new StubInstance(
         config.getInstanceName(),
         createChannel(config.getOperationQueue()));
@@ -147,7 +152,7 @@ public class Worker {
     };
     fileCache = new CASFileCache(
         inputStreamFactory,
-        root.resolve(getValidCasCacheDirectory(config, root)),
+        root.resolve(casCacheDirectory),
         config.getCasCacheMaxSizeBytes());
   }
 
