@@ -39,7 +39,7 @@ public class WorkerOptions extends OptionsBase {
 
   @Option(
       name = "cas_cache_directory",
-      help = "(Absolute or relative) path to cached files from CAS.",
+      help = "(Absolute or relative to root) path to cached files from CAS.",
       defaultValue = ""
     )
   public String casCacheDirectory;
