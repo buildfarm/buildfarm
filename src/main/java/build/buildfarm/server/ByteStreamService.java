@@ -234,7 +234,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
         if (data == null) {
           digest = parseUploadBlobDigest(writeResourceName);
           if (digest == null) {
-            String description = "Could not extract digest off: " + writeResourceName;
+            String description = "Could not parse digest of: " + writeResourceName;
             responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
             failed = true;
             return;
@@ -263,7 +263,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
           active_write_requests.remove(writeResourceName);
           Digest blobDigest = Digests.computeDigest(data);
           if (!blobDigest.equals(digest)) {
-            String description = String.format("Digest mismatch %s <-> %s", blobDigest.getHash(), digest.getHash());
+            String description = String.format("Digest mismatch %s <-> %s", Digests.toString(blobDigest), Digests.toString(digest));
             responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
             failed = true;
           } else {
