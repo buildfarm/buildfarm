@@ -144,15 +144,15 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
     }
 
     try {
-      Optional<UrlPath.ResourceOperation> serviceType = Optional.empty();
+      Optional<UrlPath.ResourceOperation> resourceOperation = Optional.empty();
       try {
-        serviceType = Optional.of(UrlPath.detectResourceOperation(resourceName));
+        resourceOperation = Optional.of(UrlPath.detectResourceOperation(resourceName));
       } catch (IllegalArgumentException ex) {
         String description = ex.getLocalizedMessage();
         responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
         return;
       }
-      switch (serviceType.get()) {
+      switch (resourceOperation.get()) {
       case Blob:
         readBlob(request, responseObserver);
         break;
@@ -174,16 +174,16 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
       StreamObserver<QueryWriteStatusResponse> responseObserver) {
     String resourceName = request.getResourceName();
 
-    Optional<UrlPath.ResourceOperation> serviceType = Optional.empty();
+    Optional<UrlPath.ResourceOperation> resourceOperation = Optional.empty();
     try {
-      serviceType = Optional.of(UrlPath.detectResourceOperation(resourceName));
+      resourceOperation = Optional.of(UrlPath.detectResourceOperation(resourceName));
     } catch (IllegalArgumentException ex) {
       String description = ex.getLocalizedMessage();
       responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
       return;
     }
 
-    switch (serviceType.get()) {
+    switch (resourceOperation.get()) {
     case UploadBlob:
       responseObserver.onError(new StatusException(Status.UNIMPLEMENTED));
       break;
@@ -311,9 +311,9 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
           return;
         }
         
-        Optional<UrlPath.ResourceOperation> serviceType = Optional.empty();
+        Optional<UrlPath.ResourceOperation> resourceOperation = Optional.empty();
         try {
-          serviceType = Optional.of(UrlPath.detectResourceOperation(writeResourceName));
+          resourceOperation = Optional.of(UrlPath.detectResourceOperation(writeResourceName));
         } catch (IllegalArgumentException ex) {
             String description = ex.getLocalizedMessage();
             responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
@@ -325,7 +325,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
         }
 
         try {
-          switch (serviceType.get()) {
+          switch (resourceOperation.get()) {
           case UploadBlob:
             writeBlob(request, responseObserver);
             finished = request.getFinishWrite();
