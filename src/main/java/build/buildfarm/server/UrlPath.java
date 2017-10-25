@@ -20,29 +20,29 @@ import com.google.devtools.remoteexecution.v1test.Digest;
 import java.util.Arrays;
 
 public class UrlPath {
-  public enum ServiceType {
+  public enum ResourceOperation {
     Blob(3),
     UploadBlob(5),
     OperationStream(4);
 
     private final int minComponentLength;
-    private ServiceType(int minComponentLength) {
+    private ResourceOperation(int minComponentLength) {
       this.minComponentLength = minComponentLength;
     }
   }
 
-  public static ServiceType detectServiceType(String resourceName) {
+  public static ResourceOperation detectResourceOperation(String resourceName) {
     // TODO: Replace this with proper readonly parser should this become
     // a bottleneck
     String[] components = resourceName.split("/");
     
     // Keep following checks ordered by descending minComponentLength
-    if (components.length >= ServiceType.UploadBlob.minComponentLength && isUploadBlob(components)) {
-      return ServiceType.UploadBlob;
-    } else if (components.length >= ServiceType.OperationStream.minComponentLength && isOperationStream(components)) {
-      return ServiceType.OperationStream;
-    } else if (components.length >= ServiceType.Blob.minComponentLength && isBlob(components)) {
-      return ServiceType.Blob;
+    if (components.length >= ResourceOperation.UploadBlob.minComponentLength && isUploadBlob(components)) {
+      return ResourceOperation.UploadBlob;
+    } else if (components.length >= ResourceOperation.OperationStream.minComponentLength && isOperationStream(components)) {
+      return ResourceOperation.OperationStream;
+    } else if (components.length >= ResourceOperation.Blob.minComponentLength && isBlob(components)) {
+      return ResourceOperation.Blob;
     }
 
     throw new IllegalArgumentException("Url path not recognized: " + resourceName);

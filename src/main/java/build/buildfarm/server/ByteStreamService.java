@@ -144,9 +144,9 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
     }
 
     try {
-      Optional<UrlPath.ServiceType> serviceType = Optional.empty();
+      Optional<UrlPath.ResourceOperation> serviceType = Optional.empty();
       try {
-        serviceType = Optional.of(UrlPath.detectServiceType(resourceName));
+        serviceType = Optional.of(UrlPath.detectResourceOperation(resourceName));
       } catch (IllegalArgumentException ex) {
         String description = ex.getLocalizedMessage();
         responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
@@ -174,9 +174,9 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
       StreamObserver<QueryWriteStatusResponse> responseObserver) {
     String resourceName = request.getResourceName();
 
-    Optional<UrlPath.ServiceType> serviceType = Optional.empty();
+    Optional<UrlPath.ResourceOperation> serviceType = Optional.empty();
     try {
-      serviceType = Optional.of(UrlPath.detectServiceType(resourceName));
+      serviceType = Optional.of(UrlPath.detectResourceOperation(resourceName));
     } catch (IllegalArgumentException ex) {
       String description = ex.getLocalizedMessage();
       responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
@@ -311,9 +311,9 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
           return;
         }
         
-        Optional<UrlPath.ServiceType> serviceType = Optional.empty();
+        Optional<UrlPath.ResourceOperation> serviceType = Optional.empty();
         try {
-          serviceType = Optional.of(UrlPath.detectServiceType(writeResourceName));
+          serviceType = Optional.of(UrlPath.detectResourceOperation(writeResourceName));
         } catch (IllegalArgumentException ex) {
             String description = ex.getLocalizedMessage();
             responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
