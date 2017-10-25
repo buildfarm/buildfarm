@@ -50,7 +50,7 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
     try {
       instance = instances.getInstance(request.getInstanceName());
     } catch (InstanceNotFoundException ex) {
-      BuildFarmInstances.respondFromException(responseObserver, ex);
+      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
       return;
     }
 
@@ -69,7 +69,7 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
     try {
       instance = instances.getInstance(batchRequest.getInstanceName());
     } catch (InstanceNotFoundException ex) {
-      BuildFarmInstances.respondFromException(responseObserver, ex);
+      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
       return;
     }
 
@@ -117,7 +117,7 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
     try {
       instance = instances.getInstance(request.getInstanceName());
     } catch (InstanceNotFoundException ex) {
-      BuildFarmInstances.respondFromException(responseObserver, ex);
+      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
       return;
     }
 

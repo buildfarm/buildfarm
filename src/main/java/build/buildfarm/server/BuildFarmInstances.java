@@ -28,9 +28,9 @@ import java.util.List;
 import java.util.Map;
 
 public class BuildFarmInstances {
-  public static void respondFromException(StreamObserver<?> responseObserver, InstanceNotFoundException ex) {
+  public static StatusException toStatusException(InstanceNotFoundException ex) {
     String errorMessage = String.format("Instance %s not known to Service", ex.instanceName);
-    responseObserver.onError(new StatusException(Status.NOT_FOUND.withDescription(errorMessage)));
+    return new StatusException(Status.NOT_FOUND.withDescription(errorMessage));
   }
 
   private final Map<String, Instance> instances;

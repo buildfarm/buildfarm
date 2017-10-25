@@ -44,7 +44,7 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
       instance = instances.getInstanceFromOperationsCollectionName(
           request.getName());
     } catch (InstanceNotFoundException ex) {
-      BuildFarmInstances.respondFromException(responseObserver, ex);
+      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
       return;
     }
 
@@ -78,7 +78,7 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
     try {
       instance = instances.getInstanceFromOperationName(request.getName());
     } catch (InstanceNotFoundException ex) {
-      BuildFarmInstances.respondFromException(responseObserver, ex);
+      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
       return;
     }
 
@@ -94,7 +94,7 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
     try {
       instance = instances.getInstanceFromOperationName(request.getName());
     } catch (InstanceNotFoundException ex) {
-      BuildFarmInstances.respondFromException(responseObserver, ex);
+      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
       return;
     }
 
@@ -115,7 +115,7 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
     try {
       instance = instances.getInstanceFromOperationName(request.getName());
     } catch (InstanceNotFoundException ex) {
-      BuildFarmInstances.respondFromException(responseObserver, ex);
+      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
       return;
     }
 
