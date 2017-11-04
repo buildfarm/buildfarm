@@ -17,23 +17,44 @@ package build.buildfarm;
 import static com.google.common.truth.Truth.assertThat;
 
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.instance.stub.Chunker;
+import build.buildfarm.instance.stub.ByteStreamUploader;
+import build.buildfarm.instance.stub.Retrier;
+import build.buildfarm.instance.stub.RetryException;
 import build.buildfarm.server.BuildFarmServer;
 import build.buildfarm.v1test.BuildFarmServerConfig;
 import build.buildfarm.v1test.InstanceConfig.HashFunction;
 import build.buildfarm.v1test.MemoryInstanceConfig;
+import build.buildfarm.v1test.OperationQueueGrpc;
+import build.buildfarm.v1test.TakeOperationRequest;
+import build.buildfarm.v1test.PollOperationRequest;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
+import com.google.devtools.remoteexecution.v1test.Action;
 import com.google.devtools.remoteexecution.v1test.BatchUpdateBlobsRequest;
 import com.google.devtools.remoteexecution.v1test.BatchUpdateBlobsResponse;
+import com.google.devtools.remoteexecution.v1test.Command;
 import com.google.devtools.remoteexecution.v1test.ContentAddressableStorageGrpc;
 import com.google.devtools.remoteexecution.v1test.Digest;
+import com.google.devtools.remoteexecution.v1test.Directory;
+import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
+import com.google.devtools.remoteexecution.v1test.ExecuteRequest;
+import com.google.devtools.remoteexecution.v1test.ExecutionGrpc;
 import com.google.devtools.remoteexecution.v1test.FindMissingBlobsRequest;
 import com.google.devtools.remoteexecution.v1test.FindMissingBlobsResponse;
 import com.google.devtools.remoteexecution.v1test.UpdateBlobRequest;
 import com.google.devtools.remoteexecution.v1test.ContentAddressableStorageGrpc;
+import com.google.longrunning.CancelOperationRequest;
+import com.google.longrunning.GetOperationRequest;
 import com.google.longrunning.ListOperationsRequest;
 import com.google.longrunning.ListOperationsResponse;
+import com.google.longrunning.Operation;
 import com.google.longrunning.OperationsGrpc;
+import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.rpc.Code;
 import io.grpc.ManagedChannel;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
@@ -65,6 +86,7 @@ public class BuildFarmServerTest {
         .setOperationCompletedDelay(Duration.newBuilder()
             .setSeconds(10)
             .setNanos(0))
+        .setCasMaxSizeBytes(640 * 1024)
         .build();
 
     BuildFarmServerConfig.Builder configBuilder =
@@ -147,5 +169,131 @@ public class BuildFarmServerTest {
     ListOperationsResponse response = stub.listOperations(request);
 
     assertThat(response.getOperationsList()).isEmpty();
+  }
+
+  @Test
+  public void canceledOperationIsNoLongerOutstanding() throws RetryException, InterruptedException {
+    Operation operation = executeAction(createSimpleAction());
+
+    // should appear in outstanding list
+    ListOperationsRequest listRequest = ListOperationsRequest.newBuilder()
+        .setName("memory/operations")
+        .setPageSize(1024)
+        .build();
+
+    OperationsGrpc.OperationsBlockingStub operationsStub =
+        OperationsGrpc.newBlockingStub(inProcessChannel);
+
+    ListOperationsResponse listResponse = operationsStub.listOperations(listRequest);
+
+    assertThat(Iterables.transform(listResponse.getOperationsList(), o -> o.getName())).containsExactly(operation.getName());
+
+    CancelOperationRequest cancelRequest = CancelOperationRequest.newBuilder()
+        .setName(operation.getName())
+        .build();
+
+    operationsStub.cancelOperation(cancelRequest);
+
+    // should now be gone
+    listResponse = operationsStub.listOperations(listRequest);
+
+    assertThat(listResponse.getOperationsList()).isEmpty();
+  }
+
+  @Test
+  public void cancellingExecutingOperationFailsPoll()
+      throws RetryException, InterruptedException, InvalidProtocolBufferException {
+    Operation operation = executeAction(createSimpleAction());
+
+    // take our operation from the queue
+    TakeOperationRequest takeRequest = TakeOperationRequest.newBuilder()
+        .setInstanceName("memory")
+        .build();
+
+    OperationQueueGrpc.OperationQueueBlockingStub operationQueueStub =
+        OperationQueueGrpc.newBlockingStub(inProcessChannel);
+
+    Operation givenOperation = operationQueueStub.take(takeRequest);
+
+    assertThat(givenOperation.getName()).isEqualTo(operation.getName());
+
+    // move the operation into EXECUTING stage
+    ExecuteOperationMetadata executingMetadata =
+      givenOperation.getMetadata().unpack(ExecuteOperationMetadata.class);
+
+    executingMetadata = executingMetadata.toBuilder()
+        .setStage(ExecuteOperationMetadata.Stage.EXECUTING)
+        .build();
+
+    Operation executingOperation = givenOperation.toBuilder()
+        .setMetadata(Any.pack(executingMetadata))
+        .build();
+
+    assertThat(operationQueueStub.put(executingOperation).getCode()).isEqualTo(Code.OK.getNumber());
+
+    // poll should succeed
+    assertThat(operationQueueStub
+        .poll(PollOperationRequest.newBuilder()
+            .setOperationName(executingOperation.getName())
+            .setStage(ExecuteOperationMetadata.Stage.EXECUTING)
+            .build())
+        .getCode()).isEqualTo(Code.OK.getNumber());
+
+    OperationsGrpc.OperationsBlockingStub operationsStub =
+        OperationsGrpc.newBlockingStub(inProcessChannel);
+
+    operationsStub.cancelOperation(CancelOperationRequest.newBuilder()
+        .setName(executingOperation.getName())
+        .build());
+
+    // poll should fail
+    assertThat(operationQueueStub
+        .poll(PollOperationRequest.newBuilder()
+            .setStage(ExecuteOperationMetadata.Stage.EXECUTING)
+            .setOperationName(executingOperation.getName())
+            .build())
+        .getCode()).isEqualTo(Code.UNAVAILABLE.getNumber());
+
+    // should not appear in outstanding list
+    GetOperationRequest getRequest = GetOperationRequest.newBuilder()
+        .setName(executingOperation.getName())
+        .build();
+
+    Operation cancelledOperation = operationsStub.getOperation(getRequest);
+
+    assertThat(cancelledOperation.getDone()).isTrue();
+    assertThat(cancelledOperation.getResultCase()).isEqualTo(Operation.ResultCase.ERROR);
+    assertThat(cancelledOperation.getError().getCode()).isEqualTo(Code.CANCELLED.getNumber());
+  }
+
+  private Action createSimpleAction() throws RetryException, InterruptedException {
+    DigestUtil digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
+    Command command = Command.newBuilder().build();
+    ByteString commandBlob = command.toByteString();
+    Directory root = Directory.newBuilder().build();
+    ByteString rootBlob = root.toByteString();
+    Action action = Action.newBuilder()
+        .setCommandDigest(digestUtil.compute(commandBlob))
+        .setInputRootDigest(digestUtil.compute(rootBlob))
+        .build();
+    ByteStreamUploader uploader = new ByteStreamUploader("memory", inProcessChannel, null, 60, new Retrier(), null);
+
+    uploader.uploadBlobs(ImmutableList.of(
+        new Chunker(rootBlob, digestUtil),
+        new Chunker(commandBlob, digestUtil)));
+    return action;
+  }
+
+  private Operation executeAction(Action action) {
+    ExecuteRequest executeRequest = ExecuteRequest.newBuilder()
+        .setInstanceName("memory")
+        .setAction(action)
+        .setSkipCacheLookup(true)
+        .build();
+
+    ExecutionGrpc.ExecutionBlockingStub executeStub =
+        ExecutionGrpc.newBlockingStub(inProcessChannel);
+
+    return executeStub.execute(executeRequest);
   }
 }

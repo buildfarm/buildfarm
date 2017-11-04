@@ -225,7 +225,19 @@ public class MemoryInstance extends AbstractServerInstance {
       return false;
     }
     String operationName = operation.getName();
-    if (isExecuting(operation)) {
+    if (operation.getDone()) {
+      // destroy requeue timer
+      Watchdog requeuer = requeuers.remove(operationName);
+      if (requeuer != null) {
+        requeuer.stop();
+      }
+      // destroy action timed out failure
+      Watchdog operationTimeoutDelay =
+          operationTimeoutDelays.remove(operationName);
+      if (operationTimeoutDelay != null) {
+        operationTimeoutDelay.stop();
+      }
+    } else if (isExecuting(operation)) {
       requeuers.get(operationName).pet();
 
       // Create a delayed fuse timed out failure
@@ -243,15 +255,6 @@ public class MemoryInstance extends AbstractServerInstance {
         Watchdog operationTimeoutDelay = new Watchdog(timeout, () -> expireOperation(operation));
         operationTimeoutDelays.put(operationName, operationTimeoutDelay);
         new Thread(operationTimeoutDelay).start();
-      }
-    } else if (isComplete(operation)) {
-      // destroy requeue timer
-      requeuers.remove(operationName).stop();
-      // destroy action timed out failure
-      Watchdog operationTimeoutDelay =
-          operationTimeoutDelays.remove(operationName);
-      if (operationTimeoutDelay != null) {
-        operationTimeoutDelay.stop();
       }
     }
     return true;

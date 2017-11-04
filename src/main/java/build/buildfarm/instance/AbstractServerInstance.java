@@ -450,7 +450,11 @@ public abstract class AbstractServerInstance implements Instance {
   @Override
   public boolean putOperation(Operation operation) {
     if (isCancelled(operation)) {
-      throw new IllegalStateException();
+      if (outstandingOperations.remove(operation.getName()) == null) {
+        throw new IllegalStateException();
+      }
+      updateOperationWatchers(operation);
+      return true;
     }
     if (isExecuting(operation) &&
         !outstandingOperations.containsKey(operation.getName())) {
@@ -586,6 +590,9 @@ public abstract class AbstractServerInstance implements Instance {
     }
     Operation operation = getOperation(operationName);
     if (operation == null) {
+      return false;
+    }
+    if (isCancelled(operation)) {
       return false;
     }
     ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
