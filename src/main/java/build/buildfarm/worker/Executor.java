@@ -86,6 +86,10 @@ class Executor implements Runnable {
       timeout = null;
     }
 
+    if (timeout == null && worker.config.hasDefaultActionTimeout()) {
+      timeout = worker.config.getDefaultActionTimeout();
+    }
+
     /* execute command */
     ActionResult.Builder resultBuilder;
     try {

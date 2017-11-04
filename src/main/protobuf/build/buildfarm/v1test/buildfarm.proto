@@ -80,6 +80,17 @@ message MemoryInstanceConfig {
 
   // limit for CAS total content size
   int64 cas_max_size_bytes = 7;
+
+  // default timeout for actions
+  // if a timeout is unspecified for an action, this value
+  // is imposed on it, after which the operation will be
+  // cancelled
+  google.protobuf.Duration default_action_timeout = 8;
+
+  // maximum selectable timeout
+  // a maximum threshold for an action's specified timeout,
+  // beyond which an action will be rejected for execution
+  google.protobuf.Duration maximum_action_timeout = 9;
 }
 
 message InstanceConfig {
@@ -169,6 +180,17 @@ message WorkerConfig {
 
   // symlink cas input-only directories
   bool link_input_directories = 18;
+
+  // default timeout for actions
+  // if a timeout is unspecified for an action, this value
+  // is imposed on it, after which the operation will
+  // be killed
+  google.protobuf.Duration default_action_timeout = 19;
+
+  // maximum selectable timeout
+  // a maximum threshold for an action's specified timeout,
+  // beyond which an action will be rejected for execution
+  google.protobuf.Duration maximum_action_timeout = 20;
 }
 
 message TreeIteratorToken {

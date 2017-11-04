@@ -21,6 +21,7 @@ import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.instance.TokenizableIterator;
 import build.buildfarm.v1test.MemoryInstanceConfig;
 import build.buildfarm.v1test.OperationIteratorToken;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -208,6 +209,19 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
+  protected void validateAction(Action action) {
+    if (action.hasTimeout() && config.hasMaximumActionTimeout()) {
+      Duration timeout = action.getTimeout();
+      Duration maximum = config.getMaximumActionTimeout();
+      Preconditions.checkState(
+          timeout.getSeconds() < maximum.getSeconds() ||
+          (timeout.getSeconds() == maximum.getSeconds() && timeout.getNanos() < maximum.getNanos()));
+    }
+
+    super.validateAction(action);
+  }
+
+  @Override
   public boolean pollOperation(
       String operationName,
       ExecuteOperationMetadata.Stage stage) {
@@ -244,8 +258,13 @@ public class MemoryInstance extends AbstractServerInstance {
       // This is in effect if the worker does not respond
       // within a configured delay with operation action timeout results
       Action action = expectAction(operation);
+      Duration actionTimeout = null;
       if (action.hasTimeout()) {
-        Duration actionTimeout = action.getTimeout();
+        actionTimeout = action.getTimeout();
+      } else if (config.hasDefaultActionTimeout()) {
+        actionTimeout = config.getDefaultActionTimeout();
+      }
+      if (actionTimeout != null) {
         Duration delay = config.getOperationCompletedDelay();
         Duration timeout = Duration.newBuilder()
             .setSeconds(actionTimeout.getSeconds() + delay.getSeconds())

@@ -301,7 +301,7 @@ public abstract class AbstractServerInstance implements Instance {
     validateActionInputDirectory(root, path, new HashSet<>(), inputDigests);
   }
 
-  private void validateAction(Action action) {
+  protected void validateAction(Action action) {
     Digest commandDigest = action.getCommandDigest();
     ImmutableSet.Builder<Digest> inputDigests = new ImmutableSet.Builder<>();
     inputDigests.add(commandDigest);

@@ -56,6 +56,7 @@ import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.rpc.Code;
 import io.grpc.ManagedChannel;
+import io.grpc.StatusRuntimeException;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import java.util.Collections;
@@ -87,6 +88,12 @@ public class BuildFarmServerTest {
             .setSeconds(10)
             .setNanos(0))
         .setCasMaxSizeBytes(640 * 1024)
+        .setDefaultActionTimeout(Duration.newBuilder()
+            .setSeconds(600)
+            .setNanos(0))
+        .setMaximumActionTimeout(Duration.newBuilder()
+            .setSeconds(3600)
+            .setNanos(0))
         .build();
 
     BuildFarmServerConfig.Builder configBuilder =
@@ -283,6 +290,16 @@ public class BuildFarmServerTest {
             .setOperationName(executingOperation.getName())
             .build())
         .getCode()).isEqualTo(Code.UNAVAILABLE.getNumber());
+  }
+
+  @Test(expected = StatusRuntimeException.class)
+  public void actionWithExcessiveTimeoutFailsValidation()
+      throws RetryException, InterruptedException, InvalidProtocolBufferException {
+    Action actionWithExcessiveTimeout = createSimpleAction().toBuilder()
+        .setTimeout(Duration.newBuilder().setSeconds(9000))
+        .build();
+
+    executeAction(actionWithExcessiveTimeout);
   }
 
   private Action createSimpleAction() throws RetryException, InterruptedException {
