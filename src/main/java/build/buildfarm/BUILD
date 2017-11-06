@@ -313,6 +313,26 @@ java_binary(
 )
 
 java_binary(
+    name = "bf-hist",
+    srcs = ["Hist.java"],
+    main_class = "build.buildfarm.Hist",
+    deps = [
+        ":common",
+        ":instance",
+        ":stub-instance",
+        "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java",
+        "//3rdparty/jvm/io/grpc:grpc_context",
+        "//3rdparty/jvm/io/grpc:grpc_core",
+        "//3rdparty/jvm/io/grpc:grpc_netty",
+        "//3rdparty/jvm/io/grpc:grpc_protobuf",
+        "//3rdparty/jvm/io/grpc:grpc_stub",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "@googleapis//:google_rpc_code_java_proto",
+    ],
+)
+
+java_binary(
     name = "bf-cancel",
     srcs = ["Cancel.java"],
     main_class = "build.buildfarm.Cancel",
