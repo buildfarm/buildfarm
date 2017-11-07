@@ -59,9 +59,11 @@ message BuildFarmServerConfig {
 }
 
 message MemoryInstanceConfig {
+  // the limits of the listOperations request
   int32 list_operations_default_page_size = 1;
   int32 list_operations_max_page_size = 2;
 
+  // the limits of the getTree request
   int32 tree_default_page_size = 3;
   int32 tree_max_page_size = 4;
 
@@ -106,6 +108,7 @@ message CASInsertionControl {
 };
 
 message WorkerConfig {
+  // the instance this requests work from
   string instance_name = 1;
 
   // server address for all buildfarm requests
