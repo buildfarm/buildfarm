@@ -12,7 +12,6 @@ java_test(
         "//3rdparty/jvm/io/grpc:grpc_stub",
         "//src/main/java/build/buildfarm",
         "//src/main/java/build/buildfarm:common",
-        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_grpc",
         "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
@@ -25,7 +24,6 @@ java_test(
     srcs = ["BuildFarmWorkerTest.java"],
     deps = [
         "//src/main/java/build/buildfarm:buildfarm-worker-impl",
-        "//src/main/java/build/buildfarm:common",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
     ],
 )
