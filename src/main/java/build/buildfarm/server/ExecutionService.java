@@ -21,7 +21,6 @@ import com.google.longrunning.Operation;
 import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.stub.StreamObserver;
-import java.util.UUID;
 
 public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
   private final BuildFarmInstances instances;
@@ -46,7 +45,6 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
         request.getSkipCacheLookup(),
         request.getTotalInputFileCount(),
         request.getTotalInputFileBytes(),
-        request.getWaitForCompletion(),
         (operation) -> {
           responseObserver.onNext(operation);
           responseObserver.onCompleted();

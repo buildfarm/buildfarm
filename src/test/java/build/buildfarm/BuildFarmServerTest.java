@@ -32,13 +32,12 @@ import com.google.protobuf.Duration;
 import io.grpc.ManagedChannel;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
+import java.util.Collections;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import java.util.Collections;
-import java.util.Iterator;
 
 @RunWith(JUnit4.class)
 public class BuildFarmServerTest {

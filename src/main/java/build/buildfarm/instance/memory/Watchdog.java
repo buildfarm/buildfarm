@@ -14,8 +14,6 @@
 
 package build.buildfarm.instance.memory;
 
-import build.buildfarm.instance.Instance;
-import com.google.longrunning.Operation;
 import com.google.protobuf.Duration;
 
 public class Watchdog implements Runnable {

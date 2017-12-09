@@ -20,11 +20,11 @@ import build.buildfarm.instance.stub.ByteStringIteratorInputStream;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterators;
 import com.google.protobuf.ByteString;
+import java.io.IOException;
+import java.io.InputStream;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import java.io.IOException;
-import java.io.InputStream;
 
 @RunWith(JUnit4.class)
 public class ByteStringIteratorInputStreamTest {

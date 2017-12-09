@@ -14,10 +14,10 @@
 
 package build.buildfarm.instance.memory;
 
-import build.buildfarm.common.Digests;
 import build.buildfarm.common.ContentAddressableStorage;
-import build.buildfarm.instance.TokenizableIterator;
+import build.buildfarm.common.Digests;
 import build.buildfarm.instance.AbstractServerInstance;
+import build.buildfarm.instance.TokenizableIterator;
 import build.buildfarm.v1test.MemoryInstanceConfig;
 import build.buildfarm.v1test.OperationIteratorToken;
 import com.google.common.collect.ImmutableList;
@@ -45,7 +45,6 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Consumer;
 import java.util.function.Function;
 
 public class MemoryInstance extends AbstractServerInstance {

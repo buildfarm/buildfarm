@@ -15,11 +15,7 @@
 package build.buildfarm.server;
 
 import build.buildfarm.common.Encoding;
-import build.buildfarm.instance.Instance;
-import build.buildfarm.instance.memory.MemoryInstance;
 import build.buildfarm.v1test.BuildFarmServerConfig;
-import build.buildfarm.v1test.InstanceConfig;
-import com.google.common.collect.Iterables;
 import com.google.common.io.ByteStreams;
 import com.google.devtools.common.options.OptionsParser;
 import com.google.protobuf.TextFormat;
@@ -30,10 +26,8 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.logging.Logger;
 
 public class BuildFarmServer {
