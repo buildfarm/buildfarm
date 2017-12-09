@@ -1,25 +1,30 @@
 workspace(name = "build_buildfarm")
 
-maven_jar(
-    name = "com_github_pcj_google_options",
-    artifact = "com.github.pcj:google-options:jar:1.0.0",
-    sha1 = "85d54fe6771e5ff0d54827b0a3315c3e12fdd0c7",
-)
-
-new_local_repository(
+# Needed for "well-known protos" and @com_google_protobuf//:protoc.
+http_archive(
     name = "com_google_protobuf",
-    build_file = "./third_party/protobuf/3.4.1/BUILD",
-    path = "./third_party/protobuf/3.4.1/",
+    sha256 = "cef7f1b5a7c5fba672bec2a319246e8feba471f04dcebfe362d55930ee7c1c30",
+    strip_prefix = "protobuf-3.5.0",
+    urls = ["https://github.com/google/protobuf/archive/v3.5.0.zip"],
 )
 
-new_local_repository(
-    name = "com_google_protobuf_java",
-    build_file = "./third_party/protobuf/3.4.1/com_google_protobuf_java.BUILD",
-    path = "./third_party/protobuf/3.4.1/",
+# Needed for @grpc_java//compiler:grpc_java_plugin.
+http_archive(
+    name = "grpc_java",
+    sha256 = "20a35772b20d8194854f6d149324f971472b7acc1a76a0969a048c4c02a1da0d",
+    strip_prefix = "grpc-java-1.8.0",
+    urls = ["https://github.com/grpc/grpc-java/archive/v1.8.0.zip"],
 )
 
-new_local_repository(
+# The API that we implement.
+new_http_archive(
     name = "googleapis",
-    path = "./third_party/googleapis/",
-    build_file = "./third_party/googleapis/BUILD",
+    sha256 = "27ade61091175f5bad45ec207f4dde524d3c8148903b60fa5641e29e3b9c5fa9",
+    url = "https://github.com/googleapis/googleapis/archive/9ea26fdb1869d674fa21c92e5818ba4eadd500c2.zip",
+    strip_prefix = "googleapis-9ea26fdb1869d674fa21c92e5818ba4eadd500c2",
+    build_file = "BUILD.googleapis",
 )
+
+load("//3rdparty:workspace.bzl", "maven_dependencies", "declare_maven")
+
+maven_dependencies(declare_maven)
