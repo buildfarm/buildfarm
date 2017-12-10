@@ -32,7 +32,7 @@ public class BuildFarmInstances {
     createInstances(instanceConfigs);
     if (!defaultInstanceName.isEmpty()) {
       if (!instances.containsKey(defaultInstanceName)) {
-        throw new IllegalArgumentException();
+        throw new IllegalArgumentException(defaultInstanceName + " not specified in instance configs.");
       }
       defaultInstance = instances.get(defaultInstanceName);
     } else {
