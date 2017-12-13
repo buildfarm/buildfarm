@@ -27,6 +27,24 @@ java_test(
 )
 
 java_test(
+  name = "ByteStreamServiceTest",
+  srcs = ["ByteStreamServiceTest.java"],
+  deps = [
+      "//src/main/java/build/buildfarm:buildfarm",
+      "//src/main/java/build/buildfarm:common",
+      "//third_party/grpc:grpc-jar",
+      "@com_google_protobuf//:protobuf_java",
+      "@googleapis//:google_bytestream_bytestream_java_grpc",
+      "@googleapis//:google_bytestream_bytestream_java_proto",
+      "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_grpc",
+      "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
+      "@googleapis//:google_rpc_code_java_proto",
+      "@org_mockito//jar",
+  ],
+  size="small",
+)
+
+java_test(
   name = "ByteStringIteratorInputStreamTest",
   srcs = ["ByteStringIteratorInputStreamTest.java"],
   deps = [

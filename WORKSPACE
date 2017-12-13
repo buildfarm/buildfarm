@@ -6,6 +6,11 @@ maven_jar(
     sha1 = "85d54fe6771e5ff0d54827b0a3315c3e12fdd0c7",
 )
 
+maven_jar(
+    name = "org_mockito",
+    artifact = "org.mockito:mockito-all:1.10.19",
+)
+
 new_local_repository(
     name = "com_google_protobuf",
     build_file = "./third_party/protobuf/3.4.1/BUILD",
