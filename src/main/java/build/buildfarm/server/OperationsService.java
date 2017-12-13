@@ -41,7 +41,7 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
       StreamObserver<ListOperationsResponse> responseObserver) {
     Instance instance;
     try {
-      instance = instances.getInstanceFromOperationsCollectionName(
+      instance = instances.getFromOperationsCollectionName(
           request.getName());
     } catch (InstanceNotFoundException ex) {
       responseObserver.onError(new StatusException(Status.NOT_FOUND));
@@ -76,7 +76,7 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
       StreamObserver<Operation> responseObserver) {
     Instance instance;
     try {
-      instance = instances.getInstanceFromOperationName(request.getName());
+      instance = instances.getFromOperationName(request.getName());
     } catch (InstanceNotFoundException ex) {
       responseObserver.onError(new StatusException(Status.NOT_FOUND));
       return;
@@ -92,7 +92,7 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
       StreamObserver<Empty> responseObserver) {
     Instance instance;
     try {
-      instance = instances.getInstanceFromOperationName(request.getName());
+      instance = instances.getFromOperationName(request.getName());
     } catch (InstanceNotFoundException ex) {
       responseObserver.onError(new StatusException(Status.NOT_FOUND));
       return;
@@ -113,7 +113,7 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
       StreamObserver<Empty> responseObserver) {
     Instance instance;
     try {
-      instance = instances.getInstanceFromOperationName(request.getName());
+      instance = instances.getFromOperationName(request.getName());
     } catch (InstanceNotFoundException ex) {
       responseObserver.onError(new StatusException(Status.NOT_FOUND));
       return;
