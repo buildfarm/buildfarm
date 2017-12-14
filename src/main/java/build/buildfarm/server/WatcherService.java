@@ -41,7 +41,7 @@ public class WatcherService extends WatcherGrpc.WatcherImplBase {
     String operationName = request.getTarget();
     Instance instance;
     try {
-      instance = instances.getInstanceFromOperationName(operationName);
+      instance = instances.getFromOperationName(operationName);
     } catch (InstanceNotFoundException ex) {
       responseObserver.onError(BuildFarmInstances.toStatusException(ex));
       return;

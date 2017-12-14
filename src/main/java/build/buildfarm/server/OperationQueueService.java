@@ -41,7 +41,7 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
       StreamObserver<Operation> responseObserver) {
     Instance instance;
     try {
-      instance = instances.getInstance(request.getInstanceName());
+      instance = instances.get(request.getInstanceName());
     } catch (InstanceNotFoundException ex) {
       responseObserver.onError(BuildFarmInstances.toStatusException(ex));
       return;
@@ -82,7 +82,7 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
       StreamObserver<com.google.rpc.Status> responseObserver) {
     Instance instance;
     try {
-      instance = instances.getInstanceFromOperationName(operation.getName());
+      instance = instances.getFromOperationName(operation.getName());
     } catch (InstanceNotFoundException ex) {
       responseObserver.onError(BuildFarmInstances.toStatusException(ex));
       return;
@@ -102,7 +102,7 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
       StreamObserver<com.google.rpc.Status> responseObserver) {
     Instance instance;
     try {
-      instance = instances.getInstanceFromOperationName(
+      instance = instances.getFromOperationName(
           request.getOperationName());
     } catch (InstanceNotFoundException ex) {
       responseObserver.onError(BuildFarmInstances.toStatusException(ex));

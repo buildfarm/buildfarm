@@ -345,12 +345,24 @@ public class MemoryInstance extends AbstractServerInstance {
         return true;
       }
     }
+    Operation completedOperation = null;
     synchronized(watchers) {
       List<Function<Operation, Boolean>> operationWatchers = watchers.get(operationName);
       if (operationWatchers == null) {
-        return false;
+        /* we can race on the synchronization and miss a done, where the
+         * watchers list has been removed, making it necessary to check for the
+         * operation within this context */
+        Operation operation = getOperation(operationName);
+        if (operation.getDone()) {
+          completedOperation = operation;
+        } else {
+          return false;
+        }
       }
       operationWatchers.add(watcher);
+    }
+    if (completedOperation != null) {
+      return watcher.apply(completedOperation);
     }
     return true;
   }

@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker;
 
+import build.buildfarm.common.Encoding;
 import build.buildfarm.common.Digests;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
@@ -54,9 +55,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Collections;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -72,7 +73,7 @@ public class Worker {
   private final Instance instance;
   private final WorkerConfig config;
   private final Path root;
-  private final Path cacheDir;
+  private final CASFileCache fileCache;
 
   private static final OutputStream nullOutputStream = ByteStreams.nullOutputStream();
 
@@ -120,7 +121,7 @@ public class Worker {
   private static Path getValidRoot(WorkerConfig config) throws ConfigurationException {
     String rootValue = config.getRoot();
     if (Strings.isNullOrEmpty(rootValue)) {
-        throw new ConfigurationException("root value in config missing");
+      throw new ConfigurationException("root value in config missing");
     }
     return Paths.get(rootValue);
   }
@@ -128,24 +129,38 @@ public class Worker {
   private static Path getValidCasCacheDirectory(WorkerConfig config, Path root) throws ConfigurationException {
     String casCacheValue = config.getCasCacheDirectory();
     if (Strings.isNullOrEmpty(casCacheValue)) {
-        throw new ConfigurationException("Cas cache directory value in config missing");
+      throw new ConfigurationException("Cas cache directory value in config missing");
     }
     return root.resolve(casCacheValue);
   }
 
   public Worker(WorkerConfig config) throws ConfigurationException {
     this.config = config;
+
+    /* configuration validation */
     root = getValidRoot(config);
-    cacheDir = getValidCasCacheDirectory(config, root);
+    Path casCacheDirectory = getValidCasCacheDirectory(config, root);
+
+    /* initialization */
     instance = new StubInstance(
         config.getInstanceName(),
         createChannel(config.getOperationQueue()));
+    InputStreamFactory inputStreamFactory = new InputStreamFactory() {
+      @Override
+      public InputStream apply(Digest digest) {
+        return instance.newStreamInput(instance.getBlobName(digest));
+      }
+    };
+    fileCache = new CASFileCache(
+        inputStreamFactory,
+        root.resolve(casCacheDirectory),
+        config.getCasCacheMaxSizeBytes());
   }
 
   public void start() {
     try {
       Files.createDirectories(root);
-      Files.createDirectories(cacheDir);
+      fileCache.start();
     } catch(IOException ex) {
       ex.printStackTrace();
       return;
@@ -179,10 +194,12 @@ public class Worker {
     Path execDir = root.resolve(operation.getName());
     Files.createDirectories(execDir);
 
+    List<String> inputs = new ArrayList<>();
+
     try {
       /* set up inputs */
       /* we should update the operation status at this point to indicate input fetches have begun */
-      if (!fetchInputs(execDir, action.getInputRootDigest()) ||
+      if (!fetchInputs(execDir, action.getInputRootDigest(), inputs) ||
           !verifyOutputLocations(execDir, action.getOutputFilesList(), action.getOutputDirectoriesList())) {
         poller.stop();
         return;
@@ -227,6 +244,8 @@ public class Worker {
           if (!Files.exists(outputPath)) {
             continue;
           }
+
+          // FIXME put the output into the fileCache
 
           InputStream inputStream = Files.newInputStream(outputPath);
           ByteString content = ByteString.readFrom(inputStream);
@@ -278,47 +297,41 @@ public class Worker {
 
       /* cleanup */
       removeDirectory(execDir);
+
+      fileCache.update(inputs);
     }
   }
 
-  private boolean linkInputs(Path execDir, Digest inputRoot, Map<Digest, Directory> directoriesIndex) throws IOException {
+  private boolean linkInputs(
+      Path execDir,
+      Digest inputRoot,
+      Map<Digest, Directory> directoriesIndex,
+      List<String> inputs)
+      throws IOException, InterruptedException {
     Directory directory = directoriesIndex.get(inputRoot);
 
     for (FileNode fileNode : directory.getFilesList()) {
-      Digest digest = fileNode.getDigest();
-      Path fileCachePath = cacheDir.resolve(String.format(
-          "%s_%d%s",
-          digest.getHash(),
-          digest.getSizeBytes(),
-          fileNode.getIsExecutable() ? "_exec" : ""));
-      boolean createFile = !Files.exists(fileCachePath);
-      if (createFile) {
-        OutputStream outputStream = Files.newOutputStream(fileCachePath);
-        instance.getBlob(digest).writeTo(outputStream);
-        outputStream.close();
+      Path execPath = execDir.resolve(fileNode.getName());
+      String fileCacheKey = fileCache.put(fileNode.getDigest(), fileNode.getIsExecutable());
+      if (fileCacheKey == null) {
+        return false;
       }
-      if (createFile || Files.isExecutable(fileCachePath) != fileNode.getIsExecutable()) {
-        ImmutableSet.Builder<PosixFilePermission> perms = new ImmutableSet.Builder<PosixFilePermission>()
-          .add(PosixFilePermission.OWNER_READ);
-        if (fileNode.getIsExecutable()) {
-          perms.add(PosixFilePermission.OWNER_EXECUTE);
-        }
-        Files.setPosixFilePermissions(fileCachePath, perms.build());
-      }
-      Files.createLink(execDir.resolve(fileNode.getName()), fileCachePath);
+      inputs.add(fileCacheKey);
+      Files.createLink(execPath, fileCache.getPath(fileCacheKey));
     }
 
     for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
       Digest digest = directoryNode.getDigest();
       Path dirPath = execDir.resolve(directoryNode.getName());
       Files.createDirectory(dirPath);
-      linkInputs(dirPath, directoryNode.getDigest(), directoriesIndex);
+      linkInputs(dirPath, directoryNode.getDigest(), directoriesIndex, inputs);
     }
 
     return true;
   }
 
-  private boolean fetchInputs(Path execDir, Digest inputRoot) throws IOException {
+  private boolean fetchInputs(Path execDir, Digest inputRoot, List<String> inputs)
+      throws IOException, InterruptedException {
     ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
     String pageToken = "";
 
@@ -336,7 +349,7 @@ public class Worker {
       directoriesIndex.put(directoryDigest, directory);
     }
 
-    return linkInputs(execDir, inputRoot, directoriesIndex.build());
+    return linkInputs(execDir, inputRoot, directoriesIndex.build(), inputs);
   }
 
   private boolean verifyOutputLocations(
@@ -484,21 +497,17 @@ public class Worker {
     });
   }
 
-  /**
-   * Decodes the given byte array assumed to be encoded with ISO-8859-1 encoding (isolatin1).
-   */
-  private static char[] convertFromLatin1(byte[] content) {
-    char[] latin1 = new char[content.length];
-    for (int i = 0; i < latin1.length; i++) { // yeah, latin1 is this easy! :-)
-      latin1[i] = (char) (0xff & content[i]);
-    }
-    return latin1;
-  }
-
   private static WorkerConfig toWorkerConfig(InputStream inputStream, WorkerOptions options) throws IOException {
     WorkerConfig.Builder builder = WorkerConfig.newBuilder();
-    String data = new String(convertFromLatin1(ByteStreams.toByteArray(inputStream)));
+    String data = new String(Encoding.convertFromLatin1(ByteStreams.toByteArray(inputStream)));
     TextFormat.merge(data, builder);
+    if (!Strings.isNullOrEmpty(options.root)) {
+      builder.setRoot(options.root);
+    }
+
+    if (!Strings.isNullOrEmpty(options.casCacheDirectory)) {
+      builder.setCasCacheDirectory(options.casCacheDirectory);
+    }
     return builder.build();
   }
 
