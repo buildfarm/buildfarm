@@ -58,6 +58,7 @@ public class BuildFarmServer {
         .addService(new ByteStreamService(instances))
         .addService(new ExecutionService(instances))
         .addService(new OperationQueueService(instances))
+        .addService(new OperationsService(instances))
         .addService(new WatcherService(instances))
         .build();
   }

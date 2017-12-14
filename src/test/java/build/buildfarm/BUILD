@@ -12,6 +12,7 @@ java_test(
       "@com_google_protobuf//:protobuf_java",
       "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_grpc",
       "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
+      "@googleapis//:google_longrunning_operations_java_grpc",
       "@googleapis//:google_rpc_code_java_proto",
   ]
 )
