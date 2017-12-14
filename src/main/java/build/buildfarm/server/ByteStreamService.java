@@ -34,6 +34,7 @@ import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
   private static final long DEFAULT_CHUNK_SIZE = 1024 * 16;
@@ -46,50 +47,6 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
     this.instances = instances;
   }
 
-  private static boolean isBlob(String resourceName) {
-    // {instance_name=**}/blobs/{hash}/{size}
-    String[] components = resourceName.split("/");
-    return components.length >= 3 &&
-      components[components.length - 3].equals("blobs");
-  }
-
-  private static boolean isUploadBlob(String resourceName) {
-    // {instance_name=**}/uploads/{uuid}/blobs/{hash}/{size}
-    String[] components = resourceName.split("/");
-    return components.length >= 5 &&
-      components[components.length - 3].equals("blobs") &&
-      components[components.length - 5].equals("uploads");
-  }
-
-  private static boolean isOperationStream(String resourceName) {
-    // {instance_name=**}/operations/{uuid}/streams/{stream}
-    String[] components = resourceName.split("/");
-    return components.length >= 4 &&
-        components[components.length - 2].equals("streams") &&
-        components[components.length - 4].equals("operations");
-  }
-
-  private static Digest parseBlobDigest(String resourceName)
-      throws IllegalArgumentException {
-    String[] components = resourceName.split("/");
-    String hash = components[components.length - 2];
-    long size = Long.parseLong(components[components.length - 1]);
-    return Digests.buildDigest(hash, size);
-  }
-
-  private static Digest parseUploadBlobDigest(String resourceName)
-      throws IllegalArgumentException {
-    String[] components = resourceName.split("/");
-    String hash = components[components.length - 2];
-    long size = Long.parseLong(components[components.length - 1]);
-    return Digests.buildDigest(hash, size);
-  }
-
-  public String parseOperationStream(String resourceName) {
-    String[] components = resourceName.split("/");
-    return String.join("/", Arrays.asList(components).subList(components.length - 4, components.length));
-  }
-
   private void readBlob(
       ReadRequest request,
       StreamObserver<ReadResponse> responseObserver) {
@@ -99,11 +56,11 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
     try {
       instance = instances.getFromBlob(resourceName);
     } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(new StatusException(Status.NOT_FOUND));
+      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
       return;
     }
 
-    Digest digest = parseBlobDigest(resourceName);
+    Digest digest = UrlPath.parseBlobDigest(resourceName);
 
     ByteString blob = instance.getBlob(
         digest, request.getReadOffset(), request.getReadLimit());
@@ -138,11 +95,11 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
     try {
       instance = instances.getFromBlob(resourceName);
     } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(new StatusException(Status.NOT_FOUND));
+      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
       return;
     }
 
-    String operationStream = parseOperationStream(resourceName);
+    String operationStream = UrlPath.parseOperationStream(resourceName);
 
     InputStream input = instance.newStreamInput(operationStream);
     long readLimit = request.getReadLimit();
@@ -186,12 +143,25 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
     }
 
     try {
-      if (isBlob(resourceName)) {
+      Optional<UrlPath.ResourceOperation> resourceOperation = Optional.empty();
+      try {
+        resourceOperation = Optional.of(UrlPath.detectResourceOperation(resourceName));
+      } catch (IllegalArgumentException ex) {
+        String description = ex.getLocalizedMessage();
+        responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
+        return;
+      }
+      switch (resourceOperation.get()) {
+      case Blob:
         readBlob(request, responseObserver);
-      } else if (isOperationStream(resourceName)) {
+        break;
+      case OperationStream:
         readOperationStream(request, responseObserver);
-      } else {
-        responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
+        String description = "Invalid service";
+        break;
+      default:
+        responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
+        break;
       }
     } catch(IOException ex) {
       responseObserver.onError(new StatusException(Status.fromThrowable(ex)));
@@ -204,12 +174,26 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
       StreamObserver<QueryWriteStatusResponse> responseObserver) {
     String resourceName = request.getResourceName();
 
-    if (isUploadBlob(resourceName)) {
+    Optional<UrlPath.ResourceOperation> resourceOperation = Optional.empty();
+    try {
+      resourceOperation = Optional.of(UrlPath.detectResourceOperation(resourceName));
+    } catch (IllegalArgumentException ex) {
+      String description = ex.getLocalizedMessage();
+      responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
+      return;
+    }
+
+    switch (resourceOperation.get()) {
+    case UploadBlob:
       responseObserver.onError(new StatusException(Status.UNIMPLEMENTED));
-    } else if (isOperationStream(resourceName)) {
+      break;
+    case OperationStream:
       responseObserver.onError(new StatusException(Status.UNIMPLEMENTED));
-    } else {
-      responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
+      break;
+    default:
+      String description = "Invalid service";
+      responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
+      break;
     }
   }
 
@@ -229,9 +213,10 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
           WriteRequest request, StreamObserver<WriteResponse> responseObserver)
           throws InterruptedException {
         if (data == null) {
-          digest = parseUploadBlobDigest(writeResourceName);
+          digest = UrlPath.parseUploadBlobDigest(writeResourceName);
           if (digest == null) {
-            responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
+            String description = "Could not parse digest of: " + writeResourceName;
+            responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
             failed = true;
             return;
           }
@@ -241,7 +226,8 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
           }
         }
         if (request.getWriteOffset() != committed_size) {
-          responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
+          String description = "Write offset invalid: " + request.getWriteOffset();
+          responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
           failed = true;
           return;
         }
@@ -258,7 +244,8 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
           active_write_requests.remove(writeResourceName);
           Digest blobDigest = Digests.computeDigest(data);
           if (!blobDigest.equals(digest)) {
-            responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
+            String description = String.format("Digest mismatch %s <-> %s", Digests.toString(blobDigest), Digests.toString(digest));
+            responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
             failed = true;
           } else {
             Instance instance;
@@ -266,7 +253,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
             try {
               instance = instances.getFromUploadBlob(writeResourceName);
             } catch (InstanceNotFoundException ex) {
-              responseObserver.onError(new StatusException(Status.NOT_FOUND));
+              responseObserver.onError(BuildFarmInstances.toStatusException(ex));
               failed = true;
               return;
             }
@@ -288,11 +275,11 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
         try {
           instance = instances.getFromOperationStream(writeResourceName);
         } catch (InstanceNotFoundException ex) {
-          responseObserver.onError(new StatusException(Status.NOT_FOUND));
+          responseObserver.onError(BuildFarmInstances.toStatusException(ex));
           return;
         }
 
-        String operationStream = parseOperationStream(writeResourceName);
+        String operationStream = UrlPath.parseOperationStream(writeResourceName);
 
         OutputStream outputStream = instance.getStreamOutput(operationStream);
         request.getData().writeTo(outputStream);
@@ -311,7 +298,8 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
           String resourceName = request.getResourceName();
           if (resourceName.isEmpty()) {
             if (writeResourceName == null) {
-              responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
+              String description = "Missing resource name in request";
+              responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
               failed = true;
             } else {
               resourceName = writeResourceName;
@@ -319,30 +307,50 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
           } else if (writeResourceName == null) {
             writeResourceName = resourceName;
           } else if (!writeResourceName.equals(resourceName)) {
-            responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
+            String description = String.format("Previous resource name changed while handling request. %s -> %s", writeResourceName, resourceName);
+            responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
             failed = true;
           }
         }
 
-        if (!failed) {
-          try {
-            if (isUploadBlob(writeResourceName)) {
-              writeBlob(request, responseObserver);
-              finished = request.getFinishWrite();
-            } else if (isOperationStream(writeResourceName)) {
-              writeOperationStream(request, responseObserver);
-              finished = request.getFinishWrite();
-            } else {
-              responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
-              failed = true;
-            }
-          } catch(InterruptedException ex) {
-            responseObserver.onError(new StatusException(Status.fromThrowable(ex)));
+        if (failed) {
+          return;
+        }
+        
+        Optional<UrlPath.ResourceOperation> resourceOperation = Optional.empty();
+        try {
+          resourceOperation = Optional.of(UrlPath.detectResourceOperation(writeResourceName));
+        } catch (IllegalArgumentException ex) {
+          String description = ex.getLocalizedMessage();
+          responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
+          failed = true;
+        }
+
+        if (failed) {
+          return;
+        }
+
+        try {
+          switch (resourceOperation.get()) {
+          case UploadBlob:
+            writeBlob(request, responseObserver);
+            finished = request.getFinishWrite();
+            break;
+          case OperationStream:
+            writeOperationStream(request, responseObserver);
+            finished = request.getFinishWrite();
+            break;
+          default:
+            responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
             failed = true;
-          } catch(IOException ex) {
-            responseObserver.onError(new StatusException(Status.fromThrowable(ex)));
-            failed = true;
+            break;
           }
+        } catch(InterruptedException ex) {
+          responseObserver.onError(new StatusException(Status.fromThrowable(ex)));
+          failed = true;
+        } catch(IOException ex) {
+          responseObserver.onError(new StatusException(Status.fromThrowable(ex)));
+          failed = true;
         }
       }
 

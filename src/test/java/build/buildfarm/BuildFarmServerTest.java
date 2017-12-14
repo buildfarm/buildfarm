@@ -27,6 +27,10 @@ import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.devtools.remoteexecution.v1test.FindMissingBlobsRequest;
 import com.google.devtools.remoteexecution.v1test.FindMissingBlobsResponse;
 import com.google.devtools.remoteexecution.v1test.UpdateBlobRequest;
+import com.google.devtools.remoteexecution.v1test.ContentAddressableStorageGrpc;
+import com.google.longrunning.ListOperationsRequest;
+import com.google.longrunning.ListOperationsResponse;
+import com.google.longrunning.OperationsGrpc;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import io.grpc.ManagedChannel;
@@ -124,5 +128,20 @@ public class BuildFarmServerTest {
         .build();
     assertThat(response.getResponsesList())
         .containsExactlyElementsIn(Collections.singleton(expected));
+  }
+
+  @Test
+  public void listOperations() {
+    ListOperationsRequest request = ListOperationsRequest.newBuilder()
+        .setName("memory/operations")
+        .setPageSize(1024)
+        .build();
+
+    OperationsGrpc.OperationsBlockingStub stub =
+        OperationsGrpc.newBlockingStub(inProcessChannel);
+
+    ListOperationsResponse response = stub.listOperations(request);
+
+    assertThat(response.getOperationsList()).isEmpty();
   }
 }

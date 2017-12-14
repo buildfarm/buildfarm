@@ -17,13 +17,19 @@ package build.buildfarm.server;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.memory.MemoryInstance;
 import build.buildfarm.v1test.InstanceConfig;
-import com.google.common.collect.Iterables;
+import io.grpc.Status;
+import io.grpc.StatusException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 public class BuildFarmInstances {
+  public static StatusException toStatusException(InstanceNotFoundException ex) {
+    String errorMessage = String.format("Instance %s not known to Service", ex.instanceName);
+    return new StatusException(Status.NOT_FOUND.withDescription(errorMessage));
+  }
+
   private final Map<String, Instance> instances;
   private final Instance defaultInstance;
 
@@ -32,7 +38,7 @@ public class BuildFarmInstances {
     createInstances(instanceConfigs);
     if (!defaultInstanceName.isEmpty()) {
       if (!instances.containsKey(defaultInstanceName)) {
-        throw new IllegalArgumentException();
+        throw new IllegalArgumentException(defaultInstanceName + " not specified in instance configs.");
       }
       defaultInstance = instances.get(defaultInstanceName);
     } else {
@@ -59,56 +65,31 @@ public class BuildFarmInstances {
 
   public Instance getFromOperationsCollectionName(
       String operationsCollectionName) throws InstanceNotFoundException {
-    // {instance_name=**}/operations
-    String[] components = operationsCollectionName.split("/");
-    String instanceName = String.join(
-        "/", Iterables.limit(
-            Arrays.asList(components),
-            components.length - 1));
+    String instanceName = UrlPath.fromOperationsCollectionName(operationsCollectionName);
     return get(instanceName);
   }
 
   public Instance getFromOperationName(String operationName)
       throws InstanceNotFoundException {
-    // {instance_name=**}/operations/{uuid}
-    String[] components = operationName.split("/");
-    String instanceName = String.join(
-        "/", Iterables.limit(
-            Arrays.asList(components),
-            components.length - 2));
+    String instanceName = UrlPath.fromOperationName(operationName);
     return get(instanceName);
   }
 
   public Instance getFromOperationStream(String operationStream)
       throws InstanceNotFoundException {
-    // {instance_name=**}/operations/{uuid}/streams/{stream}
-    String[] components = operationStream.split("/");
-    String instanceName = String.join(
-        "/", Iterables.limit(
-            Arrays.asList(components),
-            components.length - 4));
+    String instanceName = UrlPath.fromOperationStream(operationStream);
     return get(instanceName);
   }
 
   public Instance getFromBlob(String blobName)
       throws InstanceNotFoundException {
-    // {instance_name=**}/blobs/{hash}/{size}
-    String[] components = blobName.split("/");
-    String instanceName = String.join(
-        "/", Iterables.limit(
-            Arrays.asList(components),
-            components.length - 3));
+    String instanceName = UrlPath.fromBlobName(blobName);
     return get(instanceName);
   }
 
   public Instance getFromUploadBlob(String uploadBlobName)
       throws InstanceNotFoundException {
-    // {instance_name=**}/uploads/{uuid}/blobs/{hash}/{size}
-    String[] components = uploadBlobName.split("/");
-    String instanceName = String.join(
-        "/", Iterables.limit(
-            Arrays.asList(components),
-            components.length - 5));
+    String instanceName = UrlPath.fromUploadBlobName(uploadBlobName);
     return get(instanceName);
   }
 
