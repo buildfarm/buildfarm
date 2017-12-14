@@ -37,7 +37,7 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
     try {
       instance = instances.get(request.getInstanceName());
     } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(new StatusException(Status.NOT_FOUND));
+      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
       return;
     }
 

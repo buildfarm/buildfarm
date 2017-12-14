@@ -57,7 +57,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
     try {
       instance = instances.getFromBlob(resourceName);
     } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(new StatusException(Status.NOT_FOUND));
+      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
       return;
     }
 
@@ -96,7 +96,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
     try {
       instance = instances.getFromBlob(resourceName);
     } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(new StatusException(Status.NOT_FOUND));
+      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
       return;
     }
 
@@ -254,7 +254,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
             try {
               instance = instances.getFromUploadBlob(writeResourceName);
             } catch (InstanceNotFoundException ex) {
-              responseObserver.onError(new StatusException(Status.NOT_FOUND));
+              responseObserver.onError(BuildFarmInstances.toStatusException(ex));
               failed = true;
               return;
             }
@@ -276,7 +276,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
         try {
           instance = instances.getFromOperationStream(writeResourceName);
         } catch (InstanceNotFoundException ex) {
-          responseObserver.onError(new StatusException(Status.NOT_FOUND));
+          responseObserver.onError(BuildFarmInstances.toStatusException(ex));
           return;
         }
 
