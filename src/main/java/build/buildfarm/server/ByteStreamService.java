@@ -160,7 +160,8 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
         readOperationStream(request, responseObserver);
         break;
       default:
-        responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
+        String description = "Invalid service";
+        responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
         break;
       }
     } catch(IOException ex) {
@@ -191,7 +192,8 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
       responseObserver.onError(new StatusException(Status.UNIMPLEMENTED));
       break;
     default:
-      responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
+      String description = "Invalid service";
+      responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
       break;
     }
   }
@@ -214,7 +216,8 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
         if (data == null) {
           digest = UrlPath.parseUploadBlobDigest(writeResourceName);
           if (digest == null) {
-            responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
+            String description = "Could not parse digest of: " + writeResourceName;
+            responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
             failed = true;
             return;
           }
@@ -224,7 +227,8 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
           }
         }
         if (request.getWriteOffset() != committed_size) {
-          responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
+          String description = "Write offset invalid: " + request.getWriteOffset();
+          responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
           failed = true;
           return;
         }
@@ -241,7 +245,8 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
           active_write_requests.remove(writeResourceName);
           Digest blobDigest = Digests.computeDigest(data);
           if (!blobDigest.equals(digest)) {
-            responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
+            String description = String.format("Digest mismatch %s <-> %s", Digests.toString(blobDigest), Digests.toString(digest));
+            responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
             failed = true;
           } else {
             Instance instance;
@@ -294,7 +299,8 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
           String resourceName = request.getResourceName();
           if (resourceName.isEmpty()) {
             if (writeResourceName == null) {
-              responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
+              String description = "Missing resource name in request";
+              responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
               failed = true;
             } else {
               resourceName = writeResourceName;
@@ -302,7 +308,8 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
           } else if (writeResourceName == null) {
             writeResourceName = resourceName;
           } else if (!writeResourceName.equals(resourceName)) {
-            responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
+            String description = String.format("Previous resource name changed while handling request. %s -> %s", writeResourceName, resourceName);
+            responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
             failed = true;
           }
         }
@@ -315,9 +322,9 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
         try {
           resourceOperation = Optional.of(UrlPath.detectResourceOperation(writeResourceName));
         } catch (IllegalArgumentException ex) {
-            String description = ex.getLocalizedMessage();
-            responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
-            failed = true;
+          String description = ex.getLocalizedMessage();
+          responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
+          failed = true;
         }
 
         if (failed) {
