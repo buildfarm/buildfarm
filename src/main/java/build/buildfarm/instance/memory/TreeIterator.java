@@ -24,7 +24,6 @@ import com.google.devtools.remoteexecution.v1test.Directory;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.MessageLite;
-import java.util.Arrays;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Iterator;

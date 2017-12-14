@@ -17,7 +17,6 @@ package build.buildfarm.instance.memory;
 import build.buildfarm.common.ContentAddressableStorage;
 import build.buildfarm.common.ContentAddressableStorage.Blob;
 import build.buildfarm.common.Digests;
-import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import com.google.devtools.remoteexecution.v1test.Digest;

@@ -14,17 +14,15 @@
 
 package build.buildfarm.worker;
 
-import build.buildfarm.common.Encoding;
 import build.buildfarm.common.Digests;
+import build.buildfarm.common.Encoding;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
-import build.buildfarm.v1test.WorkerConfig;
 import build.buildfarm.v1test.CASInsertionControl;
+import build.buildfarm.v1test.WorkerConfig;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Maps;
 import com.google.common.io.ByteStreams;
 import com.google.devtools.common.options.OptionsParser;
 import com.google.devtools.remoteexecution.v1test.Action;
@@ -37,7 +35,6 @@ import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
 import com.google.devtools.remoteexecution.v1test.ExecuteResponse;
 import com.google.devtools.remoteexecution.v1test.FileNode;
 import com.google.devtools.remoteexecution.v1test.OutputFile;
-import com.google.devtools.remoteexecution.v1test.Platform;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -56,9 +53,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.Collections;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;

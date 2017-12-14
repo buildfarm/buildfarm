@@ -6,23 +6,23 @@ java_library(
     name = "common",
     srcs = glob(["common/**/*.java"]),
     deps = [
-        "//third_party/protobuf:protobuf_java",
-        "//third_party:guava",
+        "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
-    ]
+    ],
 )
 
 java_library(
     name = "instance",
     srcs = [
-        "instance/Instance.java"
+        "instance/Instance.java",
     ],
     deps = [
-        "//third_party/protobuf:protobuf_java",
-        "//third_party:guava",
+        "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
         "@googleapis//:google_longrunning_operations_java_proto",
-    ]
+    ],
 )
 
 java_library(
@@ -32,48 +32,60 @@ java_library(
         "instance/TokenizableIterator.java",
     ],
     deps = [
-        "//third_party/grpc:grpc-jar",
         ":common",
         ":instance",
-        "//third_party/protobuf:protobuf_java",
-        "//third_party:guava",
+        "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java",
+        "//3rdparty/jvm/io/grpc:grpc_context",
+        "//3rdparty/jvm/io/grpc:grpc_core",
+        "//3rdparty/jvm/io/grpc:grpc_netty",
+        "//3rdparty/jvm/io/grpc:grpc_protobuf",
+        "//3rdparty/jvm/io/grpc:grpc_stub",
         "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
         "@googleapis//:google_longrunning_operations_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
         "@googleapis//:google_rpc_status_java_proto",
-    ]
+    ],
 )
 
 java_library(
     name = "memory-instance",
     srcs = glob(["instance/memory/*.java"]),
     deps = [
-        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
-        "//third_party/grpc:grpc-jar",
-        "//third_party/protobuf:protobuf_java",
-        "//third_party:guava",
         ":common",
         ":instance",
         ":server-instance",
+        "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java",
+        "//3rdparty/jvm/io/grpc:grpc_context",
+        "//3rdparty/jvm/io/grpc:grpc_core",
+        "//3rdparty/jvm/io/grpc:grpc_netty",
+        "//3rdparty/jvm/io/grpc:grpc_protobuf",
+        "//3rdparty/jvm/io/grpc:grpc_stub",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
         "@googleapis//:google_longrunning_operations_java_proto",
         "@googleapis//:google_rpc_status_java_proto",
-    ]
+    ],
 )
 
 java_library(
     name = "buildfarm",
     srcs = glob(["server/**/*.java"]),
     deps = [
-        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
-        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
-        "//third_party/grpc:grpc-jar",
-        "//third_party/protobuf:protobuf_java",
-        "//third_party:guava",
         ":common",
         ":instance",
         ":memory-instance",
-        "@com_github_pcj_google_options//jar",
+        "//3rdparty/jvm/com/github/pcj:google_options",
+        "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java",
+        "//3rdparty/jvm/io/grpc:grpc_context",
+        "//3rdparty/jvm/io/grpc:grpc_core",
+        "//3rdparty/jvm/io/grpc:grpc_netty",
+        "//3rdparty/jvm/io/grpc:grpc_protobuf",
+        "//3rdparty/jvm/io/grpc:grpc_stub",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_bytestream_bytestream_java_grpc",
         "@googleapis//:google_bytestream_bytestream_java_proto",
         "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_grpc",
@@ -89,21 +101,26 @@ java_binary(
     name = "buildfarm-server",
     main_class = "build.buildfarm.server.BuildFarmServer",
     runtime_deps = [
-      ":buildfarm",
-    ]
+        ":buildfarm",
+    ],
 )
 
 java_library(
     name = "stub-instance",
     srcs = glob(["instance/stub/*.java"]),
     deps = [
-        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
-        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
-        "//third_party/grpc:grpc-jar",
-        "//third_party/protobuf:protobuf_java",
-        "//third_party:guava",
         ":common",
         ":instance",
+        "//3rdparty/jvm/com/google/code/findbugs:jsr305",
+        "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java",
+        "//3rdparty/jvm/io/grpc:grpc_context",
+        "//3rdparty/jvm/io/grpc:grpc_core",
+        "//3rdparty/jvm/io/grpc:grpc_netty",
+        "//3rdparty/jvm/io/grpc:grpc_protobuf",
+        "//3rdparty/jvm/io/grpc:grpc_stub",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_bytestream_bytestream_java_grpc",
         "@googleapis//:google_bytestream_bytestream_java_proto",
         "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_grpc",
@@ -117,14 +134,18 @@ java_library(
     name = "buildfarm-worker-impl",
     srcs = glob(["worker/**/*.java"]),
     deps = [
-        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
-        "//third_party:guava",
-        "//third_party/grpc:grpc-jar",
-        "//third_party/protobuf:protobuf_java",
         ":common",
         ":instance",
         ":stub-instance",
-        "@com_github_pcj_google_options//jar",
+        "//3rdparty/jvm/com/github/pcj:google_options",
+        "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java",
+        "//3rdparty/jvm/io/grpc:grpc_context",
+        "//3rdparty/jvm/io/grpc:grpc_core",
+        "//3rdparty/jvm/io/grpc:grpc_netty",
+        "//3rdparty/jvm/io/grpc:grpc_protobuf",
+        "//3rdparty/jvm/io/grpc:grpc_stub",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
     ],
 )
 
@@ -132,7 +153,6 @@ java_binary(
     name = "buildfarm-worker",
     main_class = "build.buildfarm.worker.Worker",
     runtime_deps = [
-      ":buildfarm-worker-impl",
+        ":buildfarm-worker-impl",
     ],
 )
-

@@ -14,9 +14,9 @@
 
 package build.buildfarm.instance;
 
-import build.buildfarm.common.Digests;
 import build.buildfarm.common.ContentAddressableStorage;
 import build.buildfarm.common.ContentAddressableStorage.Blob;
+import build.buildfarm.common.Digests;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -28,7 +28,6 @@ import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.devtools.remoteexecution.v1test.Directory;
 import com.google.devtools.remoteexecution.v1test.DirectoryNode;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
-import com.google.devtools.remoteexecution.v1test.ExecutePreconditionViolationType;
 import com.google.devtools.remoteexecution.v1test.ExecuteResponse;
 import com.google.devtools.remoteexecution.v1test.FileNode;
 import com.google.longrunning.Operation;
@@ -37,7 +36,6 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.grpc.Status;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
@@ -49,6 +47,38 @@ public abstract class AbstractServerInstance implements Instance {
   protected final Map<Digest, ActionResult> actionCache;
   protected final Map<String, Operation> outstandingOperations;
   protected final Map<String, Operation> completedOperations;
+
+  private static final String DUPLICATE_FILE_NODE =
+      "One of the input `Directory` has multiple entries with the same file name. This will also"
+          + " occur if the worker filesystem considers two names to be the same, such as two names"
+          + " that vary only by case on a case-insensitive filesystem, or two names with the same"
+          + " normalized form on a filesystem that performs Unicode normalization on filenames.";
+
+  private static final String DIRECTORY_NOT_SORTED =
+      "The files in an input `Directory` are not correctly sorted by `name`.";
+
+  private static final String DIRECTORY_CYCLE_DETECTED =
+      "The input file tree contains a cycle (a `Directory` which, directly or indirectly,"
+          + " contains itself).";
+
+  private static final String DUPLICATE_ENVIRONMENT_VARIABLE =
+      "The `Command`'s `environment_variables` contain a duplicate entry. On systems where"
+          + " environment variables may consider two different names to be the same, such as if"
+          + " environment variables are case-insensitive, this may also occur if two equivalent"
+          + " environment variables appear.";
+
+  private static final String ENVIRONMENT_VARIABLES_NOT_SORTED =
+      "The `Command`'s `environment_variables` are not correctly sorted by `name`.";
+
+  private static final String MISSING_INPUT =
+      "A requested input (or the `Command` of the `Action`) was not found in the CAS.";
+
+  private static final String INVALID_DIGEST = "A `Digest` in the input tree is invalid.";
+
+  private static final String INVALID_FILE_NAME =
+      "One of the input `PathNode`s has an invalid name, such as a name containing a `/` character"
+          + " or another character which cannot be used in a file's name on the filesystem of the"
+          + " worker.";
 
   public AbstractServerInstance(
       String name,
@@ -165,21 +195,21 @@ public abstract class AbstractServerInstance implements Instance {
 
   private void stringsUniqueAndSortedPrecondition(
       Iterable<String> strings,
-      ExecutePreconditionViolationType duplicateViolationType,
-      ExecutePreconditionViolationType unsortedViolationType) {
+      String duplicateViolationMessage,
+      String unsortedViolationMessage) {
     String lastString = "";
     for (String string : strings) {
       int direction = lastString.compareTo(string);
-      Preconditions.checkState(direction != 0, duplicateViolationType);
-      Preconditions.checkState(direction < 0, string + " >= " + lastString, unsortedViolationType);
+      Preconditions.checkState(direction != 0, duplicateViolationMessage);
+      Preconditions.checkState(direction < 0, string + " >= " + lastString, unsortedViolationMessage);
     }
   }
 
   private void filesUniqueAndSortedPrecondition(Iterable<String> files) {
     stringsUniqueAndSortedPrecondition(
         files,
-        ExecutePreconditionViolationType.DUPLICATE_FILE_NODE,
-        ExecutePreconditionViolationType.DIRECTORY_NOT_SORTED);
+        DUPLICATE_FILE_NODE,
+        DIRECTORY_NOT_SORTED);
   }
 
   private void environmentVariablesUniqueAndSortedPrecondition(
@@ -188,8 +218,8 @@ public abstract class AbstractServerInstance implements Instance {
         Iterables.transform(
             environmentVariables,
             environmentVariable -> environmentVariable.getName()),
-        ExecutePreconditionViolationType.DUPLICATE_ENVIRONMENT_VARIABLE,
-        ExecutePreconditionViolationType.ENVIRONMENT_VARIABLES_NOT_SORTED);
+        DUPLICATE_ENVIRONMENT_VARIABLE,
+        ENVIRONMENT_VARIABLES_NOT_SORTED);
   }
 
   private void validateActionInputDirectory(
@@ -199,7 +229,7 @@ public abstract class AbstractServerInstance implements Instance {
       ImmutableSet.Builder<Digest> inputDigests) {
     Preconditions.checkState(
         directory != null,
-        ExecutePreconditionViolationType.MISSING_INPUT);
+        MISSING_INPUT);
 
     Set<String> entryNames = new HashSet<>();
 
@@ -208,15 +238,15 @@ public abstract class AbstractServerInstance implements Instance {
       String fileName = fileNode.getName();
       Preconditions.checkState(
           !entryNames.contains(fileName),
-          ExecutePreconditionViolationType.DUPLICATE_FILE_NODE);
+          DUPLICATE_FILE_NODE);
       /* FIXME serverside validity check? regex?
       Preconditions.checkState(
           fileName.isValidFilename(),
-          ExecutePreconditionViolationType.INVALID_FILE_NAME);
+          INVALID_FILE_NAME);
       */
       Preconditions.checkState(
           lastFileName.compareTo(fileName) < 0,
-          ExecutePreconditionViolationType.DIRECTORY_NOT_SORTED);
+          DIRECTORY_NOT_SORTED);
       lastFileName = fileName;
       entryNames.add(fileName);
 
@@ -228,21 +258,21 @@ public abstract class AbstractServerInstance implements Instance {
 
       Preconditions.checkState(
           !entryNames.contains(directoryName),
-          ExecutePreconditionViolationType.DUPLICATE_FILE_NODE);
+          DUPLICATE_FILE_NODE);
       /* FIXME serverside validity check? regex?
       Preconditions.checkState(
           directoryName.isValidFilename(),
-          ExecutePreconditionViolationType.INVALID_FILE_NAME);
+          INVALID_FILE_NAME);
       */
       Preconditions.checkState(
           lastDirectoryName.compareTo(directoryName) < 0,
-          ExecutePreconditionViolationType.DIRECTORY_NOT_SORTED);
+          DIRECTORY_NOT_SORTED);
       lastDirectoryName = directoryName;
       entryNames.add(directoryName);
 
       Preconditions.checkState(
           !path.contains(directoryNode.getDigest()),
-          ExecutePreconditionViolationType.DIRECTORY_CYCLE_DETECTED);
+          DIRECTORY_CYCLE_DETECTED);
 
       Digest directoryDigest = directoryNode.getDigest();
       if (!visited.contains(directoryDigest)) {
@@ -275,7 +305,7 @@ public abstract class AbstractServerInstance implements Instance {
     if (!Iterables.isEmpty(missingBlobDigests)) {
       Preconditions.checkState(
           Iterables.isEmpty(missingBlobDigests),
-          ExecutePreconditionViolationType.MISSING_INPUT);
+          MISSING_INPUT);
     }
 
     // FIXME should input/output collisions (through directories) be another
@@ -288,7 +318,7 @@ public abstract class AbstractServerInstance implements Instance {
     } catch (InvalidProtocolBufferException ex) {
       Preconditions.checkState(
           false,
-          ExecutePreconditionViolationType.INVALID_DIGEST);
+          INVALID_DIGEST);
       return;
     }
     environmentVariablesUniqueAndSortedPrecondition(
@@ -301,7 +331,6 @@ public abstract class AbstractServerInstance implements Instance {
       boolean skipCacheLookup,
       int totalInputFileCount,
       long totalInputFileBytes,
-      boolean waitForCompletion,
       Consumer<Operation> onOperation) {
     validateAction(action);
 
@@ -311,9 +340,7 @@ public abstract class AbstractServerInstance implements Instance {
 
     putOperation(operation);
 
-    if (!waitForCompletion) {
-      onOperation.accept(operation);
-    }
+    onOperation.accept(operation);
 
     Operation.Builder operationBuilder = operation.toBuilder();
     ActionResult actionResult = null;
@@ -351,14 +378,6 @@ public abstract class AbstractServerInstance implements Instance {
 
     if (!operation.getDone()) {
       updateOperationWatchers(operation); // updates watchers initially for queued stage
-      if (waitForCompletion) {
-        watchOperation(operation.getName(), /*watchInitialState=*/ false, o -> {
-          if (o.getDone()) {
-            onOperation.accept(o);
-          }
-          return true;
-        });
-      }
     }
     putOperation(operation);
   }

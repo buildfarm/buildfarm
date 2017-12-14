@@ -19,15 +19,13 @@ import com.google.devtools.remoteexecution.v1test.Action;
 import com.google.devtools.remoteexecution.v1test.ActionResult;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.devtools.remoteexecution.v1test.Directory;
-import com.google.devtools.remoteexecution.v1test.Platform;
-import com.google.devtools.remoteexecution.v1test.UpdateBlobRequest;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
+import com.google.devtools.remoteexecution.v1test.Platform;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -60,7 +58,6 @@ public interface Instance {
       boolean skipCacheLookup,
       int totalInputFileCount,
       long totalInputFileBytes,
-      boolean waitForCompletion,
       Consumer<Operation> onOperation);
   void match(Platform platform, boolean requeueOnFailure, Function<Operation, Boolean> onMatch);
   boolean putOperation(Operation operation);

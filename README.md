@@ -41,3 +41,21 @@ Run via
 
 - **`CAS_CACHE_DIRECTORY`** is (absolute or relative) directory path to cached files from CAS.
 
+## Developer Information
+
+### Third-party Dependencies
+
+Most third-party dependencies (e.g. protobuf, gRPC, ...) are managed automatically via
+[bazel-deps](https://github.com/johnynek/bazel-deps). After changing the `dependencies.yaml` file,
+just run this to regenerate the 3rdparty folder:
+
+```bash
+git clone https://github.com/johnynek/bazel-deps.git ../bazel-deps2
+cd ../bazel-deps
+bazel build //src/scala/com/github/johnynek/bazel_deps:parseproject_deploy.jar
+cd ../bazel-buildfarm
+../bazel-deps/gen_maven_deps.sh generate -r `pwd` -s 3rdparty/workspace.bzl -d dependencies.yaml
+```
+
+Things that aren't supported by bazel-deps are being imported as manually managed remote repos via
+the `WORKSPACE` file.

@@ -62,9 +62,6 @@ import java.io.OutputStream;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -302,7 +299,6 @@ public class StubInstance implements Instance {
       boolean skipCacheLookup,
       int totalInputFileCount,
       long totalInputFileBytes,
-      boolean waitForCompletion,
       Consumer<Operation> onOperation) {
     throw new UnsupportedOperationException();
   }

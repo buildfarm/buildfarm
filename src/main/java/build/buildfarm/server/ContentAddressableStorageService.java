@@ -28,7 +28,6 @@ import com.google.devtools.remoteexecution.v1test.GetTreeRequest;
 import com.google.devtools.remoteexecution.v1test.GetTreeResponse;
 import com.google.devtools.remoteexecution.v1test.UpdateBlobRequest;
 import com.google.protobuf.ByteString;
-import com.google.protobuf.InvalidProtocolBufferException;
 import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.stub.StreamObserver;

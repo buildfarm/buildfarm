@@ -16,14 +16,13 @@ package build.buildfarm.server;
 
 import build.buildfarm.common.Digests;
 import build.buildfarm.instance.Instance;
-import com.google.common.collect.Iterables;
 import com.google.bytestream.ByteStreamGrpc;
+import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
+import com.google.bytestream.ByteStreamProto.QueryWriteStatusResponse;
 import com.google.bytestream.ByteStreamProto.ReadRequest;
 import com.google.bytestream.ByteStreamProto.ReadResponse;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
-import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
-import com.google.bytestream.ByteStreamProto.QueryWriteStatusResponse;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;

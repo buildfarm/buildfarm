@@ -1,0 +1,46 @@
+options:
+  languages: [ "java" ]
+  resolvers:
+    - id: "mavencentral"
+      type: "default"
+      url: https://repo.maven.apache.org/maven2/
+  transitivity: runtime_deps
+  versionConflictPolicy: highest
+
+dependencies:
+  com.github.pcj:
+    google-options:
+      lang: java
+      version: "1.0.0"
+
+  com.google.guava:
+    guava:
+      lang: java
+      version: "23.5-jre"
+
+  com.google.protobuf:
+    protobuf-java:
+      lang: java
+      version: "3.5.0"
+
+    protobuf-java-util:
+      lang: java
+      version: "3.5.0"
+
+  io.netty:
+    netty:
+      lang: java
+      modules: [ "buffer", "codec", "codec-http", "codec-http2", "codec-socks", "common", "handler",
+        "handler-proxy", "resolver", "transport" ]
+      version: "4.1.17.Final"
+
+  #
+  io.grpc:
+    grpc-all:
+      lang: java
+      version: "1.8.0"
+
+  com.google.truth:
+    truth:
+      lang: java
+      version: "0.36"
