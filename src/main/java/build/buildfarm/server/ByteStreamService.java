@@ -158,9 +158,9 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
         break;
       case OperationStream:
         readOperationStream(request, responseObserver);
-        String description = "Invalid service";
         break;
       default:
+        String description = "Invalid service";
         responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
         break;
       }
