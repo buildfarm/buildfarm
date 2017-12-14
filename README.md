@@ -9,17 +9,35 @@ Get involved by joining the discussion on the [dedicated mailing list](https://g
 
 ## Usage
 
+In general do not execute server binaries with bazel run, since bazel does not support running multiple targets.
+
+All commandline options override corresponding config settings.
+
 ### Bazel BuildFarmServer
 
 Run via
 
-    bazel run //src/main/java/build/buildfarm:buildfarm-server -- config_file [-p PORT] [--port PORT]
+    bazel build //src/main/java/build/buildfarm:buildfarm-server && \
+    bazel-bin/src/main/java/build/buildfarm/buildfarm-server <configfile> [-p PORT] [--port PORT]
 
-- **`config_file`** has to be a (undocumented) Protocol Buffer text format.
+- **`configfile`** has to be in (undocumented) Protocol Buffer text format.
   
   For format details see [here](https://stackoverflow.com/questions/18873924/what-does-the-protobuf-text-format-look-like). Protocol Buffer structure at [src/main/protobuf/build/buildfarm/v1test/buildfarm.proto](src/main/protobuf/build/buildfarm/v1test/buildfarm.proto)
 
 - **`PORT`** to expose service endpoints on
 
-  Overrides port setting in `config_file`.
+### Bazel BuildFarmWorker
+
+Run via
+
+    bazel build //src/main/java/build/buildfarm:buildfarm-worker && \
+    bazel-bin/src/main/java/build/buildfarm/buildfarm-worker <configfile> [--root ROOT] [--cas_cache_directory CAS_CACHE_DIRECTORY]
+
+- **`configfile`** has to be in (undocumented) Protocol Buffer text format.
+
+  For format details see [here](https://stackoverflow.com/questions/18873924/what-does-the-protobuf-text-format-look-like). Protocol Buffer structure at [src/main/protobuf/build/buildfarm/v1test/buildfarm.proto](src/main/protobuf/build/buildfarm/v1test/buildfarm.proto)
+
+- **`ROOT`** base directory path for all work being performed.
+
+- **`CAS_CACHE_DIRECTORY`** is (absolute or relative) directory path to cached files from CAS.
 

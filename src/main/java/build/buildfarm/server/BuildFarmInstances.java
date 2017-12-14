@@ -17,7 +17,6 @@ package build.buildfarm.server;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.memory.MemoryInstance;
 import build.buildfarm.v1test.InstanceConfig;
-import com.google.common.collect.Iterables;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -32,7 +31,7 @@ public class BuildFarmInstances {
     createInstances(instanceConfigs);
     if (!defaultInstanceName.isEmpty()) {
       if (!instances.containsKey(defaultInstanceName)) {
-        throw new IllegalArgumentException();
+        throw new IllegalArgumentException(defaultInstanceName + " not specified in instance configs.");
       }
       defaultInstance = instances.get(defaultInstanceName);
     } else {
@@ -40,14 +39,14 @@ public class BuildFarmInstances {
     }
   }
 
-  public Instance getDefaultInstance() {
+  public Instance getDefault() {
     return defaultInstance;
   }
 
-  public Instance getInstance(String name) throws InstanceNotFoundException {
+  public Instance get(String name) throws InstanceNotFoundException {
     Instance instance;
     if (name == null || name.isEmpty()) {
-      instance = getDefaultInstance();
+      instance = getDefault();
     } else {
       instance = instances.get(name);
     }
@@ -57,66 +56,41 @@ public class BuildFarmInstances {
     return instance;
   }
 
-  public Instance getInstanceFromOperationsCollectionName(
+  public Instance getFromOperationsCollectionName(
       String operationsCollectionName) throws InstanceNotFoundException {
-    // {instance_name=**}/operations
-    String[] components = operationsCollectionName.split("/");
-    String instanceName = String.join(
-        "/", Iterables.limit(
-            Arrays.asList(components),
-            components.length - 1));
-    return getInstance(instanceName);
+    String instanceName = UrlPath.fromOperationsCollectionName(operationsCollectionName);
+    return get(instanceName);
   }
 
-  public Instance getInstanceFromOperationName(String operationName)
+  public Instance getFromOperationName(String operationName)
       throws InstanceNotFoundException {
-    // {instance_name=**}/operations/{uuid}
-    String[] components = operationName.split("/");
-    String instanceName = String.join(
-        "/", Iterables.limit(
-            Arrays.asList(components),
-            components.length - 2));
-    return getInstance(instanceName);
+    String instanceName = UrlPath.fromOperationName(operationName);
+    return get(instanceName);
   }
 
-  public Instance getInstanceFromOperationStream(String operationStream)
+  public Instance getFromOperationStream(String operationStream)
       throws InstanceNotFoundException {
-    // {instance_name=**}/operations/{uuid}/streams/{stream}
-    String[] components = operationStream.split("/");
-    String instanceName = String.join(
-        "/", Iterables.limit(
-            Arrays.asList(components),
-            components.length - 4));
-    return getInstance(instanceName);
+    String instanceName = UrlPath.fromOperationStream(operationStream);
+    return get(instanceName);
   }
 
-  public Instance getInstanceFromBlob(String blobName)
+  public Instance getFromBlob(String blobName)
       throws InstanceNotFoundException {
-    // {instance_name=**}/blobs/{hash}/{size}
-    String[] components = blobName.split("/");
-    String instanceName = String.join(
-        "/", Iterables.limit(
-            Arrays.asList(components),
-            components.length - 3));
-    return getInstance(instanceName);
+    String instanceName = UrlPath.fromBlobName(blobName);
+    return get(instanceName);
   }
 
-  public Instance getInstanceFromUploadBlob(String uploadBlobName)
+  public Instance getFromUploadBlob(String uploadBlobName)
       throws InstanceNotFoundException {
-    // {instance_name=**}/uploads/{uuid}/blobs/{hash}/{size}
-    String[] components = uploadBlobName.split("/");
-    String instanceName = String.join(
-        "/", Iterables.limit(
-            Arrays.asList(components),
-            components.length - 5));
-    return getInstance(instanceName);
+    String instanceName = UrlPath.fromUploadBlobName(uploadBlobName);
+    return get(instanceName);
   }
 
   private void createInstances(List<InstanceConfig> instanceConfigs) {
     for (InstanceConfig instanceConfig : instanceConfigs) {
       String name = instanceConfig.getName();
       InstanceConfig.TypeCase typeCase = instanceConfig.getTypeCase();
-      switch (instanceConfig.getTypeCase()) {
+      switch (typeCase) {
         default:
         case TYPE_NOT_SET:
           throw new IllegalArgumentException("Instance type not set in config");

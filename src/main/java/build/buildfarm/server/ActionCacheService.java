@@ -36,7 +36,7 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
       StreamObserver<ActionResult> responseObserver) {
     Instance instance;
     try {
-      instance = instances.getInstance(request.getInstanceName());
+      instance = instances.get(request.getInstanceName());
     } catch (InstanceNotFoundException ex) {
       responseObserver.onError(new StatusException(Status.NOT_FOUND));
       return;
@@ -59,7 +59,7 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
       StreamObserver<ActionResult> responseObserver) {
     Instance instance;
     try {
-      instance = instances.getInstance(request.getInstanceName());
+      instance = instances.get(request.getInstanceName());
     } catch (InstanceNotFoundException ex) {
       responseObserver.onError(new StatusException(Status.NOT_FOUND));
       return;
