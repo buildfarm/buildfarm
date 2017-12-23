@@ -33,19 +33,6 @@ instances {
 
     # limit for CAS total content size in bytes
     cas_max_size_bytes: 1073741824 # 1024 * 1024 * 1024
-
-    # an imposed action-key-invariant timeout used in the unspecified timeout case
-    default_action_timeout: {
-      seconds: 600
-      nanos: 0
-    }
-
-    # a limit on the action timeout specified in the action, above which
-    # the operation will report a failed result immediately
-    maximum_action_timeout: {
-      seconds: 3600
-      nanos: 0
-    }
   }
 }
 
@@ -70,16 +57,6 @@ instances {
     }
 
     cas_max_size_bytes: 655360 # 640k
-
-    default_action_timeout: {
-      seconds: 600
-      nanos: 0
-    }
-
-    maximum_action_timeout: {
-      seconds: 3600
-      nanos: 0
-    }
   }
 }
 
