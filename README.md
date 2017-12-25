@@ -21,7 +21,8 @@ Run via
     bazel-bin/src/main/java/build/buildfarm/buildfarm-server <configfile> [-p PORT] [--port PORT]
 
 - **`configfile`** has to be in (undocumented) Protocol Buffer text format.
-  
+
+  For an example, see the `examples` directory.
   For format details see [here](https://stackoverflow.com/questions/18873924/what-does-the-protobuf-text-format-look-like). Protocol Buffer structure at [src/main/protobuf/build/buildfarm/v1test/buildfarm.proto](src/main/protobuf/build/buildfarm/v1test/buildfarm.proto)
 
 - **`PORT`** to expose service endpoints on
@@ -35,6 +36,7 @@ Run via
 
 - **`configfile`** has to be in (undocumented) Protocol Buffer text format.
 
+  For an example, see the `examples` directory.
   For format details see [here](https://stackoverflow.com/questions/18873924/what-does-the-protobuf-text-format-look-like). Protocol Buffer structure at [src/main/protobuf/build/buildfarm/v1test/buildfarm.proto](src/main/protobuf/build/buildfarm/v1test/buildfarm.proto)
 
 - **`ROOT`** base directory path for all work being performed.
