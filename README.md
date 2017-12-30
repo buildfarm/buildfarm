@@ -1,8 +1,9 @@
 # Bazel Buildfarm
 
-This repository will host a [Bazel](https://bazel.build) remote caching and execution system.
+This repository hosts the [Bazel](https://bazel.build) remote caching and execution system.
 
-This project is just getting started.
+This project is just getting started; background information on the status of caching and remote execution in bazel can be
+found in the [bazel documentation](https://github.com/bazelbuild/bazel/blob/master/src/main/java/com/google/devtools/build/lib/remote/README.md#remote-caching-using-the-grpc-protocol).
 
 Read the [meeting notes](https://docs.google.com/document/d/1EtQMTn-7sKFMTxIMlb0oDGpvGCMAuzphVcfx58GWuEM/edit).
 Get involved by joining the discussion on the [dedicated mailing list](https://groups.google.com/forum/#!forum/bazel-buildfarm).
