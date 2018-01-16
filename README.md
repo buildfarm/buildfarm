@@ -44,6 +44,19 @@ Run via
 
 - **`CAS_CACHE_DIRECTORY`** is (absolute or relative) directory path to cached files from CAS.
 
+### Bazel Itself
+
+To have bazel use the bazel buildfarm configured using the example configs provided in the `examples` directory, you could configure your
+`.bazelrc` as follows:
+
+```
+$ cat .bazelrc
+startup --host_jvm_args=-Dbazel.DigestFunction=SHA1
+build --spawn_strategy=remote --genrule_strategy=remote --strategy=Javac=remote --strategy=Closure=remote  --remote_executor=localhost:8980
+```
+
+Then run your build as you would normally do.
+
 ## Developer Information
 
 ### Third-party Dependencies
