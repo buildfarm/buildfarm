@@ -14,7 +14,6 @@
 
 package build.buildfarm.server;
 
-import build.buildfarm.common.Digests;
 import build.buildfarm.instance.Instance;
 import com.google.common.collect.ImmutableList;
 import com.google.devtools.remoteexecution.v1test.BatchUpdateBlobsRequest;
@@ -83,7 +82,7 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
     for (UpdateBlobRequest request : batchRequest.getRequestsList()) {
       com.google.rpc.Status status;
       Digest digest = request.getContentDigest();
-      if (digest.equals(Digests.computeDigest(request.getData()))) {
+      if (digest.equals(instance.getDigestUtil().compute(request.getData()))) {
         validBlobsBuilder.add(request.getData());
         status = statusForCode.apply(com.google.rpc.Code.OK);
       } else {

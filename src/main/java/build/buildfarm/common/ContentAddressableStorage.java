@@ -27,8 +27,8 @@ public interface ContentAddressableStorage {
     private final Digest digest;
     private final ByteString data;
 
-    public Blob(ByteString data) {
-      digest = Digests.computeDigest(data);
+    public Blob(ByteString data, DigestUtil digestUtil) {
+      digest = digestUtil.compute(data);
       this.data = data;
     }
 

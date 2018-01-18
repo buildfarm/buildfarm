@@ -14,7 +14,6 @@
 
 package build.buildfarm.worker;
 
-import build.buildfarm.common.Digests;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -112,7 +111,7 @@ class InputFetchStage extends PipelineStage {
     long entries = 0;
     for (Directory directory : directories.build()) {
       entries++;
-      Digest directoryDigest = Digests.computeDigest(directory);
+      Digest directoryDigest = worker.instance.getDigestUtil().compute(directory);
       if (!directoryDigests.add(directoryDigest)) {
         continue;
       }

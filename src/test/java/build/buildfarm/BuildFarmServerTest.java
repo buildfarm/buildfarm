@@ -16,7 +16,7 @@ package build.buildfarm;
 
 import static com.google.common.truth.Truth.assertThat;
 
-import build.buildfarm.common.Digests;
+import build.buildfarm.common.DigestUtil;
 import build.buildfarm.server.BuildFarmServer;
 import build.buildfarm.v1test.BuildFarmServerConfig;
 import build.buildfarm.v1test.MemoryInstanceConfig;
@@ -88,9 +88,10 @@ public class BuildFarmServerTest {
 
   @Test
   public void findMissingBlobs() {
+    DigestUtil sha1DigestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
     ByteString content = ByteString.copyFromUtf8("Hello, World!");
     Iterable<Digest> digests =
-        Collections.singleton(Digests.computeDigest(content));
+        Collections.singleton(sha1DigestUtil.compute(content));
     FindMissingBlobsRequest request = FindMissingBlobsRequest.newBuilder()
         .setInstanceName("memory")
         .addAllBlobDigests(digests)
@@ -106,8 +107,9 @@ public class BuildFarmServerTest {
 
   @Test
   public void batchUpdateBlobs() {
+    DigestUtil digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
     ByteString content = ByteString.copyFromUtf8("Hello, World!");
-    Digest digest = Digests.computeDigest(content);
+    Digest digest = digestUtil.compute(content);
     BatchUpdateBlobsRequest request = BatchUpdateBlobsRequest.newBuilder()
         .setInstanceName("memory")
         .addRequests(UpdateBlobRequest.newBuilder()

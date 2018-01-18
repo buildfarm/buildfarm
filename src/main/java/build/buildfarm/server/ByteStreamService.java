@@ -14,7 +14,7 @@
 
 package build.buildfarm.server;
 
-import build.buildfarm.common.Digests;
+import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance;
 import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
@@ -50,40 +50,37 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
   private void readBlob(
       ReadRequest request,
       StreamObserver<ReadResponse> responseObserver) {
-    String resourceName = request.getResourceName();
-
-    Instance instance;
     try {
-      instance = instances.getFromBlob(resourceName);
+      String resourceName = request.getResourceName();
+      Instance instance = instances.getFromBlob(resourceName);
+
+      Digest digest = UrlPath.parseBlobDigest(resourceName, instance.getDigestUtil());
+
+      ByteString blob = instance.getBlob(
+          digest, request.getReadOffset(), request.getReadLimit());
+      if (blob == null) {
+        responseObserver.onError(new StatusException(Status.NOT_FOUND));
+        return;
+      }
+
+      while (!blob.isEmpty()) {
+        ByteString chunk;
+        if (blob.size() < DEFAULT_CHUNK_SIZE) {
+          chunk = blob;
+          blob = ByteString.EMPTY;
+        } else {
+          chunk = blob.substring(0, (int) DEFAULT_CHUNK_SIZE);
+          blob = blob.substring((int) DEFAULT_CHUNK_SIZE);
+        }
+        responseObserver.onNext(ReadResponse.newBuilder()
+            .setData(chunk)
+            .build());
+      }
+
+      responseObserver.onCompleted();
     } catch (InstanceNotFoundException ex) {
       responseObserver.onError(BuildFarmInstances.toStatusException(ex));
-      return;
     }
-
-    Digest digest = UrlPath.parseBlobDigest(resourceName);
-
-    ByteString blob = instance.getBlob(
-        digest, request.getReadOffset(), request.getReadLimit());
-    if (blob == null) {
-      responseObserver.onError(new StatusException(Status.NOT_FOUND));
-      return;
-    }
-
-    while (!blob.isEmpty()) {
-      ByteString chunk;
-      if (blob.size() < DEFAULT_CHUNK_SIZE) {
-        chunk = blob;
-        blob = ByteString.EMPTY;
-      } else {
-        chunk = blob.substring(0, (int) DEFAULT_CHUNK_SIZE);
-        blob = blob.substring((int) DEFAULT_CHUNK_SIZE);
-      }
-      responseObserver.onNext(ReadResponse.newBuilder()
-          .setData(chunk)
-          .build());
-    }
-
-    responseObserver.onCompleted();
   }
 
   private void readOperationStream(
@@ -212,8 +209,22 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
       private void writeBlob(
           WriteRequest request, StreamObserver<WriteResponse> responseObserver)
           throws InterruptedException {
+        try {
+          Instance instance = instances.getFromUploadBlob(writeResourceName);
+
+          writeInstanceBlob(request, responseObserver, instance);
+        } catch (InstanceNotFoundException ex) {
+          responseObserver.onError(BuildFarmInstances.toStatusException(ex));
+          failed = true;
+        }
+      }
+
+      private void writeInstanceBlob(
+          WriteRequest request, StreamObserver<WriteResponse> responseObserver,
+          Instance instance)
+          throws InterruptedException {
         if (data == null) {
-          digest = UrlPath.parseUploadBlobDigest(writeResourceName);
+          digest = UrlPath.parseUploadBlobDigest(writeResourceName, instance.getDigestUtil());
           if (digest == null) {
             String description = "Could not parse digest of: " + writeResourceName;
             responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
@@ -242,22 +253,12 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
         }
         if (request.getFinishWrite()) {
           active_write_requests.remove(writeResourceName);
-          Digest blobDigest = Digests.computeDigest(data);
+          Digest blobDigest = instance.getDigestUtil().compute(data);
           if (!blobDigest.equals(digest)) {
-            String description = String.format("Digest mismatch %s <-> %s", Digests.toString(blobDigest), Digests.toString(digest));
+            String description = String.format("Digest mismatch %s <-> %s", DigestUtil.toString(blobDigest), DigestUtil.toString(digest));
             responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
             failed = true;
           } else {
-            Instance instance;
-
-            try {
-              instance = instances.getFromUploadBlob(writeResourceName);
-            } catch (InstanceNotFoundException ex) {
-              responseObserver.onError(BuildFarmInstances.toStatusException(ex));
-              failed = true;
-              return;
-            }
-
             try {
               instance.putBlob(data);
             } catch (IOException ex) {
@@ -270,21 +271,18 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
 
       private void writeOperationStream(
           WriteRequest request, StreamObserver<WriteResponse> responseObserver) throws IOException {
-        Instance instance;
-
         try {
-          instance = instances.getFromOperationStream(writeResourceName);
+          Instance instance = instances.getFromOperationStream(writeResourceName);
+
+          String operationStream = UrlPath.parseOperationStream(writeResourceName);
+
+          OutputStream outputStream = instance.getStreamOutput(operationStream);
+          request.getData().writeTo(outputStream);
+          if (request.getFinishWrite()) {
+            outputStream.close();
+          }
         } catch (InstanceNotFoundException ex) {
           responseObserver.onError(BuildFarmInstances.toStatusException(ex));
-          return;
-        }
-
-        String operationStream = UrlPath.parseOperationStream(writeResourceName);
-
-        OutputStream outputStream = instance.getStreamOutput(operationStream);
-        request.getData().writeTo(outputStream);
-        if (request.getFinishWrite()) {
-          outputStream.close();
         }
       }
 

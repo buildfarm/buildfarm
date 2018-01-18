@@ -16,7 +16,7 @@ package build.buildfarm.instance;
 
 import build.buildfarm.common.ContentAddressableStorage;
 import build.buildfarm.common.ContentAddressableStorage.Blob;
-import build.buildfarm.common.Digests;
+import build.buildfarm.common.DigestUtil;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -47,6 +47,7 @@ public abstract class AbstractServerInstance implements Instance {
   protected final Map<Digest, ActionResult> actionCache;
   protected final Map<String, Operation> outstandingOperations;
   protected final Map<String, Operation> completedOperations;
+  protected final DigestUtil digestUtil;
 
   private static final String DUPLICATE_FILE_NODE =
       "One of the input `Directory` has multiple entries with the same file name. This will also"
@@ -85,17 +86,24 @@ public abstract class AbstractServerInstance implements Instance {
       ContentAddressableStorage contentAddressableStorage,
       Map<Digest, ActionResult> actionCache,
       Map<String, Operation> outstandingOperations,
-      Map<String, Operation> completedOperations) {
+      Map<String, Operation> completedOperations,
+      DigestUtil digestUtil) {
     this.name = name;
     this.contentAddressableStorage = contentAddressableStorage;
     this.actionCache = actionCache;
     this.outstandingOperations = outstandingOperations;
     this.completedOperations = completedOperations;
+    this.digestUtil = digestUtil;
   }
 
   @Override
   public String getName() {
     return name;
+  }
+
+  @Override
+  public DigestUtil getDigestUtil() {
+    return digestUtil;
   }
 
   @Override
@@ -113,7 +121,7 @@ public abstract class AbstractServerInstance implements Instance {
     return String.format(
         "%s/blobs/%s",
         getName(),
-        Digests.toString(blobDigest));
+        DigestUtil.toString(blobDigest));
   }
 
   @Override
@@ -145,7 +153,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public Digest putBlob(ByteString content) throws IllegalArgumentException {
-    Blob blob = new Blob(content);
+    Blob blob = new Blob(content, digestUtil);
     contentAddressableStorage.put(blob);
     return blob.getDigest();
   }
@@ -187,7 +195,7 @@ public abstract class AbstractServerInstance implements Instance {
     return getName() + "/operations/" + id;
   }
 
-  abstract protected Operation createOperation(Action action);
+  abstract protected Operation createOperation(Digest actionDigest);
 
   // called when an operation will be queued for execution
   protected void onQueue(Operation operation, Action action) {
@@ -334,7 +342,7 @@ public abstract class AbstractServerInstance implements Instance {
       Consumer<Operation> onOperation) {
     validateAction(action);
 
-    Operation operation = createOperation(action);
+    Operation operation = createOperation(digestUtil.compute(action));
     ExecuteOperationMetadata metadata =
       expectExecuteOperationMetadata(operation);
 
@@ -351,7 +359,7 @@ public abstract class AbstractServerInstance implements Instance {
       putOperation(operationBuilder
           .setMetadata(Any.pack(metadata))
           .build());
-      actionResult = getActionResult(Digests.computeDigest(action));
+      actionResult = getActionResult(digestUtil.compute(action));
     }
 
     if (actionResult != null) {
@@ -538,7 +546,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   protected void expireOperation(Operation operation) {
     Action action = expectAction(operation);
-    Digest actionDigest = Digests.computeDigest(action);
+    Digest actionDigest = digestUtil.compute(action);
     // one last chance to get partial information from worker
     ActionResult actionResult = action.getDoNotCache()
         ? null

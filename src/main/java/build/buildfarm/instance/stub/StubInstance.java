@@ -14,7 +14,7 @@
 
 package build.buildfarm.instance.stub;
 
-import build.buildfarm.common.Digests;
+import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.OperationQueueGrpc.OperationQueueBlockingStub;
@@ -69,11 +69,13 @@ import java.util.function.Function;
 public class StubInstance implements Instance {
   private final String name;
   private final Channel channel;
+  private final DigestUtil digestUtil;
   private final ByteStreamUploader uploader;
 
-  public StubInstance(String name, Channel channel) {
+  public StubInstance(String name, Channel channel, DigestUtil digestUtil) {
     this.name = name;
     this.channel = channel;
+    this.digestUtil = digestUtil;
 
     uploader = new ByteStreamUploader(name, channel, null, 60, new Retrier(), null);
   }
@@ -129,6 +131,11 @@ public class StubInstance implements Instance {
   }
 
   @Override
+  public DigestUtil getDigestUtil() {
+    return digestUtil;
+  }
+
+  @Override
   public ActionResult getActionResult(Digest actionDigest) {
     return null;
   }
@@ -158,7 +165,7 @@ public class StubInstance implements Instance {
       throws IOException, IllegalArgumentException, InterruptedException {
     // sort of a blatant misuse - one chunker per input, query digests before exhausting iterators
     Iterable<Chunker> chunkers = Iterables.transform(
-        blobs, blob -> new Chunker(blob));
+        blobs, blob -> new Chunker(blob, digestUtil));
     List<Digest> digests = new ImmutableList.Builder()
         .addAll(Iterables.transform(chunkers, chunker -> chunker.digest()))
         .build();
@@ -249,7 +256,7 @@ public class StubInstance implements Instance {
     return String.format(
         "%s/blobs/%s",
         getName(),
-        Digests.toString(blobDigest));
+        DigestUtil.toString(blobDigest));
   }
 
   @Override
@@ -269,7 +276,7 @@ public class StubInstance implements Instance {
   @Override
   public Digest putBlob(ByteString blob)
       throws IOException, IllegalArgumentException, InterruptedException {
-    Chunker chunker = new Chunker(blob);
+    Chunker chunker = new Chunker(blob, digestUtil);
     Digest digest = chunker.digest();
     uploader.uploadBlobs(Collections.singleton(chunker));
     return digest;

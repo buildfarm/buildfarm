@@ -14,6 +14,7 @@
 
 package build.buildfarm.instance;
 
+import build.buildfarm.common.DigestUtil;
 import com.google.common.collect.ImmutableList;
 import com.google.devtools.remoteexecution.v1test.Action;
 import com.google.devtools.remoteexecution.v1test.ActionResult;
@@ -31,6 +32,8 @@ import java.util.function.Function;
 
 public interface Instance {
   String getName();
+
+  DigestUtil getDigestUtil();
 
   ActionResult getActionResult(Digest actionDigest);
   void putActionResult(Digest actionDigest, ActionResult actionResult);

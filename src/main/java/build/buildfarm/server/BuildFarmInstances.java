@@ -14,6 +14,7 @@
 
 package build.buildfarm.server;
 
+import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.memory.MemoryInstance;
 import build.buildfarm.v1test.InstanceConfig;
@@ -23,6 +24,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.naming.ConfigurationException;
 
 public class BuildFarmInstances {
   public static StatusException toStatusException(InstanceNotFoundException ex) {
@@ -33,12 +35,12 @@ public class BuildFarmInstances {
   private final Map<String, Instance> instances;
   private final Instance defaultInstance;
 
-  public BuildFarmInstances(List<InstanceConfig> instanceConfigs, String defaultInstanceName) {
+  public BuildFarmInstances(List<InstanceConfig> instanceConfigs, String defaultInstanceName) throws ConfigurationException {
     instances = new HashMap<String, Instance>();
     createInstances(instanceConfigs);
     if (!defaultInstanceName.isEmpty()) {
       if (!instances.containsKey(defaultInstanceName)) {
-        throw new IllegalArgumentException(defaultInstanceName + " not specified in instance configs.");
+        throw new ConfigurationException(defaultInstanceName + " not specified in instance configs.");
       }
       defaultInstance = instances.get(defaultInstanceName);
     } else {
@@ -93,9 +95,21 @@ public class BuildFarmInstances {
     return get(instanceName);
   }
 
-  private void createInstances(List<InstanceConfig> instanceConfigs) {
+  private static DigestUtil.HashFunction getValidHashFunction(InstanceConfig config) throws ConfigurationException {
+    switch (config.getHashFunction()) {
+      default:
+      case UNRECOGNIZED:
+        throw new ConfigurationException("HashFunction value unrecognized");
+      case MD5: return DigestUtil.HashFunction.MD5;
+      case SHA1: return DigestUtil.HashFunction.SHA1;
+      case SHA256: return DigestUtil.HashFunction.SHA256;
+    }
+  }
+
+  private void createInstances(List<InstanceConfig> instanceConfigs) throws ConfigurationException {
     for (InstanceConfig instanceConfig : instanceConfigs) {
       String name = instanceConfig.getName();
+      DigestUtil.HashFunction hashFunction = getValidHashFunction(instanceConfig);
       InstanceConfig.TypeCase typeCase = instanceConfig.getTypeCase();
       switch (typeCase) {
         default:
@@ -104,7 +118,8 @@ public class BuildFarmInstances {
         case MEMORY_INSTANCE_CONFIG:
           instances.put(name, new MemoryInstance(
               name,
-              instanceConfig.getMemoryInstanceConfig()));
+              instanceConfig.getMemoryInstanceConfig(),
+              new DigestUtil(hashFunction)));
           break;
       }
     }

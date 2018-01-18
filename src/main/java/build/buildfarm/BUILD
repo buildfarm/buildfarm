@@ -18,6 +18,7 @@ java_library(
         "instance/Instance.java",
     ],
     deps = [
+        ":common",
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
