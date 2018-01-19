@@ -43,6 +43,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 import io.grpc.Channel;
 import io.grpc.Status;
+import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
@@ -249,14 +250,15 @@ public class ShardInstance implements Instance {
 
   @Override
   public Digest putBlob(ByteString blob)
-      throws IOException, IllegalArgumentException, InterruptedException {
+      throws IllegalArgumentException, InterruptedException, StatusException {
     for(;;) {
       String worker = null;
       try {
         worker = backplane.getRandomWorker();
         if (worker == null) {
+          // FIXME should be made into a retry operation, resulting in an IOException
           // FIXME should we wait for a worker to become available?
-          throw new StatusRuntimeException(Status.UNAVAILABLE);
+          throw new StatusException(Status.RESOURCE_EXHAUSTED);
         }
         return workerStub(worker).putBlob(blob);
       } catch (IOException ex) {
@@ -335,7 +337,7 @@ public class ShardInstance implements Instance {
     // make the action available to the worker
     try {
       putBlob(action.toByteString());
-    } catch (IOException|IllegalArgumentException|InterruptedException ex) {
+    } catch (InterruptedException|StatusException ex) {
       ex.printStackTrace();
       return;
     }

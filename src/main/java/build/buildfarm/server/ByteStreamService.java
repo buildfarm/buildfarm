@@ -263,6 +263,8 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
               instance.putBlob(data);
             } catch (IOException ex) {
               responseObserver.onError(new StatusException(Status.fromThrowable(ex)));
+            } catch (StatusException ex) {
+              responseObserver.onError(ex);
               failed = true;
             }
           }

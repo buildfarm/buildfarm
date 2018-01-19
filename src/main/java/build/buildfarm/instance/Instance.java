@@ -25,6 +25,7 @@ import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage
 import com.google.devtools.remoteexecution.v1test.Platform;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
+import io.grpc.StatusException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -48,7 +49,7 @@ public interface Instance {
   ByteString getBlob(Digest blobDigest);
   ByteString getBlob(Digest blobDigest, long offset, long limit);
   Digest putBlob(ByteString blob)
-      throws IOException, IllegalArgumentException, InterruptedException;
+      throws IOException, InterruptedException, StatusException;
   String getTree(
       Digest rootDigest,
       int pageSize,
