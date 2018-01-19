@@ -20,6 +20,7 @@ import com.google.devtools.common.options.OptionsParser;
 import com.google.protobuf.TextFormat;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
+import io.grpc.util.TransmitStatusRuntimeExceptionInterceptor;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -59,6 +60,7 @@ public class BuildFarmServer {
         .addService(new OperationQueueService(instances))
         .addService(new OperationsService(instances))
         .addService(new WatcherService(instances))
+        .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
         .build();
   }
 
