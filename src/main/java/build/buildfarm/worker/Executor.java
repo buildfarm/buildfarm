@@ -14,7 +14,6 @@
 
 package build.buildfarm.worker;
 
-import build.buildfarm.v1test.CASInsertionControl;
 import com.google.common.io.ByteStreams;
 import com.google.devtools.remoteexecution.v1test.ActionResult;
 import com.google.devtools.remoteexecution.v1test.Command;
