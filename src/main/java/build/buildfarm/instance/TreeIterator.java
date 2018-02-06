@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.instance.memory;
+package build.buildfarm.instance;
 
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.TokenizableIterator;
@@ -30,7 +30,7 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Stack;
 
-class TreeIterator implements TokenizableIterator<Directory> {
+public class TreeIterator implements TokenizableIterator<Directory> {
   private final Instance instance;
   private Deque<Digest> path;
   private final ArrayDeque<Digest> parentPath;

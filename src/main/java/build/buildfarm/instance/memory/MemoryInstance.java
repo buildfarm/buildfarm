@@ -19,6 +19,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.instance.TokenizableIterator;
+import build.buildfarm.instance.TreeIterator;
 import build.buildfarm.v1test.MemoryInstanceConfig;
 import build.buildfarm.v1test.OperationIteratorToken;
 import com.google.common.annotations.VisibleForTesting;

@@ -34,6 +34,7 @@ java_library(
     srcs = [
         "instance/AbstractServerInstance.java",
         "instance/TokenizableIterator.java",
+        "instance/TreeIterator.java",
     ],
     deps = [
         ":common",
@@ -45,6 +46,7 @@ java_library(
         "//3rdparty/jvm/io/grpc:grpc_netty",
         "//3rdparty/jvm/io/grpc:grpc_protobuf",
         "//3rdparty/jvm/io/grpc:grpc_stub",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
         "@googleapis//:google_longrunning_operations_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
