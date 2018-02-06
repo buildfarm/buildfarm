@@ -209,7 +209,7 @@ class ReportResultStage extends PipelineStage {
 
     ActionResult result = resultBuilder.build();
     if (!operationContext.action.getDoNotCache() && resultBuilder.getExitCode() == 0) {
-      worker.instance.putActionResult(digestUtil.asActionKey(operationContext.metadata.getActionDigest()), result);
+      worker.instance.putActionResult(getDigestUtil().asActionKey(operationContext.metadata.getActionDigest()), result);
     }
 
     ExecuteOperationMetadata metadata = operationContext.metadata.toBuilder()
