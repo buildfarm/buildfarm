@@ -44,7 +44,7 @@ class CASFileCache {
   private final Path root;
   private final long maxSizeInBytes;
   private final DigestUtil digestUtil;
-  private final Map<String, Entry> storage;
+  private final Map<Path, Entry> storage;
   private final Map<Digest, DirectoryEntry> directoryStorage;
 
   private transient long sizeInBytes;
@@ -74,7 +74,7 @@ class CASFileCache {
     Files.createDirectories(root);
 
     Files.walkFileTree(root, new SimpleFileVisitor<Path>() {
-      private String parseFileEntryKey(String fileName, long size) {
+      private Path parseFileEntryKey(String fileName, long size) {
         String[] components = fileName.toString().split("_");
         if (components.length < 2 || components.length > 3) {
           return null;
@@ -112,7 +112,7 @@ class CASFileCache {
         if (sizeInBytes + size > maxSizeInBytes) {
           Files.delete(file);
         } else {
-          String key = null;
+          Path key = null;
           if (file.getParent().equals(root)) {
             key = parseFileEntryKey(file.getFileName().toString(), size);
           }
@@ -142,14 +142,14 @@ class CASFileCache {
     return String.format("%s_%d", digest.getHash(), digest.getSizeBytes());
   }
 
-  public static String toFileEntryKey(Digest digest, boolean isExecutable) {
-    return String.format(
+  public Path toFileEntryKey(Digest digest, boolean isExecutable) {
+    return getPath(String.format(
         "%s%s",
         digestFilename(digest),
-        (isExecutable ? "_exec" : ""));
+        (isExecutable ? "_exec" : "")));
   }
 
-  public synchronized void update(Iterable<String> inputFiles, Iterable<Digest> inputDirectories) {
+  public synchronized void update(Iterable<Path> inputFiles, Iterable<Digest> inputDirectories) {
     // decrement references and notify if any dropped to 0
     // insert after the last 0-reference count entry in list
     boolean entriesMadeAvailable = false;
@@ -158,7 +158,7 @@ class CASFileCache {
       inputFiles = Iterables.concat(inputFiles, directoryStorage.get(inputDirectory).inputs);
     }
 
-    for (String input : inputFiles) {
+    for (Path input : inputFiles) {
       Entry e = storage.get(input);
       if (e == null) {
         throw new IllegalStateException(input + " has been removed with references");
@@ -185,7 +185,7 @@ class CASFileCache {
   }
 
   /** must be called in synchronized context */
-  private String expireEntry() throws IOException, InterruptedException {
+  private Path expireEntry() throws IOException, InterruptedException {
     while (header.before == header.after) {
       wait();
     }
@@ -208,7 +208,7 @@ class CASFileCache {
     DirectoryEntry e = directoryStorage.remove(digest);
     Path path = getDirectoryPath(digest);
 
-    for (String input : e.inputs) {
+    for (Path input : e.inputs) {
       Entry fileEntry = storage.get(input);
 
       if (fileEntry != null) {
@@ -219,8 +219,8 @@ class CASFileCache {
   }
 
   /** must be called in synchronized context */
-  private void incrementReferences(Iterable<String> inputs) {
-    for (String input : inputs) {
+  private void incrementReferences(Iterable<Path> inputs) {
+    for (Path input : inputs) {
       storage.get(input).incrementReference(header);
     }
   }
@@ -231,12 +231,12 @@ class CASFileCache {
       Path path,
       Digest digest,
       Map<Digest, Directory> directoriesIndex,
-      ImmutableList.Builder<String> inputsBuilder) throws IOException, InterruptedException {
+      ImmutableList.Builder<Path> inputsBuilder) throws IOException, InterruptedException {
     Directory directory = directoriesIndex.get(digest);
     Files.createDirectory(path);
     for (FileNode fileNode : directory.getFilesList()) {
-      String fileCacheKey = put(fileNode.getDigest(), fileNode.getIsExecutable(), containingDirectory);
-      Files.createLink(path.resolve(fileNode.getName()), getPath(fileCacheKey));
+      Path fileCacheKey = put(fileNode.getDigest(), fileNode.getIsExecutable(), containingDirectory);
+      Files.createLink(path.resolve(fileNode.getName()), fileCacheKey);
       inputsBuilder.add(fileCacheKey);
     }
     for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
@@ -260,7 +260,7 @@ class CASFileCache {
       return path;
     }
 
-    ImmutableList.Builder<String> inputsBuilder = new ImmutableList.Builder<>();
+    ImmutableList.Builder<Path> inputsBuilder = new ImmutableList.Builder<>();
     fetchDirectory(digest, path, digest, directoriesIndex, inputsBuilder);
 
     e = new DirectoryEntry(directoriesIndex.get(digest), inputsBuilder.build());
@@ -270,13 +270,13 @@ class CASFileCache {
     return path;
   }
 
-  public String put(Digest digest, boolean isExecutable) throws InterruptedException {
+  public Path put(Digest digest, boolean isExecutable) throws InterruptedException {
     return put(digest, isExecutable, null);
   }
 
-  public String put(Digest digest, boolean isExecutable, Digest containingDirectory) throws InterruptedException {
-    String key = toFileEntryKey(digest, isExecutable);
-    ImmutableList.Builder<String> expiredKeys = null;
+  public Path put(Digest digest, boolean isExecutable, Digest containingDirectory) throws InterruptedException {
+    Path key = toFileEntryKey(digest, isExecutable);
+    ImmutableList.Builder<Path> expiredKeys = null;
 
     synchronized(this) {
       Entry e = storage.get(key);
@@ -292,7 +292,7 @@ class CASFileCache {
 
       while (sizeInBytes > maxSizeInBytes) {
         if (expiredKeys == null) {
-          expiredKeys = new ImmutableList.Builder<String>();
+          expiredKeys = new ImmutableList.Builder<Path>();
         }
         try {
           expiredKeys.add(expireEntry());
@@ -302,18 +302,17 @@ class CASFileCache {
     }
 
     if (expiredKeys != null) {
-      for (String expiredKey : expiredKeys.build()) {
+      for (Path expiredKey : expiredKeys.build()) {
         try {
-          Files.delete(getPath(expiredKey));
+          Files.delete(expiredKey);
         } catch (IOException ex) {
         }
       }
     }
 
     try (InputStream in = inputStreamFactory.apply(digest)) {
-      Path path = getPath(key);
       // FIXME make a validating file copy object and verify digest
-      Path tmpPath = path.resolveSibling(path.getFileName() + ".tmp");
+      Path tmpPath = key.resolveSibling(key.getFileName() + ".tmp");
       long copySize = Files.copy(in, tmpPath);
       in.close();
       if (copySize != digest.getSizeBytes()) {
@@ -321,7 +320,7 @@ class CASFileCache {
         return null;
       }
       setPermissions(tmpPath, isExecutable);
-      Files.move(tmpPath, path, REPLACE_EXISTING);
+      Files.move(tmpPath, key, REPLACE_EXISTING);
     } catch (IOException ex) {
       ex.printStackTrace();
       return null;
@@ -348,7 +347,7 @@ class CASFileCache {
 
   private static class Entry {
     Entry before, after;
-    final String key;
+    final Path key;
     final long size;
     final Set<Digest> containingDirectories;
     int referenceCount;
@@ -360,7 +359,7 @@ class CASFileCache {
       containingDirectories = null;
     }
 
-    public Entry(String key, long size, Digest containingDirectory) {
+    public Entry(Path key, long size, Digest containingDirectory) {
       this.key = key;
       this.size = size;
       referenceCount = 1;
@@ -433,9 +432,9 @@ class CASFileCache {
 
   private static class DirectoryEntry {
     Directory directory;
-    Iterable<String> inputs;
+    Iterable<Path> inputs;
 
-    public DirectoryEntry(Directory directory, Iterable<String> inputs) {
+    public DirectoryEntry(Directory directory, Iterable<Path> inputs) {
       this.directory = directory;
       this.inputs = inputs;
     }

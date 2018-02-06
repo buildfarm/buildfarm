@@ -26,7 +26,7 @@ final class OperationContext {
   final Path execDir;
   final ExecuteOperationMetadata metadata;
   final Action action;
-  final List<String> inputFiles;
+  final List<Path> inputFiles;
   final List<Digest> inputDirectories;
 
   public OperationContext(
@@ -34,7 +34,7 @@ final class OperationContext {
       Path execDir,
       ExecuteOperationMetadata metadata,
       Action action,
-      List<String> inputFiles,
+      List<Path> inputFiles,
       List<Digest> inputDirectories) {
     this.operation = operation;
     this.execDir = execDir;

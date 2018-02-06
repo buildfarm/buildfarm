@@ -152,7 +152,7 @@ class InputFetchStage extends PipelineStage {
       Path execDir,
       Digest inputRoot,
       OutputDirectory outputDirectory,
-      List<String> inputFiles,
+      List<Path> inputFiles,
       List<Digest> inputDirectories) throws IOException, InterruptedException {
     ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
     String pageToken = "";
@@ -181,19 +181,19 @@ class InputFetchStage extends PipelineStage {
       Digest inputRoot,
       Map<Digest, Directory> directoriesIndex,
       OutputDirectory outputDirectory,
-      List<String> inputFiles,
+      List<Path> inputFiles,
       List<Digest> inputDirectories)
       throws IOException, InterruptedException {
     Directory directory = directoriesIndex.get(inputRoot);
 
     for (FileNode fileNode : directory.getFilesList()) {
       Path execPath = execDir.resolve(fileNode.getName());
-      String fileCacheKey = worker.fileCache.put(fileNode.getDigest(), fileNode.getIsExecutable());
+      Path fileCacheKey = worker.fileCache.put(fileNode.getDigest(), fileNode.getIsExecutable());
       if (fileCacheKey == null) {
         throw new IOException("InputFetchStage: Failed to create cache entry for " + execPath);
       }
       inputFiles.add(fileCacheKey);
-      Files.createLink(execPath, worker.fileCache.getPath(fileCacheKey));
+      Files.createLink(execPath, fileCacheKey);
     }
 
     for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
