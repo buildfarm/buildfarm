@@ -16,6 +16,7 @@ package build.buildfarm.instance.memory;
 
 import build.buildfarm.common.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.instance.TokenizableIterator;
 import build.buildfarm.v1test.MemoryInstanceConfig;
@@ -93,7 +94,7 @@ public class MemoryInstance extends AbstractServerInstance {
     super(
         name,
         contentAddressableStorage,
-        /*actionCache=*/ new DelegateCASMap<Digest, ActionResult>(contentAddressableStorage, ActionResult.parser(), digestUtil),
+        /*actionCache=*/ new DelegateCASMap<ActionKey, ActionResult>(contentAddressableStorage, ActionResult.parser(), digestUtil),
         outstandingOperations,
         /*completedOperations=*/ new DelegateCASMap<String, Operation>(contentAddressableStorage, Operation.parser(), digestUtil),
         digestUtil);
@@ -185,13 +186,13 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  protected Operation createOperation(Digest actionDigest) {
+  protected Operation createOperation(ActionKey actionKey) {
     String name = createOperationName(UUID.randomUUID().toString());
 
     watchers.put(name, new ArrayList<Function<Operation, Boolean>>());
 
     ExecuteOperationMetadata metadata = ExecuteOperationMetadata.newBuilder()
-        .setActionDigest(actionDigest)
+        .setActionDigest(actionKey.getDigest())
         .build();
 
     return Operation.newBuilder()

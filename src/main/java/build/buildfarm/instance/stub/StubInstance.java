@@ -15,6 +15,7 @@
 package build.buildfarm.instance.stub;
 
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.OperationQueueGrpc.OperationQueueBlockingStub;
@@ -136,15 +137,15 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public ActionResult getActionResult(Digest actionDigest) {
+  public ActionResult getActionResult(ActionKey actionKey) {
     return null;
   }
 
   @Override
-  public void putActionResult(Digest actionDigest, ActionResult actionResult) {
+  public void putActionResult(ActionKey actionKey, ActionResult actionResult) {
     actionCacheBlockingStub.get().updateActionResult(UpdateActionResultRequest.newBuilder()
         .setInstanceName(getName())
-        .setActionDigest(actionDigest)
+        .setActionDigest(actionKey.getDigest())
         .setActionResult(actionResult)
         .build());
   }

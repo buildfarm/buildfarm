@@ -17,6 +17,7 @@ package build.buildfarm.instance;
 import build.buildfarm.common.ContentAddressableStorage;
 import build.buildfarm.common.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.DigestUtil.ActionKey;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -44,7 +45,7 @@ import java.util.function.Consumer;
 public abstract class AbstractServerInstance implements Instance {
   private final String name;
   protected final ContentAddressableStorage contentAddressableStorage;
-  protected final Map<Digest, ActionResult> actionCache;
+  protected final Map<ActionKey, ActionResult> actionCache;
   protected final Map<String, Operation> outstandingOperations;
   protected final Map<String, Operation> completedOperations;
   protected final DigestUtil digestUtil;
@@ -84,7 +85,7 @@ public abstract class AbstractServerInstance implements Instance {
   public AbstractServerInstance(
       String name,
       ContentAddressableStorage contentAddressableStorage,
-      Map<Digest, ActionResult> actionCache,
+      Map<ActionKey, ActionResult> actionCache,
       Map<String, Operation> outstandingOperations,
       Map<String, Operation> completedOperations,
       DigestUtil digestUtil) {
@@ -107,13 +108,13 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public ActionResult getActionResult(Digest actionDigest) {
-    return actionCache.get(actionDigest);
+  public ActionResult getActionResult(ActionKey actionKey) {
+    return actionCache.get(actionKey);
   }
 
   @Override
-  public void putActionResult(Digest actionDigest, ActionResult actionResult) {
-    actionCache.put(actionDigest, actionResult);
+  public void putActionResult(ActionKey actionKey, ActionResult actionResult) {
+    actionCache.put(actionKey, actionResult);
   }
 
   @Override
@@ -195,7 +196,7 @@ public abstract class AbstractServerInstance implements Instance {
     return getName() + "/operations/" + id;
   }
 
-  abstract protected Operation createOperation(Digest actionDigest);
+  abstract protected Operation createOperation(ActionKey actionKey);
 
   // called when an operation will be queued for execution
   protected void onQueue(Operation operation, Action action) {
@@ -342,7 +343,8 @@ public abstract class AbstractServerInstance implements Instance {
       Consumer<Operation> onOperation) {
     validateAction(action);
 
-    Operation operation = createOperation(digestUtil.compute(action));
+    ActionKey actionKey = digestUtil.computeActionKey(action);
+    Operation operation = createOperation(actionKey);
     ExecuteOperationMetadata metadata =
       expectExecuteOperationMetadata(operation);
 
@@ -359,7 +361,7 @@ public abstract class AbstractServerInstance implements Instance {
       putOperation(operationBuilder
           .setMetadata(Any.pack(metadata))
           .build());
-      actionResult = getActionResult(digestUtil.compute(action));
+      actionResult = getActionResult(actionKey);
     }
 
     if (actionResult != null) {
@@ -546,11 +548,11 @@ public abstract class AbstractServerInstance implements Instance {
 
   protected void expireOperation(Operation operation) {
     Action action = expectAction(operation);
-    Digest actionDigest = digestUtil.compute(action);
+    ActionKey actionKey = digestUtil.computeActionKey(action);
     // one last chance to get partial information from worker
     ActionResult actionResult = action.getDoNotCache()
         ? null
-        : getActionResult(actionDigest);
+        : getActionResult(actionKey);
     boolean cachedResult = actionResult != null;
     if (!cachedResult) {
       actionResult = ActionResult.newBuilder()
@@ -559,7 +561,7 @@ public abstract class AbstractServerInstance implements Instance {
               "[BUILDFARM]: Action timed out with no response from worker"))
           .build();
       if (!action.getDoNotCache()) {
-        putActionResult(actionDigest, actionResult);
+        putActionResult(actionKey, actionResult);
       }
     }
     putOperation(operation.newBuilder()

@@ -15,6 +15,7 @@
 package build.buildfarm.instance;
 
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.DigestUtil.ActionKey;
 import com.google.common.collect.ImmutableList;
 import com.google.devtools.remoteexecution.v1test.Action;
 import com.google.devtools.remoteexecution.v1test.ActionResult;
@@ -35,8 +36,8 @@ public interface Instance {
 
   DigestUtil getDigestUtil();
 
-  ActionResult getActionResult(Digest actionDigest);
-  void putActionResult(Digest actionDigest, ActionResult actionResult);
+  ActionResult getActionResult(ActionKey actionKey);
+  void putActionResult(ActionKey actionKey, ActionResult actionResult);
 
   Iterable<Digest> findMissingBlobs(Iterable<Digest> digests);
 

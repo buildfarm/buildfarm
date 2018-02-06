@@ -142,16 +142,16 @@ public class DigestUtil {
     return compute(message.toByteString());
   }
 
-  public DigestUtil.ActionKey computeActionKey(Action action) {
-    return new DigestUtil.ActionKey(compute(action));
+  public ActionKey computeActionKey(Action action) {
+    return new ActionKey(compute(action));
   }
 
   /**
    * Assumes that the given Digest is a valid digest of an Action, and creates an ActionKey wrapper.
    * This should not be called on the client side!
    */
-  public DigestUtil.ActionKey asActionKey(Digest digest) {
-    return new DigestUtil.ActionKey(digest);
+  public ActionKey asActionKey(Digest digest) {
+    return new ActionKey(digest);
   }
 
   public Digest empty() {
