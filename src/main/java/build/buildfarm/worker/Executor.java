@@ -46,10 +46,16 @@ class Executor implements Runnable {
   }
 
   private void runInterruptible() throws InterruptedException {
-    Command command;
-    try {
-      command = Command.parseFrom(workerContext.getBlob(operationContext.action.getCommandDigest()));
-    } catch (InvalidProtocolBufferException ex) {
+    ByteString commandBlob = workerContext.getBlob(operationContext.action.getCommandDigest());
+    Command command = null;
+    if (commandBlob != null) {
+      try {
+        command = Command.parseFrom(commandBlob);
+      } catch (InvalidProtocolBufferException ex) {
+      }
+    }
+
+    if (command == null) {
       owner.error().put(operationContext);
       owner.release();
       return;

@@ -445,9 +445,13 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   protected Action expectAction(Operation operation) {
+    ByteString actionBlob = getBlob(
+        expectExecuteOperationMetadata(operation).getActionDigest());
+    if (actionBlob == null) {
+      return null;
+    }
     try {
-      return Action.parseFrom(getBlob(
-          expectExecuteOperationMetadata(operation).getActionDigest()));
+      return Action.parseFrom(actionBlob);
     } catch(InvalidProtocolBufferException ex) {
       return null;
     }
