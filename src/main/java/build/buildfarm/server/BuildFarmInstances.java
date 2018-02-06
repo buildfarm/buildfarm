@@ -15,6 +15,7 @@
 package build.buildfarm.server;
 
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.memory.MemoryInstance;
 import build.buildfarm.v1test.InstanceConfig;
@@ -95,21 +96,18 @@ public class BuildFarmInstances {
     return get(instanceName);
   }
 
-  private static DigestUtil.HashFunction getValidHashFunction(InstanceConfig config) throws ConfigurationException {
-    switch (config.getHashFunction()) {
-      default:
-      case UNRECOGNIZED:
-        throw new ConfigurationException("HashFunction value unrecognized");
-      case MD5: return DigestUtil.HashFunction.MD5;
-      case SHA1: return DigestUtil.HashFunction.SHA1;
-      case SHA256: return DigestUtil.HashFunction.SHA256;
+  private static HashFunction getValidHashFunction(InstanceConfig config) throws ConfigurationException {
+    try {
+      return HashFunction.get(config.getHashFunction());
+    } catch (IllegalArgumentException e) {
+      throw new ConfigurationException("hash_function value unrecognized");
     }
   }
 
   private void createInstances(List<InstanceConfig> instanceConfigs) throws ConfigurationException {
     for (InstanceConfig instanceConfig : instanceConfigs) {
       String name = instanceConfig.getName();
-      DigestUtil.HashFunction hashFunction = getValidHashFunction(instanceConfig);
+      HashFunction hashFunction = getValidHashFunction(instanceConfig);
       InstanceConfig.TypeCase typeCase = instanceConfig.getTypeCase();
       switch (typeCase) {
         default:

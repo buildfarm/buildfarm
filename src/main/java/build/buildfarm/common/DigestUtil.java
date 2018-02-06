@@ -13,6 +13,7 @@
 // limitations under the License.
 package build.buildfarm.common;
 
+import build.buildfarm.v1test.InstanceHashFunction;
 import com.google.common.base.Preconditions;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.Hashing;
@@ -44,6 +45,17 @@ public class DigestUtil {
     HashFunction(com.google.common.hash.HashFunction hash) {
       this.hash = hash;
       empty = this.hash.newHasher().hash();
+    }
+
+    public static HashFunction get(InstanceHashFunction hashFunction) throws IllegalArgumentException {
+      switch(hashFunction) {
+      default:
+      case UNRECOGNIZED:
+        throw new IllegalArgumentException(hashFunction.toString());
+      case MD5: return HashFunction.MD5;
+      case SHA1: return HashFunction.SHA1;
+      case SHA256: return HashFunction.SHA256;
+      }
     }
 
     /** Converts to {@link HashFunction}. */

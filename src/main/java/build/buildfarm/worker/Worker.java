@@ -73,13 +73,10 @@ public class Worker {
   }
 
   private static HashFunction getValidHashFunction(WorkerConfig config) throws ConfigurationException {
-    switch (config.getHashFunction()) {
-      default:
-      case UNRECOGNIZED:
-        throw new ConfigurationException("hash_function value unrecognized");
-      case MD5: return HashFunction.MD5;
-      case SHA1: return HashFunction.SHA1;
-      case SHA256: return HashFunction.SHA256;
+    try {
+      return HashFunction.get(config.getHashFunction());
+    } catch (IllegalArgumentException e) {
+      throw new ConfigurationException("hash_function value unrecognized");
     }
   }
 
