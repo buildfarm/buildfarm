@@ -189,7 +189,6 @@ class CASFileCache {
     while (header.before == header.after) {
       wait();
     }
-    // should assert that e.referenceCount == 0
     Entry e = header.after;
     if (e.referenceCount != 0) {
       throw new RuntimeException("ERROR: Reference counts lru ordering has not been maintained correctly, attempting to expire referenced (or negatively counted) content");
