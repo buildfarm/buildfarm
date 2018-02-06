@@ -16,7 +16,7 @@ package build.buildfarm.instance.memory;
 
 import build.buildfarm.common.ContentAddressableStorage;
 import build.buildfarm.common.ContentAddressableStorage.Blob;
-import build.buildfarm.common.Digests;
+import build.buildfarm.common.DigestUtil;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import com.google.devtools.remoteexecution.v1test.Digest;
@@ -30,20 +30,23 @@ import java.util.concurrent.ConcurrentHashMap;
 
 class DelegateCASMap<K,V extends Message> implements Map<K,V> {
   private final ContentAddressableStorage contentAddressableStorage;
-  private final Map<K, Digest> digestMap;
   private final Parser<V> parser;
+  private final DigestUtil digestUtil;
+  private final Map<K, Digest> digestMap;
 
   public DelegateCASMap(
       ContentAddressableStorage contentAddressableStorage,
-      Parser<V> parser) {
+      Parser<V> parser,
+      DigestUtil digestUtil) {
     this.contentAddressableStorage = contentAddressableStorage;
     this.parser = parser;
-    this.digestMap = new ConcurrentHashMap<>();
+    this.digestUtil = digestUtil;
+    digestMap = new ConcurrentHashMap<>();
   }
 
   @Override
   public V put(K key, V value) {
-    Blob blob = new Blob(value.toByteString());
+    Blob blob = new Blob(value.toByteString(), digestUtil);
     digestMap.put(key, blob.getDigest());
     contentAddressableStorage.put(blob, () -> digestMap.remove(key));
     return value;
@@ -77,7 +80,7 @@ class DelegateCASMap<K,V extends Message> implements Map<K,V> {
   @Override
   public boolean containsValue(Object value) {
     Preconditions.checkState(value instanceof Message);
-    return contentAddressableStorage.contains(Digests.computeDigest((Message) value));
+    return contentAddressableStorage.contains(digestUtil.compute((Message) value));
   }
 
   @Override
@@ -104,7 +107,7 @@ class DelegateCASMap<K,V extends Message> implements Map<K,V> {
   public void putAll(Map<? extends K,? extends V> m) {
     Map<? extends K, Blob> blobs = Maps.transformValues(
         m,
-        (value) -> new Blob(value.toByteString()));
+        (value) -> new Blob(value.toByteString(), digestUtil));
     for (Blob blob : blobs.values()) {
       contentAddressableStorage.put(blob);
     }

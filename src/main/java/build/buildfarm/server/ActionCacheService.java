@@ -42,8 +42,8 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
       return;
     }
 
-    ActionResult actionResult =
-      instance.getActionResult(request.getActionDigest());
+    ActionResult actionResult = instance.getActionResult(
+        instance.getDigestUtil().asActionKey(request.getActionDigest()));
     if (actionResult == null) {
       responseObserver.onError(new StatusException(Status.NOT_FOUND));
       return;
@@ -66,7 +66,9 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
     }
 
     ActionResult actionResult = request.getActionResult();
-    instance.putActionResult(request.getActionDigest(), actionResult);
+    instance.putActionResult(
+        instance.getDigestUtil().asActionKey(request.getActionDigest()),
+        actionResult);
 
     responseObserver.onNext(actionResult);
     responseObserver.onCompleted();

@@ -82,11 +82,18 @@ message MemoryInstanceConfig {
   int64 cas_max_size_bytes = 7;
 }
 
+enum InstanceHashFunction {
+  MD5 = 0;
+  SHA1 = 1;
+  SHA256 = 2;
+}
+
 message InstanceConfig {
   string name = 1;
+  InstanceHashFunction hash_function = 2;
 
   oneof type {
-    MemoryInstanceConfig memory_instance_config = 2;
+    MemoryInstanceConfig memory_instance_config = 3;
   }
 }
 
@@ -102,58 +109,61 @@ message WorkerConfig {
   // the instance this requests work from
   string instance_name = 1;
 
+  // the hash function used for digests
+  InstanceHashFunction hash_function = 2;
+
   // server address for all buildfarm requests
   // like actioncache or execution in bazel, this
   // server is expected to provide all buildfarm
   // service endpoints
-  string operation_queue = 2;
+  string operation_queue = 3;
 
   // base directory for all work being performed
-  string root = 3;
+  string root = 4;
 
   // path to cached files from CAS
   // if relative, is made relative to root
-  string cas_cache_directory = 4;
+  string cas_cache_directory = 5;
 
   // limit for contents of files retained
   // from CAS in the cache
-  int64 cas_cache_max_size_bytes = 5;
+  int64 cas_cache_max_size_bytes = 6;
 
   // total size of the inline content for
   // action results
-  int32 inline_content_limit = 6;
+  int32 inline_content_limit = 7;
 
   // whether to stream stdout from processes
-  bool stream_stdout = 7;
+  bool stream_stdout = 8;
 
   // policy for process stdout
-  CASInsertionPolicy stdout_cas_policy = 8;
+  CASInsertionPolicy stdout_cas_policy = 9;
 
   // whether to stream stderr from processes
-  bool stream_stderr = 9;
+  bool stream_stderr = 10;
 
   // policy for process stdout
-  CASInsertionPolicy stderr_cas_policy = 10;
+  CASInsertionPolicy stderr_cas_policy = 11;
 
   // policy for process output files
-  CASInsertionPolicy file_cas_policy = 11;
+  CASInsertionPolicy file_cas_policy = 12;
 
   // whether the worker should attempt to requeue
   // an operation when an unexpected failure
   // occurs during an execution
-  bool requeue_on_failure = 12;
+  bool requeue_on_failure = 13;
 
   // page size for getTree request
-  uint32 tree_page_size = 13;
+  uint32 tree_page_size = 14;
 
   // period of poll requests during execution
-  google.protobuf.Duration operation_poll_period = 14;
+  google.protobuf.Duration operation_poll_period = 15;
 
   // initial platform used to match operations
-  google.devtools.remoteexecution.v1test.Platform platform = 15;
+  google.devtools.remoteexecution.v1test.Platform platform = 16;
 
   // execute width
-  int32 execute_stage_width = 16;
+  int32 execute_stage_width = 17;
 }
 
 message TreeIteratorToken {

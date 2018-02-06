@@ -16,7 +16,7 @@ package build.buildfarm.worker;
 
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 
-import build.buildfarm.common.Digests;
+import build.buildfarm.common.DigestUtil;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.devtools.remoteexecution.v1test.Digest;
@@ -36,15 +36,17 @@ class CASFileCache {
   private final InputStreamFactory inputStreamFactory;
   private final Path root;
   private final long maxSizeInBytes;
+  private final DigestUtil digestUtil;
   private final Map<String, Entry> storage;
 
   private transient long sizeInBytes;
   private transient Entry header;
 
-  CASFileCache(InputStreamFactory inputStreamFactory, Path root, long maxSizeInBytes) {
+  CASFileCache(InputStreamFactory inputStreamFactory, Path root, long maxSizeInBytes, DigestUtil digestUtil) {
     this.inputStreamFactory = inputStreamFactory;
     this.root = root;
     this.maxSizeInBytes = maxSizeInBytes;
+    this.digestUtil = digestUtil;
 
     sizeInBytes = 0;
     header = new SentinelEntry();
@@ -65,38 +67,34 @@ class CASFileCache {
     Files.walkFileTree(root, new SimpleFileVisitor<Path>() {
       private String parseFileEntryKey(String fileName, long size) {
         String[] components = fileName.toString().split("_");
-        Digest digest;
         if (components.length < 2 || components.length > 3) {
           return null;
         }
 
-        String hashComponent = components[0];
-        String sizeComponent = components[1];
-        // FIXME hash size check, and it should probably match hash func...
-        int parsedSizeComponent;
+        boolean isExecutable = false;
+        Digest digest;
         try {
-          parsedSizeComponent = Integer.parseInt(sizeComponent);
+          String sizeComponent = components[1];
+          int parsedSizeComponent = Integer.parseInt(sizeComponent);
+
+          if (parsedSizeComponent != size) {
+            return null;
+          }
+
+          String hashComponent = components[0];
+          digest = digestUtil.build(hashComponent, parsedSizeComponent);
+          if (components.length == 3) {
+            if (components[2].equals("exec")) {
+              isExecutable = true;
+            } else {
+              return null;
+            }
+          }
         } catch (NumberFormatException ex) {
           return null;
         }
 
-        if (parsedSizeComponent != size) {
-          return null;
-        }
-
-        digest = Digests.buildDigest(hashComponent, parsedSizeComponent);
-        boolean isExecutable = false;
-        if (components.length == 3) {
-          if (components[2].equals("exec")) {
-            isExecutable = true;
-          } else {
-            return null;
-          }
-        }
-
-        return toFileEntryKey(
-            Digests.buildDigest(hashComponent, parsedSizeComponent),
-            isExecutable);
+        return toFileEntryKey(digest, isExecutable);
       }
 
       @Override

@@ -14,6 +14,8 @@
 
 package build.buildfarm.worker;
 
+import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.Encoding;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
@@ -70,17 +72,27 @@ public class Worker {
     return root.resolve(casCacheValue);
   }
 
+  private static HashFunction getValidHashFunction(WorkerConfig config) throws ConfigurationException {
+    try {
+      return HashFunction.get(config.getHashFunction());
+    } catch (IllegalArgumentException e) {
+      throw new ConfigurationException("hash_function value unrecognized");
+    }
+  }
+
   public Worker(WorkerConfig config) throws ConfigurationException {
     this.config = config;
 
     /* configuration validation */
     root = getValidRoot(config);
     Path casCacheDirectory = getValidCasCacheDirectory(config, root);
+    HashFunction hashFunction = getValidHashFunction(config);
 
     /* initialization */
     instance = new StubInstance(
         config.getInstanceName(),
-        createChannel(config.getOperationQueue()));
+        createChannel(config.getOperationQueue()),
+        new DigestUtil(hashFunction));
     InputStreamFactory inputStreamFactory = new InputStreamFactory() {
       @Override
       public InputStream apply(Digest digest) {
@@ -90,7 +102,8 @@ public class Worker {
     fileCache = new CASFileCache(
         inputStreamFactory,
         root.resolve(casCacheDirectory),
-        config.getCasCacheMaxSizeBytes());
+        config.getCasCacheMaxSizeBytes(),
+        instance.getDigestUtil());
   }
 
   public void start() throws InterruptedException {

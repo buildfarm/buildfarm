@@ -14,7 +14,7 @@
 
 package build.buildfarm.worker;
 
-import build.buildfarm.common.Digests;
+import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.CASInsertionPolicy;
 import com.google.common.collect.ImmutableList;
@@ -77,6 +77,10 @@ class ReportResultStage extends PipelineStage {
     queue.offer(operationContext);
   }
 
+  private DigestUtil getDigestUtil() {
+    return worker.instance.getDigestUtil();
+  }
+
   private static int inlineOrDigest(
       ByteString content,
       CASInsertionPolicy policy,
@@ -84,7 +88,7 @@ class ReportResultStage extends PipelineStage {
       int inlineContentBytes,
       int inlineContentLimit,
       Runnable setInline,
-      Consumer<Digest> setDigest) {
+      Consumer<ByteString> setDigest) {
     boolean withinLimit = inlineContentBytes + content.size() <= inlineContentLimit;
     if (withinLimit) {
       setInline.run();
@@ -93,7 +97,7 @@ class ReportResultStage extends PipelineStage {
     if (policy.equals(CASInsertionPolicy.ALWAYS_INSERT) ||
         (!withinLimit && policy.equals(CASInsertionPolicy.INSERT_ABOVE_LIMIT))) {
       contents.add(content);
-      setDigest.accept(Digests.computeDigest(content));
+      setDigest.accept(content);
     }
     return inlineContentBytes;
   }
@@ -113,7 +117,7 @@ class ReportResultStage extends PipelineStage {
           inlineContentBytes,
           worker.config.getInlineContentLimit(),
           () -> resultBuilder.setStdoutRaw(stdoutRaw),
-          (digest) -> resultBuilder.setStdoutDigest(digest));
+          (content) -> resultBuilder.setStdoutDigest(getDigestUtil().compute(content)));
     }
 
     ByteString stderrRaw = resultBuilder.getStderrRaw();
@@ -127,7 +131,7 @@ class ReportResultStage extends PipelineStage {
           inlineContentBytes,
           worker.config.getInlineContentLimit(),
           () -> resultBuilder.setStderrRaw(stdoutRaw),
-          (digest) -> resultBuilder.setStderrDigest(digest));
+          (content) -> resultBuilder.setStderrDigest(getDigestUtil().compute(content)));
     }
 
     return inlineContentBytes;
@@ -189,7 +193,7 @@ class ReportResultStage extends PipelineStage {
           inlineContentBytes,
           worker.config.getInlineContentLimit(),
           () -> outputFileBuilder.setContent(content),
-          (digest) -> outputFileBuilder.setDigest(digest));
+          (fileContent) -> outputFileBuilder.setDigest(getDigestUtil().compute(fileContent)));
     }
 
     /* put together our outputs and update the result */
@@ -205,7 +209,7 @@ class ReportResultStage extends PipelineStage {
 
     ActionResult result = resultBuilder.build();
     if (!operationContext.action.getDoNotCache() && resultBuilder.getExitCode() == 0) {
-      worker.instance.putActionResult(operationContext.metadata.getActionDigest(), result);
+      worker.instance.putActionResult(digestUtil.asActionKey(operationContext.metadata.getActionDigest()), result);
     }
 
     ExecuteOperationMetadata metadata = operationContext.metadata.toBuilder()

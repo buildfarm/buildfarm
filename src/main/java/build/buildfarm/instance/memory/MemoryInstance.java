@@ -15,7 +15,8 @@
 package build.buildfarm.instance.memory;
 
 import build.buildfarm.common.ContentAddressableStorage;
-import build.buildfarm.common.Digests;
+import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.instance.TokenizableIterator;
 import build.buildfarm.v1test.MemoryInstanceConfig;
@@ -75,25 +76,28 @@ public class MemoryInstance extends AbstractServerInstance {
     }
   }
 
-  public MemoryInstance(String name, MemoryInstanceConfig config) {
+  public MemoryInstance(String name, MemoryInstanceConfig config, DigestUtil digestUtil) {
     this(
         name,
         config,
         /*contentAddressableStorage=*/ new MemoryLRUContentAddressableStorage(config.getCasMaxSizeBytes()),
-        /*outstandingOperations=*/ new TreeMap<String, Operation>());
+        /*outstandingOperations=*/ new TreeMap<String, Operation>(),
+        digestUtil);
   }
 
   private MemoryInstance(
       String name,
       MemoryInstanceConfig config,
       ContentAddressableStorage contentAddressableStorage,
-      Map<String, Operation> outstandingOperations) {
+      Map<String, Operation> outstandingOperations,
+      DigestUtil digestUtil) {
     super(
         name,
         contentAddressableStorage,
-        /*actionCache=*/ new DelegateCASMap<Digest, ActionResult>(contentAddressableStorage, ActionResult.parser()),
+        /*actionCache=*/ new DelegateCASMap<ActionKey, ActionResult>(contentAddressableStorage, ActionResult.parser(), digestUtil),
         outstandingOperations,
-        /*completedOperations=*/ new DelegateCASMap<String, Operation>(contentAddressableStorage, Operation.parser()));
+        /*completedOperations=*/ new DelegateCASMap<String, Operation>(contentAddressableStorage, Operation.parser(), digestUtil),
+        digestUtil);
     this.config = config;
     watchers = new ConcurrentHashMap<String, List<Function<Operation, Boolean>>>();
     streams = new HashMap<String, ByteStringStreamSource>();
@@ -182,23 +186,20 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  protected Operation createOperation(Action action) {
+  protected Operation createOperation(ActionKey actionKey) {
     String name = createOperationName(UUID.randomUUID().toString());
 
     watchers.put(name, new ArrayList<Function<Operation, Boolean>>());
 
-    Digest actionDigest = Digests.computeDigest(action.toByteString());
-
     ExecuteOperationMetadata metadata = ExecuteOperationMetadata.newBuilder()
-        .setActionDigest(actionDigest)
+        .setActionDigest(actionKey.getDigest())
         .build();
 
-    Operation.Builder operationBuilder = Operation.newBuilder()
+    return Operation.newBuilder()
         .setName(name)
         .setDone(false)
-        .setMetadata(Any.pack(metadata));
-
-    return operationBuilder.build();
+        .setMetadata(Any.pack(metadata))
+        .build();
   }
 
   @Override

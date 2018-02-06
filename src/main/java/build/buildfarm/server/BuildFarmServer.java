@@ -29,6 +29,7 @@ import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
 import java.util.logging.Logger;
+import javax.naming.ConfigurationException;
 
 public class BuildFarmServer {
   public static final Logger logger =
@@ -38,11 +39,11 @@ public class BuildFarmServer {
   private final BuildFarmInstances instances;
   private final Server server;
 
-  public BuildFarmServer(BuildFarmServerConfig config) {
+  public BuildFarmServer(BuildFarmServerConfig config) throws ConfigurationException {
     this(ServerBuilder.forPort(config.getPort()), config);
   }
 
-  public BuildFarmServer(ServerBuilder<?> serverBuilder, BuildFarmServerConfig config) {
+  public BuildFarmServer(ServerBuilder<?> serverBuilder, BuildFarmServerConfig config) throws ConfigurationException {
     this.config = config;
     String defaultInstanceName = config.getDefaultInstanceName();
     instances = new BuildFarmInstances(config.getInstancesList(), defaultInstanceName);

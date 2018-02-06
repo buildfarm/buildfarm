@@ -17,7 +17,7 @@ package build.buildfarm.instance.stub;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
-import build.buildfarm.common.Digests;
+import build.buildfarm.common.DigestUtil;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.io.ByteStreams;
@@ -39,9 +39,6 @@ import java.util.function.Supplier;
  * {@link #reset()} manually.
  */
 public final class Chunker {
-
-  private static final Chunk EMPTY_CHUNK =
-      new Chunk(Digests.computeDigest(ByteString.EMPTY), ByteString.EMPTY, 0);
 
   private static int defaultChunkSize = 1024 * 16;
 
@@ -111,20 +108,23 @@ public final class Chunker {
   // Set to true on the first call to next(). This is so that the Chunker can open its data source
   // lazily on the first call to next(), as opposed to opening it in the constructor or on reset().
   private boolean initialized;
+  private final Chunk emptyChunk;
 
-  public Chunker(ByteString data) {
-    this(data, getDefaultChunkSize());
+  public Chunker(ByteString data, DigestUtil digestUtil) {
+    this(data, getDefaultChunkSize(), digestUtil);
   }
 
-  public Chunker(ByteString data, int chunkSize) {
-    this(() -> data.newInput(), Digests.computeDigest(data), chunkSize);
+  public Chunker(ByteString data, int chunkSize, DigestUtil digestUtil) {
+    this(() -> data.newInput(), digestUtil.compute(data), chunkSize, digestUtil);
   }
 
   @VisibleForTesting
-  Chunker(Supplier<InputStream> dataSupplier, Digest digest, int chunkSize) {
+  Chunker(Supplier<InputStream> dataSupplier, Digest digest, int chunkSize, DigestUtil digestUtil) {
     this.dataSupplier = checkNotNull(dataSupplier);
     this.digest = checkNotNull(digest);
     this.chunkSize = chunkSize;
+    // ugh, this sucks
+    emptyChunk = new Chunk(digestUtil.empty(), ByteString.EMPTY, 0);
   }
 
   public Digest digest() {
@@ -171,7 +171,7 @@ public final class Chunker {
 
     if (digest.getSizeBytes() == 0) {
       data = null;
-      return EMPTY_CHUNK;
+      return emptyChunk;
     }
 
     // The cast to int is safe, because the return value is capped at chunkSize.
