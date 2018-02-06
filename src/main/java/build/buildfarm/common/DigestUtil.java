@@ -58,21 +58,8 @@ public class DigestUtil {
       }
     }
 
-    /** Converts to {@link HashFunction}. */
-    /*
-    public static class Converter extends EnumConverter<HashFunction> {
-      public Converter() {
-        super(HashFunction.class, "hash function");
-      }
-    }
-    */
-
     public com.google.common.hash.HashFunction getHash() {
       return hash;
-    }
-
-    public boolean isValidDigest(byte[] digest) {
-      return digest != null && digest.length * 8 == hash.bits();
     }
 
     public boolean isValidHexDigest(String hexDigest) {
