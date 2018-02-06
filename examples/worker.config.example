@@ -11,47 +11,31 @@ root: "/tmp/worker"
 # the local cache location relative to the 'root', or absolute
 cas_cache_directory: "cache"
 
+# total size in bytes of inline content for action results
+# output files, stdout, and stderr content, in that order
+# will be inlined if their cumulative size does not exceed this limit.
+inline_content_limit: 1048567 # 1024 * 1024
+
 # whether the stdout of running processes should be streamed
 stream_stdout: true
 
-# policy control for stdout in results injection and CAS
-stdout_cas_control: {
-  # maximum content size above which inlined output will not be present
-  limit: 16384 # 1024 * 16
-
-  # whether to insert stdout into the CAS, can be:
-  #   ALWAYS_INSERT: stdout is always inserted into the CAS
-  #   INSERT_ABOVE_LIMIT: stdout is inserted into the CAS when it exceeds the inline limit above
-  #   NEVER_INSERT: stdout is never inserted into the CAS
-  policy: ALWAYS_INSERT
-}
+# whether to insert stdout into the CAS, can be:
+#   ALWAYS_INSERT: stdout is always inserted into the CAS
+#   INSERT_ABOVE_LIMIT: stdout is inserted into the CAS when it exceeds the inline limit above
+stdout_cas_policy: ALWAYS_INSERT
 
 # whether the stderr of running processes should be streamed
 stream_stderr: true
 
-# policy control for stderr in results injection and CAS
-stderr_cas_control: {
-  # maximum content size above which inlined output will not be present
-  limit: 16384 # 1024 * 16
+# whether to insert stderr into the CAS, can be:
+#   ALWAYS_INSERT: stderr is always inserted into the CAS
+#   INSERT_ABOVE_LIMIT: stderr is inserted into the CAS when it exceeds the inline limit above
+stderr_cas_policy: ALWAYS_INSERT
 
-  # whether to insert stderr into the CAS, can be:
-  #   ALWAYS_INSERT: stderr is always inserted into the CAS
-  #   INSERT_ABOVE_LIMIT: stderr is inserted into the CAS when it exceeds the inline limit above
-  #   NEVER_INSERT: stderr is never inserted into the CAS
-  policy: ALWAYS_INSERT
-}
-
-# policy control for output files
-file_cas_control: {
-  # maximum content size which inlined output will not be present
-  limit: 16384 # 1024 * 16
-
-  # whether to insert output files into the CAS, can be:
-  #   ALWAYS_INSERT: output files are always inserted into the CAS
-  #   INSERT_ABOVE_LIMIT: output files are inserted into the CAS when it exceeds the inline limit above
-  #   NEVER_INSERT: output files are never inserted into the CAS
-  policy: ALWAYS_INSERT
-}
+# whether to insert output files into the CAS, can be:
+#   ALWAYS_INSERT: output files are always inserted into the CAS
+#   INSERT_ABOVE_LIMIT: output files are inserted into the CAS when it exceeds the inline limit above
+file_cas_control: ALWAYS_INSERT
 
 # the worker will take it upon itself to requeue (exceptionally)
 # failed operations via the OperationQueue#put method with queued

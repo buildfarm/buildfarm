@@ -90,21 +90,12 @@ message InstanceConfig {
   }
 }
 
-message CASInsertionControl {
-  // the size limit of inline content
-  int64 limit = 1;
+enum CASInsertionPolicy {
+  UNKNOWN = 0;
 
-  enum Policy {
-    UNKNOWN = 0;
+  ALWAYS_INSERT = 1;
 
-    ALWAYS_INSERT = 1;
-
-    INSERT_ABOVE_LIMIT = 2;
-
-    NEVER_INSERT = 3;
-  }
-
-  Policy policy = 2;
+  INSERT_ABOVE_LIMIT = 2;
 };
 
 message WorkerConfig {
@@ -128,37 +119,41 @@ message WorkerConfig {
   // from CAS in the cache
   int64 cas_cache_max_size_bytes = 5;
 
-  // whether to stream stdout from processes
-  bool stream_stdout = 6;
+  // total size of the inline content for
+  // action results
+  int32 inline_content_limit = 6;
 
-  // control for process stdout
-  CASInsertionControl stdout_cas_control = 7;
+  // whether to stream stdout from processes
+  bool stream_stdout = 7;
+
+  // policy for process stdout
+  CASInsertionPolicy stdout_cas_policy = 8;
 
   // whether to stream stderr from processes
-  bool stream_stderr = 8;
+  bool stream_stderr = 9;
 
-  // control for process stdout
-  CASInsertionControl stderr_cas_control = 9;
+  // policy for process stdout
+  CASInsertionPolicy stderr_cas_policy = 10;
 
-  // control for process output files
-  CASInsertionControl file_cas_control = 10;
+  // policy for process output files
+  CASInsertionPolicy file_cas_policy = 11;
 
   // whether the worker should attempt to requeue
   // an operation when an unexpected failure
   // occurs during an execution
-  bool requeue_on_failure = 11;
+  bool requeue_on_failure = 12;
 
   // page size for getTree request
-  uint32 tree_page_size = 12;
+  uint32 tree_page_size = 13;
 
   // period of poll requests during execution
-  google.protobuf.Duration operation_poll_period = 13;
+  google.protobuf.Duration operation_poll_period = 14;
 
   // initial platform used to match operations
-  google.devtools.remoteexecution.v1test.Platform platform = 14;
+  google.devtools.remoteexecution.v1test.Platform platform = 15;
 
   // execute width
-  int32 execute_stage_width = 15;
+  int32 execute_stage_width = 16;
 }
 
 message TreeIteratorToken {

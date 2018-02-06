@@ -16,7 +16,7 @@ package build.buildfarm.worker;
 
 import build.buildfarm.common.Digests;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.v1test.CASInsertionControl;
+import build.buildfarm.v1test.CASInsertionPolicy;
 import com.google.common.collect.ImmutableList;
 import com.google.devtools.remoteexecution.v1test.Action;
 import com.google.devtools.remoteexecution.v1test.ActionResult;
@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.function.Consumer;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ArrayBlockingQueue;
 
@@ -76,35 +77,60 @@ class ReportResultStage extends PipelineStage {
     queue.offer(operationContext);
   }
 
-  private void updateActionResultStdOutputs(
+  private static int inlineOrDigest(
+      ByteString content,
+      CASInsertionPolicy policy,
+      ImmutableList.Builder contents,
+      int inlineContentBytes,
+      int inlineContentLimit,
+      Runnable setInline,
+      Consumer<Digest> setDigest) {
+    boolean withinLimit = inlineContentBytes + content.size() <= inlineContentLimit;
+    if (withinLimit) {
+      setInline.run();
+      inlineContentBytes += content.size();
+    }
+    if (policy.equals(CASInsertionPolicy.ALWAYS_INSERT) ||
+        (!withinLimit && policy.equals(CASInsertionPolicy.INSERT_ABOVE_LIMIT))) {
+      contents.add(content);
+      setDigest.accept(Digests.computeDigest(content));
+    }
+    return inlineContentBytes;
+  }
+
+  private int updateActionResultStdOutputs(
       ActionResult.Builder resultBuilder,
-      ImmutableList.Builder<ByteString> contents) {
+      ImmutableList.Builder<ByteString> contents,
+      int inlineContentBytes) {
     ByteString stdoutRaw = resultBuilder.getStdoutRaw();
     if (stdoutRaw.size() > 0) {
-      CASInsertionControl control = worker.config.getStdoutCasControl();
-      boolean withinLimit = stdoutRaw.size() <= control.getLimit();
-      if (!withinLimit) {
-        resultBuilder.setStdoutRaw(ByteString.EMPTY);
-      }
-      if (control.getPolicy() == CASInsertionControl.Policy.ALWAYS_INSERT ||
-          (!withinLimit && control.getPolicy() == CASInsertionControl.Policy.INSERT_ABOVE_LIMIT)) {
-        resultBuilder.setStdoutDigest(Digests.computeDigest(stdoutRaw));
-      }
+      // reset to allow policy to determine inlining
+      resultBuilder.setStdoutRaw(ByteString.EMPTY);
+      inlineContentBytes = inlineOrDigest(
+          stdoutRaw,
+          worker.config.getStdoutCasPolicy(),
+          contents,
+          inlineContentBytes,
+          worker.config.getInlineContentLimit(),
+          () -> resultBuilder.setStdoutRaw(stdoutRaw),
+          (digest) -> resultBuilder.setStdoutDigest(digest));
     }
 
     ByteString stderrRaw = resultBuilder.getStderrRaw();
     if (stderrRaw.size() > 0) {
-      CASInsertionControl control = worker.config.getStderrCasControl();
-      boolean withinLimit = stderrRaw.size() <= control.getLimit();
-      if (!withinLimit) {
-        resultBuilder.setStderrRaw(ByteString.EMPTY);
-      }
-      if (control.getPolicy() == CASInsertionControl.Policy.ALWAYS_INSERT ||
-          (!withinLimit && control.getPolicy() == CASInsertionControl.Policy.INSERT_ABOVE_LIMIT)) {
-        contents.add(stderrRaw);
-        resultBuilder.setStderrDigest(Digests.computeDigest(stderrRaw));
-      }
+      // reset to allow policy to determine inlining
+      resultBuilder.setStderrRaw(ByteString.EMPTY);
+      inlineContentBytes = inlineOrDigest(
+          stderrRaw,
+          worker.config.getStderrCasPolicy(),
+          contents,
+          inlineContentBytes,
+          worker.config.getInlineContentLimit(),
+          () -> resultBuilder.setStderrRaw(stdoutRaw),
+          (digest) -> resultBuilder.setStderrDigest(digest));
     }
+
+    return inlineContentBytes;
   }
 
   @Override
@@ -127,8 +153,9 @@ class ReportResultStage extends PipelineStage {
       return null;
     }
 
+    int inlineContentBytes = 0;
     ImmutableList.Builder<ByteString> contents = new ImmutableList.Builder<>();
-    CASInsertionControl control = worker.config.getFileCasControl();
+    CASInsertionPolicy policy = worker.config.getFileCasPolicy();
     for (String outputFile : operationContext.action.getOutputFilesList()) {
       Path outputPath = operationContext.execDir.resolve(outputFile);
       if (!Files.exists(outputPath)) {
@@ -155,22 +182,18 @@ class ReportResultStage extends PipelineStage {
       OutputFile.Builder outputFileBuilder = resultBuilder.addOutputFilesBuilder()
           .setPath(outputFile)
           .setIsExecutable(Files.isExecutable(outputPath));
-      boolean withinLimit = content.size() <= worker.config.getFileCasControl().getLimit();
-      if (withinLimit) {
-        outputFileBuilder.setContent(content);
-      }
-      if (control.getPolicy() == CASInsertionControl.Policy.ALWAYS_INSERT ||
-          (!withinLimit && control.getPolicy() == CASInsertionControl.Policy.INSERT_ABOVE_LIMIT)) {
-        contents.add(content);
-
-        // FIXME make this happen with putAllBlobs
-        Digest outputDigest = Digests.computeDigest(content);
-        outputFileBuilder.setDigest(outputDigest);
-      }
+      inlineContentBytes = inlineOrDigest(
+          content,
+          worker.config.getFileCasPolicy(),
+          contents,
+          inlineContentBytes,
+          worker.config.getInlineContentLimit(),
+          () -> outputFileBuilder.setContent(content),
+          (digest) -> outputFileBuilder.setDigest(digest));
     }
 
     /* put together our outputs and update the result */
-    updateActionResultStdOutputs(resultBuilder, contents);
+    inlineContentBytes += updateActionResultStdOutputs(resultBuilder, contents, inlineContentBytes);
 
     try {
       worker.instance.putAllBlobs(contents.build());
