@@ -49,26 +49,27 @@ public interface Instance {
       throws IOException, InterruptedException, StatusException;
 
   String getBlobName(Digest blobDigest);
-  ByteString getBlob(Digest blobDigest);
-  ByteString getBlob(Digest blobDigest, long offset, long limit);
+  ByteString getBlob(Digest blobDigest) throws InterruptedException, IOException;
+  ByteString getBlob(Digest blobDigest, long offset, long limit) throws InterruptedException, IOException;
   Digest putBlob(ByteString blob)
       throws IOException, InterruptedException, StatusException;
   String getTree(
       Digest rootDigest,
       int pageSize,
       String pageToken,
-      ImmutableList.Builder<Directory> directories); 
+      ImmutableList.Builder<Directory> directories,
+      boolean acceptMissing) throws InterruptedException, IOException; 
   OutputStream getStreamOutput(String name);
-  InputStream newStreamInput(String name);
+  InputStream newStreamInput(String name) throws InterruptedException, IOException;
 
   void execute(
       Action action,
       boolean skipCacheLookup,
       int totalInputFileCount,
       long totalInputFileBytes,
-      Consumer<Operation> onOperation);
-  void match(Platform platform, boolean requeueOnFailure, Predicate<Operation> onMatch);
-  boolean putOperation(Operation operation);
+      Consumer<Operation> onOperation) throws InterruptedException;
+  void match(Platform platform, Predicate<Operation> onMatch) throws InterruptedException;
+  boolean putOperation(Operation operation) throws InterruptedException;
   boolean pollOperation(String operationName, Stage stage);
   // returns nextPageToken suitable for list restart
   String listOperations(
@@ -77,7 +78,7 @@ public interface Instance {
       String filter,
       ImmutableList.Builder<Operation> operations);
   Operation getOperation(String name);
-  void cancelOperation(String name);
+  void cancelOperation(String name) throws InterruptedException;
   void deleteOperation(String name);
 
   boolean watchOperation(

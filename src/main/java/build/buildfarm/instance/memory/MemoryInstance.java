@@ -14,6 +14,7 @@
 
 package build.buildfarm.instance.memory;
 
+import build.buildfarm.common.Watchdog;
 import build.buildfarm.common.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
@@ -194,7 +195,7 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  protected void validateAction(Action action) {
+  protected void validateAction(Action action) throws InterruptedException {
     if (action.hasTimeout() && config.hasMaximumActionTimeout()) {
       Duration timeout = action.getTimeout();
       Duration maximum = config.getMaximumActionTimeout();
@@ -219,7 +220,7 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  public boolean putOperation(Operation operation) {
+  public boolean putOperation(Operation operation) throws InterruptedException {
     if (!super.putOperation(operation)) {
       return false;
     }
@@ -256,7 +257,13 @@ public class MemoryInstance extends AbstractServerInstance {
             .setNanos(actionTimeout.getNanos() + delay.getNanos())
             .build();
         // this is an overuse of Watchdog, we will never pet it
-        Watchdog operationTimeoutDelay = new Watchdog(timeout, () -> expireOperation(operation));
+        Watchdog operationTimeoutDelay = new Watchdog(timeout, () -> {
+          try {
+            expireOperation(operation);
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+          }
+        });
         operationTimeoutDelays.put(operationName, operationTimeoutDelay);
         new Thread(operationTimeoutDelay).start();
       }
@@ -266,13 +273,19 @@ public class MemoryInstance extends AbstractServerInstance {
 
   private void onDispatched(Operation operation) {
     Duration timeout = config.getOperationPollTimeout();
-    Watchdog requeuer = new Watchdog(timeout, () -> putOperation(operation));
+    Watchdog requeuer = new Watchdog(timeout, () -> {
+      try {
+        putOperation(operation);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+    });
     requeuers.put(operation.getName(), requeuer);
     new Thread(requeuer).start();
   }
 
   @Override
-  protected boolean matchOperation(Operation operation) {
+  protected boolean matchOperation(Operation operation) throws InterruptedException {
     ImmutableList.Builder<Worker> rejectedWorkers = new ImmutableList.Builder<>();
     boolean dispatched = false;
     synchronized(workers) {
@@ -292,34 +305,41 @@ public class MemoryInstance extends AbstractServerInstance {
     return dispatched;
   }
 
-  @Override
-  public void match(Platform platform, boolean requeueOnFailure, Predicate<Operation> onMatch) {
-    synchronized(queuedOperations) {
-      ImmutableList.Builder<Operation> rejectedOperations = new ImmutableList.Builder<Operation>();
-      boolean matched = false;
-      while (!matched && !queuedOperations.isEmpty()) {
-        Operation operation = queuedOperations.remove(0);
-        if (satisfiesRequirements(platform, operation)) {
-          matched = true;
-          if (onMatch.test(operation)) {
-            onDispatched(operation);
-          } else if (!requeueOnFailure) {
-            rejectedOperations.add(operation);
-          }
-        } else {
+  private void matchSynchronized(Platform platform, Predicate<Operation> onMatch) throws InterruptedException {
+    ImmutableList.Builder<Operation> rejectedOperations = new ImmutableList.Builder<Operation>();
+    boolean matched = false;
+    while (!matched && !queuedOperations.isEmpty()) {
+      Operation operation = queuedOperations.remove(0);
+      if (satisfiesRequirements(platform, operation)) {
+        matched = true;
+        if (onMatch.test(operation)) {
+          onDispatched(operation);
+          /*
+          for this context, we need to make the requeue go into a bucket during onMatch
+        } else if (!requeueOnFailure) {
           rejectedOperations.add(operation);
+          */
         }
+      } else {
+        rejectedOperations.add(operation);
       }
-      Iterables.addAll(queuedOperations, rejectedOperations.build());
-      if (!matched) {
-        synchronized(workers) {
-          workers.add(new Worker(platform, onMatch));
-        }
+    }
+    Iterables.addAll(queuedOperations, rejectedOperations.build());
+    if (!matched) {
+      synchronized(workers) {
+        workers.add(new Worker(platform, onMatch));
       }
     }
   }
 
-  private boolean satisfiesRequirements(Platform platform, Operation operation) {
+  @Override
+  public void match(Platform platform, Predicate<Operation> onMatch) throws InterruptedException {
+    synchronized (queuedOperations) {
+      matchSynchronized(platform, onMatch);
+    }
+  }
+
+  private boolean satisfiesRequirements(Platform platform, Operation operation) throws InterruptedException {
     Action action = expectAction(operation);
     // string compare only
     // no duplicate names
@@ -402,8 +422,8 @@ public class MemoryInstance extends AbstractServerInstance {
 
   @Override
   protected TokenizableIterator<Directory> createTreeIterator(
-      Digest rootDigest, String pageToken) {
-    return new TreeIterator((digest) -> getBlob(digest), rootDigest, pageToken);
+      Digest rootDigest, String pageToken) throws InterruptedException, IOException {
+    return new TreeIterator(this::expectDirectory, rootDigest, pageToken);
   }
 
   @Override

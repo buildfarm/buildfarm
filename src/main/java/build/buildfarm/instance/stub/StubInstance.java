@@ -56,7 +56,7 @@ import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.rpc.Code;
-import io.grpc.Channel;
+import io.grpc.ManagedChannel;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
@@ -74,7 +74,8 @@ import java.util.function.Predicate;
 public class StubInstance implements Instance {
   private final String name;
   private final DigestUtil digestUtil;
-  private final Channel channel;
+  private final ManagedChannel channel;
+  private final Retrier retrier;
   private final ByteStreamUploader uploader;
   private final long deadlineAfter;
   private final TimeUnit deadlineAfterUnits;
@@ -82,14 +83,16 @@ public class StubInstance implements Instance {
   public StubInstance(
       String name,
       DigestUtil digestUtil,
-      Channel channel,
+      ManagedChannel channel,
       long deadlineAfter, TimeUnit deadlineAfterUnits,
+      Retrier retrier,
       ByteStreamUploader uploader) {
     this.name = name;
     this.digestUtil = digestUtil;
     this.channel = channel;
     this.deadlineAfter = deadlineAfter;
     this.deadlineAfterUnits = deadlineAfterUnits;
+    this.retrier = retrier;
     this.uploader = uploader;
   }
 
@@ -157,6 +160,10 @@ public class StubInstance implements Instance {
     return digestUtil;
   }
 
+  public ManagedChannel getChannel() {
+    return channel;
+  }
+
   @Override
   public void start() { }
 
@@ -181,13 +188,17 @@ public class StubInstance implements Instance {
 
   @Override
   public Iterable<Digest> findMissingBlobs(Iterable<Digest> digests) {
+    FindMissingBlobsRequest request = FindMissingBlobsRequest.newBuilder()
+            .setInstanceName(getName())
+            .addAllBlobDigests(digests)
+            .build();
+    if (request.getSerializedSize() > 4 * 1024 * 1024) {
+      throw new IllegalStateException("FINDMISSINGBLOBS IS TOO LARGE");
+    }
     FindMissingBlobsResponse response = contentAddressableStorageBlockingStub
         .get()
         .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
-        .findMissingBlobs(FindMissingBlobsRequest.newBuilder()
-            .setInstanceName(getName())
-            .addAllBlobDigests(digests)
-            .build());
+        .findMissingBlobs(request);
     return response.getMissingBlobDigestsList();
   }
 
@@ -195,8 +206,11 @@ public class StubInstance implements Instance {
   public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs)
       throws IOException, IllegalArgumentException, InterruptedException {
     // sort of a blatant misuse - one chunker per input, query digests before exhausting iterators
-    Iterable<Chunker> chunkers = Iterables.transform(
-        blobs, blob -> new Chunker(blob, digestUtil.compute(blob)));
+    ImmutableList.Builder<Chunker> builder = new ImmutableList.Builder<Chunker>();
+    for (ByteString blob : blobs) {
+      builder.add(new Chunker(blob, digestUtil.compute(blob)));
+    }
+    ImmutableList<Chunker> chunkers = builder.build();
     List<Digest> digests = new ImmutableList.Builder<Digest>()
         .addAll(Iterables.transform(chunkers, chunker -> chunker.digest()))
         .build();
@@ -276,12 +290,12 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public InputStream newStreamInput(String name) {
-    Iterator<ReadResponse> replies = bsBlockingStub
+  public InputStream newStreamInput(String name) throws InterruptedException, IOException {
+    Iterator<ReadResponse> replies = retrier.execute(() -> bsBlockingStub
         .get()
         .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
-        .read(ReadRequest.newBuilder().setResourceName(name).build());
-    return new ByteStringIteratorInputStream(Iterators.transform(replies, (reply) -> reply.getData()));
+        .read(ReadRequest.newBuilder().setResourceName(name).build()));
+    return new ByteStringIteratorInputStream(Iterators.transform(replies, (reply) -> reply.getData()), retrier);
   }
 
   @Override
@@ -293,16 +307,19 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public ByteString getBlob(Digest blobDigest) {
+  public ByteString getBlob(Digest blobDigest) throws InterruptedException, IOException {
     try (InputStream in = newStreamInput(getBlobName(blobDigest))) {
       return ByteString.readFrom(in);
-    } catch (IOException ex) {
-      return null;
+    } catch (StatusRuntimeException ex) {
+      if (ex.getStatus().equals(Status.NOT_FOUND)) {
+        return null;
+      }
+      throw ex;
     }
   }
 
   @Override
-  public ByteString getBlob(Digest blobDigest, long offset, long limit) {
+  public ByteString getBlob(Digest blobDigest, long offset, long limit) throws InterruptedException, IOException {
     try (InputStream in = newStreamInput(getBlobName(blobDigest))) {
       in.skip(offset);
       if (limit == 0) {
@@ -331,7 +348,8 @@ public class StubInstance implements Instance {
       Digest rootDigest,
       int pageSize,
       String pageToken,
-      ImmutableList.Builder<Directory> directories) {
+      ImmutableList.Builder<Directory> directories,
+      boolean acceptMissing) {
     GetTreeResponse response = contentAddressableStorageBlockingStub
         .get()
         .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
@@ -363,35 +381,17 @@ public class StubInstance implements Instance {
             .build()));
   }
 
-  private void requeue(Operation operation) {
-    try {
-      ExecuteOperationMetadata metadata =
-          operation.getMetadata().unpack(ExecuteOperationMetadata.class);
-
-      ExecuteOperationMetadata executingMetadata = metadata.toBuilder()
-          .setStage(ExecuteOperationMetadata.Stage.QUEUED)
-          .build();
-
-      operation = operation.toBuilder()
-          .setMetadata(Any.pack(executingMetadata))
-          .build();
-      putOperation(operation);
-    } catch(InvalidProtocolBufferException ex) {
-      // operation is dropped on the floor
-    }
-  }
-
   @Override
-  public void match(Platform platform, boolean requeueOnFailure, Predicate<Operation> onMatch) {
+  public void match(Platform platform, Predicate<Operation> onMatch) throws InterruptedException {
     Operation operation = operationQueueBlockingStub.get()
         .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
         .take(TakeOperationRequest.newBuilder()
         .setInstanceName(getName())
         .setPlatform(platform)
         .build());
-    boolean successful = onMatch.test(operation);
-    if (!Thread.currentThread().isInterrupted() && !successful && requeueOnFailure) {
-      requeue(operation);
+    boolean success = onMatch.test(operation);
+    if (Thread.currentThread().interrupted()) {
+      throw new InterruptedException();
     }
   }
 

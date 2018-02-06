@@ -47,33 +47,42 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
       return;
     }
 
-    instance.match(request.getPlatform(), /*requeueOnFailure=*/ true, (final Operation operation) -> {
-      // so this is interesting - the stdout injection belongs here, because
-      // we use this criteria to select the format for stream/blob differentiation
-      try {
-        ExecuteOperationMetadata metadata =
-            operation.getMetadata().unpack(ExecuteOperationMetadata.class);
-        metadata = metadata.toBuilder()
-            .setStdoutStreamName(operation.getName() + "/streams/stdout")
-            .setStderrStreamName(operation.getName() + "/streams/stderr")
-            .build();
-        Operation streamableOperation = operation.toBuilder()
-            .setMetadata(Any.pack(metadata))
-            .build();
+    try {
+      instance.match(request.getPlatform(), (Operation operation) -> {
+        // so this is interesting - the stdout injection belongs here, because
+        // we use this criteria to select the format for stream/blob differentiation
+        try {
+          ExecuteOperationMetadata metadata =
+              operation.getMetadata().unpack(ExecuteOperationMetadata.class);
+          metadata = metadata.toBuilder()
+              .setStdoutStreamName(operation.getName() + "/streams/stdout")
+              .setStderrStreamName(operation.getName() + "/streams/stderr")
+              .build();
+          Operation streamableOperation = operation.toBuilder()
+              .setMetadata(Any.pack(metadata))
+              .build();
 
-        responseObserver.onNext(streamableOperation);
-        responseObserver.onCompleted();
-        return true;
-      } catch(InvalidProtocolBufferException ex) {
-        responseObserver.onError(new StatusException(Status.INTERNAL));
-        // should we update operation?
-      } catch(StatusRuntimeException ex) {
-        if (ex.getStatus().getCode() != Status.Code.CANCELLED) {
-          throw ex;
+          responseObserver.onNext(streamableOperation);
+          responseObserver.onCompleted();
+          return true;
+        } catch(InvalidProtocolBufferException ex) {
+          responseObserver.onError(new StatusException(Status.INTERNAL));
+          // should we update operation?
+        } catch(StatusRuntimeException ex) {
+          if (ex.getStatus().getCode() != Status.Code.CANCELLED) {
+            throw ex;
+          }
         }
-      }
-      return false;
-    });
+        try {
+          instance.putOperation(operation);
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        }
+        return false;
+      });
+    } catch (InterruptedException e) {
+      responseObserver.onError(new StatusException(Status.fromThrowable(e)));
+    }
   }
 
   @Override
@@ -88,12 +97,16 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
       return;
     }
 
-    boolean ok = instance.putOperation(operation);
-    Code code = ok ? Code.OK : Code.UNAVAILABLE;
-    responseObserver.onNext(com.google.rpc.Status.newBuilder()
-        .setCode(code.getNumber())
-        .build());
-    responseObserver.onCompleted();
+    try {
+      boolean ok = instance.putOperation(operation);
+      Code code = ok ? Code.OK : Code.UNAVAILABLE;
+      responseObserver.onNext(com.google.rpc.Status.newBuilder()
+          .setCode(code.getNumber())
+          .build());
+      responseObserver.onCompleted();
+    } catch (InterruptedException e) {
+      responseObserver.onError(new StatusException(Status.fromThrowable(e)));
+    }
   }
 
   @Override

@@ -15,6 +15,7 @@
 package build.buildfarm.worker;
 
 public abstract class PipelineStage implements Runnable {
+  private final String name;
   protected final WorkerContext workerContext;
   protected final PipelineStage output;
   private final PipelineStage error;
@@ -23,7 +24,8 @@ public abstract class PipelineStage implements Runnable {
   protected boolean claimed;
   private boolean closed;
 
-  PipelineStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
+  PipelineStage(String name, WorkerContext workerContext, PipelineStage output, PipelineStage error) {
+    this.name = name;
     this.workerContext = workerContext;
     this.output = output;
     this.error = error;
@@ -55,10 +57,10 @@ public abstract class PipelineStage implements Runnable {
   }
 
   protected void iterate() throws InterruptedException {
-    OperationContext operationContext;
+    OperationContext operationContext, nextOperationContext;
     try {
       operationContext = take();
-      OperationContext nextOperationContext = tick(operationContext);
+      nextOperationContext = tick(operationContext);
       if (nextOperationContext != null && output.claim()) {
         output.put(nextOperationContext);
       } else {

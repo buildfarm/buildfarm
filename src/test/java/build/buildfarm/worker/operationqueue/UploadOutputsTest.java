@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker;
+package build.buildfarm.worker.operationqueue;
 
 import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.Mockito.any;
@@ -25,6 +25,8 @@ import static org.mockito.Mockito.verify;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Chunker;
+import build.buildfarm.v1test.CASInsertionPolicy;
+import build.buildfarm.v1test.WorkerConfig;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.jimfs.Configuration;
@@ -41,12 +43,13 @@ import java.io.IOException;
 import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import javax.naming.ConfigurationException;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.junit.Before;
 import org.junit.Test;
 
-public class ReportResultStageTest {
+public class UploadOutputsTest {
   private final Configuration config;
 
   private FileSystem fileSystem;
@@ -56,27 +59,21 @@ public class ReportResultStageTest {
   private ByteStreamUploader mockUploader;
 
   private DigestUtil digestUtil;
-  private ReportResultStage reportResultStage;
 
-  protected ReportResultStageTest(Configuration config) {
+  protected UploadOutputsTest(Configuration config) {
     this.config = config.toBuilder()
         .setAttributeViews("posix")
         .build();
   }
 
   @Before
-  public void setUp() {
+  public void setUp() throws ConfigurationException {
     MockitoAnnotations.initMocks(this);
 
     fileSystem = Jimfs.newFileSystem(config);
     root = Iterables.getFirst(fileSystem.getRootDirectories(), null);
 
     digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
-    WorkerContext mockWorkerContext = mock(WorkerContext.class);
-    when(mockWorkerContext.getUploader()).thenReturn(mockUploader);
-    when(mockWorkerContext.getDigestUtil()).thenReturn(digestUtil);
-    PipelineStage error = mock(PipelineStage.class);
-    reportResultStage = new ReportResultStage(mockWorkerContext, error);
     fileSystem = Jimfs.newFileSystem(config);
   }
 
@@ -86,12 +83,17 @@ public class ReportResultStageTest {
     Files.createDirectory(root.resolve("foo"));
     // maybe make some files...
     ActionResult.Builder resultBuilder = ActionResult.newBuilder();
-    UploadManifest manifest = reportResultStage.createManifest(
+    Worker.uploadOutputs(
         resultBuilder,
+        digestUtil,
         root,
         ImmutableList.<String>of(),
-        ImmutableList.<String>of("foo"));
-    reportResultStage.uploadManifest(manifest);
+        ImmutableList.<String>of("foo"),
+        mockUploader,
+        /* inlineContentLimit=*/ 0,
+        CASInsertionPolicy.ALWAYS_INSERT,
+        CASInsertionPolicy.ALWAYS_INSERT,
+        CASInsertionPolicy.ALWAYS_INSERT);
     Tree emptyTree = Tree.newBuilder()
         .setRoot(Directory.getDefaultInstance())
         .build();
@@ -114,12 +116,17 @@ public class ReportResultStageTest {
     Files.createFile(file);
     // maybe make some files...
     ActionResult.Builder resultBuilder = ActionResult.newBuilder();
-    UploadManifest manifest = reportResultStage.createManifest(
+    Worker.uploadOutputs(
         resultBuilder,
+        digestUtil,
         root,
         ImmutableList.<String>of(),
-        ImmutableList.<String>of("foo"));
-    reportResultStage.uploadManifest(manifest);
+        ImmutableList.<String>of("foo"),
+        mockUploader,
+        /* inlineContentLimit=*/ 0,
+        CASInsertionPolicy.ALWAYS_INSERT,
+        CASInsertionPolicy.ALWAYS_INSERT,
+        CASInsertionPolicy.ALWAYS_INSERT);
     Tree tree = Tree.newBuilder()
         .setRoot(Directory.newBuilder()
             .addFiles(FileNode.newBuilder()
@@ -151,12 +158,17 @@ public class ReportResultStageTest {
     Files.createFile(file);
     // maybe make some files...
     ActionResult.Builder resultBuilder = ActionResult.newBuilder();
-    UploadManifest manifest = reportResultStage.createManifest(
+    Worker.uploadOutputs(
         resultBuilder,
+        digestUtil,
         root,
         ImmutableList.<String>of(),
-        ImmutableList.<String>of("foo"));
-    reportResultStage.uploadManifest(manifest);
+        ImmutableList.<String>of("foo"),
+        mockUploader,
+        /* inlineContentLimit=*/ 0,
+        CASInsertionPolicy.ALWAYS_INSERT,
+        CASInsertionPolicy.ALWAYS_INSERT,
+        CASInsertionPolicy.ALWAYS_INSERT);
     Directory subDirectory = Directory.newBuilder()
         .addFiles(FileNode.newBuilder()
             .setName("baz")
@@ -188,12 +200,17 @@ public class ReportResultStageTest {
   public void uploadOutputsIgnoresMissingOutputDirectories()
       throws IOException, StatusException, InterruptedException {
     ActionResult.Builder resultBuilder = ActionResult.newBuilder();
-    UploadManifest manifest = reportResultStage.createManifest(
+    Worker.uploadOutputs(
         resultBuilder,
+        digestUtil,
         root,
         ImmutableList.<String>of(),
-        ImmutableList.<String>of("foo"));
-    reportResultStage.uploadManifest(manifest);
+        ImmutableList.<String>of("foo"),
+        mockUploader,
+        /* inlineContentLimit=*/ 0,
+        CASInsertionPolicy.ALWAYS_INSERT,
+        CASInsertionPolicy.ALWAYS_INSERT,
+        CASInsertionPolicy.ALWAYS_INSERT);
     Tree emptyTree = Tree.newBuilder()
         .setRoot(Directory.getDefaultInstance())
         .build();

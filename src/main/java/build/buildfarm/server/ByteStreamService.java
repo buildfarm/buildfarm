@@ -37,7 +37,7 @@ import java.util.Map;
 import java.util.Optional;
 
 public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
-  private static final long DEFAULT_CHUNK_SIZE = 1024 * 16;
+  private static final long DEFAULT_CHUNK_SIZE = 1024 * 1024;
 
   private final Map<String, ByteString> active_write_requests;
   private final Instances instances;
@@ -49,7 +49,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
 
   private void readBlob(
       ReadRequest request,
-      StreamObserver<ReadResponse> responseObserver) {
+      StreamObserver<ReadResponse> responseObserver) throws InterruptedException, IOException {
     try {
       String resourceName = request.getResourceName();
       Instance instance = instances.getFromBlob(resourceName);
@@ -85,7 +85,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
 
   private void readOperationStream(
       ReadRequest request,
-      StreamObserver<ReadResponse> responseObserver) throws IOException {
+      StreamObserver<ReadResponse> responseObserver) throws InterruptedException, IOException {
     String resourceName = request.getResourceName();
 
     Instance instance;
@@ -160,7 +160,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
         responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
         break;
       }
-    } catch(IOException ex) {
+    } catch(InterruptedException|IOException ex) {
       responseObserver.onError(new StatusException(Status.fromThrowable(ex)));
     }
   }
@@ -263,6 +263,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
               instance.putBlob(data);
             } catch (IOException ex) {
               responseObserver.onError(new StatusException(Status.fromThrowable(ex)));
+              failed = true;
             } catch (StatusException ex) {
               responseObserver.onError(ex);
               failed = true;

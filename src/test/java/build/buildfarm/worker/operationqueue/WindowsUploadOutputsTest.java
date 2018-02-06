@@ -12,12 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker;
+package build.buildfarm.worker.operationqueue;
 
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.protobuf.ByteString;
-import java.io.IOException;
+import com.google.common.jimfs.Configuration;
+import org.junit.runner.RunWith;
+import org.junit.runners.JUnit4;
 
-public interface Fetcher {
-  ByteString fetchBlob(Digest blobDigest) throws InterruptedException, IOException;
+@RunWith(JUnit4.class)
+public class WindowsUploadOutputsTest extends UploadOutputsTest {
+  public WindowsUploadOutputsTest() {
+    super(Configuration.windows());
+  }
 }

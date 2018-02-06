@@ -50,7 +50,10 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
             responseObserver.onNext(operation);
             responseObserver.onCompleted();
           });
+    } catch (InterruptedException e) {
+      responseObserver.onError(new StatusException(Status.fromThrowable(e)));
     } catch (IllegalStateException e) {
+      e.printStackTrace();
       responseObserver.onError(new StatusException(
           Status.FAILED_PRECONDITION.withDescription(e.getMessage())));
     }

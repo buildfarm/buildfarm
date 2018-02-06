@@ -42,7 +42,7 @@ public class BuildFarmServer {
 
   private final BuildFarmServerConfig config;
   private final Instances instances;
-  private final Server server;
+  private Server server;
 
   public BuildFarmServer(BuildFarmServerConfig config)
       throws InterruptedException, ConfigurationException {
@@ -98,6 +98,7 @@ public class BuildFarmServer {
   private void blockUntilShutdown() throws InterruptedException {
     if (server != null) {
       server.awaitTermination();
+      server = null;
     }
   }
 

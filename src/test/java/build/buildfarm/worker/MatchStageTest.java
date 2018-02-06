@@ -16,8 +16,11 @@ package build.buildfarm.worker;
 
 import static com.google.common.truth.Truth.assertThat;
 
+import build.buildfarm.common.DigestUtil;
+import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.WorkerConfig;
 import com.google.devtools.remoteexecution.v1test.Action;
+import com.google.devtools.remoteexecution.v1test.Command;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
 import com.google.longrunning.Operation;
@@ -40,7 +43,7 @@ public class MatchStageTest {
     Predicate<OperationContext> onPutShouldClose;
 
     PipelineSink(Predicate<OperationContext> onPutShouldClose) {
-      super(null, null, null);
+      super("PipelineSink", null, null, null);
       this.onPutShouldClose = onPutShouldClose;
     }
 
@@ -64,6 +67,11 @@ public class MatchStageTest {
 
     WorkerContext workerContext = new StubWorkerContext() {
       @Override
+      public DigestUtil getDigestUtil() {
+        return null;
+      }
+
+      @Override
       public void match(Predicate<Operation> onMatch) {
         assertThat(onMatch.test(queue.remove(0))).isEqualTo(results.remove(0));
       }
@@ -80,6 +88,11 @@ public class MatchStageTest {
       public Path getRoot() {
         return FileSystems.getDefault().getPath("tmp");
       }
+
+      @Override
+      public void requeue(Operation operation) {
+        // ignore
+      }
     };
 
     queue.add(Operation.newBuilder()
@@ -90,8 +103,14 @@ public class MatchStageTest {
 
     queue.add(Operation.newBuilder()
         .setName("good")
-        .setMetadata(Any.pack(ExecuteOperationMetadata.newBuilder()
-            .setActionDigest(Digest.newBuilder().setHash("action").build())
+        .setMetadata(Any.pack(QueuedOperationMetadata.newBuilder()
+            .setAction(Action.getDefaultInstance())
+            .setCommand(Command.newBuilder()
+                .addArguments("/bin/true")
+                .build())
+            .setExecuteOperationMetadata(ExecuteOperationMetadata.newBuilder()
+                .setActionDigest(Digest.newBuilder().setHash("action").build())
+                .build())
             .build()))
         .build());
     results.add(true);

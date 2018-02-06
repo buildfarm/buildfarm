@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.instance.memory;
+package build.buildfarm.common;
 
 import com.google.protobuf.Duration;
 
@@ -45,6 +45,9 @@ public class Watchdog implements Runnable {
         if (!stopped) {
           runnable.run();
         }
+        if (Thread.interrupted()) {
+          throw new InterruptedException();
+        }
         done = true;
         this.notify();
       }
@@ -64,12 +67,14 @@ public class Watchdog implements Runnable {
 
   public synchronized void stop() {
     stopped = true;
-    try {
-      while (!done) {
-        this.notify();
+    while (!done) {
+      this.notify();
+      try {
         this.wait();
+      } catch (InterruptedException ex) {
+        Thread.currentThread().interrupt();
+        break;
       }
-    } catch (InterruptedException ex) {
     }
   }
 }

@@ -14,31 +14,35 @@
 
 package build.buildfarm.instance.memory;
 
+import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.ContentAddressableStorage;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 public class MemoryLRUContentAddressableStorage implements ContentAddressableStorage {
   private final long maxSizeInBytes;
-  private final Map<Digest, Entry> storage;
-  private transient long sizeInBytes;
-  private transient Entry header;
-  private final Map<Digest, Object> mutexes;
+  private Consumer<Digest> onPut;
+
+  private final Map<Digest, Entry> storage = new HashMap<>();
+  private final Map<Digest, Object> mutexes = new HashMap<>();
+  private final Entry header = new SentinelEntry();
+  private transient long sizeInBytes = 0;
 
   public MemoryLRUContentAddressableStorage(long maxSizeInBytes) {
+    this(maxSizeInBytes, (digest) -> {});
+  }
+
+  public MemoryLRUContentAddressableStorage(long maxSizeInBytes, Consumer<Digest> onPut) {
     this.maxSizeInBytes = maxSizeInBytes;
-    sizeInBytes = 0;
-    header = new SentinelEntry();
-    header.before = header.after = header;
-    storage = new HashMap<>();
-    mutexes = new HashMap<>();
+    this.onPut = onPut;
   }
 
   @Override
-  public synchronized boolean contains(Digest digest) {
+  public boolean contains(Digest digest) {
     // incur access use of the digest
     return get(digest) != null;
   }
@@ -55,16 +59,6 @@ public class MemoryLRUContentAddressableStorage implements ContentAddressableSto
     }
     e.recordAccess(header);
     return e.value;
-  }
-
-  private long size() {
-    Entry e = header.before;
-    long count = 0;
-    while (e != header) {
-      count++;
-      e = e.before;
-    }
-    return count;
   }
 
   @Override
@@ -91,15 +85,6 @@ public class MemoryLRUContentAddressableStorage implements ContentAddressableSto
 
     while (sizeInBytes > maxSizeInBytes && header.after != header) {
       expireEntry(header.after);
-    }
-
-    if (sizeInBytes > maxSizeInBytes) {
-      System.out.println(String.format(
-          "Out of nodes to remove, sizeInBytes = %d, maxSizeInBytes = %d, storage = %d, list = %d",
-          sizeInBytes,
-          maxSizeInBytes,
-          storage.size(),
-          size()));
     }
 
     createEntry(blob, onExpiration);
@@ -133,6 +118,7 @@ public class MemoryLRUContentAddressableStorage implements ContentAddressableSto
   }
 
   private void expireEntry(Entry e) {
+    System.out.println("MemoryLRUCAS: expiring " + DigestUtil.toString(e.key));
     storage.remove(e.key);
     e.expire();
     sizeInBytes -= e.value.size();
@@ -192,6 +178,11 @@ public class MemoryLRUContentAddressableStorage implements ContentAddressableSto
   }
 
   class SentinelEntry extends Entry {
+    SentinelEntry() {
+      super();
+      before = after = this;
+    }
+
     @Override
     public void addOnExpiration(Runnable onExpiration) {
       throw new UnsupportedOperationException("cannot add expiration to sentinal");

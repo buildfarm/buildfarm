@@ -35,6 +35,7 @@ java_library(
     name = "server-instance",
     srcs = [
         "instance/AbstractServerInstance.java",
+        "instance/GetDirectoryFunction.java",
         "instance/TokenizableIterator.java",
         "instance/TreeIterator.java",
     ],
@@ -233,6 +234,7 @@ java_library(
         "//3rdparty/jvm/com/github/pcj:google_options",
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java_util",
         "//3rdparty/jvm/io/grpc:grpc_context",
         "//3rdparty/jvm/io/grpc:grpc_core",
         "//3rdparty/jvm/io/grpc:grpc_netty",

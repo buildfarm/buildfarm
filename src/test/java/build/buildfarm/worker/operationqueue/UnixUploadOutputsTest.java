@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker;
+package build.buildfarm.worker.operationqueue;
 
 import com.google.common.jimfs.Configuration;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
-public class UnixReportResultStageTest extends ReportResultStageTest {
-  public UnixReportResultStageTest() {
+public class UnixUploadOutputsTest extends UploadOutputsTest {
+  public UnixUploadOutputsTest() {
     super(Configuration.unix());
   }
 }

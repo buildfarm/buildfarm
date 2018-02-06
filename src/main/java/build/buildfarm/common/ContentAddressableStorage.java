@@ -73,6 +73,7 @@ public interface ContentAddressableStorage {
   @ThreadSafe
   void put(Blob blob, Runnable onExpiration);
 
+  /* FIXME MAKE THIS AUTOCLOSEABLE FIXME */
   @ThreadSafe
   Object acquire(Digest digest);
 

@@ -12,15 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker;
+package build.buildfarm.worker.shard;
 
-import com.google.common.jimfs.Configuration;
-import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
+import build.buildfarm.worker.Fetcher;
+import com.google.devtools.remoteexecution.v1test.Digest;
+import com.google.protobuf.ByteString;
+import java.io.IOException;
 
-@RunWith(JUnit4.class)
-public class WindowsReportResultStageTest extends ReportResultStageTest {
-  public WindowsReportResultStageTest() {
-    super(Configuration.windows());
+class EmptyFetcher implements Fetcher {
+  private final Fetcher delegate;
+
+  EmptyFetcher(Fetcher delegate) {
+    this.delegate = delegate;
   }
-}
+
+  @Override
+  public ByteString fetchBlob(Digest blobDigest) throws InterruptedException, IOException {
+    if (blobDigest.getSizeBytes() == 0) {
+      return ByteString.EMPTY;
+    }
+
+    return delegate.fetchBlob(blobDigest);
+  }
+};

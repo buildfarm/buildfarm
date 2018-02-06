@@ -15,40 +15,18 @@
 package build.buildfarm.worker;
 
 import build.buildfarm.common.DigestUtil;
-import build.buildfarm.instance.stub.Chunker;
-import build.buildfarm.v1test.CASInsertionPolicy;
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
+import build.buildfarm.v1test.CompletedOperationMetadata;
 import com.google.common.collect.Iterables;
-import com.google.devtools.remoteexecution.v1test.Action;
 import com.google.devtools.remoteexecution.v1test.ActionResult;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.Directory;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
 import com.google.devtools.remoteexecution.v1test.ExecuteResponse;
-import com.google.devtools.remoteexecution.v1test.FileNode;
-import com.google.devtools.remoteexecution.v1test.OutputDirectory;
-import com.google.devtools.remoteexecution.v1test.OutputFile;
-import com.google.devtools.remoteexecution.v1test.Tree;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
-import com.google.protobuf.ByteString;
+import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.grpc.StatusRuntimeException;
+import com.google.protobuf.util.Durations;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.FileVisitResult;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.Stack;
-import java.util.function.Consumer;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ArrayBlockingQueue;
 
@@ -57,7 +35,7 @@ public class ReportResultStage extends PipelineStage {
 
   public static class NullStage extends PipelineStage {
     public NullStage() {
-      super(null, null, null);
+      super(null, null, null, null);
     }
 
     @Override
@@ -79,7 +57,7 @@ public class ReportResultStage extends PipelineStage {
   }
 
   public ReportResultStage(WorkerContext workerContext, PipelineStage error) {
-    super(workerContext, new NullStage(), error);
+    super("ReportResultStage", workerContext, new NullStage(), error);
     queue = new ArrayBlockingQueue<>(1);
   }
 
@@ -97,102 +75,31 @@ public class ReportResultStage extends PipelineStage {
     return workerContext.getDigestUtil();
   }
 
-  @VisibleForTesting
-  public void uploadManifest(UploadManifest manifest)
-      throws IOException, InterruptedException {
-    List<Chunker> filesToUpload = new ArrayList<>();
-
-    Map<Digest, Path> digestToFile = manifest.getDigestToFile();
-    Map<Digest, Chunker> digestToChunkers = manifest.getDigestToChunkers();
-    Collection<Digest> digests = new ArrayList<>();
-    digests.addAll(digestToFile.keySet());
-    digests.addAll(digestToChunkers.keySet());
-
-    for (Digest digest : digests) {
-      Chunker chunker;
-      Path file = digestToFile.get(digest);
-      if (file != null) {
-        chunker = new Chunker(file, digest);
-      } else {
-        chunker = digestToChunkers.get(digest);
-        if (chunker == null) {
-          String message = "FindMissingBlobs call returned an unknown digest: " + digest;
-          throw new IOException(message);
-        }
-      }
-      filesToUpload.add(chunker);
-    }
-
-    if (!filesToUpload.isEmpty()) {
-      workerContext.getUploader().uploadBlobs(filesToUpload);
-    }
-  }
-
-  @VisibleForTesting
-  public UploadManifest createManifest(
-      ActionResult.Builder result,
-      Path execRoot,
-      Collection<String> outputFiles,
-      Collection<String> outputDirs)
-      throws IOException, InterruptedException {
-    UploadManifest manifest = new UploadManifest(
-        getDigestUtil(),
-        result,
-        execRoot,
-        /* allowSymlinks= */ true,
-        workerContext.getInlineContentLimit());
-
-    manifest.addFiles(
-        Iterables.transform(outputFiles, (file) -> execRoot.resolve(file)),
-        workerContext.getFileCasPolicy());
-    manifest.addFiles(
-        Iterables.transform(outputDirs, (dir) -> execRoot.resolve(dir)),
-        workerContext.getFileCasPolicy());
-
-    /* put together our outputs and update the result */
-    if (result.getStdoutRaw().size() > 0) {
-      manifest.addContent(
-          result.getStdoutRaw(),
-          workerContext.getStdoutCasPolicy(),
-          result::setStdoutRaw,
-          result::setStdoutDigest);
-    }
-    if (result.getStderrRaw().size() > 0) {
-      manifest.addContent(
-          result.getStderrRaw(),
-          workerContext.getStderrCasPolicy(),
-          result::setStderrRaw,
-          result::setStderrDigest);
-    }
-
-    return manifest;
-  }
-
   @Override
   protected OperationContext tick(OperationContext operationContext) throws InterruptedException {
-    final String operationName = operationContext.operation.getName();
+    ActionResult.Builder resultBuilder;
+    try {
+      resultBuilder = operationContext
+          .operation.getResponse().unpack(ExecuteResponse.class).getResult().toBuilder();
+    } catch (InvalidProtocolBufferException e) {
+      e.printStackTrace();
+      return null;
+    }
+
     Poller poller = workerContext.createPoller(
         "ReportResultStage",
         operationContext.operation.getName(),
         ExecuteOperationMetadata.Stage.EXECUTING,
         () -> {});
 
-    ActionResult.Builder resultBuilder;
-    try {
-      resultBuilder = operationContext
-          .operation.getResponse().unpack(ExecuteResponse.class).getResult().toBuilder();
-    } catch (InvalidProtocolBufferException ex) {
-      poller.stop();
-      return null;
-    }
+    long reportStartAt = System.nanoTime();
 
     try {
-      UploadManifest manifest = createManifest(
+      workerContext.uploadOutputs(
           resultBuilder,
           operationContext.execDir,
           operationContext.action.getOutputFilesList(),
           operationContext.action.getOutputDirectoriesList());
-      uploadManifest(manifest);
     } catch (IOException ex) {
       throw new IllegalStateException(ex);
     } catch (StatusRuntimeException e) {
@@ -205,8 +112,19 @@ public class ReportResultStage extends PipelineStage {
       workerContext.putActionResult(DigestUtil.asActionKey(operationContext.metadata.getActionDigest()), result);
     }
 
-    ExecuteOperationMetadata metadata = operationContext.metadata.toBuilder()
-        .setStage(ExecuteOperationMetadata.Stage.COMPLETED)
+    Duration reportedIn = Durations.fromNanos(System.nanoTime() - reportStartAt);
+
+    long completedAt = System.currentTimeMillis();
+
+    CompletedOperationMetadata metadata = CompletedOperationMetadata.newBuilder()
+        .setCompletedAt(completedAt)
+        .setExecutedOn(workerContext.getName())
+        .setFetchedIn(operationContext.fetchedIn)
+        .setExecutedIn(operationContext.executedIn)
+        .setReportedIn(reportedIn)
+        .setExecuteOperationMetadata(operationContext.metadata.toBuilder()
+            .setStage(ExecuteOperationMetadata.Stage.COMPLETED)
+            .build())
         .build();
 
     Operation operation = operationContext.operation.toBuilder()
@@ -220,23 +138,28 @@ public class ReportResultStage extends PipelineStage {
 
     poller.stop();
 
-    if (!workerContext.putOperation(operation)) {
+    try {
+      if (!workerContext.putOperation(operation, operationContext.action)) {
+        return null;
+      }
+    } catch (IOException e) {
       return null;
     }
 
-    return new OperationContext(
-        operation,
-        operationContext.execDir,
-        metadata,
-        operationContext.action);
+    return operationContext.toBuilder()
+        .setMetadata(metadata.getExecuteOperationMetadata())
+        .build();
   }
 
   @Override
   protected void after(OperationContext operationContext) {
     try {
       workerContext.destroyActionRoot(operationContext.execDir);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
     } catch (IOException e) {
-      e.printStackTrace();
+      // move to logging
+      // workerContext.logInfo("Failed to remove action root " + operationContext.execDir);
     }
   }
 }

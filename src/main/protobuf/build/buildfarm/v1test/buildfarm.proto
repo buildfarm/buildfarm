@@ -103,11 +103,24 @@ message RedisShardBackplaneConfig {
   string completed_operations_list_name = 7;
   string operation_channel_name = 8;
   string cas_prefix = 9;
+  string tree_prefix = 10;
+  bool subscribe_to_operation = 11;
 }
 
 message ShardInstanceConfig {
+  // FIXME put some more config into this!
+  bool run_dispatched_monitor = 1;
+
+  bool run_completed_collector = 2;
+
+  bool run_action_cache_sweeper = 3;
+
+  int64 max_completed_operations_count = 4;
+
+  int32 action_cache_sweep_period = 5;
+
   oneof backplane {
-    RedisShardBackplaneConfig redis_shard_backplane_config = 2;
+    RedisShardBackplaneConfig redis_shard_backplane_config = 6;
   }
 }
 
@@ -130,19 +143,16 @@ message ShardWorkerInstanceConfig {
   // page size for getTree request
   uint32 tree_page_size = 12;
 
-  // period of poll requests during execution
-  google.protobuf.Duration operation_poll_period = 13;
-
   // default timeout for actions
   // if a timeout is unspecified for an action, this value
   // is imposed on it, after which the operation will
   // be killed
-  google.protobuf.Duration default_action_timeout = 14;
+  google.protobuf.Duration default_action_timeout = 13;
 
   // maximum selectable timeout
   // a maximum threshold for an action's specified timeout,
   // beyond which an action will be rejected for execution
-  google.protobuf.Duration maximum_action_timeout = 15;
+  google.protobuf.Duration maximum_action_timeout = 14;
 }
 
 message ShardWorkerConfig {
@@ -213,6 +223,32 @@ message ShardDispatchedOperation {
   string name = 1;
 
   int64 requeue_at = 2;
+
+  int64 expire_at = 3;
+}
+
+message QueuedOperationMetadata {
+  google.devtools.remoteexecution.v1test.Action action = 1;
+
+  google.devtools.remoteexecution.v1test.Command command = 2;
+
+  repeated google.devtools.remoteexecution.v1test.Directory directories = 3;
+
+  google.devtools.remoteexecution.v1test.ExecuteOperationMetadata execute_operation_metadata = 4;
+}
+
+message CompletedOperationMetadata {
+  int64 completed_at = 1;
+
+  string executed_on = 2;
+
+  google.protobuf.Duration fetched_in = 3;
+
+  google.protobuf.Duration executed_in = 4;
+
+  google.protobuf.Duration reported_in = 5;
+
+  google.devtools.remoteexecution.v1test.ExecuteOperationMetadata execute_operation_metadata = 6;
 }
 
 message InstanceConfig {

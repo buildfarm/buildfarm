@@ -18,19 +18,16 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class Pipeline {
-  private final PipelineStage initial;
   private final Map<PipelineStage, Thread> stageThreads;
   private final Map<PipelineStage, Integer> stageClosePriorities;
+  private Thread joiningThread = null;
+  private boolean closing = false;
   // FIXME ThreadGroup?
 
   public Pipeline() {
-    this(/* initial= */ null);
-  }
-
-  public Pipeline(PipelineStage initial) {
-    this.initial = initial;
     stageThreads = new HashMap<>();
     stageClosePriorities = new HashMap<>();
   }
@@ -49,21 +46,30 @@ public class Pipeline {
     }
   }
 
-  public void put(OperationContext operationContext) throws InterruptedException {
-    initial.put(operationContext);
-  }
-
-  public void close() {
+  public void close() throws InterruptedException {
+    synchronized (this) {
+      closing = true;
+      if (joiningThread != null) {
+        joiningThread.interrupt();
+        joiningThread = null;
+      }
+    }
     join(true);
   }
 
-  public void join() {
+  public void join() throws InterruptedException {
+    synchronized (this) {
+      joiningThread = Thread.currentThread();
+    }
     join(false);
+    synchronized (this) {
+      joiningThread = null;
+    }
   }
 
-  private void join(boolean closeStage) {
+  private void join(boolean closeStage) throws InterruptedException {
     List<PipelineStage> inactiveStages = new ArrayList<>();
-    boolean wasInterrupted = false;
+    InterruptedException intEx = null;
     try {
       while (!stageThreads.isEmpty()) {
         if (closeStage) {
@@ -80,7 +86,6 @@ public class Pipeline {
             }
           }
           if (stageToClose != null && !stageToClose.isClosed()) {
-            System.out.println("Closing stage at priority " + maxPriority);
             stageToClose.close();
           }
         }
@@ -89,28 +94,37 @@ public class Pipeline {
           Thread thread = stageThread.getValue();
           try {
             thread.join(closeStage ? 1 : 1000);
-          } catch (InterruptedException ex) {
-            wasInterrupted = true;
+          } catch (InterruptedException e) {
+            if (!closeStage) {
+              synchronized (this) {
+                while (closing && !stageThreads.isEmpty()) {
+                  wait();
+                }
+              }
+              throw e;
+            }
+            intEx = e;
           }
 
           if (!thread.isAlive()) {
-            System.out.println("Stage has exited at priority " + stageClosePriorities.get(stage));
             inactiveStages.add(stage);
           } else if (stage.isClosed()) {
-            System.out.println("Interrupting unterminated closed thread at priority " + stageClosePriorities.get(stage));
             thread.interrupt();
           }
         }
         closeStage = false;
         for (PipelineStage stage : inactiveStages) {
-          stageThreads.remove(stage);
-          closeStage = true;
+          synchronized (this) {
+            stageThreads.remove(stage);
+            closeStage = true;
+            notify();
+          }
         }
         inactiveStages.clear();
       }
     } finally {
-      if (wasInterrupted) {
-        Thread.currentThread().interrupt();
+      if (intEx != null) {
+        throw intEx;
       }
     }
   }

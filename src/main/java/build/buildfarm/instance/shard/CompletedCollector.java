@@ -20,43 +20,32 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-class DispatchedMonitor implements Runnable {
+class CompletedCollector implements Runnable {
   private final ShardBackplane backplane;
-  private final Function<String, Boolean> onRequeue;
-  private final Consumer<String> onCancel;
+  private final Consumer<String> onCollected;
+  private final long maxCompletedOperationsCount;
 
-  DispatchedMonitor(
+  CompletedCollector(
       ShardBackplane backplane,
-      Function<String, Boolean> onRequeue,
-      Consumer<String> onCancel) {
+      Consumer<String> onCollected,
+      long maxCompletedOperationsCount) {
     this.backplane = backplane;
-    this.onRequeue = onRequeue;
-    this.onCancel = onCancel;
+    this.onCollected = onCollected;
+    this.maxCompletedOperationsCount = maxCompletedOperationsCount;
   }
 
   @Override
   public synchronized void run() {
-    while (true) {
+    for (;;) {
       try {
-        long now = System.currentTimeMillis(); /* FIXME sync */
-        /* iterate over dispatched */
-        for (ShardDispatchedOperation o : backplane.getDispatchedOperations()) {
-          /* if now > dispatchedOperation.getExpiresAt() */
-          if (now >= o.getRequeueAt()) {
-            boolean shouldCancel = !onRequeue.apply(o.getName());
-            if (Thread.interrupted()) {
-              throw new InterruptedException();
-            }
-            if (shouldCancel) {
-              backplane.completeOperation(o.getName());
-              onCancel.accept(o.getName());
-              if (Thread.interrupted()) {
-                throw new InterruptedException();
-              }
-            }
-          }
+        long completedOperationsCount = backplane.getCompletedOperationsCount();
+
+        if (completedOperationsCount > maxCompletedOperationsCount) {
+          String operationName = backplane.popOldestCompletedOperation();
+          onCollected.accept(operationName);
+        } else {
+          TimeUnit.SECONDS.sleep(1);
         }
-        TimeUnit.SECONDS.sleep(1);
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         break;

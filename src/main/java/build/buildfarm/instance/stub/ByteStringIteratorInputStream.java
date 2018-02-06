@@ -22,12 +22,14 @@ import java.util.Iterator;
 
 public class ByteStringIteratorInputStream extends InputStream {
   private final Iterator<ByteString> iterator;
+  private final Retrier retrier;
   private InputStream input;
   private boolean closed;
 
   @VisibleForTesting
-  public ByteStringIteratorInputStream(Iterator<ByteString> iterator) {
+  public ByteStringIteratorInputStream(Iterator<ByteString> iterator, Retrier retrier) {
     this.iterator = iterator;
+    this.retrier = retrier;
     input = ByteString.EMPTY.newInput();
     closed = false;
   }
@@ -87,11 +89,18 @@ public class ByteStringIteratorInputStream extends InputStream {
     closed = true;
   }
 
-  private void advance() {
-    ByteString data = ByteString.EMPTY;
-    while (iterator.hasNext() && data.isEmpty()) {
-      data = iterator.next();
+  private void advance() throws IOException {
+    try {
+      retrier.execute(() -> {
+        ByteString data = ByteString.EMPTY;
+        while (iterator.hasNext() && data.isEmpty()) {
+          data = iterator.next();
+        }
+        input = data.newInput();
+        return 0;
+      });
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
     }
-    input = data.newInput();
   }
 }

@@ -15,6 +15,8 @@
 package build.buildfarm.worker;
 
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
+import com.google.protobuf.Duration;
+import com.google.protobuf.util.Durations;
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.BlockingQueue;
@@ -24,7 +26,7 @@ public class InputFetchStage extends PipelineStage {
   private final BlockingQueue<OperationContext> queue;
 
   public InputFetchStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
-    super(workerContext, output, error);
+    super("InputFetchStage", workerContext, output, error);
     queue = new ArrayBlockingQueue<>(1);
   }
 
@@ -40,29 +42,35 @@ public class InputFetchStage extends PipelineStage {
 
   @Override
   protected OperationContext tick(OperationContext operationContext) throws InterruptedException {
+    // yeah, the poll fail should probably do something here...
     Poller poller = workerContext.createPoller(
         "InputFetchStage",
         operationContext.operation.getName(),
         ExecuteOperationMetadata.Stage.QUEUED);
 
+    long fetchStartAt = System.nanoTime();
+
     boolean success = true;
     try {
-      workerContext.createActionRoot(operationContext.execDir, operationContext.action);
+      workerContext.createActionRoot(
+          operationContext.execDir,
+          operationContext.directoriesIndex,
+          operationContext.action);
     } catch (IOException e) {
-      e.printStackTrace();
       success = false;
     }
 
     poller.stop();
 
     if (!success) {
-      try {
-        workerContext.destroyActionRoot(operationContext.execDir);
-      } catch (IOException e) {
-        e.printStackTrace();
-      }
+      workerContext.requeue(operationContext.operation);
+      return null;
     }
 
-    return success ? operationContext : null;
+    Duration fetchedIn = Durations.fromNanos(System.nanoTime() - fetchStartAt);
+
+    return operationContext.toBuilder()
+        .setFetchedIn(fetchedIn)
+        .build();
   }
 }

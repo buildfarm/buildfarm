@@ -44,4 +44,3 @@ public class WorkerOptions extends OptionsBase {
     )
   public String casCacheDirectory;
 }
-

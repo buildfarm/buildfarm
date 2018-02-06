@@ -23,18 +23,22 @@ import build.buildfarm.v1test.CASInsertionPolicy;
 import com.google.devtools.remoteexecution.v1test.Action;
 import com.google.devtools.remoteexecution.v1test.ActionResult;
 import com.google.devtools.remoteexecution.v1test.Digest;
+import com.google.devtools.remoteexecution.v1test.Directory;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import java.io.OutputStream;
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.function.Predicate;
 
 class StubWorkerContext implements WorkerContext {
+  @Override public String getName() { throw new UnsupportedOperationException(); }
   @Override public Poller createPoller(String name, String operationName, Stage stage) { throw new UnsupportedOperationException(); }
   @Override public Poller createPoller(String name, String operationName, Stage stage, Runnable onFailure) { throw new UnsupportedOperationException(); }
   @Override public void match(Predicate<Operation> onMatch) { throw new UnsupportedOperationException(); }
+  @Override public void requeue(Operation operation) { throw new UnsupportedOperationException(); }
   @Override public CASInsertionPolicy getFileCasPolicy() { throw new UnsupportedOperationException(); }
   @Override public CASInsertionPolicy getStdoutCasPolicy() { throw new UnsupportedOperationException(); }
   @Override public CASInsertionPolicy getStderrCasPolicy() { throw new UnsupportedOperationException(); }
@@ -42,20 +46,19 @@ class StubWorkerContext implements WorkerContext {
   @Override public int getInlineContentLimit() { throw new UnsupportedOperationException(); }
   @Override public int getExecuteStageWidth() { throw new UnsupportedOperationException(); }
   @Override public int getTreePageSize() { throw new UnsupportedOperationException(); }
-  @Override public boolean getLinkInputDirectories() { throw new UnsupportedOperationException(); }
   @Override public boolean hasDefaultActionTimeout() { throw new UnsupportedOperationException(); }
   @Override public boolean hasMaximumActionTimeout() { throw new UnsupportedOperationException(); }
   @Override public boolean getStreamStdout() { throw new UnsupportedOperationException(); }
   @Override public boolean getStreamStderr() { throw new UnsupportedOperationException(); }
   @Override public Duration getDefaultActionTimeout() { throw new UnsupportedOperationException(); }
   @Override public Duration getMaximumActionTimeout() { throw new UnsupportedOperationException(); }
-  @Override public ByteStreamUploader getUploader() { throw new UnsupportedOperationException(); }
   @Override public ByteString getBlob(Digest digest) { throw new UnsupportedOperationException(); }
-  @Override public void createActionRoot(Path root, Action action) { throw new UnsupportedOperationException(); }
+  @Override public void createActionRoot(Path root, Map<Digest, Directory> directoriesIndex, Action action) { throw new UnsupportedOperationException(); }
   @Override public void destroyActionRoot(Path root) { throw new UnsupportedOperationException(); }
   @Override public Path getRoot() { throw new UnsupportedOperationException(); }
   @Override public void removeDirectory(Path path) { throw new UnsupportedOperationException(); }
-  @Override public boolean putOperation(Operation operation) { throw new UnsupportedOperationException(); }
+  @Override public void uploadOutputs(ActionResult.Builder resultBuilder, Path actionRoot, Iterable<String> outputFiles, Iterable<String> outputDirs) { throw new UnsupportedOperationException(); }
+  @Override public boolean putOperation(Operation operation, Action action) { throw new UnsupportedOperationException(); }
   @Override public OutputStream getStreamOutput(String name) { throw new UnsupportedOperationException(); }
   @Override public void putActionResult(ActionKey actionKey, ActionResult actionResult) { throw new UnsupportedOperationException(); }
 };

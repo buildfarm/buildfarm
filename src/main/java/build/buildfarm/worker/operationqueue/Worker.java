@@ -19,6 +19,7 @@ import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.ByteStreamUploader;
+import build.buildfarm.instance.stub.Chunker;
 import build.buildfarm.instance.stub.Retrier;
 import build.buildfarm.instance.stub.Retrier.Backoff;
 import build.buildfarm.instance.stub.StubInstance;
@@ -36,6 +37,7 @@ import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.Poller;
 import build.buildfarm.worker.ReportResultStage;
 import build.buildfarm.worker.WorkerContext;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -48,15 +50,17 @@ import com.google.devtools.remoteexecution.v1test.ActionResult;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.devtools.remoteexecution.v1test.Directory;
 import com.google.devtools.remoteexecution.v1test.DirectoryNode;
+import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
 import com.google.devtools.remoteexecution.v1test.FileNode;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
+import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.TextFormat;
 import io.grpc.Channel;
-import io.grpc.StatusException;
+import io.grpc.ManagedChannel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import java.io.File;
@@ -64,9 +68,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -81,7 +89,6 @@ import javax.naming.ConfigurationException;
 
 public class Worker {
   public static final Logger logger = Logger.getLogger(Worker.class.getName());
-  private final DigestUtil digestUtil;
   private final Instance casInstance;
   private final Instance acInstance;
   private final Instance operationQueueInstance;
@@ -95,19 +102,19 @@ public class Worker {
   private static final ListeningScheduledExecutorService retryScheduler =
       MoreExecutors.listeningDecorator(Executors.newScheduledThreadPool(1));
 
-  private static Channel createChannel(String target) {
+  private static ManagedChannel createChannel(String target) {
     NettyChannelBuilder builder =
         NettyChannelBuilder.forTarget(target)
             .negotiationType(NegotiationType.PLAINTEXT);
     return builder.build();
   }
 
-  private static Path getValidRoot(WorkerConfig config) throws ConfigurationException {
+  private static Path getValidRoot(WorkerConfig config, FileSystem fileSystem) throws ConfigurationException {
     String rootValue = config.getRoot();
     if (Strings.isNullOrEmpty(rootValue)) {
       throw new ConfigurationException("root value in config missing");
     }
-    return Paths.get(rootValue);
+    return fileSystem.getPath(rootValue);
   }
 
   private static Path getValidCasCacheDirectory(WorkerConfig config, Path root) throws ConfigurationException {
@@ -154,35 +161,40 @@ public class Worker {
   private static Instance createInstance(
       String name,
       DigestUtil digestUtil,
-      Channel channel,
+      ManagedChannel channel,
       ByteStreamUploader uploader) {
     return new StubInstance(
         name,
         digestUtil,
         channel,
         60 /* FIXME CONFIG */, TimeUnit.SECONDS,
+        createStubRetrier(),
         uploader);
   }
 
   public Worker(WorkerConfig config) throws ConfigurationException {
+    this(config, FileSystems.getDefault());
+  }
+
+  public Worker(WorkerConfig config, FileSystem fileSystem) throws ConfigurationException {
     this.config = config;
 
     /* configuration validation */
-    root = getValidRoot(config);
+    root = getValidRoot(config, fileSystem);
     Path casCacheDirectory = getValidCasCacheDirectory(config, root);
     HashFunction hashFunction = getValidHashFunction(config);
 
     /* initialization */
-    digestUtil = new DigestUtil(hashFunction);
+    DigestUtil digestUtil = new DigestUtil(hashFunction);
     InstanceEndpoint casEndpoint = config.getContentAddressableStorage();
-    Channel casChannel = createChannel(casEndpoint.getTarget());
+    ManagedChannel casChannel = createChannel(casEndpoint.getTarget());
     uploader = createStubUploader(casChannel);
     casInstance = createInstance(casEndpoint.getInstanceName(), digestUtil, casChannel, uploader);
     acInstance = createInstance(config.getActionCache(), digestUtil);
     operationQueueInstance = createInstance(config.getOperationQueue(), digestUtil);
     InputStreamFactory inputStreamFactory = new InputStreamFactory() {
       @Override
-      public InputStream newInput(Digest digest) {
+      public InputStream newInput(Digest digest) throws IOException, InterruptedException {
         return casInstance.newStreamInput(casInstance.getBlobName(digest));
       }
     };
@@ -203,7 +215,7 @@ public class Worker {
     String pageToken = "";
 
     do {
-      pageToken = casInstance.getTree(inputRoot, config.getTreePageSize(), pageToken, directories);
+      pageToken = casInstance.getTree(inputRoot, config.getTreePageSize(), pageToken, directories, /*acceptMissing=*/ false);
     } while (!pageToken.isEmpty());
 
     Set<Digest> directoryDigests = new HashSet<>();
@@ -266,6 +278,107 @@ public class Worker {
     Files.createSymbolicLink(execPath, cachePath);
   }
 
+  private static UploadManifest createManifest(
+      ActionResult.Builder result,
+      DigestUtil digestUtil,
+      Path execRoot,
+      Iterable<String> outputFiles,
+      Iterable<String> outputDirs,
+      int inlineContentLimit,
+      CASInsertionPolicy fileCasPolicy,
+      CASInsertionPolicy stdoutCasPolicy,
+      CASInsertionPolicy stderrCasPolicy)
+      throws IOException, InterruptedException {
+    UploadManifest manifest = new UploadManifest(
+        digestUtil,
+        result,
+        execRoot,
+        /* allowSymlinks= */ true,
+        inlineContentLimit);
+
+    manifest.addFiles(
+        Iterables.transform(outputFiles, (file) -> execRoot.resolve(file)),
+        fileCasPolicy);
+    manifest.addFiles(
+        Iterables.transform(outputDirs, (dir) -> execRoot.resolve(dir)),
+        fileCasPolicy);
+
+    /* put together our outputs and update the result */
+    if (result.getStdoutRaw().size() > 0) {
+      manifest.addContent(
+          result.getStdoutRaw(),
+          stdoutCasPolicy,
+          result::setStdoutRaw,
+          result::setStdoutDigest);
+    }
+    if (result.getStderrRaw().size() > 0) {
+      manifest.addContent(
+          result.getStderrRaw(),
+          stderrCasPolicy,
+          result::setStderrRaw,
+          result::setStderrDigest);
+    }
+
+    return manifest;
+  }
+
+  private static void uploadManifest(UploadManifest manifest, ByteStreamUploader uploader)
+      throws IOException, InterruptedException {
+    List<Chunker> filesToUpload = new ArrayList<>();
+
+    Map<Digest, Path> digestToFile = manifest.getDigestToFile();
+    Map<Digest, Chunker> digestToChunkers = manifest.getDigestToChunkers();
+    Collection<Digest> digests = new ArrayList<>();
+    digests.addAll(digestToFile.keySet());
+    digests.addAll(digestToChunkers.keySet());
+
+    for (Digest digest : digests) {
+      Chunker chunker;
+      Path file = digestToFile.get(digest);
+      if (file != null) {
+        chunker = new Chunker(file, digest);
+      } else {
+        chunker = digestToChunkers.get(digest);
+        if (chunker == null) {
+          String message = "FindMissingBlobs call returned an unknown digest: " + digest;
+          throw new IOException(message);
+        }
+      }
+      filesToUpload.add(chunker);
+    }
+
+    if (!filesToUpload.isEmpty()) {
+      uploader.uploadBlobs(filesToUpload);
+    }
+  }
+
+  @VisibleForTesting
+  public static void uploadOutputs(
+      ActionResult.Builder resultBuilder,
+      DigestUtil digestUtil,
+      Path actionRoot,
+      Iterable<String> outputFiles,
+      Iterable<String> outputDirs,
+      ByteStreamUploader uploader,
+      int inlineContentLimit,
+      CASInsertionPolicy fileCasPolicy,
+      CASInsertionPolicy stdoutCasPolicy,
+      CASInsertionPolicy stderrCasPolicy)
+      throws IOException, InterruptedException {
+    uploadManifest(
+        createManifest(
+            resultBuilder,
+            digestUtil,
+            actionRoot,
+            outputFiles,
+            outputDirs,
+            inlineContentLimit,
+            fileCasPolicy,
+            stdoutCasPolicy,
+            stderrCasPolicy),
+        uploader);
+  }
+
   public void start() throws InterruptedException {
     try {
       Files.createDirectories(root);
@@ -276,6 +389,15 @@ public class Worker {
     }
 
     WorkerContext workerContext = new WorkerContext() {
+      @Override
+      public String getName() {
+        try {
+          return java.net.InetAddress.getLocalHost().getHostName();
+        } catch (java.net.UnknownHostException e) {
+          throw new RuntimeException(e);
+        }
+      }
+
       @Override
       public Poller createPoller(String name, String operationName, Stage stage) {
         return createPoller(name, operationName, stage, () -> {});
@@ -296,19 +418,42 @@ public class Worker {
 
       @Override
       public DigestUtil getDigestUtil() {
-        return digestUtil;
+        return casInstance.getDigestUtil();
       }
 
       @Override
       public void match(Predicate<Operation> onMatch) throws InterruptedException {
         operationQueueInstance.match(
             config.getPlatform(),
-            config.getRequeueOnFailure(),
             onMatch);
       }
 
       @Override
-      public  int getInlineContentLimit() {
+      public void requeue(Operation operation) throws InterruptedException {
+        try {
+          ExecuteOperationMetadata metadata =
+              operation.getMetadata().unpack(ExecuteOperationMetadata.class);
+
+          ExecuteOperationMetadata executingMetadata = metadata.toBuilder()
+              .setStage(ExecuteOperationMetadata.Stage.QUEUED)
+              .build();
+
+          operation = operation.toBuilder()
+              .setMetadata(Any.pack(executingMetadata))
+              .build();
+          operationQueueInstance.putOperation(operation);
+        } catch (InvalidProtocolBufferException e) {
+          e.printStackTrace();
+        }
+      }
+
+      @Override
+      public boolean putOperation(Operation operation, Action action) throws InterruptedException {
+        return operationQueueInstance.putOperation(operation);
+      }
+
+      @Override
+      public int getInlineContentLimit() {
         return config.getInlineContentLimit();
       }
 
@@ -335,11 +480,6 @@ public class Worker {
       @Override
       public int getTreePageSize() {
         return config.getTreePageSize();
-      }
-
-      @Override
-      public boolean getLinkInputDirectories() {
-        return config.getLinkInputDirectories();
       }
 
       @Override
@@ -373,17 +513,32 @@ public class Worker {
       }
 
       @Override
-      public ByteStreamUploader getUploader() {
-        return uploader;
+      public void uploadOutputs(
+          ActionResult.Builder resultBuilder,
+          Path actionRoot,
+          Iterable<String> outputFiles,
+          Iterable<String> outputDirs)
+          throws IOException, InterruptedException {
+        Worker.uploadOutputs(
+            resultBuilder,
+            casInstance.getDigestUtil(),
+            actionRoot,
+            outputFiles,
+            outputDirs,
+            uploader,
+            config.getInlineContentLimit(),
+            config.getFileCasPolicy(),
+            config.getStdoutCasPolicy(),
+            config.getStderrCasPolicy());
       }
 
       @Override
-      public ByteString getBlob(Digest digest) {
+      public ByteString getBlob(Digest digest) throws InterruptedException, IOException {
         return casInstance.getBlob(digest);
       }
 
       @Override
-      public void createActionRoot(Path root, Action action) throws IOException, InterruptedException {
+      public void createActionRoot(Path root, Map<Digest, Directory> directoriesIndex, Action action) throws IOException, InterruptedException {
         OutputDirectory outputDirectory = OutputDirectory.parse(
             action.getOutputFilesList(),
             action.getOutputDirectoriesList());
@@ -426,11 +581,6 @@ public class Worker {
       @Override
       public void removeDirectory(Path path) throws IOException {
         CASFileCache.removeDirectory(path);
-      }
-
-      @Override
-      public boolean putOperation(Operation operation) {
-        return operationQueueInstance.putOperation(operation);
       }
 
       // doesn't belong in CAS or AC, must be in OQ

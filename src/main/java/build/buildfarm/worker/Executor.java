@@ -24,6 +24,7 @@ import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.util.Durations;
 import com.google.rpc.Code;
 import java.nio.file.Path;
 import java.io.IOException;
@@ -46,21 +47,6 @@ class Executor implements Runnable {
   }
 
   private void runInterruptible() throws InterruptedException {
-    ByteString commandBlob = workerContext.getBlob(operationContext.action.getCommandDigest());
-    Command command = null;
-    if (commandBlob != null) {
-      try {
-        command = Command.parseFrom(commandBlob);
-      } catch (InvalidProtocolBufferException ex) {
-      }
-    }
-
-    if (command == null) {
-      owner.error().put(operationContext);
-      owner.release();
-      return;
-    }
-
     ExecuteOperationMetadata executingMetadata = operationContext.metadata.toBuilder()
         .setStage(ExecuteOperationMetadata.Stage.EXECUTING)
         .build();
@@ -69,9 +55,20 @@ class Executor implements Runnable {
         .setMetadata(Any.pack(executingMetadata))
         .build();
 
-    if (!workerContext.putOperation(operation)) {
+    boolean operationUpdateSuccess = false;
+    try {
+      operationUpdateSuccess = workerContext.putOperation(operation, operationContext.action);
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+
+    if (!operationUpdateSuccess) {
+      try {
+        workerContext.destroyActionRoot(operationContext.execDir);
+      } catch (IOException destroyActionRootException) {
+        destroyActionRootException.printStackTrace();
+      }
       owner.error().put(operationContext);
-      owner.release();
       return;
     }
 
@@ -94,22 +91,31 @@ class Executor implements Runnable {
     }
 
     /* execute command */
+    long executeStartAt = System.nanoTime();
+
     ActionResult.Builder resultBuilder = ActionResult.newBuilder();
     Code statusCode;
     try {
       statusCode = executeCommand(
           operationContext.execDir,
-          command,
+          operationContext.command,
           timeout,
           operationContext.metadata.getStdoutStreamName(),
           operationContext.metadata.getStderrStreamName(),
           resultBuilder);
-    } catch (IOException ex) {
+    } catch (IOException e) {
+      e.printStackTrace();
+      try {
+        workerContext.destroyActionRoot(operationContext.execDir);
+      } catch (IOException destroyActionRootException) {
+        destroyActionRootException.printStackTrace();
+      }
       poller.stop();
       owner.error().put(operationContext);
-      owner.release();
       return;
     }
+
+    Duration executedIn = Durations.fromNanos(System.nanoTime() - executeStartAt);
 
     poller.stop();
 
@@ -122,16 +128,14 @@ class Executor implements Runnable {
                   .build())
               .build()))
           .build();
-      owner.output().put(new OperationContext(
-          operation,
-          operationContext.execDir,
-          operationContext.metadata,
-          operationContext.action));
+      owner.output().put(operationContext.toBuilder()
+          .setOperation(operation)
+          .setExecutedIn(executedIn)
+          .build());
     } else {
+      // FIXME we need to release the action root
       owner.error().put(operationContext);
     }
-
-    owner.release();
   }
 
   @Override
@@ -140,6 +144,11 @@ class Executor implements Runnable {
       runInterruptible();
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
+    } catch (Exception e) {
+      e.printStackTrace();
+      throw e;
+    } finally {
+      owner.release();
     }
   }
 
@@ -180,8 +189,8 @@ class Executor implements Runnable {
     try {
       process = processBuilder.start();
       process.getOutputStream().close();
-    } catch(IOException ex) {
-      ex.printStackTrace();
+    } catch(IOException e) {
+      e.printStackTrace();
       // again, should we do something else here??
       resultBuilder.setExitCode(exitValue);
       return Code.INVALID_ARGUMENT;

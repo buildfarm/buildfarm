@@ -25,7 +25,7 @@ public class ExecuteActionStage extends PipelineStage {
   private BlockingQueue<OperationContext> queue;
 
   public ExecuteActionStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
-    super(workerContext, output, error);
+    super("ExecuteActionStage", workerContext, output, error);
     queue = new ArrayBlockingQueue<>(1);
     executors = new HashSet<>();
   }
@@ -53,15 +53,17 @@ public class ExecuteActionStage extends PipelineStage {
   }
 
   @Override
-  public synchronized void release() {
-    if (!executors.remove(Thread.currentThread())) {
-      throw new IllegalStateException();
+  public void release() {
+    synchronized (this) {
+      if (!executors.remove(Thread.currentThread())) {
+        throw new IllegalStateException();
+      }
+      this.notify();
     }
-    this.notify();
   }
 
   @Override
-  protected boolean isClaimed() {
+  protected synchronized boolean isClaimed() {
     return Iterables.any(executors, (executor) -> executor.isAlive());
   }
 
@@ -69,7 +71,7 @@ public class ExecuteActionStage extends PipelineStage {
   protected void iterate() throws InterruptedException {
     Thread executor = new Thread(new Executor(workerContext, take(), this));
 
-    synchronized(this) {
+    synchronized (this) {
       executors.add(executor);
     }
 
