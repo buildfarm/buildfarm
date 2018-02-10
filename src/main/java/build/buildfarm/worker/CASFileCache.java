@@ -220,7 +220,7 @@ class CASFileCache {
   /** must be called in synchronized context */
   private void incrementReferences(Iterable<Path> inputs) {
     for (Path input : inputs) {
-      storage.get(input).incrementReference(header);
+      storage.get(input).incrementReference();
     }
   }
 
@@ -283,7 +283,7 @@ class CASFileCache {
         if (containingDirectory != null) {
           e.containingDirectories.add(containingDirectory);
         }
-        e.incrementReference(header);
+        e.incrementReference();
         return key;
       }
 
@@ -387,7 +387,7 @@ class CASFileCache {
       before.after = this;
     }
 
-    public void incrementReference(Entry header) {
+    public void incrementReference() {
       if (referenceCount == 0) {
         remove();
       }
@@ -419,7 +419,7 @@ class CASFileCache {
     }
 
     @Override
-    public void incrementReference(Entry header) {
+    public void incrementReference() {
       throw new UnsupportedOperationException("sentinal cannot be referenced");
     }
 
