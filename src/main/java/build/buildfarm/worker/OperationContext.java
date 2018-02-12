@@ -26,18 +26,21 @@ final class OperationContext {
   final Path execDir;
   final ExecuteOperationMetadata metadata;
   final Action action;
-  final List<String> inputFiles;
+  final List<Path> inputFiles;
+  final List<Digest> inputDirectories;
 
   public OperationContext(
       Operation operation,
       Path execDir,
       ExecuteOperationMetadata metadata,
       Action action,
-      List<String> inputFiles) {
+      List<Path> inputFiles,
+      List<Digest> inputDirectories) {
     this.operation = operation;
     this.execDir = execDir;
     this.metadata = metadata;
     this.action = action;
     this.inputFiles = inputFiles;
+    this.inputDirectories = inputDirectories;
   }
 }

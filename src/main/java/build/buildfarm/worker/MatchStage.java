@@ -53,6 +53,7 @@ class MatchStage extends PipelineStage {
         execDir,
         metadata,
         action,
+        new ArrayList<>(),
         new ArrayList<>()));
     return true;
   }

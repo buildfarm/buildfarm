@@ -117,7 +117,8 @@ class Executor implements Runnable {
             operationContext.execDir,
             operationContext.metadata,
             operationContext.action,
-            operationContext.inputFiles));
+            operationContext.inputFiles,
+            operationContext.inputDirectories));
       } else {
         owner.error().offer(operationContext);
       }
@@ -127,7 +128,7 @@ class Executor implements Runnable {
 
     owner.release();
 
-    worker.fileCache.update(operationContext.inputFiles);
+    worker.fileCache.update(operationContext.inputFiles, operationContext.inputDirectories);
   }
 
   private ActionResult.Builder executeCommand(
