@@ -24,9 +24,9 @@ import java.util.ArrayList;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
-class MatchStage extends PipelineStage {
-  MatchStage(Worker worker, PipelineStage output, PipelineStage error) {
-    super(worker, output, error);
+public class MatchStage extends PipelineStage {
+  public MatchStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
+    super(workerContext, output, error);
   }
 
   @Override
@@ -34,7 +34,7 @@ class MatchStage extends PipelineStage {
     if (!output.claim()) {
       return;
     }
-    worker.instance.match(worker.config.getPlatform(), worker.config.getRequeueOnFailure(), this::fetch);
+    workerContext.match(this::fetch);
     // trigger stage shutdown if interrupted during fetch
     if (Thread.interrupted()) {
       throw new InterruptedException();
@@ -46,19 +46,19 @@ class MatchStage extends PipelineStage {
     Action action;
     try {
       metadata = operation.getMetadata().unpack(ExecuteOperationMetadata.class);
-      action = Action.parseFrom(worker.instance.getBlob(metadata.getActionDigest()));
+      action = Action.parseFrom(workerContext.getBlob(metadata.getActionDigest()));
     } catch (InvalidProtocolBufferException ex) {
       return false;
     }
-    if (action.hasTimeout() && worker.config.hasMaximumActionTimeout()) {
+    if (action.hasTimeout() && workerContext.hasMaximumActionTimeout()) {
       Duration timeout = action.getTimeout();
-      Duration maximum = worker.config.getMaximumActionTimeout();
+      Duration maximum = workerContext.getMaximumActionTimeout();
       if (timeout.getSeconds() > maximum.getSeconds() ||
           (timeout.getSeconds() == maximum.getSeconds() && timeout.getNanos() > maximum.getNanos())) {
         return false;
       }
     }
-    Path execDir = worker.root.resolve(operation.getName());
+    Path execDir = workerContext.getRoot().resolve(operation.getName());
     try {
       output.put(new OperationContext(
           operation,

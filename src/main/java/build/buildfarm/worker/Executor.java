@@ -33,14 +33,14 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 class Executor implements Runnable {
-  private final Worker worker;
+  private final WorkerContext workerContext;
   private final OperationContext operationContext;
   private final ExecuteActionStage owner;
 
   private static final OutputStream nullOutputStream = ByteStreams.nullOutputStream();
 
-  Executor(Worker worker, OperationContext operationContext, ExecuteActionStage owner) {
-    this.worker = worker;
+  Executor(WorkerContext workerContext, OperationContext operationContext, ExecuteActionStage owner) {
+    this.workerContext = workerContext;
     this.operationContext = operationContext;
     this.owner = owner;
   }
@@ -48,7 +48,7 @@ class Executor implements Runnable {
   private void runInterruptible() throws InterruptedException {
     Command command;
     try {
-      command = Command.parseFrom(worker.instance.getBlob(operationContext.action.getCommandDigest()));
+      command = Command.parseFrom(workerContext.getBlob(operationContext.action.getCommandDigest()));
     } catch (InvalidProtocolBufferException ex) {
       owner.error().put(operationContext);
       owner.release();
@@ -63,22 +63,18 @@ class Executor implements Runnable {
         .setMetadata(Any.pack(executingMetadata))
         .build();
 
-    if (!worker.instance.putOperation(operation)) {
+    if (!workerContext.getInstance().putOperation(operation)) {
       owner.error().put(operationContext);
       owner.release();
       return;
     }
 
-    final String operationName = operation.getName();
-    Poller poller = new Poller(
-        worker.config.getOperationPollPeriod(),
-        () -> {
-          boolean success = worker.instance.pollOperation(
-              operationName,
-              ExecuteOperationMetadata.Stage.EXECUTING);
-          return success;
-        });
-    new Thread(poller).start();
+    final Thread executorThread = Thread.currentThread();
+    Poller poller = workerContext.createPoller(
+        "Executor",
+        operation.getName(),
+        ExecuteOperationMetadata.Stage.EXECUTING,
+        () -> executorThread.interrupt());
 
     Duration timeout;
     if (operationContext.action.hasTimeout()) {
@@ -87,8 +83,8 @@ class Executor implements Runnable {
       timeout = null;
     }
 
-    if (timeout == null && worker.config.hasDefaultActionTimeout()) {
-      timeout = worker.config.getDefaultActionTimeout();
+    if (timeout == null && workerContext.hasDefaultActionTimeout()) {
+      timeout = workerContext.getDefaultActionTimeout();
     }
 
     /* execute command */
@@ -133,7 +129,7 @@ class Executor implements Runnable {
 
     owner.release();
 
-    worker.fileCache.update(operationContext.inputFiles, operationContext.inputDirectories);
+    workerContext.getBlobPathFactory().decrementReferences(operationContext.inputFiles, operationContext.inputDirectories);
   }
 
   @Override
@@ -165,13 +161,13 @@ class Executor implements Runnable {
 
     OutputStream stdoutSink = null, stderrSink = null;
 
-    if (stdoutStreamName != null && !stdoutStreamName.isEmpty() && worker.config.getStreamStdout()) {
-      stdoutSink = worker.instance.getStreamOutput(stdoutStreamName);
+    if (stdoutStreamName != null && !stdoutStreamName.isEmpty() && workerContext.getStreamStdout()) {
+      stdoutSink = workerContext.getInstance().getStreamOutput(stdoutStreamName);
     } else {
       stdoutSink = nullOutputStream;
     }
-    if (stderrStreamName != null && !stderrStreamName.isEmpty() && worker.config.getStreamStderr()) {
-      stderrSink = worker.instance.getStreamOutput(stderrStreamName);
+    if (stderrStreamName != null && !stderrStreamName.isEmpty() && workerContext.getStreamStderr()) {
+      stderrSink = workerContext.getInstance().getStreamOutput(stderrStreamName);
     } else {
       stderrSink = nullOutputStream;
     }

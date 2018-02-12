@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker;
+package build.buildfarm.worker.operationqueue;
 
 import com.google.devtools.common.options.Option;
 import com.google.devtools.common.options.OptionsBase;
@@ -44,4 +44,3 @@ public class WorkerOptions extends OptionsBase {
     )
   public String casCacheDirectory;
 }
-

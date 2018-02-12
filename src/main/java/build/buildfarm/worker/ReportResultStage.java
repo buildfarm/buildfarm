@@ -36,7 +36,7 @@ import java.util.function.Consumer;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ArrayBlockingQueue;
 
-class ReportResultStage extends PipelineStage {
+public class ReportResultStage extends PipelineStage {
   private final BlockingQueue<OperationContext> queue;
 
   public static class NullStage extends PipelineStage {
@@ -62,8 +62,8 @@ class ReportResultStage extends PipelineStage {
     public boolean isClosed() { return false; }
   }
 
-  ReportResultStage(Worker worker, PipelineStage error) {
-    super(worker, new NullStage(), error);
+  public ReportResultStage(WorkerContext workerContext, PipelineStage error) {
+    super(workerContext, new NullStage(), error);
     queue = new ArrayBlockingQueue<>(1);
   }
 
@@ -78,7 +78,7 @@ class ReportResultStage extends PipelineStage {
   }
 
   private DigestUtil getDigestUtil() {
-    return worker.instance.getDigestUtil();
+    return workerContext.getDigestUtil();
   }
 
   private static int inlineOrDigest(
@@ -112,10 +112,10 @@ class ReportResultStage extends PipelineStage {
       resultBuilder.setStdoutRaw(ByteString.EMPTY);
       inlineContentBytes = inlineOrDigest(
           stdoutRaw,
-          worker.config.getStdoutCasPolicy(),
+          workerContext.getStdoutCasPolicy(),
           contents,
           inlineContentBytes,
-          worker.config.getInlineContentLimit(),
+          workerContext.getInlineContentLimit(),
           () -> resultBuilder.setStdoutRaw(stdoutRaw),
           (content) -> resultBuilder.setStdoutDigest(getDigestUtil().compute(content)));
     }
@@ -126,10 +126,10 @@ class ReportResultStage extends PipelineStage {
       resultBuilder.setStderrRaw(ByteString.EMPTY);
       inlineContentBytes = inlineOrDigest(
           stderrRaw,
-          worker.config.getStderrCasPolicy(),
+          workerContext.getStderrCasPolicy(),
           contents,
           inlineContentBytes,
-          worker.config.getInlineContentLimit(),
+          workerContext.getInlineContentLimit(),
           () -> resultBuilder.setStderrRaw(stdoutRaw),
           (content) -> resultBuilder.setStderrDigest(getDigestUtil().compute(content)));
     }
@@ -140,13 +140,11 @@ class ReportResultStage extends PipelineStage {
   @Override
   protected OperationContext tick(OperationContext operationContext) throws InterruptedException {
     final String operationName = operationContext.operation.getName();
-    Poller poller = new Poller(worker.config.getOperationPollPeriod(), () -> {
-          boolean success = worker.instance.pollOperation(
-              operationName,
-              ExecuteOperationMetadata.Stage.EXECUTING);
-          return success;
-        });
-    new Thread(poller).start();
+    Poller poller = workerContext.createPoller(
+        "ReportResultStage",
+        operationContext.operation.getName(),
+        ExecuteOperationMetadata.Stage.EXECUTING,
+        () -> {});
 
     ActionResult.Builder resultBuilder;
     try {
@@ -159,7 +157,7 @@ class ReportResultStage extends PipelineStage {
 
     int inlineContentBytes = 0;
     ImmutableList.Builder<ByteString> contents = new ImmutableList.Builder<>();
-    CASInsertionPolicy policy = worker.config.getFileCasPolicy();
+    CASInsertionPolicy policy = workerContext.getFileCasPolicy();
     for (String outputFile : operationContext.action.getOutputFilesList()) {
       Path outputPath = operationContext.execDir.resolve(outputFile);
       if (!Files.exists(outputPath)) {
@@ -188,10 +186,10 @@ class ReportResultStage extends PipelineStage {
           .setIsExecutable(Files.isExecutable(outputPath));
       inlineContentBytes = inlineOrDigest(
           content,
-          worker.config.getFileCasPolicy(),
+          policy,
           contents,
           inlineContentBytes,
-          worker.config.getInlineContentLimit(),
+          workerContext.getInlineContentLimit(),
           () -> outputFileBuilder.setContent(content),
           (fileContent) -> outputFileBuilder.setDigest(getDigestUtil().compute(fileContent)));
     }
@@ -200,15 +198,15 @@ class ReportResultStage extends PipelineStage {
     inlineContentBytes += updateActionResultStdOutputs(resultBuilder, contents, inlineContentBytes);
 
     try {
-      worker.instance.putAllBlobs(contents.build());
-    } catch (IOException e) {
+      workerContext.getInstance().putAllBlobs(contents.build());
+    } catch (IOException ex) {
       poller.stop();
       return null;
     }
 
     ActionResult result = resultBuilder.build();
     if (!operationContext.action.getDoNotCache() && resultBuilder.getExitCode() == 0) {
-      worker.instance.putActionResult(DigestUtil.asActionKey(operationContext.metadata.getActionDigest()), result);
+      workerContext.getInstance().putActionResult(DigestUtil.asActionKey(operationContext.metadata.getActionDigest()), result);
     }
 
     ExecuteOperationMetadata metadata = operationContext.metadata.toBuilder()
@@ -226,7 +224,7 @@ class ReportResultStage extends PipelineStage {
 
     poller.stop();
 
-    if (!worker.instance.putOperation(operation)) {
+    if (!workerContext.getInstance().putOperation(operation)) {
       return null;
     }
 
@@ -242,7 +240,7 @@ class ReportResultStage extends PipelineStage {
   @Override
   protected void after(OperationContext operationContext) {
     try {
-      Worker.removeDirectory(operationContext.execDir);
+      CASFileCache.removeDirectory(operationContext.execDir);
     } catch (IOException ex) {
     }
   }

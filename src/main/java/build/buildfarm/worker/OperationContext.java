@@ -21,7 +21,7 @@ import com.google.longrunning.Operation;
 import java.nio.file.Path;
 import java.util.List;
 
-final class OperationContext {
+public final class OperationContext {
   final Operation operation;
   final Path execDir;
   final ExecuteOperationMetadata metadata;

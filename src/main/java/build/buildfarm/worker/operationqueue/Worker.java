@@ -12,18 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker;
+package build.buildfarm.worker.operationqueue;
 
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
+import build.buildfarm.common.BlobPathFactory;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
+import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.v1test.WorkerConfig;
+import build.buildfarm.worker.CASFileCache;
+import build.buildfarm.worker.ExecuteActionStage;
+import build.buildfarm.worker.InputFetchStage;
+import build.buildfarm.worker.InputStreamFactory;
+import build.buildfarm.worker.MatchStage;
+import build.buildfarm.worker.Pipeline;
+import build.buildfarm.worker.PipelineStage;
+import build.buildfarm.worker.Poller;
+import build.buildfarm.worker.ReportResultStage;
+import build.buildfarm.worker.WorkerContext;
 import com.google.common.base.Strings;
 import com.google.common.io.ByteStreams;
 import com.google.devtools.common.options.OptionsParser;
 import com.google.devtools.remoteexecution.v1test.Digest;
+import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
+import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.Duration;
 import com.google.protobuf.TextFormat;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.NegotiationType;
@@ -39,6 +55,8 @@ import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Predicate;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
 
@@ -115,13 +133,123 @@ public class Worker {
       return;
     }
 
+    WorkerContext workerContext = new WorkerContext() {
+      @Override
+      public Poller createPoller(String name, String operationName, Stage stage, Runnable onFailure) {
+        Poller poller = new Poller(config.getOperationPollPeriod(), () -> {
+              boolean success = instance.pollOperation(operationName, stage);
+              if (!success) {
+                onFailure.run();
+              }
+              return success;
+            });
+        new Thread(poller).start();
+        return poller;
+      }
+
+      @Override
+      public DigestUtil getDigestUtil() {
+        return instance.getDigestUtil();
+      }
+
+      @Override
+      public void match(Predicate<Operation> onMatch) throws InterruptedException {
+        instance.match(config.getPlatform(), config.getRequeueOnFailure(), onMatch);
+      }
+
+      @Override
+      public  int getInlineContentLimit() {
+        return config.getInlineContentLimit();
+      }
+
+      @Override
+      public CASInsertionPolicy getFileCasPolicy() {
+        return config.getFileCasPolicy();
+      }
+
+      @Override
+      public CASInsertionPolicy getStdoutCasPolicy() {
+        return config.getStdoutCasPolicy();
+      }
+
+      @Override
+      public CASInsertionPolicy getStderrCasPolicy() {
+        return config.getStderrCasPolicy();
+      }
+
+      @Override
+      public int getExecuteStageWidth() {
+        return config.getExecuteStageWidth();
+      }
+
+      @Override
+      public int getTreePageSize() {
+        return config.getTreePageSize();
+      }
+
+      @Override
+      public boolean getLinkInputDirectories() {
+        return config.getLinkInputDirectories();
+      }
+
+      @Override
+      public boolean hasDefaultActionTimeout() {
+        return config.hasDefaultActionTimeout();
+      }
+
+      @Override
+      public boolean hasMaximumActionTimeout() {
+        return config.hasMaximumActionTimeout();
+      }
+
+      @Override
+      public boolean getStreamStdout() {
+        return config.getStreamStdout();
+      }
+
+      @Override
+      public boolean getStreamStderr() {
+        return config.getStreamStderr();
+      }
+
+      @Override
+      public Duration getDefaultActionTimeout() {
+        return config.getDefaultActionTimeout();
+      }
+
+      @Override
+      public Duration getMaximumActionTimeout() {
+        return config.getMaximumActionTimeout();
+      }
+
+      @Override
+      public Instance getInstance() {
+        return instance;
+      }
+
+      @Override
+      public ByteString getBlob(Digest digest) {
+        return instance.getBlob(digest);
+      }
+
+      @Override
+      public BlobPathFactory getBlobPathFactory() {
+        return fileCache;
+      }
+
+      @Override
+      public Path getRoot() {
+        return root;
+      }
+    };
+
     PipelineStage errorStage = new ReportResultStage.NullStage(); /* ErrorStage(); */
-    PipelineStage reportResultStage = new ReportResultStage(this, errorStage);
-    PipelineStage executeActionStage = new ExecuteActionStage(this, reportResultStage, errorStage);
+    PipelineStage reportResultStage = new ReportResultStage(workerContext, errorStage);
+    PipelineStage executeActionStage = new ExecuteActionStage(workerContext, reportResultStage, errorStage);
     reportResultStage.setInput(executeActionStage);
-    PipelineStage inputFetchStage = new InputFetchStage(this, executeActionStage, errorStage);
+    PipelineStage inputFetchStage = new InputFetchStage(workerContext, executeActionStage, errorStage);
     executeActionStage.setInput(inputFetchStage);
-    PipelineStage matchStage = new MatchStage(this, inputFetchStage, errorStage);
+    PipelineStage matchStage = new MatchStage(workerContext, inputFetchStage, errorStage);
     inputFetchStage.setInput(matchStage);
 
     Pipeline pipeline = new Pipeline();
@@ -135,22 +263,6 @@ public class Worker {
     if (Thread.interrupted()) {
       throw new InterruptedException();
     }
-  }
-
-  public static void removeDirectory(Path directory) throws IOException {
-    Files.walkFileTree(directory, new SimpleFileVisitor<Path>() {
-      @Override
-      public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-        Files.delete(file);
-        return FileVisitResult.CONTINUE;
-      }
-
-      @Override
-      public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
-        Files.delete(dir);
-        return FileVisitResult.CONTINUE;
-      }
-    });
   }
 
   private static WorkerConfig toWorkerConfig(Readable input, WorkerOptions options) throws IOException {
@@ -181,10 +293,10 @@ public class Worker {
       throw new IllegalArgumentException("Missing CONFIG_PATH");
     }
     Path configPath = Paths.get(residue.get(0));
+    Worker worker;
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
-      Worker worker = new Worker(toWorkerConfig(new InputStreamReader(configInputStream), parser.getOptions(WorkerOptions.class)));
-      configInputStream.close();
-      worker.start();
+      worker = new Worker(toWorkerConfig(new InputStreamReader(configInputStream), parser.getOptions(WorkerOptions.class)));
     }
+    worker.start();
   }
 }

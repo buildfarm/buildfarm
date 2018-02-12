@@ -12,11 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker;
+package build.buildfarm.common;
 
 import com.google.devtools.remoteexecution.v1test.Digest;
-import java.io.InputStream;
-import java.util.function.Function;
+import com.google.devtools.remoteexecution.v1test.Directory;
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Map;
 
-public interface InputStreamFactory extends Function<Digest, InputStream> {
+public interface BlobPathFactory {
+  Path getPath(String fileName);
+  Path getBlobPath(Digest digest, boolean isExecutable, Digest containingDirectory) throws IOException, InterruptedException;
+  Path getDirectoryPath(Digest digest, Map<Digest, Directory> directoriesIndex) throws IOException, InterruptedException;
+  void decrementReferences(Iterable<Path> inputFiles, Iterable<Digest> inputDirectories);
 }

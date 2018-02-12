@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker;
+package build.buildfarm.worker.operationqueue;
 
 import build.buildfarm.v1test.WorkerConfig;
+import build.buildfarm.worker.operationqueue.Worker;
 import javax.naming.ConfigurationException;
 import org.junit.Test;
 import org.junit.runner.RunWith;

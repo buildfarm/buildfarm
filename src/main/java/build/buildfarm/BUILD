@@ -133,8 +133,8 @@ java_library(
 )
 
 java_library(
-    name = "buildfarm-worker-impl",
-    srcs = glob(["worker/**/*.java"]),
+    name = "worker",
+    srcs = glob(["worker/*.java"]),
     deps = [
         ":common",
         ":instance",
@@ -152,10 +152,30 @@ java_library(
     ],
 )
 
+java_library(
+    name = "operationqueue-worker",
+    srcs = glob(["worker/operationqueue/*.java"]),
+    deps = [
+        ":worker",
+        ":common",
+        ":instance",
+        ":stub-instance",
+        "//3rdparty/jvm/com/github/pcj:google_options",
+        "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java",
+        "//3rdparty/jvm/io/grpc:grpc_context",
+        "//3rdparty/jvm/io/grpc:grpc_core",
+        "//3rdparty/jvm/io/grpc:grpc_netty",
+        "//3rdparty/jvm/io/grpc:grpc_protobuf",
+        "//3rdparty/jvm/io/grpc:grpc_stub",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+    ],
+)
+
 java_binary(
     name = "buildfarm-worker",
-    main_class = "build.buildfarm.worker.Worker",
+    main_class = "build.buildfarm.worker.operationqueue.Worker",
     runtime_deps = [
-        ":buildfarm-worker-impl",
+        ":operationqueue-worker",
     ],
 )

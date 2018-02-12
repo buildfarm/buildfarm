@@ -20,12 +20,12 @@ import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 
-class ExecuteActionStage extends PipelineStage {
+public class ExecuteActionStage extends PipelineStage {
   private final Set<Thread> executors;
   private BlockingQueue<OperationContext> queue;
 
-  ExecuteActionStage(Worker worker, PipelineStage output, PipelineStage error) {
-    super(worker, output, error);
+  public ExecuteActionStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
+    super(workerContext, output, error);
     queue = new ArrayBlockingQueue<>(1);
     executors = new HashSet<>();
   }
@@ -46,7 +46,7 @@ class ExecuteActionStage extends PipelineStage {
       return false;
     }
 
-    while (executors.size() >= worker.config.getExecuteStageWidth()) {
+    while (executors.size() >= workerContext.getExecuteStageWidth()) {
       wait();
     }
     return true;
@@ -67,7 +67,7 @@ class ExecuteActionStage extends PipelineStage {
 
   @Override
   protected void iterate() throws InterruptedException {
-    Thread executor = new Thread(new Executor(worker, take(), this));
+    Thread executor = new Thread(new Executor(workerContext, take(), this));
 
     synchronized(this) {
       executors.add(executor);
