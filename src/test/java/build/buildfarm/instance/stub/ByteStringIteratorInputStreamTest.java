@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm;
+package build.buildfarm.instance.stub;
 
 import static com.google.common.truth.Truth.assertThat;
 
@@ -22,7 +22,9 @@ import com.google.common.collect.Iterators;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.io.InputStream;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
@@ -115,5 +117,52 @@ public class ByteStringIteratorInputStreamTest {
     assertThat(ByteString.copyFrom(buffer)).isEqualTo(ByteString.copyFrom(expected));
     assertThat(in.read()).isEqualTo(3);
     assertThat(in.read()).isEqualTo(-1);
+  }
+
+  @Test
+  public void iteratorAtBeginningHasAvailable() throws IOException {
+    InputStream in = new ByteStringIteratorInputStream(ImmutableList.<ByteString>of().iterator());
+    assertThat(in.available()).isEqualTo(0);
+  }
+
+  @Test
+  public void iteratorAtEndIsUnavailable() throws IOException {
+    InputStream in = new ByteStringIteratorInputStream(ImmutableList.<ByteString>of().iterator());
+    assertThat(in.available()).isEqualTo(0);
+  }
+
+  @Rule
+  public final ExpectedException exception = ExpectedException.none();
+
+  @Test
+  public void closedStreamAvailableThrowsIOException() throws IOException {
+    InputStream in = new ByteStringIteratorInputStream(
+        ImmutableList.<ByteString>of(
+            ByteString.copyFromUtf8("Hello, World")).iterator());
+    in.close();
+    exception.expect(IOException.class);
+    in.available();
+    assertThat(true).isFalse();
+  }
+
+  @Test
+  public void closedStreamReadDefaultThrowsIOException() throws IOException {
+    InputStream in = new ByteStringIteratorInputStream(
+        ImmutableList.<ByteString>of(
+            ByteString.copyFromUtf8("Hello, World")).iterator());
+    in.close();
+    exception.expect(IOException.class);
+    in.read();
+  }
+
+  @Test
+  public void closedStreamReadThrowsIOException() throws IOException {
+    InputStream in = new ByteStringIteratorInputStream(
+        ImmutableList.<ByteString>of(
+            ByteString.copyFromUtf8("Hello, World")).iterator());
+    in.close();
+    exception.expect(IOException.class);
+    byte[] buffer = new byte[5];
+    in.read(buffer, 0, 5);
   }
 }
