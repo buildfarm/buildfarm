@@ -190,7 +190,7 @@ public class CASFileCache {
 
   /** must be called in synchronized context */
   private Path expireEntry() throws IOException, InterruptedException {
-    while (header.before == header.after) {
+    while (header.after == header) {
       wait();
     }
     Entry e = header.after;
@@ -391,13 +391,6 @@ public class CASFileCache {
       after.before = this;
     }
 
-    public void addAfter(Entry existingEntry) {
-      before = existingEntry;
-      after = existingEntry.after;
-      after.before = this;
-      before.after = this;
-    }
-
     public void incrementReference() {
       if (referenceCount == 0) {
         remove();
@@ -421,11 +414,6 @@ public class CASFileCache {
 
     @Override
     public void addBefore(Entry existingEntry) {
-      throw new UnsupportedOperationException("sentinal cannot be added");
-    }
-
-    @Override
-    public void addAfter(Entry existingEntry) {
       throw new UnsupportedOperationException("sentinal cannot be added");
     }
 

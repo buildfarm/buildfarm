@@ -27,6 +27,23 @@ java_test(
 )
 
 java_test(
+    name = "worker-tests",
+    size = "small",
+    srcs = glob(["worker/*.java"]),
+    test_class = "build.buildfarm.AllTests",
+    deps = [
+        ":test_runner",
+        "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/com/google/jimfs",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java",
+        "//3rdparty/jvm/com/google/truth",
+        "//src/main/java/build/buildfarm:common",
+        "//src/main/java/build/buildfarm:worker",
+        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
+    ],
+)
+
+java_test(
     name = "server-tests",
     size = "small",
     srcs = glob(["server/*.java"]),
