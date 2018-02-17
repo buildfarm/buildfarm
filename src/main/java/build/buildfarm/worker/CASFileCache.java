@@ -234,9 +234,14 @@ class CASFileCache {
     Directory directory = directoriesIndex.get(digest);
     Files.createDirectory(path);
     for (FileNode fileNode : directory.getFilesList()) {
-      Path fileCacheKey = put(fileNode.getDigest(), fileNode.getIsExecutable(), containingDirectory);
-      Files.createLink(path.resolve(fileNode.getName()), fileCacheKey);
-      inputsBuilder.add(fileCacheKey);
+      if (fileNode.getDigest().getSizeBytes() != 0) {
+        Path fileCacheKey = put(fileNode.getDigest(), fileNode.getIsExecutable(), containingDirectory);
+        // FIXME this can die with 'too many links'... needs some cascading fallout
+        Files.createLink(path.resolve(fileNode.getName()), fileCacheKey);
+        inputsBuilder.add(fileCacheKey);
+      } else {
+        Files.createFile(path.resolve(fileNode.getName()));
+      }
     }
     for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
       fetchDirectory(
