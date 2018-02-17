@@ -24,9 +24,9 @@ import io.grpc.StatusException;
 import io.grpc.stub.StreamObserver;
 
 public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
-  private final BuildFarmInstances instances;
+  private final Instances instances;
 
-  public ActionCacheService(BuildFarmInstances instances) {
+  public ActionCacheService(Instances instances) {
     this.instances = instances;
   }
 

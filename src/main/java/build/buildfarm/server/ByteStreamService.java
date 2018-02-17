@@ -40,9 +40,9 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
   private static final long DEFAULT_CHUNK_SIZE = 1024 * 16;
 
   private final Map<String, ByteString> active_write_requests;
-  private final BuildFarmInstances instances;
+  private final Instances instances;
 
-  public ByteStreamService(BuildFarmInstances instances) {
+  public ByteStreamService(Instances instances) {
     active_write_requests = new HashMap<String, ByteString>();
     this.instances = instances;
   }

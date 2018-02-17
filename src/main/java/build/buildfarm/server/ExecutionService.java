@@ -23,9 +23,9 @@ import io.grpc.StatusException;
 import io.grpc.stub.StreamObserver;
 
 public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
-  private final BuildFarmInstances instances;
+  private final Instances instances;
 
-  public ExecutionService(BuildFarmInstances instances) {
+  public ExecutionService(Instances instances) {
     this.instances = instances;
   }
 

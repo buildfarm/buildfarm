@@ -27,9 +27,9 @@ import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 
 public class WatcherService extends WatcherGrpc.WatcherImplBase {
-  private final BuildFarmInstances instances;
+  private final Instances instances;
 
-  public WatcherService(BuildFarmInstances instances) {
+  public WatcherService(Instances instances) {
     this.instances = instances;
   }
 

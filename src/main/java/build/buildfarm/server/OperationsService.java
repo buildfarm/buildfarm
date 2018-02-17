@@ -29,9 +29,9 @@ import io.grpc.StatusException;
 import io.grpc.stub.StreamObserver;
 
 public class OperationsService extends OperationsGrpc.OperationsImplBase {
-  private final BuildFarmInstances instances;
+  private final Instances instances;
 
-  public OperationsService(BuildFarmInstances instances) {
+  public OperationsService(Instances instances) {
     this.instances = instances;
   }
 

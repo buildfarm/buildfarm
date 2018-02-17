@@ -36,7 +36,7 @@ public class BuildFarmServer {
     Logger.getLogger(BuildFarmServer.class.getName());
 
   private final BuildFarmServerConfig config;
-  private final BuildFarmInstances instances;
+  private final Instances instances;
   private final Server server;
 
   public BuildFarmServer(BuildFarmServerConfig config) throws ConfigurationException {
