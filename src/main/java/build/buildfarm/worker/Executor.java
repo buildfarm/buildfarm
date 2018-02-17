@@ -50,7 +50,11 @@ class Executor implements Runnable {
     try {
       command = Command.parseFrom(worker.instance.getBlob(operationContext.action.getCommandDigest()));
     } catch (InvalidProtocolBufferException ex) {
-      owner.error().offer(operationContext);
+      try {
+        owner.error().put(operationContext);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
       owner.release();
       return;
     }
@@ -64,7 +68,11 @@ class Executor implements Runnable {
         .build();
 
     if (!worker.instance.putOperation(operation)) {
-      owner.error().offer(operationContext);
+      try {
+        owner.error().put(operationContext);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
       owner.release();
       return;
     }
@@ -98,7 +106,11 @@ class Executor implements Runnable {
           operationContext.metadata.getStderrStreamName());
     } catch (IOException|InterruptedException ex) {
       poller.stop();
-      owner.error().offer(operationContext);
+      try {
+        owner.error().put(operationContext);
+      } catch (InterruptedException intEx) {
+        Thread.currentThread().interrupt();
+      }
       owner.release();
       return;
     }
@@ -112,7 +124,7 @@ class Executor implements Runnable {
                 .setResult(resultBuilder.build())
                 .build()))
             .build();
-        owner.output().offer(new OperationContext(
+        owner.output().put(new OperationContext(
             operation,
             operationContext.execDir,
             operationContext.metadata,
@@ -120,10 +132,18 @@ class Executor implements Runnable {
             operationContext.inputFiles,
             operationContext.inputDirectories));
       } else {
-        owner.error().offer(operationContext);
+        try {
+          owner.error().put(operationContext);
+        } catch (InterruptedException intEx) {
+          Thread.currentThread().interrupt();
+        }
       }
     } catch (InterruptedException ex) {
-      owner.error().offer(operationContext);
+      try {
+        owner.error().put(operationContext);
+      } catch (InterruptedException intEx) {
+        Thread.currentThread().interrupt();
+      }
     }
 
     owner.release();

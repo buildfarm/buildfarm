@@ -31,8 +31,8 @@ class ExecuteActionStage extends PipelineStage {
   }
 
   @Override
-  public void offer(OperationContext operationContext) {
-    queue.offer(operationContext);
+  public void put(OperationContext operationContext) throws InterruptedException {
+    queue.put(operationContext);
   }
 
   @Override

@@ -48,13 +48,17 @@ class MatchStage extends PipelineStage {
       return false;
     }
     Path execDir = worker.root.resolve(operation.getName());
-    output.offer(new OperationContext(
-        operation,
-        execDir,
-        metadata,
-        action,
-        new ArrayList<>(),
-        new ArrayList<>()));
+    try {
+      output.put(new OperationContext(
+          operation,
+          execDir,
+          metadata,
+          action,
+          new ArrayList<>(),
+          new ArrayList<>()));
+    } catch (InterruptedException intEx) {
+      return false;
+    }
     return true;
   }
 
@@ -74,7 +78,7 @@ class MatchStage extends PipelineStage {
   }
 
   @Override
-  public void offer(OperationContext operation) {
+  public void put(OperationContext operation) {
     throw new UnsupportedOperationException();
   }
 
