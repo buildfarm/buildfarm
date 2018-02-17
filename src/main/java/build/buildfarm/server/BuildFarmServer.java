@@ -14,7 +14,6 @@
 
 package build.buildfarm.server;
 
-import build.buildfarm.common.Encoding;
 import build.buildfarm.v1test.BuildFarmServerConfig;
 import com.google.common.io.ByteStreams;
 import com.google.devtools.common.options.OptionsParser;
@@ -23,6 +22,7 @@ import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -58,10 +58,9 @@ public class BuildFarmServer {
         .build();
   }
 
-  private static BuildFarmServerConfig toBuildFarmServerConfig(InputStream inputStream, BuildFarmServerOptions options) throws IOException {
+  private static BuildFarmServerConfig toBuildFarmServerConfig(Readable input, BuildFarmServerOptions options) throws IOException {
     BuildFarmServerConfig.Builder builder = BuildFarmServerConfig.newBuilder();
-    String data = new String(Encoding.convertFromLatin1(ByteStreams.toByteArray(inputStream)));
-    TextFormat.merge(data, builder);
+    TextFormat.merge(input, builder);
     if (options.port > 0) {
         builder.setPort(options.port);
     }
@@ -108,7 +107,7 @@ public class BuildFarmServer {
     }
     Path configPath = Paths.get(residue.get(0));
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
-      BuildFarmServer server = new BuildFarmServer(toBuildFarmServerConfig(configInputStream, parser.getOptions(BuildFarmServerOptions.class)));
+      BuildFarmServer server = new BuildFarmServer(toBuildFarmServerConfig(new InputStreamReader(configInputStream), parser.getOptions(BuildFarmServerOptions.class)));
       configInputStream.close();
       server.start();
       server.blockUntilShutdown();
