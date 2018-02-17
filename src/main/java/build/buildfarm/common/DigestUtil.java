@@ -15,9 +15,10 @@ package build.buildfarm.common;
 
 import build.buildfarm.v1test.InstanceConfig;
 import com.google.common.base.Preconditions;
+import com.google.common.hash.Funnels;
 import com.google.common.hash.HashCode;
+import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
-import com.google.common.io.ByteSource;
 import com.google.devtools.remoteexecution.v1test.Action;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.protobuf.ByteString;
@@ -52,9 +53,9 @@ public class DigestUtil {
       default:
       case UNRECOGNIZED:
         throw new IllegalArgumentException(hashFunction.toString());
-      case MD5: return HashFunction.MD5;
-      case SHA1: return HashFunction.SHA1;
-      case SHA256: return HashFunction.SHA256;
+      case MD5: return MD5;
+      case SHA1: return SHA1;
+      case SHA256: return SHA256;
       }
     }
 
@@ -96,34 +97,13 @@ public class DigestUtil {
   }
 
   public Digest compute(ByteString blob) {
+    Hasher hasher = hashFn.getHash().newHasher();
     try {
-      return buildDigest(
-          new ByteSource() {
-            @Override
-            public InputStream openStream() throws IOException {
-              return blob.newInput();
-            }
-          }.hash(hashFn.getHash()).toString(),
-          blob.size());
-    } catch(IOException ex) {
-      /* impossible */
-      return null;
+      blob.writeTo(Funnels.asOutputStream(hasher));
+    } catch (IOException e) {
+      /* impossible, due to Funnels.asOutputStream behavior */
     }
-  }
-
-  private byte[] getDigestOrFail(Path path)
-      throws IOException {
-    return new ByteSource() {
-      @Override
-      public InputStream openStream() throws IOException {
-        return Files.newInputStream(path);
-      }
-    }.hash(hashFn.getHash()).asBytes();
-  }
-
-  public Digest compute(Path file) throws IOException {
-    byte[] digest = getDigestOrFail(file);
-    return buildDigest(digest, Files.size(file));
+    return buildDigest(hasher.hash().toString(), blob.size());
   }
 
   public Digest build(String hexHash, long size) {
@@ -152,16 +132,12 @@ public class DigestUtil {
    * Assumes that the given Digest is a valid digest of an Action, and creates an ActionKey wrapper.
    * This should not be called on the client side!
    */
-  public ActionKey asActionKey(Digest digest) {
+  public static ActionKey asActionKey(Digest digest) {
     return new ActionKey(digest);
   }
 
   public Digest empty() {
     return empty;
-  }
-
-  public static Digest buildDigest(byte[] hash, long size) {
-    return buildDigest(HashCode.fromBytes(hash).toString(), size);
   }
 
   public static Digest buildDigest(String hexHash, long size) {
