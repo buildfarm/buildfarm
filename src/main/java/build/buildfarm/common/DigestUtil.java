@@ -91,6 +91,13 @@ public class DigestUtil {
   private final HashFunction hashFn;
   private final Digest empty;
 
+  public static DigestUtil forHash(String hashName) {
+    InstanceConfig.HashFunction hash = InstanceConfig.HashFunction.valueOf(
+        InstanceConfig.HashFunction.getDescriptor().findValueByName(hashName));
+    HashFunction hashFunction = HashFunction.get(hash);
+    return new DigestUtil(hashFunction);
+  }
+
   public DigestUtil(HashFunction hashFn) {
     this.hashFn = hashFn;
     empty = buildDigest(hashFn.empty().toString(), 0);
@@ -146,5 +153,13 @@ public class DigestUtil {
 
   public static String toString(Digest digest) {
     return String.format("%s/%d", digest.getHash(), digest.getSizeBytes());
+  }
+
+  public static Digest parseDigest(String digest) {
+    String[] components = digest.split("/");
+    return Digest.newBuilder()
+        .setHash(components[0])
+        .setSizeBytes(Integer.parseInt(components[1]))
+        .build();
   }
 }
