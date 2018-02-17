@@ -69,14 +69,14 @@ import java.util.function.Function;
 
 public class StubInstance implements Instance {
   private final String name;
-  private final Channel channel;
   private final DigestUtil digestUtil;
+  private final Channel channel;
   private final ByteStreamUploader uploader;
 
-  public StubInstance(String name, Channel channel, DigestUtil digestUtil) {
+  public StubInstance(String name, DigestUtil digestUtil, Channel channel) {
     this.name = name;
-    this.channel = channel;
     this.digestUtil = digestUtil;
+    this.channel = channel;
 
     uploader = new ByteStreamUploader(name, channel, null, 60, new Retrier(), null);
   }

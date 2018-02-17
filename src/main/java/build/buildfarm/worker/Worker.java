@@ -91,8 +91,8 @@ public class Worker {
     /* initialization */
     instance = new StubInstance(
         config.getInstanceName(),
-        createChannel(config.getOperationQueue()),
-        new DigestUtil(hashFunction));
+        new DigestUtil(hashFunction),
+        createChannel(config.getOperationQueue()));
     InputStreamFactory inputStreamFactory = new InputStreamFactory() {
       @Override
       public InputStream apply(Digest digest) {

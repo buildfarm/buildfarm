@@ -108,6 +108,7 @@ public class BuildFarmInstances {
     for (InstanceConfig instanceConfig : instanceConfigs) {
       String name = instanceConfig.getName();
       HashFunction hashFunction = getValidHashFunction(instanceConfig);
+      DigestUtil digestUtil = new DigestUtil(hashFunction);
       InstanceConfig.TypeCase typeCase = instanceConfig.getTypeCase();
       switch (typeCase) {
         default:
@@ -116,11 +117,10 @@ public class BuildFarmInstances {
         case MEMORY_INSTANCE_CONFIG:
           instances.put(name, new MemoryInstance(
               name,
-              instanceConfig.getMemoryInstanceConfig(),
-              new DigestUtil(hashFunction)));
+              digestUtil,
+              instanceConfig.getMemoryInstanceConfig()));
           break;
       }
     }
   }
 }
-

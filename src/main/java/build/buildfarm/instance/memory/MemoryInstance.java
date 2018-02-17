@@ -76,28 +76,28 @@ public class MemoryInstance extends AbstractServerInstance {
     }
   }
 
-  public MemoryInstance(String name, MemoryInstanceConfig config, DigestUtil digestUtil) {
+  public MemoryInstance(String name, DigestUtil digestUtil, MemoryInstanceConfig config) {
     this(
         name,
+        digestUtil,
         config,
         /*contentAddressableStorage=*/ new MemoryLRUContentAddressableStorage(config.getCasMaxSizeBytes()),
-        /*outstandingOperations=*/ new TreeMap<String, Operation>(),
-        digestUtil);
+        /*outstandingOperations=*/ new TreeMap<String, Operation>());
   }
 
   private MemoryInstance(
       String name,
+      DigestUtil digestUtil,
       MemoryInstanceConfig config,
       ContentAddressableStorage contentAddressableStorage,
-      Map<String, Operation> outstandingOperations,
-      DigestUtil digestUtil) {
+      Map<String, Operation> outstandingOperations) {
     super(
         name,
+        digestUtil,
         contentAddressableStorage,
         /*actionCache=*/ new DelegateCASMap<ActionKey, ActionResult>(contentAddressableStorage, ActionResult.parser(), digestUtil),
         outstandingOperations,
-        /*completedOperations=*/ new DelegateCASMap<String, Operation>(contentAddressableStorage, Operation.parser(), digestUtil),
-        digestUtil);
+        /*completedOperations=*/ new DelegateCASMap<String, Operation>(contentAddressableStorage, Operation.parser(), digestUtil));
     this.config = config;
     watchers = new ConcurrentHashMap<String, List<Function<Operation, Boolean>>>();
     streams = new HashMap<String, ByteStringStreamSource>();
