@@ -79,3 +79,18 @@ java_test(
         "//src/main/java/build/buildfarm:stub-instance",
     ],
 )
+
+java_test(
+    name = "memory-instance-tests",
+    size = "small",
+    srcs = glob(["instance/memory/*.java"]),
+    test_class = "build.buildfarm.AllTests",
+    deps = [
+        ":test_runner",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java",
+        "//3rdparty/jvm/com/google/truth",
+        "//src/main/java/build/buildfarm:common",
+        "//src/main/java/build/buildfarm:memory-instance",
+        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
+    ],
+)
