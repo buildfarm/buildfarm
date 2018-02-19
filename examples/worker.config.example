@@ -35,7 +35,7 @@ stderr_cas_policy: ALWAYS_INSERT
 # whether to insert output files into the CAS, can be:
 #   ALWAYS_INSERT: output files are always inserted into the CAS
 #   INSERT_ABOVE_LIMIT: output files are inserted into the CAS when it exceeds the inline limit above
-file_cas_control: ALWAYS_INSERT
+file_cas_policy: ALWAYS_INSERT
 
 # the worker will take it upon itself to requeue (exceptionally)
 # failed operations via the OperationQueue#put method with queued
