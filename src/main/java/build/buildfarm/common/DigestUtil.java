@@ -103,7 +103,7 @@ public class DigestUtil {
             public InputStream openStream() throws IOException {
               return blob.newInput();
             }
-          }.hash(Hashing.sha1()).toString(),
+          }.hash(hashFn.getHash()).toString(),
           blob.size());
     } catch(IOException ex) {
       /* impossible */

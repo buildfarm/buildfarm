@@ -17,6 +17,7 @@ package build.buildfarm.common;
 import static com.google.common.truth.Truth.assertThat;
 
 import com.google.devtools.remoteexecution.v1test.Digest;
+import com.google.protobuf.ByteString;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -43,5 +44,22 @@ public class DigestUtilTest {
     Digest digest = util.build(bazelMd5Hash, payloadSizeInBytes);
     assertThat(digest.getHash()).isEqualTo(bazelMd5Hash);
     assertThat(digest.getSizeBytes()).isEqualTo(payloadSizeInBytes);
+  }
+
+  @Test
+  public void computesMd5Hash() {
+    ByteString content = ByteString.copyFromUtf8("bazel");
+    DigestUtil util = new DigestUtil(DigestUtil.HashFunction.MD5);
+    Digest digest = util.compute(content);
+    assertThat(digest.getHash()).isEqualTo("24ef4c36ec66c15ef9f0c96fe27c0e0b");
+  }
+
+  @Test
+  public void computesSha256Hash() {
+    ByteString content = ByteString.copyFromUtf8("bazel");
+    DigestUtil util = new DigestUtil(DigestUtil.HashFunction.SHA256);
+    Digest digest = util.compute(content);
+    assertThat(digest.getHash())
+        .isEqualTo("aa0e09c406dd0db1a3bb250216045e81644d26c961c0e8c34e8a0354476ca6d4");
   }
 }
