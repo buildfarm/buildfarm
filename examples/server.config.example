@@ -1,6 +1,8 @@
 # an instance specification
 instances {
   name: "default_memory_instance"
+  # Latest versions of Bazel are using SHA256 as a default digest function
+  hash_function: SHA256
 
   # the implicit type specifier for this instance
   # a memory instance is volatile and has no persistent
@@ -39,6 +41,9 @@ instances {
 # another instance, provided to indicate multiplexing configs
 instances {
   name: "another_memory_instance"
+  # Latest versions of Bazel are using SHA256 as a default digest function
+  hash_function: SHA256
+
   memory_instance_config: {
     list_operations_default_page_size: 1024
     list_operations_max_page_size: 16384

@@ -5,6 +5,9 @@ instance_name: "default_memory_instance"
 # the endpoint used for all api requests
 operation_queue: "localhost:8980"
 
+# Latest versions of Bazel are using SHA256 as a default digest function
+hash_function: SHA256
+
 # all content for the operations will be stored under this path
 root: "/tmp/worker"
 
