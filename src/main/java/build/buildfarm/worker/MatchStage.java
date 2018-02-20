@@ -34,7 +34,13 @@ public class MatchStage extends PipelineStage {
     if (!output.claim()) {
       return;
     }
-    workerContext.match(this::fetch);
+    workerContext.match((operation) -> {
+      boolean fetched = fetch(operation);
+      if (!fetched) {
+        output.release();
+      }
+      return fetched;
+    });
     // trigger stage shutdown if interrupted during fetch
     if (Thread.interrupted()) {
       throw new InterruptedException();
@@ -47,7 +53,7 @@ public class MatchStage extends PipelineStage {
     try {
       metadata = operation.getMetadata().unpack(ExecuteOperationMetadata.class);
       action = Action.parseFrom(workerContext.getBlob(metadata.getActionDigest()));
-    } catch (InvalidProtocolBufferException ex) {
+    } catch (NullPointerException|InvalidProtocolBufferException ex) {
       return false;
     }
     if (action.hasTimeout() && workerContext.hasMaximumActionTimeout()) {
