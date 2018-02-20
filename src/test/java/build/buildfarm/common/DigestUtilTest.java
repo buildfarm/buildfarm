@@ -62,4 +62,12 @@ public class DigestUtilTest {
     assertThat(digest.getHash())
         .isEqualTo("aa0e09c406dd0db1a3bb250216045e81644d26c961c0e8c34e8a0354476ca6d4");
   }
+
+  @Test
+  public void computesSha1Hash() {
+    ByteString content = ByteString.copyFromUtf8("bazel");
+    DigestUtil util = new DigestUtil(DigestUtil.HashFunction.SHA1);
+    Digest digest = util.compute(content);
+    assertThat(digest.getHash()).isEqualTo("287d5d65c10a8609e9c504c81f650b0e1669a824");
+  }
 }
