@@ -16,7 +16,6 @@ package build.buildfarm.common;
 
 import static com.google.common.truth.Truth.assertThat;
 
-import build.buildfarm.common.DigestUtil;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import org.junit.Rule;
 import org.junit.Test;
@@ -26,24 +25,23 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class DigestUtilTest {
-    @Rule
-    public ExpectedException thrown = ExpectedException.none();
+  @Rule public ExpectedException thrown = ExpectedException.none();
 
-    @Test
-    public void invalidHashCodeIsDetectedDuringConstruction() {
-        DigestUtil util = new DigestUtil(DigestUtil.HashFunction.MD5);
-        thrown.expect(NumberFormatException.class);
-        thrown.expectMessage("[foo] is not a valid MD5 hash.");
-        util.build("foo", 3);
-    }
+  @Test
+  public void invalidHashCodeIsDetectedDuringConstruction() {
+    DigestUtil util = new DigestUtil(DigestUtil.HashFunction.MD5);
+    thrown.expect(NumberFormatException.class);
+    thrown.expectMessage("[foo] is not a valid MD5 hash.");
+    util.build("foo", 3);
+  }
 
-    @Test
-    public void canBuildAValidDigest() {
-        DigestUtil util = new DigestUtil(DigestUtil.HashFunction.MD5);
-        String bazelMd5Hash = "24ef4c36ec66c15ef9f0c96fe27c0e0b";
-        long payloadSizeInBytes = 5;
-        Digest digest = util.build(bazelMd5Hash, payloadSizeInBytes);
-        assertThat(digest.getHash()).isEqualTo(bazelMd5Hash);
-        assertThat(digest.getSizeBytes()).isEqualTo(payloadSizeInBytes);
-    }
+  @Test
+  public void canBuildAValidDigest() {
+    DigestUtil util = new DigestUtil(DigestUtil.HashFunction.MD5);
+    String bazelMd5Hash = "24ef4c36ec66c15ef9f0c96fe27c0e0b";
+    long payloadSizeInBytes = 5;
+    Digest digest = util.build(bazelMd5Hash, payloadSizeInBytes);
+    assertThat(digest.getHash()).isEqualTo(bazelMd5Hash);
+    assertThat(digest.getSizeBytes()).isEqualTo(payloadSizeInBytes);
+  }
 }
