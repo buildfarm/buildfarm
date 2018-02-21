@@ -57,6 +57,7 @@ class MatchStage extends PipelineStage {
           new ArrayList<>(),
           new ArrayList<>()));
     } catch (InterruptedException intEx) {
+      Thread.currentThread().interrupt();
       return false;
     }
     return true;
