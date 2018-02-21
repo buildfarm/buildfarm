@@ -113,4 +113,11 @@ public class ByteStringStreamSourceTest {
       Thread.sleep(10);
     }
   }
+
+  @Test
+  public void readZeroBytesIgnoresBuffer() throws IOException {
+    ByteStringStreamSource source = new ByteStringStreamSource(() -> {});
+    InputStream inputStream = source.openStream();
+    assertThat(inputStream.read(null, -1, 0)).isEqualTo(0);
+  }
 }
