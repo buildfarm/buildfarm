@@ -82,15 +82,17 @@ message MemoryInstanceConfig {
   int64 cas_max_size_bytes = 7;
 }
 
-enum InstanceHashFunction {
-  MD5 = 0;
-  SHA1 = 1;
-  SHA256 = 2;
-}
-
 message InstanceConfig {
   string name = 1;
-  InstanceHashFunction hash_function = 2;
+
+  enum HashFunction {
+    UNKNOWN = 0;
+    MD5 = 1;
+    SHA1 = 2;
+    SHA256 = 3;
+  }
+
+  HashFunction hash_function = 2;
 
   oneof type {
     MemoryInstanceConfig memory_instance_config = 3;
@@ -110,7 +112,7 @@ message WorkerConfig {
   string instance_name = 1;
 
   // the hash function used for digests
-  InstanceHashFunction hash_function = 2;
+  InstanceConfig.HashFunction hash_function = 2;
 
   // server address for all buildfarm requests
   // like actioncache or execution in bazel, this

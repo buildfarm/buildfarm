@@ -19,7 +19,7 @@ import static com.google.common.truth.Truth.assertThat;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.server.BuildFarmServer;
 import build.buildfarm.v1test.BuildFarmServerConfig;
-import build.buildfarm.v1test.InstanceHashFunction;
+import build.buildfarm.v1test.InstanceConfig.HashFunction;
 import build.buildfarm.v1test.MemoryInstanceConfig;
 import com.google.devtools.remoteexecution.v1test.BatchUpdateBlobsRequest;
 import com.google.devtools.remoteexecution.v1test.BatchUpdateBlobsResponse;
@@ -71,7 +71,7 @@ public class BuildFarmServerTest {
         BuildFarmServerConfig.newBuilder().setPort(0);
     configBuilder.addInstancesBuilder()
         .setName("memory")
-        .setHashFunction(InstanceHashFunction.SHA256)
+        .setHashFunction(HashFunction.SHA256)
         .setMemoryInstanceConfig(memoryInstanceConfig);
 
     server = new BuildFarmServer(
