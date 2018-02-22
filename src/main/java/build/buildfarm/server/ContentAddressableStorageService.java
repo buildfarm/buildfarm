@@ -34,9 +34,9 @@ import java.io.IOException;
 import java.util.function.Function;
 
 public class ContentAddressableStorageService extends ContentAddressableStorageGrpc.ContentAddressableStorageImplBase {
-  private final BuildFarmInstances instances;
+  private final Instances instances;
 
-  public ContentAddressableStorageService(BuildFarmInstances instances) {
+  public ContentAddressableStorageService(Instances instances) {
     this.instances = instances;
   }
 

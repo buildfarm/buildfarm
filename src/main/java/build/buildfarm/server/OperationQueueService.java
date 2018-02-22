@@ -29,9 +29,9 @@ import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 
 public class OperationQueueService extends OperationQueueGrpc.OperationQueueImplBase {
-  private final BuildFarmInstances instances;
+  private final Instances instances;
 
-  public OperationQueueService(BuildFarmInstances instances) {
+  public OperationQueueService(Instances instances) {
     this.instances = instances;
   }
 
