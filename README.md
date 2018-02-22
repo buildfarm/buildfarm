@@ -1,3 +1,5 @@
+[![Build status](https://badge.buildkite.com/45f4fd4c0cfb95f7705156a4119641c6d5d6c310452d6e65a4.svg)](https://buildkite.com/bazel/buildfarm-postsubmit)
+
 # Bazel Buildfarm
 
 This repository hosts the [Bazel](https://bazel.build) remote caching and execution system.
