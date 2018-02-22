@@ -84,11 +84,11 @@ public abstract class AbstractServerInstance implements Instance {
 
   public AbstractServerInstance(
       String name,
+      DigestUtil digestUtil,
       ContentAddressableStorage contentAddressableStorage,
       Map<ActionKey, ActionResult> actionCache,
       Map<String, Operation> outstandingOperations,
-      Map<String, Operation> completedOperations,
-      DigestUtil digestUtil) {
+      Map<String, Operation> completedOperations) {
     this.name = name;
     this.contentAddressableStorage = contentAddressableStorage;
     this.actionCache = actionCache;
