@@ -164,9 +164,7 @@ class InputFetchStage extends PipelineStage {
 
     Set<Digest> directoryDigests = new HashSet<>();
     ImmutableMap.Builder<Digest, Directory> directoriesIndex = new ImmutableMap.Builder<>();
-    long entries = 0;
     for (Directory directory : directories.build()) {
-      entries++;
       Digest directoryDigest = worker.instance.getDigestUtil().compute(directory);
       if (!directoryDigests.add(directoryDigest)) {
         continue;

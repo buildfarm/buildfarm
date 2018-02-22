@@ -175,9 +175,6 @@ class Executor implements Runnable {
       return resultBuilder;
     }
 
-    InputStream stdoutStream = process.getInputStream();
-    InputStream stderrStream = process.getErrorStream();
-
     ByteStringSinkReader stdoutReader = new ByteStringSinkReader(
         process.getInputStream(), stdoutSink);
     ByteStringSinkReader stderrReader = new ByteStringSinkReader(
