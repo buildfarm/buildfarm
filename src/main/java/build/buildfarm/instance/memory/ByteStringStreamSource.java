@@ -14,12 +14,11 @@
 
 package build.buildfarm.instance.memory;
 
-import com.google.common.io.ByteSource;
 import com.google.protobuf.ByteString;
 import java.io.InputStream;
 import java.io.OutputStream;
 
-class ByteStringStreamSource extends ByteSource {
+class ByteStringStreamSource {
   private final Runnable onClose;
   private final OutputStream outputStream;
 
@@ -45,7 +44,7 @@ class ByteStringStreamSource extends ByteSource {
 
       @Override
       public void write(byte[] b, int off, int len) {
-        synchronized(bufferSync) {
+        synchronized (bufferSync) {
           buffer = buffer.concat(ByteString.copyFrom(b, off, len));
           bufferSync.notifyAll();
         }
@@ -53,7 +52,7 @@ class ByteStringStreamSource extends ByteSource {
 
       @Override
       public void close() {
-        synchronized(bufferSync) {
+        synchronized (bufferSync) {
           closed = true;
           bufferSync.notifyAll();
         }
@@ -72,14 +71,13 @@ class ByteStringStreamSource extends ByteSource {
     return outputStream;
   }
 
-  @Override
   public InputStream openStream() {
     return new InputStream() {
       private int offset = 0;
 
       @Override
       public int available() {
-        synchronized(bufferSync) {
+        synchronized (bufferSync) {
           return availableUnsynchronized();
         }
       }
@@ -93,12 +91,13 @@ class ByteStringStreamSource extends ByteSource {
         if (n <= 0) {
           return 0;
         }
-        synchronized(bufferSync) {
+        synchronized (bufferSync) {
           try {
             while (!closed && availableUnsynchronized() == 0) {
               bufferSync.wait();
             }
           } catch(InterruptedException ex) {
+            Thread.currentThread().interrupt();
           }
           n = Math.min(availableUnsynchronized(), n);
         }
@@ -125,7 +124,7 @@ class ByteStringStreamSource extends ByteSource {
           if (len == 0) {
             return 0;
           }
-          synchronized(bufferSync) {
+          synchronized (bufferSync) {
             while (availableUnsynchronized() == 0) {
               if (closed) {
                 return -1;
@@ -138,6 +137,7 @@ class ByteStringStreamSource extends ByteSource {
           offset += len;
           return len;
         } catch(InterruptedException ex) {
+          Thread.currentThread().interrupt();
           return -1;
         }
       }
