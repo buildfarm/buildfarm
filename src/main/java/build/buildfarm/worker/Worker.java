@@ -16,7 +16,6 @@ package build.buildfarm.worker;
 
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
-import build.buildfarm.common.Encoding;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.WorkerConfig;
@@ -31,6 +30,7 @@ import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -153,10 +153,9 @@ public class Worker {
     });
   }
 
-  private static WorkerConfig toWorkerConfig(InputStream inputStream, WorkerOptions options) throws IOException {
+  private static WorkerConfig toWorkerConfig(Readable input, WorkerOptions options) throws IOException {
     WorkerConfig.Builder builder = WorkerConfig.newBuilder();
-    String data = new String(Encoding.convertFromLatin1(ByteStreams.toByteArray(inputStream)));
-    TextFormat.merge(data, builder);
+    TextFormat.merge(input, builder);
     if (!Strings.isNullOrEmpty(options.root)) {
       builder.setRoot(options.root);
     }
@@ -183,7 +182,7 @@ public class Worker {
     }
     Path configPath = Paths.get(residue.get(0));
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
-      Worker worker = new Worker(toWorkerConfig(configInputStream, parser.getOptions(WorkerOptions.class)));
+      Worker worker = new Worker(toWorkerConfig(new InputStreamReader(configInputStream), parser.getOptions(WorkerOptions.class)));
       configInputStream.close();
       worker.start();
     }
