@@ -28,10 +28,14 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
 
 public class BuildFarmServer {
+  // We need to keep references to the root and netty loggers to prevent them from being garbage
+  // collected, which would cause us to loose their configuration.
+  private static final Logger nettyLogger = Logger.getLogger("io.grpc.netty");
   public static final Logger logger =
     Logger.getLogger(BuildFarmServer.class.getName());
 
@@ -98,6 +102,13 @@ public class BuildFarmServer {
   }
 
   public static void main(String[] args) throws Exception {
+    // Only log severe log messages from Netty. Otherwise it logs warnings that look like this:
+    //
+    // 170714 08:16:28.552:WT 18 [io.grpc.netty.NettyServerHandler.onStreamError] Stream Error
+    // io.netty.handler.codec.http2.Http2Exception$StreamException: Received DATA frame for an
+    // unknown stream 11369
+    nettyLogger.setLevel(Level.SEVERE);
+
     OptionsParser parser = OptionsParser.newOptionsParser(BuildFarmServerOptions.class);
     parser.parseAndExitUponError(args);
     List<String> residue = parser.getResidue();
