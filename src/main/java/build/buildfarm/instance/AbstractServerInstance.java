@@ -564,7 +564,7 @@ public abstract class AbstractServerInstance implements Instance {
         putActionResult(actionKey, actionResult);
       }
     }
-    putOperation(operation.newBuilder()
+    putOperation(operation.toBuilder()
         .setDone(true)
         .setMetadata(Any.pack(ExecuteOperationMetadata.newBuilder()
             .setStage(ExecuteOperationMetadata.Stage.COMPLETED)
