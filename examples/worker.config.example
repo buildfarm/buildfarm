@@ -2,6 +2,12 @@
 # all requests will be tagged with this instance name
 instance_name: "default_memory_instance"
 
+# the hash function for this worker, required
+# to match out of band between the client and server
+# since resource names must be determined on the client
+# for a valid upload
+hash_function: SHA256
+
 # the endpoint used for all api requests
 operation_queue: "localhost:8980"
 
@@ -72,3 +78,5 @@ platform: {
 # from CAS in the cache
 cas_cache_max_size_bytes: 2147483648 # 2 * 1024 * 1024 * 1024
 
+# the number of concurrently available slots in the execute phase
+execute_stage_width: 1

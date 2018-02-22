@@ -2,6 +2,12 @@
 instances {
   name: "default_memory_instance"
 
+  # the hash function for this instance, required
+  # to match out of band between the client and server
+  # since resource names must be determined on the client
+  # for a valid upload
+  hash_function: SHA256
+
   # the implicit type specifier for this instance
   # a memory instance is volatile and has no persistent
   # footprint. all bulk storage is in terms of the CAS
@@ -39,6 +45,10 @@ instances {
 # another instance, provided to indicate multiplexing configs
 instances {
   name: "another_memory_instance"
+
+  # hash functions may be different between instances
+  hash_function: SHA1
+
   memory_instance_config: {
     list_operations_default_page_size: 1024
     list_operations_max_page_size: 16384
