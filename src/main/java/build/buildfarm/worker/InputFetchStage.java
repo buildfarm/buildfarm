@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker;
 
+import build.buildfarm.common.DigestUtil;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -185,6 +186,9 @@ class InputFetchStage extends PipelineStage {
       List<Digest> inputDirectories)
       throws IOException, InterruptedException {
     Directory directory = directoriesIndex.get(inputRoot);
+    if (directory == null) {
+      throw new IOException("Directory " + DigestUtil.toString(inputRoot) + " is not in input index");
+    }
 
     for (FileNode fileNode : directory.getFilesList()) {
       Path execPath = execDir.resolve(fileNode.getName());
