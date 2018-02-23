@@ -44,13 +44,12 @@ class Executor implements Runnable {
     this.owner = owner;
   }
 
-  @Override
-  public void run() {
+  private void runInterruptible() throws InterruptedException {
     Command command;
     try {
       command = Command.parseFrom(worker.instance.getBlob(operationContext.action.getCommandDigest()));
     } catch (InvalidProtocolBufferException ex) {
-      owner.error().offer(operationContext);
+      owner.error().put(operationContext);
       owner.release();
       return;
     }
@@ -64,7 +63,7 @@ class Executor implements Runnable {
         .build();
 
     if (!worker.instance.putOperation(operation)) {
-      owner.error().offer(operationContext);
+      owner.error().put(operationContext);
       owner.release();
       return;
     }
@@ -96,39 +95,44 @@ class Executor implements Runnable {
           timeout,
           operationContext.metadata.getStdoutStreamName(),
           operationContext.metadata.getStderrStreamName());
-    } catch (IOException|InterruptedException ex) {
+    } catch (IOException ex) {
       poller.stop();
-      owner.error().offer(operationContext);
+      owner.error().put(operationContext);
       owner.release();
       return;
     }
 
     poller.stop();
 
-    try {
-      if (owner.output().claim()) {
-        operation = operation.toBuilder()
-            .setResponse(Any.pack(ExecuteResponse.newBuilder()
-                .setResult(resultBuilder.build())
-                .build()))
-            .build();
-        owner.output().offer(new OperationContext(
-            operation,
-            operationContext.execDir,
-            operationContext.metadata,
-            operationContext.action,
-            operationContext.inputFiles,
-            operationContext.inputDirectories));
-      } else {
-        owner.error().offer(operationContext);
-      }
-    } catch (InterruptedException ex) {
-      owner.error().offer(operationContext);
+    if (owner.output().claim()) {
+      operation = operation.toBuilder()
+          .setResponse(Any.pack(ExecuteResponse.newBuilder()
+              .setResult(resultBuilder.build())
+              .build()))
+          .build();
+      owner.output().put(new OperationContext(
+          operation,
+          operationContext.execDir,
+          operationContext.metadata,
+          operationContext.action,
+          operationContext.inputFiles,
+          operationContext.inputDirectories));
+    } else {
+      owner.error().put(operationContext);
     }
 
     owner.release();
 
     worker.fileCache.update(operationContext.inputFiles, operationContext.inputDirectories);
+  }
+
+  @Override
+  public void run() {
+    try {
+      runInterruptible();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
   }
 
   private ActionResult.Builder executeCommand(

@@ -51,12 +51,12 @@ class InputFetchStage extends PipelineStage {
   }
 
   @Override
-  public void offer(OperationContext operationContext) {
-    queue.offer(operationContext);
+  public void put(OperationContext operationContext) throws InterruptedException {
+    queue.put(operationContext);
   }
 
   @Override
-  protected OperationContext tick(OperationContext operationContext) {
+  protected OperationContext tick(OperationContext operationContext) throws InterruptedException {
     final String operationName = operationContext.operation.getName();
     Poller poller = new Poller(worker.config.getOperationPollPeriod(), () -> {
           boolean success = worker.instance.pollOperation(
@@ -90,8 +90,8 @@ class InputFetchStage extends PipelineStage {
           execDir,
           operationContext.action.getOutputFilesList(),
           operationContext.action.getOutputDirectoriesList());
-    } catch (IOException|InterruptedException ex) {
-      ex.printStackTrace();
+    } catch (IOException e) {
+      e.printStackTrace();
       success = false;
     }
 

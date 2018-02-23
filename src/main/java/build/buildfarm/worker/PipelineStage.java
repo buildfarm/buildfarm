@@ -37,12 +37,16 @@ abstract class PipelineStage implements Runnable {
     this.input = input;
   }
 
+  private void runInterruptible() throws InterruptedException {
+    while (!output.isClosed() || isClaimed()) {
+      iterate();
+    }
+  }
+
   @Override
   public void run() {
     try {
-      while (!output.isClosed() || isClaimed()) {
-        iterate();
-      }
+      runInterruptible();
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     } finally {
@@ -56,9 +60,9 @@ abstract class PipelineStage implements Runnable {
       operationContext = take();
       OperationContext nextOperationContext = tick(operationContext);
       if (nextOperationContext != null && output.claim()) {
-        output.offer(nextOperationContext);
+        output.put(nextOperationContext);
       } else {
-        error.offer(operationContext);
+        error.put(operationContext);
       }
     } finally {
       release();
@@ -66,7 +70,7 @@ abstract class PipelineStage implements Runnable {
     after(operationContext);
   }
 
-  protected OperationContext tick(OperationContext operationContext) {
+  protected OperationContext tick(OperationContext operationContext) throws InterruptedException {
     return operationContext;
   }
 
@@ -109,5 +113,5 @@ abstract class PipelineStage implements Runnable {
   }
 
   abstract OperationContext take() throws InterruptedException;
-  abstract void offer(OperationContext operationContext);
+  abstract void put(OperationContext operationContext) throws InterruptedException;
 }

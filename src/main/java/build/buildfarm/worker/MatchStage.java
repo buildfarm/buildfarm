@@ -33,9 +33,11 @@ class MatchStage extends PipelineStage {
     if (!output.claim()) {
       return;
     }
-    worker.instance.match(worker.config.getPlatform(), worker.config.getRequeueOnFailure(), (operation) -> {
-      return fetch(operation);
-    });
+    worker.instance.match(worker.config.getPlatform(), worker.config.getRequeueOnFailure(), this::fetch);
+    // trigger stage shutdown if interrupted during fetch
+    if (Thread.interrupted()) {
+      throw new InterruptedException();
+    }
   }
 
   private boolean fetch(Operation operation) {
@@ -48,13 +50,18 @@ class MatchStage extends PipelineStage {
       return false;
     }
     Path execDir = worker.root.resolve(operation.getName());
-    output.offer(new OperationContext(
-        operation,
-        execDir,
-        metadata,
-        action,
-        new ArrayList<>(),
-        new ArrayList<>()));
+    try {
+      output.put(new OperationContext(
+          operation,
+          execDir,
+          metadata,
+          action,
+          new ArrayList<>(),
+          new ArrayList<>()));
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      return false;
+    }
     return true;
   }
 
@@ -74,7 +81,7 @@ class MatchStage extends PipelineStage {
   }
 
   @Override
-  public void offer(OperationContext operation) {
+  public void put(OperationContext operation) {
     throw new UnsupportedOperationException();
   }
 
