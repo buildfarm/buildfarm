@@ -201,6 +201,36 @@ public class BuildFarmServerTest {
   }
 
   @Test
+  public void canceledOperationHasCancelledState()
+      throws RetryException, InterruptedException, InvalidProtocolBufferException {
+    Operation operation = executeAction(createSimpleAction());
+
+    OperationsGrpc.OperationsBlockingStub operationsStub =
+        OperationsGrpc.newBlockingStub(inProcessChannel);
+
+    // should be available with cancelled state
+    GetOperationRequest getRequest = GetOperationRequest.newBuilder()
+        .setName(operation.getName())
+        .build();
+
+    Operation preCancelOperation = operationsStub.getOperation(getRequest);
+
+    assertThat(preCancelOperation.getDone()).isFalse();
+
+    CancelOperationRequest cancelRequest = CancelOperationRequest.newBuilder()
+        .setName(operation.getName())
+        .build();
+
+    operationsStub.cancelOperation(cancelRequest);
+
+    Operation cancelledOperation = operationsStub.getOperation(getRequest);
+
+    assertThat(cancelledOperation.getDone()).isTrue();
+    assertThat(cancelledOperation.getResultCase()).isEqualTo(Operation.ResultCase.ERROR);
+    assertThat(cancelledOperation.getError().getCode()).isEqualTo(Code.CANCELLED.getNumber());
+  }
+
+  @Test
   public void cancellingExecutingOperationFailsPoll()
       throws RetryException, InterruptedException, InvalidProtocolBufferException {
     Operation operation = executeAction(createSimpleAction());
@@ -253,17 +283,6 @@ public class BuildFarmServerTest {
             .setOperationName(executingOperation.getName())
             .build())
         .getCode()).isEqualTo(Code.UNAVAILABLE.getNumber());
-
-    // should not appear in outstanding list
-    GetOperationRequest getRequest = GetOperationRequest.newBuilder()
-        .setName(executingOperation.getName())
-        .build();
-
-    Operation cancelledOperation = operationsStub.getOperation(getRequest);
-
-    assertThat(cancelledOperation.getDone()).isTrue();
-    assertThat(cancelledOperation.getResultCase()).isEqualTo(Operation.ResultCase.ERROR);
-    assertThat(cancelledOperation.getError().getCode()).isEqualTo(Code.CANCELLED.getNumber());
   }
 
   private Action createSimpleAction() throws RetryException, InterruptedException {
