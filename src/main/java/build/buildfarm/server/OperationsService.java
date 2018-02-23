@@ -120,6 +120,7 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
     }
 
     instance.cancelOperation(request.getName());
+    responseObserver.onNext(Empty.getDefaultInstance());
     responseObserver.onCompleted();
   }
 }
