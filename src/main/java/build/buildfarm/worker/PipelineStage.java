@@ -37,12 +37,16 @@ abstract class PipelineStage implements Runnable {
     this.input = input;
   }
 
+  private void runInterruptible() throws InterruptedException {
+    while (!output.isClosed() || isClaimed()) {
+      iterate();
+    }
+  }
+
   @Override
   public void run() {
     try {
-      while (!output.isClosed() || isClaimed()) {
-        iterate();
-      }
+      runInterruptible();
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     } finally {
@@ -66,7 +70,7 @@ abstract class PipelineStage implements Runnable {
     after(operationContext);
   }
 
-  protected OperationContext tick(OperationContext operationContext) {
+  protected OperationContext tick(OperationContext operationContext) throws InterruptedException {
     return operationContext;
   }
 

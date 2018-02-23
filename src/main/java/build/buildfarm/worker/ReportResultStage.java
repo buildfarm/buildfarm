@@ -138,7 +138,7 @@ class ReportResultStage extends PipelineStage {
   }
 
   @Override
-  protected OperationContext tick(OperationContext operationContext) {
+  protected OperationContext tick(OperationContext operationContext) throws InterruptedException {
     final String operationName = operationContext.operation.getName();
     Poller poller = new Poller(worker.config.getOperationPollPeriod(), () -> {
           boolean success = worker.instance.pollOperation(
@@ -201,8 +201,7 @@ class ReportResultStage extends PipelineStage {
 
     try {
       worker.instance.putAllBlobs(contents.build());
-    } catch (IOException ex) {
-    } catch (InterruptedException ex) {
+    } catch (IOException e) {
       poller.stop();
       return null;
     }

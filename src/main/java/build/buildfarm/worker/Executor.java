@@ -44,17 +44,12 @@ class Executor implements Runnable {
     this.owner = owner;
   }
 
-  @Override
-  public void run() {
+  private void runInterruptible() throws InterruptedException {
     Command command;
     try {
       command = Command.parseFrom(worker.instance.getBlob(operationContext.action.getCommandDigest()));
     } catch (InvalidProtocolBufferException ex) {
-      try {
-        owner.error().put(operationContext);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      }
+      owner.error().put(operationContext);
       owner.release();
       return;
     }
@@ -68,11 +63,7 @@ class Executor implements Runnable {
         .build();
 
     if (!worker.instance.putOperation(operation)) {
-      try {
-        owner.error().put(operationContext);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      }
+      owner.error().put(operationContext);
       owner.release();
       return;
     }
@@ -104,51 +95,44 @@ class Executor implements Runnable {
           timeout,
           operationContext.metadata.getStdoutStreamName(),
           operationContext.metadata.getStderrStreamName());
-    } catch (IOException|InterruptedException ex) {
+    } catch (IOException ex) {
       poller.stop();
-      try {
-        owner.error().put(operationContext);
-      } catch (InterruptedException intEx) {
-        Thread.currentThread().interrupt();
-      }
+      owner.error().put(operationContext);
       owner.release();
       return;
     }
 
     poller.stop();
 
-    try {
-      if (owner.output().claim()) {
-        operation = operation.toBuilder()
-            .setResponse(Any.pack(ExecuteResponse.newBuilder()
-                .setResult(resultBuilder.build())
-                .build()))
-            .build();
-        owner.output().put(new OperationContext(
-            operation,
-            operationContext.execDir,
-            operationContext.metadata,
-            operationContext.action,
-            operationContext.inputFiles,
-            operationContext.inputDirectories));
-      } else {
-        try {
-          owner.error().put(operationContext);
-        } catch (InterruptedException intEx) {
-          Thread.currentThread().interrupt();
-        }
-      }
-    } catch (InterruptedException ex) {
-      try {
-        owner.error().put(operationContext);
-      } catch (InterruptedException intEx) {
-        Thread.currentThread().interrupt();
-      }
+    if (owner.output().claim()) {
+      operation = operation.toBuilder()
+          .setResponse(Any.pack(ExecuteResponse.newBuilder()
+              .setResult(resultBuilder.build())
+              .build()))
+          .build();
+      owner.output().put(new OperationContext(
+          operation,
+          operationContext.execDir,
+          operationContext.metadata,
+          operationContext.action,
+          operationContext.inputFiles,
+          operationContext.inputDirectories));
+    } else {
+      owner.error().put(operationContext);
     }
 
     owner.release();
 
     worker.fileCache.update(operationContext.inputFiles, operationContext.inputDirectories);
+  }
+
+  @Override
+  public void run() {
+    try {
+      runInterruptible();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
   }
 
   private ActionResult.Builder executeCommand(

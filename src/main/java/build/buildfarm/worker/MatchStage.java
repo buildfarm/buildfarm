@@ -33,11 +33,9 @@ class MatchStage extends PipelineStage {
     if (!output.claim()) {
       return;
     }
-    worker.instance.match(worker.config.getPlatform(), worker.config.getRequeueOnFailure(), (operation) -> {
-      return fetch(operation);
-    });
+    worker.instance.match(worker.config.getPlatform(), worker.config.getRequeueOnFailure(), this::fetch);
     // trigger stage shutdown if interrupted during fetch
-    if (Thread.currentThread().interrupted()) {
+    if (Thread.interrupted()) {
       throw new InterruptedException();
     }
   }
@@ -60,7 +58,7 @@ class MatchStage extends PipelineStage {
           action,
           new ArrayList<>(),
           new ArrayList<>()));
-    } catch (InterruptedException intEx) {
+    } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       return false;
     }
