@@ -336,7 +336,7 @@ public class StubInstance implements Instance {
         .setPlatform(platform)
         .build());
     boolean successful = onMatch.apply(operation);
-    if (!successful && requeueOnFailure) {
+    if (!Thread.currentThread().isInterrupted() && !successful && requeueOnFailure) {
       requeue(operation);
     }
   }
