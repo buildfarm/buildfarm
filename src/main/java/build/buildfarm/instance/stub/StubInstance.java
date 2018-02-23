@@ -65,7 +65,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
-import java.util.function.Function;
+import java.util.function.Predicate;
 
 public class StubInstance implements Instance {
   private final String name;
@@ -330,12 +330,12 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public void match(Platform platform, boolean requeueOnFailure, Function<Operation, Boolean> onMatch) {
+  public void match(Platform platform, boolean requeueOnFailure, Predicate<Operation> onMatch) {
     Operation operation = operationQueueBlockingStub.get().take(TakeOperationRequest.newBuilder()
         .setInstanceName(getName())
         .setPlatform(platform)
         .build());
-    boolean successful = onMatch.apply(operation);
+    boolean successful = onMatch.test(operation);
     if (!Thread.currentThread().isInterrupted() && !successful && requeueOnFailure) {
       requeue(operation);
     }
@@ -366,7 +366,7 @@ public class StubInstance implements Instance {
   public boolean watchOperation(
       String operationName,
       boolean watchInitialState,
-      Function<Operation, Boolean> watcher) {
+      Predicate<Operation> watcher) {
     return false;
   }
 
