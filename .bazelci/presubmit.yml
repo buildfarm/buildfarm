@@ -10,3 +10,8 @@ platforms:
     - "..."
     test_targets:
     - "..."
+  macos:
+    build_targets:
+    - "..."
+    test_targets:
+    - "..."
