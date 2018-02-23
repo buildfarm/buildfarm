@@ -36,6 +36,10 @@ class MatchStage extends PipelineStage {
     worker.instance.match(worker.config.getPlatform(), worker.config.getRequeueOnFailure(), (operation) -> {
       return fetch(operation);
     });
+    // trigger stage shutdown if interrupted during fetch
+    if (Thread.currentThread().interrupted()) {
+      throw new InterruptedException();
+    }
   }
 
   private boolean fetch(Operation operation) {
