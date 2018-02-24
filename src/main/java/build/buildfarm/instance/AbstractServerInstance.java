@@ -564,9 +564,6 @@ public abstract class AbstractServerInstance implements Instance {
           .setStderrRaw(ByteString.copyFromUtf8(
               "[BUILDFARM]: Action timed out with no response from worker"))
           .build();
-      if (!action.getDoNotCache()) {
-        putActionResult(actionKey, actionResult);
-      }
     }
     putOperation(operation.newBuilder()
         .setDone(true)
