@@ -40,14 +40,19 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
       return;
     }
 
-    instance.execute(
-        request.getAction(),
-        request.getSkipCacheLookup(),
-        request.getTotalInputFileCount(),
-        request.getTotalInputFileBytes(),
-        (operation) -> {
-          responseObserver.onNext(operation);
-          responseObserver.onCompleted();
-        });
+    try {
+      instance.execute(
+          request.getAction(),
+          request.getSkipCacheLookup(),
+          request.getTotalInputFileCount(),
+          request.getTotalInputFileBytes(),
+          (operation) -> {
+            responseObserver.onNext(operation);
+            responseObserver.onCompleted();
+          });
+    } catch (IllegalStateException e) {
+      responseObserver.onError(new StatusException(
+          Status.FAILED_PRECONDITION.withDescription(e.getMessage())));
+    }
   }
 }
