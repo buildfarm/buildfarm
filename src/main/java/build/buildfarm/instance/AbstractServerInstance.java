@@ -551,32 +551,26 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   protected void expireOperation(Operation operation) {
-    Action action = expectAction(operation);
-    ActionKey actionKey = digestUtil.computeActionKey(action);
-    // one last chance to get partial information from worker
-    ActionResult actionResult = action.getDoNotCache()
-        ? null
-        : getActionResult(actionKey);
-    boolean cachedResult = actionResult != null;
-    if (!cachedResult) {
-      actionResult = ActionResult.newBuilder()
-          .setExitCode(-1)
-          .setStderrRaw(ByteString.copyFromUtf8(
-              "[BUILDFARM]: Action timed out with no response from worker"))
-          .build();
+    ActionResult actionResult = ActionResult.newBuilder()
+        .setExitCode(-1)
+        .setStderrRaw(ByteString.copyFromUtf8(
+            "[BUILDFARM]: Action timed out with no response from worker"))
+        .build();
+    ExecuteResponse executeResponse = ExecuteResponse.newBuilder()
+        .setResult(actionResult)
+        .setCachedResult(false)
+        .setStatus(com.google.rpc.Status.newBuilder()
+            .setCode(com.google.rpc.Code.DEADLINE_EXCEEDED.getNumber())
+            .build())
+        .build();
+    ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
+    if (metadata == null) {
+      throw new IllegalStateException("Operation " + operation.getName() + " did not contain valid metadata");
     }
-    putOperation(operation.newBuilder()
+    putOperation(operation.toBuilder()
         .setDone(true)
-        .setMetadata(Any.pack(ExecuteOperationMetadata.newBuilder()
-            .setStage(ExecuteOperationMetadata.Stage.COMPLETED)
-            .build()))
-        .setResponse(Any.pack(ExecuteResponse.newBuilder()
-            .setResult(actionResult)
-            .setStatus(com.google.rpc.Status.newBuilder()
-                .setCode(com.google.rpc.Code.DEADLINE_EXCEEDED.getNumber())
-                .build())
-            .setCachedResult(cachedResult)
-            .build()))
+        .setMetadata(Any.pack(metadata))
+        .setResponse(Any.pack(executeResponse))
         .build());
   }
 
