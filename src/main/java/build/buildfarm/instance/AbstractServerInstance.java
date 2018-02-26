@@ -572,6 +572,9 @@ public abstract class AbstractServerInstance implements Instance {
             .build()))
         .setResponse(Any.pack(ExecuteResponse.newBuilder()
             .setResult(actionResult)
+            .setStatus(com.google.rpc.Status.newBuilder()
+                .setCode(com.google.rpc.Code.DEADLINE_EXCEEDED.getNumber())
+                .build())
             .setCachedResult(cachedResult)
             .build()))
         .build());
