@@ -35,6 +35,7 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.rpc.Code;
 import io.grpc.Status;
 import java.util.HashSet;
 import java.util.Map;
@@ -372,6 +373,9 @@ public abstract class AbstractServerInstance implements Instance {
           .setDone(true)
           .setResponse(Any.pack(ExecuteResponse.newBuilder()
               .setResult(actionResult)
+              .setStatus(com.google.rpc.Status.newBuilder()
+                  .setCode(Code.OK.getNumber())
+                  .build())
               .setCachedResult(actionResult != null)
               .build()));
     } else {
@@ -545,7 +549,7 @@ public abstract class AbstractServerInstance implements Instance {
     putOperation(operation.toBuilder()
         .setDone(true)
         .setError(com.google.rpc.Status.newBuilder()
-            .setCode(com.google.rpc.Code.CANCELLED.getNumber())
+            .setCode(Code.CANCELLED.getNumber())
             .build())
         .build());
   }
@@ -558,9 +562,8 @@ public abstract class AbstractServerInstance implements Instance {
         .build();
     ExecuteResponse executeResponse = ExecuteResponse.newBuilder()
         .setResult(actionResult)
-        .setCachedResult(false)
         .setStatus(com.google.rpc.Status.newBuilder()
-            .setCode(com.google.rpc.Code.DEADLINE_EXCEEDED.getNumber())
+            .setCode(Code.DEADLINE_EXCEEDED.getNumber())
             .build())
         .build();
     ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);

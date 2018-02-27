@@ -24,6 +24,7 @@ import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.rpc.Code;
 import java.nio.file.Path;
 import java.io.IOException;
 import java.io.InputStream;
@@ -91,14 +92,16 @@ class Executor implements Runnable {
     }
 
     /* execute command */
-    ActionResult.Builder resultBuilder;
+    ActionResult.Builder resultBuilder = ActionResult.newBuilder();
+    Code statusCode;
     try {
-      resultBuilder = executeCommand(
+      statusCode = executeCommand(
           operationContext.execDir,
           command,
           timeout,
           operationContext.metadata.getStdoutStreamName(),
-          operationContext.metadata.getStderrStreamName());
+          operationContext.metadata.getStderrStreamName(),
+          resultBuilder);
     } catch (IOException ex) {
       poller.stop();
       owner.error().put(operationContext);
@@ -112,6 +115,9 @@ class Executor implements Runnable {
       operation = operation.toBuilder()
           .setResponse(Any.pack(ExecuteResponse.newBuilder()
               .setResult(resultBuilder.build())
+              .setStatus(com.google.rpc.Status.newBuilder()
+                  .setCode(statusCode.getNumber())
+                  .build())
               .build()))
           .build();
       owner.output().put(new OperationContext(
@@ -139,12 +145,13 @@ class Executor implements Runnable {
     }
   }
 
-  private ActionResult.Builder executeCommand(
+  private Code executeCommand(
       Path execDir,
       Command command,
       Duration timeout,
       String stdoutStreamName,
-      String stderrStreamName)
+      String stderrStreamName,
+      ActionResult.Builder resultBuilder)
       throws IOException, InterruptedException {
     ProcessBuilder processBuilder =
         new ProcessBuilder(command.getArgumentsList())
@@ -178,9 +185,8 @@ class Executor implements Runnable {
     } catch(IOException ex) {
       ex.printStackTrace();
       // again, should we do something else here??
-      ActionResult.Builder resultBuilder = ActionResult.newBuilder()
-          .setExitCode(exitValue);
-      return resultBuilder;
+      resultBuilder.setExitCode(exitValue);
+      return Code.INVALID_ARGUMENT;
     }
 
     ByteStringSinkReader stdoutReader = new ByteStringSinkReader(
@@ -194,6 +200,7 @@ class Executor implements Runnable {
     stderrReaderThread.start();
 
     boolean doneWaiting = false;
+    Code statusCode = Code.UNKNOWN;
     if (timeout == null) {
       exitValue = process.waitFor();
     } else {
@@ -203,11 +210,13 @@ class Executor implements Runnable {
         if (remainingNanoTime > 0) {
           if (process.waitFor(remainingNanoTime, TimeUnit.NANOSECONDS)) {
             exitValue = process.exitValue();
+            statusCode = Code.OK;
             doneWaiting = true;
           }
         } else {
           process.destroyForcibly();
           process.waitFor(100, TimeUnit.MILLISECONDS); // fair trade, i think
+          statusCode = Code.DEADLINE_EXCEEDED;
           doneWaiting = true;
         }
       }
@@ -220,9 +229,10 @@ class Executor implements Runnable {
       stderrReaderThread.interrupt();
     }
     stderrReaderThread.join();
-    return ActionResult.newBuilder()
+    resultBuilder
         .setExitCode(exitValue)
         .setStdoutRaw(stdoutReader.getData())
         .setStderrRaw(stderrReader.getData());
+    return statusCode;
   }
 }
