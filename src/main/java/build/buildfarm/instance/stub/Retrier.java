@@ -162,23 +162,10 @@ public class Retrier {
   private final Supplier<Backoff> backoffSupplier;
   private final Predicate<Status> isRetriable;
 
-  @VisibleForTesting
+  public
   Retrier(Supplier<Backoff> backoffSupplier, Predicate<Status> isRetriable) {
     this.backoffSupplier = backoffSupplier;
     this.isRetriable = isRetriable;
-  }
-
-  public Retrier(/* RemoteOptions options */) {
-    this(
-     /* options.experimentalRemoteRetry
-            ? Backoff.exponential(
-                Duration.ofMillis(options.experimentalRemoteRetryStartDelayMillis),
-                Duration.ofMillis(options.experimentalRemoteRetryMaxDelayMillis),
-                options.experimentalRemoteRetryMultiplier,
-                options.experimentalRemoteRetryJitter,
-                options.experimentalRemoteRetryMaxAttempts)
-            : */ Backoff.NO_RETRIES,
-        DEFAULT_IS_RETRIABLE);
   }
 
   /**
