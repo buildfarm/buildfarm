@@ -199,26 +199,18 @@ class Executor implements Runnable {
     stdoutReaderThread.start();
     stderrReaderThread.start();
 
-    boolean doneWaiting = false;
-    Code statusCode = Code.UNKNOWN;
+    Code statusCode = Code.OK;
     if (timeout == null) {
       exitValue = process.waitFor();
     } else {
-      while (!doneWaiting) {
-        long timeoutNanos = timeout.getSeconds() * 1000000000L + timeout.getNanos();
-        long remainingNanoTime = timeoutNanos - (System.nanoTime() - startNanoTime);
-        if (remainingNanoTime > 0) {
-          if (process.waitFor(remainingNanoTime, TimeUnit.NANOSECONDS)) {
-            exitValue = process.exitValue();
-            statusCode = Code.OK;
-            doneWaiting = true;
-          }
-        } else {
-          process.destroyForcibly();
-          process.waitFor(100, TimeUnit.MILLISECONDS); // fair trade, i think
-          statusCode = Code.DEADLINE_EXCEEDED;
-          doneWaiting = true;
-        }
+      long timeoutNanos = timeout.getSeconds() * 1000000000L + timeout.getNanos();
+      long remainingNanoTime = timeoutNanos - (System.nanoTime() - startNanoTime);
+      if (process.waitFor(remainingNanoTime, TimeUnit.NANOSECONDS)) {
+        exitValue = process.exitValue();
+      } else {
+        process.destroyForcibly();
+        process.waitFor(100, TimeUnit.MILLISECONDS); // fair trade, i think
+        statusCode = Code.DEADLINE_EXCEEDED;
       }
     }
     if (!stdoutReader.isComplete()) {
