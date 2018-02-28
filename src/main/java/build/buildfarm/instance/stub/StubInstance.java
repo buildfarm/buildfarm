@@ -167,7 +167,7 @@ public class StubInstance implements Instance {
     // sort of a blatant misuse - one chunker per input, query digests before exhausting iterators
     Iterable<Chunker> chunkers = Iterables.transform(
         blobs, blob -> new Chunker(blob, digestUtil));
-    List<Digest> digests = new ImmutableList.Builder()
+    List<Digest> digests = new ImmutableList.Builder<Digest>()
         .addAll(Iterables.transform(chunkers, chunker -> chunker.digest()))
         .build();
     uploader.uploadBlobs(chunkers);

@@ -274,11 +274,11 @@ class CASFileCache {
     return path;
   }
 
-  public Path put(Digest digest, boolean isExecutable) throws InterruptedException {
+  public Path put(Digest digest, boolean isExecutable) throws IOException, InterruptedException {
     return put(digest, isExecutable, null);
   }
 
-  public Path put(Digest digest, boolean isExecutable, Digest containingDirectory) throws InterruptedException {
+  public Path put(Digest digest, boolean isExecutable, Digest containingDirectory) throws IOException, InterruptedException {
     Path key = toFileEntryKey(digest, isExecutable);
     ImmutableList.Builder<Path> expiredKeys = null;
 
@@ -298,40 +298,30 @@ class CASFileCache {
         if (expiredKeys == null) {
           expiredKeys = new ImmutableList.Builder<Path>();
         }
-        try {
-          expiredKeys.add(expireEntry());
-        } catch (IOException ex) {
-        }
+        expiredKeys.add(expireEntry());
       }
     }
 
     if (expiredKeys != null) {
       for (Path expiredKey : expiredKeys.build()) {
-        try {
-          Files.delete(expiredKey);
-        } catch (IOException ex) {
-        }
+        Files.delete(expiredKey);
       }
     }
 
+    Path tmpPath;
+    long copySize;
     try (InputStream in = inputStreamFactory.apply(digest)) {
       // FIXME make a validating file copy object and verify digest
-      Path tmpPath = key.resolveSibling(key.getFileName() + ".tmp");
-      long copySize = Files.copy(in, tmpPath);
-      in.close();
-      if (copySize != digest.getSizeBytes()) {
-        Files.delete(tmpPath);
-        return null;
-      }
-      setPermissions(tmpPath, isExecutable);
-      Files.move(tmpPath, key, REPLACE_EXISTING);
-    } catch (IOException ex) {
-      ex.printStackTrace();
-      return null;
-    } catch (StatusRuntimeException ex) {
-      ex.printStackTrace();
+      tmpPath = key.resolveSibling(key.getFileName() + ".tmp");
+      copySize = Files.copy(in, tmpPath);
+    }
+
+    if (copySize != digest.getSizeBytes()) {
+      Files.delete(tmpPath);
       return null;
     }
+    setPermissions(tmpPath, isExecutable);
+    Files.move(tmpPath, key, REPLACE_EXISTING);
 
     Entry e = new Entry(key, digest.getSizeBytes(), containingDirectory);
 

@@ -21,6 +21,8 @@ import java.io.IOException;
 
 /** An exception to indicate failed retry attempts. */
 public final class RetryException extends IOException {
+  private static final long serialVersionUID = 1;
+
   private final int attempts;
 
   RetryException(Throwable cause, int retryAttempts) {

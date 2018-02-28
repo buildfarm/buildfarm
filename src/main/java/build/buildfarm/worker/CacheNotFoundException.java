@@ -20,6 +20,8 @@ import com.google.devtools.remoteexecution.v1test.Digest;
  * An exception to indicate cache misses.
  */
 public final class CacheNotFoundException extends Exception {
+  private static final long serialVersionUID = 1;
+
   private final Digest missingDigest;
 
   CacheNotFoundException(Digest missingDigest) {
