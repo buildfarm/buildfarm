@@ -17,6 +17,7 @@ package build.buildfarm.worker;
 import com.google.devtools.remoteexecution.v1test.Action;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
 import com.google.longrunning.Operation;
+import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -48,6 +49,14 @@ class MatchStage extends PipelineStage {
       action = Action.parseFrom(worker.instance.getBlob(metadata.getActionDigest()));
     } catch (InvalidProtocolBufferException ex) {
       return false;
+    }
+    if (action.hasTimeout() && worker.config.hasMaximumActionTimeout()) {
+      Duration timeout = action.getTimeout();
+      Duration maximum = worker.config.getMaximumActionTimeout();
+      if (timeout.getSeconds() > maximum.getSeconds() ||
+          (timeout.getSeconds() == maximum.getSeconds() && timeout.getNanos() > maximum.getNanos())) {
+        return false;
+      }
     }
     Path execDir = worker.root.resolve(operation.getName());
     try {

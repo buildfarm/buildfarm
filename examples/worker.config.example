@@ -80,3 +80,16 @@ cas_cache_max_size_bytes: 2147483648 # 2 * 1024 * 1024 * 1024
 
 # the number of concurrently available slots in the execute phase
 execute_stage_width: 1
+
+# an imposed action-key-invariant timeout used in the unspecified timeout case
+default_action_timeout: {
+  seconds: 600
+  nanos: 0
+}
+
+# a limit on the action timeout specified in the action, above which
+# the operation will report a failed result immediately
+maximum_action_timeout: {
+  seconds: 3600
+  nanos: 0
+}

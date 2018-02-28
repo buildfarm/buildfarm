@@ -24,6 +24,7 @@ import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.rpc.Code;
 import java.nio.file.Path;
 import java.io.IOException;
 import java.io.InputStream;
@@ -86,15 +87,21 @@ class Executor implements Runnable {
       timeout = null;
     }
 
+    if (timeout == null && worker.config.hasDefaultActionTimeout()) {
+      timeout = worker.config.getDefaultActionTimeout();
+    }
+
     /* execute command */
-    ActionResult.Builder resultBuilder;
+    ActionResult.Builder resultBuilder = ActionResult.newBuilder();
+    Code statusCode;
     try {
-      resultBuilder = executeCommand(
+      statusCode = executeCommand(
           operationContext.execDir,
           command,
           timeout,
           operationContext.metadata.getStdoutStreamName(),
-          operationContext.metadata.getStderrStreamName());
+          operationContext.metadata.getStderrStreamName(),
+          resultBuilder);
     } catch (IOException ex) {
       poller.stop();
       owner.error().put(operationContext);
@@ -108,6 +115,9 @@ class Executor implements Runnable {
       operation = operation.toBuilder()
           .setResponse(Any.pack(ExecuteResponse.newBuilder()
               .setResult(resultBuilder.build())
+              .setStatus(com.google.rpc.Status.newBuilder()
+                  .setCode(statusCode.getNumber())
+                  .build())
               .build()))
           .build();
       owner.output().put(new OperationContext(
@@ -135,12 +145,13 @@ class Executor implements Runnable {
     }
   }
 
-  private ActionResult.Builder executeCommand(
+  private Code executeCommand(
       Path execDir,
       Command command,
       Duration timeout,
       String stdoutStreamName,
-      String stderrStreamName)
+      String stderrStreamName,
+      ActionResult.Builder resultBuilder)
       throws IOException, InterruptedException {
     ProcessBuilder processBuilder =
         new ProcessBuilder(command.getArgumentsList())
@@ -174,9 +185,8 @@ class Executor implements Runnable {
     } catch(IOException ex) {
       ex.printStackTrace();
       // again, should we do something else here??
-      ActionResult.Builder resultBuilder = ActionResult.newBuilder()
-          .setExitCode(exitValue);
-      return resultBuilder;
+      resultBuilder.setExitCode(exitValue);
+      return Code.INVALID_ARGUMENT;
     }
 
     ByteStringSinkReader stdoutReader = new ByteStringSinkReader(
@@ -189,23 +199,18 @@ class Executor implements Runnable {
     stdoutReaderThread.start();
     stderrReaderThread.start();
 
-    boolean doneWaiting = false;
+    Code statusCode = Code.OK;
     if (timeout == null) {
       exitValue = process.waitFor();
     } else {
-      while (!doneWaiting) {
-        long timeoutNanos = timeout.getSeconds() * 1000000000L + timeout.getNanos();
-        long remainingNanoTime = timeoutNanos - (System.nanoTime() - startNanoTime);
-        if (remainingNanoTime > 0) {
-          if (process.waitFor(remainingNanoTime, TimeUnit.NANOSECONDS)) {
-            exitValue = process.exitValue();
-            doneWaiting = true;
-          }
-        } else {
-          process.destroyForcibly();
-          process.waitFor(100, TimeUnit.MILLISECONDS); // fair trade, i think
-          doneWaiting = true;
-        }
+      long timeoutNanos = timeout.getSeconds() * 1000000000L + timeout.getNanos();
+      long remainingNanoTime = timeoutNanos - (System.nanoTime() - startNanoTime);
+      if (process.waitFor(remainingNanoTime, TimeUnit.NANOSECONDS)) {
+        exitValue = process.exitValue();
+      } else {
+        process.destroyForcibly();
+        process.waitFor(100, TimeUnit.MILLISECONDS); // fair trade, i think
+        statusCode = Code.DEADLINE_EXCEEDED;
       }
     }
     if (!stdoutReader.isComplete()) {
@@ -216,9 +221,10 @@ class Executor implements Runnable {
       stderrReaderThread.interrupt();
     }
     stderrReaderThread.join();
-    return ActionResult.newBuilder()
+    resultBuilder
         .setExitCode(exitValue)
         .setStdoutRaw(stdoutReader.getData())
         .setStderrRaw(stderrReader.getData());
+    return statusCode;
   }
 }

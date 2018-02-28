@@ -35,6 +35,7 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.rpc.Code;
 import io.grpc.Status;
 import java.util.HashSet;
 import java.util.Map;
@@ -301,7 +302,7 @@ public abstract class AbstractServerInstance implements Instance {
     validateActionInputDirectory(root, path, new HashSet<>(), inputDigests);
   }
 
-  private void validateAction(Action action) {
+  protected void validateAction(Action action) {
     Digest commandDigest = action.getCommandDigest();
     ImmutableSet.Builder<Digest> inputDigests = new ImmutableSet.Builder<>();
     inputDigests.add(commandDigest);
@@ -372,6 +373,9 @@ public abstract class AbstractServerInstance implements Instance {
           .setDone(true)
           .setResponse(Any.pack(ExecuteResponse.newBuilder()
               .setResult(actionResult)
+              .setStatus(com.google.rpc.Status.newBuilder()
+                  .setCode(Code.OK.getNumber())
+                  .build())
               .setCachedResult(actionResult != null)
               .build()));
     } else {
@@ -545,38 +549,31 @@ public abstract class AbstractServerInstance implements Instance {
     putOperation(operation.toBuilder()
         .setDone(true)
         .setError(com.google.rpc.Status.newBuilder()
-            .setCode(com.google.rpc.Code.CANCELLED.getNumber())
+            .setCode(Code.CANCELLED.getNumber())
             .build())
         .build());
   }
 
   protected void expireOperation(Operation operation) {
-    Action action = expectAction(operation);
-    ActionKey actionKey = digestUtil.computeActionKey(action);
-    // one last chance to get partial information from worker
-    ActionResult actionResult = action.getDoNotCache()
-        ? null
-        : getActionResult(actionKey);
-    boolean cachedResult = actionResult != null;
-    if (!cachedResult) {
-      actionResult = ActionResult.newBuilder()
-          .setExitCode(-1)
-          .setStderrRaw(ByteString.copyFromUtf8(
-              "[BUILDFARM]: Action timed out with no response from worker"))
-          .build();
-      if (!action.getDoNotCache()) {
-        putActionResult(actionKey, actionResult);
-      }
+    ActionResult actionResult = ActionResult.newBuilder()
+        .setExitCode(-1)
+        .setStderrRaw(ByteString.copyFromUtf8(
+            "[BUILDFARM]: Action timed out with no response from worker"))
+        .build();
+    ExecuteResponse executeResponse = ExecuteResponse.newBuilder()
+        .setResult(actionResult)
+        .setStatus(com.google.rpc.Status.newBuilder()
+            .setCode(Code.DEADLINE_EXCEEDED.getNumber())
+            .build())
+        .build();
+    ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
+    if (metadata == null) {
+      throw new IllegalStateException("Operation " + operation.getName() + " did not contain valid metadata");
     }
-    putOperation(operation.newBuilder()
+    putOperation(operation.toBuilder()
         .setDone(true)
-        .setMetadata(Any.pack(ExecuteOperationMetadata.newBuilder()
-            .setStage(ExecuteOperationMetadata.Stage.COMPLETED)
-            .build()))
-        .setResponse(Any.pack(ExecuteResponse.newBuilder()
-            .setResult(actionResult)
-            .setCachedResult(cachedResult)
-            .build()))
+        .setMetadata(Any.pack(metadata))
+        .setResponse(Any.pack(executeResponse))
         .build());
   }
 
