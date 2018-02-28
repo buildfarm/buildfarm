@@ -84,7 +84,7 @@ class ReportResultStage extends PipelineStage {
   private static int inlineOrDigest(
       ByteString content,
       CASInsertionPolicy policy,
-      ImmutableList.Builder contents,
+      ImmutableList.Builder<ByteString> contents,
       int inlineContentBytes,
       int inlineContentLimit,
       Runnable setInline,
@@ -208,7 +208,7 @@ class ReportResultStage extends PipelineStage {
 
     ActionResult result = resultBuilder.build();
     if (!operationContext.action.getDoNotCache() && resultBuilder.getExitCode() == 0) {
-      worker.instance.putActionResult(getDigestUtil().asActionKey(operationContext.metadata.getActionDigest()), result);
+      worker.instance.putActionResult(DigestUtil.asActionKey(operationContext.metadata.getActionDigest()), result);
     }
 
     ExecuteOperationMetadata metadata = operationContext.metadata.toBuilder()

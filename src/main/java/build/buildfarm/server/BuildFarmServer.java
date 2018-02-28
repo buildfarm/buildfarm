@@ -119,11 +119,11 @@ public class BuildFarmServer {
       throw new IllegalArgumentException("Missing CONFIG_PATH");
     }
     Path configPath = Paths.get(residue.get(0));
+    BuildFarmServer server;
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
-      BuildFarmServer server = new BuildFarmServer(toBuildFarmServerConfig(new InputStreamReader(configInputStream), parser.getOptions(BuildFarmServerOptions.class)));
-      configInputStream.close();
-      server.start();
-      server.blockUntilShutdown();
+      server = new BuildFarmServer(toBuildFarmServerConfig(new InputStreamReader(configInputStream), parser.getOptions(BuildFarmServerOptions.class)));
     }
+    server.start();
+    server.blockUntilShutdown();
   }
 }

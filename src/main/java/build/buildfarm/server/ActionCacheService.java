@@ -14,6 +14,7 @@
 
 package build.buildfarm.server;
 
+import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance;
 import com.google.devtools.remoteexecution.v1test.ActionCacheGrpc;
 import com.google.devtools.remoteexecution.v1test.ActionResult;
@@ -43,7 +44,7 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
     }
 
     ActionResult actionResult = instance.getActionResult(
-        instance.getDigestUtil().asActionKey(request.getActionDigest()));
+        DigestUtil.asActionKey(request.getActionDigest()));
     if (actionResult == null) {
       responseObserver.onError(new StatusException(Status.NOT_FOUND));
       return;
@@ -67,7 +68,7 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
 
     ActionResult actionResult = request.getActionResult();
     instance.putActionResult(
-        instance.getDigestUtil().asActionKey(request.getActionDigest()),
+        DigestUtil.asActionKey(request.getActionDigest()),
         actionResult);
 
     responseObserver.onNext(actionResult);

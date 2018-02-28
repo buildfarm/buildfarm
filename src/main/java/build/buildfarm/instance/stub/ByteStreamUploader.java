@@ -16,6 +16,7 @@ package build.buildfarm.instance.stub;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Throwables.throwIfUnchecked;
 import static java.lang.String.format;
 import static java.util.Collections.singletonList;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
@@ -26,7 +27,6 @@ import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
-import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListenableScheduledFuture;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
@@ -160,11 +160,9 @@ public final class ByteStreamUploader {
       if (cause instanceof RetryException) {
         throw (RetryException) cause;
       } else {
-        throw Throwables.propagate(cause);
+        throwIfUnchecked(cause);
+        throw new RuntimeException(cause);
       }
-    } catch (InterruptedException e) {
-      Thread.interrupted();
-      throw e;
     }
   }
 

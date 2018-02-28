@@ -47,6 +47,8 @@ import java.util.concurrent.TimeUnit;
 public class Retrier {
   /** Wraps around a StatusRuntimeException to make it pass through a single layer of retries. */
   public static class PassThroughException extends Exception {
+    private static final long serialVersionUID = 1;
+
     public PassThroughException(StatusRuntimeException e) {
       super(e);
     }
