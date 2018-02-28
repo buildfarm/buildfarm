@@ -47,11 +47,11 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
+import java.util.function.Predicate;
 
 public class MemoryInstance extends AbstractServerInstance {
   private final MemoryInstanceConfig config;
-  private final Map<String, List<Function<Operation, Boolean>>> watchers;
+  private final Map<String, List<Predicate<Operation>>> watchers;
   private final Map<String, ByteStringStreamSource> streams;
   private final List<Operation> queuedOperations;
   private final List<Worker> workers;
@@ -61,9 +61,9 @@ public class MemoryInstance extends AbstractServerInstance {
 
   private static final class Worker {
     private final Platform platform;
-    private final Function<Operation, Boolean> onMatch;
+    private final Predicate<Operation> onMatch;
 
-    Worker(Platform platform, Function<Operation, Boolean> onMatch) {
+    Worker(Platform platform, Predicate<Operation> onMatch) {
       this.platform = platform;
       this.onMatch = onMatch;
     }
@@ -72,8 +72,8 @@ public class MemoryInstance extends AbstractServerInstance {
       return platform;
     }
 
-    boolean apply(Operation operation) {
-      return onMatch.apply(operation);
+    boolean test(Operation operation) {
+      return onMatch.test(operation);
     }
   }
 
@@ -100,7 +100,7 @@ public class MemoryInstance extends AbstractServerInstance {
         outstandingOperations,
         /*completedOperations=*/ new DelegateCASMap<String, Operation>(contentAddressableStorage, Operation.parser(), digestUtil));
     this.config = config;
-    watchers = new ConcurrentHashMap<String, List<Function<Operation, Boolean>>>();
+    watchers = new ConcurrentHashMap<String, List<Predicate<Operation>>>();
     streams = new HashMap<String, ByteStringStreamSource>();
     queuedOperations = new ArrayList<Operation>();
     workers = new ArrayList<Worker>();
@@ -159,7 +159,7 @@ public class MemoryInstance extends AbstractServerInstance {
   @Override
   protected void updateOperationWatchers(Operation operation) {
     synchronized(watchers) {
-      List<Function<Operation, Boolean>> operationWatchers =
+      List<Predicate<Operation>> operationWatchers =
           watchers.get(operation.getName());
       if (operationWatchers != null) {
         if (operation.getDone()) {
@@ -167,10 +167,10 @@ public class MemoryInstance extends AbstractServerInstance {
         }
         long unfilteredWatcherCount = operationWatchers.size();
         super.updateOperationWatchers(operation);
-        ImmutableList.Builder<Function<Operation, Boolean>> filteredWatchers = new ImmutableList.Builder<>();
+        ImmutableList.Builder<Predicate<Operation>> filteredWatchers = new ImmutableList.Builder<>();
         long filteredWatcherCount = 0;
-        for (Function<Operation, Boolean> watcher : operationWatchers) {
-          if (watcher.apply(operation)) {
+        for (Predicate<Operation> watcher : operationWatchers) {
+          if (watcher.test(operation)) {
             filteredWatchers.add(watcher);
             filteredWatcherCount++;
           }
@@ -190,7 +190,7 @@ public class MemoryInstance extends AbstractServerInstance {
   protected Operation createOperation(ActionKey actionKey) {
     String name = createOperationName(UUID.randomUUID().toString());
 
-    watchers.put(name, new ArrayList<Function<Operation, Boolean>>());
+    watchers.put(name, new ArrayList<Predicate<Operation>>());
 
     ExecuteOperationMetadata metadata = ExecuteOperationMetadata.newBuilder()
         .setActionDigest(actionKey.getDigest())
@@ -297,7 +297,7 @@ public class MemoryInstance extends AbstractServerInstance {
           rejectedWorkers.add(worker);
         } else {
           // worker onMatch false return indicates inviability
-          if (dispatched = worker.apply(operation)) {
+          if (dispatched = worker.test(operation)) {
             onDispatched(operation);
           }
         }
@@ -308,7 +308,7 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  public void match(Platform platform, boolean requeueOnFailure, Function<Operation, Boolean> onMatch) {
+  public void match(Platform platform, boolean requeueOnFailure, Predicate<Operation> onMatch) {
     synchronized(queuedOperations) {
       ImmutableList.Builder<Operation> rejectedOperations = new ImmutableList.Builder<Operation>();
       boolean matched = false;
@@ -316,7 +316,7 @@ public class MemoryInstance extends AbstractServerInstance {
         Operation operation = queuedOperations.remove(0);
         if (satisfiesRequirements(platform, operation)) {
           matched = true;
-          if (onMatch.apply(operation)) {
+          if (onMatch.test(operation)) {
             onDispatched(operation);
           } else if (!requeueOnFailure) {
             rejectedOperations.add(operation);
@@ -357,10 +357,10 @@ public class MemoryInstance extends AbstractServerInstance {
   public boolean watchOperation(
       String operationName,
       boolean watchInitialState,
-      Function<Operation, Boolean> watcher) {
+      Predicate<Operation> watcher) {
     if (watchInitialState) {
       Operation operation = getOperation(operationName);
-      if (!watcher.apply(operation)) {
+      if (!watcher.test(operation)) {
         return false;
       }
       if (operation.getDone()) {
@@ -369,7 +369,7 @@ public class MemoryInstance extends AbstractServerInstance {
     }
     Operation completedOperation = null;
     synchronized(watchers) {
-      List<Function<Operation, Boolean>> operationWatchers = watchers.get(operationName);
+      List<Predicate<Operation>> operationWatchers = watchers.get(operationName);
       if (operationWatchers == null) {
         /* we can race on the synchronization and miss a done, where the
          * watchers list has been removed, making it necessary to check for the
@@ -384,7 +384,7 @@ public class MemoryInstance extends AbstractServerInstance {
       operationWatchers.add(watcher);
     }
     if (completedOperation != null) {
-      return watcher.apply(completedOperation);
+      return watcher.test(completedOperation);
     }
     return true;
   }

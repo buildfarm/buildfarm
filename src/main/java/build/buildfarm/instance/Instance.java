@@ -29,7 +29,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.function.Consumer;
-import java.util.function.Function;
+import java.util.function.Predicate;
 
 public interface Instance {
   String getName();
@@ -63,7 +63,7 @@ public interface Instance {
       int totalInputFileCount,
       long totalInputFileBytes,
       Consumer<Operation> onOperation);
-  void match(Platform platform, boolean requeueOnFailure, Function<Operation, Boolean> onMatch);
+  void match(Platform platform, boolean requeueOnFailure, Predicate<Operation> onMatch);
   boolean putOperation(Operation operation);
   boolean pollOperation(String operationName, Stage stage);
   // returns nextPageToken suitable for list restart
@@ -79,5 +79,5 @@ public interface Instance {
   boolean watchOperation(
       String operationName,
       boolean watchInitialState,
-      Function<Operation, Boolean> watcher);
+      Predicate<Operation> watcher);
 }
