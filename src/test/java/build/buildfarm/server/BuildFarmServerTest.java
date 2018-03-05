@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm;
+package build.buildfarm.server;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.fail;
 
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.stub.Chunker;
@@ -31,10 +32,10 @@ import build.buildfarm.v1test.PollOperationRequest;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.devtools.remoteexecution.v1test.Action;
+import com.google.devtools.remoteexecution.v1test.ActionCacheGrpc;
 import com.google.devtools.remoteexecution.v1test.BatchUpdateBlobsRequest;
 import com.google.devtools.remoteexecution.v1test.BatchUpdateBlobsResponse;
 import com.google.devtools.remoteexecution.v1test.Command;
-import com.google.devtools.remoteexecution.v1test.ContentAddressableStorageGrpc;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.devtools.remoteexecution.v1test.Directory;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
@@ -42,6 +43,7 @@ import com.google.devtools.remoteexecution.v1test.ExecuteRequest;
 import com.google.devtools.remoteexecution.v1test.ExecutionGrpc;
 import com.google.devtools.remoteexecution.v1test.FindMissingBlobsRequest;
 import com.google.devtools.remoteexecution.v1test.FindMissingBlobsResponse;
+import com.google.devtools.remoteexecution.v1test.GetActionResultRequest;
 import com.google.devtools.remoteexecution.v1test.UpdateBlobRequest;
 import com.google.devtools.remoteexecution.v1test.ContentAddressableStorageGrpc;
 import com.google.longrunning.CancelOperationRequest;
@@ -119,10 +121,10 @@ public class BuildFarmServerTest {
 
   @Test
   public void findMissingBlobs() {
-    DigestUtil sha1DigestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
+    DigestUtil digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
     ByteString content = ByteString.copyFromUtf8("Hello, World!");
     Iterable<Digest> digests =
-        Collections.singleton(sha1DigestUtil.compute(content));
+        Collections.singleton(digestUtil.compute(content));
     FindMissingBlobsRequest request = FindMissingBlobsRequest.newBuilder()
         .setInstanceName("memory")
         .addAllBlobDigests(digests)
@@ -156,7 +158,7 @@ public class BuildFarmServerTest {
     BatchUpdateBlobsResponse.Response expected = BatchUpdateBlobsResponse.Response.newBuilder()
         .setBlobDigest(digest)
         .setStatus(com.google.rpc.Status.newBuilder()
-            .setCode(com.google.rpc.Code.OK.getNumber())
+            .setCode(Code.OK.getNumber())
             .build())
         .build();
     assertThat(response.getResponsesList())
@@ -331,5 +333,24 @@ public class BuildFarmServerTest {
         ExecutionGrpc.newBlockingStub(inProcessChannel);
 
     return executeStub.execute(executeRequest);
+  }
+
+  @Test
+  public void actionNotCached() {
+    DigestUtil digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
+    GetActionResultRequest request = GetActionResultRequest.newBuilder()
+        .setInstanceName("memory")
+        .setActionDigest(digestUtil.empty())
+        .build();
+
+    ActionCacheGrpc.ActionCacheBlockingStub actionCacheStub =
+        ActionCacheGrpc.newBlockingStub(inProcessChannel);
+
+    try {
+      actionCacheStub.getActionResult(request);
+      fail("expected exception");
+    } catch (StatusRuntimeException e) {
+      assertThat(e.getStatus().getCode()).isEqualTo(io.grpc.Status.Code.NOT_FOUND);
+    }
   }
 }
