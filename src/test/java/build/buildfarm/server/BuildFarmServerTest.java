@@ -15,6 +15,7 @@
 package build.buildfarm.server;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.fail;
 
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.stub.Chunker;
@@ -345,13 +346,11 @@ public class BuildFarmServerTest {
     ActionCacheGrpc.ActionCacheBlockingStub actionCacheStub =
         ActionCacheGrpc.newBlockingStub(inProcessChannel);
 
-    StatusRuntimeException notFound = null;
     try {
       actionCacheStub.getActionResult(request);
+      fail("expected exception");
     } catch (StatusRuntimeException e) {
-      notFound = e;
+      assertThat(e.getStatus().getCode()).isEqualTo(io.grpc.Status.Code.NOT_FOUND);
     }
-    assertThat(notFound).isNotNull();
-    assertThat(notFound.getStatus().getCode()).isEqualTo(io.grpc.Status.Code.NOT_FOUND);
   }
 }

@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
@@ -131,37 +130,33 @@ public class ByteStringIteratorInputStreamTest {
     assertThat(in.available()).isEqualTo(0);
   }
 
-  @Rule
-  public final ExpectedException exception = ExpectedException.none();
-
-  @Test
+  @Test(expected = IOException.class)
   public void closedStreamAvailableThrowsIOException() throws IOException {
     InputStream in = new ByteStringIteratorInputStream(
         ImmutableList.<ByteString>of(
             ByteString.copyFromUtf8("Hello, World")).iterator());
     in.close();
-    exception.expect(IOException.class);
+
     in.available();
-    assertThat(true).isFalse();
   }
 
-  @Test
+  @Test(expected = IOException.class)
   public void closedStreamReadDefaultThrowsIOException() throws IOException {
     InputStream in = new ByteStringIteratorInputStream(
         ImmutableList.<ByteString>of(
             ByteString.copyFromUtf8("Hello, World")).iterator());
     in.close();
-    exception.expect(IOException.class);
+
     in.read();
   }
 
-  @Test
+  @Test(expected = IOException.class)
   public void closedStreamReadThrowsIOException() throws IOException {
     InputStream in = new ByteStringIteratorInputStream(
         ImmutableList.<ByteString>of(
             ByteString.copyFromUtf8("Hello, World")).iterator());
     in.close();
-    exception.expect(IOException.class);
+
     byte[] buffer = new byte[5];
     in.read(buffer, 0, 5);
   }
