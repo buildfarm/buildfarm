@@ -91,4 +91,25 @@ public class ByteStringStreamSourceTest {
       Thread.sleep(10);
     }
   }
+
+  @Test
+  public void readBlocksForInput() throws IOException, InterruptedException {
+    ByteStringStreamSource source = new ByteStringStreamSource(() -> {});
+    InputStream inputStream = source.openStream();
+    Thread thread = new Thread(() -> {
+      try {
+        assertThat(inputStream.read()).isEqualTo('a');
+      } catch (IOException e) {
+        fail("Unexpected IOException: " + e);
+      }
+    });
+    thread.start();
+    while (!thread.isAlive()) {
+      Thread.sleep(10);
+    }
+    source.getOutputStream().write('a');
+    while (thread.isAlive()) {
+      Thread.sleep(10);
+    }
+  }
 }
