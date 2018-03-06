@@ -15,6 +15,7 @@
 package build.buildfarm.instance.memory;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.fail;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -84,7 +85,7 @@ public class ByteStringStreamSourceTest {
       try {
         assertThat(inputStream.skip(1)).isEqualTo(1);
       } catch (IOException e) {
-        assertThat(false).isTrue();
+        fail("Unexpected IOException: " + e);
       }
     });
     thread.start();
