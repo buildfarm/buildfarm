@@ -18,6 +18,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import org.junit.Test;
@@ -29,12 +30,12 @@ import java.io.InputStream;
 @RunWith(JUnit4.class)
 public class ByteStringStreamSourceTest {
   @Test
-  public void closeCallsOnClose() throws IOException {
+  public void closeCallsOnCloseOnce() throws IOException {
     Runnable mockOnClose = mock(Runnable.class);
     ByteStringStreamSource source = new ByteStringStreamSource(mockOnClose);
     verify(mockOnClose, never()).run();
     source.getOutputStream().close();
-    verify(mockOnClose).run();
+    verify(mockOnClose, times(1)).run();
   }
 
   @Test

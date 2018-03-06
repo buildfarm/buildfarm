@@ -41,7 +41,7 @@ public class MemoryLRUContentAddressableStorageTest {
     storage.put(new Blob(ByteString.copyFromUtf8("stdout"), sha1DigestUtil), mockOnExpiration);
     verify(mockOnExpiration, never()).run();
     storage.put(new Blob(ByteString.copyFromUtf8("stderr"), sha1DigestUtil));
-    verify(mockOnExpiration).run();
+    verify(mockOnExpiration, times(1)).run();
   }
 
   @Test
@@ -54,7 +54,7 @@ public class MemoryLRUContentAddressableStorageTest {
     storage.put(new Blob(ByteString.copyFromUtf8("stdout"), sha1DigestUtil), mockOnExpiration);
     verify(mockOnExpiration, never()).run();
     storage.put(new Blob(ByteString.copyFromUtf8("a"), sha1DigestUtil));
-    verify(mockOnExpiration).run();
+    verify(mockOnExpiration, times(1)).run();
   }
 
   @Test
