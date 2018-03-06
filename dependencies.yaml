@@ -44,3 +44,8 @@ dependencies:
     truth:
       lang: java
       version: "0.36"
+
+  org.mockito:
+    mockito-core:
+      lang: java
+      version: "2.15.0"
