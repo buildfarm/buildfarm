@@ -16,6 +16,9 @@ package build.buildfarm.instance.memory;
 
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.fail;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -25,22 +28,13 @@ import java.io.InputStream;
 
 @RunWith(JUnit4.class)
 public class ByteStringStreamSourceTest {
-  private class CountingRunnable implements Runnable {
-    int runCount = 0;
-
-    @Override
-    public void run() {
-      runCount++;
-    }
-  };
-
   @Test
   public void closeCallsOnClose() throws IOException {
-    CountingRunnable counter = new CountingRunnable();
-    ByteStringStreamSource source = new ByteStringStreamSource(counter);
-    assertThat(counter.runCount).isEqualTo(0);
+    Runnable mockOnClose = mock(Runnable.class);
+    ByteStringStreamSource source = new ByteStringStreamSource(mockOnClose);
+    verify(mockOnClose, never()).run();
     source.getOutputStream().close();
-    assertThat(counter.runCount).isEqualTo(1);
+    verify(mockOnClose).run();
   }
 
   @Test

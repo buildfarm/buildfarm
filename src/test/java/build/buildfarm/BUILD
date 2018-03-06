@@ -89,6 +89,7 @@ java_test(
         ":test_runner",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "//3rdparty/jvm/com/google/truth",
+        "//3rdparty/jvm/org/mockito:mockito_core",
         "//src/main/java/build/buildfarm:common",
         "//src/main/java/build/buildfarm:memory-instance",
         "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",

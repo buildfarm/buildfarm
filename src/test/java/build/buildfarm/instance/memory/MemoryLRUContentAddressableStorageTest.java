@@ -15,6 +15,10 @@
 package build.buildfarm.instance.memory;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import build.buildfarm.instance.memory.MemoryLRUContentAddressableStorage;
 import build.buildfarm.common.ContentAddressableStorage;
@@ -28,25 +32,29 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class MemoryLRUContentAddressableStorageTest {
-  private class CountingRunnable implements Runnable {
-    int runCount = 0;
-
-    @Override
-    public void run() {
-      runCount++;
-    }
-  };
-
   @Test
   public void expireShouldCallOnExpiration() {
     ContentAddressableStorage storage = new MemoryLRUContentAddressableStorage(10);
 
     DigestUtil sha1DigestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
-    CountingRunnable onExpiration = new CountingRunnable();
-    storage.put(new Blob(ByteString.copyFromUtf8("stdout"), sha1DigestUtil), onExpiration);
-    assertThat(onExpiration.runCount).isEqualTo(0);
+    Runnable mockOnExpiration = mock(Runnable.class);
+    storage.put(new Blob(ByteString.copyFromUtf8("stdout"), sha1DigestUtil), mockOnExpiration);
+    verify(mockOnExpiration, never()).run();
     storage.put(new Blob(ByteString.copyFromUtf8("stderr"), sha1DigestUtil));
-    assertThat(onExpiration.runCount).isEqualTo(1);
+    verify(mockOnExpiration).run();
+  }
+
+  @Test
+  public void expireShouldOccurAtLimitExactly() {
+    ContentAddressableStorage storage = new MemoryLRUContentAddressableStorage(11);
+
+    DigestUtil sha1DigestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
+    Runnable mockOnExpiration = mock(Runnable.class);
+    storage.put(new Blob(ByteString.copyFromUtf8("stdin"), sha1DigestUtil), mockOnExpiration);
+    storage.put(new Blob(ByteString.copyFromUtf8("stdout"), sha1DigestUtil), mockOnExpiration);
+    verify(mockOnExpiration, never()).run();
+    storage.put(new Blob(ByteString.copyFromUtf8("a"), sha1DigestUtil));
+    verify(mockOnExpiration).run();
   }
 
   @Test
@@ -54,11 +62,11 @@ public class MemoryLRUContentAddressableStorageTest {
     ContentAddressableStorage storage = new MemoryLRUContentAddressableStorage(10);
 
     DigestUtil sha1DigestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
-    CountingRunnable onExpiration = new CountingRunnable();
-    storage.put(new Blob(ByteString.copyFromUtf8("stdout"), sha1DigestUtil), onExpiration);
-    storage.put(new Blob(ByteString.copyFromUtf8("stdout"), sha1DigestUtil), onExpiration);
-    assertThat(onExpiration.runCount).isEqualTo(0);
+    Runnable mockOnExpiration = mock(Runnable.class);
+    storage.put(new Blob(ByteString.copyFromUtf8("stdout"), sha1DigestUtil), mockOnExpiration);
+    storage.put(new Blob(ByteString.copyFromUtf8("stdout"), sha1DigestUtil), mockOnExpiration);
+    verify(mockOnExpiration, never()).run();
     storage.put(new Blob(ByteString.copyFromUtf8("stderr"), sha1DigestUtil));
-    assertThat(onExpiration.runCount).isEqualTo(2);
+    verify(mockOnExpiration, times(2)).run();
   }
 }
