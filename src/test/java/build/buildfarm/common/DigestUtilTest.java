@@ -75,9 +75,8 @@ public class DigestUtilTest {
         .isEqualTo("aa0e09c406dd0db1a3bb250216045e81644d26c961c0e8c34e8a0354476ca6d4");
   }
 
-  @Test
+  @Test(expected = IllegalArgumentException.class)
   public void unrecognizedHashFunctionThrows() {
-    exception.expect(IllegalArgumentException.class);
     HashFunction.get(InstanceConfig.HashFunction.UNRECOGNIZED);
   }
 
