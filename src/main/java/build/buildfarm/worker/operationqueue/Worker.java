@@ -31,9 +31,16 @@ import build.buildfarm.worker.Poller;
 import build.buildfarm.worker.ReportResultStage;
 import build.buildfarm.worker.WorkerContext;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Iterables;
 import com.google.devtools.common.options.OptionsParser;
+import com.google.devtools.remoteexecution.v1test.Action;
 import com.google.devtools.remoteexecution.v1test.Digest;
+import com.google.devtools.remoteexecution.v1test.Directory;
+import com.google.devtools.remoteexecution.v1test.DirectoryNode;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
+import com.google.devtools.remoteexecution.v1test.FileNode;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -42,6 +49,7 @@ import com.google.protobuf.TextFormat;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -50,16 +58,24 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.Stack;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
 
 public class Worker {
   public static final Logger logger = Logger.getLogger(Worker.class.getName());
-  public final Instance instance;
-  public final WorkerConfig config;
-  public final Path root;
-  public final CASFileCache fileCache;
+  private final Instance instance;
+  private final WorkerConfig config;
+  private final Path root;
+  private final CASFileCache fileCache;
+  private final Map<Path, Iterable<Path>> rootInputFiles = new ConcurrentHashMap<>();
+  private final Map<Path, Iterable<Digest>> rootInputDirectories = new ConcurrentHashMap<>();
 
   private static ManagedChannel createChannel(String target) {
     NettyChannelBuilder builder =
@@ -116,6 +132,134 @@ public class Worker {
         root.resolve(casCacheDirectory),
         config.getCasCacheMaxSizeBytes(),
         instance.getDigestUtil());
+  }
+
+  class OutputDirectory {
+    public final Map<String, OutputDirectory> directories;
+
+    OutputDirectory() {
+      directories = new HashMap<>();
+    }
+
+    void stamp(Path root) throws IOException {
+      if (directories.isEmpty()) {
+        Files.createDirectories(root);
+      } else {
+        for (Map.Entry<String, OutputDirectory> entry : directories.entrySet()) {
+          entry.getValue().stamp(root.resolve(entry.getKey()));
+        }
+      }
+    }
+  }
+
+  private void fetchInputs(
+      Path execDir,
+      Digest inputRoot,
+      OutputDirectory outputDirectory,
+      ImmutableList.Builder<Path> inputFiles,
+      ImmutableList.Builder<Digest> inputDirectories) throws IOException, InterruptedException {
+    ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
+    String pageToken = "";
+
+    do {
+      pageToken = instance.getTree(inputRoot, config.getTreePageSize(), pageToken, directories);
+    } while (!pageToken.isEmpty());
+
+    Set<Digest> directoryDigests = new HashSet<>();
+    ImmutableMap.Builder<Digest, Directory> directoriesIndex = new ImmutableMap.Builder<>();
+    for (Directory directory : directories.build()) {
+      Digest directoryDigest = instance.getDigestUtil().compute(directory);
+      if (!directoryDigests.add(directoryDigest)) {
+        continue;
+      }
+      directoriesIndex.put(directoryDigest, directory);
+    }
+
+    linkInputs(execDir, inputRoot, directoriesIndex.build(), outputDirectory, inputFiles, inputDirectories);
+  }
+
+  private void linkInputs(
+      Path execDir,
+      Digest inputRoot,
+      Map<Digest, Directory> directoriesIndex,
+      OutputDirectory outputDirectory,
+      ImmutableList.Builder<Path> inputFiles,
+      ImmutableList.Builder<Digest> inputDirectories)
+      throws IOException, InterruptedException {
+    Directory directory = directoriesIndex.get(inputRoot);
+    if (directory == null) {
+      throw new IOException("Directory " + DigestUtil.toString(inputRoot) + " is not in input index");
+    }
+
+    for (FileNode fileNode : directory.getFilesList()) {
+      Path execPath = execDir.resolve(fileNode.getName());
+      Path fileCacheKey = fileCache.put(fileNode.getDigest(), fileNode.getIsExecutable(), /* containingDirectory=*/ null);
+      if (fileCacheKey == null) {
+        throw new IOException("InputFetchStage: Failed to create cache entry for " + execPath);
+      }
+      inputFiles.add(fileCacheKey);
+      Files.createLink(execPath, fileCacheKey);
+    }
+
+    for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
+      Digest digest = directoryNode.getDigest();
+      String name = directoryNode.getName();
+      OutputDirectory childOutputDirectory = outputDirectory != null
+          ? outputDirectory.directories.get(name) : null;
+      Path dirPath = execDir.resolve(name);
+      if (childOutputDirectory != null || !config.getLinkInputDirectories()) {
+        Files.createDirectories(dirPath);
+        linkInputs(dirPath, digest, directoriesIndex, childOutputDirectory, inputFiles, inputDirectories);
+      } else {
+        inputDirectories.add(digest);
+        linkDirectory(dirPath, digest, directoriesIndex);
+      }
+    }
+  }
+
+  private void linkDirectory(
+      Path execPath,
+      Digest digest,
+      Map<Digest, Directory> directoriesIndex) throws IOException, InterruptedException {
+    Path cachePath = fileCache.putDirectory(digest, directoriesIndex);
+    Files.createSymbolicLink(execPath, cachePath);
+  }
+
+  private OutputDirectory parseOutputDirectories(Iterable<String> outputFiles, Iterable<String> outputDirs) {
+    OutputDirectory outputDirectory = new OutputDirectory();
+    Stack<OutputDirectory> stack = new Stack<>();
+
+    OutputDirectory currentOutputDirectory = outputDirectory;
+    String prefix = "";
+    for (String outputFile : outputFiles) {
+      while (!outputFile.startsWith(prefix)) {
+        currentOutputDirectory = stack.pop();
+        int upPathSeparatorIndex = prefix.lastIndexOf(File.separator, prefix.length() - 2);
+        prefix = prefix.substring(0, upPathSeparatorIndex + 1);
+      }
+      String prefixedFile = outputFile.substring(prefix.length());
+      int separatorIndex = prefixedFile.indexOf(File.separator);
+      while (separatorIndex >= 0) {
+        if (separatorIndex == 0) {
+          throw new IllegalArgumentException("double separator in output file");
+        }
+
+        String directoryName = prefixedFile.substring(0, separatorIndex);
+        prefix += directoryName + File.separator;
+        prefixedFile = prefixedFile.substring(separatorIndex + 1);
+        stack.push(currentOutputDirectory);
+        OutputDirectory nextOutputDirectory = new OutputDirectory();
+        currentOutputDirectory.directories.put(directoryName, nextOutputDirectory);
+        currentOutputDirectory = nextOutputDirectory;
+        separatorIndex = prefixedFile.indexOf(File.separator);
+      }
+    }
+
+    if (!Iterables.isEmpty(outputDirs)) {
+      throw new IllegalArgumentException("outputDir specified: " + outputDirs);
+    }
+
+    return outputDirectory;
   }
 
   public void start() throws InterruptedException {
@@ -232,8 +376,39 @@ public class Worker {
       }
 
       @Override
-      public CASFileCache getCASFileCache() {
-        return fileCache;
+      public void createActionRoot(Path root, Action action) throws IOException, InterruptedException {
+        OutputDirectory outputDirectory = parseOutputDirectories(
+            action.getOutputFilesList(),
+            action.getOutputDirectoriesList());
+
+        if (Files.exists(root)) {
+          CASFileCache.removeDirectory(root);
+        }
+        Files.createDirectories(root);
+
+        ImmutableList.Builder<Path> inputFiles = new ImmutableList.Builder<>();
+        ImmutableList.Builder<Digest> inputDirectories = new ImmutableList.Builder<>();
+
+        fetchInputs(
+            root,
+            action.getInputRootDigest(),
+            outputDirectory,
+            inputFiles,
+            inputDirectories);
+
+        outputDirectory.stamp(root);
+
+        rootInputFiles.put(root, inputFiles.build());
+        rootInputDirectories.put(root, inputDirectories.build());
+      }
+
+      @Override
+      public void destroyActionRoot(Path root) throws IOException {
+        Iterable<Path> inputFiles = rootInputFiles.remove(root);
+        Iterable<Digest> inputDirectories = rootInputDirectories.remove(root);
+
+        fileCache.decrementReferences(inputFiles, inputDirectories);
+        CASFileCache.removeDirectory(root);
       }
 
       @Override

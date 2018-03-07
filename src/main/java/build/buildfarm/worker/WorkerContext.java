@@ -17,7 +17,7 @@ package build.buildfarm.worker;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.CASInsertionPolicy;
-import build.buildfarm.worker.CASFileCache;
+import com.google.devtools.remoteexecution.v1test.Action;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
 import com.google.longrunning.Operation;
@@ -47,7 +47,8 @@ public interface WorkerContext {
   Duration getMaximumActionTimeout();
   Instance getInstance();
   ByteString getBlob(Digest digest);
-  CASFileCache getCASFileCache();
+  void createActionRoot(Path root, Action action) throws IOException, InterruptedException;
+  void destroyActionRoot(Path root) throws IOException;
   Path getRoot();
   void removeDirectory(Path path) throws IOException;
 }

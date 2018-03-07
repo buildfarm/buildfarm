@@ -64,9 +64,7 @@ public class MatchStage extends PipelineStage {
           operation,
           execDir,
           metadata,
-          action,
-          new ArrayList<>(),
-          new ArrayList<>()));
+          action));
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       return false;
