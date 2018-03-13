@@ -37,6 +37,7 @@ java_test(
         "//3rdparty/jvm/com/google/jimfs",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "//3rdparty/jvm/com/google/truth",
+        "//3rdparty/jvm/org/mockito:mockito_core",
         "//src/main/java/build/buildfarm:common",
         "//src/main/java/build/buildfarm:instance",
         "//src/main/java/build/buildfarm:worker",

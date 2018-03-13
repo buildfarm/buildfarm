@@ -17,21 +17,32 @@ package build.buildfarm.worker;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.CASInsertionPolicy;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
 import com.google.devtools.remoteexecution.v1test.Action;
 import com.google.devtools.remoteexecution.v1test.ActionResult;
 import com.google.devtools.remoteexecution.v1test.Digest;
+import com.google.devtools.remoteexecution.v1test.Directory;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
 import com.google.devtools.remoteexecution.v1test.ExecuteResponse;
+import com.google.devtools.remoteexecution.v1test.FileNode;
+import com.google.devtools.remoteexecution.v1test.OutputDirectory;
 import com.google.devtools.remoteexecution.v1test.OutputFile;
+import com.google.devtools.remoteexecution.v1test.Tree;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.List;
+import java.util.Stack;
 import java.util.function.Consumer;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -137,29 +148,17 @@ public class ReportResultStage extends PipelineStage {
     return inlineContentBytes;
   }
 
-  @Override
-  protected OperationContext tick(OperationContext operationContext) throws InterruptedException {
-    final String operationName = operationContext.operation.getName();
-    Poller poller = workerContext.createPoller(
-        "ReportResultStage",
-        operationContext.operation.getName(),
-        ExecuteOperationMetadata.Stage.EXECUTING,
-        () -> {});
-
-    ActionResult.Builder resultBuilder;
-    try {
-      resultBuilder = operationContext
-          .operation.getResponse().unpack(ExecuteResponse.class).getResult().toBuilder();
-    } catch (InvalidProtocolBufferException ex) {
-      poller.stop();
-      return null;
-    }
-
+  @VisibleForTesting
+  public void uploadOutputs(
+      ActionResult.Builder resultBuilder,
+      Path root,
+      Iterable<String> outputFiles,
+      Iterable<String> outputDirs)
+      throws IOException, InterruptedException {
     int inlineContentBytes = 0;
     ImmutableList.Builder<ByteString> contents = new ImmutableList.Builder<>();
-    CASInsertionPolicy policy = workerContext.getFileCasPolicy();
-    for (String outputFile : operationContext.action.getOutputFilesList()) {
-      Path outputPath = operationContext.execDir.resolve(outputFile);
+    for (String outputFile : outputFiles) {
+      Path outputPath = root.resolve(outputFile);
       if (!Files.exists(outputPath)) {
         continue;
       }
@@ -186,7 +185,7 @@ public class ReportResultStage extends PipelineStage {
           .setIsExecutable(Files.isExecutable(outputPath));
       inlineContentBytes = inlineOrDigest(
           content,
-          policy,
+          workerContext.getFileCasPolicy(),
           contents,
           inlineContentBytes,
           workerContext.getInlineContentLimit(),
@@ -194,11 +193,104 @@ public class ReportResultStage extends PipelineStage {
           (fileContent) -> outputFileBuilder.setDigest(getDigestUtil().compute(fileContent)));
     }
 
+    for (String outputDir : outputDirs) {
+      Path outputDirPath = root.resolve(outputDir);
+      if (!Files.exists(outputDirPath)) {
+        continue;
+      }
+
+      Tree.Builder treeBuilder = Tree.newBuilder();
+      Directory.Builder outputRoot = treeBuilder.getRootBuilder();
+      Files.walkFileTree(outputDirPath, new SimpleFileVisitor<Path>() {
+        Directory.Builder currentDirectory = null;
+        Stack<Directory.Builder> path = new Stack<>();
+
+        @Override
+        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+          ByteString content;
+          try (InputStream inputStream = Files.newInputStream(file)) {
+            content = ByteString.readFrom(inputStream);
+          } catch (IOException e) {
+            e.printStackTrace();
+            return FileVisitResult.CONTINUE;
+          }
+
+          // should we cast to PosixFilePermissions and do gymnastics there for executable?
+
+          // TODO symlink per revision proposal
+          contents.add(content);
+          FileNode.Builder fileNodeBuilder = currentDirectory.addFilesBuilder()
+              .setName(file.getFileName().toString())
+              .setDigest(getDigestUtil().compute(content))
+              .setIsExecutable(Files.isExecutable(file));
+          return FileVisitResult.CONTINUE;
+        }
+
+        @Override
+        public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
+          path.push(currentDirectory);
+          if (dir.equals(outputDirPath)) {
+            currentDirectory = outputRoot;
+          } else {
+            currentDirectory = treeBuilder.addChildrenBuilder();
+          }
+          return FileVisitResult.CONTINUE;
+        }
+
+        @Override
+        public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+          Directory.Builder parentDirectory = path.pop();
+          if (parentDirectory != null) {
+            parentDirectory.addDirectoriesBuilder()
+                .setName(dir.getFileName().toString())
+                .setDigest(getDigestUtil().compute(currentDirectory.build()));
+          }
+          currentDirectory = parentDirectory;
+          return FileVisitResult.CONTINUE;
+        }
+      });
+      Tree tree = treeBuilder.build();
+      ByteString treeBlob = tree.toByteString();
+      contents.add(treeBlob);
+      Digest treeDigest = getDigestUtil().compute(treeBlob);
+      resultBuilder.addOutputDirectoriesBuilder()
+          .setPath(outputDir)
+          .setTreeDigest(treeDigest);
+    }
+
     /* put together our outputs and update the result */
-    inlineContentBytes += updateActionResultStdOutputs(resultBuilder, contents, inlineContentBytes);
+    updateActionResultStdOutputs(resultBuilder, contents, inlineContentBytes);
+
+    List<ByteString> blobs = contents.build();
+    if (!blobs.isEmpty()) {
+      workerContext.putAllBlobs(contents.build());
+    }
+  }
+
+  @Override
+  protected OperationContext tick(OperationContext operationContext) throws InterruptedException {
+    final String operationName = operationContext.operation.getName();
+    Poller poller = workerContext.createPoller(
+        "ReportResultStage",
+        operationContext.operation.getName(),
+        ExecuteOperationMetadata.Stage.EXECUTING,
+        () -> {});
+
+    ActionResult.Builder resultBuilder;
+    try {
+      resultBuilder = operationContext
+          .operation.getResponse().unpack(ExecuteResponse.class).getResult().toBuilder();
+    } catch (InvalidProtocolBufferException ex) {
+      poller.stop();
+      return null;
+    }
 
     try {
-      workerContext.putAllBlobs(contents.build());
+      uploadOutputs(
+          resultBuilder,
+          operationContext.execDir,
+          operationContext.action.getOutputFilesList(),
+          operationContext.action.getOutputDirectoriesList());
     } catch (IOException ex) {
       poller.stop();
       return null;
