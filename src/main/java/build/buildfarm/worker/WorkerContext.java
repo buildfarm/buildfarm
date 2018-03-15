@@ -23,6 +23,7 @@ import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.function.Predicate;
 
@@ -47,4 +48,5 @@ public interface WorkerContext {
   ByteString getBlob(Digest digest);
   BlobPathFactory getBlobPathFactory();
   Path getRoot();
+  void removeDirectory(Path path) throws IOException;
 }

@@ -237,7 +237,7 @@ public class CASFileCache implements BlobPathFactory {
         fileEntry.containingDirectories.remove(digest);
       }
     }
-    removeDirectory(path);
+    CASFileCache.removeDirectory(path);
   }
 
   /** must be called in synchronized context */

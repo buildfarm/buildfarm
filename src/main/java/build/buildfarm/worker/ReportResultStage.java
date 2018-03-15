@@ -240,7 +240,7 @@ public class ReportResultStage extends PipelineStage {
   @Override
   protected void after(OperationContext operationContext) {
     try {
-      CASFileCache.removeDirectory(operationContext.execDir);
+      workerContext.removeDirectory(operationContext.execDir);
     } catch (IOException ex) {
     }
   }

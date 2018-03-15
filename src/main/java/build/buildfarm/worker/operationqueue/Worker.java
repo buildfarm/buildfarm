@@ -241,6 +241,11 @@ public class Worker {
       public Path getRoot() {
         return root;
       }
+
+      @Override
+      public void removeDirectory(Path path) throws IOException {
+        CASFileCache.removeDirectory(path);
+      }
     };
 
     PipelineStage errorStage = new ReportResultStage.NullStage(); /* ErrorStage(); */

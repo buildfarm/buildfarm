@@ -72,7 +72,7 @@ public class InputFetchStage extends PipelineStage {
     boolean success = true;
     try {
       if (Files.exists(execDir)) {
-        CASFileCache.removeDirectory(execDir);
+        workerContext.removeDirectory(execDir);
       }
       Files.createDirectories(execDir);
 
