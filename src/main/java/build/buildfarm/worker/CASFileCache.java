@@ -130,7 +130,7 @@ public class CASFileCache {
       @Override
       public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
         if (!dir.equals(root)) {
-          Files.delete(dir);
+          CASFileCache.removeDirectory(dir);
         }
         return FileVisitResult.CONTINUE;
       }
@@ -233,7 +233,7 @@ public class CASFileCache {
         fileEntry.containingDirectories.remove(digest);
       }
     }
-    removeDirectory(path);
+    CASFileCache.removeDirectory(path);
   }
 
   /** must be called in synchronized context */
@@ -251,6 +251,9 @@ public class CASFileCache {
       Map<Digest, Directory> directoriesIndex,
       ImmutableList.Builder<Path> inputsBuilder) throws IOException, InterruptedException {
     Directory directory = directoriesIndex.get(digest);
+    if (Files.isDirectory(path)) {
+      CASFileCache.removeDirectory(path);
+    }
     Files.createDirectory(path);
     for (FileNode fileNode : directory.getFilesList()) {
       if (fileNode.getDigest().getSizeBytes() != 0) {
