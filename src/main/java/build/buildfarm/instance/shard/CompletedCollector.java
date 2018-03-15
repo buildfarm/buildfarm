@@ -36,12 +36,15 @@ class CompletedCollector implements Runnable {
 
   @Override
   public synchronized void run() {
+    System.out.println("CompletedCollector: Running");
+
     for (;;) {
       try {
         long completedOperationsCount = backplane.getCompletedOperationsCount();
 
         if (completedOperationsCount > maxCompletedOperationsCount) {
           String operationName = backplane.popOldestCompletedOperation();
+          System.out.println("CompletedCollector: Collected " + operationName);
           onCollected.accept(operationName);
         } else {
           TimeUnit.SECONDS.sleep(1);
@@ -53,5 +56,7 @@ class CompletedCollector implements Runnable {
         e.printStackTrace();
       }
     }
+
+    System.out.println("CompletedCollector: Exiting");
   }
 }

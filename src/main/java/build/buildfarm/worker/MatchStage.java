@@ -43,13 +43,23 @@ public class MatchStage extends PipelineStage {
 
   @Override
   protected void iterate() throws InterruptedException {
+    long startTime = System.nanoTime();
     if (!output.claim()) {
       return;
     }
+    long waitTime = System.nanoTime() - startTime;
+
+    workerContext.logInfo("MatchStage: Matching");
+
     workerContext.match((operation) -> {
+      workerContext.logInfo("MatchStage: Starting operation: " + operation.getName());
+
       try {
         boolean fetched = fetch(operation);
-        if (!fetched) {
+        if (fetched) {
+          workerContext.logInfo("MatchStage: Done with operation: " + operation.getName());
+        } else {
+          workerContext.logInfo("MatchStage: Operation fetch failed: " + operation.getName());
           output.release();
           workerContext.requeue(operation);
         }
@@ -59,6 +69,11 @@ public class MatchStage extends PipelineStage {
         return false;
       }
     });
+    long endTime = System.nanoTime();
+    workerContext.logInfo(String.format(
+        "MatchStage::iterate(): %gms (%gms wait)",
+        (endTime - startTime) / 1000000.0f,
+        waitTime / 1000000.0f));
   }
 
   private static Map<Digest, Directory> createDirectoriesIndex(Iterable<Directory> directories, DigestUtil digestUtil) {

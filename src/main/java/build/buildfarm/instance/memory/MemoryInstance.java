@@ -237,6 +237,14 @@ public class MemoryInstance extends AbstractServerInstance {
       if (operationTimeoutDelay != null) {
         operationTimeoutDelay.stop();
       }
+
+      String operationStatus = "terminated";
+      if (isCancelled(operation)) {
+        operationStatus = "cancelled";
+      } else if (isComplete(operation)) {
+        operationStatus = "completed";
+      }
+      System.out.println(String.format("Operation %s was %s", operationName, operationStatus));
     } else if (isExecuting(operation)) {
       requeuers.get(operationName).pet();
 
@@ -274,6 +282,7 @@ public class MemoryInstance extends AbstractServerInstance {
   private void onDispatched(Operation operation) {
     Duration timeout = config.getOperationPollTimeout();
     Watchdog requeuer = new Watchdog(timeout, () -> {
+      System.out.println("REQUEUEING " + operation.getName());
       try {
         putOperation(operation);
       } catch (InterruptedException e) {

@@ -57,19 +57,32 @@ public abstract class PipelineStage implements Runnable {
   }
 
   protected void iterate() throws InterruptedException {
+    long startTime, waitTime;
     OperationContext operationContext, nextOperationContext;
     try {
       operationContext = take();
+      startTime = System.nanoTime();
       nextOperationContext = tick(operationContext);
+      long waitStartTime = System.nanoTime();
       if (nextOperationContext != null && output.claim()) {
         output.put(nextOperationContext);
       } else {
         error.put(operationContext);
       }
+      waitTime = System.nanoTime() - waitStartTime;
     } finally {
       release();
     }
     after(operationContext);
+
+    long endTime = System.nanoTime();
+    workerContext.logInfo(String.format(
+        "%s::iterate(%s): %gms (%gms wait) %s",
+        name,
+        operationContext.operation.getName(),
+        (endTime - startTime) / 1000000.0f,
+        waitTime / 1000000.0f,
+        nextOperationContext == null ? "Failed" : "Success"));
   }
 
   protected OperationContext tick(OperationContext operationContext) throws InterruptedException {

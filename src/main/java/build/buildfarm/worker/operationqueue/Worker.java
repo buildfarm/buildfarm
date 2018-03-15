@@ -407,6 +407,7 @@ public class Worker {
       public Poller createPoller(String name, String operationName, Stage stage, Runnable onFailure) {
         Poller poller = new Poller(config.getOperationPollPeriod(), () -> {
               boolean success = operationQueueInstance.pollOperation(operationName, stage);
+              logInfo(name + ": poller: Completed Poll for " + operationName + ": " + (success ? "OK" : "Failed"));
               if (!success) {
                 onFailure.run();
               }
@@ -450,6 +451,11 @@ public class Worker {
       @Override
       public boolean putOperation(Operation operation, Action action) throws InterruptedException {
         return operationQueueInstance.putOperation(operation);
+      }
+
+      @Override
+      public void logInfo(String msg) {
+        logger.info(msg);
       }
 
       @Override

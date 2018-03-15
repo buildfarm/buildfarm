@@ -573,6 +573,7 @@ public class Worker implements Instances {
                 e.printStackTrace();
               }
 
+              logInfo(name + ": poller: Completed Poll for " + operationName + ": " + (success ? "OK" : "Failed"));
               if (!success) {
                 onFailure.run();
               }
@@ -644,6 +645,11 @@ public class Worker implements Instances {
           }
         }
         */
+      }
+
+      @Override
+      public void logInfo(String msg) {
+        System.out.println(msg);
       }
 
       @Override
@@ -758,6 +764,7 @@ public class Worker implements Instances {
         for (String outputFile : outputFiles) {
           Path outputPath = actionRoot.resolve(outputFile);
           if (!Files.exists(outputPath)) {
+            logInfo("ReportResultStage: " + outputPath + " does not exist...");
             continue;
           }
 
@@ -793,6 +800,7 @@ public class Worker implements Instances {
         for (String outputDir : outputDirs) {
           Path outputDirPath = actionRoot.resolve(outputDir);
           if (!Files.exists(outputDirPath)) {
+            logInfo("ReportResultStage: " + outputDir + " does not exist...");
             continue;
           }
 

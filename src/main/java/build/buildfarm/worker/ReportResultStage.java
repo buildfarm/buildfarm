@@ -103,6 +103,7 @@ public class ReportResultStage extends PipelineStage {
     } catch (IOException e) {
       throw new IllegalStateException(e);
     } catch (StatusRuntimeException e) {
+      e.printStackTrace();
       poller.stop();
       return null;
     }
@@ -143,6 +144,7 @@ public class ReportResultStage extends PipelineStage {
         return null;
       }
     } catch (IOException e) {
+      e.printStackTrace();
       return null;
     }
 
@@ -158,8 +160,7 @@ public class ReportResultStage extends PipelineStage {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     } catch (IOException e) {
-      // move to logging
-      // workerContext.logInfo("Failed to remove action root " + operationContext.execDir);
+      e.printStackTrace();
     }
   }
 }

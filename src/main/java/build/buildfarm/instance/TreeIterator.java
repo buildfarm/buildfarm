@@ -119,6 +119,8 @@ public class TreeIterator implements TokenizableIterator<Directory> {
         pointers.push(Iterators.transform(
             directory.getDirectoriesList().iterator(),
             directoryNode -> directoryNode.getDigest()));
+      } else {
+        System.out.println("null directory - " + DigestUtil.toString(digest) + ": " + toNextPageToken());
       }
       advanceIterator();
       return directory;

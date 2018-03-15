@@ -96,12 +96,15 @@ class ActionCacheSweeper implements Runnable {
     // maybe we don't need to aggregate this and can just ship it off incrementally
     Set<ActionKey> expiredActionKeys = expiredActionKeysBuilder.build();
     if (expiredActionKeys.size() > 0) {
+      System.out.println("ActionCacheSweeper: Removing " + expiredActionKeys.size());
       backplane.removeActionResults(expiredActionKeys);
     }
   }
 
   @Override
   public synchronized void run() {
+    System.out.println("ActionCacheSweeper: Running");
+
     for (;;) {
       try {
         sweep();
@@ -113,5 +116,7 @@ class ActionCacheSweeper implements Runnable {
         e.printStackTrace();
       }
     }
+
+    System.out.println("ActionCacheSweeper: Exiting");
   }
 }

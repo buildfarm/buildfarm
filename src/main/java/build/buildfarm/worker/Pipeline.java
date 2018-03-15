@@ -86,6 +86,7 @@ public class Pipeline {
             }
           }
           if (stageToClose != null && !stageToClose.isClosed()) {
+            System.out.println("Closing stage at priority " + maxPriority);
             stageToClose.close();
           }
         }
@@ -107,8 +108,10 @@ public class Pipeline {
           }
 
           if (!thread.isAlive()) {
+            System.out.println("Stage has exited at priority " + stageClosePriorities.get(stage));
             inactiveStages.add(stage);
           } else if (stage.isClosed()) {
+            System.out.println("Interrupting unterminated closed thread at priority " + stageClosePriorities.get(stage));
             thread.interrupt();
           }
         }

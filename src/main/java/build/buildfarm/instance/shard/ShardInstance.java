@@ -183,6 +183,7 @@ public class ShardInstance extends AbstractServerInstance {
 
   @Override
   public ActionResult getActionResult(ActionKey actionKey) {
+    // System.out.println("getActionResult: " + DigestUtil.toString(actionKey.getDigest()));
     ActionResult actionResult;
     try {
       actionResult = backplane.getActionResult(actionKey);
@@ -219,6 +220,11 @@ public class ShardInstance extends AbstractServerInstance {
     }
   }
 
+  @Override
+  public Iterable<Digest> findMissingBlobs(Iterable<Digest> blobDigests) {
+    return findMissingBlobs(blobDigests, false);
+  }
+
   public ImmutableList<String> checkMissingBlob(Digest digest, boolean correct) throws IOException {
     ImmutableList.Builder<String> foundWorkers = new ImmutableList.Builder<>();
     Deque<String> workers;
@@ -233,6 +239,7 @@ public class ShardInstance extends AbstractServerInstance {
     }
 
     Set<String> originalLocationSet = backplane.getBlobLocationSet(digest);
+    System.out.println("ShardInstance::checkMissingBlob(" + DigestUtil.toString(digest) + "): Current set is: " + originalLocationSet);
 
     for (String worker : workers) {
       try {
@@ -241,6 +248,7 @@ public class ShardInstance extends AbstractServerInstance {
           try {
             resultDigests = createStubRetrier().execute(() -> workerStub(worker).findMissingBlobs(ImmutableList.<Digest>of(digest)));
             if (Iterables.size(resultDigests) == 0) {
+              System.out.println("ShardInstance::checkMissingBlob(" + DigestUtil.toString(digest) + "): Adding back to " + worker);
               if (correct) {
                 backplane.addBlobLocation(digest, worker);
               }
@@ -260,7 +268,7 @@ public class ShardInstance extends AbstractServerInstance {
         throw Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException();
       } catch (StatusRuntimeException e) {
         if (e.getStatus().getCode().equals(Status.UNAVAILABLE.getCode())) {
-          removeMalfunctioningWorker(worker);
+          removeMalfunctioningWorker(worker, e, "findMissingBlobs(...)");
         } else {
           e.printStackTrace();
         }
@@ -270,6 +278,7 @@ public class ShardInstance extends AbstractServerInstance {
 
     for (String worker : originalLocationSet) {
       if (workerSet.contains(worker) && !found.contains(worker)) {
+        System.out.println("ShardInstance::checkMissingBlob(" + DigestUtil.toString(digest) + "): Removing from " + worker);
         if (correct) {
           backplane.removeBlobLocation(digest, worker);
         }
@@ -279,7 +288,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @Override
-  public Iterable<Digest> findMissingBlobs(Iterable<Digest> blobDigests) {
+  protected Iterable<Digest> findMissingBlobs(Iterable<Digest> blobDigests, boolean forValidation) {
     Iterable<Digest> nonEmptyDigests = Iterables.filter(blobDigests, (digest) -> digest.getSizeBytes() > 0);
     if (Iterables.isEmpty(nonEmptyDigests)) {
       return nonEmptyDigests;
@@ -311,7 +320,7 @@ public class ShardInstance extends AbstractServerInstance {
       } catch (StatusRuntimeException e) {
         Status status = Status.fromThrowable(e);
         if (status.getCode() == Status.Code.UNAVAILABLE) {
-          removeMalfunctioningWorker(worker);
+          removeMalfunctioningWorker(worker, e, "findMissingBlobs(...)");
         } else {
           e.printStackTrace();
         }
@@ -352,8 +361,9 @@ public class ShardInstance extends AbstractServerInstance {
     } catch (StatusRuntimeException e) {
       Status st = Status.fromThrowable(e);
       if (st.getCode().equals(Status.Code.UNAVAILABLE)) {
-        removeMalfunctioningWorker(worker);
+        removeMalfunctioningWorker(worker, e, "getBlob(" + DigestUtil.toString(blobDigest) + ")");
       } else if (st.getCode().equals(Status.Code.NOT_FOUND)) {
+        System.out.println(worker + " did not contain " + DigestUtil.toString(blobDigest));
         // ignore this, the worker will update the backplane eventually
       } else if (Retrier.DEFAULT_IS_RETRIABLE.test(st)) {
         // why not, always
@@ -365,7 +375,7 @@ public class ShardInstance extends AbstractServerInstance {
     }
   }
 
-  private ByteString getBlobImpl(Digest blobDigest, long offset, long limit) throws InterruptedException, IOException {
+  private ByteString getBlobImpl(Digest blobDigest, long offset, long limit, boolean forValidation) throws InterruptedException, IOException {
     List<String> workersList = new ArrayList<>(Sets.intersection(backplane.getBlobLocationSet(blobDigest), backplane.getWorkerSet()));
     Collections.shuffle(workersList, rand);
     Deque<String> workers = new ArrayDeque(workersList);
@@ -374,6 +384,9 @@ public class ShardInstance extends AbstractServerInstance {
     ByteString content;
     do {
       if (workers.isEmpty()) {
+        if (forValidation) {
+          System.out.println("No location for getBlobImpl(" + DigestUtil.toString(blobDigest) + ", " + offset + ", " + limit + ")");
+        }
         if (triedCheck) {
           return null;
         }
@@ -394,8 +407,13 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @Override
+  protected ByteString getBlob(Digest blobDigest, boolean forValidation) throws InterruptedException, IOException {
+    return getBlobImpl(blobDigest, 0, 0, forValidation);
+  }
+
+  @Override
   public ByteString getBlob(Digest blobDigest, long offset, long limit) throws InterruptedException, IOException {
-    return getBlobImpl(blobDigest, offset, limit);
+    return getBlobImpl(blobDigest, offset, limit, false);
   }
 
   private static ManagedChannel createChannel(String target) {
@@ -451,6 +469,7 @@ public class ShardInstance extends AbstractServerInstance {
           // FIXME should we wait for a worker to become available?
           throw Status.RESOURCE_EXHAUSTED.asException();
         }
+        // System.out.println("putBlob(" + DigestUtil.toString(digestUtil.compute(blob)) + ") => " + worker);
         Digest digest = workerStub(worker).putBlob(blob);
         boolean known = false;
         try {
@@ -475,7 +494,7 @@ public class ShardInstance extends AbstractServerInstance {
         }
         return digest;
       } catch (IOException e) {
-        removeMalfunctioningWorker(worker);
+        removeMalfunctioningWorker(worker, e, "putBlob(" + DigestUtil.toString(digestUtil.compute(blob)) + ")");
       }
     }
   }
@@ -570,11 +589,14 @@ public class ShardInstance extends AbstractServerInstance {
     return command;
   }
 
-  private void removeMalfunctioningWorker(String worker) {
+  private void removeMalfunctioningWorker(String worker, Exception e, String context) {
     StubInstance instance = workerStubs.remove(worker);
     try {
       if (backplane.isWorker(worker)) {
         backplane.removeWorker(worker);
+
+        System.out.println("Removing worker '" + worker + "' during(" + context + ") because of:");
+        e.printStackTrace();
       }
     } catch (IOException eIO) {
       throw Status.fromThrowable(eIO).asRuntimeException();
@@ -641,13 +663,16 @@ public class ShardInstance extends AbstractServerInstance {
   public boolean validateOperation(String operationName, boolean validateDone) throws IOException, InterruptedException {
     Operation operation = getOperation(operationName);
     if (operation == null) {
+      System.out.println("Operation " + operationName + " no longer exists");
       return false;
     }
     if (validateDone && operation.getDone()) {
+      System.out.println("Operation " + operation.getName() + " has already completed");
       return false;
     }
     Action action = expectAction(operation);
     if (action == null) {
+      System.out.println("Action for " + operation.getName() + " no longer exists");
       return false;
     }
     boolean isQueuedOperationMetadata = operation.getMetadata().is(QueuedOperationMetadata.class);
@@ -680,13 +705,16 @@ public class ShardInstance extends AbstractServerInstance {
   private boolean requeueOperation(String operationName) throws IOException, InterruptedException {
     Operation operation = getOperation(operationName);
     if (operation == null) {
+      System.out.println("Operation " + operationName + " no longer exists");
       return false;
     }
     if (operation.getDone()) {
+      System.out.println("Operation " + operation.getName() + " has already completed");
       return false;
     }
     Action action = expectAction(operation);
     if (action == null) {
+      System.out.println("Action for " + operation.getName() + " no longer exists");
       return false;
     }
     boolean isQueuedOperationMetadata = operation.getMetadata().is(QueuedOperationMetadata.class);
@@ -762,7 +790,12 @@ public class ShardInstance extends AbstractServerInstance {
       directories = getTreeDirectories(action.getInputRootDigest());
       command = expectCommand(action.getCommandDigest());
     } catch (IOException e) {
-      throw new IllegalStateException(e);
+      try {
+        System.out.println("execute invalid: " + JsonFormat.printer().print(action));
+      } catch (InvalidProtocolBufferException invalidProtoEx) {
+        invalidProtoEx.printStackTrace();
+      }
+      throw new IllegalStateException();
     }
 
     try {
@@ -772,9 +805,24 @@ public class ShardInstance extends AbstractServerInstance {
       backplane.putTree(action.getInputRootDigest(), directories);
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
+    } catch (IllegalStateException e) {
+      try {
+        System.out.println("execute invalid: " + JsonFormat.printer().print(action));
+      } catch (InvalidProtocolBufferException invalidProtoEx) {
+        invalidProtoEx.printStackTrace();
+      }
+      throw e;
     }
 
     Operation operation = createOperation();
+
+    /*
+    try {
+      System.out.println("execute(" + operation.getName() + "): " + JsonFormat.printer().print(action));
+    } catch (InvalidProtocolBufferException e) {
+      e.printStackTrace();
+    }
+    */
 
     try {
       backplane.putOperation(operation, ExecuteOperationMetadata.Stage.UNKNOWN);

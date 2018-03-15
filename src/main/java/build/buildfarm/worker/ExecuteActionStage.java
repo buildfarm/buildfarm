@@ -60,6 +60,7 @@ public class ExecuteActionStage extends PipelineStage {
       }
       this.notify();
     }
+    workerContext.logInfo("ExecuteActionStage: " + executors.size() + "/" + workerContext.getExecuteStageWidth());
   }
 
   @Override
@@ -69,10 +70,15 @@ public class ExecuteActionStage extends PipelineStage {
 
   @Override
   protected void iterate() throws InterruptedException {
-    Thread executor = new Thread(new Executor(workerContext, take(), this));
+    workerContext.logInfo("ExecuteActionStage: Waiting for input");
+    OperationContext operationContext = take();
+    Thread executor = new Thread(new Executor(workerContext, operationContext, this));
+
+    workerContext.logInfo("ExecuteActionStage: spawn " + operationContext.operation.getName());
 
     synchronized (this) {
       executors.add(executor);
+      workerContext.logInfo("ExecuteActionStage: " + executors.size() + "/" + workerContext.getExecuteStageWidth());
     }
 
     executor.start();

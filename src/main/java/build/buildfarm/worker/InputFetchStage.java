@@ -48,6 +48,8 @@ public class InputFetchStage extends PipelineStage {
         operationContext.operation.getName(),
         ExecuteOperationMetadata.Stage.QUEUED);
 
+    workerContext.logInfo("InputFetchStage: Fetching inputs: " + operationContext.operation.getName());
+
     long fetchStartAt = System.nanoTime();
 
     boolean success = true;
@@ -57,6 +59,7 @@ public class InputFetchStage extends PipelineStage {
           operationContext.directoriesIndex,
           operationContext.action);
     } catch (IOException e) {
+      e.printStackTrace();
       success = false;
     }
 
