@@ -16,7 +16,6 @@ package build.buildfarm.worker;
 
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 
-import build.buildfarm.common.BlobPathFactory;
 import build.buildfarm.common.DigestUtil;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -40,7 +39,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class CASFileCache implements BlobPathFactory {
+public class CASFileCache {
   private final InputStreamFactory inputStreamFactory;
   private final Path root;
   private final long maxSizeInBytes;
@@ -154,7 +153,6 @@ public class CASFileCache implements BlobPathFactory {
     return getPath(getFileName(digest, isExecutable));
   }
 
-  @Override
   public synchronized void decrementReferences(Iterable<Path> inputFiles, Iterable<Digest> inputDirectories) {
     // decrement references and notify if any dropped to 0
     // insert after the last 0-reference count entry in list
@@ -182,12 +180,11 @@ public class CASFileCache implements BlobPathFactory {
     }
   }
 
-  @Override
   public Path getPath(String filename) {
     return root.resolve(filename);
   }
 
-  private Path directoryPath(Digest digest) {
+  private Path getDirectoryPath(Digest digest) {
     return root.resolve(digestFilename(digest));
   }
 
@@ -228,7 +225,7 @@ public class CASFileCache implements BlobPathFactory {
   /** must be called in synchronized context */
   private void expireDirectory(Digest digest) throws IOException {
     DirectoryEntry e = directoryStorage.remove(digest);
-    Path path = directoryPath(digest);
+    Path path = getDirectoryPath(digest);
 
     for (Path input : e.inputs) {
       Entry fileEntry = storage.get(input);
@@ -258,7 +255,7 @@ public class CASFileCache implements BlobPathFactory {
     Files.createDirectory(path);
     for (FileNode fileNode : directory.getFilesList()) {
       if (fileNode.getDigest().getSizeBytes() != 0) {
-        Path fileCacheKey = getBlobPath(fileNode.getDigest(), fileNode.getIsExecutable(), containingDirectory);
+        Path fileCacheKey = put(fileNode.getDigest(), fileNode.getIsExecutable(), containingDirectory);
         // FIXME this can die with 'too many links'... needs some cascading fallout
         Files.createLink(path.resolve(fileNode.getName()), fileCacheKey);
         inputsBuilder.add(fileCacheKey);
@@ -276,11 +273,10 @@ public class CASFileCache implements BlobPathFactory {
     }
   }
 
-  @Override
-  public synchronized Path getDirectoryPath(
+  public synchronized Path putDirectory(
       Digest digest,
       Map<Digest, Directory> directoriesIndex) throws IOException, InterruptedException {
-    Path path = directoryPath(digest);
+    Path path = getDirectoryPath(digest);
 
     DirectoryEntry e = directoryStorage.get(digest);
     if (e != null) {
@@ -298,8 +294,7 @@ public class CASFileCache implements BlobPathFactory {
     return path;
   }
 
-  @Override
-  public Path getBlobPath(Digest digest, boolean isExecutable, Digest containingDirectory) throws IOException, InterruptedException {
+  public Path put(Digest digest, boolean isExecutable, Digest containingDirectory) throws IOException, InterruptedException {
     Path key = getKey(digest, isExecutable);
     ImmutableList.Builder<Path> expiredKeys = null;
 

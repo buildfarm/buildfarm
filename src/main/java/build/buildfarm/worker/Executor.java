@@ -129,7 +129,7 @@ class Executor implements Runnable {
 
     owner.release();
 
-    workerContext.getBlobPathFactory().decrementReferences(operationContext.inputFiles, operationContext.inputDirectories);
+    workerContext.getCASFileCache().decrementReferences(operationContext.inputFiles, operationContext.inputDirectories);
   }
 
   @Override

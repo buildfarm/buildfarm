@@ -95,7 +95,7 @@ public class InputFetchStage extends PipelineStage {
     poller.stop();
 
     if (!success) {
-      workerContext.getBlobPathFactory().decrementReferences(operationContext.inputFiles, operationContext.inputDirectories);
+      workerContext.getCASFileCache().decrementReferences(operationContext.inputFiles, operationContext.inputDirectories);
     }
 
     return success ? operationContext : null;
@@ -187,7 +187,7 @@ public class InputFetchStage extends PipelineStage {
 
     for (FileNode fileNode : directory.getFilesList()) {
       Path execPath = execDir.resolve(fileNode.getName());
-      Path fileCacheKey = workerContext.getBlobPathFactory().getBlobPath(fileNode.getDigest(), fileNode.getIsExecutable(), /* containingDirectory=*/ null);
+      Path fileCacheKey = workerContext.getCASFileCache().put(fileNode.getDigest(), fileNode.getIsExecutable(), /* containingDirectory=*/ null);
       if (fileCacheKey == null) {
         throw new IOException("InputFetchStage: Failed to create cache entry for " + execPath);
       }
@@ -215,7 +215,7 @@ public class InputFetchStage extends PipelineStage {
       Path execPath,
       Digest digest,
       Map<Digest, Directory> directoriesIndex) throws IOException, InterruptedException {
-    Path cachePath = workerContext.getBlobPathFactory().getDirectoryPath(digest, directoriesIndex);
+    Path cachePath = workerContext.getCASFileCache().putDirectory(digest, directoriesIndex);
     Files.createSymbolicLink(execPath, cachePath);
   }
 

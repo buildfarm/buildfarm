@@ -16,7 +16,6 @@ package build.buildfarm.worker.operationqueue;
 
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
-import build.buildfarm.common.BlobPathFactory;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.CASInsertionPolicy;
@@ -228,7 +227,7 @@ public class Worker {
       }
 
       @Override
-      public BlobPathFactory getBlobPathFactory() {
+      public CASFileCache getCASFileCache() {
         return fileCache;
       }
 
