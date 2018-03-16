@@ -234,7 +234,7 @@ public class CASFileCache {
         fileEntry.containingDirectories.remove(digest);
       }
     }
-    CASFileCache.removeDirectory(path);
+    removeDirectory(path);
   }
 
   /** must be called in synchronized context */
