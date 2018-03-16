@@ -60,8 +60,7 @@ public class InputFetchStage extends PipelineStage {
     Poller poller = workerContext.createPoller(
         "InputFetchStage",
         operationContext.operation.getName(),
-        ExecuteOperationMetadata.Stage.QUEUED,
-        () -> {});
+        ExecuteOperationMetadata.Stage.QUEUED);
 
     Path execDir = operationContext.execDir;
 

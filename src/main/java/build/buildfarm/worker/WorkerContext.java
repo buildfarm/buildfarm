@@ -28,6 +28,7 @@ import java.nio.file.Path;
 import java.util.function.Predicate;
 
 public interface WorkerContext {
+  Poller createPoller(String name, String operationName, Stage stage);
   Poller createPoller(String name, String operationName, Stage stage, Runnable onFailure);
   void match(Predicate<Operation> onMatch) throws InterruptedException;
   CASInsertionPolicy getFileCasPolicy();
