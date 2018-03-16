@@ -17,7 +17,7 @@ package build.buildfarm.worker;
 import com.google.protobuf.Duration;
 import java.util.function.BooleanSupplier;
 
-class Poller implements Runnable {
+public class Poller implements Runnable {
   private final Duration period;
   private final BooleanSupplier poll;
   private boolean running;

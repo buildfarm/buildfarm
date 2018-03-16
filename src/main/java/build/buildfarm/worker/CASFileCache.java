@@ -39,7 +39,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-class CASFileCache {
+public class CASFileCache {
   private final InputStreamFactory inputStreamFactory;
   private final Path root;
   private final long maxSizeInBytes;
@@ -50,7 +50,7 @@ class CASFileCache {
   private transient long sizeInBytes;
   private transient Entry header;
 
-  CASFileCache(InputStreamFactory inputStreamFactory, Path root, long maxSizeInBytes, DigestUtil digestUtil) {
+  public CASFileCache(InputStreamFactory inputStreamFactory, Path root, long maxSizeInBytes, DigestUtil digestUtil) {
     this.inputStreamFactory = inputStreamFactory;
     this.root = root;
     this.maxSizeInBytes = maxSizeInBytes;
@@ -103,7 +103,7 @@ class CASFileCache {
           return null;
         }
 
-        return toFileEntryKey(digest, isExecutable);
+        return getKey(digest, isExecutable);
       }
 
       @Override
@@ -142,14 +142,18 @@ class CASFileCache {
     return String.format("%s_%d", digest.getHash(), digest.getSizeBytes());
   }
 
-  public Path toFileEntryKey(Digest digest, boolean isExecutable) {
-    return getPath(String.format(
+  public static String getFileName(Digest digest, boolean isExecutable) {
+    return String.format(
         "%s%s",
         digestFilename(digest),
-        (isExecutable ? "_exec" : "")));
+        (isExecutable ? "_exec" : ""));
   }
 
-  public synchronized void update(Iterable<Path> inputFiles, Iterable<Digest> inputDirectories) {
+  public Path getKey(Digest digest, boolean isExecutable) {
+    return getPath(getFileName(digest, isExecutable));
+  }
+
+  public synchronized void decrementReferences(Iterable<Path> inputFiles, Iterable<Digest> inputDirectories) {
     // decrement references and notify if any dropped to 0
     // insert after the last 0-reference count entry in list
     boolean entriesMadeAvailable = false;
@@ -202,6 +206,22 @@ class CASFileCache {
     return e.key;
   }
 
+  public static void removeDirectory(Path directory) throws IOException {
+    Files.walkFileTree(directory, new SimpleFileVisitor<Path>() {
+      @Override
+      public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+        Files.delete(file);
+        return FileVisitResult.CONTINUE;
+      }
+
+      @Override
+      public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+        Files.delete(dir);
+        return FileVisitResult.CONTINUE;
+      }
+    });
+  }
+
   /** must be called in synchronized context */
   private void expireDirectory(Digest digest) throws IOException {
     DirectoryEntry e = directoryStorage.remove(digest);
@@ -214,7 +234,7 @@ class CASFileCache {
         fileEntry.containingDirectories.remove(digest);
       }
     }
-    Worker.removeDirectory(path);
+    removeDirectory(path);
   }
 
   /** must be called in synchronized context */
@@ -274,12 +294,8 @@ class CASFileCache {
     return path;
   }
 
-  public Path put(Digest digest, boolean isExecutable) throws IOException, InterruptedException {
-    return put(digest, isExecutable, null);
-  }
-
   public Path put(Digest digest, boolean isExecutable, Digest containingDirectory) throws IOException, InterruptedException {
-    Path key = toFileEntryKey(digest, isExecutable);
+    Path key = getKey(digest, isExecutable);
     ImmutableList.Builder<Path> expiredKeys = null;
 
     synchronized(this) {

@@ -37,11 +37,11 @@ import java.util.Stack;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ArrayBlockingQueue;
 
-class InputFetchStage extends PipelineStage {
+public class InputFetchStage extends PipelineStage {
   private final BlockingQueue<OperationContext> queue;
 
-  InputFetchStage(Worker worker, PipelineStage output, PipelineStage error) {
-    super(worker, output, error);
+  public InputFetchStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
+    super(workerContext, output, error);
     queue = new ArrayBlockingQueue<>(1);
   }
 
@@ -57,14 +57,10 @@ class InputFetchStage extends PipelineStage {
 
   @Override
   protected OperationContext tick(OperationContext operationContext) throws InterruptedException {
-    final String operationName = operationContext.operation.getName();
-    Poller poller = new Poller(worker.config.getOperationPollPeriod(), () -> {
-          boolean success = worker.instance.pollOperation(
-              operationName,
-              ExecuteOperationMetadata.Stage.QUEUED);
-          return success;
-        });
-    new Thread(poller).start();
+    Poller poller = workerContext.createPoller(
+        "InputFetchStage",
+        operationContext.operation.getName(),
+        ExecuteOperationMetadata.Stage.QUEUED);
 
     Path execDir = operationContext.execDir;
 
@@ -75,7 +71,7 @@ class InputFetchStage extends PipelineStage {
     boolean success = true;
     try {
       if (Files.exists(execDir)) {
-        Worker.removeDirectory(execDir);
+        workerContext.removeDirectory(execDir);
       }
       Files.createDirectories(execDir);
 
@@ -98,7 +94,7 @@ class InputFetchStage extends PipelineStage {
     poller.stop();
 
     if (!success) {
-      worker.fileCache.update(operationContext.inputFiles, operationContext.inputDirectories);
+      workerContext.getCASFileCache().decrementReferences(operationContext.inputFiles, operationContext.inputDirectories);
     }
 
     return success ? operationContext : null;
@@ -159,13 +155,13 @@ class InputFetchStage extends PipelineStage {
     String pageToken = "";
 
     do {
-      pageToken = worker.instance.getTree(inputRoot, worker.config.getTreePageSize(), pageToken, directories);
+      pageToken = workerContext.getInstance().getTree(inputRoot, workerContext.getTreePageSize(), pageToken, directories);
     } while (!pageToken.isEmpty());
 
     Set<Digest> directoryDigests = new HashSet<>();
     ImmutableMap.Builder<Digest, Directory> directoriesIndex = new ImmutableMap.Builder<>();
     for (Directory directory : directories.build()) {
-      Digest directoryDigest = worker.instance.getDigestUtil().compute(directory);
+      Digest directoryDigest = workerContext.getDigestUtil().compute(directory);
       if (!directoryDigests.add(directoryDigest)) {
         continue;
       }
@@ -190,7 +186,7 @@ class InputFetchStage extends PipelineStage {
 
     for (FileNode fileNode : directory.getFilesList()) {
       Path execPath = execDir.resolve(fileNode.getName());
-      Path fileCacheKey = worker.fileCache.put(fileNode.getDigest(), fileNode.getIsExecutable());
+      Path fileCacheKey = workerContext.getCASFileCache().put(fileNode.getDigest(), fileNode.getIsExecutable(), /* containingDirectory=*/ null);
       if (fileCacheKey == null) {
         throw new IOException("InputFetchStage: Failed to create cache entry for " + execPath);
       }
@@ -204,7 +200,7 @@ class InputFetchStage extends PipelineStage {
       OutputDirectory childOutputDirectory = outputDirectory != null
           ? outputDirectory.directories.get(name) : null;
       Path dirPath = execDir.resolve(name);
-      if (childOutputDirectory != null || !worker.config.getLinkInputDirectories()) {
+      if (childOutputDirectory != null || !workerContext.getLinkInputDirectories()) {
         Files.createDirectories(dirPath);
         linkInputs(dirPath, digest, directoriesIndex, childOutputDirectory, inputFiles, inputDirectories);
       } else {
@@ -218,7 +214,7 @@ class InputFetchStage extends PipelineStage {
       Path execPath,
       Digest digest,
       Map<Digest, Directory> directoriesIndex) throws IOException, InterruptedException {
-    Path cachePath = worker.fileCache.putDirectory(digest, directoriesIndex);
+    Path cachePath = workerContext.getCASFileCache().putDirectory(digest, directoriesIndex);
     Files.createSymbolicLink(execPath, cachePath);
   }
 

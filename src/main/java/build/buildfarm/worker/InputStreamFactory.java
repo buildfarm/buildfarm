@@ -18,5 +18,5 @@ import com.google.devtools.remoteexecution.v1test.Digest;
 import java.io.InputStream;
 import java.util.function.Function;
 
-interface InputStreamFactory extends Function<Digest, InputStream> {
+public interface InputStreamFactory extends Function<Digest, InputStream> {
 }

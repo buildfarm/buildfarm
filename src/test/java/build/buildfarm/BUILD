@@ -55,13 +55,13 @@ java_test(
 )
 
 java_test(
-    name = "worker-tests",
+    name = "operationqueue-worker-tests",
     size = "small",
-    srcs = glob(["worker/*.java"]),
+    srcs = glob(["worker/operationqueue/*.java"]),
     test_class = "build.buildfarm.AllTests",
     deps = [
         ":test_runner",
-        "//src/main/java/build/buildfarm:buildfarm-worker-impl",
+        "//src/main/java/build/buildfarm:operationqueue-worker",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
     ],
 )

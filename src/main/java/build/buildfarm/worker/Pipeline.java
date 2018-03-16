@@ -19,12 +19,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-class Pipeline {
+public class Pipeline {
   private final Map<PipelineStage, Thread> stageThreads;
   private final Map<PipelineStage, Integer> stageClosePriorities;
   // FIXME ThreadGroup?
 
-  Pipeline() {
+  public Pipeline() {
     stageThreads = new HashMap<>();
     stageClosePriorities = new HashMap<>();
   }
@@ -37,13 +37,13 @@ class Pipeline {
     stageClosePriorities.put(stage, closePriority);
   }
 
-  void start() {
+  public void start() {
     for (Thread stageThread : stageThreads.values()) {
       stageThread.start();
     }
   }
 
-  void join() {
+  public void join() {
     List<PipelineStage> inactiveStages = new ArrayList<>();
     boolean closeStage = false;
     boolean wasInterrupted = false;

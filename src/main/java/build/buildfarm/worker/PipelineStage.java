@@ -14,8 +14,8 @@
 
 package build.buildfarm.worker;
 
-abstract class PipelineStage implements Runnable {
-  protected final Worker worker;
+public abstract class PipelineStage implements Runnable {
+  protected final WorkerContext workerContext;
   protected final PipelineStage output;
   private final PipelineStage error;
 
@@ -23,8 +23,8 @@ abstract class PipelineStage implements Runnable {
   protected boolean claimed;
   private boolean closed;
 
-  PipelineStage(Worker worker, PipelineStage output, PipelineStage error) {
-    this.worker = worker;
+  PipelineStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
+    this.workerContext = workerContext;
     this.output = output;
     this.error = error;
 
