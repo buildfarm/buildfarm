@@ -120,16 +120,12 @@ class Executor implements Runnable {
           operation,
           operationContext.execDir,
           operationContext.metadata,
-          operationContext.action,
-          operationContext.inputFiles,
-          operationContext.inputDirectories));
+          operationContext.action));
     } else {
       owner.error().put(operationContext);
     }
 
     owner.release();
-
-    workerContext.getCASFileCache().decrementReferences(operationContext.inputFiles, operationContext.inputDirectories);
   }
 
   @Override

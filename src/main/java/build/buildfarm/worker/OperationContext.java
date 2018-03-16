@@ -21,26 +21,20 @@ import com.google.longrunning.Operation;
 import java.nio.file.Path;
 import java.util.List;
 
-public final class OperationContext {
+final class OperationContext {
   final Operation operation;
   final Path execDir;
   final ExecuteOperationMetadata metadata;
   final Action action;
-  final List<Path> inputFiles;
-  final List<Digest> inputDirectories;
 
-  public OperationContext(
+  OperationContext(
       Operation operation,
       Path execDir,
       ExecuteOperationMetadata metadata,
-      Action action,
-      List<Path> inputFiles,
-      List<Digest> inputDirectories) {
+      Action action) {
     this.operation = operation;
     this.execDir = execDir;
     this.metadata = metadata;
     this.action = action;
-    this.inputFiles = inputFiles;
-    this.inputDirectories = inputDirectories;
   }
 }
