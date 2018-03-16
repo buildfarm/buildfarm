@@ -17,6 +17,7 @@ package build.buildfarm.worker;
 import com.google.devtools.remoteexecution.v1test.Action;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
 import com.google.longrunning.Operation;
+import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.nio.file.Path;
@@ -52,10 +53,21 @@ public class MatchStage extends PipelineStage {
     Action action;
     try {
       metadata = operation.getMetadata().unpack(ExecuteOperationMetadata.class);
-      action = Action.parseFrom(workerContext.getBlob(metadata.getActionDigest()));
-    } catch (NullPointerException|InvalidProtocolBufferException ex) {
+    } catch (InvalidProtocolBufferException e) {
       return false;
     }
+
+    ByteString actionBlob = workerContext.getBlob(metadata.getActionDigest());
+    if (actionBlob == null) {
+      return false;
+    }
+
+    try {
+      action = Action.parseFrom(actionBlob);
+    } catch (InvalidProtocolBufferException ex) {
+      return false;
+    }
+
     if (action.hasTimeout() && workerContext.hasMaximumActionTimeout()) {
       Duration timeout = action.getTimeout();
       Duration maximum = workerContext.getMaximumActionTimeout();
