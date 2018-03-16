@@ -38,7 +38,9 @@ java_test(
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "//3rdparty/jvm/com/google/truth",
         "//src/main/java/build/buildfarm:common",
+        "//src/main/java/build/buildfarm:instance",
         "//src/main/java/build/buildfarm:worker",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
     ],
 )
