@@ -18,6 +18,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.worker.CASFileCache;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.CASInsertionPolicy;
+import com.google.devtools.remoteexecution.v1test.Action;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
 import com.google.longrunning.Operation;
@@ -46,7 +47,8 @@ class StubWorkerContext implements WorkerContext {
   @Override public Duration getMaximumActionTimeout() { throw new UnsupportedOperationException(); }
   @Override public Instance getInstance() { throw new UnsupportedOperationException(); }
   @Override public ByteString getBlob(Digest digest) { throw new UnsupportedOperationException(); }
-  @Override public CASFileCache getCASFileCache() { throw new UnsupportedOperationException(); }
+  @Override public void createActionRoot(Path root, Action action) { throw new UnsupportedOperationException(); }
+  @Override public void destroyActionRoot(Path root) { throw new UnsupportedOperationException(); }
   @Override public Path getRoot() { throw new UnsupportedOperationException(); }
   @Override public void removeDirectory(Path path) { throw new UnsupportedOperationException(); }
 };
