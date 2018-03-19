@@ -15,24 +15,24 @@
 package build.buildfarm.worker.operationqueue;
 
 import build.buildfarm.v1test.WorkerConfig;
-import build.buildfarm.worker.operationqueue.Worker;
 import javax.naming.ConfigurationException;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
-public class BuildFarmWorkerTest {
+public class WorkerTest {
   @Test(expected = ConfigurationException.class)
   public void missingWorkerRoot() throws ConfigurationException {
-    WorkerConfig.Builder builder = WorkerConfig.newBuilder();
-    new Worker(builder.build());
+    new Worker(WorkerConfig.newBuilder()
+        .setCasCacheDirectory("/cache")
+        .build());
   }
 
   @Test(expected = ConfigurationException.class)
   public void missingCasCacheDirectory() throws ConfigurationException {
-    WorkerConfig.Builder builder = WorkerConfig.newBuilder();
-    builder.setRoot("/");
-    new Worker(builder.build());
+    new Worker(WorkerConfig.newBuilder()
+        .setRoot("/")
+        .build());
   }
 }
