@@ -73,12 +73,15 @@ public class StubInstance implements Instance {
   private final Channel channel;
   private final ByteStreamUploader uploader;
 
-  public StubInstance(String name, DigestUtil digestUtil, Channel channel) {
+  public StubInstance(
+      String name,
+      DigestUtil digestUtil,
+      Channel channel,
+      ByteStreamUploader uploader) {
     this.name = name;
     this.digestUtil = digestUtil;
     this.channel = channel;
-
-    uploader = new ByteStreamUploader(name, channel, null, 60, new Retrier(), null);
+    this.uploader = uploader;
   }
 
   private final Supplier<ActionCacheBlockingStub> actionCacheBlockingStub =

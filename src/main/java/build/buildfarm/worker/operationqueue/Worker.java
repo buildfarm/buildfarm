@@ -17,6 +17,9 @@ package build.buildfarm.worker.operationqueue;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.instance.stub.ByteStreamUploader;
+import build.buildfarm.instance.stub.Retrier;
+import build.buildfarm.instance.stub.Retrier.Backoff;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.v1test.WorkerConfig;
@@ -34,6 +37,8 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
+import com.google.common.util.concurrent.ListeningScheduledExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.devtools.common.options.OptionsParser;
 import com.google.devtools.remoteexecution.v1test.Action;
 import com.google.devtools.remoteexecution.v1test.Digest;
@@ -46,7 +51,7 @@ import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.TextFormat;
-import io.grpc.ManagedChannel;
+import io.grpc.Channel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import java.io.File;
@@ -64,6 +69,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
@@ -76,8 +82,10 @@ public class Worker {
   private final CASFileCache fileCache;
   private final Map<Path, Iterable<Path>> rootInputFiles = new ConcurrentHashMap<>();
   private final Map<Path, Iterable<Digest>> rootInputDirectories = new ConcurrentHashMap<>();
+  private final ListeningScheduledExecutorService retryScheduler =
+      MoreExecutors.listeningDecorator(Executors.newScheduledThreadPool(1));
 
-  private static ManagedChannel createChannel(String target) {
+  private static Channel createChannel(String target) {
     NettyChannelBuilder builder =
         NettyChannelBuilder.forTarget(target)
             .negotiationType(NegotiationType.PLAINTEXT);
@@ -108,6 +116,21 @@ public class Worker {
     }
   }
 
+  private static Retrier createStubRetrier() {
+    return new Retrier(
+        Backoff.exponential(
+            java.time.Duration.ofMillis(/*options.experimentalRemoteRetryStartDelayMillis=*/ 100),
+            java.time.Duration.ofMillis(/*options.experimentalRemoteRetryMaxDelayMillis=*/ 5000),
+            /*options.experimentalRemoteRetryMultiplier=*/ 2,
+            /*options.experimentalRemoteRetryJitter=*/ 0.1,
+            /*options.experimentalRemoteRetryMaxAttempts=*/ 5),
+        Retrier.DEFAULT_IS_RETRIABLE);
+  }
+
+  private ByteStreamUploader createStubUploader(Channel channel) {
+    return new ByteStreamUploader("", channel, null, 300, createStubRetrier(), retryScheduler);
+  }
+
   public Worker(WorkerConfig config) throws ConfigurationException {
     this.config = config;
 
@@ -117,10 +140,12 @@ public class Worker {
     HashFunction hashFunction = getValidHashFunction(config);
 
     /* initialization */
+    Channel channel = createChannel(config.getOperationQueue());
     instance = new StubInstance(
         config.getInstanceName(),
         new DigestUtil(hashFunction),
-        createChannel(config.getOperationQueue()));
+        channel,
+        createStubUploader(channel));
     InputStreamFactory inputStreamFactory = new InputStreamFactory() {
       @Override
       public InputStream apply(Digest digest) {

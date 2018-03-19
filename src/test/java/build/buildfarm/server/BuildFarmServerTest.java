@@ -314,7 +314,7 @@ public class BuildFarmServerTest {
         .setCommandDigest(digestUtil.compute(commandBlob))
         .setInputRootDigest(digestUtil.compute(rootBlob))
         .build();
-    ByteStreamUploader uploader = new ByteStreamUploader("memory", inProcessChannel, null, 60, new Retrier(), null);
+    ByteStreamUploader uploader = new ByteStreamUploader("memory", inProcessChannel, null, 60, Retrier.NO_RETRIES, null);
 
     uploader.uploadBlobs(ImmutableList.of(
         new Chunker(rootBlob, digestUtil),
