@@ -259,24 +259,24 @@ public class Worker {
     for (String outputFile : outputFiles) {
       while (!outputFile.startsWith(prefix)) {
         currentOutputDirectory = stack.pop();
-        int upPathSeparatorIndex = prefix.lastIndexOf(File.separator, prefix.length() - 2);
+        int upPathSeparatorIndex = prefix.lastIndexOf('/', prefix.length() - 2);
         prefix = prefix.substring(0, upPathSeparatorIndex + 1);
       }
       String prefixedFile = outputFile.substring(prefix.length());
-      int separatorIndex = prefixedFile.indexOf(File.separator);
+      int separatorIndex = prefixedFile.indexOf('/');
       while (separatorIndex >= 0) {
         if (separatorIndex == 0) {
           throw new IllegalArgumentException("double separator in output file");
         }
 
         String directoryName = prefixedFile.substring(0, separatorIndex);
-        prefix += directoryName + File.separator;
+        prefix += directoryName + '/';
         prefixedFile = prefixedFile.substring(separatorIndex + 1);
         stack.push(currentOutputDirectory);
         OutputDirectory nextOutputDirectory = new OutputDirectory();
         currentOutputDirectory.directories.put(directoryName, nextOutputDirectory);
         currentOutputDirectory = nextOutputDirectory;
-        separatorIndex = prefixedFile.indexOf(File.separator);
+        separatorIndex = prefixedFile.indexOf('/');
       }
     }
 
