@@ -25,6 +25,7 @@ import com.google.devtools.remoteexecution.v1test.Directory;
 import com.google.devtools.remoteexecution.v1test.DirectoryNode;
 import com.google.devtools.remoteexecution.v1test.FileNode;
 import io.grpc.StatusRuntimeException;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.FileVisitResult;
@@ -347,12 +348,7 @@ public class CASFileCache {
   }
 
   private static void setPermissions(Path path, boolean isExecutable) throws IOException {
-    ImmutableSet.Builder<PosixFilePermission> perms = new ImmutableSet.Builder<PosixFilePermission>()
-      .add(PosixFilePermission.OWNER_READ);
-    if (isExecutable) {
-      perms.add(PosixFilePermission.OWNER_EXECUTE);
-    }
-    Files.setPosixFilePermissions(path, perms.build());
+    new File(path.toString()).setExecutable(false, isExecutable);
   }
 
   private static class Entry {
