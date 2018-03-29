@@ -18,7 +18,6 @@ import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 
 import build.buildfarm.common.DigestUtil;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.devtools.remoteexecution.v1test.Directory;
@@ -33,7 +32,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.nio.file.attribute.PosixFilePermission;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;

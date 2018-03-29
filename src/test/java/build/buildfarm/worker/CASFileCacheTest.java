@@ -50,7 +50,6 @@ class CASFileCacheTest {
 
   protected CASFileCacheTest(Configuration config) {
     this.config = config.toBuilder()
-        .setAttributeViews("posix")
         .build();
   }
 
