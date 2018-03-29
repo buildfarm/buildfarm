@@ -49,8 +49,7 @@ class CASFileCacheTest {
   private Map<Digest, ByteString> blobs;
 
   protected CASFileCacheTest(Configuration config) {
-    this.config = config.toBuilder()
-        .build();
+    this.config = config;
   }
 
   @Before
