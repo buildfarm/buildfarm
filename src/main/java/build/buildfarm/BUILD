@@ -110,7 +110,7 @@ java_binary(
 load("@io_bazel_rules_docker//container:container.bzl", "container_image")
 
 container_image(
-    name = "server",
+    name = "server.container",
     base = "@java_base//image",
     # leverage the implicit target of the buildfarm-server to get a fat jar.
     # this is simply a workaround for the fact that we have so many dependencies,
@@ -197,5 +197,21 @@ java_binary(
     main_class = "build.buildfarm.worker.operationqueue.Worker",
     runtime_deps = [
         ":operationqueue-worker",
+    ],
+)
+
+container_image(
+    name = "worker.container",
+    base = "@java_base//image",
+    # leverage the implicit target of the buildfarm-server to get a fat jar.
+    # this is simply a workaround for the fact that we have so many dependencies,
+    # so we'd want some wrappy script. This seemed more straightforward.
+    # https://docs.bazel.build/versions/master/be/java.html#java_binary_implicit_outputs
+    files = [
+        "//src/main/java/build/buildfarm:buildfarm-worker_deploy.jar",
+    ],
+    cmd = [
+        "buildfarm-worker_deploy.jar",
+        "/config/worker.config",
     ],
 )
