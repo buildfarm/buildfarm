@@ -107,6 +107,26 @@ java_binary(
     ],
 )
 
+load("@io_bazel_rules_docker//container:container.bzl", "container_image")
+
+container_image(
+    name = "server",
+    base = "@java_base//image",
+    # leverage the implicit target of the buildfarm-server to get a fat jar.
+    # this is simply a workaround for the fact that we have so many dependencies,
+    # so we'd want some wrappy script. This seemed more straightforward.
+    # https://docs.bazel.build/versions/master/be/java.html#java_binary_implicit_outputs
+    files = [
+        "//src/main/java/build/buildfarm:buildfarm-server_deploy.jar"
+    ],
+    cmd = [
+        "buildfarm-server_deploy.jar",
+        "/config/server.config",
+        "--port",
+        "8098"
+    ],
+)
+
 java_library(
     name = "stub-instance",
     srcs = glob(["instance/stub/*.java"]),
