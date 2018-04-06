@@ -346,7 +346,7 @@ public class CASFileCache {
   }
 
   private static void setPermissions(Path path, boolean isExecutable) throws IOException {
-    new File(path.toString()).setExecutable(false, isExecutable);
+    new File(path.toString()).setExecutable(isExecutable, true);
   }
 
   private static class Entry {
