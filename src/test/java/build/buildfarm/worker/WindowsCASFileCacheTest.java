@@ -14,13 +14,17 @@
 
 package build.buildfarm.worker;
 
+import com.google.common.collect.Iterables;
 import com.google.common.jimfs.Configuration;
+import com.google.common.jimfs.Jimfs;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class WindowsCASFileCacheTest extends CASFileCacheTest {
   public WindowsCASFileCacheTest() {
-    super(Configuration.windows());
+    super(Iterables.getFirst(
+        Jimfs.newFileSystem(Configuration.windows()).getRootDirectories(),
+        null));
   }
 }
