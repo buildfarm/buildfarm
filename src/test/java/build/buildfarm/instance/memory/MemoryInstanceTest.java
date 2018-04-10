@@ -120,28 +120,7 @@ public class MemoryInstanceTest {
     // we should not be at the end
     assertThat(nextToken).isNotEqualTo("");
     assertThat(operations.build().size()).isEqualTo(1);
-  }
 
-  @Test
-  public void listOperationsPages() {
-    Operation testOperation1 = Operation.newBuilder()
-        .setName("test-operation1")
-        .build();
-
-    Operation testOperation2 = Operation.newBuilder()
-        .setName("test-operation2")
-        .build();
-
-    outstandingOperations.put(testOperation1.getName(), testOperation1);
-    outstandingOperations.put(testOperation2.getName(), testOperation2);
-
-    ImmutableList.Builder<Operation> operations = new ImmutableList.Builder<>();
-
-    String nextToken = instance.listOperations(
-        /* pageSize=*/ 1,
-        /* pageToken=*/ "",
-        /* filter=*/ "",
-        operations);
     nextToken = instance.listOperations(
         /* pageSize=*/ 1,
         /* pageToken=*/ nextToken,
