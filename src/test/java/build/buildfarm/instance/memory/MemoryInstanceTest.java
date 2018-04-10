@@ -22,6 +22,7 @@ import build.buildfarm.common.DigestUtil;
 import com.google.common.collect.ImmutableList;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Duration;
+import com.google.protobuf.util.Durations;
 import java.util.HashMap;
 import java.util.Map;
 import org.junit.Before;
@@ -49,18 +50,10 @@ public class MemoryInstanceTest {
         .setListOperationsMaxPageSize(16384)
         .setTreeDefaultPageSize(1024)
         .setTreeMaxPageSize(16384)
-        .setOperationPollTimeout(Duration.newBuilder()
-            .setSeconds(10)
-            .setNanos(0))
-        .setOperationCompletedDelay(Duration.newBuilder()
-            .setSeconds(10)
-            .setNanos(0))
-        .setDefaultActionTimeout(Duration.newBuilder()
-            .setSeconds(600)
-            .setNanos(0))
-        .setMaximumActionTimeout(Duration.newBuilder()
-            .setSeconds(3600)
-            .setNanos(0))
+        .setOperationPollTimeout(Durations.fromSeconds(10))
+        .setOperationCompletedDelay(Durations.fromSeconds(10))
+        .setDefaultActionTimeout(Durations.fromSeconds(600))
+        .setMaximumActionTimeout(Durations.fromSeconds(3600))
         .build();
 
     instance = new MemoryInstance(
