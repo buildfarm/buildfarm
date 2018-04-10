@@ -21,6 +21,7 @@ import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.instance.TokenizableIterator;
 import build.buildfarm.v1test.MemoryInstanceConfig;
 import build.buildfarm.v1test.OperationIteratorToken;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -86,7 +87,8 @@ public class MemoryInstance extends AbstractServerInstance {
         /*outstandingOperations=*/ new TreeMap<String, Operation>());
   }
 
-  private MemoryInstance(
+  @VisibleForTesting
+  public MemoryInstance(
       String name,
       DigestUtil digestUtil,
       MemoryInstanceConfig config,
@@ -425,18 +427,20 @@ public class MemoryInstance extends AbstractServerInstance {
   protected TokenizableIterator<Operation> createOperationsIterator(
       String pageToken) {
     Iterator<Operation> iter = sortedOperations().iterator();
-    OperationIteratorToken token;
-    try {
-      token = OperationIteratorToken.parseFrom(
-          BaseEncoding.base64().decode(pageToken));
-    } catch (InvalidProtocolBufferException ex) {
-      throw new IllegalArgumentException();
-    }
+    final OperationIteratorToken token;
     if (!pageToken.isEmpty()) {
-      boolean paged = true;
-      while (iter.hasNext() && !paged) {
-        paged = iter.next().getName().equals(pageToken);
+      try {
+        token = OperationIteratorToken.parseFrom(
+            BaseEncoding.base64().decode(pageToken));
+      } catch (InvalidProtocolBufferException ex) {
+        throw new IllegalArgumentException();
       }
+      boolean paged = false;
+      while (iter.hasNext() && !paged) {
+        paged = iter.next().getName().equals(token.getOperationName());
+      }
+    } else {
+      token = null;
     }
     return new TokenizableIterator<Operation>() {
       private OperationIteratorToken nextToken = token;
