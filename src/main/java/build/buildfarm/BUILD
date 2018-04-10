@@ -2,6 +2,8 @@ package(
     default_visibility = ["//src:__subpackages__"],
 )
 
+load("@io_bazel_rules_docker//container:container.bzl", "container_image")
+
 java_library(
     name = "common",
     srcs = glob(["common/**/*.java"]),
@@ -107,8 +109,6 @@ java_binary(
     ],
 )
 
-load("@io_bazel_rules_docker//container:container.bzl", "container_image")
-
 container_image(
     name = "server.container",
     base = "@java_base//image",
@@ -117,7 +117,7 @@ container_image(
     # so we'd want some wrappy script. This seemed more straightforward.
     # https://docs.bazel.build/versions/master/be/java.html#java_binary_implicit_outputs
     files = [
-        "//src/main/java/build/buildfarm:buildfarm-server_deploy.jar"
+        ":buildfarm-server_deploy.jar"
     ],
     cmd = [
         "buildfarm-server_deploy.jar",
@@ -208,7 +208,7 @@ container_image(
     # so we'd want some wrappy script. This seemed more straightforward.
     # https://docs.bazel.build/versions/master/be/java.html#java_binary_implicit_outputs
     files = [
-        "//src/main/java/build/buildfarm:buildfarm-worker_deploy.jar",
+        ":buildfarm-worker_deploy.jar",
     ],
     cmd = [
         "buildfarm-worker_deploy.jar",
