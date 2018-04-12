@@ -19,7 +19,10 @@ import com.google.common.collect.Iterables;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Stack;
 
@@ -42,15 +45,19 @@ public class OutputDirectory extends HashMap<String, OutputDirectory> {
     OutputDirectory outputDirectory = new OutputDirectory();
     Stack<OutputDirectory> stack = new Stack<>();
 
+    List<String> sortedOutputDirs = new ArrayList<>();
+    Iterables.addAll(sortedOutputDirs, Iterables.transform(outputDirs, (d) -> d + "/"));
+    Collections.sort(sortedOutputDirs);
+
     OutputDirectory currentOutputDirectory = outputDirectory;
     String prefix = "";
-    for (String outputDir : outputDirs) {
+    for (String outputDir : sortedOutputDirs) {
       while (!outputDir.startsWith(prefix)) {
         currentOutputDirectory = stack.pop();
         int upPathSeparatorIndex = prefix.lastIndexOf('/', prefix.length() - 2);
         prefix = prefix.substring(0, upPathSeparatorIndex + 1);
       }
-      String prefixedFile = outputDir.substring(prefix.length());
+      String prefixedFile = outputDir.substring(prefix.length(), outputDir.length() - 1);
       while (prefixedFile.length() > 0) {
         int separatorIndex = prefixedFile.indexOf('/');
         if (separatorIndex == 0) {
