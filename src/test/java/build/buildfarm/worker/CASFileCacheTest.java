@@ -20,9 +20,6 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Iterables;
-import com.google.common.jimfs.Configuration;
-import com.google.common.jimfs.Jimfs;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.devtools.remoteexecution.v1test.Directory;
 import com.google.devtools.remoteexecution.v1test.DirectoryNode;
@@ -32,7 +29,6 @@ import java.io.InputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.FileSystem;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
@@ -40,24 +36,19 @@ import org.junit.Before;
 import org.junit.Test;
 
 class CASFileCacheTest {
-  private final Configuration config;
-
   private CASFileCache fileCache;
   private DigestUtil digestUtil;
-  private FileSystem fileSystem;
   private Path root;
   private Map<Digest, ByteString> blobs;
 
-  protected CASFileCacheTest(Configuration config) {
-    this.config = config;
+  protected CASFileCacheTest(Path root) {
+    this.root = root;
   }
 
   @Before
   public void setUp() {
     digestUtil = new DigestUtil(HashFunction.SHA256);
-    fileSystem = Jimfs.newFileSystem(config);
     blobs = new HashMap<Digest, ByteString>();
-    root = Iterables.getFirst(fileSystem.getRootDirectories(), null);
     fileCache = new CASFileCache(
         new InputStreamFactory() {
           @Override

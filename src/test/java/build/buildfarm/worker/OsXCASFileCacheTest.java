@@ -14,13 +14,17 @@
 
 package build.buildfarm.worker;
 
+import com.google.common.collect.Iterables;
 import com.google.common.jimfs.Configuration;
+import com.google.common.jimfs.Jimfs;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class OsXCASFileCacheTest extends CASFileCacheTest {
   public OsXCASFileCacheTest() {
-    super(Configuration.osX());
+    super(Iterables.getFirst(
+        Jimfs.newFileSystem(Configuration.osX()).getRootDirectories(),
+        null));
   }
 }
