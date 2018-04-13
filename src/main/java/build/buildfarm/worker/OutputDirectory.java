@@ -32,13 +32,12 @@ public class OutputDirectory extends HashMap<String, OutputDirectory> {
   }
 
   public static OutputDirectory parse(Iterable<String> outputFiles, Iterable<String> outputDirs) {
-    return parseDirectories(Iterables.mergeSorted(
+    return parseDirectories(Iterables.concat(
         ImmutableList.<Iterable<String>>of(
             Iterables.transform(
-                outputFiles,
-                (file) -> file.contains("/") ? file.substring(0, file.lastIndexOf('/') + 1) : ""),
-            outputDirs),
-        (a, b) -> a.compareTo(b)));
+                Iterables.filter(outputFiles, (file) -> file.contains("/")),
+                (file) -> "/" + file.substring(0, file.lastIndexOf('/') + 1)),
+            Iterables.transform(outputDirs, (d) -> d.isEmpty() ? "/" : ("/" + d + "/")))));
   }
 
   private static OutputDirectory parseDirectories(Iterable<String> outputDirs) {
@@ -46,11 +45,11 @@ public class OutputDirectory extends HashMap<String, OutputDirectory> {
     Stack<OutputDirectory> stack = new Stack<>();
 
     List<String> sortedOutputDirs = new ArrayList<>();
-    Iterables.addAll(sortedOutputDirs, Iterables.transform(outputDirs, (d) -> d + "/"));
+    Iterables.addAll(sortedOutputDirs, outputDirs);
     Collections.sort(sortedOutputDirs);
 
     OutputDirectory currentOutputDirectory = outputDirectory;
-    String prefix = "";
+    String prefix = "/";
     for (String outputDir : sortedOutputDirs) {
       while (!outputDir.startsWith(prefix)) {
         currentOutputDirectory = stack.pop();
