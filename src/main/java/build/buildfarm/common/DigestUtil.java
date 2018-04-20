@@ -86,6 +86,20 @@ public class DigestUtil {
     private ActionKey(Digest digest) {
       this.digest = digest;
     }
+
+    @Override
+    public boolean equals(Object o) {
+      if (o instanceof ActionKey) {
+        ActionKey actionKey = (ActionKey) o;
+        return digest.equals(actionKey.getDigest());
+      }
+      return false;
+    }
+
+    @Override
+    public int hashCode() {
+      return digest.hashCode();
+    }
   }
 
   private final HashFunction hashFn;
