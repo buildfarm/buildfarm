@@ -15,11 +15,17 @@
 package build.buildfarm.instance.memory;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.mockito.Mockito.when;
 
-import build.buildfarm.v1test.MemoryInstanceConfig;
 import build.buildfarm.common.ContentAddressableStorage;
+import build.buildfarm.common.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.DigestUtil.HashFunction;
+import build.buildfarm.instance.Instance;
+import build.buildfarm.v1test.MemoryInstanceConfig;
 import com.google.common.collect.ImmutableList;
+import com.google.devtools.remoteexecution.v1test.Action;
+import com.google.devtools.remoteexecution.v1test.ActionResult;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Duration;
 import com.google.protobuf.util.Durations;
@@ -34,7 +40,7 @@ import org.mockito.MockitoAnnotations;
 
 @RunWith(JUnit4.class)
 public class MemoryInstanceTest {
-  private MemoryInstance instance;
+  private Instance instance;
 
   private Map<String, Operation> outstandingOperations;
 
@@ -129,5 +135,27 @@ public class MemoryInstanceTest {
     // we should have reached the end
     assertThat(nextToken).isEqualTo("");
     assertThat(operations.build()).containsExactly(testOperation1, testOperation2);
+  }
+
+  @Test
+  public void actionCacheMissResult() {
+    Action action = Action.getDefaultInstance();
+
+    assertThat(instance.getActionResult(
+          instance.getDigestUtil().computeActionKey(action))).isNull();
+  }
+
+  @Test
+  public void actionCacheRetrievableByActionKey() {
+    ActionResult result = ActionResult.getDefaultInstance();
+    when(storage.get(instance.getDigestUtil().compute(result)))
+        .thenReturn(new Blob(result.toByteString(), instance.getDigestUtil()));
+
+    Action action = Action.getDefaultInstance();
+    instance.putActionResult(
+        instance.getDigestUtil().computeActionKey(action),
+        result);
+    assertThat(instance.getActionResult(
+        instance.getDigestUtil().computeActionKey(action))).isEqualTo(result);
   }
 }
