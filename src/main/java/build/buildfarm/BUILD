@@ -1,8 +1,8 @@
+load("@io_bazel_rules_docker//container:container.bzl", "container_image")
+
 package(
     default_visibility = ["//src:__subpackages__"],
 )
-
-load("@io_bazel_rules_docker//container:container.bzl", "container_image")
 
 java_library(
     name = "common",
