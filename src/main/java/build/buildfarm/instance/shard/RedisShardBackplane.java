@@ -586,7 +586,23 @@ public class RedisShardBackplane implements ShardBackplane {
 
   public Iterable<String> getCompletedOperations() throws IOException {
     try (Jedis jedis = getJedis()) {
-      return jedis.lrange(config.getCompletedOperationsListName(), 0, -1);
+      return getCompletedOperations(jedis);
+    } catch (JedisConnectionException e) {
+      Throwable cause = e.getCause();
+      if (cause instanceof IOException) {
+        throw (IOException) cause;
+      }
+      throw new IOException(e);
+    }
+  }
+
+  public Map<String, Operation> getOperationsMap() throws IOException {
+    try (Jedis jedis = getJedis()) {
+      ImmutableMap.Builder<String, Operation> builder = new ImmutableMap.Builder<>();
+      for (Map.Entry<String, String> entry : jedis.hgetAll(config.getDispatchedOperationsHashName()).entrySet()) {
+        builder.put(entry.getKey(), parseOperationJson(entry.getValue()));
+      }
+      return builder.build();
     } catch (JedisConnectionException e) {
       Throwable cause = e.getCause();
       if (cause instanceof IOException) {
