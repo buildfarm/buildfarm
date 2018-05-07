@@ -37,6 +37,9 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.rpc.Code;
 import io.grpc.Status;
+import io.grpc.StatusException;
+import io.grpc.StatusRuntimeException;
+import java.io.IOException;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -164,7 +167,7 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public Digest putBlob(ByteString content) throws IllegalArgumentException {
+  public Digest putBlob(ByteString content) throws IOException, InterruptedException, StatusException {
     if (content.size() == 0) {
       return digestUtil.empty();
     }
@@ -174,7 +177,7 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs) {
+  public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs) throws IOException, InterruptedException, StatusException {
     ImmutableList.Builder<Digest> blobDigestsBuilder =
       new ImmutableList.Builder<Digest>();
     for (ByteString blob : blobs) {
@@ -235,7 +238,7 @@ public abstract class AbstractServerInstance implements Instance {
   abstract protected Operation createOperation(ActionKey actionKey);
 
   // called when an operation will be queued for execution
-  protected void onQueue(Operation operation, Action action) {
+  protected void onQueue(Operation operation, Action action) throws IOException, InterruptedException, StatusException {
   }
 
   private void stringsUniqueAndSortedPrecondition(
@@ -418,7 +421,16 @@ public abstract class AbstractServerInstance implements Instance {
               .setCachedResult(actionResult != null)
               .build()));
     } else {
-      onQueue(operation, action);
+      try {
+        onQueue(operation, action);
+      } catch (IOException|StatusException ex) {
+        deleteOperation(operation.getName());
+        throw new StatusRuntimeException(Status.fromThrowable(ex));
+      } catch (InterruptedException ex) {
+        deleteOperation(operation.getName());
+        Thread.currentThread().interrupt();
+        throw new StatusRuntimeException(Status.fromThrowable(ex));
+      }
       metadata = metadata.toBuilder()
           .setStage(ExecuteOperationMetadata.Stage.QUEUED)
           .build();

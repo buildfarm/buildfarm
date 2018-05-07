@@ -26,6 +26,7 @@ import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
+import io.grpc.StatusException;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Path;

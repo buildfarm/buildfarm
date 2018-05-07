@@ -36,6 +36,7 @@ import com.google.devtools.remoteexecution.v1test.FileNode;
 import com.google.devtools.remoteexecution.v1test.OutputDirectory;
 import com.google.devtools.remoteexecution.v1test.Tree;
 import com.google.protobuf.ByteString;
+import io.grpc.StatusException;
 import java.io.IOException;
 import java.nio.file.FileSystem;
 import java.nio.file.Files;
@@ -81,7 +82,7 @@ public class ReportResultStageTest {
 
   @Test
   public void uploadOutputsUploadsEmptyOutputDirectories()
-      throws IOException, InterruptedException {
+      throws IOException, StatusException, InterruptedException {
     Files.createDirectory(root.resolve("foo"));
     // maybe make some files...
     ActionResult.Builder resultBuilder = ActionResult.newBuilder();
@@ -106,7 +107,7 @@ public class ReportResultStageTest {
 
   @Test
   public void uploadOutputsUploadsFiles()
-      throws IOException, InterruptedException {
+      throws IOException, StatusException, InterruptedException {
     Path topdir = root.resolve("foo");
     Files.createDirectory(topdir);
     Path file = topdir.resolve("bar");
@@ -141,7 +142,7 @@ public class ReportResultStageTest {
 
   @Test
   public void uploadOutputsUploadsNestedDirectories()
-      throws IOException, InterruptedException {
+      throws IOException, StatusException, InterruptedException {
     Path topdir = root.resolve("foo");
     Files.createDirectory(topdir);
     Path subdir = topdir.resolve("bar");
@@ -185,7 +186,7 @@ public class ReportResultStageTest {
 
   @Test
   public void uploadOutputsIgnoresMissingOutputDirectories()
-      throws IOException, InterruptedException {
+      throws IOException, StatusException, InterruptedException {
     ActionResult.Builder resultBuilder = ActionResult.newBuilder();
     UploadManifest manifest = reportResultStage.createManifest(
         resultBuilder,

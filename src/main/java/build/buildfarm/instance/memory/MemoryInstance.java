@@ -39,6 +39,8 @@ import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
+import io.grpc.StatusException;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
@@ -187,7 +189,7 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  protected void onQueue(Operation operation, Action action) {
+  protected void onQueue(Operation operation, Action action) throws IOException, InterruptedException, StatusException {
     putBlob(action.toByteString());
   }
 

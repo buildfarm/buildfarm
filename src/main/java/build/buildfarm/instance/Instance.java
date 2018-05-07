@@ -43,7 +43,7 @@ public interface Instance {
   Iterable<Digest> findMissingBlobs(Iterable<Digest> digests);
 
   Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs)
-      throws IOException, IllegalArgumentException, InterruptedException;
+      throws IOException, InterruptedException, StatusException;
 
   String getBlobName(Digest blobDigest);
   ByteString getBlob(Digest blobDigest);

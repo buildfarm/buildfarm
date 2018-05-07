@@ -35,6 +35,7 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
+import io.grpc.StatusRuntimeException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.FileVisitResult;
@@ -193,6 +194,8 @@ public class ReportResultStage extends PipelineStage {
           operationContext.action.getOutputDirectoriesList());
       uploadManifest(manifest);
     } catch (IOException ex) {
+      throw new IllegalStateException(ex);
+    } catch (StatusRuntimeException e) {
       poller.stop();
       return null;
     }
