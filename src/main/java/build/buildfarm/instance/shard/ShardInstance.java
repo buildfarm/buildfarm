@@ -17,14 +17,18 @@ package build.buildfarm.instance.shard;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.ShardBackplane;
-import build.buildfarm.instance.Instance;
+import build.buildfarm.instance.AbstractServerInstance;
+import build.buildfarm.instance.TokenizableIterator;
+import build.buildfarm.instance.TreeIterator;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Retrier;
 import build.buildfarm.instance.stub.Retrier.Backoff;
 import build.buildfarm.instance.stub.StubInstance;
+import build.buildfarm.v1test.OperationIteratorToken;
 import build.buildfarm.v1test.ShardInstanceConfig;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.devtools.remoteexecution.v1test.Action;
@@ -53,6 +57,7 @@ import java.io.OutputStream;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -64,9 +69,7 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 import javax.naming.ConfigurationException;
 
-public class ShardInstance implements Instance {
-  private final String name;
-  private DigestUtil digestUtil;
+public class ShardInstance extends AbstractServerInstance {
   private final ShardInstanceConfig config;
   private final ShardBackplane backplane;
   private final Map<String, StubInstance> workerStubs;
@@ -74,8 +77,7 @@ public class ShardInstance implements Instance {
       MoreExecutors.listeningDecorator(Executors.newScheduledThreadPool(1));
 
   public ShardInstance(String name, DigestUtil digestUtil, ShardInstanceConfig config) throws InterruptedException, ConfigurationException {
-    this.name = name;
-    this.digestUtil = digestUtil;
+    super(name, digestUtil, null, null, null, null);
     this.config = config;
     ShardInstanceConfig.BackplaneCase backplaneCase = config.getBackplaneCase();
     switch (backplaneCase) {
@@ -87,16 +89,6 @@ public class ShardInstance implements Instance {
         break;
     }
     workerStubs = new ConcurrentHashMap<>();
-  }
-
-  @Override
-  public String getName() {
-    return name;
-  }
-
-  @Override
-  public DigestUtil getDigestUtil() {
-    return digestUtil;
   }
 
   @Override
@@ -267,6 +259,13 @@ public class ShardInstance implements Instance {
     }
   }
 
+  protected int getTreeDefaultPageSize() { return 1024; }
+  protected int getTreeMaxPageSize() { return 1024; }
+  protected TokenizableIterator<Directory> createTreeIterator(
+      Digest rootDigest, String pageToken) {
+    return new TreeIterator((digest) -> getBlob(digest), rootDigest, pageToken);
+  }
+
   private void removeMalfunctioningWorker(String worker) {
     if (worker == null) {
       return;
@@ -274,15 +273,6 @@ public class ShardInstance implements Instance {
 
     workerStubs.remove(worker);
     backplane.removeWorker(worker);
-  }
-
-  @Override
-  public String getTree(
-      Digest rootDigest,
-      int pageSize,
-      String pageToken,
-      ImmutableList.Builder<Directory> directories) {
-    throw new UnsupportedOperationException();
   }
 
   @Override
@@ -295,15 +285,13 @@ public class ShardInstance implements Instance {
     throw new UnsupportedOperationException();
   }
 
-  private String createOperationName(String id) {
-    return getName() + "/operations/" + id;
-  }
-
   private static ExecuteOperationMetadata createExecuteOperationMetadata(ActionKey actionKey) {
     return ExecuteOperationMetadata.newBuilder()
         .setActionDigest(actionKey.getDigest())
         .build();
   }
+
+  protected Operation createOperation(ActionKey actionKey) { throw new UnsupportedOperationException(); }
 
   private Operation createOperation(ExecuteOperationMetadata metadata) {
     String name = createOperationName(UUID.randomUUID().toString());
@@ -363,26 +351,23 @@ public class ShardInstance implements Instance {
     throw new UnsupportedOperationException();
   }
 
+  protected boolean matchOperation(Operation operation) { throw new UnsupportedOperationException(); }
+  protected void enqueueOperation(Operation operation) { throw new UnsupportedOperationException(); }
+  protected Object operationLock(String operationName) { throw new UnsupportedOperationException(); }
+
   @Override
   public boolean pollOperation(String operationName, Stage stage) {
     throw new UnsupportedOperationException();
   }
 
-  // returns nextPageToken suitable for list restart
   @Override
-  public String listOperations(
-      int pageSize,
-      String pageToken,
-      String filter,
-      ImmutableList.Builder<Operation> operations) {
-    /*
-    try (Jedis jedis = backplane.getJedis()) {
-      operations.add(parseOperationJson(jedis.get("Operation:" + operation)));
-    } catch (InvalidProtocolBufferException ex) {
-      ex.printStackTrace();
-    }
-    return "";
-    */
+  protected int getListOperationsDefaultPageSize() { return 1024; }
+
+  @Override
+  protected int getListOperationsMaxPageSize() { return 1024; }
+
+  @Override
+  protected TokenizableIterator<Operation> createOperationsIterator(String pageToken) {
     throw new UnsupportedOperationException();
   }
 

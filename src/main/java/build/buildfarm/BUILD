@@ -81,7 +81,7 @@ java_library(
     srcs = glob(["instance/shard/*.java"]),
     deps = [
         ":common",
-        ":instance",
+        ":server-instance",
         ":stub-instance",
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
