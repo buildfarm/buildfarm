@@ -133,7 +133,7 @@ public class TreeIterator implements TokenizableIterator<Directory> {
   private TreeIteratorToken parseToken(byte[] bytes) {
     try {
       return TreeIteratorToken.parseFrom(bytes);
-    } catch (InvalidProtocolBufferException ex) {
+    } catch (InvalidProtocolBufferException e) {
       throw new IllegalArgumentException();
     }
   }

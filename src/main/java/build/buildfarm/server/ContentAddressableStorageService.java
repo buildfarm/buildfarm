@@ -47,8 +47,8 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
     Instance instance;
     try {
       instance = instances.get(request.getInstanceName());
-    } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
+    } catch (InstanceNotFoundException e) {
+      responseObserver.onError(BuildFarmInstances.toStatusException(e));
       return;
     }
 
@@ -66,8 +66,8 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
     Instance instance;
     try {
       instance = instances.get(batchRequest.getInstanceName());
-    } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
+    } catch (InstanceNotFoundException e) {
+      responseObserver.onError(BuildFarmInstances.toStatusException(e));
       return;
     }
 
@@ -96,11 +96,11 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
 
     try {
       instance.putAllBlobs(validBlobsBuilder.build());
-    } catch (IOException|StatusException ex) {
-      responseObserver.onError(new StatusException(Status.fromThrowable(ex)));
+    } catch (IOException|StatusException e) {
+      responseObserver.onError(Status.fromThrowable(e).asException());
       return;
-    } catch (InterruptedException ex) {
-      responseObserver.onError(new StatusException(Status.fromThrowable(ex)));
+    } catch (InterruptedException e) {
+      responseObserver.onError(Status.fromThrowable(e).asException());
       Thread.currentThread().interrupt();
       return;
     }
@@ -118,14 +118,14 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
     Instance instance;
     try {
       instance = instances.get(request.getInstanceName());
-    } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
+    } catch (InstanceNotFoundException e) {
+      responseObserver.onError(BuildFarmInstances.toStatusException(e));
       return;
     }
 
     int pageSize = request.getPageSize();
     if (pageSize < 0) {
-      responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
+      responseObserver.onError(Status.INVALID_ARGUMENT.asException());
       return;
     }
     ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
@@ -139,7 +139,7 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
           .build());
       responseObserver.onCompleted();
     } catch (InterruptedException|IOException e) {
-      responseObserver.onError(new StatusException(Status.fromThrowable(e)));
+      responseObserver.onError(Status.fromThrowable(e).asException());
     }
   }
 }

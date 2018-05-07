@@ -383,8 +383,8 @@ public class Worker {
     try {
       Files.createDirectories(root);
       fileCache.start();
-    } catch(IOException ex) {
-      ex.printStackTrace();
+    } catch(IOException e) {
+      e.printStackTrace();
       return;
     }
 

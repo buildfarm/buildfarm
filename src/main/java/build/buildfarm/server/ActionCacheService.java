@@ -38,15 +38,15 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
     Instance instance;
     try {
       instance = instances.get(request.getInstanceName());
-    } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
+    } catch (InstanceNotFoundException e) {
+      responseObserver.onError(BuildFarmInstances.toStatusException(e));
       return;
     }
 
     ActionResult actionResult = instance.getActionResult(
         DigestUtil.asActionKey(request.getActionDigest()));
     if (actionResult == null) {
-      responseObserver.onError(new StatusException(Status.NOT_FOUND));
+      responseObserver.onError(Status.NOT_FOUND.asException());
       return;
     }
 
@@ -61,8 +61,8 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
     Instance instance;
     try {
       instance = instances.get(request.getInstanceName());
-    } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
+    } catch (InstanceNotFoundException e) {
+      responseObserver.onError(BuildFarmInstances.toStatusException(e));
       return;
     }
 

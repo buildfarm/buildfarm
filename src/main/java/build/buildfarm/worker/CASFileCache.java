@@ -126,7 +126,7 @@ public class CASFileCache implements ContentAddressableStorage {
           return null;
         }
       }
-    } catch (NumberFormatException ex) {
+    } catch (NumberFormatException e) {
       return null;
     }
 

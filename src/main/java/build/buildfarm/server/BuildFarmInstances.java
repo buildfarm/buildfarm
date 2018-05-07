@@ -29,9 +29,9 @@ import java.util.Map;
 import javax.naming.ConfigurationException;
 
 public class BuildFarmInstances implements Instances {
-  public static StatusException toStatusException(InstanceNotFoundException ex) {
-    String errorMessage = String.format("Instance %s not known to Service", ex.instanceName);
-    return new StatusException(Status.NOT_FOUND.withDescription(errorMessage));
+  public static StatusException toStatusException(InstanceNotFoundException e) {
+    String errorMessage = String.format("Instance %s not known to Service", e.instanceName);
+    return Status.NOT_FOUND.withDescription(errorMessage).asException();
   }
 
   private final Map<String, Instance> instances;

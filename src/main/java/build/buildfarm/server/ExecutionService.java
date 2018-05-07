@@ -35,8 +35,8 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
     Instance instance;
     try {
       instance = instances.get(request.getInstanceName());
-    } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
+    } catch (InstanceNotFoundException e) {
+      responseObserver.onError(BuildFarmInstances.toStatusException(e));
       return;
     }
 
@@ -51,11 +51,11 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
             responseObserver.onCompleted();
           });
     } catch (InterruptedException e) {
-      responseObserver.onError(new StatusException(Status.fromThrowable(e)));
+      responseObserver.onError(Status.fromThrowable(e).asException());
     } catch (IllegalStateException e) {
       e.printStackTrace();
-      responseObserver.onError(new StatusException(
-          Status.FAILED_PRECONDITION.withDescription(e.getMessage())));
+      responseObserver.onError(
+          Status.FAILED_PRECONDITION.withDescription(e.getMessage()).asException());
     }
   }
 }

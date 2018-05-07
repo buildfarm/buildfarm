@@ -43,14 +43,14 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
     try {
       instance = instances.getFromOperationsCollectionName(
           request.getName());
-    } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
+    } catch (InstanceNotFoundException e) {
+      responseObserver.onError(BuildFarmInstances.toStatusException(e));
       return;
     }
 
     int pageSize = request.getPageSize();
     if (pageSize < 0) {
-      responseObserver.onError(new StatusException(Status.OUT_OF_RANGE));
+      responseObserver.onError(Status.OUT_OF_RANGE.asException());
       return;
     }
 
@@ -77,8 +77,8 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
     Instance instance;
     try {
       instance = instances.getFromOperationName(request.getName());
-    } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
+    } catch (InstanceNotFoundException e) {
+      responseObserver.onError(BuildFarmInstances.toStatusException(e));
       return;
     }
 
@@ -93,8 +93,8 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
     Instance instance;
     try {
       instance = instances.getFromOperationName(request.getName());
-    } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
+    } catch (InstanceNotFoundException e) {
+      responseObserver.onError(BuildFarmInstances.toStatusException(e));
       return;
     }
 
@@ -102,8 +102,8 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
       instance.deleteOperation(request.getName());
       responseObserver.onNext(Empty.newBuilder().build());
       responseObserver.onCompleted();
-    } catch (IllegalStateException ex) {
-      responseObserver.onError(new StatusException(Status.fromThrowable(ex)));
+    } catch (IllegalStateException e) {
+      responseObserver.onError(Status.fromThrowable(e).asException());
     }
   }
 
@@ -114,8 +114,8 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
     Instance instance;
     try {
       instance = instances.getFromOperationName(request.getName());
-    } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
+    } catch (InstanceNotFoundException e) {
+      responseObserver.onError(BuildFarmInstances.toStatusException(e));
       return;
     }
 
@@ -124,7 +124,7 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
       responseObserver.onNext(Empty.getDefaultInstance());
       responseObserver.onCompleted();
     } catch (InterruptedException e) {
-      responseObserver.onError(new StatusException(Status.fromThrowable(e)));
+      responseObserver.onError(Status.fromThrowable(e).asException());
       Thread.currentThread().interrupt();
     }
   }

@@ -43,10 +43,10 @@ public class ByteStringSinkReader implements Runnable {
           sink.write(buffer, 0, len);
         }
       }
-    } catch(IOException ex) {
+    } catch(IOException e) {
     } finally {
-      try { input.close(); } catch(IOException ex) { }
-      try { sink.close(); } catch(IOException ex) { }
+      try { input.close(); } catch(IOException e) { }
+      try { sink.close(); } catch(IOException e) { }
       complete();
     }
   }

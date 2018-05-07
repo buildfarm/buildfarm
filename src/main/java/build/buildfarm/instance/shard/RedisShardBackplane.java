@@ -89,8 +89,8 @@ public class RedisShardBackplane implements ShardBackplane {
     URI redisURI;
     try {
       redisURI = new URI(config.getRedisUri());
-    } catch (URISyntaxException ex) {
-      throw new ConfigurationException(ex.getMessage());
+    } catch (URISyntaxException e) {
+      throw new ConfigurationException(e.getMessage());
     }
 
     JedisPoolConfig jedisPoolConfig = new JedisPoolConfig();
@@ -315,8 +315,8 @@ public class RedisShardBackplane implements ShardBackplane {
         throw (IOException) cause;
       }
       throw new IOException(e);
-    } catch (InvalidProtocolBufferException ex) {
-      ex.printStackTrace();
+    } catch (InvalidProtocolBufferException e) {
+      e.printStackTrace();
     }
   }
 
@@ -497,8 +497,8 @@ public class RedisShardBackplane implements ShardBackplane {
       Operation.Builder operationBuilder = Operation.newBuilder();
       getOperationParser().merge(operationJson, operationBuilder);
       return operationBuilder.build();
-    } catch (InvalidProtocolBufferException ex) {
-      ex.printStackTrace();
+    } catch (InvalidProtocolBufferException e) {
+      e.printStackTrace();
       return null;
     }
   }
@@ -547,8 +547,8 @@ public class RedisShardBackplane implements ShardBackplane {
     String json;
     try {
       json = operationPrinter.print(operation);
-    } catch (InvalidProtocolBufferException ex) {
-      ex.printStackTrace();
+    } catch (InvalidProtocolBufferException e) {
+      e.printStackTrace();
       return false;
     }
 
@@ -615,15 +615,15 @@ public class RedisShardBackplane implements ShardBackplane {
   public ImmutableList<ShardDispatchedOperation> getDispatchedOperations() throws IOException {
     ImmutableList.Builder<ShardDispatchedOperation> builder = new ImmutableList.Builder<ShardDispatchedOperation>();
     try (Jedis jedis = getJedis()) {
-      for (Map.Entry<String, String> e : jedis.hgetAll(config.getDispatchedOperationsHashName()).entrySet()) {
+      for (Map.Entry<String, String> entry : jedis.hgetAll(config.getDispatchedOperationsHashName()).entrySet()) {
         try {
           ShardDispatchedOperation.Builder dispatchedOperationBuilder = ShardDispatchedOperation.newBuilder();
-          JsonFormat.parser().merge(e.getValue(), dispatchedOperationBuilder);
+          JsonFormat.parser().merge(entry.getValue(), dispatchedOperationBuilder);
           builder.add(dispatchedOperationBuilder.build());
-        } catch (InvalidProtocolBufferException ex) {
+        } catch (InvalidProtocolBufferException e) {
           /* guess we don't want to spin on this */
-          jedis.hdel(config.getDispatchedOperationsHashName(), e.getKey());
-          ex.printStackTrace();
+          jedis.hdel(config.getDispatchedOperationsHashName(), entry.getKey());
+          e.printStackTrace();
         }
       }
     } catch (JedisConnectionException e) {
@@ -659,8 +659,8 @@ public class RedisShardBackplane implements ShardBackplane {
           operationName = result.get(1);
         }
       }
-    } catch (InvalidProtocolBufferException ex) {
-      ex.printStackTrace();
+    } catch (InvalidProtocolBufferException e) {
+      e.printStackTrace();
       operationName = null;
     } catch (JedisConnectionException e) {
       Throwable cause = e.getCause();
@@ -690,7 +690,7 @@ public class RedisShardBackplane implements ShardBackplane {
         }
       }
       return success;
-    } catch (InvalidProtocolBufferException ex) {
+    } catch (InvalidProtocolBufferException e) {
       return false;
     } catch (JedisConnectionException e) {
       Throwable cause = e.getCause();

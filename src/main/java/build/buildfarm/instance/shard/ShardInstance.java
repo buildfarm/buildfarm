@@ -187,7 +187,7 @@ public class ShardInstance extends AbstractServerInstance {
     try {
       actionResult = backplane.getActionResult(actionKey);
     } catch (IOException e) {
-      throw new StatusRuntimeException(Status.fromThrowable(e));
+      throw Status.fromThrowable(e).asRuntimeException();
     }
     if (actionResult == null) {
       return actionResult;
@@ -205,7 +205,7 @@ public class ShardInstance extends AbstractServerInstance {
     try {
       backplane.removeActionResult(actionKey);
     } catch (IOException e) {
-      throw new StatusRuntimeException(Status.fromThrowable(e));
+      throw Status.fromThrowable(e).asRuntimeException();
     }
     return null;
   }
@@ -215,7 +215,7 @@ public class ShardInstance extends AbstractServerInstance {
     try {
       backplane.putActionResult(actionKey, actionResult);
     } catch (IOException e) {
-      throw new StatusRuntimeException(Status.fromThrowable(e));
+      throw Status.fromThrowable(e).asRuntimeException();
     }
   }
 
@@ -229,7 +229,7 @@ public class ShardInstance extends AbstractServerInstance {
       Collections.shuffle(workersList, rand);
       workers = new ArrayDeque(workersList);
     } catch (IOException e) {
-      throw new StatusRuntimeException(Status.fromThrowable(e));
+      throw Status.fromThrowable(e).asRuntimeException();
     }
 
     Set<String> originalLocationSet = backplane.getBlobLocationSet(digest);
@@ -255,9 +255,9 @@ public class ShardInstance extends AbstractServerInstance {
         }
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
-        throw new StatusRuntimeException(Status.CANCELLED);
+        throw Status.CANCELLED.asRuntimeException();
       } catch (IOException e) {
-        throw new StatusRuntimeException(Status.INTERNAL.withDescription(e.getMessage()));
+        throw Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException();
       } catch (StatusRuntimeException e) {
         if (e.getStatus().getCode().equals(Status.UNAVAILABLE.getCode())) {
           removeMalfunctioningWorker(worker);
@@ -291,7 +291,7 @@ public class ShardInstance extends AbstractServerInstance {
       Collections.shuffle(workersList, rand);
       workers = new ArrayDeque(workersList);
     } catch (IOException e) {
-      throw new StatusRuntimeException(Status.fromThrowable(e));
+      throw Status.fromThrowable(e).asRuntimeException();
     }
 
     for (String worker : workers) {
@@ -304,10 +304,10 @@ public class ShardInstance extends AbstractServerInstance {
         nonEmptyDigests = workerMissingDigests;
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
-        throw new StatusRuntimeException(Status.CANCELLED);
+        throw Status.CANCELLED.asRuntimeException();
       } catch (IOException e) {
         e.printStackTrace();
-        throw new StatusRuntimeException(Status.INTERNAL.withDescription(e.getMessage()));
+        throw Status.INTERNAL.asRuntimeException();
       } catch (StatusRuntimeException e) {
         Status status = Status.fromThrowable(e);
         if (status.getCode() == Status.Code.UNAVAILABLE) {
@@ -443,13 +443,13 @@ public class ShardInstance extends AbstractServerInstance {
         try {
           worker = backplane.getRandomWorker();
         } catch (IOException e) {
-          throw new StatusException(Status.fromThrowable(e));
+          throw Status.fromThrowable(e).asException();
         }
 
         if (worker == null) {
           // FIXME should be made into a retry operation, resulting in an IOException
           // FIXME should we wait for a worker to become available?
-          throw new StatusException(Status.RESOURCE_EXHAUSTED);
+          throw Status.RESOURCE_EXHAUSTED.asException();
         }
         Digest digest = workerStub(worker).putBlob(blob);
         boolean known = false;
@@ -577,7 +577,7 @@ public class ShardInstance extends AbstractServerInstance {
         backplane.removeWorker(worker);
       }
     } catch (IOException eIO) {
-      throw new StatusRuntimeException(Status.fromThrowable(eIO));
+      throw Status.fromThrowable(eIO).asRuntimeException();
     }
 
     if (instance != null) {
@@ -771,7 +771,7 @@ public class ShardInstance extends AbstractServerInstance {
        * outstanding action has its tree retained */
       backplane.putTree(action.getInputRootDigest(), directories);
     } catch (IOException e) {
-      throw new StatusRuntimeException(Status.fromThrowable(e));
+      throw Status.fromThrowable(e).asRuntimeException();
     }
 
     Operation operation = createOperation();
@@ -779,7 +779,7 @@ public class ShardInstance extends AbstractServerInstance {
     try {
       backplane.putOperation(operation, ExecuteOperationMetadata.Stage.UNKNOWN);
     } catch (IOException e) {
-      throw new StatusRuntimeException(Status.fromThrowable(e));
+      throw Status.fromThrowable(e).asRuntimeException();
     }
 
     onOperation.accept(operation);
@@ -804,7 +804,7 @@ public class ShardInstance extends AbstractServerInstance {
       backplane.putOperation(queuedOperation, ExecuteOperationMetadata.Stage.QUEUED);
     } catch (IOException e) {
       // cleanup? retry?
-      throw new StatusRuntimeException(Status.fromThrowable(e));
+      throw Status.fromThrowable(e).asRuntimeException();
     }
   }
 
@@ -823,7 +823,7 @@ public class ShardInstance extends AbstractServerInstance {
         }
         return backplane.putOperation(operation, ExecuteOperationMetadata.Stage.COMPLETED);
       } catch (IOException e) {
-        throw new StatusRuntimeException(Status.fromThrowable(e));
+        throw Status.fromThrowable(e).asRuntimeException();
       }
     }
     throw new UnsupportedOperationException();
@@ -854,11 +854,11 @@ public class ShardInstance extends AbstractServerInstance {
             try {
               return backplane.getOperation(operationName);
             } catch (IOException e) {
-              throw new StatusRuntimeException(Status.fromThrowable(e));
+              throw Status.fromThrowable(e).asRuntimeException();
             }
           }).iterator();
     } catch (IOException e) {
-      throw new StatusRuntimeException(Status.fromThrowable(e));
+      throw Status.fromThrowable(e).asRuntimeException();
     }
     OperationIteratorToken token;
     if (!pageToken.isEmpty()) {
@@ -907,7 +907,7 @@ public class ShardInstance extends AbstractServerInstance {
     try {
       return backplane.getOperation(name);
     } catch (IOException e) {
-      throw new StatusRuntimeException(Status.fromThrowable(e));
+      throw Status.fromThrowable(e).asRuntimeException();
     }
   }
 
@@ -916,7 +916,7 @@ public class ShardInstance extends AbstractServerInstance {
     try {
       backplane.deleteOperation(name);
     } catch (IOException e) {
-      throw new StatusRuntimeException(Status.fromThrowable(e));
+      throw Status.fromThrowable(e).asRuntimeException();
     }
   }
 
@@ -938,7 +938,7 @@ public class ShardInstance extends AbstractServerInstance {
     try {
       return backplane.watchOperation(operationName, watcher);
     } catch (IOException e) {
-      throw new StatusRuntimeException(Status.fromThrowable(e));
+      throw Status.fromThrowable(e).asRuntimeException();
     }
   }
 

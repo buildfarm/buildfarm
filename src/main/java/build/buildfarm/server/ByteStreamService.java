@@ -59,7 +59,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
       ByteString blob = instance.getBlob(
           digest, request.getReadOffset(), request.getReadLimit());
       if (blob == null) {
-        responseObserver.onError(new StatusException(Status.NOT_FOUND));
+        responseObserver.onError(Status.NOT_FOUND.asException());
         return;
       }
 
@@ -78,8 +78,8 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
       }
 
       responseObserver.onCompleted();
-    } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
+    } catch (InstanceNotFoundException e) {
+      responseObserver.onError(BuildFarmInstances.toStatusException(e));
     }
   }
 
@@ -91,8 +91,8 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
     Instance instance;
     try {
       instance = instances.getFromBlob(resourceName);
-    } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
+    } catch (InstanceNotFoundException e) {
+      responseObserver.onError(BuildFarmInstances.toStatusException(e));
       return;
     }
 
@@ -104,7 +104,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
     while (readOffset > 0) {
       long n = input.skip(readOffset);
       if (n == 0) {
-        responseObserver.onError(new StatusException(Status.OUT_OF_RANGE));
+        responseObserver.onError(Status.OUT_OF_RANGE.asException());
         return;
       }
       readOffset -= n;
@@ -135,7 +135,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
     long readLimit = request.getReadLimit();
     long readOffset = request.getReadOffset();
     if (readLimit < 0 || readOffset < 0) {
-      responseObserver.onError(new StatusException(Status.OUT_OF_RANGE));
+      responseObserver.onError(Status.OUT_OF_RANGE.asException());
       return;
     }
 
@@ -143,9 +143,9 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
       Optional<UrlPath.ResourceOperation> resourceOperation = Optional.empty();
       try {
         resourceOperation = Optional.of(UrlPath.detectResourceOperation(resourceName));
-      } catch (IllegalArgumentException ex) {
-        String description = ex.getLocalizedMessage();
-        responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
+      } catch (IllegalArgumentException e) {
+        String description = e.getLocalizedMessage();
+        responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(description).asException());
         return;
       }
       switch (resourceOperation.get()) {
@@ -157,11 +157,11 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
         break;
       default:
         String description = "Invalid service";
-        responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
+        responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(description).asException());
         break;
       }
-    } catch(InterruptedException|IOException ex) {
-      responseObserver.onError(new StatusException(Status.fromThrowable(ex)));
+    } catch(InterruptedException|IOException e) {
+      responseObserver.onError(Status.fromThrowable(e).asException());
     }
   }
 
@@ -174,22 +174,22 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
     Optional<UrlPath.ResourceOperation> resourceOperation = Optional.empty();
     try {
       resourceOperation = Optional.of(UrlPath.detectResourceOperation(resourceName));
-    } catch (IllegalArgumentException ex) {
-      String description = ex.getLocalizedMessage();
-      responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
+    } catch (IllegalArgumentException e) {
+      String description = e.getLocalizedMessage();
+      responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(description).asException());
       return;
     }
 
     switch (resourceOperation.get()) {
     case UploadBlob:
-      responseObserver.onError(new StatusException(Status.UNIMPLEMENTED));
+      responseObserver.onError(Status.UNIMPLEMENTED.asException());
       break;
     case OperationStream:
-      responseObserver.onError(new StatusException(Status.UNIMPLEMENTED));
+      responseObserver.onError(Status.UNIMPLEMENTED.asException());
       break;
     default:
       String description = "Invalid service";
-      responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
+      responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(description).asException());
       break;
     }
   }
@@ -213,8 +213,8 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
           Instance instance = instances.getFromUploadBlob(writeResourceName);
 
           writeInstanceBlob(request, responseObserver, instance);
-        } catch (InstanceNotFoundException ex) {
-          responseObserver.onError(BuildFarmInstances.toStatusException(ex));
+        } catch (InstanceNotFoundException e) {
+          responseObserver.onError(BuildFarmInstances.toStatusException(e));
           failed = true;
         }
       }
@@ -261,11 +261,11 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
           } else {
             try {
               instance.putBlob(data);
-            } catch (IOException ex) {
-              responseObserver.onError(new StatusException(Status.fromThrowable(ex)));
+            } catch (IOException e) {
+              responseObserver.onError(new StatusException(Status.fromThrowable(e)));
               failed = true;
-            } catch (StatusException ex) {
-              responseObserver.onError(ex);
+            } catch (StatusException e) {
+              responseObserver.onError(e);
               failed = true;
             }
           }
@@ -284,8 +284,8 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
           if (request.getFinishWrite()) {
             outputStream.close();
           }
-        } catch (InstanceNotFoundException ex) {
-          responseObserver.onError(BuildFarmInstances.toStatusException(ex));
+        } catch (InstanceNotFoundException e) {
+          responseObserver.onError(BuildFarmInstances.toStatusException(e));
         }
       }
 
@@ -309,7 +309,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
             writeResourceName = resourceName;
           } else if (!writeResourceName.equals(resourceName)) {
             String description = String.format("Previous resource name changed while handling request. %s -> %s", writeResourceName, resourceName);
-            responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
+            responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(description).asException());
             failed = true;
           }
         }
@@ -321,9 +321,9 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
         Optional<UrlPath.ResourceOperation> resourceOperation = Optional.empty();
         try {
           resourceOperation = Optional.of(UrlPath.detectResourceOperation(writeResourceName));
-        } catch (IllegalArgumentException ex) {
-          String description = ex.getLocalizedMessage();
-          responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
+        } catch (IllegalArgumentException e) {
+          String description = e.getLocalizedMessage();
+          responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(description).asException());
           failed = true;
         }
 
@@ -342,15 +342,15 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
             finished = request.getFinishWrite();
             break;
           default:
-            responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
+            responseObserver.onError(Status.INVALID_ARGUMENT.asException());
             failed = true;
             break;
           }
-        } catch(InterruptedException ex) {
-          responseObserver.onError(new StatusException(Status.fromThrowable(ex)));
+        } catch(InterruptedException e) {
+          responseObserver.onError(Status.fromThrowable(e).asException());
           failed = true;
-        } catch(IOException ex) {
-          responseObserver.onError(new StatusException(Status.fromThrowable(ex)));
+        } catch(IOException e) {
+          responseObserver.onError(Status.fromThrowable(e).asException());
           failed = true;
         }
       }

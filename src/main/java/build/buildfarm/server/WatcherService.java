@@ -41,8 +41,8 @@ public class WatcherService extends WatcherGrpc.WatcherImplBase {
     Instance instance;
     try {
       instance = instances.getFromOperationName(operationName);
-    } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
+    } catch (InstanceNotFoundException e) {
+      responseObserver.onError(BuildFarmInstances.toStatusException(e));
       return;
     }
 
@@ -61,7 +61,7 @@ public class WatcherService extends WatcherGrpc.WatcherImplBase {
     } if (resumeMarker.isEmpty()) {
       watchInitialState = true;
     } else {
-      responseObserver.onError(new StatusException(Status.UNIMPLEMENTED));
+      responseObserver.onError(Status.UNIMPLEMENTED.asException());
       return;
     }
 
@@ -86,13 +86,13 @@ public class WatcherService extends WatcherGrpc.WatcherImplBase {
             if (operation == null || operation.getDone()) {
               responseObserver.onCompleted();
             }
-          } catch (StatusRuntimeException ex) {
-            if (ex.getStatus().getCode() != Status.Code.CANCELLED) {
-              throw ex;
+          } catch (StatusRuntimeException e) {
+            if (e.getStatus().getCode() != Status.Code.CANCELLED) {
+              throw e;
             }
             return false;
-          } catch (IllegalStateException ex) {
-            ex.printStackTrace();
+          } catch (IllegalStateException e) {
+            e.printStackTrace();
             // check for 'call is closed'?
             return false;
           }

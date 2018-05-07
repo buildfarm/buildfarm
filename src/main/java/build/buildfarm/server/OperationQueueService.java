@@ -42,8 +42,8 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
     Instance instance;
     try {
       instance = instances.get(request.getInstanceName());
-    } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
+    } catch (InstanceNotFoundException e) {
+      responseObserver.onError(BuildFarmInstances.toStatusException(e));
       return;
     }
 
@@ -65,12 +65,12 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
           responseObserver.onNext(streamableOperation);
           responseObserver.onCompleted();
           return true;
-        } catch(InvalidProtocolBufferException ex) {
-          responseObserver.onError(new StatusException(Status.INTERNAL));
+        } catch(InvalidProtocolBufferException e) {
+          responseObserver.onError(Status.INTERNAL.asException());
           // should we update operation?
-        } catch(StatusRuntimeException ex) {
-          if (ex.getStatus().getCode() != Status.Code.CANCELLED) {
-            throw ex;
+        } catch(StatusRuntimeException e) {
+          if (e.getStatus().getCode() != Status.Code.CANCELLED) {
+            throw e;
           }
         }
         try {
@@ -81,7 +81,7 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
         return false;
       });
     } catch (InterruptedException e) {
-      responseObserver.onError(new StatusException(Status.fromThrowable(e)));
+      responseObserver.onError(Status.fromThrowable(e).asException());
     }
   }
 
@@ -92,8 +92,8 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
     Instance instance;
     try {
       instance = instances.getFromOperationName(operation.getName());
-    } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
+    } catch (InstanceNotFoundException e) {
+      responseObserver.onError(BuildFarmInstances.toStatusException(e));
       return;
     }
 
@@ -105,7 +105,7 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
           .build());
       responseObserver.onCompleted();
     } catch (InterruptedException e) {
-      responseObserver.onError(new StatusException(Status.fromThrowable(e)));
+      responseObserver.onError(Status.fromThrowable(e).asException());
     }
   }
 
@@ -117,8 +117,8 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
     try {
       instance = instances.getFromOperationName(
           request.getOperationName());
-    } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
+    } catch (InstanceNotFoundException e) {
+      responseObserver.onError(BuildFarmInstances.toStatusException(e));
       return;
     }
 

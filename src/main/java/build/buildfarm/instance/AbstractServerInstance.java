@@ -495,13 +495,13 @@ public abstract class AbstractServerInstance implements Instance {
     } else {
       try {
         onQueue(operation, action);
-      } catch (IOException|StatusException ex) {
+      } catch (IOException|StatusException e) {
         deleteOperation(operation.getName());
-        throw new StatusRuntimeException(Status.fromThrowable(ex));
-      } catch (InterruptedException ex) {
+        throw Status.fromThrowable(e).asRuntimeException();
+      } catch (InterruptedException e) {
         deleteOperation(operation.getName());
         Thread.currentThread().interrupt();
-        throw new StatusRuntimeException(Status.fromThrowable(ex));
+        throw Status.fromThrowable(e).asRuntimeException();
       }
       metadata = metadata.toBuilder()
           .setStage(ExecuteOperationMetadata.Stage.QUEUED)

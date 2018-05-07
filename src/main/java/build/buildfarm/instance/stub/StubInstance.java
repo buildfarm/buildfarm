@@ -236,7 +236,7 @@ public class StubInstance implements Instance {
                 @Override
                 public void onError(Throwable t) {
                   exception.compareAndSet(
-                      null, new StatusRuntimeException(Status.fromThrowable(t)));
+                      null, Status.fromThrowable(t).asRuntimeException());
                 }
 
                 @Override
@@ -310,11 +310,11 @@ public class StubInstance implements Instance {
   public ByteString getBlob(Digest blobDigest) throws InterruptedException, IOException {
     try (InputStream in = newStreamInput(getBlobName(blobDigest))) {
       return ByteString.readFrom(in);
-    } catch (StatusRuntimeException ex) {
-      if (ex.getStatus().equals(Status.NOT_FOUND)) {
+    } catch (StatusRuntimeException e) {
+      if (e.getStatus().equals(Status.NOT_FOUND)) {
         return null;
       }
-      throw ex;
+      throw e;
     }
   }
 
@@ -329,7 +329,7 @@ public class StubInstance implements Instance {
       byte[] buf = new byte[len];
       len = in.read(buf);
       return ByteString.copyFrom(buf, 0, len);
-    } catch (IOException ex) {
+    } catch (IOException e) {
       return null;
     }
   }

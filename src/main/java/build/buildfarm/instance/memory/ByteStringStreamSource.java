@@ -96,7 +96,7 @@ class ByteStringStreamSource {
             while (!closed && availableUnsynchronized() == 0) {
               bufferSync.wait();
             }
-          } catch(InterruptedException ex) {
+          } catch(InterruptedException e) {
             Thread.currentThread().interrupt();
           }
           n = Math.min(availableUnsynchronized(), n);
@@ -136,7 +136,7 @@ class ByteStringStreamSource {
           }
           offset += len;
           return len;
-        } catch(InterruptedException ex) {
+        } catch(InterruptedException e) {
           Thread.currentThread().interrupt();
           return -1;
         }

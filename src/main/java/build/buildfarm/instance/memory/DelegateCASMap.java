@@ -127,7 +127,7 @@ class DelegateCASMap<K,V extends Message> implements Map<K,V> {
         return null;
       }
       return parser.parseFrom(blob.getData());
-    } catch (InvalidProtocolBufferException ex) {
+    } catch (InvalidProtocolBufferException e) {
       return null;
     }
   }

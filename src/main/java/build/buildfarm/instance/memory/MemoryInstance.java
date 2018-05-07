@@ -435,7 +435,7 @@ public class MemoryInstance extends AbstractServerInstance {
       try {
         token = OperationIteratorToken.parseFrom(
             BaseEncoding.base64().decode(pageToken));
-      } catch (InvalidProtocolBufferException ex) {
+      } catch (InvalidProtocolBufferException e) {
         throw new IllegalArgumentException();
       }
       boolean paged = false;

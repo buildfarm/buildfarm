@@ -51,7 +51,7 @@ public class Watchdog implements Runnable {
         done = true;
         this.notify();
       }
-    } catch (InterruptedException ex) {
+    } catch (InterruptedException e) {
     }
   }
 
@@ -71,7 +71,7 @@ public class Watchdog implements Runnable {
       this.notify();
       try {
         this.wait();
-      } catch (InterruptedException ex) {
+      } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         break;
       }

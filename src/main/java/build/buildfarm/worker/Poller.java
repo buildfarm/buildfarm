@@ -39,7 +39,7 @@ public class Poller implements Runnable {
           // FP interface with distinct returns, do not memoize!
           running = poll.getAsBoolean();
         }
-      } catch (InterruptedException ex) {
+      } catch (InterruptedException e) {
         running = false;
       }
     }
