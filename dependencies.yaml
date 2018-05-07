@@ -4,6 +4,8 @@ options:
     - id: "mavencentral"
       type: "default"
       url: https://repo.maven.apache.org/maven2/
+    - id: "bintray"
+      url: https://jcenter.bintray.com
   transitivity: runtime_deps
   versionConflictPolicy: highest
 
@@ -64,3 +66,21 @@ dependencies:
     commons-pool2:
       lang: java
       version: "2.4.3"
+
+  com.github.jnr:
+    jnr-constants:
+      lang: java
+      version: "0.9.9"
+
+    jnr-ffi:
+      lang: java
+      version: "2.1.7"
+
+    jffi:
+      lang: java
+      version: "1.2.16"
+
+  com.github.serceman:
+    jnr-fuse:
+      lang: java
+      version: "0.5.1"

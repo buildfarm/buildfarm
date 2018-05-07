@@ -184,38 +184,40 @@ message ShardWorkerConfig {
   // occurs during an execution
   bool requeue_on_failure = 11;
 
+  bool use_fuse_cas = 12;
+
   // period of poll requests during execution
-  google.protobuf.Duration operation_poll_period = 12;
+  google.protobuf.Duration operation_poll_period = 13;
 
   // initial platform used to match operations
-  google.devtools.remoteexecution.v1test.Platform platform = 13;
+  google.devtools.remoteexecution.v1test.Platform platform = 14;
 
   // total size of the inline content for
   // action results
-  int32 inline_content_limit = 14;
+  int32 inline_content_limit = 15;
 
   // execute width
-  int32 execute_stage_width = 15;
+  int32 execute_stage_width = 16;
 
   // symlink cas input-only directories
-  bool link_input_directories = 16;
+  bool link_input_directories = 17;
 
   // selected hash function
-  InstanceConfig.HashFunction hash_function = 17;
+  InstanceConfig.HashFunction hash_function = 18;
 
   // default timeout for actions
   // if a timeout is unspecified for an action, this value
   // is imposed on it, after which the operation will
   // be killed
-  google.protobuf.Duration default_action_timeout = 18;
+  google.protobuf.Duration default_action_timeout = 19;
 
   // maximum selectable timeout
   // a maximum threshold for an action's specified timeout,
   // beyond which an action will be rejected for execution
-  google.protobuf.Duration maximum_action_timeout = 19;
+  google.protobuf.Duration maximum_action_timeout = 20;
 
   oneof backplane {
-    RedisShardBackplaneConfig redis_shard_backplane_config = 20;
+    RedisShardBackplaneConfig redis_shard_backplane_config = 21;
   }
 }
 

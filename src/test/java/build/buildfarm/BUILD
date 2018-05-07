@@ -33,6 +33,9 @@ java_test(
     test_class = "build.buildfarm.AllTests",
     deps = [
         ":test_runner",
+        "//3rdparty/jvm/com/github/jnr:jnr_constants",
+        "//3rdparty/jvm/com/github/jnr:jnr_ffi",
+        "//3rdparty/jvm/com/github/serceman:jnr_fuse",
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/jimfs",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",

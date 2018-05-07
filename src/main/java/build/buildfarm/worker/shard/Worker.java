@@ -35,6 +35,7 @@ import build.buildfarm.server.ByteStreamService;
 import build.buildfarm.worker.CASFileCache;
 import build.buildfarm.worker.ExecuteActionStage;
 import build.buildfarm.worker.Fetcher;
+import build.buildfarm.worker.FuseCAS;
 import build.buildfarm.worker.InputFetchStage;
 import build.buildfarm.worker.InputStreamFactory;
 import build.buildfarm.worker.MatchStage;
@@ -123,6 +124,7 @@ public class Worker implements Instances {
   private final Path root;
   private final DigestUtil digestUtil;
   private final ContentAddressableStorage storage;
+  private final FuseCAS fuseCAS;
   private final CASFileCache fileCache;
   private final Pipeline pipeline;
   private final ShardBackplane backplane;
@@ -517,29 +519,39 @@ public class Worker implements Instances {
       }
     };
 
-    InputStreamFactory inputStreamFactory = new InputStreamFactory() {
-      @Override
-      public InputStream newInput(Digest blobDigest) throws InterruptedException, IOException {
-        // jank hax
-        ByteString blob = new EmptyFetcher(new StorageFetcher(storage, remoteFetcher))
-            .fetchBlob(blobDigest);
+    if (config.getUseFuseCas()) {
+      fileCache = null;
 
-        if (blob == null) {
-          return null;
+      storage = new MemoryLRUContentAddressableStorage(config.getCasMaxSizeBytes(), this::onStoragePut);
+
+      fuseCAS = new FuseCAS(root, new EmptyFetcher(new StorageFetcher(storage, localPopulatingFetcher)));
+    } else {
+      fuseCAS = null;
+
+      InputStreamFactory inputStreamFactory = new InputStreamFactory() {
+        @Override
+        public InputStream newInput(Digest blobDigest) throws InterruptedException, IOException {
+          // jank hax
+          ByteString blob = new EmptyFetcher(new StorageFetcher(storage, remoteFetcher))
+              .fetchBlob(blobDigest);
+
+          if (blob == null) {
+            return null;
+          }
+          
+          return blob.newInput();
         }
-        
-        return blob.newInput();
-      }
-    };
-    Path casCacheDirectory = getValidCasCacheDirectory(config, root);
-    fileCache = new CASFileCache(
-        inputStreamFactory,
-        root.resolve(casCacheDirectory),
-        config.getCasCacheMaxSizeBytes(),
-        digestUtil,
-        this::onStoragePut,
-        this::onStorageExpire);
-    storage = fileCache;
+      };
+      Path casCacheDirectory = getValidCasCacheDirectory(config, root);
+      fileCache = new CASFileCache(
+          inputStreamFactory,
+          root.resolve(casCacheDirectory),
+          config.getCasCacheMaxSizeBytes(),
+          digestUtil,
+          this::onStoragePut,
+          this::onStorageExpire);
+      storage = fileCache;
+    }
     instance = new ShardWorkerInstance(
         config.getPublicName(),
         digestUtil,
@@ -882,56 +894,66 @@ public class Worker implements Instances {
 
       @Override
       public void createActionRoot(Path actionRoot, Map<Digest, Directory> directoriesIndex, Action action) throws IOException, InterruptedException {
-        OutputDirectory outputDirectory = OutputDirectory.parse(
-            action.getOutputFilesList(),
-            action.getOutputDirectoriesList());
+        if (config.getUseFuseCas()) {
+          String topdir = root.relativize(actionRoot).toString();
+          fuseCAS.createInputRoot(topdir, action.getInputRootDigest());
+        } else {
+          OutputDirectory outputDirectory = OutputDirectory.parse(
+              action.getOutputFilesList(),
+              action.getOutputDirectoriesList());
 
-        if (Files.exists(actionRoot)) {
-          CASFileCache.removeDirectory(actionRoot);
-        }
-        Files.createDirectories(actionRoot);
+          if (Files.exists(actionRoot)) {
+            CASFileCache.removeDirectory(actionRoot);
+          }
+          Files.createDirectories(actionRoot);
 
-        ImmutableList.Builder<Path> inputFiles = new ImmutableList.Builder<>();
-        ImmutableList.Builder<Digest> inputDirectories = new ImmutableList.Builder<>();
+          ImmutableList.Builder<Path> inputFiles = new ImmutableList.Builder<>();
+          ImmutableList.Builder<Digest> inputDirectories = new ImmutableList.Builder<>();
 
-        System.out.println("WorkerContext::createActionRoot(" + DigestUtil.toString(action.getInputRootDigest()) + ") calling fetchInputs");
-        try {
-          fetchInputs(
-              actionRoot,
-              action.getInputRootDigest(),
-              directoriesIndex,
-              outputDirectory,
-              inputFiles,
-              inputDirectories);
-        } catch (IOException e) {
-          fileCache.decrementReferences(inputFiles.build(), inputDirectories.build());
-          throw e;
-        }
+          System.out.println("WorkerContext::createActionRoot(" + DigestUtil.toString(action.getInputRootDigest()) + ") calling fetchInputs");
+          try {
+            fetchInputs(
+                actionRoot,
+                action.getInputRootDigest(),
+                directoriesIndex,
+                outputDirectory,
+                inputFiles,
+                inputDirectories);
+          } catch (IOException e) {
+            fileCache.decrementReferences(inputFiles.build(), inputDirectories.build());
+            throw e;
+          }
 
-        rootInputFiles.put(actionRoot, inputFiles.build());
-        rootInputDirectories.put(actionRoot, inputDirectories.build());
+          rootInputFiles.put(actionRoot, inputFiles.build());
+          rootInputDirectories.put(actionRoot, inputDirectories.build());
 
-        System.out.println("WorkerContext::createActionRoot(" + DigestUtil.toString(action.getInputRootDigest()) + ") stamping output directories");
-        try {
-          outputDirectory.stamp(actionRoot);
-        } catch (IOException e) {
-          destroyActionRoot(actionRoot);
-          throw e;
+          System.out.println("WorkerContext::createActionRoot(" + DigestUtil.toString(action.getInputRootDigest()) + ") stamping output directories");
+          try {
+            outputDirectory.stamp(actionRoot);
+          } catch (IOException e) {
+            destroyActionRoot(actionRoot);
+            throw e;
+          }
         }
       }
 
       // might want to split for removeDirectory and decrement references to avoid removing for streamed output
       @Override
       public void destroyActionRoot(Path actionRoot) throws InterruptedException, IOException {
-        Iterable<Path> inputFiles = rootInputFiles.remove(actionRoot);
-        Iterable<Digest> inputDirectories = rootInputDirectories.remove(actionRoot);
-        if (inputFiles != null || inputDirectories != null) {
-          fileCache.decrementReferences(
-              inputFiles == null ? ImmutableList.<Path>of() : inputFiles,
-              inputDirectories == null ? ImmutableList.<Digest>of() : inputDirectories);
-        }
-        if (Files.exists(actionRoot)) {
-          removeDirectory(actionRoot);
+        if (config.getUseFuseCas()) {
+          String topdir = root.relativize(actionRoot).toString();
+          fuseCAS.destroyInputRoot(topdir);
+        } else {
+          Iterable<Path> inputFiles = rootInputFiles.remove(actionRoot);
+          Iterable<Digest> inputDirectories = rootInputDirectories.remove(actionRoot);
+          if (inputFiles != null || inputDirectories != null) {
+            fileCache.decrementReferences(
+                inputFiles == null ? ImmutableList.<Path>of() : inputFiles,
+                inputDirectories == null ? ImmutableList.<Digest>of() : inputDirectories);
+          }
+          if (Files.exists(actionRoot)) {
+            removeDirectory(actionRoot);
+          }
         }
       }
 
@@ -980,6 +1002,10 @@ public class Worker implements Instances {
     } catch (InterruptedException e) {
       return;
     }
+    if (config.getUseFuseCas()) {
+      System.err.println("Umounting Fuse");
+      fuseCAS.stop();
+    }
     if (server != null) {
       System.err.println("Shutting down the server");
       server.shutdown();
@@ -1022,9 +1048,11 @@ public class Worker implements Instances {
     try {
       backplane.removeWorker(config.getPublicName());
 
-      ImmutableList.Builder<Digest> blobDigests = new ImmutableList.Builder<>();
-      fileCache.start(blobDigests::add);
-      backplane.addBlobsLocation(blobDigests.build(), config.getPublicName());
+      if (!config.getUseFuseCas()) {
+        ImmutableList.Builder<Digest> blobDigests = new ImmutableList.Builder<>();
+        fileCache.start(blobDigests::add);
+        backplane.addBlobsLocation(blobDigests.build(), config.getPublicName());
+      }
 
       server.start();
       backplane.addWorker(config.getPublicName());
