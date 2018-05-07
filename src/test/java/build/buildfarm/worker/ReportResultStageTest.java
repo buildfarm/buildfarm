@@ -85,11 +85,12 @@ public class ReportResultStageTest {
     Files.createDirectory(root.resolve("foo"));
     // maybe make some files...
     ActionResult.Builder resultBuilder = ActionResult.newBuilder();
-    reportResultStage.uploadOutputs(
+    UploadManifest manifest = reportResultStage.createManifest(
         resultBuilder,
         root,
         ImmutableList.<String>of(),
         ImmutableList.<String>of("foo"));
+    reportResultStage.uploadManifest(manifest);
     Tree emptyTree = Tree.newBuilder()
         .setRoot(Directory.getDefaultInstance())
         .build();
@@ -112,11 +113,12 @@ public class ReportResultStageTest {
     Files.createFile(file);
     // maybe make some files...
     ActionResult.Builder resultBuilder = ActionResult.newBuilder();
-    reportResultStage.uploadOutputs(
+    UploadManifest manifest = reportResultStage.createManifest(
         resultBuilder,
         root,
         ImmutableList.<String>of(),
         ImmutableList.<String>of("foo"));
+    reportResultStage.uploadManifest(manifest);
     Tree tree = Tree.newBuilder()
         .setRoot(Directory.newBuilder()
             .addFiles(FileNode.newBuilder()
@@ -148,11 +150,12 @@ public class ReportResultStageTest {
     Files.createFile(file);
     // maybe make some files...
     ActionResult.Builder resultBuilder = ActionResult.newBuilder();
-    reportResultStage.uploadOutputs(
+    UploadManifest manifest = reportResultStage.createManifest(
         resultBuilder,
         root,
         ImmutableList.<String>of(),
         ImmutableList.<String>of("foo"));
+    reportResultStage.uploadManifest(manifest);
     Directory subDirectory = Directory.newBuilder()
         .addFiles(FileNode.newBuilder()
             .setName("baz")
@@ -184,11 +187,12 @@ public class ReportResultStageTest {
   public void uploadOutputsIgnoresMissingOutputDirectories()
       throws IOException, InterruptedException {
     ActionResult.Builder resultBuilder = ActionResult.newBuilder();
-    reportResultStage.uploadOutputs(
+    UploadManifest manifest = reportResultStage.createManifest(
         resultBuilder,
         root,
         ImmutableList.<String>of(),
         ImmutableList.<String>of("foo"));
+    reportResultStage.uploadManifest(manifest);
     Tree emptyTree = Tree.newBuilder()
         .setRoot(Directory.getDefaultInstance())
         .build();

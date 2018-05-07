@@ -54,3 +54,13 @@ dependencies:
     mockito-core:
       lang: java
       version: "2.15.0"
+
+  redis.clients:
+    jedis:
+      lang: java
+      version: "2.9.0"
+
+  org.apache.commons:
+    commons-pool2:
+      lang: java
+      version: "2.4.3"

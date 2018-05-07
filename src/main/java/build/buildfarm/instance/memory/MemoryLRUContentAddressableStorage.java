@@ -21,11 +21,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-class MemoryLRUContentAddressableStorage implements ContentAddressableStorage {
+public class MemoryLRUContentAddressableStorage implements ContentAddressableStorage {
   private final long maxSizeInBytes;
   private final Map<Digest, Entry> storage;
   private transient long sizeInBytes;
   private transient Entry header;
+  private final Map<Digest, Object> mutexes;
 
   public MemoryLRUContentAddressableStorage(long maxSizeInBytes) {
     this.maxSizeInBytes = maxSizeInBytes;
@@ -33,6 +34,7 @@ class MemoryLRUContentAddressableStorage implements ContentAddressableStorage {
     header = new SentinelEntry();
     header.before = header.after = header;
     storage = new HashMap<>();
+    mutexes = new HashMap<>();
   }
 
   @Override
@@ -103,6 +105,23 @@ class MemoryLRUContentAddressableStorage implements ContentAddressableStorage {
     createEntry(blob, onExpiration);
 
     storage.put(blob.getDigest(), header.before);
+  }
+
+  @Override
+  public synchronized Object acquire(Digest digest) {
+    Object mutex = mutexes.get(digest);
+    if (mutex == null) {
+      mutex = new Object();
+      mutexes.put(digest, mutex);
+    }
+    return mutex;
+  }
+
+  @Override
+  public synchronized void release(Digest digest) {
+    // prevents this lock from being exclusive to other accesses, since it
+    // must now be present
+    mutexes.remove(digest);
   }
 
   private void createEntry(Blob blob, Runnable onExpiration) {

@@ -12,6 +12,7 @@ java_library(
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
+        "@googleapis//:google_longrunning_operations_java_proto",
     ],
 )
 
@@ -59,7 +60,6 @@ java_library(
     srcs = glob(["instance/memory/*.java"]),
     deps = [
         ":common",
-        ":instance",
         ":server-instance",
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
@@ -76,12 +76,34 @@ java_library(
 )
 
 java_library(
+    name = "shard-instance",
+    srcs = glob(["instance/shard/*.java"]),
+    deps = [
+        ":common",
+        ":instance",
+        ":stub-instance",
+        "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java_util",
+        "//3rdparty/jvm/io/grpc:grpc_context",
+        "//3rdparty/jvm/io/grpc:grpc_core",
+        "//3rdparty/jvm/io/grpc:grpc_netty",
+        "//3rdparty/jvm/io/grpc:grpc_protobuf",
+        "//3rdparty/jvm/io/grpc:grpc_stub",
+        "//3rdparty/jvm/org/apache/commons:commons_pool2",
+        "//3rdparty/jvm/redis/clients:jedis",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+    ],
+)
+
+java_library(
     name = "buildfarm",
     srcs = glob(["server/**/*.java"]),
     deps = [
         ":common",
         ":instance",
         ":memory-instance",
+        ":shard-instance",
         "//3rdparty/jvm/com/github/pcj:google_options",
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
@@ -152,6 +174,51 @@ java_library(
         "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
         "@googleapis//:google_longrunning_operations_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
+    ],
+)
+
+java_library(
+    name = "shard-worker",
+    srcs = glob(["worker/shard/*.java"]),
+    deps = [
+        ":buildfarm",
+        ":worker",
+        ":common",
+        ":instance",
+        ":memory-instance",
+        ":server-instance",
+        ":shard-instance",
+        ":stub-instance",
+        "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java_util",
+        "//3rdparty/jvm/io/grpc:grpc_context",
+        "//3rdparty/jvm/io/grpc:grpc_core",
+        "//3rdparty/jvm/io/grpc:grpc_netty",
+        "//3rdparty/jvm/io/grpc:grpc_protobuf",
+        "//3rdparty/jvm/io/grpc:grpc_stub",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "@com_github_pcj_google_options//jar",
+    ],
+)
+
+container_image(
+    name = "buildfarm-shard-worker.container",
+    base = "@java_base//image",
+    files = [
+        ":buildfarm-shard-worker_deploy.jar",
+    ],
+    cmd = [
+        "buildfarm-shard-worker_deploy.jar",
+        "/config/worker.config",
+    ],
+)
+
+java_binary(
+    name = "buildfarm-shard-worker",
+    main_class = "build.buildfarm.worker.shard.Worker",
+    runtime_deps = [
+        ":shard-worker",
     ],
 )
 

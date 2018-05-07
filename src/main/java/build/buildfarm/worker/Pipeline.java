@@ -20,11 +20,17 @@ import java.util.List;
 import java.util.Map;
 
 public class Pipeline {
+  private final PipelineStage initial;
   private final Map<PipelineStage, Thread> stageThreads;
   private final Map<PipelineStage, Integer> stageClosePriorities;
   // FIXME ThreadGroup?
 
   public Pipeline() {
+    this(/* initial= */ null);
+  }
+
+  public Pipeline(PipelineStage initial) {
+    this.initial = initial;
     stageThreads = new HashMap<>();
     stageClosePriorities = new HashMap<>();
   }
@@ -43,9 +49,20 @@ public class Pipeline {
     }
   }
 
+  public void put(OperationContext operationContext) throws InterruptedException {
+    initial.put(operationContext);
+  }
+
+  public void close() {
+    join(true);
+  }
+
   public void join() {
+    join(false);
+  }
+
+  private void join(boolean closeStage) {
     List<PipelineStage> inactiveStages = new ArrayList<>();
-    boolean closeStage = false;
     boolean wasInterrupted = false;
     try {
       while (!stageThreads.isEmpty()) {

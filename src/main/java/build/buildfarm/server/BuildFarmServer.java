@@ -44,11 +44,13 @@ public class BuildFarmServer {
   private final Instances instances;
   private final Server server;
 
-  public BuildFarmServer(BuildFarmServerConfig config) throws ConfigurationException {
+  public BuildFarmServer(BuildFarmServerConfig config)
+      throws InterruptedException, ConfigurationException {
     this(ServerBuilder.forPort(config.getPort()), config);
   }
 
-  public BuildFarmServer(ServerBuilder<?> serverBuilder, BuildFarmServerConfig config) throws ConfigurationException {
+  public BuildFarmServer(ServerBuilder<?> serverBuilder, BuildFarmServerConfig config)
+      throws InterruptedException, ConfigurationException {
     this.config = config;
     String defaultInstanceName = config.getDefaultInstanceName();
     instances = new BuildFarmInstances(config.getInstancesList(), defaultInstanceName);

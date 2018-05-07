@@ -18,6 +18,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.memory.MemoryInstance;
+import build.buildfarm.instance.shard.ShardInstance;
 import build.buildfarm.v1test.InstanceConfig;
 import io.grpc.Status;
 import io.grpc.StatusException;
@@ -36,7 +37,8 @@ public class BuildFarmInstances implements Instances {
   private final Map<String, Instance> instances;
   private final Instance defaultInstance;
 
-  public BuildFarmInstances(List<InstanceConfig> instanceConfigs, String defaultInstanceName) throws ConfigurationException {
+  public BuildFarmInstances(List<InstanceConfig> instanceConfigs, String defaultInstanceName)
+      throws InterruptedException, ConfigurationException {
     instances = new HashMap<String, Instance>();
     createInstances(instanceConfigs);
     if (!defaultInstanceName.isEmpty()) {
@@ -110,7 +112,8 @@ public class BuildFarmInstances implements Instances {
     }
   }
 
-  private void createInstances(List<InstanceConfig> instanceConfigs) throws ConfigurationException {
+  private void createInstances(List<InstanceConfig> instanceConfigs)
+      throws InterruptedException, ConfigurationException {
     for (InstanceConfig instanceConfig : instanceConfigs) {
       String name = instanceConfig.getName();
       HashFunction hashFunction = getValidHashFunction(instanceConfig);
@@ -125,6 +128,12 @@ public class BuildFarmInstances implements Instances {
               name,
               digestUtil,
               instanceConfig.getMemoryInstanceConfig()));
+          break;
+        case SHARD_INSTANCE_CONFIG:
+          instances.put(name, new ShardInstance(
+              name,
+              digestUtil,
+              instanceConfig.getShardInstanceConfig()));
           break;
       }
     }

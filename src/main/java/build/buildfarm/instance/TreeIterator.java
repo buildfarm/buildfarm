@@ -14,7 +14,6 @@
 
 package build.buildfarm.instance;
 
-import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.TokenizableIterator;
 import build.buildfarm.v1test.TreeIteratorToken;
 import com.google.common.collect.Iterators;
@@ -29,21 +28,22 @@ import java.util.Deque;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Stack;
+import java.util.function.Function;
 
 public class TreeIterator implements TokenizableIterator<Directory> {
-  private final Instance instance;
+  private final Function<Digest, ByteString> getBlob;
   private Deque<Digest> path;
   private final ArrayDeque<Digest> parentPath;
   private final Stack<Iterator<Digest>> pointers;
 
-  public TreeIterator(Instance instance, Digest rootDigest, String pageToken) {
-    this.instance = instance;
+  public TreeIterator(Function<Digest, ByteString> getBlob, Digest rootDigest, String pageToken) {
+    this.getBlob = getBlob;
     parentPath = new ArrayDeque<Digest>();
     pointers = new Stack<Iterator<Digest>>();
 
     Iterator<Digest> iter = Iterators.singletonIterator(rootDigest);
 
-    Directory directory = expectDirectory(instance.getBlob(rootDigest));
+    Directory directory = expectDirectory(getBlob.apply(rootDigest));
 
     if (!pageToken.isEmpty()) {
       TreeIteratorToken token = parseToken(BaseEncoding.base64().decode(pageToken));
@@ -60,7 +60,7 @@ public class TreeIterator implements TokenizableIterator<Directory> {
         }
         parentPath.addLast(digest);
         pointers.push(iter);
-        directory = expectDirectory(instance.getBlob(digest));
+        directory = expectDirectory(getBlob.apply(digest));
         if (directory == null) {
           // some directory data has disappeared, current iter
           // is correct and will be next directory fetched
@@ -108,7 +108,7 @@ public class TreeIterator implements TokenizableIterator<Directory> {
      * (and simplify the interface) that they have been
      * removed. */
     Digest digest = iter.next();
-    Directory directory = expectDirectory(instance.getBlob(digest));
+    Directory directory = expectDirectory(getBlob.apply(digest));
     if (directory != null) {
       /* the path to a new iter set is the path to its parent */
       parentPath.addLast(digest);

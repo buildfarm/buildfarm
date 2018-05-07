@@ -401,7 +401,7 @@ public class MemoryInstance extends AbstractServerInstance {
   @Override
   protected TokenizableIterator<Directory> createTreeIterator(
       Digest rootDigest, String pageToken) {
-    return new TreeIterator(this, rootDigest, pageToken);
+    return new TreeIterator((digest) -> getBlob(digest), rootDigest, pageToken);
   }
 
   @Override

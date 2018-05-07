@@ -93,6 +93,128 @@ message MemoryInstanceConfig {
   google.protobuf.Duration maximum_action_timeout = 9;
 }
 
+message RedisShardBackplaneConfig {
+  string redis_uri = 1;
+  string workers_set_name = 2;
+  string action_cache_hash_name = 3;
+  string operations_hash_name = 4;
+  string queued_operations_list_name = 5;
+  string dispatched_operations_hash_name = 6;
+  string completed_operations_list_name = 7;
+  string operation_channel_name = 8;
+  string cas_prefix = 9;
+}
+
+message ShardInstanceConfig {
+  oneof backplane {
+    RedisShardBackplaneConfig redis_shard_backplane_config = 2;
+  }
+}
+
+message ShardWorkerInstanceConfig {
+  // whether to stream stdout from processes
+  bool stream_stdout = 6;
+
+  // control for process stdout
+  CASInsertionPolicy stdout_cas_policy = 7;
+
+  // whether to stream stderr from processes
+  bool stream_stderr = 8;
+
+  // control for process stdout
+  CASInsertionPolicy stderr_cas_policy = 9;
+
+  // control for process output files
+  CASInsertionPolicy file_cas_policy = 10;
+
+  // page size for getTree request
+  uint32 tree_page_size = 12;
+
+  // period of poll requests during execution
+  google.protobuf.Duration operation_poll_period = 13;
+
+  // default timeout for actions
+  // if a timeout is unspecified for an action, this value
+  // is imposed on it, after which the operation will
+  // be killed
+  google.protobuf.Duration default_action_timeout = 14;
+
+  // maximum selectable timeout
+  // a maximum threshold for an action's specified timeout,
+  // beyond which an action will be rejected for execution
+  google.protobuf.Duration maximum_action_timeout = 15;
+}
+
+message ShardWorkerConfig {
+  ShardWorkerInstanceConfig shard_worker_instance_config = 1;
+
+  int32 port = 2;
+
+  string public_name = 3;
+
+  // base directory for all work being performed
+  string root = 4;
+
+  // path to cached files from CAS
+  // if relative, is made relative to root
+  string cas_cache_directory = 5;
+
+  // limit for contents of files retained
+  // from CAS in the cache
+  int64 cas_cache_max_size_bytes = 6;
+
+  // limit for CAS total content size
+  int64 cas_max_size_bytes = 7;
+
+  // page size for getTree request
+  uint32 tree_page_size = 8;
+
+  // whether the worker should attempt to requeue
+  // an operation when an unexpected failure
+  // occurs during an execution
+  bool requeue_on_failure = 11;
+
+  // period of poll requests during execution
+  google.protobuf.Duration operation_poll_period = 12;
+
+  // initial platform used to match operations
+  google.devtools.remoteexecution.v1test.Platform platform = 13;
+
+  // total size of the inline content for
+  // action results
+  int32 inline_content_limit = 14;
+
+  // execute width
+  int32 execute_stage_width = 15;
+
+  // symlink cas input-only directories
+  bool link_input_directories = 16;
+
+  // selected hash function
+  InstanceConfig.HashFunction hash_function = 17;
+
+  // default timeout for actions
+  // if a timeout is unspecified for an action, this value
+  // is imposed on it, after which the operation will
+  // be killed
+  google.protobuf.Duration default_action_timeout = 18;
+
+  // maximum selectable timeout
+  // a maximum threshold for an action's specified timeout,
+  // beyond which an action will be rejected for execution
+  google.protobuf.Duration maximum_action_timeout = 19;
+
+  oneof backplane {
+    RedisShardBackplaneConfig redis_shard_backplane_config = 20;
+  }
+}
+
+message ShardDispatchedOperation {
+  string name = 1;
+
+  int64 requeue_at = 2;
+}
+
 message InstanceConfig {
   string name = 1;
 
@@ -107,6 +229,7 @@ message InstanceConfig {
 
   oneof type {
     MemoryInstanceConfig memory_instance_config = 3;
+    ShardInstanceConfig shard_instance_config = 4;
   }
 }
 

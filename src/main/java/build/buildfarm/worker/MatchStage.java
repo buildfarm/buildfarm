@@ -16,6 +16,7 @@ package build.buildfarm.worker;
 
 import com.google.devtools.remoteexecution.v1test.Action;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
+import com.google.devtools.remoteexecution.v1test.Platform;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
@@ -53,7 +54,7 @@ public class MatchStage extends PipelineStage {
     Action action;
     try {
       metadata = operation.getMetadata().unpack(ExecuteOperationMetadata.class);
-    } catch (InvalidProtocolBufferException e) {
+    } catch (InvalidProtocolBufferException ex) {
       return false;
     }
 

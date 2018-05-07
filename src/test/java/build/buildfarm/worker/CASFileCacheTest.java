@@ -52,7 +52,7 @@ class CASFileCacheTest {
     fileCache = new CASFileCache(
         new InputStreamFactory() {
           @Override
-          public InputStream apply(Digest digest) {
+          public InputStream newInput(Digest digest) {
             return blobs.get(digest).newInput();
           }
         },
@@ -113,10 +113,7 @@ class CASFileCacheTest {
   public void expireUnreferencedEntryRemovesBlobFile() throws IOException, InterruptedException {
     byte[] bigData = new byte[1000];
     ByteString bigBlob = ByteString.copyFrom(bigData);
-    Digest bigDigest = Digest.newBuilder()
-        .setHash("big")
-        .setSizeBytes(bigBlob.size())
-        .build();
+    Digest bigDigest = digestUtil.compute(bigBlob);
     blobs.put(bigDigest, bigBlob);
     Path bigPath = fileCache.put(bigDigest, false, null);
 

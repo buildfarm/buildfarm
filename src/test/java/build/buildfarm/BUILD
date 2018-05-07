@@ -88,6 +88,18 @@ java_test(
 )
 
 java_test(
+    name = "shard-worker-tests",
+    size = "small",
+    srcs = glob(["worker/shard/*.java"]),
+    test_class = "build.buildfarm.AllTests",
+    deps = [
+        ":test_runner",
+        "//src/main/java/build/buildfarm:shard-worker",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+    ],
+)
+
+java_test(
     name = "stub-instance-tests",
     size = "small",
     srcs = glob(["instance/stub/*.java"]),

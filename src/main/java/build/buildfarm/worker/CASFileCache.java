@@ -16,6 +16,7 @@ package build.buildfarm.worker;
 
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 
+import build.buildfarm.common.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -23,6 +24,7 @@ import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.devtools.remoteexecution.v1test.Directory;
 import com.google.devtools.remoteexecution.v1test.DirectoryNode;
 import com.google.devtools.remoteexecution.v1test.FileNode;
+import com.google.protobuf.ByteString;
 import io.grpc.StatusRuntimeException;
 import java.io.File;
 import java.io.IOException;
@@ -36,18 +38,100 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class CASFileCache {
+public class CASFileCache implements ContentAddressableStorage {
   private final InputStreamFactory inputStreamFactory;
   private final Path root;
   private final long maxSizeInBytes;
   private final DigestUtil digestUtil;
-  private final Map<Path, Entry> storage;
-  private final Map<Digest, DirectoryEntry> directoryStorage;
+  private final Map<Path, Entry> storage = new ConcurrentHashMap<>();
+  private final Map<Digest, DirectoryEntry> directoryStorage = new HashMap<>();
+  private final Map<Digest, Object> mutexes = new HashMap<>();
 
-  private transient long sizeInBytes;
-  private transient Entry header;
+  private transient long sizeInBytes = 0;
+  private transient Entry header = new SentinelEntry();
+
+  public synchronized boolean contains(Digest digest, boolean isExecutable) {
+    Path key = getKey(digest, isExecutable);
+    Entry e = storage.get(key);
+    if (e != null) {
+      e.recordAccess(header);
+      return true;
+    }
+    return false;
+  }
+
+  @Override
+  public boolean contains(Digest digest) {
+    /* maybe swap the order here if we're higher in ratio on one side */
+    return contains(digest, false) || contains(digest, true);
+  }
+
+  private Blob get(Digest digest, boolean isExecutable) {
+    try {
+      Path blobPath = put(digest, isExecutable, null);
+      try (InputStream in = Files.newInputStream(blobPath)) {
+        return new Blob(ByteString.readFrom(in), digestUtil);
+      } finally {
+        decrementReferences(ImmutableList.<Path>of(blobPath), ImmutableList.<Digest>of());
+      }
+    } catch (java.nio.file.NoSuchFileException e) {
+    } catch (IOException e) {
+      if (!e.getMessage().equals("file not found")) {
+        e.printStackTrace();
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+    return null;
+  }
+
+  @Override
+  public Blob get(Digest digest) {
+    if (contains(digest, false)) {
+      return get(digest, false);
+    }
+    return get(digest, true);
+  }
+
+
+  @Override
+  public void put(Blob blob) {
+    Path blobPath = getKey(blob.getDigest(), false);
+    try {
+      putImpl(blobPath, blob.getDigest().getSizeBytes(), false, () -> blob.getData().newInput(), null);
+      decrementReferences(ImmutableList.<Path>of(blobPath), ImmutableList.<Digest>of());
+    } catch (IOException e) {
+      /* unlikely, our stream comes from the blob */
+      e.printStackTrace();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+  }
+
+  @Override
+  public void put(Blob blob, Runnable onExpiration) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public synchronized Object acquire(Digest digest) {
+    Object mutex = mutexes.get(digest);
+    if (mutex == null) {
+      mutex = new Object();
+      mutexes.put(digest, mutex);
+    }
+    return mutex;
+  }
+
+  @Override
+  public synchronized void release(Digest digest) {
+    // prevents this lock from being exclusive to other accesses, since it
+    // must now be present
+    mutexes.remove(digest);
+  }
 
   public CASFileCache(InputStreamFactory inputStreamFactory, Path root, long maxSizeInBytes, DigestUtil digestUtil) {
     this.inputStreamFactory = inputStreamFactory;
@@ -55,11 +139,7 @@ public class CASFileCache {
     this.maxSizeInBytes = maxSizeInBytes;
     this.digestUtil = digestUtil;
 
-    sizeInBytes = 0;
-    header = new SentinelEntry();
     header.before = header.after = header;
-    storage = new ConcurrentHashMap<>();
-    directoryStorage = new HashMap<>();
   }
 
   /**
@@ -298,6 +378,22 @@ public class CASFileCache {
 
   public Path put(Digest digest, boolean isExecutable, Digest containingDirectory) throws IOException, InterruptedException {
     Path key = getKey(digest, isExecutable);
+    putImpl(key, digest.getSizeBytes(), isExecutable, () -> inputStreamFactory.newInput(digest), containingDirectory);
+    return key;
+  }
+
+  @FunctionalInterface
+  interface InputStreamSupplier {
+    InputStream newInput() throws IOException;
+  }
+
+  private void putImpl(
+      Path key,
+      long blobSizeInBytes,
+      boolean isExecutable,
+      InputStreamSupplier inSupplier,
+      Digest containingDirectory)
+      throws IOException, InterruptedException {
     ImmutableList.Builder<Path> expiredKeys = null;
 
     synchronized(this) {
@@ -307,10 +403,10 @@ public class CASFileCache {
           e.containingDirectories.add(containingDirectory);
         }
         e.incrementReference();
-        return key;
+        return;
       }
 
-      sizeInBytes += digest.getSizeBytes();
+      sizeInBytes += blobSizeInBytes;
 
       while (sizeInBytes > maxSizeInBytes) {
         if (expiredKeys == null) {
@@ -328,24 +424,22 @@ public class CASFileCache {
 
     Path tmpPath;
     long copySize;
-    try (InputStream in = inputStreamFactory.apply(digest)) {
+    try (InputStream in = inSupplier.newInput()) {
       // FIXME make a validating file copy object and verify digest
       tmpPath = key.resolveSibling(key.getFileName() + ".tmp");
       copySize = Files.copy(in, tmpPath);
     }
 
-    if (copySize != digest.getSizeBytes()) {
+    if (copySize != blobSizeInBytes) {
       Files.delete(tmpPath);
-      return null;
+      throw new IOException("blob digest size mismatch, expected " + blobSizeInBytes + ", was " + copySize);
     }
     setPermissions(tmpPath, isExecutable);
     Files.move(tmpPath, key, REPLACE_EXISTING);
 
-    Entry e = new Entry(key, digest.getSizeBytes(), containingDirectory);
+    Entry e = new Entry(key, blobSizeInBytes, containingDirectory);
 
     storage.put(key, e);
-
-    return key;
   }
 
   private static void setPermissions(Path path, boolean isExecutable) throws IOException {
@@ -401,6 +495,13 @@ public class CASFileCache {
         addBefore(header);
       }
     }
+
+    public void recordAccess(Entry header) {
+      if (referenceCount == 0) {
+        remove();
+        addBefore(header);
+      }
+    }
   }
 
   private static class SentinelEntry extends Entry {
@@ -422,6 +523,11 @@ public class CASFileCache {
     @Override
     public void decrementReference(Entry header) {
       throw new UnsupportedOperationException("sentinal cannot be referenced");
+    }
+
+    @Override
+    public void recordAccess(Entry header) {
+      throw new UnsupportedOperationException("sentinal cannot be accessed");
     }
   }
 

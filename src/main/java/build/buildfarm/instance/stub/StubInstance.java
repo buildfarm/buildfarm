@@ -39,6 +39,9 @@ import com.google.devtools.remoteexecution.v1test.ActionCacheGrpc.ActionCacheBlo
 import com.google.devtools.remoteexecution.v1test.ActionResult;
 import com.google.devtools.remoteexecution.v1test.ContentAddressableStorageGrpc;
 import com.google.devtools.remoteexecution.v1test.ContentAddressableStorageGrpc.ContentAddressableStorageBlockingStub;
+import com.google.devtools.remoteexecution.v1test.ExecuteRequest;
+import com.google.devtools.remoteexecution.v1test.ExecutionGrpc;
+import com.google.devtools.remoteexecution.v1test.ExecutionGrpc.ExecutionBlockingStub;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.devtools.remoteexecution.v1test.Directory;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
@@ -63,6 +66,7 @@ import java.io.OutputStream;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -72,15 +76,20 @@ public class StubInstance implements Instance {
   private final DigestUtil digestUtil;
   private final Channel channel;
   private final ByteStreamUploader uploader;
+  private final long deadlineAfter;
+  private final TimeUnit deadlineAfterUnits;
 
   public StubInstance(
       String name,
       DigestUtil digestUtil,
       Channel channel,
+      long deadlineAfter, TimeUnit deadlineAfterUnits,
       ByteStreamUploader uploader) {
     this.name = name;
     this.digestUtil = digestUtil;
     this.channel = channel;
+    this.deadlineAfter = deadlineAfter;
+    this.deadlineAfterUnits = deadlineAfterUnits;
     this.uploader = uploader;
   }
 
@@ -129,6 +138,15 @@ public class StubInstance implements Instance {
             }
           });
 
+  private final Supplier<ExecutionBlockingStub> executionBlockingStub =
+      Suppliers.memoize(
+          new Supplier<ExecutionBlockingStub>() {
+            @Override
+            public ExecutionBlockingStub get() {
+              return ExecutionGrpc.newBlockingStub(channel);
+            }
+          });
+
   @Override
   public String getName() {
     return name;
@@ -146,7 +164,9 @@ public class StubInstance implements Instance {
 
   @Override
   public void putActionResult(ActionKey actionKey, ActionResult actionResult) {
-    actionCacheBlockingStub.get().updateActionResult(UpdateActionResultRequest.newBuilder()
+    actionCacheBlockingStub.get()
+        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
+        .updateActionResult(UpdateActionResultRequest.newBuilder()
         .setInstanceName(getName())
         .setActionDigest(actionKey.getDigest())
         .setActionResult(actionResult)
@@ -157,6 +177,7 @@ public class StubInstance implements Instance {
   public Iterable<Digest> findMissingBlobs(Iterable<Digest> digests) {
     FindMissingBlobsResponse response = contentAddressableStorageBlockingStub
         .get()
+        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
         .findMissingBlobs(FindMissingBlobsRequest.newBuilder()
             .setInstanceName(getName())
             .addAllBlobDigests(digests)
@@ -185,6 +206,7 @@ public class StubInstance implements Instance {
       long written_bytes = 0;
       final AtomicReference<RuntimeException> exception = new AtomicReference<>(null);
       StreamObserver<WriteRequest> requestObserver = bsStub.get()
+          .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
           .write(
               new StreamObserver<WriteResponse>() {
                 @Override
@@ -251,6 +273,7 @@ public class StubInstance implements Instance {
   public InputStream newStreamInput(String name) {
     Iterator<ReadResponse> replies = bsBlockingStub
         .get()
+        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
         .read(ReadRequest.newBuilder().setResourceName(name).build());
     return new ByteStringIteratorInputStream(Iterators.transform(replies, (reply) -> reply.getData()));
   }
@@ -274,7 +297,18 @@ public class StubInstance implements Instance {
 
   @Override
   public ByteString getBlob(Digest blobDigest, long offset, long limit) {
-    return null;
+    try (InputStream in = newStreamInput(getBlobName(blobDigest))) {
+      in.skip(offset);
+      if (limit == 0) {
+        return ByteString.readFrom(in);
+      }
+      int len = (int) limit;
+      byte[] buf = new byte[len];
+      len = in.read(buf);
+      return ByteString.copyFrom(buf, 0, len);
+    } catch (IOException ex) {
+      return null;
+    }
   }
 
   @Override
@@ -294,6 +328,7 @@ public class StubInstance implements Instance {
       ImmutableList.Builder<Directory> directories) {
     GetTreeResponse response = contentAddressableStorageBlockingStub
         .get()
+        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
         .getTree(GetTreeRequest.newBuilder()
             .setInstanceName(getName())
             .setRootDigest(rootDigest)
@@ -311,7 +346,15 @@ public class StubInstance implements Instance {
       int totalInputFileCount,
       long totalInputFileBytes,
       Consumer<Operation> onOperation) {
-    throw new UnsupportedOperationException();
+    onOperation.accept(executionBlockingStub
+        .get()
+        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
+        .execute(ExecuteRequest.newBuilder()
+            .setAction(action)
+            .setSkipCacheLookup(skipCacheLookup)
+            .setTotalInputFileCount(totalInputFileCount)
+            .setTotalInputFileBytes(totalInputFileBytes)
+            .build()));
   }
 
   private void requeue(Operation operation) {
@@ -334,7 +377,9 @@ public class StubInstance implements Instance {
 
   @Override
   public void match(Platform platform, boolean requeueOnFailure, Predicate<Operation> onMatch) {
-    Operation operation = operationQueueBlockingStub.get().take(TakeOperationRequest.newBuilder()
+    Operation operation = operationQueueBlockingStub.get()
+        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
+        .take(TakeOperationRequest.newBuilder()
         .setInstanceName(getName())
         .setPlatform(platform)
         .build());
@@ -348,6 +393,7 @@ public class StubInstance implements Instance {
   public boolean putOperation(Operation operation) {
     return operationQueueBlockingStub
         .get()
+        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
         .put(operation)
         .getCode() == Code.OK.getNumber();
   }
@@ -358,6 +404,7 @@ public class StubInstance implements Instance {
       ExecuteOperationMetadata.Stage stage) {
     return operationQueueBlockingStub
         .get()
+        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
         .poll(PollOperationRequest.newBuilder()
             .setOperationName(operationName)
             .setStage(stage)

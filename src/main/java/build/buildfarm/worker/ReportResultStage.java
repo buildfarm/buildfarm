@@ -97,7 +97,38 @@ public class ReportResultStage extends PipelineStage {
   }
 
   @VisibleForTesting
-  public void uploadOutputs(
+  public void uploadManifest(UploadManifest manifest)
+      throws IOException, InterruptedException {
+    List<Chunker> filesToUpload = new ArrayList<>();
+
+    Map<Digest, Path> digestToFile = manifest.getDigestToFile();
+    Map<Digest, Chunker> digestToChunkers = manifest.getDigestToChunkers();
+    Collection<Digest> digests = new ArrayList<>();
+    digests.addAll(digestToFile.keySet());
+    digests.addAll(digestToChunkers.keySet());
+
+    for (Digest digest : digests) {
+      Chunker chunker;
+      Path file = digestToFile.get(digest);
+      if (file != null) {
+        chunker = new Chunker(file, digest);
+      } else {
+        chunker = digestToChunkers.get(digest);
+        if (chunker == null) {
+          String message = "FindMissingBlobs call returned an unknown digest: " + digest;
+          throw new IOException(message);
+        }
+      }
+      filesToUpload.add(chunker);
+    }
+
+    if (!filesToUpload.isEmpty()) {
+      workerContext.getUploader().uploadBlobs(filesToUpload);
+    }
+  }
+
+  @VisibleForTesting
+  public UploadManifest createManifest(
       ActionResult.Builder result,
       Path execRoot,
       Collection<String> outputFiles,
@@ -133,32 +164,7 @@ public class ReportResultStage extends PipelineStage {
           result::setStderrDigest);
     }
 
-    List<Chunker> filesToUpload = new ArrayList<>();
-
-    Map<Digest, Path> digestToFile = manifest.getDigestToFile();
-    Map<Digest, Chunker> digestToChunkers = manifest.getDigestToChunkers();
-    Collection<Digest> digests = new ArrayList<>();
-    digests.addAll(digestToFile.keySet());
-    digests.addAll(digestToChunkers.keySet());
-
-    for (Digest digest : digests) {
-      Chunker chunker;
-      Path file = digestToFile.get(digest);
-      if (file != null) {
-        chunker = new Chunker(file, digest);
-      } else {
-        chunker = digestToChunkers.get(digest);
-        if (chunker == null) {
-          String message = "FindMissingBlobs call returned an unknown digest: " + digest;
-          throw new IOException(message);
-        }
-      }
-      filesToUpload.add(chunker);
-    }
-
-    if (!filesToUpload.isEmpty()) {
-      workerContext.getUploader().uploadBlobs(filesToUpload);
-    }
+    return manifest;
   }
 
   @Override
@@ -180,11 +186,12 @@ public class ReportResultStage extends PipelineStage {
     }
 
     try {
-      uploadOutputs(
+      UploadManifest manifest = createManifest(
           resultBuilder,
           operationContext.execDir,
           operationContext.action.getOutputFilesList(),
           operationContext.action.getOutputDirectoriesList());
+      uploadManifest(manifest);
     } catch (IOException ex) {
       poller.stop();
       return null;
@@ -224,8 +231,9 @@ public class ReportResultStage extends PipelineStage {
   @Override
   protected void after(OperationContext operationContext) {
     try {
-      workerContext.removeDirectory(operationContext.execDir);
-    } catch (IOException ex) {
+      workerContext.destroyActionRoot(operationContext.execDir);
+    } catch (IOException e) {
+      e.printStackTrace();
     }
   }
 }

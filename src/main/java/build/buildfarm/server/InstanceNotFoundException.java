@@ -1,6 +1,6 @@
 package build.buildfarm.server;
 
-class InstanceNotFoundException extends Exception {
+public class InstanceNotFoundException extends Exception {
   private static final long serialVersionUID = 1;
 
   public final String instanceName;

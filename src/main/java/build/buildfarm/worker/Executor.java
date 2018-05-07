@@ -35,11 +35,11 @@ import java.util.concurrent.TimeUnit;
 class Executor implements Runnable {
   private final WorkerContext workerContext;
   private final OperationContext operationContext;
-  private final ExecuteActionStage owner;
+  private final PipelineStage owner;
 
   private static final OutputStream nullOutputStream = ByteStreams.nullOutputStream();
 
-  Executor(WorkerContext workerContext, OperationContext operationContext, ExecuteActionStage owner) {
+  Executor(WorkerContext workerContext, OperationContext operationContext, PipelineStage owner) {
     this.workerContext = workerContext;
     this.operationContext = operationContext;
     this.owner = owner;

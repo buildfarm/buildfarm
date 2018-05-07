@@ -72,4 +72,10 @@ public interface ContentAddressableStorage {
    */
   @ThreadSafe
   void put(Blob blob, Runnable onExpiration);
+
+  @ThreadSafe
+  Object acquire(Digest digest);
+
+  @ThreadSafe
+  void release(Digest digest);
 }
