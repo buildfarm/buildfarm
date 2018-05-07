@@ -418,8 +418,8 @@ public class StubInstance implements Instance {
         .setInstanceName(getName())
         .setPlatform(platform)
         .build());
-    boolean success = onMatch.test(operation);
-    if (Thread.currentThread().interrupted()) {
+    boolean success = onMatch.test(operation); // unused
+    if (Thread.interrupted()) {
       throw new InterruptedException();
     }
   }
