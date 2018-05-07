@@ -368,7 +368,47 @@ public class ShardInstance extends AbstractServerInstance {
 
   @Override
   protected TokenizableIterator<Operation> createOperationsIterator(String pageToken) {
-    throw new UnsupportedOperationException();
+    Iterator<Operation> iter = Iterables.transform(
+        backplane.getOperations(),
+        (operationName) -> backplane.getOperation(operationName)).iterator();
+    OperationIteratorToken token;
+    try {
+      token = OperationIteratorToken.parseFrom(
+          BaseEncoding.base64().decode(pageToken));
+    } catch (InvalidProtocolBufferException ex) {
+      throw new IllegalArgumentException();
+    }
+    if (!pageToken.isEmpty()) {
+      boolean paged = true;
+      while (iter.hasNext() && !paged) {
+        paged = iter.next().getName().equals(pageToken);
+      }
+    }
+    return new TokenizableIterator<Operation>() {
+      private OperationIteratorToken nextToken = token;
+
+      @Override
+      public boolean hasNext() {
+        return iter.hasNext();
+      }
+
+      @Override
+      public Operation next() {
+        Operation operation = iter.next();
+        nextToken = OperationIteratorToken.newBuilder()
+            .setOperationName(operation.getName())
+            .build();
+        return operation;
+      }
+
+      @Override
+      public String toNextPageToken() {
+        if (hasNext()) {
+          return BaseEncoding.base64().encode(nextToken.toByteArray());
+        }
+        return "";
+      }
+    };
   }
 
   @Override

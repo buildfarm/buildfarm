@@ -154,4 +154,9 @@ public interface ShardBackplane {
    * Register a watcher for an operation
    */
   public boolean watchOperation(String operationName, Predicate<Operation> watcher);
+
+  /**
+   * Get all operations
+   */
+  public Iterable<String> getOperations();
 }

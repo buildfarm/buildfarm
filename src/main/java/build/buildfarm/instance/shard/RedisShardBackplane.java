@@ -314,6 +314,16 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   @Override
+  public Iterable<String> getOperations() {
+    try (Jedis jedis = getJedis()) {
+      Iterable<String> completedOperations = jedis.lrange(config.getCompletedOperationsListName(), 0, -1);
+      Iterable<String> dispatchedOperations = jedis.hgetAll(config.getDispatchedOperationsHashName()).keySet();
+      Iterable<String> queuedOperations = jedis.lrange(config.getQueuedOperationsListName(), 0, -1);
+      return Iterables.concat(queuedOperations, dispatchedOperations, completedOperations);
+    }
+  }
+
+  @Override
   public String dispatchOperation() throws InterruptedException {
     String operationName = null;
 
