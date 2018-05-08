@@ -134,7 +134,7 @@ public class ShardInstance extends AbstractServerInstance {
     ImmutableList.Builder<Digest> missingDigests = new ImmutableList.Builder<>();
     Map<String, ImmutableList.Builder<Digest>> workerDigestBuilders = new HashMap<>();
     Map<Digest, Integer> blobDigestScores = new HashMap<>();
-    for (Digest blobDigest : blobDigests) {
+    for (Digest blobDigest : Iterables.filter(blobDigests, (digest) -> digest.getSizeBytes() > 0)) {
       Set<String> workers = backplane.getBlobLocationSet(blobDigest);
       if (workers.isEmpty()) {
         missingDigests.add(blobDigest);
