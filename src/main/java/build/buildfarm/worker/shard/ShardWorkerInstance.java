@@ -78,6 +78,12 @@ public class ShardWorkerInstance implements Instance {
   }
 
   @Override
+  public void start() { }
+
+  @Override
+  public void stop() { }
+
+  @Override
   public ActionResult getActionResult(ActionKey actionKey) {
     throw new UnsupportedOperationException();
   }

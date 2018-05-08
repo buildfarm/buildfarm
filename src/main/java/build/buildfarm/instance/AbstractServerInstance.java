@@ -102,6 +102,12 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
+  public void start() { }
+
+  @Override
+  public void stop() { }
+
+  @Override
   public String getName() {
     return name;
   }

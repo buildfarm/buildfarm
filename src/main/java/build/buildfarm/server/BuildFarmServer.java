@@ -76,6 +76,7 @@ public class BuildFarmServer {
   }
 
   public void start() throws IOException {
+    instances.start();
     server.start();
     Runtime.getRuntime().addShutdownHook(new Thread() {
       @Override
@@ -88,6 +89,7 @@ public class BuildFarmServer {
   }
 
   public void stop() {
+    instances.stop();
     if (server != null) {
       server.shutdown();
     }
@@ -127,5 +129,6 @@ public class BuildFarmServer {
     }
     server.start();
     server.blockUntilShutdown();
+    server.stop();
   }
 }

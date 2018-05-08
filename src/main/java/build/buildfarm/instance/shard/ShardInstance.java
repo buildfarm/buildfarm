@@ -73,6 +73,7 @@ public class ShardInstance extends AbstractServerInstance {
   private final ShardInstanceConfig config;
   private final ShardBackplane backplane;
   private final Map<String, StubInstance> workerStubs;
+  private final Thread dispatchedMonitor;
   private final ListeningScheduledExecutorService retryScheduler =
       MoreExecutors.listeningDecorator(Executors.newScheduledThreadPool(1));
 
@@ -89,6 +90,18 @@ public class ShardInstance extends AbstractServerInstance {
         break;
     }
     workerStubs = new ConcurrentHashMap<>();
+
+    dispatchedMonitor = new Thread(new DispatchedMonitor(backplane, (operationName) -> validateOperation(operationName)));
+  }
+
+  @Override
+  public void start() {
+    dispatchedMonitor.start();
+  }
+
+  @Override
+  public void stop() {
+    dispatchedMonitor.stop();
   }
 
   @Override
@@ -172,8 +185,8 @@ public class ShardInstance extends AbstractServerInstance {
 
   @Override
   public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs)
-      throws IOException, IllegalArgumentException, InterruptedException {
-      throw new UnsupportedOperationException();
+      throws IllegalArgumentException, InterruptedException, StatusException {
+    throw new UnsupportedOperationException();
   }
 
   @Override
@@ -304,6 +317,23 @@ public class ShardInstance extends AbstractServerInstance {
     return operationBuilder.build();
   }
 
+  private boolean validateOperation(String operationName) {
+    Operation operation = getOperation(operationName);
+    if (operation == null || operation.getDone())
+      return false;
+    Action action = expectAction(operation);
+    if (action == null) {
+      return false;
+    }
+    try {
+      validateAction(action);
+    } catch (Exception ex) {
+      ex.printStackTrace();
+      return false;
+    }
+    return true;
+  }
+
   @Override
   public void execute(
       Action action,
@@ -311,6 +341,8 @@ public class ShardInstance extends AbstractServerInstance {
       int totalInputFileCount,
       long totalInputFileBytes,
       Consumer<Operation> onOperation) {
+    validateAction(action);
+
     ExecuteOperationMetadata metadata = createExecuteOperationMetadata(digestUtil.computeActionKey(action));
     Operation operation = createOperation(metadata);
 
@@ -319,8 +351,6 @@ public class ShardInstance extends AbstractServerInstance {
     onOperation.accept(operation);
 
     // FIXME lookup
-
-    // FIXME validation
 
     // make the action available to the worker
     try {

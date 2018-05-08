@@ -37,6 +37,9 @@ public interface Instance {
 
   DigestUtil getDigestUtil();
 
+  void start();
+  void stop();
+
   ActionResult getActionResult(ActionKey actionKey);
   void putActionResult(ActionKey actionKey, ActionResult actionResult);
 

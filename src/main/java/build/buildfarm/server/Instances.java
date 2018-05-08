@@ -3,6 +3,8 @@ package build.buildfarm.server;
 import build.buildfarm.instance.Instance;
 
 public interface Instances {
+  void start();
+  void stop();
   Instance getFromBlob(String blobName) throws InstanceNotFoundException;
   Instance getFromUploadBlob(String uploadBlobName) throws InstanceNotFoundException;
   Instance getFromOperationsCollectionName(String operationsCollectionName) throws InstanceNotFoundException;

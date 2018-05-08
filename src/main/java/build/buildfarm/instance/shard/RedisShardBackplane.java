@@ -25,7 +25,9 @@ import com.google.common.collect.Iterables;
 import com.google.devtools.remoteexecution.v1test.ActionResult;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
+import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
 import com.google.longrunning.Operation;
+import com.google.protobuf.Any;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 import java.net.URI;
@@ -251,14 +253,18 @@ public class RedisShardBackplane implements ShardBackplane {
             .build());
   }
 
+  private Operation getOperation(Jedis jedis, String operationName) {
+    String json = jedis.hget(config.getOperationsHashName(), operationName);
+    if (json == null) {
+      return null;
+    }
+    return parseOperationJson(json);
+  }
+
   @Override
   public Operation getOperation(String operationName) {
     try (Jedis jedis = getJedis()) {
-      String json = jedis.hget(config.getOperationsHashName(), operationName);
-      if (json == null) {
-        return null;
-      }
-      return parseOperationJson(json);
+      return getOperation(jedis, operationName);
     }
   }
 
@@ -324,6 +330,25 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   @Override
+  public ImmutableList<ShardDispatchedOperation> getDispatchedOperations() {
+    ImmutableList.Builder<ShardDispatchedOperation> builder = new ImmutableList.Builder<ShardDispatchedOperation>();
+    try (Jedis jedis = getJedis()) {
+      for (Map.Entry<String, String> e : jedis.hgetAll(config.getDispatchedOperationsHashName()).entrySet()) {
+        try {
+          ShardDispatchedOperation.Builder dispatchedOperationBuilder = ShardDispatchedOperation.newBuilder();
+          JsonFormat.parser().merge(e.getValue(), dispatchedOperationBuilder);
+          builder.add(dispatchedOperationBuilder.build());
+        } catch (InvalidProtocolBufferException ex) {
+          /* guess we don't want to spin on this */
+          jedis.hdel(config.getDispatchedOperationsHashName(), e.getKey());
+          ex.printStackTrace();
+        }
+      }
+    }
+    return builder.build();
+  }
+
+  @Override
   public String dispatchOperation() throws InterruptedException {
     String operationName = null;
 
@@ -354,9 +379,58 @@ public class RedisShardBackplane implements ShardBackplane {
     return operationName;
   }
 
+  @Override
+  public boolean pollOperation(String operationName, Stage stage) {
+    try (Jedis jedis = getJedis()) {
+      boolean success = false;
+      if (jedis.hexists(config.getDispatchedOperationsHashName(), operationName)) {
+        ShardDispatchedOperation o = ShardDispatchedOperation.newBuilder()
+            .setName(operationName)
+            .setRequeueAt(System.currentTimeMillis() + 30 * 1000)
+            .build();
+        if (jedis.hset(config.getDispatchedOperationsHashName(), operationName, JsonFormat.printer().print(o)) == 0) {
+          success = true;
+        } else {
+          /* someone else beat us to the punch, delete our incorrectly added key */
+          jedis.hdel(config.getDispatchedOperationsHashName(), operationName);
+        }
+      }
+      return success;
+    } catch (InvalidProtocolBufferException ex) {
+      return false;
+    }
+  }
+
+  @Override
+  public void requeueDispatchedOperation(ShardDispatchedOperation o) {
+    try (Jedis jedis = getJedis()) {
+      /* should we attempt to transact this? can we do a conditional? */
+      if (jedis.hdel(config.getDispatchedOperationsHashName(), o.getName()) == 1) {
+        Operation operation = getOperation(jedis, o.getName());
+        ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
+        /* freak out for completed/other incompatible state? */
+        metadata = metadata.toBuilder()
+            .setStage(ExecuteOperationMetadata.Stage.QUEUED)
+            .build();
+        putOperation(operation.toBuilder().setMetadata(Any.pack(metadata)).build());
+      }
+    }
+  }
+
   private void completeOperation(Jedis jedis, String operationName) {
     if (jedis.hdel(config.getDispatchedOperationsHashName(), operationName) == 1) {
       jedis.rpush(config.getCompletedOperationsListName(), operationName);
+    }
+  }
+
+  @Override
+  public void deleteOperation(String operationName) {
+    try (Jedis jedis = getJedis()) {
+      /* FIXME moar transaction */
+      jedis.hdel(config.getDispatchedOperationsHashName(), operationName);
+      jedis.lrem(config.getQueuedOperationsListName(), 0, operationName);
+      jedis.lrem(config.getCompletedOperationsListName(), 0, operationName);
+      jedis.hdel(config.getOperationsHashName(), operationName);
     }
   }
 

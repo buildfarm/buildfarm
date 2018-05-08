@@ -138,4 +138,18 @@ public class BuildFarmInstances implements Instances {
       }
     }
   }
+
+  @Override
+  public void start() {
+    for (Instance instance : instances.values()) {
+      instance.start();
+    }
+  }
+
+  @Override
+  public void stop() {
+    for (Instance instance : instances.values()) {
+      instance.stop();
+    }
+  }
 }

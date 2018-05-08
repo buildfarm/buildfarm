@@ -158,6 +158,12 @@ public class StubInstance implements Instance {
   }
 
   @Override
+  public void start() { }
+
+  @Override
+  public void stop() { }
+
+  @Override
   public ActionResult getActionResult(ActionKey actionKey) {
     return null;
   }

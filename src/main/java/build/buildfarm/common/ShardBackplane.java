@@ -16,8 +16,11 @@ package build.buildfarm.common;
 
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.ThreadSafety.ThreadSafe;
+import build.buildfarm.v1test.ShardDispatchedOperation;
+import com.google.common.collect.ImmutableList;
 import com.google.devtools.remoteexecution.v1test.ActionResult;
 import com.google.devtools.remoteexecution.v1test.Digest;
+import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
 import com.google.longrunning.Operation;
 import java.util.Set;
 import java.util.function.Predicate;
@@ -151,12 +154,37 @@ public interface ShardBackplane {
   public String dispatchOperation() throws InterruptedException;
 
   /**
+   * The state of operations is tracked in a series of lists representing the
+   * order in which the work is to be processed (queued, dispatched, and
+   * completed).
+   *
+   * Updates a dispatchedOperation requeue_at and returns whether the
+   * operation is still valid.
+   */
+  public boolean pollOperation(String operationName, Stage stage);
+
+  /**
+   * Delete an operation
+   */
+  public void deleteOperation(String operationName);
+
+  /**
    * Register a watcher for an operation
    */
   public boolean watchOperation(String operationName, Predicate<Operation> watcher);
 
   /**
+   * Get all dispatched operations
+   */
+  public ImmutableList<ShardDispatchedOperation> getDispatchedOperations();
+
+  /**
    * Get all operations
    */
   public Iterable<String> getOperations();
+
+  /**
+   * Requeue a dispatched operation
+   */
+  public void requeueDispatchedOperation(ShardDispatchedOperation operation);
 }
