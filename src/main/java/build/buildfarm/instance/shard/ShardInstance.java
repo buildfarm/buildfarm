@@ -55,6 +55,7 @@ import com.google.protobuf.util.JsonFormat;
 import io.grpc.Channel;
 import io.grpc.ManagedChannel;
 import io.grpc.Status;
+import io.grpc.Status.Code;
 import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
 import io.grpc.netty.NegotiationType;
@@ -125,7 +126,7 @@ public class ShardInstance extends AbstractServerInstance {
           },
           (operationName) -> {
             try {
-              cancelOperation(operationName);
+              errorOperation(operationName, Code.FAILED_PRECONDITION);
             } catch (InterruptedException e) {
               Thread.currentThread().interrupt();
             }
@@ -319,7 +320,7 @@ public class ShardInstance extends AbstractServerInstance {
         throw Status.INTERNAL.asRuntimeException();
       } catch (StatusRuntimeException e) {
         Status status = Status.fromThrowable(e);
-        if (status.getCode() == Status.Code.UNAVAILABLE) {
+        if (status.getCode() == Code.UNAVAILABLE) {
           removeMalfunctioningWorker(worker, e, "findMissingBlobs(...)");
         } else {
           e.printStackTrace();
@@ -360,9 +361,9 @@ public class ShardInstance extends AbstractServerInstance {
       }
     } catch (StatusRuntimeException e) {
       Status st = Status.fromThrowable(e);
-      if (st.getCode().equals(Status.Code.UNAVAILABLE)) {
+      if (st.getCode().equals(Code.UNAVAILABLE)) {
         removeMalfunctioningWorker(worker, e, "getBlob(" + DigestUtil.toString(blobDigest) + ")");
-      } else if (st.getCode().equals(Status.Code.NOT_FOUND)) {
+      } else if (st.getCode().equals(Code.NOT_FOUND)) {
         System.out.println(worker + " did not contain " + DigestUtil.toString(blobDigest));
         // ignore this, the worker will update the backplane eventually
       } else if (Retrier.DEFAULT_IS_RETRIABLE.test(st)) {
@@ -863,7 +864,7 @@ public class ShardInstance extends AbstractServerInstance {
 
   @Override
   public boolean putOperation(Operation operation) throws InterruptedException {
-    if (isCancelled(operation)) {
+    if (isErrored(operation)) {
       try {
         Action action = expectAction(operation);
         if (action != null) {

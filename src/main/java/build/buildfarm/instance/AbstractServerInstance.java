@@ -36,8 +36,8 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.rpc.Code;
 import io.grpc.Status;
+import io.grpc.Status.Code;
 import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
 import java.io.IOException;
@@ -490,7 +490,7 @@ public abstract class AbstractServerInstance implements Instance {
           .setResponse(Any.pack(ExecuteResponse.newBuilder()
               .setResult(actionResult)
               .setStatus(com.google.rpc.Status.newBuilder()
-                  .setCode(Code.OK.getNumber())
+                  .setCode(Code.OK.value())
                   .build())
               .setCachedResult(actionResult != null)
               .build()));
@@ -573,7 +573,12 @@ public abstract class AbstractServerInstance implements Instance {
   protected boolean isCancelled(Operation operation) {
     return operation.getDone() &&
         operation.getResultCase() == Operation.ResultCase.ERROR &&
-        operation.getError().getCode() == Status.Code.CANCELLED.value();
+        operation.getError().getCode() == Code.CANCELLED.value();
+  }
+
+  protected boolean isErrored(Operation operation) {
+    return operation.getDone() &&
+        operation.getResultCase() == Operation.ResultCase.ERROR;
   }
 
   protected boolean isQueued(Operation operation) {
@@ -688,12 +693,16 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public void cancelOperation(String name) throws InterruptedException {
+    errorOperation(name, Code.CANCELLED);
+  }
+
+  protected void errorOperation(String name, Code code) throws InterruptedException {
     Operation operation = getOperation(name);
     if (operation == null) {
-      throw new IllegalStateException("Trying to cancel nonexistent operation [" + name + "]");
+      throw new IllegalStateException("Trying to error nonexistent operation [" + name + "]");
     }
     if (operation.getDone()) {
-      throw new IllegalStateException("Trying to cancel already completed operation [" + name + "]");
+      throw new IllegalStateException("Trying to error already completed operation [" + name + "]");
     }
     ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
     if (metadata == null) {
@@ -705,7 +714,7 @@ public abstract class AbstractServerInstance implements Instance {
             .setStage(ExecuteOperationMetadata.Stage.COMPLETED)
             .build()))
         .setError(com.google.rpc.Status.newBuilder()
-            .setCode(com.google.rpc.Code.CANCELLED.getNumber())
+            .setCode(code.value())
             .build());
     putOperation(builder.build());
   }
@@ -719,7 +728,7 @@ public abstract class AbstractServerInstance implements Instance {
     ExecuteResponse executeResponse = ExecuteResponse.newBuilder()
         .setResult(actionResult)
         .setStatus(com.google.rpc.Status.newBuilder()
-            .setCode(Code.DEADLINE_EXCEEDED.getNumber())
+            .setCode(Code.DEADLINE_EXCEEDED.value())
             .build())
         .build();
     ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
