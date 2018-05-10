@@ -456,8 +456,7 @@ public class Worker implements Instances {
 
       @Override
       public ByteString fetchBlob(Digest blobDigest) throws InterruptedException, IOException {
-        /* I swear to god, we're going to get to just pinging random workers */
-        Set<String> workerSet = backplane.getBlobLocationSet(blobDigest);
+        Set<String> workerSet = Sets.intersection(backplane.getBlobLocationSet(blobDigest), backplane.getWorkerSet());
         if (workerSet.remove(config.getPublicName())) {
           backplane.removeBlobLocation(blobDigest, config.getPublicName());
         }
