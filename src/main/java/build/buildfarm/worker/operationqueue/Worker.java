@@ -35,6 +35,7 @@ import build.buildfarm.worker.OutputDirectory;
 import build.buildfarm.worker.Pipeline;
 import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.Poller;
+import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.ReportResultStage;
 import build.buildfarm.worker.WorkerContext;
 import com.google.common.annotations.VisibleForTesting;
@@ -81,6 +82,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
@@ -101,6 +103,7 @@ public class Worker {
 
   private static final ListeningScheduledExecutorService retryScheduler =
       MoreExecutors.listeningDecorator(Executors.newScheduledThreadPool(1));
+  private final Set<String> activeOperations = new ConcurrentSkipListSet<>();
 
   private static ManagedChannel createChannel(String target) {
     NettyChannelBuilder builder =
@@ -388,7 +391,7 @@ public class Worker {
       return;
     }
 
-    WorkerContext workerContext = new WorkerContext() {
+    WorkerContext context = new WorkerContext() {
       @Override
       public String getName() {
         try {
@@ -424,14 +427,19 @@ public class Worker {
 
       @Override
       public void match(Predicate<Operation> onMatch) throws InterruptedException {
-        operationQueueInstance.match(
-            config.getPlatform(),
-            onMatch);
+        operationQueueInstance.match(config.getPlatform(), (operation) -> {
+          if (activeOperations.contains(operation.getName())) {
+            return onMatch.test(null);
+          }
+          activeOperations.add(operation.getName());
+          return onMatch.test(operation);
+        });
       }
 
       @Override
       public void requeue(Operation operation) throws InterruptedException {
         try {
+          deactivate(operation);
           ExecuteOperationMetadata metadata =
               operation.getMetadata().unpack(ExecuteOperationMetadata.class);
 
@@ -446,6 +454,11 @@ public class Worker {
         } catch (InvalidProtocolBufferException e) {
           e.printStackTrace();
         }
+      }
+
+      @Override
+      public void deactivate(Operation operation) {
+        activeOperations.remove(operation.getName());
       }
 
       @Override
@@ -601,13 +614,14 @@ public class Worker {
       }
     };
 
-    PipelineStage errorStage = new ReportResultStage.NullStage(); /* ErrorStage(); */
-    PipelineStage reportResultStage = new ReportResultStage(workerContext, errorStage);
-    PipelineStage executeActionStage = new ExecuteActionStage(workerContext, reportResultStage, errorStage);
+    PipelineStage completeStage = new PutOperationStage(context::deactivate);
+    PipelineStage errorStage = completeStage; /* new ErrorStage(); */
+    PipelineStage reportResultStage = new ReportResultStage(context, completeStage, errorStage);
+    PipelineStage executeActionStage = new ExecuteActionStage(context, reportResultStage, errorStage);
     reportResultStage.setInput(executeActionStage);
-    PipelineStage inputFetchStage = new InputFetchStage(workerContext, executeActionStage, errorStage);
+    PipelineStage inputFetchStage = new InputFetchStage(context, executeActionStage, new PutOperationStage(context::requeue));
     executeActionStage.setInput(inputFetchStage);
-    PipelineStage matchStage = new MatchStage(workerContext, inputFetchStage, errorStage);
+    PipelineStage matchStage = new MatchStage(context, inputFetchStage, errorStage);
     inputFetchStage.setInput(matchStage);
 
     Pipeline pipeline = new Pipeline();

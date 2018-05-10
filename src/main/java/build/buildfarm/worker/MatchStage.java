@@ -52,6 +52,11 @@ public class MatchStage extends PipelineStage {
     workerContext.logInfo("MatchStage: Matching");
 
     workerContext.match((operation) -> {
+      if (operation == null) {
+        output.release();
+        return false;
+      }
+
       workerContext.logInfo("MatchStage: Starting operation: " + operation.getName());
 
       try {

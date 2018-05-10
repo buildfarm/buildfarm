@@ -65,15 +65,14 @@ public class InputFetchStage extends PipelineStage {
 
     poller.stop();
 
-    if (!success) {
-      workerContext.requeue(operationContext.operation);
+    if (success) {
+      Duration fetchedIn = Durations.fromNanos(System.nanoTime() - fetchStartAt);
+
+      return operationContext.toBuilder()
+          .setFetchedIn(fetchedIn)
+          .build();
+    } else {
       return null;
     }
-
-    Duration fetchedIn = Durations.fromNanos(System.nanoTime() - fetchStartAt);
-
-    return operationContext.toBuilder()
-        .setFetchedIn(fetchedIn)
-        .build();
   }
 }

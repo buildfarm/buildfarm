@@ -39,6 +39,7 @@ public interface WorkerContext {
   Poller createPoller(String name, String operationName, Stage stage, Runnable onFailure);
   void match(Predicate<Operation> onMatch) throws InterruptedException;
   void requeue(Operation operation) throws InterruptedException;
+  void deactivate(Operation operation);
   void logInfo(String msg);
   CASInsertionPolicy getFileCasPolicy();
   CASInsertionPolicy getStdoutCasPolicy();

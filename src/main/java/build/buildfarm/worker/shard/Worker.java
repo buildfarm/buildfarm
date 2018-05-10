@@ -42,6 +42,7 @@ import build.buildfarm.worker.OutputDirectory;
 import build.buildfarm.worker.Pipeline;
 import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.Poller;
+import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.ReportResultStage;
 import build.buildfarm.worker.WorkerContext;
 import build.buildfarm.v1test.CASInsertionPolicy;
@@ -104,6 +105,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.Stack;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -129,6 +131,7 @@ public class Worker implements Instances {
   private final Map<Path, Iterable<Digest>> rootInputDirectories = new ConcurrentHashMap<>();
   private final ListeningScheduledExecutorService retryScheduler =
       MoreExecutors.listeningDecorator(Executors.newScheduledThreadPool(1));
+  private final Set<String> activeOperations = new ConcurrentSkipListSet<>();
 
   @Override
   public Instance getFromBlob(String blobName) throws InstanceNotFoundException { return instance; }
@@ -456,7 +459,9 @@ public class Worker implements Instances {
 
       @Override
       public ByteString fetchBlob(Digest blobDigest) throws InterruptedException, IOException {
-        Set<String> workerSet = Sets.intersection(backplane.getBlobLocationSet(blobDigest), backplane.getWorkerSet());
+        Set<String> workerSet = new HashSet<>(Sets.intersection(
+            backplane.getBlobLocationSet(blobDigest),
+            backplane.getWorkerSet()));
         if (workerSet.remove(config.getPublicName())) {
           backplane.removeBlobLocation(blobDigest, config.getPublicName());
         }
@@ -589,7 +594,13 @@ public class Worker implements Instances {
 
       @Override
       public void match(Predicate<Operation> onMatch) throws InterruptedException {
-        instance.match(config.getPlatform(), onMatch);
+        instance.match(config.getPlatform(), (operation) -> {
+          if (activeOperations.contains(operation.getName())) {
+            return onMatch.test(null);
+          }
+          activeOperations.add(operation.getName());
+          return onMatch.test(operation);
+        });
       }
 
       private ExecuteOperationMetadata expectExecuteOperationMetadata(Operation operation) {
@@ -619,31 +630,20 @@ public class Worker implements Instances {
         return null;
       }
 
-      /*
-      private boolean isQueued(Operation operation) {
-        ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
-        return metadata != null
-            && metadata.getStage() == ExecuteOperationMetadata.Stage.QUEUED;
-      }
-      */
-
       @Override
       public void requeue(Operation operation) throws InterruptedException {
+        deactivate(operation);
         try {
           backplane.pollOperation(operation.getName(), ExecuteOperationMetadata.Stage.QUEUED, 0);
         } catch (IOException e) {
           // ignore, at least dispatcher will pick us up in 30s
           e.printStackTrace();
         }
-        /*
-        if (isQueued(operation)) {
-          try {
-            backplane.requeueDispatchedOperation(operation);
-          } catch (IOException e) {
-            e.printStackTrace();
-          }
-        }
-        */
+      }
+
+      @Override
+      public void deactivate(Operation operation) {
+        activeOperations.remove(operation.getName());
       }
 
       @Override
@@ -955,11 +955,12 @@ public class Worker implements Instances {
       }
     };
 
-    PipelineStage errorStage = new ReportResultStage.NullStage(); /* ErrorStage(); */
-    PipelineStage reportResultStage = new ReportResultStage(context, errorStage);
+    PipelineStage completeStage = new PutOperationStage(context::deactivate);
+    PipelineStage errorStage = completeStage; /* new ErrorStage(); */
+    PipelineStage reportResultStage = new ReportResultStage(context, completeStage, errorStage);
     PipelineStage executeActionStage = new ExecuteActionStage(context, reportResultStage, errorStage);
     reportResultStage.setInput(executeActionStage);
-    PipelineStage inputFetchStage = new InputFetchStage(context, executeActionStage, errorStage);
+    PipelineStage inputFetchStage = new InputFetchStage(context, executeActionStage, new PutOperationStage(context::requeue));
     executeActionStage.setInput(inputFetchStage);
     PipelineStage matchStage = new MatchStage(context, inputFetchStage, errorStage);
     inputFetchStage.setInput(matchStage);
