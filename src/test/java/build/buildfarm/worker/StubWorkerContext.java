@@ -15,15 +15,18 @@
 package build.buildfarm.worker;
 
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.worker.CASFileCache;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.CASInsertionPolicy;
 import com.google.devtools.remoteexecution.v1test.Action;
+import com.google.devtools.remoteexecution.v1test.ActionResult;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
+import java.io.OutputStream;
 import java.nio.file.Path;
 import java.util.function.Predicate;
 
@@ -45,10 +48,13 @@ class StubWorkerContext implements WorkerContext {
   @Override public boolean getStreamStderr() { throw new UnsupportedOperationException(); }
   @Override public Duration getDefaultActionTimeout() { throw new UnsupportedOperationException(); }
   @Override public Duration getMaximumActionTimeout() { throw new UnsupportedOperationException(); }
-  @Override public Instance getInstance() { throw new UnsupportedOperationException(); }
   @Override public ByteString getBlob(Digest digest) { throw new UnsupportedOperationException(); }
   @Override public void createActionRoot(Path root, Action action) { throw new UnsupportedOperationException(); }
   @Override public void destroyActionRoot(Path root) { throw new UnsupportedOperationException(); }
   @Override public Path getRoot() { throw new UnsupportedOperationException(); }
   @Override public void removeDirectory(Path path) { throw new UnsupportedOperationException(); }
+  @Override public boolean putOperation(Operation operation) { throw new UnsupportedOperationException(); }
+  @Override public OutputStream getStreamOutput(String name) { throw new UnsupportedOperationException(); }
+  @Override public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs) { throw new UnsupportedOperationException(); }
+  @Override public void putActionResult(ActionKey actionKey, ActionResult actionResult) { throw new UnsupportedOperationException(); }
 };

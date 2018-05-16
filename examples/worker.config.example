@@ -1,15 +1,35 @@
-# the instance domain that this worker will execute work in
-# all requests will be tagged with this instance name
-instance_name: "default_memory_instance"
-
 # the hash function for this worker, required
 # to match out of band between the client and server
 # since resource names must be determined on the client
 # for a valid upload
 hash_function: SHA256
 
-# the endpoint used for all api requests
-operation_queue: "localhost:8980"
+# the endpoint used to execute operations
+operation_queue: {
+  target: "localhost:8980"
+
+  # the instance domain that this worker will execute work in
+  # all requests will be tagged with this instance name
+  instance_name: "default_memory_instance"
+}
+
+# the endpoint used for cas interactions
+content_addressable_storage: {
+  target: "localhost:8980"
+
+  # the instance domain that this worker will make resource requests in
+  # all requests will be tagged with this instance name
+  instance_name: "default_memory_instance"
+}
+
+# the endpoint used for action cache interactions
+action_cache: {
+  target: "localhost:8980"
+
+  # the instance domain that this worker will make resource requests in
+  # all requests will be tagged with this instance name
+  instance_name: "default_memory_instance"
+}
 
 # all content for the operations will be stored under this path
 root: "/tmp/worker"

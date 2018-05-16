@@ -198,7 +198,7 @@ public class ReportResultStage extends PipelineStage {
     inlineContentBytes += updateActionResultStdOutputs(resultBuilder, contents, inlineContentBytes);
 
     try {
-      workerContext.getInstance().putAllBlobs(contents.build());
+      workerContext.putAllBlobs(contents.build());
     } catch (IOException ex) {
       poller.stop();
       return null;
@@ -206,7 +206,7 @@ public class ReportResultStage extends PipelineStage {
 
     ActionResult result = resultBuilder.build();
     if (!operationContext.action.getDoNotCache() && resultBuilder.getExitCode() == 0) {
-      workerContext.getInstance().putActionResult(DigestUtil.asActionKey(operationContext.metadata.getActionDigest()), result);
+      workerContext.putActionResult(DigestUtil.asActionKey(operationContext.metadata.getActionDigest()), result);
     }
 
     ExecuteOperationMetadata metadata = operationContext.metadata.toBuilder()
@@ -224,7 +224,7 @@ public class ReportResultStage extends PipelineStage {
 
     poller.stop();
 
-    if (!workerContext.getInstance().putOperation(operation)) {
+    if (!workerContext.putOperation(operation)) {
       return null;
     }
 

@@ -118,79 +118,86 @@ enum CASInsertionPolicy {
   INSERT_ABOVE_LIMIT = 2;
 };
 
+message InstanceEndpoint {
+  // target suitable for grpc channel creation: host:port is common
+  string target = 1;
+
+  // instance to be used
+  string instance_name = 2;
+}
+
 message WorkerConfig {
-  // the instance this requests work from
-  string instance_name = 1;
+  InstanceConfig.HashFunction hash_function = 1;
 
-  // the hash function used for digests
-  InstanceConfig.HashFunction hash_function = 2;
+  // endpoint for all cas requests
+  InstanceEndpoint content_addressable_storage = 2;
 
-  // server address for all buildfarm requests
-  // like actioncache or execution in bazel, this
-  // server is expected to provide all buildfarm
-  // service endpoints
-  string operation_queue = 3;
+  // endpoint for all action cache requests
+  InstanceEndpoint action_cache = 3;
+
+  // endpoint for all operation execution requests
+  InstanceEndpoint operation_queue = 4;
 
   // base directory for all work being performed
-  string root = 4;
+  string root = 5;
 
   // path to cached files from CAS
   // if relative, is made relative to root
-  string cas_cache_directory = 5;
+  string cas_cache_directory = 6;
 
   // limit for contents of files retained
   // from CAS in the cache
-  int64 cas_cache_max_size_bytes = 6;
+  int64 cas_cache_max_size_bytes = 7;
 
   // total size of the inline content for
   // action results
-  int32 inline_content_limit = 7;
+  int32 inline_content_limit = 8;
 
   // whether to stream stdout from processes
-  bool stream_stdout = 8;
+  bool stream_stdout = 9;
 
   // policy for process stdout
-  CASInsertionPolicy stdout_cas_policy = 9;
+  CASInsertionPolicy stdout_cas_policy = 10;
 
   // whether to stream stderr from processes
-  bool stream_stderr = 10;
+  bool stream_stderr = 11;
 
   // policy for process stdout
-  CASInsertionPolicy stderr_cas_policy = 11;
+  CASInsertionPolicy stderr_cas_policy = 12;
 
   // policy for process output files
-  CASInsertionPolicy file_cas_policy = 12;
+  CASInsertionPolicy file_cas_policy = 13;
 
   // whether the worker should attempt to requeue
   // an operation when an unexpected failure
   // occurs during an execution
-  bool requeue_on_failure = 13;
+  bool requeue_on_failure = 14;
 
   // page size for getTree request
-  uint32 tree_page_size = 14;
+  uint32 tree_page_size = 15;
 
   // period of poll requests during execution
-  google.protobuf.Duration operation_poll_period = 15;
+  google.protobuf.Duration operation_poll_period = 16;
 
   // initial platform used to match operations
-  google.devtools.remoteexecution.v1test.Platform platform = 16;
+  google.devtools.remoteexecution.v1test.Platform platform = 17;
 
   // execute width
-  int32 execute_stage_width = 17;
+  int32 execute_stage_width = 18;
 
   // symlink cas input-only directories
-  bool link_input_directories = 18;
+  bool link_input_directories = 19;
 
   // default timeout for actions
   // if a timeout is unspecified for an action, this value
   // is imposed on it, after which the operation will
   // be killed
-  google.protobuf.Duration default_action_timeout = 19;
+  google.protobuf.Duration default_action_timeout = 20;
 
   // maximum selectable timeout
   // a maximum threshold for an action's specified timeout,
   // beyond which an action will be rejected for execution
-  google.protobuf.Duration maximum_action_timeout = 20;
+  google.protobuf.Duration maximum_action_timeout = 21;
 }
 
 message TreeIteratorToken {
