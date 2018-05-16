@@ -1,4 +1,4 @@
-// Copyright 2017 The Bazel Authors. All rights reserved.
+// Copyright 2018 The Bazel Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.server;
+package build.buildfarm.proxy.http;
 
-import build.buildfarm.instance.Instance;
+import build.buildfarm.common.TokenizableIterator;
+import build.buildfarm.common.TreeIterator;
 import com.google.common.collect.ImmutableList;
 import com.google.devtools.remoteexecution.v1test.BatchUpdateBlobsRequest;
 import com.google.devtools.remoteexecution.v1test.BatchUpdateBlobsResponse;
@@ -27,50 +28,54 @@ import com.google.devtools.remoteexecution.v1test.GetTreeRequest;
 import com.google.devtools.remoteexecution.v1test.GetTreeResponse;
 import com.google.devtools.remoteexecution.v1test.UpdateBlobRequest;
 import com.google.protobuf.ByteString;
+import io.grpc.Metadata;
 import io.grpc.Status;
 import io.grpc.StatusException;
+import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.StreamObserver;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.function.Function;
 
 public class ContentAddressableStorageService extends ContentAddressableStorageGrpc.ContentAddressableStorageImplBase {
-  private final Instances instances;
+  private final SimpleBlobStore simpleBlobStore;
+  private final int treeDefaultPageSize;
+  private final int treeMaxPageSize;
 
-  public ContentAddressableStorageService(Instances instances) {
-    this.instances = instances;
+  public ContentAddressableStorageService(
+      SimpleBlobStore simpleBlobStore,
+      int treeDefaultPageSize,
+      int treeMaxPageSize) {
+    this.simpleBlobStore = simpleBlobStore;
+    this.treeDefaultPageSize = treeDefaultPageSize;
+    this.treeMaxPageSize = treeMaxPageSize;
   }
 
   @Override
   public void findMissingBlobs(
       FindMissingBlobsRequest request,
       StreamObserver<FindMissingBlobsResponse> responseObserver) {
-    Instance instance;
+    FindMissingBlobsResponse.Builder responseBuilder =
+        FindMissingBlobsResponse.newBuilder();
     try {
-      instance = instances.get(request.getInstanceName());
-    } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
-      return;
+      for (Digest blobDigest : request.getBlobDigestsList()) {
+        if (!simpleBlobStore.containsKey(blobDigest.getHash())) {
+          responseBuilder.addMissingBlobDigests(blobDigest);
+        }
+      }
+      responseObserver.onNext(responseBuilder.build());
+      responseObserver.onCompleted();
+    } catch (IOException e) {
+      responseObserver.onError(Status.fromThrowable(e).asException());
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
     }
-
-    responseObserver.onNext(FindMissingBlobsResponse.newBuilder()
-        .addAllMissingBlobDigests(
-            instance.findMissingBlobs(request.getBlobDigestsList()))
-        .build());
-    responseObserver.onCompleted();
   }
 
   @Override
   public void batchUpdateBlobs(
       BatchUpdateBlobsRequest batchRequest,
       StreamObserver<BatchUpdateBlobsResponse> responseObserver) {
-    Instance instance;
-    try {
-      instance = instances.get(batchRequest.getInstanceName());
-    } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
-      return;
-    }
-
     ImmutableList.Builder<ByteString> validBlobsBuilder = new ImmutableList.Builder<>();
     ImmutableList.Builder<BatchUpdateBlobsResponse.Response> responses =
         new ImmutableList.Builder<>();
@@ -78,31 +83,27 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
         (code) -> com.google.rpc.Status.newBuilder()
             .setCode(code.getNumber())
             .build();
-    // FIXME do this validation through the instance interface
     for (UpdateBlobRequest request : batchRequest.getRequestsList()) {
-      com.google.rpc.Status status;
       Digest digest = request.getContentDigest();
-      if (digest.equals(instance.getDigestUtil().compute(request.getData()))) {
-        validBlobsBuilder.add(request.getData());
-        status = statusForCode.apply(com.google.rpc.Code.OK);
-      } else {
-        status = statusForCode.apply(com.google.rpc.Code.INVALID_ARGUMENT);
+      try {
+        simpleBlobStore.put(
+            digest.getHash(),
+            digest.getSizeBytes(),
+            request.getData().newInput());
+        responses.add(BatchUpdateBlobsResponse.Response.newBuilder()
+            .setBlobDigest(digest)
+            .setStatus(statusForCode.apply(com.google.rpc.Code.OK))
+            .build());
+      } catch (IOException e) {
+        StatusException statusException = Status.fromThrowable(e).asException();
+        responses.add(BatchUpdateBlobsResponse.Response.newBuilder()
+            .setBlobDigest(digest)
+            .setStatus(StatusProto.fromThrowable(statusException))
+            .build());
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        return;
       }
-      responses.add(BatchUpdateBlobsResponse.Response.newBuilder()
-          .setBlobDigest(digest)
-          .setStatus(status)
-          .build());
-    }
-
-    try {
-      instance.putAllBlobs(validBlobsBuilder.build());
-    } catch (InterruptedException ex) {
-      responseObserver.onError(new StatusException(Status.fromThrowable(ex)));
-      Thread.currentThread().interrupt();
-      return;
-    } catch (IOException ex) {
-      responseObserver.onError(new StatusException(Status.fromThrowable(ex)));
-      return;
     }
 
     responseObserver.onNext(BatchUpdateBlobsResponse.newBuilder()
@@ -111,18 +112,45 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
     responseObserver.onCompleted();
   }
 
+  private String getTree(
+      Digest rootDigest, int pageSize, String pageToken,
+      ImmutableList.Builder<Directory> directories)
+      throws IOException, InterruptedException {
+    if (pageSize == 0) {
+      pageSize = treeDefaultPageSize;
+    }
+    if (pageSize >= 0 && pageSize > treeMaxPageSize) {
+      pageSize = treeMaxPageSize;
+    }
+
+    TokenizableIterator<Directory> iter =
+        new TreeIterator(
+            (digest) -> {
+              ByteArrayOutputStream stream = new ByteArrayOutputStream((int) digest.getSizeBytes());
+              if (!simpleBlobStore.get(digest.getHash(), stream)) {
+                return null;
+              }
+              return ByteString.copyFrom(stream.toByteArray());
+            }, rootDigest, pageToken);
+
+    while (iter.hasNext() && pageSize != 0) {
+      Directory directory = iter.next();
+      // If part of the tree is missing from the CAS, the server will return the
+      // portion present and omit the rest.
+      if (directory != null) {
+        directories.add(directory);
+        if (pageSize > 0) {
+          pageSize--;
+        }
+      }
+    }
+    return iter.toNextPageToken();
+  }
+
   @Override
   public void getTree(
       GetTreeRequest request,
       StreamObserver<GetTreeResponse> responseObserver) {
-    Instance instance;
-    try {
-      instance = instances.get(request.getInstanceName());
-    } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
-      return;
-    }
-
     int pageSize = request.getPageSize();
     if (pageSize < 0) {
       responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
@@ -130,8 +158,11 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
     }
     ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
     try {
-      String nextPageToken = instance.getTree(
-          request.getRootDigest(), pageSize, request.getPageToken(), directories);
+      String nextPageToken = getTree(
+          request.getRootDigest(),
+          pageSize,
+          request.getPageToken(),
+          directories);
 
       responseObserver.onNext(GetTreeResponse.newBuilder()
           .addAllDirectories(directories.build())
@@ -145,4 +176,3 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
     }
   }
 }
-

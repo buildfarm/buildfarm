@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.server;
+package build.buildfarm.common;
 
-import build.buildfarm.common.DigestUtil;
 import com.google.common.collect.Iterables;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import java.util.Arrays;
@@ -118,12 +117,33 @@ public class UrlPath {
     return digestUtil.build(hash, size);
   }
 
+  public static Digest parseBlobDigest(String resourceName) {
+    String[] components = resourceName.split("/");
+    String hash = components[components.length - 2];
+    long size = Long.parseLong(components[components.length - 1]);
+    return Digest.newBuilder()
+        .setHash(hash)
+        .setSizeBytes(size)
+        .build();
+  }
+
   public static Digest parseUploadBlobDigest(String resourceName, DigestUtil digestUtil)
       throws NumberFormatException {
     String[] components = resourceName.split("/");
     String hash = components[components.length - 2];
     long size = Long.parseLong(components[components.length - 1]);
     return digestUtil.build(hash, size);
+  }
+
+  public static Digest parseUploadBlobDigest(String resourceName)
+      throws NumberFormatException {
+    String[] components = resourceName.split("/");
+    String hash = components[components.length - 2];
+    long size = Long.parseLong(components[components.length - 1]);
+    return Digest.newBuilder()
+        .setHash(hash)
+        .setSizeBytes(size)
+        .build();
   }
 
   public static String parseOperationStream(String resourceName) {

@@ -17,8 +17,9 @@ package build.buildfarm.instance.memory;
 import build.buildfarm.common.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.TokenizableIterator;
+import build.buildfarm.common.TreeIterator;
 import build.buildfarm.instance.AbstractServerInstance;
-import build.buildfarm.instance.TokenizableIterator;
 import build.buildfarm.v1test.MemoryInstanceConfig;
 import build.buildfarm.v1test.OperationIteratorToken;
 import com.google.common.annotations.VisibleForTesting;
@@ -38,6 +39,7 @@ import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
@@ -398,8 +400,8 @@ public class MemoryInstance extends AbstractServerInstance {
 
   @Override
   protected TokenizableIterator<Directory> createTreeIterator(
-      Digest rootDigest, String pageToken) {
-    return new TreeIterator(this, rootDigest, pageToken);
+      Digest rootDigest, String pageToken) throws IOException, InterruptedException {
+    return new TreeIterator(this::getBlob, rootDigest, pageToken);
   }
 
   @Override

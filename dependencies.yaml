@@ -18,6 +18,15 @@ dependencies:
       lang: java
       version: "23.5-jre"
 
+  com.google.auth:
+    google-auth-library-credentials:
+      lang: java
+      version: "0.9.1"
+
+    google-auth-library-oauth2-http:
+      lang: java
+      version: "0.9.1"
+
   com.google.jimfs:
     jimfs:
       lang: java

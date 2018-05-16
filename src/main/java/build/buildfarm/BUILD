@@ -33,7 +33,6 @@ java_library(
     name = "server-instance",
     srcs = [
         "instance/AbstractServerInstance.java",
-        "instance/TokenizableIterator.java",
     ],
     deps = [
         ":common",
@@ -215,5 +214,37 @@ container_image(
     cmd = [
         "buildfarm-worker_deploy.jar",
         "/config/worker.config",
+    ],
+)
+
+java_binary(
+    name = "buildfarm-http-proxy",
+    srcs = glob(["proxy/http/*.java"]),
+    main_class = "build.buildfarm.proxy.http.HttpProxy",
+    deps = [
+        ":common",
+        "//3rdparty/jvm/com/github/pcj:google_options",
+        "//3rdparty/jvm/com/google/auth:google_auth_library_credentials",
+        "//3rdparty/jvm/com/google/auth:google_auth_library_oauth2_http",
+        "//3rdparty/jvm/com/google/code/findbugs:jsr305",
+        "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java",
+        "//3rdparty/jvm/io/grpc:grpc_auth",
+        "//3rdparty/jvm/io/grpc:grpc_core",
+        "//3rdparty/jvm/io/grpc:grpc_netty",
+        "//3rdparty/jvm/io/grpc:grpc_protobuf",
+        "//3rdparty/jvm/io/grpc:grpc_stub",
+        "//3rdparty/jvm/io/netty:netty_buffer",
+        "//3rdparty/jvm/io/netty:netty_codec",
+        "//3rdparty/jvm/io/netty:netty_codec_http",
+        "//3rdparty/jvm/io/netty:netty_common",
+        "//3rdparty/jvm/io/netty:netty_handler",
+        "//3rdparty/jvm/io/netty:netty_transport",
+        "@googleapis//:google_bytestream_bytestream_java_grpc",
+        "@googleapis//:google_bytestream_bytestream_java_proto",
+        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_grpc",
+        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
+        "@googleapis//:google_rpc_code_java_proto",
+        "@googleapis//:google_rpc_status_java_proto",
     ],
 )
