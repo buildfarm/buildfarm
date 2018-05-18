@@ -55,7 +55,7 @@ public interface WorkerContext {
   void destroyActionRoot(Path root) throws IOException;
   Path getRoot();
   void removeDirectory(Path path) throws IOException;
-  boolean putOperation(Operation operation);
+  boolean putOperation(Operation operation) throws InterruptedException;
   OutputStream getStreamOutput(String name);
-  void putActionResult(ActionKey actionKey, ActionResult actionResult);
+  void putActionResult(ActionKey actionKey, ActionResult actionResult) throws InterruptedException;
 }

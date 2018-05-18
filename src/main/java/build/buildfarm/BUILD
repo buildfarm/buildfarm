@@ -6,7 +6,7 @@ package(
 
 java_library(
     name = "common",
-    srcs = glob(["common/**/*.java"]),
+    srcs = glob(["common/*.java"]),
     deps = [
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
@@ -33,9 +33,12 @@ java_library(
     name = "server-instance",
     srcs = [
         "instance/AbstractServerInstance.java",
+        "instance/OperationsMap.java",
         "instance/TokenizableIterator.java",
     ],
     deps = [
+        ":ac",
+        ":cas",
         ":common",
         ":instance",
         "//3rdparty/jvm/com/google/guava",
@@ -56,6 +59,8 @@ java_library(
     name = "memory-instance",
     srcs = glob(["instance/memory/*.java"]),
     deps = [
+        ":ac",
+        ":cas",
         ":common",
         ":instance",
         ":server-instance",
@@ -190,6 +195,36 @@ java_library(
         "//3rdparty/jvm/io/grpc:grpc_protobuf",
         "//3rdparty/jvm/io/grpc:grpc_stub",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+    ],
+)
+
+java_library(
+    name = "cas",
+    srcs = glob(["cas/*.java"]),
+    deps = [
+        ":common",
+        ":stub-instance",
+        "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java",
+        "//3rdparty/jvm/io/grpc:grpc_core",
+        "//3rdparty/jvm/io/grpc:grpc_netty",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "@googleapis//:google_bytestream_bytestream_java_grpc",
+        "@googleapis//:google_bytestream_bytestream_java_proto",
+        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_grpc",
+        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
+    ],
+)
+
+java_library(
+    name = "ac",
+    srcs = glob(["ac/*.java"]),
+    deps = [
+        ":common",
+        "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/io/grpc:grpc_core",
+        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_grpc",
+        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
     ],
 )
 

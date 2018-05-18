@@ -88,12 +88,16 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
       return;
     }
 
-    boolean ok = instance.putOperation(operation);
-    Code code = ok ? Code.OK : Code.UNAVAILABLE;
-    responseObserver.onNext(com.google.rpc.Status.newBuilder()
-        .setCode(code.getNumber())
-        .build());
-    responseObserver.onCompleted();
+    try {
+      boolean ok = instance.putOperation(operation);
+      Code code = ok ? Code.OK : Code.UNAVAILABLE;
+      responseObserver.onNext(com.google.rpc.Status.newBuilder()
+          .setCode(code.getNumber())
+          .build());
+      responseObserver.onCompleted();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
   }
 
   @Override

@@ -23,9 +23,13 @@ import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Retrier;
 import build.buildfarm.instance.stub.RetryException;
 import build.buildfarm.server.BuildFarmServer;
+import build.buildfarm.v1test.ActionCacheConfig;
 import build.buildfarm.v1test.BuildFarmServerConfig;
+import build.buildfarm.v1test.ContentAddressableStorageConfig;
+import build.buildfarm.v1test.DelegateCASConfig;
 import build.buildfarm.v1test.InstanceConfig.HashFunction;
 import build.buildfarm.v1test.MemoryInstanceConfig;
+import build.buildfarm.v1test.MemoryCASConfig;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.TakeOperationRequest;
 import build.buildfarm.v1test.PollOperationRequest;
@@ -89,7 +93,12 @@ public class BuildFarmServerTest {
         .setOperationCompletedDelay(Duration.newBuilder()
             .setSeconds(10)
             .setNanos(0))
-        .setCasMaxSizeBytes(640 * 1024)
+        .setCasConfig(ContentAddressableStorageConfig.newBuilder()
+            .setMemory(MemoryCASConfig.newBuilder()
+                .setMaxSizeBytes(640 * 1024)))
+        .setActionCacheConfig(ActionCacheConfig.newBuilder()
+            .setDelegateCas(DelegateCASConfig.getDefaultInstance())
+            .build())
         .setDefaultActionTimeout(Duration.newBuilder()
             .setSeconds(600)
             .setNanos(0))

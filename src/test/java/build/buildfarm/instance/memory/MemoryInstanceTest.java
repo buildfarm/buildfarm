@@ -17,11 +17,13 @@ package build.buildfarm.instance.memory;
 import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.Mockito.when;
 
-import build.buildfarm.common.ContentAddressableStorage;
-import build.buildfarm.common.ContentAddressableStorage.Blob;
+import build.buildfarm.cas.ContentAddressableStorage;
+import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.v1test.ActionCacheConfig;
+import build.buildfarm.v1test.DelegateCASConfig;
 import build.buildfarm.v1test.MemoryInstanceConfig;
 import com.google.common.collect.ImmutableList;
 import com.google.devtools.remoteexecution.v1test.Action;
@@ -42,7 +44,7 @@ import org.mockito.MockitoAnnotations;
 public class MemoryInstanceTest {
   private Instance instance;
 
-  private Map<String, Operation> outstandingOperations;
+  private MemoryInstance.OutstandingOperations outstandingOperations;
 
   @Mock
   private ContentAddressableStorage storage;
@@ -50,7 +52,7 @@ public class MemoryInstanceTest {
   @Before
   public void setUp() throws Exception {
     MockitoAnnotations.initMocks(this);
-    outstandingOperations = new HashMap<>();
+    outstandingOperations = new MemoryInstance.OutstandingOperations();
     MemoryInstanceConfig memoryInstanceConfig = MemoryInstanceConfig.newBuilder()
         .setListOperationsDefaultPageSize(1024)
         .setListOperationsMaxPageSize(16384)
@@ -60,6 +62,9 @@ public class MemoryInstanceTest {
         .setOperationCompletedDelay(Durations.fromSeconds(10))
         .setDefaultActionTimeout(Durations.fromSeconds(600))
         .setMaximumActionTimeout(Durations.fromSeconds(3600))
+        .setActionCacheConfig(ActionCacheConfig.newBuilder()
+            .setDelegateCas(DelegateCASConfig.getDefaultInstance())
+            .build())
         .build();
 
     instance = new MemoryInstance(
@@ -146,7 +151,7 @@ public class MemoryInstanceTest {
   }
 
   @Test
-  public void actionCacheRetrievableByActionKey() {
+  public void actionCacheRetrievableByActionKey() throws InterruptedException {
     ActionResult result = ActionResult.getDefaultInstance();
     when(storage.get(instance.getDigestUtil().compute(result)))
         .thenReturn(new Blob(result.toByteString(), instance.getDigestUtil()));

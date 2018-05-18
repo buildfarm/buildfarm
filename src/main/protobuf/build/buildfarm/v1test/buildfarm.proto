@@ -58,6 +58,44 @@ message BuildFarmServerConfig {
   int32 port = 2;
 }
 
+message MemoryCASConfig {
+  // limit for CAS total content size
+  int64 max_size_bytes = 1;
+}
+
+message GrpcCASConfig {
+  // CAS resources must contain instance names
+  string instance_name = 1;
+
+  // grpc endpoint supporting CAS/BS
+  string target = 2;
+}
+
+message ContentAddressableStorageConfig {
+  oneof type {
+    MemoryCASConfig memory = 1;
+    GrpcCASConfig grpc = 2;
+  }
+}
+
+message DelegateCASConfig {
+}
+
+message GrpcACConfig {
+  // AC requests can contain instance names
+  string instance_name = 1;
+
+  // grpc endpoint supporting AC
+  string target = 2;
+}
+
+message ActionCacheConfig {
+  oneof type {
+    DelegateCASConfig delegate_cas = 1;
+    GrpcACConfig grpc = 2;
+  }
+}
+
 message MemoryInstanceConfig {
   // the limits of the listOperations request
   int32 list_operations_default_page_size = 1;
@@ -78,19 +116,20 @@ message MemoryInstanceConfig {
   // considered lost on a worker and is requeued
   google.protobuf.Duration operation_completed_delay = 6;
 
-  // limit for CAS total content size
-  int64 cas_max_size_bytes = 7;
-
   // default timeout for actions
   // if a timeout is unspecified for an action, this value
   // is imposed on it, after which the operation will be
   // cancelled
-  google.protobuf.Duration default_action_timeout = 8;
+  google.protobuf.Duration default_action_timeout = 7;
 
   // maximum selectable timeout
   // a maximum threshold for an action's specified timeout,
   // beyond which an action will be rejected for execution
-  google.protobuf.Duration maximum_action_timeout = 9;
+  google.protobuf.Duration maximum_action_timeout = 8;
+
+  ContentAddressableStorageConfig cas_config = 9;
+
+  ActionCacheConfig action_cache_config = 10;
 }
 
 message InstanceConfig {
