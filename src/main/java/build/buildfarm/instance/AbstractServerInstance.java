@@ -406,15 +406,18 @@ public abstract class AbstractServerInstance implements Instance {
 
     Map<Digest, Directory> directoriesIndex = createDirectoriesIndex(directories);
 
-    long startTime = System.nanoTime();
+    // long startTime = System.nanoTime();
     validateActionInputDirectoryDigest(action.getInputRootDigest(), new Stack<>(), new HashSet<>(), directoriesIndex, inputDigestsBuilder);
+    /*
     long endTime = System.nanoTime();
     float ms = (endTime - startTime) / 1000000.0f;
     System.out.println(String.format("AbstractServerInstance::validateAction(%s): validateActionInputs %gms", DigestUtil.toString(actionDigest), ms));
+    */
 
     Preconditions.checkState(command != null, MISSING_INPUT + " Command " + DigestUtil.toString(commandDigest));
 
     ImmutableSet<Digest> inputDigests = inputDigestsBuilder.build();
+    /*
     long sizeInBytes = 0;
     for (Digest input : inputDigests) {
       sizeInBytes += input.getSizeBytes();
@@ -424,18 +427,24 @@ public abstract class AbstractServerInstance implements Instance {
       executable = command.getArgumentsList().get(0);
     }
     System.out.println(String.format("Action Input Size %d: %s", sizeInBytes, executable));
+    */
 
     // A requested input (or the [Command][] of the [Action][]) was not found in
     // the [ContentAddressableStorage][].
-    startTime = System.nanoTime();
+    // startTime = System.nanoTime();
     Iterable<Digest> missingBlobDigests = findMissingBlobs(inputDigests, true);
+    /*
     endTime = System.nanoTime();
     ms = (endTime - startTime) / 1000000.0f;
     System.out.println(String.format("AbstractServerInstance::validateAction(%s): findMissingBlobs %gms", DigestUtil.toString(actionDigest), ms));
+    */
     if (!Iterables.isEmpty(missingBlobDigests)) {
+      boolean elided = Iterables.size(missingBlobDigests) > 30;
       Preconditions.checkState(
           Iterables.isEmpty(missingBlobDigests),
-          MISSING_INPUT + " " + Iterables.transform(missingBlobDigests, (digest) -> DigestUtil.toString(digest)));
+          MISSING_INPUT + " "
+              + Iterables.transform(Iterables.limit(missingBlobDigests, 30), (digest) -> DigestUtil.toString(digest))
+              + (elided ? "..." : ""));
     }
 
     // FIXME should input/output collisions (through directories) be another

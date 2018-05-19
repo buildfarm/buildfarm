@@ -44,7 +44,7 @@ class CompletedCollector implements Runnable {
 
         if (completedOperationsCount > maxCompletedOperationsCount) {
           String operationName = backplane.popOldestCompletedOperation();
-          System.out.println("CompletedCollector: Collected " + operationName);
+          // System.out.println("CompletedCollector: Collected " + operationName);
           onCollected.accept(operationName);
         } else {
           TimeUnit.SECONDS.sleep(1);
