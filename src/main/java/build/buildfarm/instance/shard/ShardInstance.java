@@ -138,7 +138,6 @@ public class ShardInstance extends AbstractServerInstance {
     if (config.getRunCompletedCollector()) {
       completedCollector = new Thread(new CompletedCollector(
           backplane,
-          this::deleteOperation,
           config.getMaxCompletedOperationsCount()));
     } else {
       completedCollector = null;

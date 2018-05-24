@@ -282,10 +282,10 @@ public interface ShardBackplane {
   public long getCompletedOperationsCount() throws IOException;
 
   /**
-   * Pop the oldest completed operation
+   * Pop the oldest completed operations to not have more than limit operations
    */
   @ThreadSafe
-  public String popOldestCompletedOperation() throws IOException;
+  public void destroyOldestCompletedOperations(long limit) throws IOException;
 
   /**
    * Page through action cache

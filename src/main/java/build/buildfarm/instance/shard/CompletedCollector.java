@@ -17,20 +17,15 @@ package build.buildfarm.instance.shard;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.v1test.ShardDispatchedOperation;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
-import java.util.function.Function;
 
 class CompletedCollector implements Runnable {
   private final ShardBackplane backplane;
-  private final Consumer<String> onCollected;
   private final long maxCompletedOperationsCount;
 
   CompletedCollector(
       ShardBackplane backplane,
-      Consumer<String> onCollected,
       long maxCompletedOperationsCount) {
     this.backplane = backplane;
-    this.onCollected = onCollected;
     this.maxCompletedOperationsCount = maxCompletedOperationsCount;
   }
 
@@ -40,15 +35,8 @@ class CompletedCollector implements Runnable {
 
     for (;;) {
       try {
-        long completedOperationsCount = backplane.getCompletedOperationsCount();
-
-        if (completedOperationsCount > maxCompletedOperationsCount) {
-          String operationName = backplane.popOldestCompletedOperation();
-          // System.out.println("CompletedCollector: Collected " + operationName);
-          onCollected.accept(operationName);
-        } else {
-          TimeUnit.SECONDS.sleep(1);
-        }
+        backplane.destroyOldestCompletedOperations(maxCompletedOperationsCount);
+        TimeUnit.SECONDS.sleep(1);
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         break;

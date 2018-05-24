@@ -732,7 +732,7 @@ public class RedisShardBackplane implements ShardBackplane {
 
   private void completeOperation(Jedis jedis, String operationName) {
     if (jedis.hdel(config.getDispatchedOperationsHashName(), operationName) == 1) {
-      jedis.rpush(config.getCompletedOperationsListName(), operationName);
+      jedis.lpush(config.getCompletedOperationsListName(), operationName);
     }
   }
 
@@ -799,9 +799,17 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   @Override
-  public String popOldestCompletedOperation() throws IOException {
+  public void destroyOldestCompletedOperations(long limit) throws IOException {
     try (Jedis jedis = getJedis()) {
-      return jedis.lpop(config.getCompletedOperationsListName());
+      List<String> oldestOperations = jedis.lrange(config.getCompletedOperationsListName(), limit - 1, -1);
+      if (oldestOperations.size() > 0) {
+        jedis.ltrim(config.getCompletedOperationsListName(), 0, -oldestOperations.size());
+        Pipeline p = jedis.pipelined();
+        for (String operationName : oldestOperations) {
+          p.hdel(config.getOperationsHashName(), operationName);
+        }
+        p.sync();
+      }
     } catch (JedisConnectionException e) {
       Throwable cause = e.getCause();
       if (cause instanceof IOException) {
