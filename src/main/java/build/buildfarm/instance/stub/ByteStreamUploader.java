@@ -27,6 +27,7 @@ import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
+import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListenableScheduledFuture;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
@@ -147,7 +148,7 @@ public final class ByteStreamUploader {
       throws RetryException, InterruptedException {
     List<ListenableFuture<Void>> uploads = new ArrayList<>();
 
-    for (Chunker chunker : chunkers) {
+    for (Chunker chunker : Iterables.filter(chunkers, (c) -> c.digest().getSizeBytes() > 0)) {
       uploads.add(uploadBlobAsync(chunker));
     }
 

@@ -169,7 +169,7 @@ public class StubInstance implements Instance {
       throws IOException, IllegalArgumentException, InterruptedException {
     // sort of a blatant misuse - one chunker per input, query digests before exhausting iterators
     Iterable<Chunker> chunkers = Iterables.transform(
-        blobs, blob -> new Chunker(blob, digestUtil));
+        blobs, blob -> new Chunker(blob, digestUtil.compute(blob)));
     List<Digest> digests = new ImmutableList.Builder<Digest>()
         .addAll(Iterables.transform(chunkers, chunker -> chunker.digest()))
         .build();
@@ -280,8 +280,8 @@ public class StubInstance implements Instance {
   @Override
   public Digest putBlob(ByteString blob)
       throws IOException, IllegalArgumentException, InterruptedException {
-    Chunker chunker = new Chunker(blob, digestUtil);
-    Digest digest = chunker.digest();
+    Digest digest = digestUtil.compute(blob);
+    Chunker chunker = new Chunker(blob, digest);
     uploader.uploadBlobs(Collections.singleton(chunker));
     return digest;
   }

@@ -17,7 +17,6 @@ package build.buildfarm.instance.stub;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
-import build.buildfarm.common.DigestUtil;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.io.ByteStreams;
@@ -108,23 +107,20 @@ public final class Chunker {
   // Set to true on the first call to next(). This is so that the Chunker can open its data source
   // lazily on the first call to next(), as opposed to opening it in the constructor or on reset().
   private boolean initialized;
-  private final Chunk emptyChunk;
 
-  public Chunker(ByteString data, DigestUtil digestUtil) {
-    this(data, getDefaultChunkSize(), digestUtil);
+  public Chunker(ByteString data, Digest digest) {
+    this(data, digest, getDefaultChunkSize());
   }
 
-  public Chunker(ByteString data, int chunkSize, DigestUtil digestUtil) {
-    this(() -> data.newInput(), digestUtil.compute(data), chunkSize, digestUtil);
+  public Chunker(ByteString data, Digest digest, int chunkSize) {
+    this(() -> data.newInput(), digest, chunkSize);
   }
 
   @VisibleForTesting
-  Chunker(Supplier<InputStream> dataSupplier, Digest digest, int chunkSize, DigestUtil digestUtil) {
+  Chunker(Supplier<InputStream> dataSupplier, Digest digest, int chunkSize) {
     this.dataSupplier = checkNotNull(dataSupplier);
     this.digest = checkNotNull(digest);
     this.chunkSize = chunkSize;
-    // ugh, this sucks
-    emptyChunk = new Chunk(digestUtil.empty(), ByteString.EMPTY, 0);
   }
 
   public Digest digest() {
@@ -171,7 +167,7 @@ public final class Chunker {
 
     if (digest.getSizeBytes() == 0) {
       data = null;
-      return emptyChunk;
+      return new Chunk(Digest.getDefaultInstance(), ByteString.EMPTY, 0);
     }
 
     // The cast to int is safe, because the return value is capped at chunkSize.

@@ -286,20 +286,23 @@ public abstract class AbstractServerInstance implements Instance {
 
       Digest directoryDigest = directoryNode.getDigest();
       if (!visited.contains(directoryDigest)) {
-        path.push(directoryDigest);
-        validateActionInputDirectory(expectDirectory(directoryDigest), path, visited, inputDigests);
-        path.pop();
-        visited.add(directoryDigest);
+        validateActionInputDirectory(directoryDigest, path, visited, inputDigests);
       }
     }
   }
 
-  private void validateActionInputs(Digest inputRootDigest, ImmutableSet.Builder<Digest> inputDigests) {
-    Stack<Digest> path = new Stack<>();
-    path.push(inputRootDigest);
-
-    Directory root = expectDirectory(inputRootDigest);
-    validateActionInputDirectory(root, path, new HashSet<>(), inputDigests);
+  private void validateActionInputDirectory(
+      Digest directoryDigest,
+      Stack<Digest> path,
+      Set<Digest> visited,
+      ImmutableSet.Builder<Digest> inputDigests) {
+    if (directoryDigest.getSizeBytes() != 0 || Directory.getDefaultInstance().toByteString().size() != 0) {
+      path.push(directoryDigest);
+      Directory root = expectDirectory(directoryDigest);
+      validateActionInputDirectory(root, path, visited, inputDigests);
+      path.pop();
+      visited.add(directoryDigest);
+    }
   }
 
   protected void validateAction(Action action) {
@@ -307,7 +310,7 @@ public abstract class AbstractServerInstance implements Instance {
     ImmutableSet.Builder<Digest> inputDigests = new ImmutableSet.Builder<>();
     inputDigests.add(commandDigest);
 
-    validateActionInputs(action.getInputRootDigest(), inputDigests);
+    validateActionInputDirectory(action.getInputRootDigest(), new Stack<>(), new HashSet<>(), inputDigests);
 
     // A requested input (or the [Command][] of the [Action][]) was not found in
     // the [ContentAddressableStorage][].
@@ -322,17 +325,19 @@ public abstract class AbstractServerInstance implements Instance {
     // invalid action?
     filesUniqueAndSortedPrecondition(action.getOutputFilesList());
     filesUniqueAndSortedPrecondition(action.getOutputDirectoriesList());
-    Command command;
-    try {
-      command = Command.parseFrom(getBlob(commandDigest));
-    } catch (InvalidProtocolBufferException ex) {
-      Preconditions.checkState(
-          false,
-          INVALID_DIGEST);
-      return;
+    if (commandDigest.getSizeBytes() != 0 || Command.getDefaultInstance().toByteString().size() != 0) {
+      Command command;
+      try {
+        command = Command.parseFrom(getBlob(commandDigest));
+      } catch (InvalidProtocolBufferException ex) {
+        Preconditions.checkState(
+            false,
+            INVALID_DIGEST);
+        return;
+      }
+      environmentVariablesUniqueAndSortedPrecondition(
+          command.getEnvironmentVariablesList());
     }
-    environmentVariablesUniqueAndSortedPrecondition(
-        command.getEnvironmentVariablesList());
   }
 
   @Override

@@ -133,7 +133,7 @@ public class MemoryInstance extends AbstractServerInstance {
   @Override
   public Iterable<Digest> findMissingBlobs(Iterable<Digest> digests) {
     return Iterables.filter(
-        digests, digest -> !contentAddressableStorage.contains(digest));
+        digests, digest -> digest.getSizeBytes() != 0 && !contentAddressableStorage.contains(digest));
   }
 
   @Override
