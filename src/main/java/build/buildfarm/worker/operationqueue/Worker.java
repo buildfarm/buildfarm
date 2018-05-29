@@ -83,6 +83,7 @@ public class Worker {
   private final Instance casInstance;
   private final Instance acInstance;
   private final Instance operationQueueInstance;
+  private final ByteStreamUploader uploader;
   private final WorkerConfig config;
   private final Path root;
   private final CASFileCache fileCache;
@@ -138,14 +139,22 @@ public class Worker {
     return new ByteStreamUploader("", channel, null, 300, createStubRetrier(), retryScheduler);
   }
 
-  private static Instance createInstance(InstanceEndpoint instanceEndpoint,
+  private static Instance createInstance(
+      InstanceEndpoint instanceEndpoint,
       DigestUtil digestUtil) {
-    Channel channel = createChannel(instanceEndpoint.getTarget());
-    return new StubInstance(
+    return createInstance(
         instanceEndpoint.getInstanceName(),
-        digestUtil,
-        channel,
-        createStubUploader(channel));
+        createChannel(instanceEndpoint.getTarget()),
+        null,
+        digestUtil);
+  }
+
+  private static Instance createInstance(
+      String name,
+      Channel channel,
+      ByteStreamUploader uploader,
+      DigestUtil digestUtil) {
+    return new StubInstance(name, digestUtil, channel, uploader);
   }
 
   public Worker(WorkerConfig config) throws ConfigurationException {
@@ -158,7 +167,10 @@ public class Worker {
 
     /* initialization */
     digestUtil = new DigestUtil(hashFunction);
-    casInstance = createInstance(config.getContentAddressableStorage(), digestUtil);
+    InstanceEndpoint casEndpoint = config.getContentAddressableStorage();
+    Channel casChannel = createChannel(casEndpoint.getTarget());
+    uploader = createStubUploader(casChannel);
+    casInstance = createInstance(casEndpoint.getInstanceName(), casChannel, uploader, digestUtil);
     acInstance = createInstance(config.getActionCache(), digestUtil);
     operationQueueInstance = createInstance(config.getOperationQueue(), digestUtil);
     InputStreamFactory inputStreamFactory = new InputStreamFactory() {
@@ -354,6 +366,11 @@ public class Worker {
       }
 
       @Override
+      public ByteStreamUploader getUploader() {
+        return uploader;
+      }
+
+      @Override
       public ByteString getBlob(Digest digest) {
         return casInstance.getBlob(digest);
       }
@@ -413,12 +430,6 @@ public class Worker {
       @Override
       public OutputStream getStreamOutput(String name) {
         return operationQueueInstance.getStreamOutput(name);
-      }
-
-      @Override
-      public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs)
-          throws IOException, IllegalArgumentException, InterruptedException {
-        return casInstance.putAllBlobs(blobs);
       }
 
       @Override

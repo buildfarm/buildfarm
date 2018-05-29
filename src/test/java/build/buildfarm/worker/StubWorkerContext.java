@@ -18,6 +18,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.worker.CASFileCache;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.v1test.CASInsertionPolicy;
 import com.google.devtools.remoteexecution.v1test.Action;
 import com.google.devtools.remoteexecution.v1test.ActionResult;
@@ -48,6 +49,7 @@ class StubWorkerContext implements WorkerContext {
   @Override public boolean getStreamStderr() { throw new UnsupportedOperationException(); }
   @Override public Duration getDefaultActionTimeout() { throw new UnsupportedOperationException(); }
   @Override public Duration getMaximumActionTimeout() { throw new UnsupportedOperationException(); }
+  @Override public ByteStreamUploader getUploader() { throw new UnsupportedOperationException(); }
   @Override public ByteString getBlob(Digest digest) { throw new UnsupportedOperationException(); }
   @Override public void createActionRoot(Path root, Action action) { throw new UnsupportedOperationException(); }
   @Override public void destroyActionRoot(Path root) { throw new UnsupportedOperationException(); }
@@ -55,6 +57,5 @@ class StubWorkerContext implements WorkerContext {
   @Override public void removeDirectory(Path path) { throw new UnsupportedOperationException(); }
   @Override public boolean putOperation(Operation operation) { throw new UnsupportedOperationException(); }
   @Override public OutputStream getStreamOutput(String name) { throw new UnsupportedOperationException(); }
-  @Override public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs) { throw new UnsupportedOperationException(); }
   @Override public void putActionResult(ActionKey actionKey, ActionResult actionResult) { throw new UnsupportedOperationException(); }
 };

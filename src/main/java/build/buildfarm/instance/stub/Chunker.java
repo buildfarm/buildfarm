@@ -25,9 +25,10 @@ import com.google.protobuf.ByteString;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.NoSuchElementException;
 import java.util.Objects;
-import java.util.function.Supplier;
 
 /**
  * Splits a data source into one or more {@link Chunk}s of at most {@code chunkSize} bytes.
@@ -96,7 +97,12 @@ public final class Chunker {
     }
   }
 
-  private final Supplier<InputStream> dataSupplier;
+  @FunctionalInterface
+  public interface DataSupplier {
+    InputStream get() throws IOException;
+  }
+
+  private final DataSupplier dataSupplier;
   private final Digest digest;
   private final int chunkSize;
 
@@ -116,11 +122,24 @@ public final class Chunker {
     this(() -> data.newInput(), digest, chunkSize);
   }
 
+  public Chunker(Path path, Digest digest) {
+    this(() -> Files.newInputStream(path), digest, getDefaultChunkSize());
+  }
+
   @VisibleForTesting
-  Chunker(Supplier<InputStream> dataSupplier, Digest digest, int chunkSize) {
+  Chunker(DataSupplier dataSupplier, Digest digest, int chunkSize) {
     this.dataSupplier = checkNotNull(dataSupplier);
     this.digest = checkNotNull(digest);
     this.chunkSize = chunkSize;
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (obj instanceof Chunker) {
+      Chunker other = (Chunker) obj;
+      return digest.equals(other.digest) && chunkSize == other.chunkSize;
+    }
+    return false;
   }
 
   public Digest digest() {

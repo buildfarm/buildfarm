@@ -23,7 +23,8 @@ import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 
 import build.buildfarm.common.DigestUtil;
-import build.buildfarm.instance.Instance;
+import build.buildfarm.instance.stub.ByteStreamUploader;
+import build.buildfarm.instance.stub.Chunker;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.jimfs.Configuration;
@@ -51,10 +52,7 @@ public class ReportResultStageTest {
   private Path root;
 
   @Mock
-  private Instance mockInstance;
-
-  @Mock
-  private WorkerContext mockWorkerContext;
+  private ByteStreamUploader mockUploader;
 
   private DigestUtil digestUtil;
   private ReportResultStage reportResultStage;
@@ -73,6 +71,8 @@ public class ReportResultStageTest {
     root = Iterables.getFirst(fileSystem.getRootDirectories(), null);
 
     digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
+    WorkerContext mockWorkerContext = mock(WorkerContext.class);
+    when(mockWorkerContext.getUploader()).thenReturn(mockUploader);
     when(mockWorkerContext.getDigestUtil()).thenReturn(digestUtil);
     PipelineStage error = mock(PipelineStage.class);
     reportResultStage = new ReportResultStage(mockWorkerContext, error);
@@ -93,8 +93,9 @@ public class ReportResultStageTest {
     Tree emptyTree = Tree.newBuilder()
         .setRoot(Directory.getDefaultInstance())
         .build();
-    verify(mockWorkerContext)
-        .putAllBlobs(eq(ImmutableList.<ByteString>of(emptyTree.toByteString())));
+    verify(mockUploader)
+        .uploadBlobs(eq(ImmutableList.<Chunker>of(
+            new Chunker(emptyTree.toByteString(), digestUtil.compute(emptyTree)))));
     assertThat(resultBuilder.getOutputDirectoriesList()).containsExactly(
         OutputDirectory.newBuilder()
             .setPath("foo")
@@ -125,8 +126,10 @@ public class ReportResultStageTest {
                 .build())
             .build())
         .build();
-    verify(mockWorkerContext)
-        .putAllBlobs(eq(ImmutableList.<ByteString>of(ByteString.EMPTY, tree.toByteString())));
+    verify(mockUploader)
+        .uploadBlobs(eq(ImmutableList.<Chunker>of(
+            new Chunker(ByteString.EMPTY, digestUtil.empty()),
+            new Chunker(tree.toByteString(), digestUtil.compute(tree)))));
     assertThat(resultBuilder.getOutputDirectoriesList()).containsExactly(
         OutputDirectory.newBuilder()
             .setPath("foo")
@@ -166,8 +169,10 @@ public class ReportResultStageTest {
             .build())
         .addChildren(subDirectory)
         .build();
-    verify(mockWorkerContext)
-        .putAllBlobs(eq(ImmutableList.<ByteString>of(ByteString.EMPTY, tree.toByteString())));
+    verify(mockUploader)
+        .uploadBlobs(eq(ImmutableList.<Chunker>of(
+            new Chunker(ByteString.EMPTY, digestUtil.empty()),
+            new Chunker(tree.toByteString(), digestUtil.compute(tree)))));
     assertThat(resultBuilder.getOutputDirectoriesList()).containsExactly(
         OutputDirectory.newBuilder()
             .setPath("foo")
@@ -187,7 +192,7 @@ public class ReportResultStageTest {
     Tree emptyTree = Tree.newBuilder()
         .setRoot(Directory.getDefaultInstance())
         .build();
-    verify(mockWorkerContext, never())
-        .putAllBlobs(any());
+    verify(mockUploader, never())
+        .uploadBlobs(any());
   }
 }

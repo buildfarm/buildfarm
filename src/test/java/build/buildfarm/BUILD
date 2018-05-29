@@ -40,6 +40,7 @@ java_test(
         "//3rdparty/jvm/org/mockito:mockito_core",
         "//src/main/java/build/buildfarm:common",
         "//src/main/java/build/buildfarm:instance",
+        "//src/main/java/build/buildfarm:stub-instance",
         "//src/main/java/build/buildfarm:worker",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",

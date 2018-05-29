@@ -19,6 +19,7 @@ import com.google.common.hash.Funnels;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
+import com.google.common.io.ByteSource;
 import com.google.devtools.remoteexecution.v1test.Action;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.protobuf.ByteString;
@@ -115,6 +116,23 @@ public class DigestUtil {
   public DigestUtil(HashFunction hashFn) {
     this.hashFn = hashFn;
     empty = buildDigest(hashFn.empty().toString(), 0);
+  }
+
+  public Digest compute(Path file) throws IOException {
+    return compute(file, Files.size(file));
+  }
+
+  private String computeHash(Path file) throws IOException {
+    return new ByteSource() {
+      @Override
+      public InputStream openStream() throws IOException {
+        return Files.newInputStream(file);
+      }
+    }.hash(hashFn.getHash()).toString();
+  }
+
+  public Digest compute(Path file, long fileSize) throws IOException {
+    return buildDigest(computeHash(file), fileSize);
   }
 
   public Digest compute(ByteString blob) {
