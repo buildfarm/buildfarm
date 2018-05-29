@@ -14,8 +14,11 @@
 
 package build.buildfarm.worker;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -26,9 +29,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Stack;
 
-// would be great to be able to inherit from ImmutableMap...
-public class OutputDirectory extends HashMap<String, OutputDirectory> {
-  private OutputDirectory() {
+public class OutputDirectory {
+  private final Map<String, OutputDirectory> children;
+
+  private static final OutputDirectory defaultInstance = new OutputDirectory(ImmutableMap.<String, OutputDirectory>of());
+  private static OutputDirectory getDefaultInstance() {
+    return defaultInstance;
+  }
+
+  private OutputDirectory(Map<String, OutputDirectory> children) {
+    this.children = children;
   }
 
   public static OutputDirectory parse(Iterable<String> outputFiles, Iterable<String> outputDirs) {
@@ -40,19 +50,37 @@ public class OutputDirectory extends HashMap<String, OutputDirectory> {
             Iterables.transform(outputDirs, (d) -> d.isEmpty() ? "/" : ("/" + d + "/")))));
   }
 
+  private static class Builder {
+    Map<String, Builder> children = new HashMap<>();
+
+    public Builder addChild(String name) {
+      Builder childBuilder = new Builder();
+      Preconditions.checkState(!children.containsKey(name), "Duplicate Output Directory Name");
+      children.put(name, childBuilder);
+      return childBuilder;
+    }
+
+    public OutputDirectory build() {
+      if (children.isEmpty()) {
+        return OutputDirectory.getDefaultInstance();
+      }
+      return new OutputDirectory(ImmutableMap.copyOf(Maps.transformValues(children, (v) -> v.build())));
+    }
+  };
+
   private static OutputDirectory parseDirectories(Iterable<String> outputDirs) {
-    OutputDirectory outputDirectory = new OutputDirectory();
-    Stack<OutputDirectory> stack = new Stack<>();
+    Builder builder = new Builder();
+    Stack<Builder> stack = new Stack<>();
 
     List<String> sortedOutputDirs = new ArrayList<>();
     Iterables.addAll(sortedOutputDirs, outputDirs);
     Collections.sort(sortedOutputDirs);
 
-    OutputDirectory currentOutputDirectory = outputDirectory;
+    Builder currentBuilder = builder;
     String prefix = "/";
     for (String outputDir : sortedOutputDirs) {
       while (!outputDir.startsWith(prefix)) {
-        currentOutputDirectory = stack.pop();
+        currentBuilder = stack.pop();
         int upPathSeparatorIndex = prefix.lastIndexOf('/', prefix.length() - 2);
         prefix = prefix.substring(0, upPathSeparatorIndex + 1);
       }
@@ -66,23 +94,29 @@ public class OutputDirectory extends HashMap<String, OutputDirectory> {
         String directoryName = separatorIndex == -1 ? prefixedFile : prefixedFile.substring(0, separatorIndex);
         prefix += directoryName + '/';
         prefixedFile = separatorIndex == -1 ? "" : prefixedFile.substring(separatorIndex + 1);
-        stack.push(currentOutputDirectory);
-        OutputDirectory nextOutputDirectory = new OutputDirectory();
-        currentOutputDirectory.put(directoryName, nextOutputDirectory);
-        currentOutputDirectory = nextOutputDirectory;
+        stack.push(currentBuilder);
+        currentBuilder = currentBuilder.addChild(directoryName);
       }
     }
 
-    return outputDirectory;
+    return builder.build();
   }
 
   public void stamp(Path root) throws IOException {
-    if (isEmpty()) {
+    if (children.isEmpty()) {
       Files.createDirectories(root);
     } else {
-      for (Map.Entry<String, OutputDirectory> entry : entrySet()) {
+      for (Map.Entry<String, OutputDirectory> entry : children.entrySet()) {
         entry.getValue().stamp(root.resolve(entry.getKey()));
       }
     }
+  }
+
+  public OutputDirectory getChild(String directoryName) {
+    return children.get(directoryName);
+  }
+
+  public boolean isLeaf() {
+    return children.isEmpty();
   }
 }

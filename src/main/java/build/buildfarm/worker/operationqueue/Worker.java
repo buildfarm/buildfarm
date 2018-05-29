@@ -227,7 +227,7 @@ public class Worker {
       Digest digest = directoryNode.getDigest();
       String name = directoryNode.getName();
       OutputDirectory childOutputDirectory = outputDirectory != null
-          ? outputDirectory.get(name) : null;
+          ? outputDirectory.getChild(name) : null;
       Path dirPath = execDir.resolve(name);
       if (childOutputDirectory != null || !config.getLinkInputDirectories()) {
         Files.createDirectories(dirPath);

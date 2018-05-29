@@ -31,9 +31,8 @@ public class OutputDirectoryTest {
         ImmutableList.<String>of("foo", "bar/baz"),
         ImmutableList.<String>of());
 
-    assertThat(outputDirectory).doesNotContainKey("foo");
-    assertThat(outputDirectory).containsKey("bar");
-    assertThat(outputDirectory.get("bar")).isEmpty();
+    assertThat(outputDirectory.getChild("foo")).isNull();
+    assertThat(outputDirectory.getChild("bar").isLeaf()).isTrue();
   }
 
   @Test
@@ -42,10 +41,7 @@ public class OutputDirectoryTest {
         ImmutableList.<String>of(),
         ImmutableList.<String>of("bar/baz", "foo"));
 
-    assertThat(outputDirectory).containsKey("foo");
-    assertThat(outputDirectory.get("foo")).isEmpty();
-    assertThat(outputDirectory).containsKey("bar");
-    assertThat(outputDirectory.get("bar")).containsKey("baz");
-    assertThat(outputDirectory.get("bar").get("baz")).isEmpty();
+    assertThat(outputDirectory.getChild("foo").isLeaf()).isTrue();
+    assertThat(outputDirectory.getChild("bar").getChild("baz").isLeaf()).isTrue();
   }
 }
