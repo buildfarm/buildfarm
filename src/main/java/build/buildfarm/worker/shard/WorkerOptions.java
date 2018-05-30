@@ -43,4 +43,11 @@ public class WorkerOptions extends OptionsBase {
       defaultValue = ""
     )
   public String casCacheDirectory;
+
+  @Option(
+      name = "public_name",
+      help = "HOST:PORT pair used when registering this worker as a CAS member.",
+      defaultValue = ""
+    )
+  public String publicName;
 }

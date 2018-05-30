@@ -1078,6 +1078,12 @@ public class Worker implements Instances {
     if (!Strings.isNullOrEmpty(options.root)) {
       builder.setRoot(options.root);
     }
+    if (!Strings.isNullOrEmpty(options.casCacheDirectory)) {
+      builder.setCasCacheDirectory(options.casCacheDirectory);
+    }
+    if (!Strings.isNullOrEmpty(options.publicName)) {
+      builder.setPublicName(options.publicName);
+    }
 
     return builder.build();
   }
