@@ -96,6 +96,7 @@ public abstract class PipelineStage implements Runnable {
       wait();
     }
     if (closed) {
+      notify(); // no further notify would be called, we must signal
       return false;
     }
     claimed = true;
