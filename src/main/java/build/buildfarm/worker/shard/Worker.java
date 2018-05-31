@@ -1096,11 +1096,11 @@ public class Worker implements Instances {
       throw new IllegalArgumentException("Missing CONFIG_PATH");
     }
     Path configPath = Paths.get(residue.get(0));
+    Worker worker;
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
-      Worker worker = new Worker(toShardWorkerConfig(new InputStreamReader(configInputStream), parser.getOptions(WorkerOptions.class)));
-      configInputStream.close();
-      worker.start();
-      worker.blockUntilShutdown();
+      worker = new Worker(toShardWorkerConfig(new InputStreamReader(configInputStream), parser.getOptions(WorkerOptions.class)));
     }
+    worker.start();
+    worker.blockUntilShutdown();
   }
 }
