@@ -68,7 +68,7 @@ Most third-party dependencies (e.g. protobuf, gRPC, ...) are managed automatical
 just run this to regenerate the 3rdparty folder:
 
 ```bash
-git clone https://github.com/johnynek/bazel-deps.git ../bazel-deps2
+git clone https://github.com/johnynek/bazel-deps.git ../bazel-deps
 cd ../bazel-deps
 bazel build //src/scala/com/github/johnynek/bazel_deps:parseproject_deploy.jar
 cd ../bazel-buildfarm
