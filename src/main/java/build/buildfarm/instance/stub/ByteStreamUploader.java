@@ -41,7 +41,7 @@ import io.grpc.ClientCall;
 import io.grpc.Metadata;
 import io.grpc.Status;
 import io.grpc.Status.Code;
-import io.grpc.StatusException;
+import io.grpc.StatusRuntimeException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -236,7 +236,7 @@ public class ByteStreamUploader {
 
           @Override
           public void failure(Status status) {
-            StatusException cause = status.asException();
+            StatusRuntimeException cause = status.asRuntimeException();
             long nextDelayMillis = backoffTimes.nextDelayMillis();
             if (nextDelayMillis < 0 || !retrier.isRetriable(status)) {
               // Out of retries or status not retriable.

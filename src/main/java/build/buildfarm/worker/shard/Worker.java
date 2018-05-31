@@ -375,13 +375,6 @@ public class Worker implements Instances {
               Throwable cause = e.getCause();
               if (cause instanceof StatusRuntimeException) {
                 StatusRuntimeException sre = (StatusRuntimeException) e.getCause();
-                /*
-                if (sre.getStatus().getCode() == Status.Code.CANCELLED) {
-                  // io.grpc.Context was cancelled without error
-                  removeMalfunctioningWorkerClient(worker);
-                  continue;
-                }
-                */
                 throw sre;
               }
               throw e;
@@ -431,13 +424,6 @@ public class Worker implements Instances {
               } catch (RetryException e) {
                 if (e.getCause() instanceof StatusRuntimeException) {
                   StatusRuntimeException sre = (StatusRuntimeException) e.getCause();
-                  /*
-                  if (sre.getStatus().getCode() == Status.Code.CANCELLED) {
-                    // io.grpc.Context was cancelled without error
-                    removeMalfunctioningWorkerClient(worker);
-                    continue;
-                  }
-                  */
                   throw sre;
                 }
                 throw e;

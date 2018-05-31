@@ -53,6 +53,7 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 import io.grpc.Channel;
+import io.grpc.Context;
 import io.grpc.ManagedChannel;
 import io.grpc.Status;
 import io.grpc.Status.Code;
@@ -267,8 +268,12 @@ public class ShardInstance extends AbstractServerInstance {
       } catch (IOException e) {
         throw Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException();
       } catch (StatusRuntimeException e) {
-        if (e.getStatus().getCode().equals(Status.UNAVAILABLE.getCode())) {
-          removeMalfunctioningWorker(worker, e, "findMissingBlobs(...)");
+        Status status = Status.fromThrowable(e);
+        if (status.getCode() == Code.UNAVAILABLE) {
+          removeMalfunctioningWorker(worker, e, String.format("checkMissingBlobs(%s)", DigestUtil.toString(digest)));
+        } else if (status.getCode() == Code.CANCELLED && Context.current().isCancelled()) {
+          // do nothing further if we're cancelled
+          throw e;
         } else {
           e.printStackTrace();
         }
@@ -321,6 +326,9 @@ public class ShardInstance extends AbstractServerInstance {
         Status status = Status.fromThrowable(e);
         if (status.getCode() == Code.UNAVAILABLE) {
           removeMalfunctioningWorker(worker, e, "findMissingBlobs(...)");
+        } else if (status.getCode() == Code.CANCELLED && Context.current().isCancelled()) {
+          // do nothing further if we're cancelled
+          throw e;
         } else {
           e.printStackTrace();
         }
@@ -359,13 +367,16 @@ public class ShardInstance extends AbstractServerInstance {
         }
       }
     } catch (StatusRuntimeException e) {
-      Status st = Status.fromThrowable(e);
-      if (st.getCode().equals(Code.UNAVAILABLE)) {
+      Status status = Status.fromThrowable(e);
+      if (status.getCode() == Code.CANCELLED && Context.current().isCancelled()) {
+        throw e;
+      }
+      if (status.getCode() == Code.UNAVAILABLE) {
         removeMalfunctioningWorker(worker, e, "getBlob(" + DigestUtil.toString(blobDigest) + ")");
-      } else if (st.getCode().equals(Code.NOT_FOUND)) {
+      } else if (status.getCode() == Code.NOT_FOUND) {
         System.out.println(worker + " did not contain " + DigestUtil.toString(blobDigest));
         // ignore this, the worker will update the backplane eventually
-      } else if (Retrier.DEFAULT_IS_RETRIABLE.test(st)) {
+      } else if (status.getCode() == Code.CANCELLED /* yes, gross */ || SHARD_IS_RETRIABLE.test(status)) {
         // why not, always
         workers.addLast(worker);
       } else {
@@ -423,6 +434,9 @@ public class ShardInstance extends AbstractServerInstance {
     return builder.build();
   }
 
+  private static final com.google.common.base.Predicate<Status> SHARD_IS_RETRIABLE =
+      st -> st.getCode() != Code.CANCELLED && Retrier.DEFAULT_IS_RETRIABLE.test(st);
+
   private static Retrier createStubRetrier() {
     return new Retrier(
         Backoff.exponential(
@@ -431,7 +445,7 @@ public class ShardInstance extends AbstractServerInstance {
             /*options.experimentalRemoteRetryMultiplier=*/ 2,
             /*options.experimentalRemoteRetryJitter=*/ 0.1,
             /*options.experimentalRemoteRetryMaxAttempts=*/ 5),
-        Retrier.DEFAULT_IS_RETRIABLE);
+        SHARD_IS_RETRIABLE);
   }
 
   private ByteStreamUploader createStubUploader(Channel channel) {
@@ -470,7 +484,15 @@ public class ShardInstance extends AbstractServerInstance {
           throw Status.RESOURCE_EXHAUSTED.asException();
         }
         // System.out.println("putBlob(" + DigestUtil.toString(digestUtil.compute(blob)) + ") => " + worker);
-        Digest digest = workerStub(worker).putBlob(blob);
+        Digest digest;
+        try {
+          digest = workerStub(worker).putBlob(blob);
+        } catch (RetryException e) {
+          if (e.getCause() instanceof StatusRuntimeException) {
+            throw (StatusRuntimeException) e.getCause();
+          }
+          throw e;
+        }
         boolean known = false;
         try {
           if (commandCache.get(digest) == null) {
@@ -493,8 +515,17 @@ public class ShardInstance extends AbstractServerInstance {
           }
         }
         return digest;
+      } catch (StatusRuntimeException e) {
+        Status status = Status.fromThrowable(e);
+        if (status.getCode() == Code.UNAVAILABLE) {
+          removeMalfunctioningWorker(worker, e, "putBlob(" + DigestUtil.toString(digestUtil.compute(blob)) + ")");
+        } else if (status.getCode() == Code.CANCELLED && Context.current().isCancelled()) {
+          throw e;
+        } else {
+          e.printStackTrace();
+        }
       } catch (IOException e) {
-        removeMalfunctioningWorker(worker, e, "putBlob(" + DigestUtil.toString(digestUtil.compute(blob)) + ")");
+        e.printStackTrace();
       }
     }
   }
