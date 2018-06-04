@@ -107,6 +107,7 @@ java_binary(
     runtime_deps = [
         ":buildfarm",
     ],
+    visibility = ["//visibility:public"],
 )
 
 container_image(
@@ -198,6 +199,7 @@ java_binary(
     runtime_deps = [
         ":operationqueue-worker",
     ],
+    visibility = ["//visibility:public"],
 )
 
 container_image(
