@@ -128,12 +128,23 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public ByteString getBlob(Digest blobDigest) {
+    if (blobDigest.getSizeBytes() == 0) {
+      return ByteString.EMPTY;
+    }
     return getBlob(blobDigest, 0, 0);
   }
 
   @Override
   public ByteString getBlob(Digest blobDigest, long offset, long limit)
       throws IndexOutOfBoundsException {
+    if (blobDigest.getSizeBytes() == 0) {
+      if (offset == 0 && limit >= 0) {
+        return ByteString.EMPTY;
+      } else {
+        throw new IndexOutOfBoundsException();
+      }
+    }
+
     Blob blob = contentAddressableStorage.get(blobDigest);
 
     if (blob == null) {
@@ -286,23 +297,20 @@ public abstract class AbstractServerInstance implements Instance {
 
       Digest directoryDigest = directoryNode.getDigest();
       if (!visited.contains(directoryDigest)) {
-        validateActionInputDirectory(directoryDigest, path, visited, inputDigests);
+        validateActionInputDirectoryDigest(directoryDigest, path, visited, inputDigests);
       }
     }
   }
 
-  private void validateActionInputDirectory(
+  private void validateActionInputDirectoryDigest(
       Digest directoryDigest,
       Stack<Digest> path,
       Set<Digest> visited,
       ImmutableSet.Builder<Digest> inputDigests) {
-    if (directoryDigest.getSizeBytes() != 0 || Directory.getDefaultInstance().toByteString().size() != 0) {
-      path.push(directoryDigest);
-      Directory root = expectDirectory(directoryDigest);
-      validateActionInputDirectory(root, path, visited, inputDigests);
-      path.pop();
-      visited.add(directoryDigest);
-    }
+    path.push(directoryDigest);
+    validateActionInputDirectory(expectDirectory(directoryDigest), path, visited, inputDigests);
+    path.pop();
+    visited.add(directoryDigest);
   }
 
   protected void validateAction(Action action) {
@@ -310,7 +318,7 @@ public abstract class AbstractServerInstance implements Instance {
     ImmutableSet.Builder<Digest> inputDigests = new ImmutableSet.Builder<>();
     inputDigests.add(commandDigest);
 
-    validateActionInputDirectory(action.getInputRootDigest(), new Stack<>(), new HashSet<>(), inputDigests);
+    validateActionInputDirectoryDigest(action.getInputRootDigest(), new Stack<>(), new HashSet<>(), inputDigests);
 
     // A requested input (or the [Command][] of the [Action][]) was not found in
     // the [ContentAddressableStorage][].
