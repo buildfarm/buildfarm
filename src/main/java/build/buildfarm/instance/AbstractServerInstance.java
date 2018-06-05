@@ -356,7 +356,6 @@ public abstract class AbstractServerInstance implements Instance {
     filesUniqueAndSortedPrecondition(action.getOutputFilesList());
     filesUniqueAndSortedPrecondition(action.getOutputDirectoriesList());
 
-    Preconditions.checkState(commandDigest.getSizeBytes() != 0, INVALID_DIGEST);
     Command command;
     try {
       command = Command.parseFrom(getBlob(commandDigest));
