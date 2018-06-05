@@ -15,6 +15,7 @@
 package build.buildfarm.worker.operationqueue;
 
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.ByteStreamUploader;
@@ -22,6 +23,7 @@ import build.buildfarm.instance.stub.Retrier;
 import build.buildfarm.instance.stub.Retrier.Backoff;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.CASInsertionPolicy;
+import build.buildfarm.v1test.InstanceEndpoint;
 import build.buildfarm.v1test.WorkerConfig;
 import build.buildfarm.worker.CASFileCache;
 import build.buildfarm.worker.ExecuteActionStage;
@@ -41,6 +43,7 @@ import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.devtools.common.options.OptionsParser;
 import com.google.devtools.remoteexecution.v1test.Action;
+import com.google.devtools.remoteexecution.v1test.ActionResult;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.devtools.remoteexecution.v1test.Directory;
 import com.google.devtools.remoteexecution.v1test.DirectoryNode;
@@ -58,6 +61,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -76,13 +80,17 @@ import javax.naming.ConfigurationException;
 
 public class Worker {
   public static final Logger logger = Logger.getLogger(Worker.class.getName());
-  private final Instance instance;
+  private final DigestUtil digestUtil;
+  private final Instance casInstance;
+  private final Instance acInstance;
+  private final Instance operationQueueInstance;
   private final WorkerConfig config;
   private final Path root;
   private final CASFileCache fileCache;
   private final Map<Path, Iterable<Path>> rootInputFiles = new ConcurrentHashMap<>();
   private final Map<Path, Iterable<Digest>> rootInputDirectories = new ConcurrentHashMap<>();
-  private final ListeningScheduledExecutorService retryScheduler =
+
+  private static final ListeningScheduledExecutorService retryScheduler =
       MoreExecutors.listeningDecorator(Executors.newScheduledThreadPool(1));
 
   private static Channel createChannel(String target) {
@@ -127,8 +135,18 @@ public class Worker {
         Retrier.DEFAULT_IS_RETRIABLE);
   }
 
-  private ByteStreamUploader createStubUploader(Channel channel) {
+  private static ByteStreamUploader createStubUploader(Channel channel) {
     return new ByteStreamUploader("", channel, null, 300, createStubRetrier(), retryScheduler);
+  }
+
+  private static Instance createInstance(InstanceEndpoint instanceEndpoint,
+      DigestUtil digestUtil) {
+    Channel channel = createChannel(instanceEndpoint.getTarget());
+    return new StubInstance(
+        instanceEndpoint.getInstanceName(),
+        digestUtil,
+        channel,
+        createStubUploader(channel));
   }
 
   public Worker(WorkerConfig config) throws ConfigurationException {
@@ -140,23 +158,21 @@ public class Worker {
     HashFunction hashFunction = getValidHashFunction(config);
 
     /* initialization */
-    Channel channel = createChannel(config.getOperationQueue());
-    instance = new StubInstance(
-        config.getInstanceName(),
-        new DigestUtil(hashFunction),
-        channel,
-        createStubUploader(channel));
+    digestUtil = new DigestUtil(hashFunction);
+    casInstance = createInstance(config.getContentAddressableStorage(), digestUtil);
+    acInstance = createInstance(config.getActionCache(), digestUtil);
+    operationQueueInstance = createInstance(config.getOperationQueue(), digestUtil);
     InputStreamFactory inputStreamFactory = new InputStreamFactory() {
       @Override
       public InputStream apply(Digest digest) {
-        return instance.newStreamInput(instance.getBlobName(digest));
+        return casInstance.newStreamInput(casInstance.getBlobName(digest));
       }
     };
     fileCache = new CASFileCache(
         inputStreamFactory,
         root.resolve(casCacheDirectory),
         config.getCasCacheMaxSizeBytes(),
-        instance.getDigestUtil());
+        casInstance.getDigestUtil());
   }
 
   class OutputDirectory {
@@ -187,13 +203,13 @@ public class Worker {
     String pageToken = "";
 
     do {
-      pageToken = instance.getTree(inputRoot, config.getTreePageSize(), pageToken, directories);
+      pageToken = casInstance.getTree(inputRoot, config.getTreePageSize(), pageToken, directories);
     } while (!pageToken.isEmpty());
 
     Set<Digest> directoryDigests = new HashSet<>();
     ImmutableMap.Builder<Digest, Directory> directoriesIndex = new ImmutableMap.Builder<>();
     for (Directory directory : directories.build()) {
-      Digest directoryDigest = instance.getDigestUtil().compute(directory);
+      Digest directoryDigest = casInstance.getDigestUtil().compute(directory);
       if (!directoryDigests.add(directoryDigest)) {
         continue;
       }
@@ -305,7 +321,7 @@ public class Worker {
       @Override
       public Poller createPoller(String name, String operationName, Stage stage, Runnable onFailure) {
         Poller poller = new Poller(config.getOperationPollPeriod(), () -> {
-              boolean success = instance.pollOperation(operationName, stage);
+              boolean success = operationQueueInstance.pollOperation(operationName, stage);
               if (!success) {
                 onFailure.run();
               }
@@ -317,12 +333,15 @@ public class Worker {
 
       @Override
       public DigestUtil getDigestUtil() {
-        return instance.getDigestUtil();
+        return digestUtil;
       }
 
       @Override
       public void match(Predicate<Operation> onMatch) throws InterruptedException {
-        instance.match(config.getPlatform(), config.getRequeueOnFailure(), onMatch);
+        operationQueueInstance.match(
+            config.getPlatform(),
+            config.getRequeueOnFailure(),
+            onMatch);
       }
 
       @Override
@@ -391,13 +410,8 @@ public class Worker {
       }
 
       @Override
-      public Instance getInstance() {
-        return instance;
-      }
-
-      @Override
       public ByteString getBlob(Digest digest) {
-        return instance.getBlob(digest);
+        return casInstance.getBlob(digest);
       }
 
       @Override
@@ -444,6 +458,28 @@ public class Worker {
       @Override
       public void removeDirectory(Path path) throws IOException {
         CASFileCache.removeDirectory(path);
+      }
+
+      @Override
+      public boolean putOperation(Operation operation) {
+        return operationQueueInstance.putOperation(operation);
+      }
+
+      // doesn't belong in CAS or AC, must be in OQ
+      @Override
+      public OutputStream getStreamOutput(String name) {
+        return operationQueueInstance.getStreamOutput(name);
+      }
+
+      @Override
+      public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs)
+          throws IOException, IllegalArgumentException, InterruptedException {
+        return casInstance.putAllBlobs(blobs);
+      }
+
+      @Override
+      public void putActionResult(ActionKey actionKey, ActionResult actionResult) {
+        acInstance.putActionResult(actionKey, actionResult);
       }
     };
 

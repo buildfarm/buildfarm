@@ -63,7 +63,7 @@ class Executor implements Runnable {
         .setMetadata(Any.pack(executingMetadata))
         .build();
 
-    if (!workerContext.getInstance().putOperation(operation)) {
+    if (!workerContext.putOperation(operation)) {
       owner.error().put(operationContext);
       owner.release();
       return;
@@ -158,12 +158,12 @@ class Executor implements Runnable {
     OutputStream stdoutSink = null, stderrSink = null;
 
     if (stdoutStreamName != null && !stdoutStreamName.isEmpty() && workerContext.getStreamStdout()) {
-      stdoutSink = workerContext.getInstance().getStreamOutput(stdoutStreamName);
+      stdoutSink = workerContext.getStreamOutput(stdoutStreamName);
     } else {
       stdoutSink = nullOutputStream;
     }
     if (stderrStreamName != null && !stderrStreamName.isEmpty() && workerContext.getStreamStderr()) {
-      stderrSink = workerContext.getInstance().getStreamOutput(stderrStreamName);
+      stderrSink = workerContext.getStreamOutput(stderrStreamName);
     } else {
       stderrSink = nullOutputStream;
     }

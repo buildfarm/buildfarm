@@ -15,15 +15,18 @@
 package build.buildfarm.worker;
 
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.CASInsertionPolicy;
 import com.google.devtools.remoteexecution.v1test.Action;
+import com.google.devtools.remoteexecution.v1test.ActionResult;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.Path;
 import java.util.function.Predicate;
 
@@ -45,10 +48,13 @@ public interface WorkerContext {
   boolean getStreamStderr();
   Duration getDefaultActionTimeout();
   Duration getMaximumActionTimeout();
-  Instance getInstance();
   ByteString getBlob(Digest digest);
   void createActionRoot(Path root, Action action) throws IOException, InterruptedException;
   void destroyActionRoot(Path root) throws IOException;
   Path getRoot();
   void removeDirectory(Path path) throws IOException;
+  boolean putOperation(Operation operation);
+  OutputStream getStreamOutput(String name);
+  Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs) throws IOException, IllegalArgumentException, InterruptedException;
+  void putActionResult(ActionKey actionKey, ActionResult actionResult);
 }
