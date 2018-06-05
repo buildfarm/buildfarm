@@ -333,19 +333,22 @@ public abstract class AbstractServerInstance implements Instance {
     // invalid action?
     filesUniqueAndSortedPrecondition(action.getOutputFilesList());
     filesUniqueAndSortedPrecondition(action.getOutputDirectoriesList());
-    if (commandDigest.getSizeBytes() != 0 || Command.getDefaultInstance().toByteString().size() != 0) {
-      Command command;
-      try {
-        command = Command.parseFrom(getBlob(commandDigest));
-      } catch (InvalidProtocolBufferException ex) {
-        Preconditions.checkState(
-            false,
-            INVALID_DIGEST);
-        return;
-      }
-      environmentVariablesUniqueAndSortedPrecondition(
-          command.getEnvironmentVariablesList());
+
+    Preconditions.checkState(commandDigest.getSizeBytes() != 0, INVALID_DIGEST);
+    Command command;
+    try {
+      command = Command.parseFrom(getBlob(commandDigest));
+    } catch (InvalidProtocolBufferException ex) {
+      Preconditions.checkState(
+          false,
+          INVALID_DIGEST);
+      return;
     }
+    environmentVariablesUniqueAndSortedPrecondition(
+        command.getEnvironmentVariablesList());
+    Preconditions.checkState(
+        !command.getArgumentsList().isEmpty(),
+        INVALID_DIGEST);
   }
 
   @Override
