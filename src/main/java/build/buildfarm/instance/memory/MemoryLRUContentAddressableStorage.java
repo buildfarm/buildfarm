@@ -43,6 +43,10 @@ class MemoryLRUContentAddressableStorage implements ContentAddressableStorage {
 
   @Override
   public synchronized Blob get(Digest digest) {
+    if (digest.getSizeBytes() == 0) {
+      throw new IllegalArgumentException("Cannot fetch empty blob");
+    }
+
     Entry e = storage.get(digest);
     if (e == null) {
       return null;
@@ -68,6 +72,10 @@ class MemoryLRUContentAddressableStorage implements ContentAddressableStorage {
 
   @Override
   public synchronized void put(Blob blob, Runnable onExpiration) {
+    if (blob.getDigest().getSizeBytes() == 0) {
+      throw new IllegalArgumentException("Cannot put empty blob");
+    }
+
     Entry e = storage.get(blob.getDigest());
     if (e != null) {
       if (onExpiration != null) {

@@ -127,13 +127,21 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public ByteString getBlob(Digest blobDigest) {
+  public final ByteString getBlob(Digest blobDigest) {
     return getBlob(blobDigest, 0, 0);
   }
 
   @Override
   public ByteString getBlob(Digest blobDigest, long offset, long limit)
       throws IndexOutOfBoundsException {
+    if (blobDigest.getSizeBytes() == 0) {
+      if (offset == 0 && limit >= 0) {
+        return ByteString.EMPTY;
+      } else {
+        throw new IndexOutOfBoundsException();
+      }
+    }
+
     Blob blob = contentAddressableStorage.get(blobDigest);
 
     if (blob == null) {
@@ -155,9 +163,34 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public Digest putBlob(ByteString content) throws IllegalArgumentException {
+    if (content.size() == 0) {
+      return digestUtil.empty();
+    }
     Blob blob = new Blob(content, digestUtil);
     contentAddressableStorage.put(blob);
     return blob.getDigest();
+  }
+
+  @Override
+  public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs) {
+    ImmutableList.Builder<Digest> blobDigestsBuilder =
+      new ImmutableList.Builder<Digest>();
+    for (ByteString blob : blobs) {
+      blobDigestsBuilder.add(putBlob(blob));
+    }
+    return blobDigestsBuilder.build();
+  }
+
+  @Override
+  public Iterable<Digest> findMissingBlobs(Iterable<Digest> digests) {
+    ImmutableList.Builder<Digest> missingBlobs = new ImmutableList.Builder<>();
+    for (Digest digest : digests) {
+      if (digest.getSizeBytes() == 0 || contentAddressableStorage.contains(digest)) {
+        continue;
+      }
+      missingBlobs.add(digest);
+    }
+    return missingBlobs.build();
   }
 
   protected abstract int getTreeDefaultPageSize();
@@ -286,20 +319,20 @@ public abstract class AbstractServerInstance implements Instance {
 
       Digest directoryDigest = directoryNode.getDigest();
       if (!visited.contains(directoryDigest)) {
-        path.push(directoryDigest);
-        validateActionInputDirectory(expectDirectory(directoryDigest), path, visited, inputDigests);
-        path.pop();
-        visited.add(directoryDigest);
+        validateActionInputDirectoryDigest(directoryDigest, path, visited, inputDigests);
       }
     }
   }
 
-  private void validateActionInputs(Digest inputRootDigest, ImmutableSet.Builder<Digest> inputDigests) {
-    Stack<Digest> path = new Stack<>();
-    path.push(inputRootDigest);
-
-    Directory root = expectDirectory(inputRootDigest);
-    validateActionInputDirectory(root, path, new HashSet<>(), inputDigests);
+  private void validateActionInputDirectoryDigest(
+      Digest directoryDigest,
+      Stack<Digest> path,
+      Set<Digest> visited,
+      ImmutableSet.Builder<Digest> inputDigests) {
+    path.push(directoryDigest);
+    validateActionInputDirectory(expectDirectory(directoryDigest), path, visited, inputDigests);
+    path.pop();
+    visited.add(directoryDigest);
   }
 
   protected void validateAction(Action action) {
@@ -307,7 +340,7 @@ public abstract class AbstractServerInstance implements Instance {
     ImmutableSet.Builder<Digest> inputDigests = new ImmutableSet.Builder<>();
     inputDigests.add(commandDigest);
 
-    validateActionInputs(action.getInputRootDigest(), inputDigests);
+    validateActionInputDirectoryDigest(action.getInputRootDigest(), new Stack<>(), new HashSet<>(), inputDigests);
 
     // A requested input (or the [Command][] of the [Action][]) was not found in
     // the [ContentAddressableStorage][].
@@ -322,6 +355,7 @@ public abstract class AbstractServerInstance implements Instance {
     // invalid action?
     filesUniqueAndSortedPrecondition(action.getOutputFilesList());
     filesUniqueAndSortedPrecondition(action.getOutputDirectoriesList());
+
     Command command;
     try {
       command = Command.parseFrom(getBlob(commandDigest));
@@ -333,6 +367,9 @@ public abstract class AbstractServerInstance implements Instance {
     }
     environmentVariablesUniqueAndSortedPrecondition(
         command.getEnvironmentVariablesList());
+    Preconditions.checkState(
+        !command.getArgumentsList().isEmpty(),
+        INVALID_DIGEST);
   }
 
   @Override

@@ -306,19 +306,20 @@ public class BuildFarmServerTest {
 
   private Action createSimpleAction() throws RetryException, InterruptedException {
     DigestUtil digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
-    Command command = Command.newBuilder().build();
-    ByteString commandBlob = command.toByteString();
-    Directory root = Directory.newBuilder().build();
-    ByteString rootBlob = root.toByteString();
+    Command command = Command.newBuilder()
+        .addArguments("echo")
+        .build();
+    Digest commandBlobDigest = digestUtil.compute(command);
+    Directory root = Directory.getDefaultInstance();
+    Digest rootBlobDigest = digestUtil.compute(root);
     Action action = Action.newBuilder()
-        .setCommandDigest(digestUtil.compute(commandBlob))
-        .setInputRootDigest(digestUtil.compute(rootBlob))
+        .setCommandDigest(commandBlobDigest)
+        .setInputRootDigest(rootBlobDigest)
         .build();
     ByteStreamUploader uploader = new ByteStreamUploader("memory", inProcessChannel, null, 60, Retrier.NO_RETRIES, null);
 
     uploader.uploadBlobs(ImmutableList.of(
-        new Chunker(rootBlob, digestUtil),
-        new Chunker(commandBlob, digestUtil)));
+        new Chunker(command.toByteString(), commandBlobDigest)));
     return action;
   }
 
