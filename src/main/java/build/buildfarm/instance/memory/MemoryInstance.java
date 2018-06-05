@@ -131,33 +131,6 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  public Iterable<Digest> findMissingBlobs(Iterable<Digest> digests) {
-    ImmutableList.Builder<Digest> missingBlobs = new ImmutableList.Builder<>();
-    for (Digest digest : digests) {
-      if (digest.getSizeBytes() == 0 || contentAddressableStorage.contains(digest)) {
-        continue;
-      }
-      missingBlobs.add(digest);
-    }
-    return missingBlobs.build();
-  }
-
-  @Override
-  public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs)
-      throws IllegalArgumentException {
-    if (Iterables.any(blobs, blob -> blob.size() == 0)) {
-      throw new IllegalArgumentException();
-    }
-
-    ImmutableList.Builder<Digest> blobDigestsBuilder =
-      new ImmutableList.Builder<Digest>();
-    for (ByteString blob : blobs) {
-      blobDigestsBuilder.add(putBlob(blob));
-    }
-    return blobDigestsBuilder.build();
-  }
-
-  @Override
   protected void enqueueOperation(Operation operation) {
     synchronized(queuedOperations) {
       queuedOperations.add(operation);

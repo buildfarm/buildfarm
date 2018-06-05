@@ -127,10 +127,7 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public ByteString getBlob(Digest blobDigest) {
-    if (blobDigest.getSizeBytes() == 0) {
-      return ByteString.EMPTY;
-    }
+  public final ByteString getBlob(Digest blobDigest) {
     return getBlob(blobDigest, 0, 0);
   }
 
@@ -166,9 +163,34 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public Digest putBlob(ByteString content) throws IllegalArgumentException {
+    if (content.size() == 0) {
+      return digestUtil.empty();
+    }
     Blob blob = new Blob(content, digestUtil);
     contentAddressableStorage.put(blob);
     return blob.getDigest();
+  }
+
+  @Override
+  public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs) {
+    ImmutableList.Builder<Digest> blobDigestsBuilder =
+      new ImmutableList.Builder<Digest>();
+    for (ByteString blob : blobs) {
+      blobDigestsBuilder.add(putBlob(blob));
+    }
+    return blobDigestsBuilder.build();
+  }
+
+  @Override
+  public Iterable<Digest> findMissingBlobs(Iterable<Digest> digests) {
+    ImmutableList.Builder<Digest> missingBlobs = new ImmutableList.Builder<>();
+    for (Digest digest : digests) {
+      if (digest.getSizeBytes() == 0 || contentAddressableStorage.contains(digest)) {
+        continue;
+      }
+      missingBlobs.add(digest);
+    }
+    return missingBlobs.build();
   }
 
   protected abstract int getTreeDefaultPageSize();
