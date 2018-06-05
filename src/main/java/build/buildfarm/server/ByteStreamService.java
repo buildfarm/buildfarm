@@ -55,7 +55,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
       String resourceName = request.getResourceName();
       Instance instance = instances.getFromBlob(resourceName);
 
-      Digest digest = UrlPath.parseBlobDigest(resourceName, instance.getDigestUtil());
+      Digest digest = UrlPath.parseBlobDigest(resourceName);
 
       ByteString blob = instance.getBlob(
           digest, request.getReadOffset(), request.getReadLimit());
@@ -225,7 +225,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
           Instance instance)
           throws InterruptedException {
         if (data == null) {
-          digest = UrlPath.parseUploadBlobDigest(writeResourceName, instance.getDigestUtil());
+          digest = UrlPath.parseUploadBlobDigest(writeResourceName);
           if (digest == null) {
             String description = "Could not parse digest of: " + writeResourceName;
             responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));

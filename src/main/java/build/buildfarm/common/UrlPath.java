@@ -34,7 +34,7 @@ public class UrlPath {
     // TODO: Replace this with proper readonly parser should this become
     // a bottleneck
     String[] components = resourceName.split("/");
-    
+
     // Keep following checks ordered by descending minComponentLength
     if (components.length >= ResourceOperation.UploadBlob.minComponentLength && isUploadBlob(components)) {
       return ResourceOperation.UploadBlob;
@@ -46,7 +46,7 @@ public class UrlPath {
 
     throw new IllegalArgumentException("Url path not recognized: " + resourceName);
   }
-    
+
   private static boolean isBlob(String[] components) {
     // {instance_name=**}/blobs/{hash}/{size}
     return components[components.length - 3].equals("blobs");
@@ -109,14 +109,6 @@ public class UrlPath {
             components.length - 5));
   }
 
-  public static Digest parseBlobDigest(String resourceName, DigestUtil digestUtil)
-      throws NumberFormatException {
-    String[] components = resourceName.split("/");
-    String hash = components[components.length - 2];
-    long size = Long.parseLong(components[components.length - 1]);
-    return digestUtil.build(hash, size);
-  }
-
   public static Digest parseBlobDigest(String resourceName) {
     String[] components = resourceName.split("/");
     String hash = components[components.length - 2];
@@ -125,14 +117,6 @@ public class UrlPath {
         .setHash(hash)
         .setSizeBytes(size)
         .build();
-  }
-
-  public static Digest parseUploadBlobDigest(String resourceName, DigestUtil digestUtil)
-      throws NumberFormatException {
-    String[] components = resourceName.split("/");
-    String hash = components[components.length - 2];
-    long size = Long.parseLong(components[components.length - 1]);
-    return digestUtil.build(hash, size);
   }
 
   public static Digest parseUploadBlobDigest(String resourceName)
