@@ -54,3 +54,10 @@ container_pull(
   repository = "distroless/java",
   digest = "sha256:625c3584876171c6d786d8d8a74b2aaceac06fef450e7fd7322247464f118aa9",
 )
+
+# Runtime requirement for worker if connecting to a server over SSL
+maven_jar(
+    name = "io_netty_netty_tcnative_boringssl_static",
+    artifact = "io.netty:netty-tcnative-boringssl-static:2.0.8.Final",
+    sha1 = "5c3483dfa33cd04f5469c95abf67e1b69a8f1221",
+)

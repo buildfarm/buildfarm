@@ -38,7 +38,7 @@ dependencies:
       modules: [ "buffer", "codec", "codec-http", "codec-http2", "codec-socks", "common", "handler",
         "handler-proxy", "resolver", "transport" ]
       version: "4.1.17.Final"
-
+      
   #
   io.grpc:
     grpc-all:

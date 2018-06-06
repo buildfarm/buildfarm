@@ -189,6 +189,7 @@ java_library(
         "//3rdparty/jvm/io/grpc:grpc_netty",
         "//3rdparty/jvm/io/grpc:grpc_protobuf",
         "//3rdparty/jvm/io/grpc:grpc_stub",
+        "//3rdparty/jvm/io/netty:netty_handler",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
     ],
 )
@@ -198,6 +199,7 @@ java_binary(
     main_class = "build.buildfarm.worker.operationqueue.Worker",
     runtime_deps = [
         ":operationqueue-worker",
+        "@io_netty_netty_tcnative_boringssl_static//jar",
     ],
     visibility = ["//visibility:public"],
 )
