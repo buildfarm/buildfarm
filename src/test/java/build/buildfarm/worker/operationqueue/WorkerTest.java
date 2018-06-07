@@ -16,6 +16,8 @@ package build.buildfarm.worker.operationqueue;
 
 import build.buildfarm.v1test.WorkerConfig;
 import javax.naming.ConfigurationException;
+import javax.net.ssl.SSLException;
+
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -23,14 +25,14 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class WorkerTest {
   @Test(expected = ConfigurationException.class)
-  public void missingWorkerRoot() throws ConfigurationException {
+  public void missingWorkerRoot() throws ConfigurationException, SSLException {
     new Worker(WorkerConfig.newBuilder()
         .setCasCacheDirectory("/cache")
         .build());
   }
 
   @Test(expected = ConfigurationException.class)
-  public void missingCasCacheDirectory() throws ConfigurationException {
+  public void missingCasCacheDirectory() throws ConfigurationException, SSLException {
     new Worker(WorkerConfig.newBuilder()
         .setRoot("/")
         .build());

@@ -55,6 +55,7 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.TextFormat;
 import io.grpc.Channel;
+import io.grpc.netty.GrpcSslContexts;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import java.io.File;
@@ -77,6 +78,7 @@ import java.util.concurrent.Executors;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
+import javax.net.ssl.SSLException;
 
 public class Worker {
   public static final Logger logger = Logger.getLogger(Worker.class.getName());
@@ -93,13 +95,21 @@ public class Worker {
   private static final ListeningScheduledExecutorService retryScheduler =
       MoreExecutors.listeningDecorator(Executors.newScheduledThreadPool(1));
 
-  private static Channel createChannel(String target) {
-    NettyChannelBuilder builder =
-        NettyChannelBuilder.forTarget(target)
-            .negotiationType(NegotiationType.PLAINTEXT);
+  private static Channel createChannel(String target) throws SSLException {
+    NettyChannelBuilder builder = NettyChannelBuilder.forTarget(target);
+    if (target.endsWith(":443")) {
+      // Build an io.netty.handler.ssl.SslContext that uses the 'well-known'
+      // x509 cert pool (which resides in the @local_jdk//:jre/lib/security/cacerts
+      // jdk keystore).
+      builder.negotiationType(NegotiationType.TLS);
+      builder.sslContext(GrpcSslContexts.forClient().build());
+      logger.info("Adding well known x509 cert pool to grpc channel (target port is 443)");
+    } else {
+      builder.negotiationType(NegotiationType.PLAINTEXT);      
+    }
     return builder.build();
   }
-
+  
   private static Path getValidRoot(WorkerConfig config) throws ConfigurationException {
     String rootValue = config.getRoot();
     if (Strings.isNullOrEmpty(rootValue)) {
@@ -140,7 +150,7 @@ public class Worker {
   }
 
   private static Instance createInstance(InstanceEndpoint instanceEndpoint,
-      DigestUtil digestUtil) {
+      DigestUtil digestUtil) throws SSLException {
     Channel channel = createChannel(instanceEndpoint.getTarget());
     return new StubInstance(
         instanceEndpoint.getInstanceName(),
@@ -149,7 +159,7 @@ public class Worker {
         createStubUploader(channel));
   }
 
-  public Worker(WorkerConfig config) throws ConfigurationException {
+  public Worker(WorkerConfig config) throws ConfigurationException, SSLException {
     this.config = config;
 
     /* configuration validation */
