@@ -1,5 +1,8 @@
 workspace(name = "build_buildfarm")
 
+load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
 # Needed for "well-known protos" and @com_google_protobuf//:protoc.
 http_archive(
     name = "com_google_protobuf",
@@ -17,12 +20,12 @@ http_archive(
 )
 
 # The API that we implement.
-new_http_archive(
+http_archive(
     name = "googleapis",
     sha256 = "27ade61091175f5bad45ec207f4dde524d3c8148903b60fa5641e29e3b9c5fa9",
     url = "https://github.com/googleapis/googleapis/archive/9ea26fdb1869d674fa21c92e5818ba4eadd500c2.zip",
     strip_prefix = "googleapis-9ea26fdb1869d674fa21c92e5818ba4eadd500c2",
-    build_file = "BUILD.googleapis",
+    build_file = "@//:BUILD.googleapis",
 )
 
 load("//3rdparty:workspace.bzl", "maven_dependencies", "declare_maven")
