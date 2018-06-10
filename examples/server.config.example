@@ -47,7 +47,7 @@ instances {
     action_cache_config: {
       # retain a local map of actionKeys and retain actions in CAS
       delegate_cas: {}
-    }                         
+    }
 
     # an imposed action-key-invariant timeout used in the unspecified timeout case
     default_action_timeout: {
@@ -106,7 +106,7 @@ instances {
         # target suitable for netty channel
         target: "ac-host.cloud.org:5001"
       }
-    }                         
+    }
 
     default_action_timeout: {
       seconds: 600
