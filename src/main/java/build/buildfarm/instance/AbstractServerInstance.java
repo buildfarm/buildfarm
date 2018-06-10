@@ -165,7 +165,8 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public Digest putBlob(ByteString content) throws IllegalArgumentException, InterruptedException {
+  public Digest putBlob(ByteString content)
+      throws InterruptedException {
     if (content.size() == 0) {
       return digestUtil.empty();
     }
@@ -176,7 +177,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs)
-      throws IllegalArgumentException, InterruptedException {
+      throws InterruptedException {
     ImmutableList.Builder<Digest> blobDigestsBuilder =
       new ImmutableList.Builder<Digest>();
     for (ByteString blob : blobs) {
