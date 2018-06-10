@@ -425,7 +425,7 @@ public abstract class AbstractServerInstance implements Instance {
     if (!Iterables.isEmpty(missingBlobDigests)) {
       Preconditions.checkState(
           Iterables.isEmpty(missingBlobDigests),
-          MISSING_INPUT + "[" + String.join(",", Iterables.transform(missingBlobDigests, (d) -> DigestUtil.toString(d))) + "]");
+          MISSING_INPUT);
     }
 
     // FIXME should input/output collisions (through directories) be another
