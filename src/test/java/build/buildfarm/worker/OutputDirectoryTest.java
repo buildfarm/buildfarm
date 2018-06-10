@@ -44,4 +44,14 @@ public class OutputDirectoryTest {
     assertThat(outputDirectory.getChild("foo").isLeaf()).isTrue();
     assertThat(outputDirectory.getChild("bar").getChild("baz").isLeaf()).isTrue();
   }
+
+  @Test
+  public void outputDirectoryIgnoresDuplicateOutputDirs() {
+    // create three references to output directory 'bar'
+    OutputDirectory outputDirectory = OutputDirectory.parse(
+        ImmutableList.<String>of("bar/baz", "bar/foo"),
+        ImmutableList.<String>of("bar"));
+
+    assertThat(outputDirectory.getChild("bar").isLeaf()).isTrue();
+  }
 }

@@ -84,6 +84,9 @@ public class OutputDirectory {
         int upPathSeparatorIndex = prefix.lastIndexOf('/', prefix.length() - 2);
         prefix = prefix.substring(0, upPathSeparatorIndex + 1);
       }
+      if (outputDir.length() == prefix.length()) {
+        continue;
+      }
       String prefixedFile = outputDir.substring(prefix.length(), outputDir.length() - 1);
       while (prefixedFile.length() > 0) {
         int separatorIndex = prefixedFile.indexOf('/');
