@@ -37,10 +37,10 @@ public class BuildFarmInstances implements Instances {
   private final Map<String, Instance> instances;
   private final Instance defaultInstance;
 
-  public BuildFarmInstances(List<InstanceConfig> instanceConfigs, String defaultInstanceName)
+  public BuildFarmInstances(List<InstanceConfig> instanceConfigs, String defaultInstanceName, Runnable onStop)
       throws InterruptedException, ConfigurationException {
     instances = new HashMap<String, Instance>();
-    createInstances(instanceConfigs);
+    createInstances(instanceConfigs, onStop);
     if (!defaultInstanceName.isEmpty()) {
       if (!instances.containsKey(defaultInstanceName)) {
         throw new ConfigurationException(defaultInstanceName + " not specified in instance configs.");
@@ -112,7 +112,7 @@ public class BuildFarmInstances implements Instances {
     }
   }
 
-  private void createInstances(List<InstanceConfig> instanceConfigs)
+  private void createInstances(List<InstanceConfig> instanceConfigs, Runnable onStop)
       throws InterruptedException, ConfigurationException {
     for (InstanceConfig instanceConfig : instanceConfigs) {
       String name = instanceConfig.getName();
@@ -133,7 +133,7 @@ public class BuildFarmInstances implements Instances {
           instances.put(name, new ShardInstance(
               name,
               digestUtil,
-              instanceConfig.getShardInstanceConfig()));
+              instanceConfig.getShardInstanceConfig(), onStop));
           break;
       }
     }

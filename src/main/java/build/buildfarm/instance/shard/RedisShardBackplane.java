@@ -81,7 +81,8 @@ public class RedisShardBackplane implements ShardBackplane {
   public RedisShardBackplane(
       RedisShardBackplaneConfig config,
       Function<Operation, Operation> onPublish,
-      Function<Operation, Operation> onComplete) throws ConfigurationException {
+      Function<Operation, Operation> onComplete,
+      Runnable onUnsubscribe) throws ConfigurationException {
     this.config = config;
     this.onPublish = onPublish;
     this.onComplete = onComplete;
@@ -99,18 +100,19 @@ public class RedisShardBackplane implements ShardBackplane {
 
     if (config.getSubscribeToOperation()) {
       JedisPubSub operationSubscriber = new JedisPubSub() {
-        boolean subscribed = false;
-
         @Override
         public void onMessage(String channel, String message) {
-          Operation operation = parseOperationJson(message);
+          Operation operation = message == null
+              ? null : parseOperationJson(message);
+          String operationName = message == null
+              ? channel : operation.getName();
           synchronized (watchers) {
             List<Predicate<Operation>> operationWatchers =
-                watchers.get(operation.getName());
+                watchers.get(operationName);
             if (operationWatchers == null)
               return;
-            if (operation.getDone()) {
-              watchers.remove(operation.getName());
+            if (operation == null || operation.getDone()) {
+              watchers.remove(operationName);
             }
             long unfilteredWatcherCount = operationWatchers.size();
             ImmutableList.Builder<Predicate<Operation>> filteredWatchers = new ImmutableList.Builder<>();
@@ -121,7 +123,7 @@ public class RedisShardBackplane implements ShardBackplane {
                 filteredWatcherCount++;
               }
             }
-            if (!operation.getDone() && filteredWatcherCount != unfilteredWatcherCount) {
+            if (operation != null && !operation.getDone() && filteredWatcherCount != unfilteredWatcherCount) {
               operationWatchers = new ArrayList<>();
               Iterables.addAll(operationWatchers, filteredWatchers.build());
               watchers.put(operation.getName(), operationWatchers);
@@ -130,13 +132,22 @@ public class RedisShardBackplane implements ShardBackplane {
         }
       };
 
-      subscriptionThread = new Thread(() -> {
-        for(;;) {
-          try (Jedis jedis = getJedis()) {
-            jedis.subscribe(operationSubscriber, config.getOperationChannelName());
-          }
-        }
-      });
+      subscriptionThread = new Thread(new RedisShardSubscription(
+          config.getOperationChannelName(),
+          operationSubscriber,
+          /* onUnsubscribe=*/ () -> {
+            subscriptionThread = null;
+            onUnsubscribe.run();
+          },
+          /* onReset=*/ (jedis) -> {
+            // need to resend all watcher information
+            // should probably lock out watcher additions here
+            for (String operationName : watchers.keySet()) {
+              String json = jedis.hget(config.getOperationsHashName(), operationName);
+              operationSubscriber.onMessage(operationName, json);
+            }
+          },
+          this::getJedis));
     } else {
       subscriptionThread = null;
     }

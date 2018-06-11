@@ -86,6 +86,7 @@ import javax.naming.ConfigurationException;
 
 public class ShardInstance extends AbstractServerInstance {
   private final ShardInstanceConfig config;
+  private final Runnable onStop;
   private final ShardBackplane backplane;
   private final Map<String, StubInstance> workerStubs;
   private final Thread dispatchedMonitor;
@@ -97,16 +98,17 @@ public class ShardInstance extends AbstractServerInstance {
   private final ConcurrentMap<Digest, Command> commandCache = new ConcurrentLRUCache<>(64 * 1024);
   private final Random rand = new Random();
 
-  public ShardInstance(String name, DigestUtil digestUtil, ShardInstanceConfig config) throws InterruptedException, ConfigurationException {
+  public ShardInstance(String name, DigestUtil digestUtil, ShardInstanceConfig config, Runnable onStop) throws InterruptedException, ConfigurationException {
     super(name, digestUtil, null, null, null, null);
     this.config = config;
+    this.onStop = onStop;
     ShardInstanceConfig.BackplaneCase backplaneCase = config.getBackplaneCase();
     switch (backplaneCase) {
       default:
       case BACKPLANE_NOT_SET:
         throw new IllegalArgumentException("Shard Backplane not set in config");
       case REDIS_SHARD_BACKPLANE_CONFIG:
-        backplane = new RedisShardBackplane(config.getRedisShardBackplaneConfig(), this::stripOperation, this::stripOperation);
+        backplane = new RedisShardBackplane(config.getRedisShardBackplaneConfig(), this::stripOperation, this::stripOperation, this::stop);
         break;
     }
     workerStubs = new ConcurrentHashMap<>();
@@ -180,6 +182,7 @@ public class ShardInstance extends AbstractServerInstance {
       dispatchedMonitor.stop();
     }
     backplane.stop();
+    onStop.run();
   }
 
   @Override

@@ -43,6 +43,7 @@ public class BuildFarmServer {
   private final BuildFarmServerConfig config;
   private final Instances instances;
   private Server server;
+  private boolean stopping = false;
 
   public BuildFarmServer(BuildFarmServerConfig config)
       throws InterruptedException, ConfigurationException {
@@ -53,7 +54,7 @@ public class BuildFarmServer {
       throws InterruptedException, ConfigurationException {
     this.config = config;
     String defaultInstanceName = config.getDefaultInstanceName();
-    instances = new BuildFarmInstances(config.getInstancesList(), defaultInstanceName);
+    instances = new BuildFarmInstances(config.getInstancesList(), defaultInstanceName, this::stop);
     server = serverBuilder
         .addService(new ActionCacheService(instances))
         .addService(new ContentAddressableStorageService(instances))
@@ -89,6 +90,12 @@ public class BuildFarmServer {
   }
 
   public void stop() {
+    synchronized (this) {
+      if (stopping) {
+        return;
+      }
+      stopping = true;
+    }
     instances.stop();
     if (server != null) {
       server.shutdown();
