@@ -532,8 +532,6 @@ public abstract class AbstractServerInstance implements Instance {
 
   protected ExecuteOperationMetadata expectExecuteOperationMetadata(
       Operation operation) {
-    Preconditions.checkState(
-        operation.getMetadata().is(ExecuteOperationMetadata.class));
     try {
       return operation.getMetadata().unpack(ExecuteOperationMetadata.class);
     } catch(InvalidProtocolBufferException e) {
@@ -715,7 +713,7 @@ public abstract class AbstractServerInstance implements Instance {
     }
     ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
     if (metadata == null) {
-      throw new IllegalStateException("Operation " + name + " did not contain valid metadata");
+      metadata = ExecuteOperationMetadata.getDefaultInstance();
     }
     Operation.Builder builder = operation.toBuilder()
         .setDone(true)
