@@ -119,4 +119,20 @@ public class MemoryLRUContentAddressableStorageTest {
     }
     assertThat(digestLockingRunnable.runCount).isEqualTo(1);
   }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void emptyPutThrowsIllegalArgumentException() {
+    ContentAddressableStorage storage = new MemoryLRUContentAddressableStorage(10);
+
+    DigestUtil digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
+    storage.put(new Blob(ByteString.EMPTY, digestUtil));
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void emptyGetThrowsIllegalArgumentException() {
+    ContentAddressableStorage storage = new MemoryLRUContentAddressableStorage(10);
+
+    DigestUtil digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
+    storage.get(digestUtil.compute(ByteString.EMPTY));
+  }
 }
