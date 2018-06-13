@@ -16,6 +16,8 @@ package build.buildfarm.instance.stub;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Iterator;
@@ -87,10 +89,17 @@ public class ByteStringIteratorInputStream extends InputStream {
     closed = true;
   }
 
-  private void advance() {
+  private void advance() throws IOException {
     ByteString data = ByteString.EMPTY;
-    while (iterator.hasNext() && data.isEmpty()) {
-      data = iterator.next();
+    try {
+      while (iterator.hasNext() && data.isEmpty()) {
+        data = iterator.next();
+      }
+    } catch (StatusRuntimeException e) {
+      if (Status.fromThrowable(e).getCode() == Status.Code.NOT_FOUND) {
+        throw new IOException(e);
+      }
+      throw e;
     }
     input = data.newInput();
   }
