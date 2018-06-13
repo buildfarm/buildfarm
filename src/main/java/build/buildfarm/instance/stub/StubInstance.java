@@ -265,6 +265,9 @@ public class StubInstance implements Instance {
 
   @Override
   public ByteString getBlob(Digest blobDigest) {
+    if (blobDigest.getSizeBytes() == 0) {
+      return ByteString.EMPTY;
+    }
     try (InputStream in = newStreamInput(getBlobName(blobDigest))) {
       return ByteString.readFrom(in);
     } catch (IOException ex) {
@@ -280,6 +283,9 @@ public class StubInstance implements Instance {
   @Override
   public Digest putBlob(ByteString blob)
       throws IOException, IllegalArgumentException, InterruptedException {
+    if (blob.size() == 0) {
+      return digestUtil.empty();
+    }
     Digest digest = digestUtil.compute(blob);
     Chunker chunker = new Chunker(blob, digest);
     uploader.uploadBlobs(Collections.singleton(chunker));
