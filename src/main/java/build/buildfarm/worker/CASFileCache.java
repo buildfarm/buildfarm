@@ -228,13 +228,13 @@ public class CASFileCache implements ContentAddressableStorage {
   public void put(Blob blob) {
     Path blobPath = getKey(blob.getDigest(), false);
     try {
-      synchronized (acquire(blobPath)) {
-        try {
-          putImpl(blobPath, blob.getDigest().getSizeBytes(), false, () -> blob.getData().newInput(), null, () -> onPut.accept(blob.getDigest()));
-        } finally {
-          release(blobPath);
-        }
-      }
+      putImpl(
+          blobPath,
+          blob.getDigest().getSizeBytes(),
+          /* isExecutable=*/ false,
+          () -> blob.getData().newInput(),
+          null,
+          () -> onPut.accept(blob.getDigest()));
       decrementReferences(ImmutableList.<Path>of(blobPath), ImmutableList.<Digest>of());
     } catch (IOException e) {
       /* unlikely, our stream comes from the blob */
@@ -625,13 +625,13 @@ public class CASFileCache implements ContentAddressableStorage {
 
   public Path put(Digest digest, boolean isExecutable, Digest containingDirectory) throws IOException, InterruptedException {
     Path key = getKey(digest, isExecutable);
-    synchronized (acquire(key)) {
-      try {
-        putImpl(key, digest.getSizeBytes(), isExecutable, () -> inputStreamFactory.newInput(digest), containingDirectory, () -> onPut.accept(digest));
-      } finally {
-        release(key);
-      }
-    }
+    putImpl(
+        key,
+        digest.getSizeBytes(),
+        isExecutable,
+        () -> inputStreamFactory.newInput(digest),
+        containingDirectory,
+        () -> onPut.accept(digest));
     return key;
   }
 
@@ -640,8 +640,31 @@ public class CASFileCache implements ContentAddressableStorage {
     InputStream newInput() throws InterruptedException, IOException;
   }
 
-  // must have key locked
   private void putImpl(
+      Path key,
+      long blobSizeInBytes,
+      boolean isExecutable,
+      InputStreamSupplier inSupplier,
+      Digest containingDirectory,
+      Runnable onInsert)
+      throws IOException, InterruptedException {
+    synchronized (acquire(key)) {
+      try {
+        putImplSynchronized(
+            key,
+            blobSizeInBytes,
+            isExecutable,
+            inSupplier,
+            containingDirectory,
+            onInsert);
+      } finally {
+        release(key);
+      }
+    }
+  }
+
+  // must have key locked
+  private void putImplSynchronized(
       Path key,
       long blobSizeInBytes,
       boolean isExecutable,
