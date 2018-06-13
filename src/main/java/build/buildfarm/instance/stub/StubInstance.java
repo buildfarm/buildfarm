@@ -265,6 +265,9 @@ public class StubInstance implements Instance {
 
   @Override
   public ByteString getBlob(Digest blobDigest) {
+    if (blobDigest.getSizeBytes() == 0) {
+      return ByteString.EMPTY;
+    }
     try (InputStream in = newStreamInput(getBlobName(blobDigest))) {
       return ByteString.readFrom(in);
     } catch (IOException ex) {
