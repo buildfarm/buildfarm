@@ -36,11 +36,11 @@ public class MemoryLRUContentAddressableStorageTest {
   public void expireShouldCallOnExpiration() {
     ContentAddressableStorage storage = new MemoryLRUContentAddressableStorage(10);
 
-    DigestUtil sha1DigestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
+    DigestUtil digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
     Runnable mockOnExpiration = mock(Runnable.class);
-    storage.put(new Blob(ByteString.copyFromUtf8("stdout"), sha1DigestUtil), mockOnExpiration);
+    storage.put(new Blob(ByteString.copyFromUtf8("stdout"), digestUtil), mockOnExpiration);
     verify(mockOnExpiration, never()).run();
-    storage.put(new Blob(ByteString.copyFromUtf8("stderr"), sha1DigestUtil));
+    storage.put(new Blob(ByteString.copyFromUtf8("stderr"), digestUtil));
     verify(mockOnExpiration, times(1)).run();
   }
 
@@ -48,12 +48,12 @@ public class MemoryLRUContentAddressableStorageTest {
   public void expireShouldOccurAtLimitExactly() {
     ContentAddressableStorage storage = new MemoryLRUContentAddressableStorage(11);
 
-    DigestUtil sha1DigestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
+    DigestUtil digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
     Runnable mockOnExpiration = mock(Runnable.class);
-    storage.put(new Blob(ByteString.copyFromUtf8("stdin"), sha1DigestUtil), mockOnExpiration);
-    storage.put(new Blob(ByteString.copyFromUtf8("stdout"), sha1DigestUtil), mockOnExpiration);
+    storage.put(new Blob(ByteString.copyFromUtf8("stdin"), digestUtil), mockOnExpiration);
+    storage.put(new Blob(ByteString.copyFromUtf8("stdout"), digestUtil), mockOnExpiration);
     verify(mockOnExpiration, never()).run();
-    storage.put(new Blob(ByteString.copyFromUtf8("a"), sha1DigestUtil));
+    storage.put(new Blob(ByteString.copyFromUtf8("a"), digestUtil));
     verify(mockOnExpiration, times(1)).run();
   }
 
@@ -61,12 +61,12 @@ public class MemoryLRUContentAddressableStorageTest {
   public void duplicateEntryRegistersMultipleOnExpiration() {
     ContentAddressableStorage storage = new MemoryLRUContentAddressableStorage(10);
 
-    DigestUtil sha1DigestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
+    DigestUtil digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
     Runnable mockOnExpiration = mock(Runnable.class);
-    storage.put(new Blob(ByteString.copyFromUtf8("stdout"), sha1DigestUtil), mockOnExpiration);
-    storage.put(new Blob(ByteString.copyFromUtf8("stdout"), sha1DigestUtil), mockOnExpiration);
+    storage.put(new Blob(ByteString.copyFromUtf8("stdout"), digestUtil), mockOnExpiration);
+    storage.put(new Blob(ByteString.copyFromUtf8("stdout"), digestUtil), mockOnExpiration);
     verify(mockOnExpiration, never()).run();
-    storage.put(new Blob(ByteString.copyFromUtf8("stderr"), sha1DigestUtil));
+    storage.put(new Blob(ByteString.copyFromUtf8("stderr"), digestUtil));
     verify(mockOnExpiration, times(2)).run();
   }
 
