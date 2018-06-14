@@ -15,6 +15,8 @@
 package build.buildfarm.worker;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyZeroInteractions;
 
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
@@ -70,6 +72,29 @@ class CASFileCacheTest {
     assertThat(Files.exists(path)).isTrue();
   }
 
+  @Test
+  public void putEmptyFileCreatesFileButAvoidsInvokingInputStreamFactory() throws IOException, InterruptedException {
+    // In practice, calling the InputStreamFactory in the .put method results in
+    // an rpc call to the server's ByteStreamService.  We want to avoid making
+    // rpc calls for zero-length blobs (and the resulting NOT_FOUND response).
+    // See https://github.com/bazelbuild/bazel-buildfarm/issues/154.
+    HashMap<Digest, ByteString> blobs = new HashMap<Digest, ByteString>();
+    InputStreamFactory mockInputStreamFactory = mock(InputStreamFactory.class);
+    CASFileCache fileCache = new CASFileCache(
+        mockInputStreamFactory,
+        root,
+        /* maxSizeInBytes=*/ 1024,
+        digestUtil);
+
+    ByteString blob = ByteString.copyFromUtf8("");
+    Digest blobDigest = digestUtil.compute(blob);
+    blobs.put(blobDigest, blob);  
+    Path path = fileCache.put(blobDigest, false, null);
+            
+    assertThat(Files.exists(path)).isTrue();
+    verifyZeroInteractions(mockInputStreamFactory);
+  }
+  
   @Test
   public void putCreatesExecutable() throws IOException, InterruptedException {
     ByteString blob = ByteString.copyFromUtf8("executable");

@@ -325,10 +325,17 @@ public class CASFileCache {
 
     Path tmpPath;
     long copySize;
-    try (InputStream in = inputStreamFactory.apply(digest)) {
-      // FIXME make a validating file copy object and verify digest
+
+    if (digest.getSizeBytes() > 0) {
+      try (InputStream in = inputStreamFactory.apply(digest)) {
+        // FIXME make a validating file copy object and verify digest
+        tmpPath = key.resolveSibling(key.getFileName() + ".tmp");
+        copySize = Files.copy(in, tmpPath);
+      }
+    } else {
       tmpPath = key.resolveSibling(key.getFileName() + ".tmp");
-      copySize = Files.copy(in, tmpPath);
+      Files.createFile(tmpPath);
+      copySize = 0;
     }
 
     if (copySize != digest.getSizeBytes()) {
