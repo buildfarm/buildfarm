@@ -52,7 +52,7 @@ Run via
 > discoverable as `BUILDFARM_SERVICE_HOST=10.1.0.4` and
 > `BUILDFARM_SERVICE_PORT=8980`, starting the worker as `buildfarm-worker
 > <configfile> --operation_queue_host_var=BUILDFARM_SERVICE_HOST
-> --operation_queue_host_var=BUILDFARM_SERVICE_HOST` will configure the worker
+> --operation_queue_port_var=BUILDFARM_SERVICE_PORT` will configure the worker
 > to talk gRPC with `10.1.0.4:8980` for the operation queue. 
 
 ### Bazel Itself
