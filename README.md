@@ -46,13 +46,14 @@ Run via
 
 - **`CAS_CACHE_DIRECTORY`** is (absolute or relative) directory path to cached files from CAS.
 
-> To override the host:port target string where the server is running, provide
-> the name of the enviroment variables for those properties.  For example, if
-> `BUILDFARM_SERVICE_HOST=10.1.0.4` and `BUILDFARM_SERVICE_PORT=8980`, starting
-> the worker as `buildfarm-worker <configfile>
-> --server_host_envvar=BUILDFARM_SERVICE_HOST
-> --server_port_envvar=BUILDFARM_SERVICE_HOST` will configure the worker to talk
-> gRPC with `10.1.0.4:8980`. 
+> To override the endpoint for the operation queue, action cache, or cas service
+> provide the name of the enviroment variables for those services via command
+> line flags. For example, if you have a kubernetes service for the server
+> discoverable as `BUILDFARM_SERVICE_HOST=10.1.0.4` and
+> `BUILDFARM_SERVICE_PORT=8980`, starting the worker as `buildfarm-worker
+> <configfile> --operation_queue_host_var=BUILDFARM_SERVICE_HOST
+> --operation_queue_host_var=BUILDFARM_SERVICE_HOST` will configure the worker
+> to talk gRPC with `10.1.0.4:8980` for the operation queue. 
 
 ### Bazel Itself
 
