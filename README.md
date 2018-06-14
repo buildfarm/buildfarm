@@ -46,6 +46,14 @@ Run via
 
 - **`CAS_CACHE_DIRECTORY`** is (absolute or relative) directory path to cached files from CAS.
 
+> To override the host:port target string where the server is running, provide
+> the name of the enviroment variables for those properties.  For example, if
+> `BUILDFARM_SERVICE_HOST=10.1.0.4` and `BUILDFARM_SERVICE_PORT=8980`, starting
+> the worker as `buildfarm-worker <configfile>
+> --server_host_envvar=BUILDFARM_SERVICE_HOST
+> --server_port_envvar=BUILDFARM_SERVICE_HOST` will configure the worker to talk
+> gRPC with `10.1.0.4:8980`. 
+
 ### Bazel Itself
 
 To have bazel use the bazel buildfarm configured using the example configs provided in the `examples` directory, you could configure your

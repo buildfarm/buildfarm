@@ -115,7 +115,7 @@ public class Worker {
     }
     return root.resolve(casCacheValue);
   }
-
+  
   private static HashFunction getValidHashFunction(WorkerConfig config) throws ConfigurationException {
     try {
       return HashFunction.get(config.getHashFunction());
@@ -124,6 +124,13 @@ public class Worker {
     }
   }
 
+  private static InstanceEndpoint overrideEndpoint(InstanceEndpoint src, String hostVar, String portVar) {
+    return InstanceEndpoint.newBuilder()
+      .mergeFrom(src)
+      .setTarget(String.format("%s:%s", System.getenv(hostVar), System.getenv(portVar)))
+      .build();
+  }
+  
   private static Retrier createStubRetrier() {
     return new Retrier(
         Backoff.exponential(
