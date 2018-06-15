@@ -189,10 +189,31 @@ public class ReportResultStageTest {
         root,
         ImmutableList.<String>of(),
         ImmutableList.<String>of("foo"));
-    Tree emptyTree = Tree.newBuilder()
-        .setRoot(Directory.getDefaultInstance())
-        .build();
     verify(mockUploader, never())
         .uploadBlobs(any());
+  }
+
+  @Test(expected=IllegalStateException.class)
+  public void uploadOutputsThrowsIllegalStateExceptionWhenOutputFileIsDirectory()
+      throws IOException, InterruptedException {
+    Files.createDirectory(root.resolve("foo"));
+    ActionResult.Builder resultBuilder = ActionResult.newBuilder();
+    reportResultStage.uploadOutputs(
+        resultBuilder,
+        root,
+        ImmutableList.<String>of("foo"),
+        ImmutableList.<String>of());
+  }
+
+  @Test(expected=IllegalStateException.class)
+  public void uploadOutputsThrowsIllegalStateExceptionWhenOutputDirectoryIsFile()
+      throws IOException, InterruptedException {
+    Files.createFile(root.resolve("foo"));
+    ActionResult.Builder resultBuilder = ActionResult.newBuilder();
+    reportResultStage.uploadOutputs(
+        resultBuilder,
+        root,
+        ImmutableList.<String>of(),
+        ImmutableList.<String>of("foo"));
   }
 }

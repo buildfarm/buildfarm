@@ -88,6 +88,19 @@ java_test(
 )
 
 java_test(
+    name = "instance-tests",
+    size = "small",
+    srcs = glob(["instance/*.java"]),
+    test_class = "build.buildfarm.AllTests",
+    deps = [
+        ":test_runner",
+        "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/com/google/truth",
+        "//src/main/java/build/buildfarm:server-instance",
+    ],
+)
+
+java_test(
     name = "stub-instance-tests",
     size = "small",
     srcs = glob(["instance/stub/*.java"]),

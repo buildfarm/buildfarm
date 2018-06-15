@@ -17,8 +17,6 @@ package build.buildfarm.worker;
 import static com.google.common.truth.Truth.assertThat;
 
 import com.google.common.collect.ImmutableList;
-import build.buildfarm.v1test.WorkerConfig;
-import javax.naming.ConfigurationException;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;

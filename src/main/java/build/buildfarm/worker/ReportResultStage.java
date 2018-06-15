@@ -35,6 +35,8 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.rpc.Status;
+import com.google.rpc.Code;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.FileVisitResult;
@@ -113,9 +115,8 @@ public class ReportResultStage extends PipelineStage {
     manifest.addFiles(
         Iterables.transform(outputFiles, (file) -> execRoot.resolve(file)),
         workerContext.getFileCasPolicy());
-    manifest.addFiles(
-        Iterables.transform(outputDirs, (dir) -> execRoot.resolve(dir)),
-        workerContext.getFileCasPolicy());
+    manifest.addDirectories(
+        Iterables.transform(outputDirs, (dir) -> execRoot.resolve(dir)));
 
     /* put together our outputs and update the result */
     if (result.getStdoutRaw().size() > 0) {
@@ -170,21 +171,27 @@ public class ReportResultStage extends PipelineStage {
         ExecuteOperationMetadata.Stage.EXECUTING,
         () -> {});
 
-    ActionResult.Builder resultBuilder;
+    ExecuteResponse executeResponse;
     try {
-      resultBuilder = operationContext
-          .operation.getResponse().unpack(ExecuteResponse.class).getResult().toBuilder();
+      executeResponse = operationContext.operation
+          .getResponse().unpack(ExecuteResponse.class);
     } catch (InvalidProtocolBufferException ex) {
       poller.stop();
       return null;
     }
 
+    ActionResult.Builder resultBuilder = executeResponse.getResult().toBuilder();
+    Status.Builder status = executeResponse.getStatus().toBuilder();
     try {
       uploadOutputs(
           resultBuilder,
           operationContext.execDir,
           operationContext.action.getOutputFilesList(),
           operationContext.action.getOutputDirectoriesList());
+    } catch (IllegalStateException e) {
+      status
+          .setCode(Code.FAILED_PRECONDITION.getNumber())
+          .setMessage(e.getMessage());
     } catch (IOException ex) {
       poller.stop();
       return null;
@@ -202,9 +209,9 @@ public class ReportResultStage extends PipelineStage {
     Operation operation = operationContext.operation.toBuilder()
         .setDone(true)
         .setMetadata(Any.pack(metadata))
-        .setResponse(Any.pack(ExecuteResponse.newBuilder()
+        .setResponse(Any.pack(executeResponse.toBuilder()
             .setResult(result)
-            .setCachedResult(false)
+            .setStatus(status)
             .build()))
         .build();
 

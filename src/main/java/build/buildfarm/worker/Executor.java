@@ -110,10 +110,9 @@ class Executor implements Runnable {
     if (owner.output().claim()) {
       operation = operation.toBuilder()
           .setResponse(Any.pack(ExecuteResponse.newBuilder()
-              .setResult(resultBuilder.build())
+              .setResult(resultBuilder)
               .setStatus(com.google.rpc.Status.newBuilder()
-                  .setCode(statusCode.getNumber())
-                  .build())
+                  .setCode(statusCode.getNumber()))
               .build()))
           .build();
       owner.output().put(new OperationContext(
