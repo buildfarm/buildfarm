@@ -15,6 +15,9 @@
 package build.buildfarm.worker;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.when;
 
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
@@ -66,8 +69,29 @@ class CASFileCacheTest {
     ByteString blob = ByteString.copyFromUtf8("Hello, World");
     Digest blobDigest = digestUtil.compute(blob);
     blobs.put(blobDigest, blob);
-    Path path = fileCache.put(blobDigest, false, null);
+    Path path = fileCache.put(blobDigest, false);
     assertThat(Files.exists(path)).isTrue();
+  }
+
+  @Test(expected = IllegalStateException.class)
+  public void putEmptyFileThrowsIllegalStateException() throws IOException, InterruptedException {
+    InputStreamFactory mockInputStreamFactory = mock(InputStreamFactory.class);
+    CASFileCache fileCache = new CASFileCache(
+        mockInputStreamFactory,
+        root,
+        /* maxSizeInBytes=*/ 1024,
+        digestUtil);
+
+    ByteString blob = ByteString.copyFromUtf8("");
+    Digest blobDigest = digestUtil.compute(blob);
+    // supply an empty input stream if called for test clarity
+    when(mockInputStreamFactory.apply(blobDigest))
+        .thenReturn(ByteString.EMPTY.newInput());
+    try {
+      fileCache.put(blobDigest, false);
+    } finally {
+      verifyZeroInteractions(mockInputStreamFactory);
+    }
   }
 
   @Test
@@ -75,7 +99,7 @@ class CASFileCacheTest {
     ByteString blob = ByteString.copyFromUtf8("executable");
     Digest blobDigest = digestUtil.compute(blob);
     blobs.put(blobDigest, blob);
-    Path path = fileCache.put(blobDigest, true, null);
+    Path path = fileCache.put(blobDigest, true);
     assertThat(Files.isExecutable(path)).isTrue();
   }
 
@@ -118,7 +142,7 @@ class CASFileCacheTest {
         .setSizeBytes(bigBlob.size())
         .build();
     blobs.put(bigDigest, bigBlob);
-    Path bigPath = fileCache.put(bigDigest, false, null);
+    Path bigPath = fileCache.put(bigDigest, false);
 
     fileCache.decrementReferences(ImmutableList.<Path>of(bigPath), ImmutableList.of());
 
@@ -129,7 +153,7 @@ class CASFileCacheTest {
         .setSizeBytes(strawBlob.size())
         .build();
     blobs.put(strawDigest, strawBlob);
-    Path strawPath = fileCache.put(strawDigest, false, null);
+    Path strawPath = fileCache.put(strawDigest, false);
 
     assertThat(Files.exists(bigPath)).isFalse();
     assertThat(Files.exists(strawPath)).isTrue();
@@ -149,8 +173,8 @@ class CASFileCacheTest {
     // explicitly not providing blob via blobs, this would throw if fetched from factory
     //
     // FIXME https://github.com/google/truth/issues/285 assertThat(Path) is ambiguous
-    assertThat(fileCache.put(blobDigest, false, null).equals(path)).isTrue();
-    assertThat(fileCache.put(blobDigest, true, null).equals(execPath)).isTrue();
+    assertThat(fileCache.put(blobDigest, false).equals(path)).isTrue();
+    assertThat(fileCache.put(blobDigest, true).equals(execPath)).isTrue();
   }
 
   @Test
