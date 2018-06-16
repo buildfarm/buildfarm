@@ -30,6 +30,7 @@ import build.buildfarm.worker.ExecuteActionStage;
 import build.buildfarm.worker.InputFetchStage;
 import build.buildfarm.worker.InputStreamFactory;
 import build.buildfarm.worker.MatchStage;
+import build.buildfarm.worker.OutputDirectory;
 import build.buildfarm.worker.Pipeline;
 import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.Poller;
@@ -66,12 +67,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
-import java.util.List;
-import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.Stack;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.function.Predicate;
@@ -84,6 +83,7 @@ public class Worker {
   private final Instance casInstance;
   private final Instance acInstance;
   private final Instance operationQueueInstance;
+  private final ByteStreamUploader uploader;
   private final WorkerConfig config;
   private final Path root;
   private final CASFileCache fileCache;
@@ -139,14 +139,22 @@ public class Worker {
     return new ByteStreamUploader("", channel, null, 300, createStubRetrier(), retryScheduler);
   }
 
-  private static Instance createInstance(InstanceEndpoint instanceEndpoint,
+  private static Instance createInstance(
+      InstanceEndpoint instanceEndpoint,
       DigestUtil digestUtil) {
-    Channel channel = createChannel(instanceEndpoint.getTarget());
-    return new StubInstance(
+    return createInstance(
         instanceEndpoint.getInstanceName(),
-        digestUtil,
-        channel,
-        createStubUploader(channel));
+        createChannel(instanceEndpoint.getTarget()),
+        null,
+        digestUtil);
+  }
+
+  private static Instance createInstance(
+      String name,
+      Channel channel,
+      ByteStreamUploader uploader,
+      DigestUtil digestUtil) {
+    return new StubInstance(name, digestUtil, channel, uploader);
   }
 
   public Worker(WorkerConfig config) throws ConfigurationException {
@@ -159,7 +167,10 @@ public class Worker {
 
     /* initialization */
     digestUtil = new DigestUtil(hashFunction);
-    casInstance = createInstance(config.getContentAddressableStorage(), digestUtil);
+    InstanceEndpoint casEndpoint = config.getContentAddressableStorage();
+    Channel casChannel = createChannel(casEndpoint.getTarget());
+    uploader = createStubUploader(casChannel);
+    casInstance = createInstance(casEndpoint.getInstanceName(), casChannel, uploader, digestUtil);
     acInstance = createInstance(config.getActionCache(), digestUtil);
     operationQueueInstance = createInstance(config.getOperationQueue(), digestUtil);
     InputStreamFactory inputStreamFactory = new InputStreamFactory() {
@@ -173,24 +184,6 @@ public class Worker {
         root.resolve(casCacheDirectory),
         config.getCasCacheMaxSizeBytes(),
         casInstance.getDigestUtil());
-  }
-
-  class OutputDirectory {
-    public final Map<String, OutputDirectory> directories;
-
-    OutputDirectory() {
-      directories = new HashMap<>();
-    }
-
-    void stamp(Path root) throws IOException {
-      if (directories.isEmpty()) {
-        Files.createDirectories(root);
-      } else {
-        for (Map.Entry<String, OutputDirectory> entry : directories.entrySet()) {
-          entry.getValue().stamp(root.resolve(entry.getKey()));
-        }
-      }
-    }
   }
 
   private void fetchInputs(
@@ -246,7 +239,7 @@ public class Worker {
       Digest digest = directoryNode.getDigest();
       String name = directoryNode.getName();
       OutputDirectory childOutputDirectory = outputDirectory != null
-          ? outputDirectory.directories.get(name) : null;
+          ? outputDirectory.getChild(name) : null;
       Path dirPath = execDir.resolve(name);
       if (childOutputDirectory != null || !config.getLinkInputDirectories()) {
         Files.createDirectories(dirPath);
@@ -264,43 +257,6 @@ public class Worker {
       Map<Digest, Directory> directoriesIndex) throws IOException, InterruptedException {
     Path cachePath = fileCache.putDirectory(digest, directoriesIndex);
     Files.createSymbolicLink(execPath, cachePath);
-  }
-
-  private OutputDirectory parseOutputDirectories(Iterable<String> outputFiles, Iterable<String> outputDirs) {
-    OutputDirectory outputDirectory = new OutputDirectory();
-    Stack<OutputDirectory> stack = new Stack<>();
-
-    OutputDirectory currentOutputDirectory = outputDirectory;
-    String prefix = "";
-    for (String outputFile : outputFiles) {
-      while (!outputFile.startsWith(prefix)) {
-        currentOutputDirectory = stack.pop();
-        int upPathSeparatorIndex = prefix.lastIndexOf('/', prefix.length() - 2);
-        prefix = prefix.substring(0, upPathSeparatorIndex + 1);
-      }
-      String prefixedFile = outputFile.substring(prefix.length());
-      int separatorIndex = prefixedFile.indexOf('/');
-      while (separatorIndex >= 0) {
-        if (separatorIndex == 0) {
-          throw new IllegalArgumentException("double separator in output file");
-        }
-
-        String directoryName = prefixedFile.substring(0, separatorIndex);
-        prefix += directoryName + '/';
-        prefixedFile = prefixedFile.substring(separatorIndex + 1);
-        stack.push(currentOutputDirectory);
-        OutputDirectory nextOutputDirectory = new OutputDirectory();
-        currentOutputDirectory.directories.put(directoryName, nextOutputDirectory);
-        currentOutputDirectory = nextOutputDirectory;
-        separatorIndex = prefixedFile.indexOf('/');
-      }
-    }
-
-    if (!Iterables.isEmpty(outputDirs)) {
-      throw new IllegalArgumentException("outputDir specified: " + outputDirs);
-    }
-
-    return outputDirectory;
   }
 
   public void start() throws InterruptedException {
@@ -410,13 +366,18 @@ public class Worker {
       }
 
       @Override
+      public ByteStreamUploader getUploader() {
+        return uploader;
+      }
+
+      @Override
       public ByteString getBlob(Digest digest) {
         return casInstance.getBlob(digest);
       }
 
       @Override
       public void createActionRoot(Path root, Action action) throws IOException, InterruptedException {
-        OutputDirectory outputDirectory = parseOutputDirectories(
+        OutputDirectory outputDirectory = OutputDirectory.parse(
             action.getOutputFilesList(),
             action.getOutputDirectoriesList());
 
@@ -469,12 +430,6 @@ public class Worker {
       @Override
       public OutputStream getStreamOutput(String name) {
         return operationQueueInstance.getStreamOutput(name);
-      }
-
-      @Override
-      public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs)
-          throws IOException, IllegalArgumentException, InterruptedException {
-        return casInstance.putAllBlobs(blobs);
       }
 
       @Override

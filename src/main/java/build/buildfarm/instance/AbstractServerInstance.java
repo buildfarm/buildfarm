@@ -18,10 +18,12 @@ import build.buildfarm.common.ContentAddressableStorage;
 import build.buildfarm.common.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Sets;
 import com.google.devtools.remoteexecution.v1test.Action;
 import com.google.devtools.remoteexecution.v1test.ActionResult;
 import com.google.devtools.remoteexecution.v1test.Command;
@@ -265,10 +267,43 @@ public abstract class AbstractServerInstance implements Instance {
         ENVIRONMENT_VARIABLES_NOT_SORTED);
   }
 
-  private void validateActionInputDirectory(
+  private void enumerateActionInputDirectory(
+      String directoryPath,
       Directory directory,
-      Stack<Digest> path,
+      ImmutableSet.Builder<String> inputFiles,
+      ImmutableSet.Builder<String> inputDirectories) {
+    Preconditions.checkState(
+        directory != null,
+        MISSING_INPUT);
+
+    for (FileNode fileNode : directory.getFilesList()) {
+      String fileName = fileNode.getName();
+      String filePath = directoryPath.isEmpty() ? fileName : (directoryPath + "/" + fileName);
+      inputFiles.add(filePath);
+    }
+    for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
+      String directoryName = directoryNode.getName();
+
+      Digest directoryDigest = directoryNode.getDigest();
+      String subDirectoryPath = directoryPath.isEmpty()
+          ? directoryName
+          : (directoryPath + "/" + directoryName);
+      inputDirectories.add(subDirectoryPath);
+      enumerateActionInputDirectory(
+          subDirectoryPath,
+          expectDirectory(directoryDigest),
+          inputFiles,
+          inputDirectories);
+    }
+  }
+
+  private void validateActionInputDirectory(
+      String directoryPath,
+      Directory directory,
+      Stack<Digest> pathDigests,
       Set<Digest> visited,
+      ImmutableSet.Builder<String> inputFiles,
+      ImmutableSet.Builder<String> inputDirectories,
       ImmutableSet.Builder<Digest> inputDigests) {
     Preconditions.checkState(
         directory != null,
@@ -294,6 +329,8 @@ public abstract class AbstractServerInstance implements Instance {
       entryNames.add(fileName);
 
       inputDigests.add(fileNode.getDigest());
+      String filePath = directoryPath.isEmpty() ? fileName : (directoryPath + "/" + fileName);
+      inputFiles.add(filePath);
     }
     String lastDirectoryName = "";
     for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
@@ -314,33 +351,70 @@ public abstract class AbstractServerInstance implements Instance {
       entryNames.add(directoryName);
 
       Preconditions.checkState(
-          !path.contains(directoryNode.getDigest()),
+          !pathDigests.contains(directoryNode.getDigest()),
           DIRECTORY_CYCLE_DETECTED);
 
       Digest directoryDigest = directoryNode.getDigest();
+      String subDirectoryPath = directoryPath.isEmpty()
+          ? directoryName
+          : (directoryPath + "/" + directoryName);
+      inputDirectories.add(subDirectoryPath);
       if (!visited.contains(directoryDigest)) {
-        validateActionInputDirectoryDigest(directoryDigest, path, visited, inputDigests);
+        validateActionInputDirectoryDigest(
+            subDirectoryPath,
+            directoryDigest,
+            pathDigests,
+            visited,
+            inputFiles,
+            inputDirectories,
+            inputDigests);
+      } else {
+        enumerateActionInputDirectory(
+            subDirectoryPath,
+            expectDirectory(directoryDigest),
+            inputFiles,
+            inputDirectories);
       }
     }
   }
 
   private void validateActionInputDirectoryDigest(
+      String directoryPath,
       Digest directoryDigest,
-      Stack<Digest> path,
+      Stack<Digest> pathDigests,
       Set<Digest> visited,
+      ImmutableSet.Builder<String> inputFiles,
+      ImmutableSet.Builder<String> inputDirectories,
       ImmutableSet.Builder<Digest> inputDigests) {
-    path.push(directoryDigest);
-    validateActionInputDirectory(expectDirectory(directoryDigest), path, visited, inputDigests);
-    path.pop();
+    pathDigests.push(directoryDigest);
+    validateActionInputDirectory(
+        directoryPath,
+        expectDirectory(directoryDigest),
+        pathDigests,
+        visited,
+        inputFiles,
+        inputDirectories,
+        inputDigests);
+    pathDigests.pop();
     visited.add(directoryDigest);
   }
 
   protected void validateAction(Action action) {
     Digest commandDigest = action.getCommandDigest();
+    ImmutableSet.Builder<String> inputDirectoriesBuilder = new ImmutableSet.Builder<>();
+    ImmutableSet.Builder<String> inputFilesBuilder = new ImmutableSet.Builder<>();
     ImmutableSet.Builder<Digest> inputDigests = new ImmutableSet.Builder<>();
     inputDigests.add(commandDigest);
 
-    validateActionInputDirectoryDigest(action.getInputRootDigest(), new Stack<>(), new HashSet<>(), inputDigests);
+    inputDirectoriesBuilder.add("");
+    validateActionInputDirectoryDigest(
+        "",
+        action.getInputRootDigest(),
+        new Stack<>(),
+        new HashSet<>(),
+        inputFilesBuilder,
+        inputDirectoriesBuilder,
+        inputDigests);
 
     // A requested input (or the [Command][] of the [Action][]) was not found in
     // the [ContentAddressableStorage][].
@@ -356,6 +430,12 @@ public abstract class AbstractServerInstance implements Instance {
     filesUniqueAndSortedPrecondition(action.getOutputFilesList());
     filesUniqueAndSortedPrecondition(action.getOutputDirectoriesList());
 
+    AbstractServerInstance.validateOutputs(
+        inputFilesBuilder.build(),
+        inputDirectoriesBuilder.build(),
+        Sets.newHashSet(action.getOutputFilesList()),
+        Sets.newHashSet(action.getOutputDirectoriesList()));
+
     Command command;
     try {
       command = Command.parseFrom(getBlob(commandDigest));
@@ -370,6 +450,57 @@ public abstract class AbstractServerInstance implements Instance {
     Preconditions.checkState(
         !command.getArgumentsList().isEmpty(),
         INVALID_DIGEST);
+  }
+
+  @VisibleForTesting
+  public static void validateOutputs(
+      Set<String> inputFiles,
+      Set<String> inputDirectories,
+      Set<String> outputFiles,
+      Set<String> outputDirectories) {
+    Preconditions.checkState(
+        Sets.intersection(outputFiles, outputDirectories).isEmpty(),
+        "an output file has the same path as an output directory");
+
+    Set<String> parentsOfOutputs = new HashSet<>();
+
+    // An output file cannot be a parent of another output file, be a child of a listed output directory, or have the same path as any of the listed output directories.
+    for (String outputFile : outputFiles) {
+      Preconditions.checkState(
+        !inputDirectories.contains(outputFile),
+        "output file is input directory");
+      String currentPath = outputFile;
+      while (currentPath != "") {
+        final String dirname;
+        if (currentPath.contains("/")) {
+          dirname = currentPath.substring(0, currentPath.lastIndexOf('/'));
+        } else {
+          dirname = "";
+        }
+        parentsOfOutputs.add(dirname);
+        currentPath = dirname;
+      }
+    }
+
+    // An output directory cannot be a parent of another output directory, be a parent of a listed output file, or have the same path as any of the listed output files.
+    for (String outputDir : outputDirectories) {
+      Preconditions.checkState(
+        !inputFiles.contains(outputDir),
+        "output directory is input file");
+      String currentPath = outputDir;
+      while (currentPath != "") {
+        final String dirname;
+        if (currentPath.contains("/")) {
+          dirname = currentPath.substring(0, currentPath.lastIndexOf('/'));
+        } else {
+          dirname = "";
+        }
+        parentsOfOutputs.add(dirname);
+        currentPath = dirname;
+      }
+    }
+    Preconditions.checkState(Sets.intersection(outputFiles, parentsOfOutputs).isEmpty(), "an output file cannot be a parent of another output");
+    Preconditions.checkState(Sets.intersection(outputDirectories, parentsOfOutputs).isEmpty(), "an output directory cannot be a parent of another output");
   }
 
   @Override

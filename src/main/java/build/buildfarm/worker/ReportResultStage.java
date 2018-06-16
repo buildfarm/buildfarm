@@ -15,23 +15,40 @@
 package build.buildfarm.worker;
 
 import build.buildfarm.common.DigestUtil;
-import build.buildfarm.instance.Instance;
+import build.buildfarm.instance.stub.Chunker;
 import build.buildfarm.v1test.CASInsertionPolicy;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Iterables;
 import com.google.devtools.remoteexecution.v1test.Action;
 import com.google.devtools.remoteexecution.v1test.ActionResult;
 import com.google.devtools.remoteexecution.v1test.Digest;
+import com.google.devtools.remoteexecution.v1test.Directory;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
 import com.google.devtools.remoteexecution.v1test.ExecuteResponse;
+import com.google.devtools.remoteexecution.v1test.FileNode;
+import com.google.devtools.remoteexecution.v1test.OutputDirectory;
 import com.google.devtools.remoteexecution.v1test.OutputFile;
+import com.google.devtools.remoteexecution.v1test.Tree;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.rpc.Status;
+import com.google.rpc.Code;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Stack;
 import java.util.function.Consumer;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -81,60 +98,66 @@ public class ReportResultStage extends PipelineStage {
     return workerContext.getDigestUtil();
   }
 
-  private static int inlineOrDigest(
-      ByteString content,
-      CASInsertionPolicy policy,
-      ImmutableList.Builder<ByteString> contents,
-      int inlineContentBytes,
-      int inlineContentLimit,
-      Runnable setInline,
-      Consumer<ByteString> setDigest) {
-    boolean withinLimit = inlineContentBytes + content.size() <= inlineContentLimit;
-    if (withinLimit) {
-      setInline.run();
-      inlineContentBytes += content.size();
-    }
-    if (policy.equals(CASInsertionPolicy.ALWAYS_INSERT) ||
-        (!withinLimit && policy.equals(CASInsertionPolicy.INSERT_ABOVE_LIMIT))) {
-      contents.add(content);
-      setDigest.accept(content);
-    }
-    return inlineContentBytes;
-  }
+  @VisibleForTesting
+  public void uploadOutputs(
+      ActionResult.Builder result,
+      Path execRoot,
+      Collection<String> outputFiles,
+      Collection<String> outputDirs)
+      throws IOException, InterruptedException {
+    UploadManifest manifest = new UploadManifest(
+        getDigestUtil(),
+        result,
+        execRoot,
+        /* allowSymlinks= */ true,
+        workerContext.getInlineContentLimit());
 
-  private int updateActionResultStdOutputs(
-      ActionResult.Builder resultBuilder,
-      ImmutableList.Builder<ByteString> contents,
-      int inlineContentBytes) {
-    ByteString stdoutRaw = resultBuilder.getStdoutRaw();
-    if (stdoutRaw.size() > 0) {
-      // reset to allow policy to determine inlining
-      resultBuilder.setStdoutRaw(ByteString.EMPTY);
-      inlineContentBytes = inlineOrDigest(
-          stdoutRaw,
+    manifest.addFiles(
+        Iterables.transform(outputFiles, (file) -> execRoot.resolve(file)),
+        workerContext.getFileCasPolicy());
+    manifest.addDirectories(
+        Iterables.transform(outputDirs, (dir) -> execRoot.resolve(dir)));
+
+    /* put together our outputs and update the result */
+    if (result.getStdoutRaw().size() > 0) {
+      manifest.addContent(
+          result.getStdoutRaw(),
           workerContext.getStdoutCasPolicy(),
-          contents,
-          inlineContentBytes,
-          workerContext.getInlineContentLimit(),
-          () -> resultBuilder.setStdoutRaw(stdoutRaw),
-          (content) -> resultBuilder.setStdoutDigest(getDigestUtil().compute(content)));
+          result::setStdoutRaw,
+          result::setStdoutDigest);
     }
-
-    ByteString stderrRaw = resultBuilder.getStderrRaw();
-    if (stderrRaw.size() > 0) {
-      // reset to allow policy to determine inlining
-      resultBuilder.setStderrRaw(ByteString.EMPTY);
-      inlineContentBytes = inlineOrDigest(
-          stderrRaw,
+    if (result.getStderrRaw().size() > 0) {
+      manifest.addContent(
+          result.getStderrRaw(),
           workerContext.getStderrCasPolicy(),
-          contents,
-          inlineContentBytes,
-          workerContext.getInlineContentLimit(),
-          () -> resultBuilder.setStderrRaw(stdoutRaw),
-          (content) -> resultBuilder.setStderrDigest(getDigestUtil().compute(content)));
+          result::setStderrRaw,
+          result::setStderrDigest);
     }
 
-    return inlineContentBytes;
+    List<Chunker> filesToUpload = new ArrayList<>();
+
+    Map<Digest, Path> digestToFile = manifest.getDigestToFile();
+    Map<Digest, Chunker> digestToChunkers = manifest.getDigestToChunkers();
+    Collection<Digest> digests = new ArrayList<>();
+    digests.addAll(digestToFile.keySet());
+    digests.addAll(digestToChunkers.keySet());
+
+    for (Digest digest : digests) {
+      Chunker chunker;
+      Path file = digestToFile.get(digest);
+      if (file != null) {
+        chunker = new Chunker(file, digest);
+      } else {
+        chunker = digestToChunkers.get(digest);
+      }
+      if (chunker != null) {
+        filesToUpload.add(chunker);
+      }
+    }
+
+    if (!filesToUpload.isEmpty()) {
+      workerContext.getUploader().uploadBlobs(filesToUpload);
+    }
   }
 
   @Override
@@ -146,59 +169,27 @@ public class ReportResultStage extends PipelineStage {
         ExecuteOperationMetadata.Stage.EXECUTING,
         () -> {});
 
-    ActionResult.Builder resultBuilder;
+    ExecuteResponse executeResponse;
     try {
-      resultBuilder = operationContext
-          .operation.getResponse().unpack(ExecuteResponse.class).getResult().toBuilder();
+      executeResponse = operationContext.operation
+          .getResponse().unpack(ExecuteResponse.class);
     } catch (InvalidProtocolBufferException ex) {
       poller.stop();
       return null;
     }
 
-    int inlineContentBytes = 0;
-    ImmutableList.Builder<ByteString> contents = new ImmutableList.Builder<>();
-    CASInsertionPolicy policy = workerContext.getFileCasPolicy();
-    for (String outputFile : operationContext.action.getOutputFilesList()) {
-      Path outputPath = operationContext.execDir.resolve(outputFile);
-      if (!Files.exists(outputPath)) {
-        continue;
-      }
-
-      // FIXME put the output into the fileCache
-      // FIXME this needs to be streamed to the server, not read to completion, but
-      // this is a constraint of not knowing the hash, however, if we put the entry
-      // into the cache, we can likely do so, stream the output up, and be done
-      //
-      // will run into issues if we end up blocking on the cache insertion, might
-      // want to decrement input references *before* this to ensure that we cannot
-      // cause an internal deadlock
-
-      ByteString content;
-      try {
-        InputStream inputStream = Files.newInputStream(outputPath);
-        content = ByteString.readFrom(inputStream);
-        inputStream.close();
-      } catch (IOException ex) {
-        continue;
-      }
-      OutputFile.Builder outputFileBuilder = resultBuilder.addOutputFilesBuilder()
-          .setPath(outputFile)
-          .setIsExecutable(Files.isExecutable(outputPath));
-      inlineContentBytes = inlineOrDigest(
-          content,
-          policy,
-          contents,
-          inlineContentBytes,
-          workerContext.getInlineContentLimit(),
-          () -> outputFileBuilder.setContent(content),
-          (fileContent) -> outputFileBuilder.setDigest(getDigestUtil().compute(fileContent)));
-    }
-
-    /* put together our outputs and update the result */
-    inlineContentBytes += updateActionResultStdOutputs(resultBuilder, contents, inlineContentBytes);
-
+    ActionResult.Builder resultBuilder = executeResponse.getResult().toBuilder();
+    Status.Builder status = executeResponse.getStatus().toBuilder();
     try {
-      workerContext.putAllBlobs(contents.build());
+      uploadOutputs(
+          resultBuilder,
+          operationContext.execDir,
+          operationContext.action.getOutputFilesList(),
+          operationContext.action.getOutputDirectoriesList());
+    } catch (IllegalStateException e) {
+      status
+          .setCode(Code.FAILED_PRECONDITION.getNumber())
+          .setMessage(e.getMessage());
     } catch (IOException ex) {
       poller.stop();
       return null;
@@ -216,9 +207,9 @@ public class ReportResultStage extends PipelineStage {
     Operation operation = operationContext.operation.toBuilder()
         .setDone(true)
         .setMetadata(Any.pack(metadata))
-        .setResponse(Any.pack(ExecuteResponse.newBuilder()
+        .setResponse(Any.pack(executeResponse.toBuilder()
             .setResult(result)
-            .setCachedResult(false)
+            .setStatus(status)
             .build()))
         .build();
 

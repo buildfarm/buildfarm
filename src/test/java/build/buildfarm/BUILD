@@ -37,8 +37,10 @@ java_test(
         "//3rdparty/jvm/com/google/jimfs",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "//3rdparty/jvm/com/google/truth",
+        "//3rdparty/jvm/org/mockito:mockito_core",
         "//src/main/java/build/buildfarm:common",
         "//src/main/java/build/buildfarm:instance",
+        "//src/main/java/build/buildfarm:stub-instance",
         "//src/main/java/build/buildfarm:worker",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
@@ -82,6 +84,19 @@ java_test(
         ":test_runner",
         "//src/main/java/build/buildfarm:operationqueue-worker",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+    ],
+)
+
+java_test(
+    name = "instance-tests",
+    size = "small",
+    srcs = glob(["instance/*.java"]),
+    test_class = "build.buildfarm.AllTests",
+    deps = [
+        ":test_runner",
+        "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/com/google/truth",
+        "//src/main/java/build/buildfarm:server-instance",
     ],
 )
 
