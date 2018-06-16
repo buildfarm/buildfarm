@@ -149,12 +149,10 @@ public class ReportResultStage extends PipelineStage {
         chunker = new Chunker(file, digest);
       } else {
         chunker = digestToChunkers.get(digest);
-        if (chunker == null) {
-          String message = "FindMissingBlobs call returned an unknown digest: " + digest;
-          throw new IOException(message);
-        }
       }
-      filesToUpload.add(chunker);
+      if (chunker != null) {
+        filesToUpload.add(chunker);
+      }
     }
 
     if (!filesToUpload.isEmpty()) {
