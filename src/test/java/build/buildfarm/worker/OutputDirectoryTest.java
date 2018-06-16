@@ -89,4 +89,11 @@ public class OutputDirectoryTest {
     assertThat(outputDirectory.isLeaf()).isFalse();
     assertThat(outputDirectory.getChild("foo").isLeaf()).isFalse();
   }
+
+  @Test(expected=IllegalArgumentException.class)
+  public void duplicateDirectorySeparatorIsInvalid() {
+    OutputDirectory outputDirectory = OutputDirectory.parse(
+        ImmutableList.<String>of(),
+        ImmutableList.<String>of("a//b"));
+  }
 }
