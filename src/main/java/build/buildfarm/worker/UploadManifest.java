@@ -295,17 +295,20 @@ class UploadManifest {
   private static Dirent.Type direntTypeFromStat(FileStatus stat) {
     if (stat == null) {
       return Dirent.Type.UNKNOWN;
-    } else if (stat.isSpecialFile()) {
-      return Dirent.Type.UNKNOWN;
-    } else if (stat.isFile()) {
-      return Dirent.Type.FILE;
-    } else if (stat.isDirectory()) {
-      return Dirent.Type.DIRECTORY;
-    } else if (stat.isSymbolicLink()) {
-      return Dirent.Type.SYMLINK;
-    } else {
+    }
+    if (stat.isSpecialFile()) {
       return Dirent.Type.UNKNOWN;
     }
+    if (stat.isFile()) {
+      return Dirent.Type.FILE;
+    }
+    if (stat.isDirectory()) {
+      return Dirent.Type.DIRECTORY;
+    }
+    if (stat.isSymbolicLink()) {
+      return Dirent.Type.SYMLINK;
+    }
+    return Dirent.Type.UNKNOWN;
   }
 
   private List<Dirent> readdir(Path path, boolean followSymlinks) throws IOException {
