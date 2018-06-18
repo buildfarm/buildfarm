@@ -270,7 +270,6 @@ public class CASFileCache {
     }
   }
 
-  /** must be called in synchronized context */
   private void fetchDirectory(
       Digest containingDirectory,
       Path path,
