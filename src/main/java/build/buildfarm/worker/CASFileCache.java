@@ -242,7 +242,7 @@ public class CASFileCache {
   private void expireDirectory(Digest digest) throws IOException {
     DirectoryEntry e = directoryStorage.remove(digest);
     purgeDirectoryFromInputs(digest, e.inputs);
-    CASFileCache.removeDirectory(getDirectoryPath(digest));
+    removeDirectory(getDirectoryPath(digest));
   }
 
   /** must be called in synchronized context */
@@ -318,7 +318,7 @@ public class CASFileCache {
         purgeDirectoryFromInputs(digest, inputs);
         decrementReferencesSynchronized(inputs, ImmutableList.<Digest>of());
       }
-      CASFileCache.removeDirectory(path);
+      removeDirectory(path);
       throw e;
     }
 
