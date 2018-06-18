@@ -17,6 +17,8 @@ package build.buildfarm.worker;
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 
 import build.buildfarm.common.DigestUtil;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.devtools.remoteexecution.v1test.Digest;
@@ -243,6 +245,31 @@ public class CASFileCache {
     }
   }
 
+  public void putFiles(
+      Iterable<FileNode> files,
+      Path path,
+      ImmutableList.Builder<Path> inputsBuilder) throws IOException, InterruptedException {
+    putDirectoryFiles(files, path, /* containingDirectory=*/ null, inputsBuilder);
+  }
+
+  private void putDirectoryFiles(
+      Iterable<FileNode> files,
+      Path path,
+      Digest containingDirectory,
+      ImmutableList.Builder<Path> inputsBuilder) throws IOException, InterruptedException {
+    for (FileNode fileNode : files) {
+      Path filePath = path.resolve(fileNode.getName());
+      if (fileNode.getDigest().getSizeBytes() != 0) {
+        Path fileCacheKey = put(fileNode.getDigest(), fileNode.getIsExecutable(), containingDirectory);
+        // FIXME this can die with 'too many links'... needs some cascading fallout
+        Files.createLink(filePath, fileCacheKey);
+        inputsBuilder.add(fileCacheKey);
+      } else {
+        Files.createFile(filePath);
+      }
+    }
+  }
+
   /** must be called in synchronized context */
   private void fetchDirectory(
       Digest containingDirectory,
@@ -252,16 +279,7 @@ public class CASFileCache {
       ImmutableList.Builder<Path> inputsBuilder) throws IOException, InterruptedException {
     Directory directory = directoriesIndex.get(digest);
     Files.createDirectory(path);
-    for (FileNode fileNode : directory.getFilesList()) {
-      if (fileNode.getDigest().getSizeBytes() != 0) {
-        Path fileCacheKey = put(fileNode.getDigest(), fileNode.getIsExecutable(), containingDirectory);
-        // FIXME this can die with 'too many links'... needs some cascading fallout
-        Files.createLink(path.resolve(fileNode.getName()), fileCacheKey);
-        inputsBuilder.add(fileCacheKey);
-      } else {
-        Files.createFile(path.resolve(fileNode.getName()));
-      }
-    }
+    putDirectoryFiles(directory.getFilesList(), path, containingDirectory, inputsBuilder);
     for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
       fetchDirectory(
           containingDirectory,
@@ -293,7 +311,14 @@ public class CASFileCache {
     return path;
   }
 
-  public Path put(Digest digest, boolean isExecutable, Digest containingDirectory) throws IOException, InterruptedException {
+  @VisibleForTesting
+  public Path put(Digest digest, boolean isExecutable) throws IOException, InterruptedException {
+    return put(digest, isExecutable, /* containingDirectory=*/ null);
+  }
+
+  private Path put(Digest digest, boolean isExecutable, Digest containingDirectory) throws IOException, InterruptedException {
+    Preconditions.checkState(digest.getSizeBytes() > 0, "file entries may not be empty");
+
     Path key = getKey(digest, isExecutable);
     ImmutableList.Builder<Path> expiredKeys = null;
 
@@ -323,17 +348,17 @@ public class CASFileCache {
       }
     }
 
-    Path tmpPath;
-    long copySize;
+    Path tmpPath = key.resolveSibling(key.getFileName() + ".tmp");
     try (InputStream in = inputStreamFactory.apply(digest)) {
       // FIXME make a validating file copy object and verify digest
-      tmpPath = key.resolveSibling(key.getFileName() + ".tmp");
-      copySize = Files.copy(in, tmpPath);
-    }
-
-    if (copySize != digest.getSizeBytes()) {
-      Files.delete(tmpPath);
-      return null;
+      long copySize = Files.copy(in, tmpPath);
+      if (copySize != digest.getSizeBytes()) {
+        Files.delete(tmpPath);
+        throw new IOException(String.format(
+            "invalid size copied for %s: was %d",
+            DigestUtil.toString(digest),
+            copySize));
+      }
     }
     setPermissions(tmpPath, isExecutable);
     Files.move(tmpPath, key, REPLACE_EXISTING);

@@ -225,16 +225,7 @@ public class Worker {
       throw new IOException("Directory " + DigestUtil.toString(inputRoot) + " is not in input index");
     }
 
-    for (FileNode fileNode : directory.getFilesList()) {
-      Path execPath = execDir.resolve(fileNode.getName());
-      Path fileCacheKey = fileCache.put(fileNode.getDigest(), fileNode.getIsExecutable(), /* containingDirectory=*/ null);
-      if (fileCacheKey == null) {
-        throw new IOException("InputFetchStage: Failed to create cache entry for " + execPath);
-      }
-      inputFiles.add(fileCacheKey);
-      Files.createLink(execPath, fileCacheKey);
-    }
-
+    fileCache.putFiles(directory.getFilesList(), execDir, inputFiles);
     for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
       Digest digest = directoryNode.getDigest();
       String name = directoryNode.getName();
