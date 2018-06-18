@@ -318,7 +318,12 @@ public class CASFileCache {
         purgeDirectoryFromInputs(digest, inputs);
         decrementReferencesSynchronized(inputs, ImmutableList.<Digest>of());
       }
-      removeDirectory(path);
+      try {
+        removeDirectory(path);
+      } catch (IOException rmdirEx) {
+        // unexpected failure removing directory, log and maintain original exception
+        rmdirEx.printStackTrace();
+      }
       throw e;
     }
 
