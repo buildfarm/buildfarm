@@ -270,7 +270,6 @@ public class CASFileCache {
     }
   }
 
-  /** must be called in synchronized context */
   private void fetchDirectory(
       Digest containingDirectory,
       Path path,
@@ -290,21 +289,23 @@ public class CASFileCache {
     }
   }
 
-  public synchronized Path putDirectory(
+  public Path putDirectory(
       Digest digest,
       Map<Digest, Directory> directoriesIndex) throws IOException, InterruptedException {
     Path path = getDirectoryPath(digest);
 
-    DirectoryEntry e = directoryStorage.get(digest);
-    if (e != null) {
-      incrementReferences(e.inputs);
-      return path;
+    synchronized (this) {
+      DirectoryEntry e = directoryStorage.get(digest);
+      if (e != null) {
+        incrementReferences(e.inputs);
+        return path;
+      }
     }
 
     ImmutableList.Builder<Path> inputsBuilder = new ImmutableList.Builder<>();
     fetchDirectory(digest, path, digest, directoriesIndex, inputsBuilder);
 
-    e = new DirectoryEntry(directoriesIndex.get(digest), inputsBuilder.build());
+    DirectoryEntry e = new DirectoryEntry(directoriesIndex.get(digest), inputsBuilder.build());
 
     directoryStorage.put(digest, e);
 
