@@ -481,11 +481,6 @@ public abstract class AbstractServerInstance implements Instance {
         ExecuteOperationMetadata.Stage.EXECUTING;
   }
 
-  protected boolean isComplete(Operation operation) {
-    return expectExecuteOperationMetadata(operation).getStage() ==
-        ExecuteOperationMetadata.Stage.COMPLETED;
-  }
-
   abstract protected boolean matchOperation(Operation operation);
   abstract protected void enqueueOperation(Operation operation);
 
