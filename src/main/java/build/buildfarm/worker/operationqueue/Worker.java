@@ -232,7 +232,7 @@ public class Worker {
       throw new IOException("Directory " + DigestUtil.toString(inputRoot) + " is not in input index");
     }
 
-    fileCache.putDirectoryFiles(directory.getFilesList(), execDir, inputFiles);
+    fileCache.putFiles(directory.getFilesList(), execDir, inputFiles);
     for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
       Digest digest = directoryNode.getDigest();
       String name = directoryNode.getName();

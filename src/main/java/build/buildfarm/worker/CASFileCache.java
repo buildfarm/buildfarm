@@ -245,7 +245,7 @@ public class CASFileCache {
     }
   }
 
-  public void putDirectoryFiles(
+  public void putFiles(
       Iterable<FileNode> files,
       Path path,
       ImmutableList.Builder<Path> inputsBuilder) throws IOException, InterruptedException {
