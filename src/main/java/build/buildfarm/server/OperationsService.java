@@ -119,8 +119,14 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
       return;
     }
 
-    instance.cancelOperation(request.getName());
-    responseObserver.onNext(Empty.getDefaultInstance());
-    responseObserver.onCompleted();
+    try {
+      instance.cancelOperation(request.getName());
+      responseObserver.onNext(Empty.getDefaultInstance());
+      responseObserver.onCompleted();
+    } catch (IllegalStateException e) {
+      responseObserver.onError(Status.FAILED_PRECONDITION
+          .withDescription(e.getMessage())
+          .asException());
+    }
   }
 }

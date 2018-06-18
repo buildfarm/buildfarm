@@ -262,19 +262,25 @@ public class MemoryInstance extends AbstractServerInstance {
 
   private void onDispatched(Operation operation) {
     Duration timeout = config.getOperationPollTimeout();
-    Watchdog requeuer = new Watchdog(timeout, () -> putOperation(operation));
+    Watchdog requeuer = new Watchdog(timeout, () -> {
+      Action action = expectAction(operation);
+      validateAction(action);
+      putOperation(operation);
+    });
     requeuers.put(operation.getName(), requeuer);
     new Thread(requeuer).start();
   }
 
   @Override
   protected boolean matchOperation(Operation operation) {
+    Action action = expectAction(operation);
+
     ImmutableList.Builder<Worker> rejectedWorkers = new ImmutableList.Builder<>();
     boolean dispatched = false;
     synchronized(workers) {
       while (!dispatched && !workers.isEmpty()) {
         Worker worker = workers.remove(0);
-        if (!satisfiesRequirements(worker.getPlatform(), operation)) {
+        if (!satisfiesRequirements(worker.getPlatform(), action)) {
           rejectedWorkers.add(worker);
         } else {
           // worker onMatch false return indicates inviability
@@ -295,15 +301,21 @@ public class MemoryInstance extends AbstractServerInstance {
       boolean matched = false;
       while (!matched && !queuedOperations.isEmpty()) {
         Operation operation = queuedOperations.remove(0);
-        if (satisfiesRequirements(platform, operation)) {
-          matched = true;
-          if (onMatch.test(operation)) {
-            onDispatched(operation);
-          } else if (!requeueOnFailure) {
+        try {
+          Action action = expectAction(operation);
+          if (satisfiesRequirements(platform, action)) {
+            matched = true;
+            if (onMatch.test(operation)) {
+              onDispatched(operation);
+            } else if (!requeueOnFailure) {
+              rejectedOperations.add(operation);
+            }
+          } else {
             rejectedOperations.add(operation);
           }
-        } else {
-          rejectedOperations.add(operation);
+        } catch (IllegalStateException e) {
+          // do not requeue
+          e.printStackTrace();
         }
       }
       Iterables.addAll(queuedOperations, rejectedOperations.build());
@@ -315,8 +327,7 @@ public class MemoryInstance extends AbstractServerInstance {
     }
   }
 
-  private boolean satisfiesRequirements(Platform platform, Operation operation) {
-    Action action = expectAction(operation);
+  private boolean satisfiesRequirements(Platform platform, Action action) {
     // string compare only
     // no duplicate names
     ImmutableMap.Builder<String, String> provisionsBuilder =

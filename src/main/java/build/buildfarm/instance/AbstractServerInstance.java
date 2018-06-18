@@ -444,28 +444,25 @@ public abstract class AbstractServerInstance implements Instance {
     }
   }
 
-  protected Action expectAction(Operation operation) {
-    ByteString actionBlob = getBlob(
-        expectExecuteOperationMetadata(operation).getActionDigest());
-    if (actionBlob == null) {
-      return null;
-    }
+  protected Action expectAction(Operation operation) throws IllegalStateException {
+    Digest actionDigest = expectExecuteOperationMetadata(operation).getActionDigest();
+    ByteString actionBlob = getBlob(actionDigest);
+    Preconditions.checkState(actionBlob != null, "missing action digest: " + actionDigest);
     try {
       return Action.parseFrom(actionBlob);
-    } catch(InvalidProtocolBufferException ex) {
-      return null;
+    } catch (InvalidProtocolBufferException e) {
+      throw new IllegalStateException(e);
     }
   }
 
-  protected Directory expectDirectory(Digest directoryBlobDigest) {
+  protected Directory expectDirectory(Digest directoryDigest) throws IllegalStateException {
+    ByteString directoryBlob = getBlob(directoryDigest);
+    Preconditions.checkState(directoryBlob != null, "missing directory digest: " + directoryDigest);
     try {
-      ByteString directoryBlob = getBlob(directoryBlobDigest);
-      if (directoryBlob != null) {
-        return Directory.parseFrom(directoryBlob);
-      }
-    } catch(InvalidProtocolBufferException ex) {
+      return Directory.parseFrom(directoryBlob);
+    } catch (InvalidProtocolBufferException e) {
+      throw new IllegalStateException(e);
     }
-    return null;
   }
 
   protected boolean isCancelled(Operation operation) {
@@ -634,9 +631,6 @@ public abstract class AbstractServerInstance implements Instance {
       return false;
     }
     ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
-    if (metadata == null) {
-      return false;
-    }
     // stage limitation to {QUEUED, EXECUTING} above is required
     if (metadata.getStage() != stage) {
       return false;

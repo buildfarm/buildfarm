@@ -88,12 +88,18 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
       return;
     }
 
-    boolean ok = instance.putOperation(operation);
-    Code code = ok ? Code.OK : Code.UNAVAILABLE;
-    responseObserver.onNext(com.google.rpc.Status.newBuilder()
-        .setCode(code.getNumber())
-        .build());
-    responseObserver.onCompleted();
+    try {
+      boolean ok = instance.putOperation(operation);
+      Code code = ok ? Code.OK : Code.UNAVAILABLE;
+      responseObserver.onNext(com.google.rpc.Status.newBuilder()
+          .setCode(code.getNumber())
+          .build());
+      responseObserver.onCompleted();
+    } catch (IllegalStateException e) {
+      responseObserver.onError(Status.FAILED_PRECONDITION
+          .withDescription(e.getMessage())
+          .asException());
+    }
   }
 
   @Override
@@ -109,13 +115,19 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
       return;
     }
 
-    boolean ok = instance.pollOperation(
-        request.getOperationName(),
-        request.getStage());
-    Code code = ok ? Code.OK : Code.UNAVAILABLE;
-    responseObserver.onNext(com.google.rpc.Status.newBuilder()
-        .setCode(code.getNumber())
-        .build());
-    responseObserver.onCompleted();
+    try {
+      boolean ok = instance.pollOperation(
+          request.getOperationName(),
+          request.getStage());
+      Code code = ok ? Code.OK : Code.UNAVAILABLE;
+      responseObserver.onNext(com.google.rpc.Status.newBuilder()
+          .setCode(code.getNumber())
+          .build());
+      responseObserver.onCompleted();
+    } catch (IllegalStateException e) {
+      responseObserver.onError(Status.FAILED_PRECONDITION
+          .withDescription(e.getMessage())
+          .asException());
+    }
   }
 }
