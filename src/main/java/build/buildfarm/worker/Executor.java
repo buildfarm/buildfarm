@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker;
 
+import build.buildfarm.common.DigestUtil;
 import com.google.common.io.ByteStreams;
 import com.google.devtools.remoteexecution.v1test.ActionResult;
 import com.google.devtools.remoteexecution.v1test.Command;
@@ -31,6 +32,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
 
 class Executor implements Runnable {
   private final WorkerContext workerContext;
@@ -45,13 +47,28 @@ class Executor implements Runnable {
     this.owner = owner;
   }
 
+  private void log(Level level, String message) {
+    workerContext.log(level, String.format(
+        "Executor %s (ActionDigest=%s): %s",
+        operationContext.operation.getName(),
+        DigestUtil.toString(workerContext.getDigestUtil().compute(operationContext.action)),
+        message));
+  }
+
   private void runInterruptible() throws InterruptedException {
     ByteString commandBlob = workerContext.getBlob(operationContext.action.getCommandDigest());
     Command command = null;
-    if (commandBlob != null) {
+    if (commandBlob == null) {
+      log(Level.INFO, String.format(
+          "Command %s is missing",
+          DigestUtil.toString(operationContext.action.getCommandDigest())));
+    } else {
       try {
         command = Command.parseFrom(commandBlob);
       } catch (InvalidProtocolBufferException ex) {
+        log(Level.INFO, String.format("Command %s is invalid: %s",
+            DigestUtil.toString(operationContext.action.getCommandDigest()),
+            ex.getMessage()));
       }
     }
 

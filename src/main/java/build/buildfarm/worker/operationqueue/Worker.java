@@ -75,6 +75,7 @@ import java.util.Stack;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.function.Predicate;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
 
@@ -342,6 +343,11 @@ public class Worker {
             config.getPlatform(),
             config.getRequeueOnFailure(),
             onMatch);
+      }
+
+      @Override
+      public void log(Level level, String message) {
+        logger.log(level, message);
       }
 
       @Override

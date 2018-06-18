@@ -29,11 +29,13 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Path;
 import java.util.function.Predicate;
+import java.util.logging.Level;
 
 public interface WorkerContext {
   Poller createPoller(String name, String operationName, Stage stage);
   Poller createPoller(String name, String operationName, Stage stage, Runnable onFailure);
   void match(Predicate<Operation> onMatch) throws InterruptedException;
+  void log(Level level, String msg);
   CASInsertionPolicy getFileCasPolicy();
   CASInsertionPolicy getStdoutCasPolicy();
   CASInsertionPolicy getStderrCasPolicy();

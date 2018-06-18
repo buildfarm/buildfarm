@@ -29,11 +29,13 @@ import com.google.protobuf.Duration;
 import java.io.OutputStream;
 import java.nio.file.Path;
 import java.util.function.Predicate;
+import java.util.logging.Level;
 
 class StubWorkerContext implements WorkerContext {
   @Override public Poller createPoller(String name, String operationName, Stage stage) { throw new UnsupportedOperationException(); }
   @Override public Poller createPoller(String name, String operationName, Stage stage, Runnable onFailure) { throw new UnsupportedOperationException(); }
   @Override public void match(Predicate<Operation> onMatch) { throw new UnsupportedOperationException(); }
+  @Override public void log(Level level, String message) { throw new UnsupportedOperationException(); }
   @Override public CASInsertionPolicy getFileCasPolicy() { throw new UnsupportedOperationException(); }
   @Override public CASInsertionPolicy getStdoutCasPolicy() { throw new UnsupportedOperationException(); }
   @Override public CASInsertionPolicy getStderrCasPolicy() { throw new UnsupportedOperationException(); }
