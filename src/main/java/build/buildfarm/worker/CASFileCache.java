@@ -189,7 +189,8 @@ public class CASFileCache {
     return root.resolve(filename);
   }
 
-  private Path getDirectoryPath(Digest digest) {
+  @VisibleForTesting
+  public Path getDirectoryPath(Digest digest) {
     return root.resolve(digestFilename(digest));
   }
 

@@ -48,6 +48,19 @@ class CASFileCacheTest {
     this.root = root;
   }
 
+  private static final class BrokenInputStream extends InputStream {
+    private final IOException exception;
+
+    public BrokenInputStream(IOException exception) {
+      this.exception = exception;
+    }
+
+    @Override
+    public int read() throws IOException {
+      throw exception;
+    }
+  }
+
   @Before
   public void setUp() {
     digestUtil = new DigestUtil(HashFunction.SHA256);
@@ -56,7 +69,11 @@ class CASFileCacheTest {
         new InputStreamFactory() {
           @Override
           public InputStream apply(Digest digest) {
-            return blobs.get(digest).newInput();
+            ByteString content = blobs.get(digest);
+            if (content == null) {
+              return new BrokenInputStream(new IOException("NOT_FOUND"));
+            }
+            return content.newInput();
           }
         },
         root,
@@ -131,6 +148,41 @@ class CASFileCacheTest {
     assertThat(Files.isDirectory(dirPath)).isTrue();
     assertThat(Files.exists(dirPath.resolve("file"))).isTrue();
     assertThat(Files.isDirectory(dirPath.resolve("subdir"))).isTrue();
+  }
+
+  @Test
+  public void putDirectoryIOExceptionRollsBack() throws IOException, InterruptedException {
+    ByteString file = ByteString.copyFromUtf8("Peanut Butter");
+    Digest fileDigest = Digest.newBuilder()
+        .setHash("file")
+        .setSizeBytes(file.size())
+        .build();
+    // omitting blobs.put to incur IOException
+    Directory subDirectory = Directory.newBuilder().build();
+    Digest subdirDigest = Digest.newBuilder().setHash("subdir").build();
+    Directory directory = Directory.newBuilder()
+        .addFiles(FileNode.newBuilder()
+            .setName("file")
+            .setDigest(fileDigest)
+            .build())
+        .addDirectories(DirectoryNode.newBuilder()
+            .setName("subdir")
+            .setDigest(subdirDigest)
+            .build())
+        .build();
+    Digest dirDigest = Digest.newBuilder().setHash("test").build();
+    Map<Digest, Directory> directoriesIndex = ImmutableMap.of(
+        dirDigest, directory,
+        subdirDigest, subDirectory);
+    boolean exceptionHandled = false;
+    try {
+      fileCache.putDirectory(dirDigest, directoriesIndex);
+    } catch (IOException e) {
+      assertThat(e.getMessage()).isEqualTo("NOT_FOUND");
+      exceptionHandled = true;
+    }
+    assertThat(exceptionHandled).isTrue();
+    assertThat(Files.exists(fileCache.getDirectoryPath(dirDigest))).isFalse();
   }
 
   @Test
