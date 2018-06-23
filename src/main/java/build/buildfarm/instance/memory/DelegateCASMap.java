@@ -60,47 +60,8 @@ class DelegateCASMap<K,V extends Message> {
     return expectValueType(valueDigest);
   }
 
-  public boolean isEmpty() {
-    return digestMap.isEmpty();
-  }
-
-  public int size() {
-    return digestMap.size();
-  }
-
   public boolean containsKey(Object key) {
     return digestMap.get(key) != null;
-  }
-
-  public boolean containsValue(Object value) {
-    Preconditions.checkState(value instanceof Message);
-    return contentAddressableStorage.contains(digestUtil.compute((Message) value));
-  }
-
-  public Set<Map.Entry<K, V>> entrySet() {
-    return delegate().entrySet();
-  }
-
-  public Collection<V> values() {
-    return delegate().values();
-  }
-
-  public Set<K> keySet() {
-    return digestMap.keySet();
-  }
-
-  public void clear() {
-    digestMap.clear();
-  }
-
-  public void putAll(Map<? extends K,? extends V> m) throws InterruptedException {
-    Map<? extends K, Blob> blobs = Maps.transformValues(
-        m,
-        (value) -> new Blob(value.toByteString(), digestUtil));
-    for (Blob blob : blobs.values()) {
-      contentAddressableStorage.put(blob);
-    }
-    digestMap.putAll(Maps.transformValues(blobs, (blob) -> blob.getDigest()));
   }
 
   public V remove(Object key) {
@@ -118,11 +79,5 @@ class DelegateCASMap<K,V extends Message> {
     } catch (InvalidProtocolBufferException ex) {
       return null;
     }
-  }
-
-  private Map<K, V> delegate() {
-    return Maps.transformValues(
-        digestMap,
-        (valueDigest) -> expectValueType(valueDigest));
   }
 }
