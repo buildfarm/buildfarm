@@ -32,7 +32,7 @@ class DelegateCASMap<K,V extends Message> {
   private final ContentAddressableStorage contentAddressableStorage;
   private final Parser<V> parser;
   private final DigestUtil digestUtil;
-  private final Map<K, Digest> digestMap;
+  private final Map<K, Digest> digestMap = new ConcurrentHashMap<>();
 
   public DelegateCASMap(
       ContentAddressableStorage contentAddressableStorage,
@@ -41,7 +41,6 @@ class DelegateCASMap<K,V extends Message> {
     this.contentAddressableStorage = contentAddressableStorage;
     this.parser = parser;
     this.digestUtil = digestUtil;
-    digestMap = new ConcurrentHashMap<>();
   }
 
   public V put(K key, V value) throws InterruptedException {
