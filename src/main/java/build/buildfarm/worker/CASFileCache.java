@@ -155,6 +155,10 @@ public class CASFileCache {
   }
 
   public synchronized void decrementReferences(Iterable<Path> inputFiles, Iterable<Digest> inputDirectories) {
+    decrementReferencesSynchronized(inputFiles, inputDirectories);
+  }
+
+  private void decrementReferencesSynchronized(Iterable<Path> inputFiles, Iterable<Digest> inputDirectories) {
     // decrement references and notify if any dropped to 0
     // insert after the last 0-reference count entry in list
     boolean entriesMadeAvailable = false;
@@ -185,7 +189,8 @@ public class CASFileCache {
     return root.resolve(filename);
   }
 
-  private Path getDirectoryPath(Digest digest) {
+  @VisibleForTesting
+  public Path getDirectoryPath(Digest digest) {
     return root.resolve(digestFilename(digest));
   }
 
@@ -224,18 +229,21 @@ public class CASFileCache {
   }
 
   /** must be called in synchronized context */
-  private void expireDirectory(Digest digest) throws IOException {
-    DirectoryEntry e = directoryStorage.remove(digest);
-    Path path = getDirectoryPath(digest);
-
-    for (Path input : e.inputs) {
+  private void purgeDirectoryFromInputs(Digest digest, Iterable<Path> inputs) {
+    for (Path input : inputs) {
       Entry fileEntry = storage.get(input);
 
       if (fileEntry != null) {
         fileEntry.containingDirectories.remove(digest);
       }
     }
-    removeDirectory(path);
+  }
+
+  /** must be called in synchronized context */
+  private void expireDirectory(Digest digest) throws IOException {
+    DirectoryEntry e = directoryStorage.remove(digest);
+    purgeDirectoryFromInputs(digest, e.inputs);
+    removeDirectory(getDirectoryPath(digest));
   }
 
   /** must be called in synchronized context */
@@ -303,7 +311,22 @@ public class CASFileCache {
     }
 
     ImmutableList.Builder<Path> inputsBuilder = new ImmutableList.Builder<>();
-    fetchDirectory(digest, path, digest, directoriesIndex, inputsBuilder);
+    try {
+      fetchDirectory(digest, path, digest, directoriesIndex, inputsBuilder);
+    } catch (IOException e) {
+      ImmutableList<Path> inputs = inputsBuilder.build();
+      synchronized (this) {
+        purgeDirectoryFromInputs(digest, inputs);
+        decrementReferencesSynchronized(inputs, ImmutableList.<Digest>of());
+      }
+      try {
+        removeDirectory(path);
+      } catch (IOException rmdirEx) {
+        // unexpected failure removing directory, log and maintain original exception
+        rmdirEx.printStackTrace();
+      }
+      throw e;
+    }
 
     DirectoryEntry e = new DirectoryEntry(directoriesIndex.get(digest), inputsBuilder.build());
 
