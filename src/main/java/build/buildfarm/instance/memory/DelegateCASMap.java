@@ -18,8 +18,11 @@ import build.buildfarm.common.ContentAddressableStorage;
 import build.buildfarm.common.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
 import com.google.common.base.Preconditions;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.Maps;
 import com.google.devtools.remoteexecution.v1test.Digest;
+import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Message;
 import com.google.protobuf.Parser;
@@ -27,12 +30,16 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 class DelegateCASMap<K,V extends Message> implements Map<K,V> {
   private final ContentAddressableStorage contentAddressableStorage;
   private final Parser<V> parser;
   private final DigestUtil digestUtil;
-  private final Map<K, Digest> digestMap;
+  private final Map<K, Digest> digestMap = new ConcurrentHashMap<>();
+  private final Cache<K, Digest> emptyCache = CacheBuilder.newBuilder()
+      .expireAfterWrite(5, TimeUnit.MINUTES)
+      .build();
 
   public DelegateCASMap(
       ContentAddressableStorage contentAddressableStorage,
@@ -41,20 +48,26 @@ class DelegateCASMap<K,V extends Message> implements Map<K,V> {
     this.contentAddressableStorage = contentAddressableStorage;
     this.parser = parser;
     this.digestUtil = digestUtil;
-    digestMap = new ConcurrentHashMap<>();
   }
 
   @Override
   public V put(K key, V value) {
     Blob blob = new Blob(value.toByteString(), digestUtil);
-    digestMap.put(key, blob.getDigest());
-    contentAddressableStorage.put(blob, () -> digestMap.remove(key));
+    if (blob.size() == 0) {
+      emptyCache.put(key, blob.getDigest());
+    } else {
+      digestMap.put(key, blob.getDigest());
+      contentAddressableStorage.put(blob, () -> digestMap.remove(key));
+    }
     return value;
   }
 
   @Override
   public V get(Object key) {
     Digest valueDigest = digestMap.get(key);
+    if (valueDigest == null) {
+      valueDigest = emptyCache.getIfPresent(key);
+    }
     if (valueDigest == null) {
       return null;
     }
@@ -74,7 +87,7 @@ class DelegateCASMap<K,V extends Message> implements Map<K,V> {
 
   @Override
   public boolean containsKey(Object key) {
-    return digestMap.get(key) != null;
+    return digestMap.containsKey(key) || emptyCache.getIfPresent(key) != null;
   }
 
   @Override
@@ -117,11 +130,19 @@ class DelegateCASMap<K,V extends Message> implements Map<K,V> {
   @Override
   public V remove(Object key) {
     Digest valueDigest = digestMap.remove(key);
+    if (valueDigest == null) {
+      emptyCache.invalidate(key);
+      valueDigest = digestUtil.empty();
+    }
     return expectValueType(valueDigest);
   }
 
   private V expectValueType(Digest valueDigest) {
     try {
+      if (valueDigest.getSizeBytes() == 0) {
+        return parser.parseFrom(ByteString.EMPTY);
+      }
+
       Blob blob = contentAddressableStorage.get(valueDigest);
       if (blob == null) {
         return null;
