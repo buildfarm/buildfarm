@@ -274,8 +274,8 @@ public class ShardInstance extends AbstractServerInstance {
         Status status = Status.fromThrowable(e);
         if (status.getCode() == Code.UNAVAILABLE) {
           removeMalfunctioningWorker(worker, e, String.format("checkMissingBlobs(%s)", DigestUtil.toString(digest)));
-        } else if (status.getCode() == Code.CANCELLED && Context.current().isCancelled()) {
-          // do nothing further if we're cancelled
+        } else if (Context.current().isCancelled()) {
+          // do nothing further if we're cancelled or timed out
           throw e;
         } else {
           e.printStackTrace();
@@ -329,7 +329,7 @@ public class ShardInstance extends AbstractServerInstance {
         Status status = Status.fromThrowable(e);
         if (status.getCode() == Code.UNAVAILABLE) {
           removeMalfunctioningWorker(worker, e, "findMissingBlobs(...)");
-        } else if (status.getCode() == Code.CANCELLED && Context.current().isCancelled()) {
+        } else if (Context.current().isCancelled()) {
           // do nothing further if we're cancelled
           throw e;
         } else {
@@ -371,7 +371,7 @@ public class ShardInstance extends AbstractServerInstance {
       }
     } catch (StatusRuntimeException e) {
       Status status = Status.fromThrowable(e);
-      if (status.getCode() == Code.CANCELLED && Context.current().isCancelled()) {
+      if (Context.current().isCancelled()) {
         throw e;
       }
       if (status.getCode() == Code.UNAVAILABLE) {
@@ -522,7 +522,7 @@ public class ShardInstance extends AbstractServerInstance {
         Status status = Status.fromThrowable(e);
         if (status.getCode() == Code.UNAVAILABLE) {
           removeMalfunctioningWorker(worker, e, "putBlob(" + DigestUtil.toString(digestUtil.compute(blob)) + ")");
-        } else if (status.getCode() == Code.CANCELLED && Context.current().isCancelled()) {
+        } else if (Context.current().isCancelled()) {
           throw e;
         } else {
           e.printStackTrace();
