@@ -62,10 +62,14 @@ import redis.clients.jedis.exceptions.JedisConnectionException;
 public class RedisShardBackplane implements ShardBackplane {
   private final RedisShardBackplaneConfig config;
   private final Map<String, List<Predicate<Operation>>> watchers = new ConcurrentHashMap<>();
-  private final JedisPool pool;
-  private final Thread subscriptionThread;
   private final Function<Operation, Operation> onPublish;
   private final Function<Operation, Operation> onComplete;
+  private final Runnable onUnsubscribe;
+  private final URI redisURI;
+
+  private Thread subscriptionThread = null;
+  private RedisShardSubscription operationSubscription = null;
+  private JedisPool pool = null;
 
   private Set<String> workerSet = null;
   private long workerSetExpiresAt = 0;
@@ -86,77 +90,92 @@ public class RedisShardBackplane implements ShardBackplane {
     this.config = config;
     this.onPublish = onPublish;
     this.onComplete = onComplete;
+    this.onUnsubscribe = onUnsubscribe;
 
-    URI redisURI;
     try {
       redisURI = new URI(config.getRedisUri());
     } catch (URISyntaxException e) {
       throw new ConfigurationException(e.getMessage());
     }
+  }
 
+  private void startPool() {
     JedisPoolConfig jedisPoolConfig = new JedisPoolConfig();
     jedisPoolConfig.setMaxTotal(128);
+    // no explicit start, has to be object lifetime...
     pool = new JedisPool(jedisPoolConfig, redisURI, /* connectionTimeout=*/ 30000, /* soTimeout=*/ 30000);
+  }
 
-    if (config.getSubscribeToOperation()) {
-      JedisPubSub operationSubscriber = new JedisPubSub() {
-        @Override
-        public void onMessage(String channel, String message) {
-          Operation operation = message == null
-              ? null : parseOperationJson(message);
-          String operationName = message == null
-              ? channel : operation.getName();
-          synchronized (watchers) {
-            List<Predicate<Operation>> operationWatchers =
-                watchers.get(operationName);
-            if (operationWatchers == null)
-              return;
-            if (operation == null || operation.getDone()) {
-              watchers.remove(operationName);
-            }
-            long unfilteredWatcherCount = operationWatchers.size();
-            ImmutableList.Builder<Predicate<Operation>> filteredWatchers = new ImmutableList.Builder<>();
-            long filteredWatcherCount = 0;
-            for (Predicate<Operation> watcher : operationWatchers) {
-              if (watcher.test(operation)) {
-                filteredWatchers.add(watcher);
-                filteredWatcherCount++;
-              }
-            }
-            if (operation != null && !operation.getDone() && filteredWatcherCount != unfilteredWatcherCount) {
-              operationWatchers = new ArrayList<>();
-              Iterables.addAll(operationWatchers, filteredWatchers.build());
-              watchers.put(operation.getName(), operationWatchers);
+  private JedisPubSub createOperationSubscriber() {
+    return new JedisPubSub() {
+      @Override
+      public void onMessage(String channel, String message) {
+        Operation operation = message == null
+            ? null : parseOperationJson(message);
+        String operationName = message == null
+            ? channel : operation.getName();
+        synchronized (watchers) {
+          List<Predicate<Operation>> operationWatchers =
+              watchers.get(operationName);
+          if (operationWatchers == null)
+            return;
+          if (operation == null || operation.getDone()) {
+            watchers.remove(operationName);
+          }
+          long unfilteredWatcherCount = operationWatchers.size();
+          ImmutableList.Builder<Predicate<Operation>> filteredWatchers = new ImmutableList.Builder<>();
+          long filteredWatcherCount = 0;
+          for (Predicate<Operation> watcher : operationWatchers) {
+            if (watcher.test(operation)) {
+              filteredWatchers.add(watcher);
+              filteredWatcherCount++;
             }
           }
+          if (operation != null && !operation.getDone() && filteredWatcherCount != unfilteredWatcherCount) {
+            operationWatchers = new ArrayList<>();
+            Iterables.addAll(operationWatchers, filteredWatchers.build());
+            watchers.put(operation.getName(), operationWatchers);
+          }
         }
-      };
+      }
+    };
+  }
 
-      subscriptionThread = new Thread(new RedisShardSubscription(
-          config.getOperationChannelName(),
-          operationSubscriber,
-          /* onUnsubscribe=*/ () -> {
-            subscriptionThread = null;
-            onUnsubscribe.run();
-          },
-          /* onReset=*/ (jedis) -> {
-            // need to resend all watcher information
-            // should probably lock out watcher additions here
-            for (String operationName : watchers.keySet()) {
-              String json = jedis.hget(config.getOperationsHashName(), operationName);
-              operationSubscriber.onMessage(operationName, json);
-            }
-          },
-          this::getJedis));
-    } else {
-      subscriptionThread = null;
-    }
+  private RedisShardSubscription createOperationSubscription() {
+    JedisPubSub operationSubscriber = createOperationSubscriber();
+
+    return new RedisShardSubscription(
+        config.getOperationChannelName(),
+        operationSubscriber,
+        /* onUnsubscribe=*/ () -> {
+          subscriptionThread = null;
+          onUnsubscribe.run();
+        },
+        /* onReset=*/ (jedis) -> {
+          // need to resend all watcher information
+          // should probably lock out watcher additions here
+          for (String operationName : watchers.keySet()) {
+            String json = jedis.hget(config.getOperationsHashName(), operationName);
+            operationSubscriber.onMessage(operationName, json);
+          }
+        },
+        this::getJedis);
+  }
+
+  private void startSubscriptionThread() {
+    operationSubscription = createOperationSubscription();
+
+    // use Executors...
+    subscriptionThread = new Thread(operationSubscription);
+
+    subscriptionThread.start();
   }
 
   @Override
   public void start() {
-    if (subscriptionThread != null) {
-      subscriptionThread.start();
+    startPool();
+    if (config.getSubscribeToOperation()) {
+      startSubscriptionThread();
     }
   }
 
@@ -166,7 +185,9 @@ public class RedisShardBackplane implements ShardBackplane {
       subscriptionThread.stop();
       // subscriptionThread.join();
     }
-    pool.close();
+    if (pool != null) {
+      pool.close();
+    }
   }
 
   @Override

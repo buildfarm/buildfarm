@@ -44,6 +44,10 @@ class RedisShardSubscription implements Runnable {
     this.jedisFactory = jedisFactory;
   }
 
+  public JedisPubSub getSubscriber() {
+    return subscriber;
+  }
+
   private void subscribe(Jedis jedis, boolean isReset) throws IOException {
     try {
       if (isReset) {

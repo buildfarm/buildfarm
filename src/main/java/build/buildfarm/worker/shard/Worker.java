@@ -986,6 +986,8 @@ public class Worker implements Instances {
     try {
       pipeline.close();
     } catch (InterruptedException e) {
+      backplane.stop(); // the pool must be signaled...
+      Thread.currentThread().interrupt();
       return;
     }
     if (config.getUseFuseCas()) {
@@ -1032,6 +1034,8 @@ public class Worker implements Instances {
   @Override
   public void start() {
     try {
+      backplane.start();
+
       backplane.removeWorker(config.getPublicName());
 
       if (!config.getUseFuseCas()) {
@@ -1042,12 +1046,12 @@ public class Worker implements Instances {
 
       server.start();
       backplane.addWorker(config.getPublicName());
-
-      pipeline.start();
-    } catch (IOException e) {
+    } catch (Exception e) {
+      stop();
       e.printStackTrace();
       return;
     }
+    pipeline.start();
     Runtime.getRuntime().addShutdownHook(new Thread() {
       @Override
       public void run() {
