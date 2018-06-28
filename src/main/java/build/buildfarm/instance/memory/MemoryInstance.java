@@ -120,8 +120,8 @@ public class MemoryInstance extends AbstractServerInstance {
         name,
         digestUtil,
         config,
-        /*contentAddressableStorage=*/ ContentAddressableStorages.create(config.getCasConfig()),
-        /*outstandingOperations=*/ new OutstandingOperations());
+        ContentAddressableStorages.create(config.getCasConfig()),
+        new OutstandingOperations());
   }
 
   @VisibleForTesting
@@ -135,9 +135,9 @@ public class MemoryInstance extends AbstractServerInstance {
         name,
         digestUtil,
         contentAddressableStorage,
-        /*actionCache=*/ MemoryInstance.createActionCache(config.getActionCacheConfig(), contentAddressableStorage, digestUtil),
+        MemoryInstance.createActionCache(config.getActionCacheConfig(), contentAddressableStorage, digestUtil),
         outstandingOperations,
-        /*completedOperations=*/ MemoryInstance.createCompletedOperationMap(contentAddressableStorage, digestUtil));
+        MemoryInstance.createCompletedOperationMap(contentAddressableStorage, digestUtil));
     this.config = config;
     watchers = new ConcurrentHashMap<String, List<Predicate<Operation>>>();
     streams = new HashMap<String, ByteStringStreamSource>();
