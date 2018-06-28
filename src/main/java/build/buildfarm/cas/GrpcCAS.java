@@ -75,15 +75,6 @@ class GrpcCAS implements ContentAddressableStorage {
             }
           });
 
-  private final Supplier<ByteStreamStub> bsStub =
-      Suppliers.memoize(
-          new Supplier<ByteStreamStub>() {
-            @Override
-            public ByteStreamStub get() {
-              return ByteStreamGrpc.newStub(channel);
-            }
-          });
-
   public InputStream newStreamInput(String name) {
     Iterator<ReadResponse> replies = bsBlockingStub
         .get()
