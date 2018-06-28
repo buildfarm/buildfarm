@@ -124,7 +124,14 @@ class GrpcCAS implements ContentAddressableStorage {
   @Override
   public Blob get(Digest digest) {
     try (InputStream in = newStreamInput(getBlobName(digest))) {
-      return new Blob(ByteString.readFrom(in), digest);
+      ByteString content = ByteString.readFrom(in);
+      if (content.size() != digest.getSizeBytes()) {
+        throw new IOException(String.format(
+            "size/data mismatch: was %d, expected %d",
+            content.size(),
+            digest.getSizeBytes()));
+      }
+      return new Blob(content, digest);
     } catch (IOException ex) {
       expire(digest);
       return null;
