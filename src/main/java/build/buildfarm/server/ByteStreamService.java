@@ -54,37 +54,39 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
   private void readBlob(
       ReadRequest request,
       StreamObserver<ReadResponse> responseObserver) throws InterruptedException, IOException {
+    String resourceName = request.getResourceName();
+    Instance instance;
     try {
-      String resourceName = request.getResourceName();
-      Instance instance = instances.getFromBlob(resourceName);
-
-      Digest digest = UrlPath.parseBlobDigest(resourceName, instance.getDigestUtil());
-
-      ByteString blob = instance.getBlob(
-          digest, request.getReadOffset(), request.getReadLimit());
-      if (blob == null) {
-        responseObserver.onError(Status.NOT_FOUND.asException());
-        return;
-      }
-
-      while (!blob.isEmpty()) {
-        ByteString chunk;
-        if (blob.size() < DEFAULT_CHUNK_SIZE) {
-          chunk = blob;
-          blob = ByteString.EMPTY;
-        } else {
-          chunk = blob.substring(0, (int) DEFAULT_CHUNK_SIZE);
-          blob = blob.substring((int) DEFAULT_CHUNK_SIZE);
-        }
-        responseObserver.onNext(ReadResponse.newBuilder()
-            .setData(chunk)
-            .build());
-      }
-
-      responseObserver.onCompleted();
+      instance = instances.getFromBlob(resourceName);
     } catch (InstanceNotFoundException e) {
       responseObserver.onError(BuildFarmInstances.toStatusException(e));
+      return;
     }
+
+    Digest digest = UrlPath.parseBlobDigest(resourceName, instance.getDigestUtil());
+
+    ByteString blob = instance.getBlob(
+        digest, request.getReadOffset(), request.getReadLimit());
+    if (blob == null) {
+      responseObserver.onError(Status.NOT_FOUND.asException());
+      return;
+    }
+
+    while (!blob.isEmpty()) {
+      ByteString chunk;
+      if (blob.size() < DEFAULT_CHUNK_SIZE) {
+        chunk = blob;
+        blob = ByteString.EMPTY;
+      } else {
+        chunk = blob.substring(0, (int) DEFAULT_CHUNK_SIZE);
+        blob = blob.substring((int) DEFAULT_CHUNK_SIZE);
+      }
+      responseObserver.onNext(ReadResponse.newBuilder()
+          .setData(chunk)
+          .build());
+    }
+
+    responseObserver.onCompleted();
   }
 
   private void readOperationStream(
