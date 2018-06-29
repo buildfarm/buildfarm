@@ -471,20 +471,20 @@ public class ShardInstance extends AbstractServerInstance {
 
   @Override
   public Digest putBlob(ByteString blob)
-      throws IllegalArgumentException, InterruptedException, StatusException {
+      throws IllegalArgumentException, InterruptedException {
     for(;;) {
       String worker = null;
       try {
         try {
           worker = backplane.getRandomWorker();
         } catch (IOException e) {
-          throw Status.fromThrowable(e).asException();
+          throw Status.fromThrowable(e).asRuntimeException();
         }
 
         if (worker == null) {
           // FIXME should be made into a retry operation, resulting in an IOException
           // FIXME should we wait for a worker to become available?
-          throw Status.RESOURCE_EXHAUSTED.asException();
+          throw Status.RESOURCE_EXHAUSTED.asRuntimeException();
         }
         // System.out.println("putBlob(" + DigestUtil.toString(digestUtil.compute(blob)) + ") => " + worker);
         Digest digest;
@@ -864,16 +864,31 @@ public class ShardInstance extends AbstractServerInstance {
       throw Status.fromThrowable(e).asRuntimeException();
     }
 
-    onOperation.accept(operation);
+    try {
+      onOperation.accept(operation);
+    } catch (Exception e) {
+      try {
+        backplane.deleteOperation(operation.getName());
+      } catch (IOException deleteEx) {
+        deleteEx.printStackTrace();
+      }
+      e.printStackTrace();
+      throw e;
+    }
 
     // FIXME lookup
 
     // make the action available to the worker
     try {
       putBlob(action.toByteString());
-    } catch (StatusException e) {
+    } catch (Exception e) {
+      try {
+        backplane.deleteOperation(operation.getName());
+      } catch (IOException deleteEx) {
+        deleteEx.printStackTrace();
+      }
       e.printStackTrace();
-      return;
+      throw e;
     }
 
     final Operation queuedOperation = buildQueuedOperation(
