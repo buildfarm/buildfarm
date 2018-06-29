@@ -608,7 +608,9 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   private void queueOperation(Jedis jedis, String operationName) {
-    jedis.hdel(config.getDispatchedOperationsHashName(), operationName);
+    if (jedis.hdel(config.getDispatchedOperationsHashName(), operationName) == 1) {
+      System.err.println("RedisShardBackplane::queueOperation: WARNING Removed dispatched operation");
+    }
     jedis.lpush(config.getQueuedOperationsListName(), operationName);
   }
 
@@ -669,9 +671,10 @@ public class RedisShardBackplane implements ShardBackplane {
           JsonFormat.parser().merge(entry.getValue(), dispatchedOperationBuilder);
           builder.add(dispatchedOperationBuilder.build());
         } catch (InvalidProtocolBufferException e) {
+          System.err.println("RedisShardBackplane::getDispatchedOperations: removing invalid operation " + entry.getKey());
+          e.printStackTrace();
           /* guess we don't want to spin on this */
           jedis.hdel(config.getDispatchedOperationsHashName(), entry.getKey());
-          e.printStackTrace();
         }
       }
     } catch (JedisConnectionException e) {
@@ -763,9 +766,10 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   private void completeOperation(Jedis jedis, String operationName) {
-    if (jedis.hdel(config.getDispatchedOperationsHashName(), operationName) == 1) {
-      jedis.lpush(config.getCompletedOperationsListName(), operationName);
+    if (jedis.hdel(config.getDispatchedOperationsHashName(), operationName) != 1) {
+      System.err.println("RedisShardBackplane::completeOperation: WARNING " + operationName + " was not in dispatched list");
     }
+    jedis.lpush(config.getCompletedOperationsListName(), operationName);
   }
 
   @Override
@@ -807,7 +811,7 @@ public class RedisShardBackplane implements ShardBackplane {
       jedis.lrem(config.getCompletedOperationsListName(), 0, operationName);
       jedis.hdel(config.getOperationsHashName(), operationName);
 
-      // operationSubscriber.onMessage(config.getOperationChannelName(), operationJson);
+      operationSubscription.getSubscriber().onMessage(operationName, null);
     } catch (JedisConnectionException e) {
       Throwable cause = e.getCause();
       if (cause instanceof IOException) {

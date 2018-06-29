@@ -594,6 +594,7 @@ public class Worker implements Instances {
       public void match(Predicate<Operation> onMatch) throws InterruptedException {
         instance.match(config.getPlatform(), (operation) -> {
           if (activeOperations.contains(operation.getName())) {
+            System.err.println("WorkerContext::match: WARNING matched duplicate operation " + operation.getName());
             return onMatch.test(null);
           }
           activeOperations.add(operation.getName());
