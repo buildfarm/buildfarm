@@ -124,7 +124,7 @@ container_image(
         "buildfarm-server_deploy.jar",
         "/config/server.config",
         "--port",
-        "8098"
+        "8980"
     ],
 )
 
