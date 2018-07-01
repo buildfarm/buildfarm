@@ -202,20 +202,3 @@ java_binary(
     ],
     visibility = ["//visibility:public"],
 )
-
-container_image(
-    name = "worker.container",
-    base = "@java_base//image",
-    # leverage the implicit target of the buildfarm-server to get a fat jar.
-    # this is simply a workaround for the fact that we have so many dependencies,
-    # so we'd want some wrappy script. This seemed more straightforward.
-    # https://docs.bazel.build/versions/master/be/java.html#java_binary_implicit_outputs
-    files = [
-        ":buildfarm-worker_deploy.jar",
-    ],
-    cmd = [
-        "buildfarm-worker_deploy.jar",
-        "/config/worker.config",
-    ],
-    visibility = ["//visibility:public"],
-)
