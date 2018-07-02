@@ -54,6 +54,7 @@ import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
 import redis.clients.jedis.JedisPubSub;
 import redis.clients.jedis.Pipeline;
+import redis.clients.jedis.Response;
 import redis.clients.jedis.ScanParams;
 import redis.clients.jedis.ScanResult;
 import redis.clients.jedis.Transaction;
@@ -311,9 +312,7 @@ public class RedisShardBackplane implements ShardBackplane {
   @Override
   public ActionResult getActionResult(ActionKey actionKey) throws IOException {
     try (Jedis jedis = getJedis()) {
-      String json = jedis.hget(
-          config.getActionCacheHashName(),
-          DigestUtil.toString(actionKey.getDigest()));
+      String json = jedis.get(acKey(actionKey));
       if (json == null) {
         return null;
       }
@@ -337,10 +336,7 @@ public class RedisShardBackplane implements ShardBackplane {
       throws IOException {
     try (Jedis jedis = getJedis()) {
       String json = JsonFormat.printer().print(actionResult);
-      jedis.hset(
-          config.getActionCacheHashName(),
-          DigestUtil.toString(actionKey.getDigest()),
-          json);
+      jedis.setex(acKey(actionKey), config.getActionCacheExpire(), json);
     } catch (JedisConnectionException e) {
       Throwable cause = e.getCause();
       if (cause instanceof IOException) {
@@ -353,7 +349,7 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   private void removeActionResult(Jedis jedis, ActionKey actionKey) {
-    jedis.hdel(config.getActionCacheHashName(), DigestUtil.toString(actionKey.getDigest()));
+    jedis.del(acKey(actionKey));
   }
 
   @Override
@@ -374,9 +370,7 @@ public class RedisShardBackplane implements ShardBackplane {
     try (Jedis jedis = getJedis()) {
       Pipeline p = jedis.pipelined();
       for (ActionKey actionKey : actionKeys) {
-        p.hdel(
-            config.getActionCacheHashName(),
-            DigestUtil.toString(actionKey.getDigest()));
+        removeActionResult(jedis, actionKey);
       }
       p.sync();
     } catch (JedisConnectionException e) {
@@ -393,10 +387,35 @@ public class RedisShardBackplane implements ShardBackplane {
     if (scanToken == null) {
       scanToken = SCAN_POINTER_START;
     }
-    ScanParams scanParams = new ScanParams().count(count);
-    final ScanResult<Map.Entry<String, String>> scanResult;
+
+    final String token;
+    ImmutableList.Builder<Map.Entry<ActionKey, ActionResult>> results = new ImmutableList.Builder<>();
+
+    ScanParams scanParams = new ScanParams()
+        .match(config.getActionCachePrefix() + ":*")
+        .count(count);
+
     try (Jedis jedis = getJedis()) {
-      scanResult = jedis.hscan(config.getActionCacheHashName(), scanToken, scanParams);
+      ScanResult<String> scanResult = jedis.scan(scanToken, scanParams);
+      token = scanResult.getStringCursor().equals(SCAN_POINTER_START) ? null : scanResult.getStringCursor();
+      List<String> keyResults = scanResult.getResult();
+
+      List<Response<String>> actionResults = new ArrayList<>(keyResults.size());
+      Pipeline p = jedis.pipelined();
+      for (int i = 0; i < keyResults.size(); i++) {
+        actionResults.set(i, p.get(keyResults.get(i)));
+      }
+      p.sync();
+      for (int i = 0; i < keyResults.size(); i++) {
+        String json = actionResults.get(i).get();
+        if (json == null) {
+          continue;
+        }
+        String key = keyResults.get(i);
+        results.add(new AbstractMap.SimpleEntry<>(
+            DigestUtil.asActionKey(DigestUtil.parseDigest(key.split(":")[1])),
+            parseActionResult(json)));
+      }
     } catch (JedisConnectionException e) {
       Throwable cause = e.getCause();
       if (cause instanceof IOException) {
@@ -405,12 +424,8 @@ public class RedisShardBackplane implements ShardBackplane {
       throw new IOException(e);
     }
     return new ActionCacheScanResult(
-        scanResult.getStringCursor().equals(SCAN_POINTER_START) ? null : scanResult.getStringCursor(),
-        Iterables.transform(
-            scanResult.getResult(),
-            (entry) -> new AbstractMap.SimpleEntry<ActionKey, ActionResult>(
-                DigestUtil.asActionKey(DigestUtil.parseDigest(entry.getKey())),
-                parseActionResult(entry.getValue()))));
+        token,
+        results.build());
   }
 
   @Override
@@ -865,6 +880,10 @@ public class RedisShardBackplane implements ShardBackplane {
 
   private String treeKey(Digest blobDigest) {
     return config.getTreePrefix() + ":" + DigestUtil.toString(blobDigest);
+  }
+
+  private String acKey(ActionKey actionKey) {
+    return config.getActionCachePrefix() + ":" + DigestUtil.toString(actionKey.getDigest());
   }
 
   @Override

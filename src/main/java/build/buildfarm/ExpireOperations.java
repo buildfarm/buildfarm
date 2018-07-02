@@ -38,7 +38,7 @@ class ExpireOperations {
     RedisShardBackplaneConfig config = RedisShardBackplaneConfig.newBuilder()
         .setRedisUri("redis://buildfarm.pit-irn-1.uberatc.net:6379")
         .setWorkersSetName("Workers")
-        .setActionCacheHashName("ActionCache")
+        .setActionCachePrefix("ActionCache")
         .setOperationsHashName("Operations")
         .setQueuedOperationsListName("QueuedOperations")
         .setDispatchedOperationsHashName("DispatchedOperations")
