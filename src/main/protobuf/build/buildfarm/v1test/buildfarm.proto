@@ -98,10 +98,10 @@ message RedisShardBackplaneConfig {
   string workers_set_name = 2;
   string action_cache_prefix = 3;
   int32 action_cache_expire = 4;
-  string operations_hash_name = 5;
-  string queued_operations_list_name = 6;
-  string dispatched_operations_hash_name = 7;
-  string completed_operations_list_name = 8;
+  string operation_prefix = 5;
+  int32 operation_expire = 6;
+  string queued_operations_list_name = 7;
+  string dispatched_operations_hash_name = 8;
   string operation_channel_name = 9;
   string cas_prefix = 10;
   int32 cas_expire = 11;
@@ -111,12 +111,7 @@ message RedisShardBackplaneConfig {
 }
 
 message ShardInstanceConfig {
-  // FIXME put some more config into this!
   bool run_dispatched_monitor = 1;
-
-  bool run_completed_collector = 2;
-
-  bool run_action_cache_sweeper = 3;
 
   int64 max_completed_operations_count = 4;
 

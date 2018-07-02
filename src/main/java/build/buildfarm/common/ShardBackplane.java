@@ -276,18 +276,6 @@ public interface ShardBackplane {
   public void removeTree(Digest inputRoot) throws IOException;
 
   /**
-   * Get the size of the completed operations list
-   */
-  @ThreadSafe
-  public long getCompletedOperationsCount() throws IOException;
-
-  /**
-   * Pop the oldest completed operations to not have more than limit operations
-   */
-  @ThreadSafe
-  public void destroyOldestCompletedOperations(long limit) throws IOException;
-
-  /**
    * Page through action cache
    */
   @ThreadSafe

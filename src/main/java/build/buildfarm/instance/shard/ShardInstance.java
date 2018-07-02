@@ -90,8 +90,6 @@ public class ShardInstance extends AbstractServerInstance {
   private final ShardBackplane backplane;
   private final Map<String, StubInstance> workerStubs;
   private final Thread dispatchedMonitor;
-  private final Thread completedCollector;
-  private final Thread actionCacheSweeper;
   private final ListeningScheduledExecutorService retryScheduler =
       MoreExecutors.listeningDecorator(Executors.newScheduledThreadPool(1));
   private final Map<Digest, Directory> directoryCache = new ConcurrentLRUCache<>(64 * 1024);
@@ -137,23 +135,6 @@ public class ShardInstance extends AbstractServerInstance {
     } else {
       dispatchedMonitor = null;
     }
-
-    if (config.getRunCompletedCollector()) {
-      completedCollector = new Thread(new CompletedCollector(
-          backplane,
-          config.getMaxCompletedOperationsCount()));
-    } else {
-      completedCollector = null;
-    }
-
-    if (config.getRunActionCacheSweeper()) {
-      actionCacheSweeper = new Thread(new ActionCacheSweeper(
-          backplane,
-          this::findMissingBlobs,
-          config.getActionCacheSweepPeriod()));
-    } else {
-      actionCacheSweeper = null;
-    }
   }
 
   @Override
@@ -162,22 +143,10 @@ public class ShardInstance extends AbstractServerInstance {
     if (dispatchedMonitor != null) {
       dispatchedMonitor.start();
     }
-    if (completedCollector != null) {
-      completedCollector.start();
-    }
-    if (actionCacheSweeper != null) {
-      actionCacheSweeper.start();
-    }
   }
 
   @Override
   public void stop() {
-    if (actionCacheSweeper != null) {
-      actionCacheSweeper.stop();
-    }
-    if (completedCollector != null) {
-      completedCollector.stop();
-    }
     if (dispatchedMonitor != null) {
       dispatchedMonitor.stop();
     }

@@ -156,7 +156,7 @@ public class RedisShardBackplane implements ShardBackplane {
           // need to resend all watcher information
           // should probably lock out watcher additions here
           for (String operationName : watchers.keySet()) {
-            String json = jedis.hget(config.getOperationsHashName(), operationName);
+            String json = jedis.get(operationKey(operationName));
             operationSubscriber.onMessage(operationName, json);
           }
         },
@@ -566,7 +566,7 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   private Operation getOperation(Jedis jedis, String operationName) {
-    String json = jedis.hget(config.getOperationsHashName(), operationName);
+    String json = jedis.get(operationKey(operationName));
     if (json == null) {
       return null;
     }
@@ -609,7 +609,7 @@ public class RedisShardBackplane implements ShardBackplane {
       if (complete) {
         completeOperation(jedis, operation.getName());
       }
-      jedis.hset(config.getOperationsHashName(), operation.getName(), json);
+      jedis.setex(operationKey(operation.getName()), config.getOperationExpire(), json);
       if (queue) {
         queueOperation(jedis, operation.getName());
       }
@@ -635,22 +635,6 @@ public class RedisShardBackplane implements ShardBackplane {
     jedis.lpush(config.getQueuedOperationsListName(), operationName);
   }
 
-  private Iterable<String> getCompletedOperations(Jedis jedis) {
-    return jedis.lrange(config.getCompletedOperationsListName(), 0, -1);
-  }
-
-  public Iterable<String> getCompletedOperations() throws IOException {
-    try (Jedis jedis = getJedis()) {
-      return getCompletedOperations(jedis);
-    } catch (JedisConnectionException e) {
-      Throwable cause = e.getCause();
-      if (cause instanceof IOException) {
-        throw (IOException) cause;
-      }
-      throw new IOException(e);
-    }
-  }
-
   public Map<String, Operation> getOperationsMap() throws IOException {
     try (Jedis jedis = getJedis()) {
       ImmutableMap.Builder<String, Operation> builder = new ImmutableMap.Builder<>();
@@ -670,9 +654,12 @@ public class RedisShardBackplane implements ShardBackplane {
   @Override
   public Iterable<String> getOperations() throws IOException {
     try (Jedis jedis = getJedis()) {
+      throw new UnsupportedOperationException();
+      /*
       Iterable<String> dispatchedOperations = jedis.hkeys(config.getDispatchedOperationsHashName());
       Iterable<String> queuedOperations = jedis.lrange(config.getQueuedOperationsListName(), 0, -1);
       return Iterables.concat(queuedOperations, dispatchedOperations, getCompletedOperations(jedis));
+      */
     } catch (JedisConnectionException e) {
       Throwable cause = e.getCause();
       if (cause instanceof IOException) {
@@ -790,7 +777,6 @@ public class RedisShardBackplane implements ShardBackplane {
     if (jedis.hdel(config.getDispatchedOperationsHashName(), operationName) != 1) {
       System.err.println("RedisShardBackplane::completeOperation: WARNING " + operationName + " was not in dispatched list");
     }
-    jedis.lpush(config.getCompletedOperationsListName(), operationName);
   }
 
   @Override
@@ -806,67 +792,16 @@ public class RedisShardBackplane implements ShardBackplane {
     }
   }
 
-  public void deleteAllCompletedOperation(Iterable<String> operationNames) throws IOException {
-    try (Jedis jedis = getJedis()) {
-      Transaction t = jedis.multi();
-      for (String operationName : operationNames) {
-        t.lrem(config.getCompletedOperationsListName(), 0, operationName);
-        t.hdel(config.getOperationsHashName(), operationName);
-      }
-      t.exec();
-    } catch (JedisConnectionException e) {
-      Throwable cause = e.getCause();
-      if (cause instanceof IOException) {
-        throw (IOException) cause;
-      }
-      throw new IOException(e);
-    }
-  }
-
   @Override
   public void deleteOperation(String operationName) throws IOException {
     try (Jedis jedis = getJedis()) {
-      /* FIXME moar transaction */
-      jedis.hdel(config.getDispatchedOperationsHashName(), operationName);
-      jedis.lrem(config.getQueuedOperationsListName(), 0, operationName);
-      jedis.lrem(config.getCompletedOperationsListName(), 0, operationName);
-      jedis.hdel(config.getOperationsHashName(), operationName);
+      Transaction t = jedis.multi();
+      t.hdel(config.getDispatchedOperationsHashName(), operationName);
+      t.lrem(config.getQueuedOperationsListName(), 0, operationName);
+      t.del(operationKey(operationName));
+      t.exec();
 
       operationSubscription.getSubscriber().onMessage(operationName, null);
-    } catch (JedisConnectionException e) {
-      Throwable cause = e.getCause();
-      if (cause instanceof IOException) {
-        throw (IOException) cause;
-      }
-      throw new IOException(e);
-    }
-  }
-
-  @Override
-  public long getCompletedOperationsCount() throws IOException {
-    try (Jedis jedis = getJedis()) {
-      return jedis.llen(config.getCompletedOperationsListName());
-    } catch (JedisConnectionException e) {
-      Throwable cause = e.getCause();
-      if (cause instanceof IOException) {
-        throw (IOException) cause;
-      }
-      throw new IOException(e);
-    }
-  }
-
-  @Override
-  public void destroyOldestCompletedOperations(long limit) throws IOException {
-    try (Jedis jedis = getJedis()) {
-      List<String> oldestOperations = jedis.lrange(config.getCompletedOperationsListName(), limit - 1, -1);
-      if (oldestOperations.size() > 0) {
-        jedis.ltrim(config.getCompletedOperationsListName(), 0, -oldestOperations.size());
-        Pipeline p = jedis.pipelined();
-        for (String operationName : oldestOperations) {
-          p.hdel(config.getOperationsHashName(), operationName);
-        }
-        p.sync();
-      }
     } catch (JedisConnectionException e) {
       Throwable cause = e.getCause();
       if (cause instanceof IOException) {
@@ -890,6 +825,10 @@ public class RedisShardBackplane implements ShardBackplane {
 
   private String acKey(ActionKey actionKey) {
     return config.getActionCachePrefix() + ":" + DigestUtil.toString(actionKey.getDigest());
+  }
+
+  private String operationKey(String operationName) {
+    return config.getOperationPrefix() + ":" + operationName;
   }
 
   @Override

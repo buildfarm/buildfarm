@@ -90,23 +90,6 @@ java_binary(
     ],
 )
 
-java_binary(
-    name = "bf-expire-operations",
-    srcs = ["ExpireOperations.java"],
-    main_class = "build.buildfarm.ExpireOperations",
-    deps = [
-        ":common",
-        ":instance",
-        ":shard-instance",
-        ":stub-instance",
-        "//3rdparty/jvm/com/google/protobuf:protobuf_java_util",
-        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
-        "@com_google_guava_guava//jar",
-        "@io_grpc_grpc_core//jar",
-        "@io_grpc_grpc_netty//jar",
-    ],
-)
-
 java_library(
     name = "shard-instance",
     srcs = glob(["instance/shard/*.java"]),
