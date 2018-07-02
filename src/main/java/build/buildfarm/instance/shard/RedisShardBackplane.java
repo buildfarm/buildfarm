@@ -431,7 +431,11 @@ public class RedisShardBackplane implements ShardBackplane {
   @Override
   public void addBlobLocation(Digest blobDigest, String workerName) throws IOException {
     try (Jedis jedis = getJedis()) {
-      jedis.sadd(casKey(blobDigest), workerName);
+      String key = casKey(blobDigest);
+      Transaction t = jedis.multi();
+      t.sadd(key, workerName);
+      t.expire(key, config.getCasExpire());
+      t.exec();
     } catch (JedisConnectionException e) {
       Throwable cause = e.getCause();
       if (cause instanceof IOException) {
@@ -447,7 +451,9 @@ public class RedisShardBackplane implements ShardBackplane {
     try (Jedis jedis = getJedis()) {
       Pipeline p = jedis.pipelined();
       for (Digest blobDigest : blobDigests) {
-        p.sadd(casKey(blobDigest), workerName);
+        String key = casKey(blobDigest);
+        p.sadd(key, workerName);
+        p.expire(key, config.getCasExpire());
       }
       p.sync();
     } catch (JedisConnectionException e) {
