@@ -889,9 +889,12 @@ public class RedisShardBackplane implements ShardBackplane {
   @Override
   public void putTree(Digest inputRoot, Iterable<Directory> directories) throws IOException {
     try (Jedis jedis = getJedis()) {
-      jedis.set(treeKey(inputRoot), JsonFormat.printer().print(GetTreeResponse.newBuilder()
-          .addAllDirectories(directories)
-          .build()));
+      jedis.setex(
+          treeKey(inputRoot),
+          config.getTreeExpire(),
+          JsonFormat.printer().print(GetTreeResponse.newBuilder()
+              .addAllDirectories(directories)
+              .build()));
     } catch (JedisConnectionException e) {
       Throwable cause = e.getCause();
       if (cause instanceof IOException) {

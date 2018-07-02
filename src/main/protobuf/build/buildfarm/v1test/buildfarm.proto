@@ -105,7 +105,8 @@ message RedisShardBackplaneConfig {
   string operation_channel_name = 9;
   string cas_prefix = 10;
   string tree_prefix = 11;
-  bool subscribe_to_operation = 12;
+  int32 tree_expire = 12;
+  bool subscribe_to_operation = 13;
 }
 
 message ShardInstanceConfig {
