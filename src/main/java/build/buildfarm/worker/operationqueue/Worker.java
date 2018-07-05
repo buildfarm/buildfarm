@@ -43,13 +43,14 @@ import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.devtools.common.options.OptionsParser;
-import com.google.devtools.remoteexecution.v1test.Action;
-import com.google.devtools.remoteexecution.v1test.ActionResult;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.Directory;
-import com.google.devtools.remoteexecution.v1test.DirectoryNode;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
-import com.google.devtools.remoteexecution.v1test.FileNode;
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.DirectoryNode;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
+import build.bazel.remote.execution.v2.FileNode;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -367,10 +368,10 @@ public class Worker {
       }
 
       @Override
-      public void createActionRoot(Path root, Action action) throws IOException, InterruptedException {
+      public void createActionRoot(Path root, Action action, Command command) throws IOException, InterruptedException {
         OutputDirectory outputDirectory = OutputDirectory.parse(
-            action.getOutputFilesList(),
-            action.getOutputDirectoriesList());
+            command.getOutputFilesList(),
+            command.getOutputDirectoriesList());
 
         if (Files.exists(root)) {
           CASFileCache.removeDirectory(root);

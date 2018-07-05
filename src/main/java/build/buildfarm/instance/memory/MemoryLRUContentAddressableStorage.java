@@ -15,7 +15,7 @@
 package build.buildfarm.instance.memory;
 
 import build.buildfarm.common.ContentAddressableStorage;
-import com.google.devtools.remoteexecution.v1test.Digest;
+import build.bazel.remote.execution.v2.Digest;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;

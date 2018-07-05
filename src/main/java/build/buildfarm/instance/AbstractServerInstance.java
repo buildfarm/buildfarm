@@ -24,15 +24,17 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
-import com.google.devtools.remoteexecution.v1test.Action;
-import com.google.devtools.remoteexecution.v1test.ActionResult;
-import com.google.devtools.remoteexecution.v1test.Command;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.Directory;
-import com.google.devtools.remoteexecution.v1test.DirectoryNode;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
-import com.google.devtools.remoteexecution.v1test.ExecuteResponse;
-import com.google.devtools.remoteexecution.v1test.FileNode;
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.DirectoryNode;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecuteResponse;
+import build.bazel.remote.execution.v2.ExecutionPolicy;
+import build.bazel.remote.execution.v2.FileNode;
+import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -43,7 +45,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
-import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 public abstract class AbstractServerInstance implements Instance {
   private final String name;
@@ -425,17 +427,6 @@ public abstract class AbstractServerInstance implements Instance {
           MISSING_INPUT);
     }
 
-    // FIXME should input/output collisions (through directories) be another
-    // invalid action?
-    filesUniqueAndSortedPrecondition(action.getOutputFilesList());
-    filesUniqueAndSortedPrecondition(action.getOutputDirectoriesList());
-
-    AbstractServerInstance.validateOutputs(
-        inputFilesBuilder.build(),
-        inputDirectoriesBuilder.build(),
-        Sets.newHashSet(action.getOutputFilesList()),
-        Sets.newHashSet(action.getOutputDirectoriesList()));
-
     Command command;
     try {
       command = Command.parseFrom(getBlob(commandDigest));
@@ -445,6 +436,18 @@ public abstract class AbstractServerInstance implements Instance {
           INVALID_DIGEST);
       return;
     }
+
+    // FIXME should input/output collisions (through directories) be another
+    // invalid action?
+    filesUniqueAndSortedPrecondition(command.getOutputFilesList());
+    filesUniqueAndSortedPrecondition(command.getOutputDirectoriesList());
+
+    AbstractServerInstance.validateOutputs(
+        inputFilesBuilder.build(),
+        inputDirectoriesBuilder.build(),
+        Sets.newHashSet(command.getOutputFilesList()),
+        Sets.newHashSet(command.getOutputDirectoriesList()));
+
     environmentVariablesUniqueAndSortedPrecondition(
         command.getEnvironmentVariablesList());
     Preconditions.checkState(
@@ -505,21 +508,34 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public void execute(
-      Action action,
+      Digest actionDigest,
       boolean skipCacheLookup,
-      int totalInputFileCount,
-      long totalInputFileBytes,
-      Consumer<Operation> onOperation) {
+      ExecutionPolicy executionPolicy,
+      ResultsCachePolicy resultsCachePolicy,
+      Predicate<Operation> watcher) {
+    ByteString actionBlob = getBlob(actionDigest);
+    Preconditions.checkState(actionBlob != null, INVALID_DIGEST);
+
+    Action action;
+    try {
+      action = Action.parseFrom(actionBlob);
+    } catch (InvalidProtocolBufferException e) {
+      Preconditions.checkState(
+          false,
+          INVALID_DIGEST);
+      return;
+    }
+
     validateAction(action);
 
-    ActionKey actionKey = digestUtil.computeActionKey(action);
+    ActionKey actionKey = DigestUtil.asActionKey(actionDigest);
     Operation operation = createOperation(actionKey);
     ExecuteOperationMetadata metadata =
       expectExecuteOperationMetadata(operation);
 
     putOperation(operation);
 
-    onOperation.accept(operation);
+    watchOperation(operation.getName(), watcher);
 
     Operation.Builder operationBuilder = operation.toBuilder();
     ActionResult actionResult = null;
@@ -579,6 +595,18 @@ public abstract class AbstractServerInstance implements Instance {
     try {
       return Action.parseFrom(getBlob(
           expectExecuteOperationMetadata(operation).getActionDigest()));
+    } catch(InvalidProtocolBufferException ex) {
+      return null;
+    }
+  }
+
+  protected Command expectCommand(Operation operation) {
+    Action action = expectAction(operation);
+    if (action == null) {
+      return null;
+    }
+    try {
+      return Command.parseFrom(getBlob(action.getCommandDigest()));
     } catch(InvalidProtocolBufferException ex) {
       return null;
     }

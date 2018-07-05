@@ -18,7 +18,7 @@ import static com.google.common.truth.Truth.assertThat;
 
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.v1test.InstanceConfig;
-import com.google.devtools.remoteexecution.v1test.Digest;
+import build.bazel.remote.execution.v2.Digest;
 import com.google.protobuf.ByteString;
 import org.junit.Rule;
 import org.junit.Test;

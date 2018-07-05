@@ -18,7 +18,7 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.PollOperationRequest;
 import build.buildfarm.v1test.TakeOperationRequest;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.InvalidProtocolBufferException;

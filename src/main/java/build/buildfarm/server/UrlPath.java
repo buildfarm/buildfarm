@@ -16,7 +16,7 @@ package build.buildfarm.server;
 
 import build.buildfarm.common.DigestUtil;
 import com.google.common.collect.Iterables;
-import com.google.devtools.remoteexecution.v1test.Digest;
+import build.bazel.remote.execution.v2.Digest;
 import java.util.Arrays;
 
 public class UrlPath {

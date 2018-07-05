@@ -14,9 +14,10 @@
 
 package build.buildfarm.worker;
 
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.Action;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import com.google.longrunning.Operation;
 import java.nio.file.Path;
 import java.util.List;
@@ -26,15 +27,18 @@ final class OperationContext {
   final Path execDir;
   final ExecuteOperationMetadata metadata;
   final Action action;
+  final Command command;
 
   OperationContext(
       Operation operation,
       Path execDir,
       ExecuteOperationMetadata metadata,
-      Action action) {
+      Action action,
+      Command command) {
     this.operation = operation;
     this.execDir = execDir;
     this.metadata = metadata;
     this.action = action;
+    this.command = command;
   }
 }

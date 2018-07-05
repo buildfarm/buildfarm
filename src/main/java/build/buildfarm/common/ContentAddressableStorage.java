@@ -15,7 +15,7 @@
 package build.buildfarm.common;
 
 import build.buildfarm.common.ThreadSafety.ThreadSafe;
-import com.google.devtools.remoteexecution.v1test.Digest;
+import build.bazel.remote.execution.v2.Digest;
 import com.google.protobuf.ByteString;
 
 public interface ContentAddressableStorage {

@@ -59,7 +59,6 @@ public class BuildFarmServer {
         .addService(new ExecutionService(instances))
         .addService(new OperationQueueService(instances))
         .addService(new OperationsService(instances))
-        .addService(new WatcherService(instances))
         .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
         .build();
   }

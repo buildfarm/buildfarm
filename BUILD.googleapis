@@ -6,22 +6,6 @@ exports_files(["LICENSE"])
 
 load("@//third_party/grpc_java:java_grpc_library.bzl", "java_grpc_library")
 
-JAVA_LIBRARY_PROTOS = [
-    "google_api_auth",
-    "google_api_http",
-    "google_api_annotations",
-    "google_watch_v1",
-    "google_rpc_status",
-    "google_rpc_error_details",
-    "google_rpc_code",
-    "google_longrunning_operations",
-    "google_devtools_remoteexecution_v1test_remote_execution",
-    "google_devtools_build_v1_publish_build_event",
-    "google_bytestream_bytestream",
-    "google_devtools_build_v1_build_status",
-    "google_devtools_build_v1_build_events",
-]
-
 java_proto_library(
     name = "google_devtools_build_v1_build_status_java_proto",
     deps = [":google_devtools_build_v1_build_status_proto"],
@@ -74,14 +58,6 @@ java_proto_library(
 )
 
 java_proto_library(
-    name = "google_devtools_remoteexecution_v1test_remote_execution_java_proto",
-    deps = [
-        ":google_devtools_remoteexecution_v1test_remote_execution_proto",
-        ":google_longrunning_operations_proto",
-    ],
-)
-
-java_proto_library(
     name = "google_api_annotations_java_proto",
     deps = [":google_api_annotations_proto"],
 )
@@ -112,24 +88,6 @@ java_grpc_library(
     name = "google_watch_v1_java_grpc",
     srcs = [":google_watch_v1_proto"],
     deps = [":google_watch_v1_java_proto"],
-)
-
-java_grpc_library(
-    name = "google_devtools_remoteexecution_v1test_remote_execution_java_grpc",
-    srcs = [":google_devtools_remoteexecution_v1test_remote_execution_proto"],
-    deps = [":google_devtools_remoteexecution_v1test_remote_execution_java_proto"],
-)
-
-proto_library(
-    name = "google_devtools_remoteexecution_v1test_remote_execution_proto",
-    srcs = ["google/devtools/remoteexecution/v1test/remote_execution.proto"],
-    deps = [
-        ":google_api_annotations_proto",
-        ":google_longrunning_operations_proto",
-        ":google_rpc_status_proto",
-        "@com_google_protobuf//:any_proto",
-        "@com_google_protobuf//:duration_proto",
-    ],
 )
 
 proto_library(
