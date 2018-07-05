@@ -115,7 +115,7 @@ public class Worker {
     }
     return root.resolve(casCacheValue);
   }
-
+  
   private static HashFunction getValidHashFunction(WorkerConfig config) throws ConfigurationException {
     try {
       return HashFunction.get(config.getHashFunction());
@@ -124,6 +124,29 @@ public class Worker {
     }
   }
 
+  private static InstanceEndpoint overrideEndpoint(
+      String label, 
+      InstanceEndpoint src, 
+      String hostVar, 
+      String portVar) throws ConfigurationException {
+    String host = System.getenv(hostVar);
+    if (Strings.isNullOrEmpty(host)) {
+      throw new ConfigurationException(
+        String.format("Environment variable '%s' is not set (for %s endpoint)", hostVar, label));
+    }
+    String port = System.getenv(portVar);
+    if (Strings.isNullOrEmpty(port)) {
+      throw new ConfigurationException(
+        String.format("Environment variable '%s' is not set (for %s endpoint)", portVar, label));
+    }
+    String target = String.format("%s:%s", host, port);
+    System.out.format("Targeting %s '%s' at %s\n", label, src.getInstanceName(), target);
+    return InstanceEndpoint.newBuilder()
+      .mergeFrom(src)
+      .setTarget(target)
+      .build();
+  }
+  
   private static Retrier createStubRetrier() {
     return new Retrier(
         Backoff.exponential(
@@ -451,7 +474,7 @@ public class Worker {
     }
   }
 
-  private static WorkerConfig toWorkerConfig(Readable input, WorkerOptions options) throws IOException {
+  private static WorkerConfig toWorkerConfig(Readable input, WorkerOptions options) throws IOException, ConfigurationException {
     WorkerConfig.Builder builder = WorkerConfig.newBuilder();
     TextFormat.merge(input, builder);
     if (!Strings.isNullOrEmpty(options.root)) {
@@ -461,6 +484,25 @@ public class Worker {
     if (!Strings.isNullOrEmpty(options.casCacheDirectory)) {
       builder.setCasCacheDirectory(options.casCacheDirectory);
     }
+
+    if (!Strings.isNullOrEmpty(options.operationQueueHostVar) && !Strings.isNullOrEmpty(options.operationQueuePortVar)) {
+      builder.setOperationQueue(
+        overrideEndpoint("operation queue", builder.getOperationQueue(), 
+          options.operationQueueHostVar, options.operationQueuePortVar));
+    }
+
+    if (!Strings.isNullOrEmpty(options.contentAddressableStorageHostVar) && !Strings.isNullOrEmpty(options.contentAddressableStoragePortVar)) {
+      builder.setContentAddressableStorage(
+        overrideEndpoint("content addressible storage", builder.getContentAddressableStorage(), 
+          options.contentAddressableStorageHostVar, options.contentAddressableStoragePortVar));
+    }
+
+    if (!Strings.isNullOrEmpty(options.actionCacheHostVar) && !Strings.isNullOrEmpty(options.actionCachePortVar)) {
+      builder.setActionCache(
+        overrideEndpoint("action cache", builder.getActionCache(), 
+          options.actionCacheHostVar, options.actionCachePortVar));
+    }
+
     return builder.build();
   }
 

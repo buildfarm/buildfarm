@@ -39,8 +39,58 @@ public class WorkerOptions extends OptionsBase {
 
   @Option(
       name = "cas_cache_directory",
+      category = "CAS File Cache",
       help = "(Absolute or relative to root) path to cached files from CAS.",
       defaultValue = ""
     )
   public String casCacheDirectory;
+
+  @Option(
+      name = "operation_queue_host_var",
+      category = "Operation Queue",
+      help = "Name of the environment variable containing the operation_queue service host.",
+      defaultValue = ""
+    )
+  public String operationQueueHostVar;
+    
+  @Option(
+      name = "operation_queue_port_var",
+      category = "Operation Queue",
+      help = "Name of the environment variable containing the operation_queue service port.",
+      defaultValue = ""
+    )
+  public String operationQueuePortVar;
+      
+  @Option(
+      name = "content_addressable_storage_host_var",
+      category = "Content Addressable Storage",
+      help = "Name of the environment variable containing the operation_queue service host.",
+      defaultValue = ""
+    )
+  public String contentAddressableStorageHostVar;
+    
+  @Option(
+      name = "content_addressable_storage_port_var",
+      category = "Content Addressable Storage",
+      help = "Name of the environment variable containing the content_addressable_storage service port.",
+      defaultValue = ""
+    )
+  public String contentAddressableStoragePortVar;
+      
+  @Option(
+      name = "action_cache_host_var",
+      category = "Action Cache",
+      help = "Name of the environment variable containing the action_cache service host.",
+      defaultValue = ""
+    )
+  public String actionCacheHostVar;
+    
+  @Option(
+      name = "action_cache_port_var",
+      category = "Action Cache",
+      help = "Name of the environment variable containing the action_cache service port.",
+      defaultValue = ""
+    )
+  public String actionCachePortVar;
+      
 }
