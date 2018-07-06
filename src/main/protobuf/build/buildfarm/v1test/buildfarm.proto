@@ -95,6 +95,7 @@ message MemoryInstanceConfig {
 
 message RedisShardBackplaneConfig {
   string redis_uri = 1;
+  int32 jedis_pool_max_total = 15;
   string workers_set_name = 2;
   string action_cache_prefix = 3;
   int32 action_cache_expire = 4;

@@ -105,7 +105,7 @@ public class RedisShardBackplane implements ShardBackplane {
 
   private void startPool() {
     JedisPoolConfig jedisPoolConfig = new JedisPoolConfig();
-    jedisPoolConfig.setMaxTotal(128);
+    jedisPoolConfig.setMaxTotal(config.getJedisPoolMaxTotal());
     // no explicit start, has to be object lifetime...
     pool = new JedisPool(jedisPoolConfig, redisURI, /* connectionTimeout=*/ 30000, /* soTimeout=*/ 30000);
   }
