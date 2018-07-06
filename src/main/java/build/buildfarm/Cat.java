@@ -144,10 +144,11 @@ class Cat {
     String last = "";
     for (FileNode fileNode : directory.getFilesList()) {
       String name = fileNode.getName();
+      String displayName = name;
       if (fileNode.getIsExecutable()) {
-        name = "*" + name + "*";
+        displayName = "*" + name + "*";
       }
-      indentOut(indentLevel, "File: " + name + " File " + DigestUtil.toString(fileNode.getDigest()));
+      indentOut(indentLevel, "File: " + displayName + " File " + DigestUtil.toString(fileNode.getDigest()));
       if (!filesUnsorted && last.compareTo(name) > 0) {
         filesUnsorted = true;
       } else {
