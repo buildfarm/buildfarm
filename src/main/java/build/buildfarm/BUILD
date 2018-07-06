@@ -333,6 +333,16 @@ java_binary(
 )
 
 java_binary(
+    name = "bf-cas",
+    srcs = ["CASTest.java"],
+    main_class = "build.buildfarm.CASTest",
+    deps = [
+        ":common",
+        ":worker",
+    ],
+)
+
+java_binary(
     name = "bf-cat",
     srcs = ["Cat.java"],
     main_class = "build.buildfarm.Cat",
