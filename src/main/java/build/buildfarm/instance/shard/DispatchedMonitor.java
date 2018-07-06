@@ -18,16 +18,16 @@ import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.v1test.ShardDispatchedOperation;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import java.util.function.Function;
+import java.util.function.Predicate;
 
 class DispatchedMonitor implements Runnable {
   private final ShardBackplane backplane;
-  private final Function<String, Boolean> onRequeue;
+  private final Predicate<String> onRequeue;
   private final Consumer<String> onCancel;
 
   DispatchedMonitor(
       ShardBackplane backplane,
-      Function<String, Boolean> onRequeue,
+      Predicate<String> onRequeue,
       Consumer<String> onCancel) {
     this.backplane = backplane;
     this.onRequeue = onRequeue;
@@ -46,7 +46,7 @@ class DispatchedMonitor implements Runnable {
           if (now >= o.getRequeueAt()) {
             System.out.println("DispatchedMonitor: Testing " + o.getName() + " because " + now + " >= " + o.getRequeueAt());
             long startTime = System.nanoTime();
-            boolean shouldCancel = !onRequeue.apply(o.getName());
+            boolean shouldCancel = !onRequeue.test(o.getName());
             if (Thread.interrupted()) {
               throw new InterruptedException();
             }
