@@ -18,6 +18,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.worker.CASFileCache;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.v1test.CASInsertionPolicy;
 import com.google.devtools.remoteexecution.v1test.Action;
@@ -37,7 +38,7 @@ class StubWorkerContext implements WorkerContext {
   @Override public String getName() { throw new UnsupportedOperationException(); }
   @Override public Poller createPoller(String name, String operationName, Stage stage) { throw new UnsupportedOperationException(); }
   @Override public Poller createPoller(String name, String operationName, Stage stage, Runnable onFailure) { throw new UnsupportedOperationException(); }
-  @Override public void match(Predicate<Operation> onMatch) { throw new UnsupportedOperationException(); }
+  @Override public void match(MatchListener listener) { throw new UnsupportedOperationException(); }
   @Override public void requeue(Operation operation) { throw new UnsupportedOperationException(); }
   @Override public void deactivate(Operation operation) { throw new UnsupportedOperationException(); }
   @Override public void logInfo(String msg) { }

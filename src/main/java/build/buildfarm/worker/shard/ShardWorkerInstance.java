@@ -253,19 +253,29 @@ public class ShardWorkerInstance extends AbstractServerInstance {
     throw new UnsupportedOperationException();
   }
 
-  private void matchResettable(Platform platform, Predicate<Operation> onMatch) throws InterruptedException, IOException {
+  private void matchResettable(Platform platform, MatchListener listener) throws InterruptedException, IOException {
     boolean complete = false;
     while (!complete && !Thread.currentThread().isInterrupted()) {
       try {
         String operationName = null;
         do {
+          listener.onWaitStart();
           operationName = backplane.dispatchOperation();
+          listener.onWaitEnd();
         } while (operationName == null);
 
         // FIXME platform match
-
-        Operation operation = backplane.getOperation(operationName);
-        boolean success = onMatch.test(operation);
+        if (listener.onOperationName(operationName)) {
+          Operation operation = backplane.getOperation(operationName);
+          if (operation == null) {
+            backplane.completeOperation(operationName);
+            operation = Operation.newBuilder()
+                .setName(operationName)
+                .setDone(true)
+                .build();
+          }
+          listener.onOperation(operation);
+        }
         complete = true;
       } catch (SocketTimeoutException e) {
         // ignore
@@ -277,17 +287,17 @@ public class ShardWorkerInstance extends AbstractServerInstance {
     }
   }
 
-  private void matchInterruptible(Platform platform, Predicate<Operation> onMatch) throws InterruptedException, IOException {
-    matchResettable(platform, onMatch);
+  private void matchInterruptible(Platform platform, MatchListener listener) throws InterruptedException, IOException {
+    matchResettable(platform, listener);
     if (Thread.interrupted()) {
       throw new InterruptedException();
     }
   }
 
   @Override
-  public void match(Platform platform, Predicate<Operation> onMatch) throws InterruptedException {
+  public void match(Platform platform, MatchListener listener) throws InterruptedException {
     try {
-      matchInterruptible(platform, onMatch);
+      matchInterruptible(platform, listener);
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }

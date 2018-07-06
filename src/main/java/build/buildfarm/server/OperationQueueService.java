@@ -15,6 +15,7 @@
 package build.buildfarm.server;
 
 import build.buildfarm.instance.Instance;
+import build.buildfarm.instance.Instance.SimpleMatchListener;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.PollOperationRequest;
 import build.buildfarm.v1test.TakeOperationRequest;
@@ -48,7 +49,7 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
     }
 
     try {
-      instance.match(request.getPlatform(), (Operation operation) -> {
+      instance.match(request.getPlatform(), new SimpleMatchListener((operation) -> {
         // so this is interesting - the stdout injection belongs here, because
         // we use this criteria to select the format for stream/blob differentiation
         try {
@@ -79,7 +80,7 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
           Thread.currentThread().interrupt();
         }
         return false;
-      });
+      }));
     } catch (InterruptedException e) {
       responseObserver.onError(Status.fromThrowable(e).asException());
     }

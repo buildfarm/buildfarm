@@ -21,6 +21,7 @@ import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.instance.memory.MemoryLRUContentAddressableStorage;
 import build.buildfarm.instance.shard.RedisShardBackplane;
 import build.buildfarm.instance.stub.ByteStreamUploader;
@@ -591,15 +592,68 @@ public class Worker implements Instances {
       }
 
       @Override
-      public void match(Predicate<Operation> onMatch) throws InterruptedException {
-        instance.match(config.getPlatform(), (operation) -> {
-          if (activeOperations.contains(operation.getName())) {
-            System.err.println("WorkerContext::match: WARNING matched duplicate operation " + operation.getName());
-            return onMatch.test(null);
+      public void match(MatchListener listener) throws InterruptedException {
+        instance.match(config.getPlatform(), new MatchListener() {
+          @Override
+          public void onWaitStart() {
+            listener.onWaitStart();
           }
-          activeOperations.add(operation.getName());
-          return onMatch.test(operation);
+
+          @Override
+          public void onWaitEnd() {
+            listener.onWaitEnd();
+          }
+
+          @Override
+          public boolean onOperationName(String operationName) {
+            if (activeOperations.contains(operationName)) {
+              System.err.println("WorkerContext::match: WARNING matched duplicate operation " + operationName);
+              return listener.onOperation(null);
+            }
+            activeOperations.add(operationName);
+            boolean success = listener.onOperationName(operationName);
+            if (!success) {
+              try {
+                // fast path to requeue, implementation specific
+                backplane.pollOperation(operationName, ExecuteOperationMetadata.Stage.QUEUED, 0);
+              } catch (IOException e) {
+                System.err.println("Failure while trying to fast requeue " + operationName);
+                e.printStackTrace();
+              }
+            }
+            return success;
+          }
+
+          @Override
+          public boolean onOperation(Operation operation) {
+            // could not fetch
+            if (operation.getDone()) {
+              activeOperations.remove(operation.getName());
+              listener.onOperation(null);
+              try {
+                backplane.pollOperation(operation.getName(), ExecuteOperationMetadata.Stage.QUEUED, 0);
+              } catch (IOException e) {
+                System.err.println("Failure while trying to fast requeue " + operation.getName());
+                e.printStackTrace();
+              }
+              return false;
+            }
+
+            boolean success = listener.onOperation(operation);
+            if (!success) {
+              try {
+                requeue(operation);
+              } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+              }
+            }
+            return success;
+          }
         });
+        if (Thread.interrupted()) {
+          throw new InterruptedException();
+        }
       }
 
       private ExecuteOperationMetadata expectExecuteOperationMetadata(Operation operation) {

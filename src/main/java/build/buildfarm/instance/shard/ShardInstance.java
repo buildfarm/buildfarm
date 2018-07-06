@@ -875,7 +875,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @Override
-  public void match(Platform platform, Predicate<Operation> onMatch) {
+  public void match(Platform platform, MatchListener listener) {
     throw new UnsupportedOperationException();
   }
 

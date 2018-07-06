@@ -68,7 +68,7 @@ public interface Instance {
       int totalInputFileCount,
       long totalInputFileBytes,
       Consumer<Operation> onOperation) throws InterruptedException;
-  void match(Platform platform, Predicate<Operation> onMatch) throws InterruptedException;
+  void match(Platform platform, MatchListener listener) throws InterruptedException;
   boolean putOperation(Operation operation) throws InterruptedException;
   boolean pollOperation(String operationName, Stage stage);
   // returns nextPageToken suitable for list restart
@@ -85,4 +85,33 @@ public interface Instance {
       String operationName,
       boolean watchInitialState,
       Predicate<Operation> watcher);
+
+  interface MatchListener {
+    // start/end pair called for each wait period
+    void onWaitStart();
+
+    void onWaitEnd();
+
+    // optional notification if distinct from operation fetch
+    // returns false if this listener will not handle this match
+    boolean onOperationName(String operationName);
+
+    // returns false if this listener will not handle this match
+    boolean onOperation(Operation operation);
+  }
+
+  public static class SimpleMatchListener implements MatchListener {
+    private final Predicate<Operation> onMatch;
+
+    public SimpleMatchListener(Predicate<Operation> onMatch) {
+      this.onMatch = onMatch;
+    }
+
+    @Override public void onWaitStart() { }
+    @Override public void onWaitEnd() { }
+    @Override public boolean onOperationName(String operationName) { return true; }
+    @Override public boolean onOperation(Operation operation) {
+      return onMatch.test(operation);
+    }
+  }
 }

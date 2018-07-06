@@ -411,14 +411,18 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public void match(Platform platform, Predicate<Operation> onMatch) throws InterruptedException {
-    Operation operation = operationQueueBlockingStub.get()
-        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
-        .take(TakeOperationRequest.newBuilder()
+  public void match(Platform platform, MatchListener listener) throws InterruptedException {
+    TakeOperationRequest request = TakeOperationRequest.newBuilder()
         .setInstanceName(getName())
         .setPlatform(platform)
-        .build());
-    boolean success = onMatch.test(operation); // unused
+        .build();
+    // not required to call onOperationName
+    listener.onWaitStart();
+    Operation operation = operationQueueBlockingStub.get()
+        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
+        .take(request);
+    listener.onWaitEnd();
+    listener.onOperation(operation);
     if (Thread.interrupted()) {
       throw new InterruptedException();
     }

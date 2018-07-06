@@ -66,19 +66,19 @@ public class MemoryInstance extends AbstractServerInstance {
 
   private static final class Worker {
     private final Platform platform;
-    private final Predicate<Operation> onMatch;
+    private final MatchListener listener;
 
-    Worker(Platform platform, Predicate<Operation> onMatch) {
+    Worker(Platform platform, MatchListener listener) {
       this.platform = platform;
-      this.onMatch = onMatch;
+      this.listener = listener;
     }
 
     Platform getPlatform() {
       return platform;
     }
 
-    boolean test(Operation operation) {
-      return onMatch.test(operation);
+    MatchListener getListener() {
+      return listener;
     }
   }
 
@@ -304,7 +304,7 @@ public class MemoryInstance extends AbstractServerInstance {
           rejectedWorkers.add(worker);
         } else {
           // worker onMatch false return indicates inviability
-          if (dispatched = worker.test(operation)) {
+          if (dispatched = worker.getListener().onOperation(operation)) {
             onDispatched(operation);
           }
         }
@@ -314,17 +314,17 @@ public class MemoryInstance extends AbstractServerInstance {
     return dispatched;
   }
 
-  private void matchSynchronized(Platform platform, Predicate<Operation> onMatch) throws InterruptedException {
+  private void matchSynchronized(Platform platform, MatchListener listener) throws InterruptedException {
     ImmutableList.Builder<Operation> rejectedOperations = new ImmutableList.Builder<Operation>();
     boolean matched = false;
     while (!matched && !queuedOperations.isEmpty()) {
       Operation operation = queuedOperations.remove(0);
       if (satisfiesRequirements(platform, operation)) {
         matched = true;
-        if (onMatch.test(operation)) {
+        if (listener.onOperation(operation)) {
           onDispatched(operation);
           /*
-          for this context, we need to make the requeue go into a bucket during onMatch
+          for this context, we need to make the requeue go into a bucket during onOperation
         } else if (!requeueOnFailure) {
           rejectedOperations.add(operation);
           */
@@ -336,15 +336,16 @@ public class MemoryInstance extends AbstractServerInstance {
     Iterables.addAll(queuedOperations, rejectedOperations.build());
     if (!matched) {
       synchronized(workers) {
-        workers.add(new Worker(platform, onMatch));
+        listener.onWaitStart();
+        workers.add(new Worker(platform, listener));
       }
     }
   }
 
   @Override
-  public void match(Platform platform, Predicate<Operation> onMatch) throws InterruptedException {
+  public void match(Platform platform, MatchListener listener) throws InterruptedException {
     synchronized (queuedOperations) {
-      matchSynchronized(platform, onMatch);
+      matchSynchronized(platform, listener);
     }
   }
 

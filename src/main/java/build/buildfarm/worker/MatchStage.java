@@ -15,7 +15,9 @@
 package build.buildfarm.worker;
 
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.v1test.QueuedOperationMetadata;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.devtools.remoteexecution.v1test.Action;
 import com.google.devtools.remoteexecution.v1test.Command;
@@ -41,17 +43,50 @@ public class MatchStage extends PipelineStage {
     super("MatchStage", workerContext, output, error);
   }
 
-  @Override
-  protected void iterate() throws InterruptedException {
-    long startTime = System.nanoTime();
-    if (!output.claim()) {
-      return;
+  class MatchOperationListener implements MatchListener {
+    private long waitStart;
+    private long waitDuration = 0;
+    private Poller poller = null;
+
+    public long getWaitDuration() {
+      return waitDuration;
     }
-    long waitTime = System.nanoTime() - startTime;
 
-    workerContext.logInfo("MatchStage: Matching");
+    @Override
+    public void onWaitStart() {
+      waitStart = System.nanoTime();
+    }
 
-    workerContext.match((operation) -> {
+    @Override
+    public void onWaitEnd() {
+      long now = System.nanoTime();
+      waitDuration += now - waitStart;
+      waitStart = now;
+    }
+
+    @Override
+    public boolean onOperationName(String operationName) {
+      Preconditions.checkState(poller == null);
+      poller = workerContext.createPoller(
+          "MatchStage",
+          operationName,
+          ExecuteOperationMetadata.Stage.QUEUED);
+      return true;
+    }
+
+    @Override
+    public boolean onOperation(Operation operation) {
+      try {
+        return onOperationPolled(operation);
+      } finally {
+        if (!Thread.currentThread().isInterrupted() && poller != null) {
+          poller.stop();
+          poller = null;
+        }
+      }
+    }
+
+    private boolean onOperationPolled(Operation operation) {
       if (operation == null) {
         output.release();
         return false;
@@ -66,7 +101,10 @@ public class MatchStage extends PipelineStage {
         } else {
           workerContext.logInfo("MatchStage: Operation fetch failed: " + operation.getName());
           output.release();
-          workerContext.requeue(operation);
+        }
+        if (poller != null) {
+          poller.stop();
+          poller = null;
         }
         if (context != null) {
           output.put(context);
@@ -76,8 +114,24 @@ public class MatchStage extends PipelineStage {
         Thread.currentThread().interrupt();
         return false;
       }
-    });
+    }
+  }
+
+  @Override
+  protected void iterate() throws InterruptedException {
+    long startTime = System.nanoTime();
+    if (!output.claim()) {
+      return;
+    }
+    long waitTime = System.nanoTime() - startTime;
+
+    workerContext.logInfo("MatchStage: Matching");
+
+    MatchOperationListener listener = new MatchOperationListener();
+
+    workerContext.match(listener);
     long endTime = System.nanoTime();
+    waitTime += listener.getWaitDuration();
     workerContext.logInfo(String.format(
         "MatchStage::iterate(): %gms (%gms wait)",
         (endTime - startTime) / 1000000.0f,

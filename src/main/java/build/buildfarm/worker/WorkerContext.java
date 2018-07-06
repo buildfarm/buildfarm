@@ -17,6 +17,7 @@ package build.buildfarm.worker;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.v1test.CASInsertionPolicy;
 import com.google.devtools.remoteexecution.v1test.Action;
@@ -31,13 +32,12 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Path;
 import java.util.Map;
-import java.util.function.Predicate;
 
 public interface WorkerContext {
   String getName();
   Poller createPoller(String name, String operationName, Stage stage);
   Poller createPoller(String name, String operationName, Stage stage, Runnable onFailure);
-  void match(Predicate<Operation> onMatch) throws InterruptedException;
+  void match(MatchListener listener) throws InterruptedException;
   void requeue(Operation operation) throws InterruptedException;
   void deactivate(Operation operation);
   void logInfo(String msg);

@@ -18,6 +18,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Chunker;
 import build.buildfarm.instance.stub.Retrier;
@@ -426,14 +427,45 @@ public class Worker {
       }
 
       @Override
-      public void match(Predicate<Operation> onMatch) throws InterruptedException {
-        operationQueueInstance.match(config.getPlatform(), (operation) -> {
-          if (activeOperations.contains(operation.getName())) {
-            return onMatch.test(null);
+      public void match(MatchListener listener) throws InterruptedException {
+        operationQueueInstance.match(config.getPlatform(), new MatchListener() {
+          @Override
+          public void onWaitStart() {
+            listener.onWaitStart();
           }
-          activeOperations.add(operation.getName());
-          return onMatch.test(operation);
+
+          @Override
+          public void onWaitEnd() {
+            listener.onWaitEnd();
+          }
+
+          @Override
+          public boolean onOperationName(String operationName) {
+            return true;
+          }
+
+          @Override
+          public boolean onOperation(Operation operation) {
+            if (activeOperations.contains(operation.getName())) {
+              System.err.println("WorkerContext::match: WARNING matched duplicate operation " + operation.getName());
+              return listener.onOperation(null);
+            }
+            activeOperations.add(operation.getName());
+            boolean success = listener.onOperation(operation);
+            if (!success) {
+              try {
+                requeue(operation);
+              } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+              }
+            }
+            return success;
+          }
         });
+        if (Thread.interrupted()) {
+          throw new InterruptedException();
+        }
       }
 
       @Override

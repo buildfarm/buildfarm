@@ -17,6 +17,7 @@ package build.buildfarm.worker;
 import static com.google.common.truth.Truth.assertThat;
 
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.WorkerConfig;
 import com.google.devtools.remoteexecution.v1test.Action;
@@ -72,8 +73,8 @@ public class MatchStageTest {
       }
 
       @Override
-      public void match(Predicate<Operation> onMatch) {
-        assertThat(onMatch.test(queue.remove(0))).isEqualTo(results.remove(0));
+      public void match(MatchListener listener) {
+        assertThat(listener.onOperation(queue.remove(0))).isEqualTo(results.remove(0));
       }
 
       @Override
