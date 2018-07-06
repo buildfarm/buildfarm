@@ -46,6 +46,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import javax.naming.ConfigurationException;
@@ -69,6 +70,8 @@ public class RedisShardBackplane implements ShardBackplane {
   private final URI redisURI;
 
   private Thread subscriptionThread = null;
+  private Thread failsafeOperationThread = null;
+  private OperationSubscriber operationSubscriber = null;
   private RedisShardSubscription operationSubscription = null;
   private JedisPool pool = null;
 
@@ -107,69 +110,41 @@ public class RedisShardBackplane implements ShardBackplane {
     pool = new JedisPool(jedisPoolConfig, redisURI, /* connectionTimeout=*/ 30000, /* soTimeout=*/ 30000);
   }
 
-  private JedisPubSub createOperationSubscriber() {
-    return new JedisPubSub() {
-      @Override
-      public void onMessage(String channel, String message) {
-        Operation operation = message == null
-            ? null : parseOperationJson(message);
-        String operationName = message == null
-            ? channel : operation.getName();
-        synchronized (watchers) {
-          List<Predicate<Operation>> operationWatchers =
-              watchers.get(operationName);
-          if (operationWatchers == null)
-            return;
-          if (operation == null || operation.getDone()) {
-            watchers.remove(operationName);
-          }
-          long unfilteredWatcherCount = operationWatchers.size();
-          ImmutableList.Builder<Predicate<Operation>> filteredWatchers = new ImmutableList.Builder<>();
-          long filteredWatcherCount = 0;
-          for (Predicate<Operation> watcher : operationWatchers) {
-            if (watcher.test(operation)) {
-              filteredWatchers.add(watcher);
-              filteredWatcherCount++;
-            }
-          }
-          if (operation != null && !operation.getDone() && filteredWatcherCount != unfilteredWatcherCount) {
-            operationWatchers = new ArrayList<>();
-            Iterables.addAll(operationWatchers, filteredWatchers.build());
-            watchers.put(operation.getName(), operationWatchers);
-          }
-        }
-      }
-    };
-  }
+  private void startSubscriptionThread() {
+    operationSubscriber = new OperationSubscriber(watchers, this::operationKey);
 
-  private RedisShardSubscription createOperationSubscription() {
-    JedisPubSub operationSubscriber = createOperationSubscriber();
-
-    return new RedisShardSubscription(
+    operationSubscription = new RedisShardSubscription(
         config.getOperationChannelName(),
         operationSubscriber,
         /* onUnsubscribe=*/ () -> {
           subscriptionThread = null;
           onUnsubscribe.run();
         },
-        /* onReset=*/ (jedis) -> {
-          // need to resend all watcher information
-          // should probably lock out watcher additions here
-          for (String operationName : watchers.keySet()) {
-            String json = jedis.get(operationKey(operationName));
-            operationSubscriber.onMessage(operationName, json);
-          }
-        },
+        /* onReset=*/ operationSubscriber::updateWatchedIfDone,
         this::getJedis);
-  }
-
-  private void startSubscriptionThread() {
-    operationSubscription = createOperationSubscription();
 
     // use Executors...
     subscriptionThread = new Thread(operationSubscription);
 
     subscriptionThread.start();
+
+    failsafeOperationThread = new Thread(() -> {
+      while (true) {
+        try {
+          TimeUnit.SECONDS.sleep(30);
+          try (Jedis jedis = getJedis()) {
+            operationSubscriber.updateWatchedIfDone(jedis);
+          }
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          break;
+        } catch (Exception e) {
+          e.printStackTrace();
+        }
+      }
+    });
+
+    failsafeOperationThread.start();
   }
 
   @Override
@@ -185,6 +160,8 @@ public class RedisShardBackplane implements ShardBackplane {
     if (subscriptionThread != null) {
       subscriptionThread.stop();
       // subscriptionThread.join();
+      failsafeOperationThread.stop();
+      // failsafeOperationThread.join();
     }
     if (pool != null) {
       pool.close();
@@ -403,7 +380,7 @@ public class RedisShardBackplane implements ShardBackplane {
       List<Response<String>> actionResults = new ArrayList<>(keyResults.size());
       Pipeline p = jedis.pipelined();
       for (int i = 0; i < keyResults.size(); i++) {
-        actionResults.set(i, p.get(keyResults.get(i)));
+        actionResults.add(p.get(keyResults.get(i)));
       }
       p.sync();
       for (int i = 0; i < keyResults.size(); i++) {
@@ -545,7 +522,10 @@ public class RedisShardBackplane implements ShardBackplane {
     return blobDigestsWorkers.build();
   }
 
-  private static Operation parseOperationJson(String operationJson) {
+  public static Operation parseOperationJson(String operationJson) {
+    if (operationJson == null) {
+      return null;
+    }
     try {
       Operation.Builder operationBuilder = Operation.newBuilder();
       getOperationParser().merge(operationJson, operationBuilder);
