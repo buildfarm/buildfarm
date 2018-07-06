@@ -252,6 +252,7 @@ java_library(
         "//3rdparty/jvm/com/github/jnr:jnr_ffi",
         "//3rdparty/jvm/com/github/pcj:google_options",
         "//3rdparty/jvm/com/github/serceman:jnr_fuse",
+        "//3rdparty/jvm/com/google/code/findbugs:jsr305",
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java_util",

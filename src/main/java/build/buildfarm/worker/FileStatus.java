@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker.operationqueue;
+package build.buildfarm.worker;
 
 import java.io.IOException;
 
@@ -79,11 +79,7 @@ public interface FileStatus {
   long getLastChangeTime() throws IOException;
 
   /**
-   * Returns the unique file node id. Usually it is computed using both device
-   * and inode numbers.
-   *
-   * <p>Think of this value as a reference to the underlying inode. "mv"ing file a to file b
-   * ought to cause the node ID of b to change, but appending / modifying b should not.
+   * see BasicFileAttributes.fileKey()
    */
-  long getNodeId() throws IOException;
+  Object fileKey();
 }

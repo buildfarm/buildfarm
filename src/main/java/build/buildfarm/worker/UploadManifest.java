@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker.operationqueue;
+package build.buildfarm.worker;
 
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.stub.Chunker;
@@ -42,7 +42,7 @@ import java.util.function.Consumer;
 
 /** UploadManifest adds output metadata to a {@link ActionResult}. */
 /** FIXME move into worker implementation and implement 'fast add' with this for sharding */
-class UploadManifest {
+public class UploadManifest {
   private static final String ERR_NO_SUCH_FILE_OR_DIR = " (No such file or directory)";
 
   private static final LinkOption[] NO_LINK_OPTION = new LinkOption[0];
@@ -77,7 +77,7 @@ class UploadManifest {
 
     this.digestToFile = new HashMap<>();
     this.digestToChunkers = new HashMap<>();
-    this.inlineContentBytes = 0;
+    this.inlineContentBytes = 1;
   }
 
   /**
@@ -187,14 +187,14 @@ class UploadManifest {
     digestToChunkers.put(chunker.digest(), chunker);
   }
 
-  private LinkOption[] linkOpts(boolean followSymlinks) {
+  private static LinkOption[] linkOpts(boolean followSymlinks) {
     return followSymlinks ? NO_LINK_OPTION : NOFOLLOW_LINKS_OPTION;
   }
 
   /**
    * Returns the status of a file.
    */
-  private FileStatus stat(final Path path, final boolean followSymlinks) throws IOException {
+  private static FileStatus stat(final Path path, final boolean followSymlinks) throws IOException {
     final BasicFileAttributes attributes;
     try {
       attributes =
@@ -240,9 +240,8 @@ class UploadManifest {
       }
 
       @Override
-      public long getNodeId() {
-        // TODO(bazel-team): Consider making use of attributes.fileKey().
-        return -1;
+      public Object fileKey() {
+        return attributes.fileKey();
       }
     };
 
@@ -252,7 +251,7 @@ class UploadManifest {
   /**
    * Like stat(), but returns null on failures instead of throwing.
    */
-  private FileStatus statNullable(Path path, boolean followSymlinks) {
+  private static FileStatus statNullable(Path path, boolean followSymlinks) {
     try {
       return stat(path, followSymlinks);
     } catch (IOException e) {
@@ -288,12 +287,13 @@ class UploadManifest {
     }
   }
 
-  private List<Dirent> readdir(Path path, boolean followSymlinks) throws IOException {
+  public static List<Dirent> readdir(Path path, boolean followSymlinks) throws IOException {
     List<Dirent> dirents = new ArrayList<>();
     try (DirectoryStream<Path> stream = Files.newDirectoryStream(path)) {
       for (Path file : stream) {
+        FileStatus stat = statNullable(file, followSymlinks);
         Dirent.Type type = direntTypeFromStat(statNullable(file, followSymlinks));
-        dirents.add(new Dirent(file.getFileName().toString(), type));
+        dirents.add(new Dirent(file.getFileName().toString(), type, stat));
       }
     }
     return dirents;

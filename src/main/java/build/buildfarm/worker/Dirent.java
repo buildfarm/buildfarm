@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker.operationqueue;
+package build.buildfarm.worker;
 
 import com.google.common.base.Preconditions;
 import java.io.Serializable;
 import java.util.Objects;
+import javax.annotation.Nullable;
 
 /** Directory entry representation returned by {@link Path#readdir}. */
 public final class Dirent implements Serializable, Comparable<Dirent> {
@@ -34,11 +35,13 @@ public final class Dirent implements Serializable, Comparable<Dirent> {
 
   private final String name;
   private final Type type;
+  @Nullable private final FileStatus stat;
 
   /** Creates a new dirent with the given name and type, both of which must be non-null. */
-  public Dirent(String name, Type type) {
+  public Dirent(String name, Type type, FileStatus stat) {
     this.name = Preconditions.checkNotNull(name);
     this.type = Preconditions.checkNotNull(type);
+    this.stat = stat;
   }
 
   public String getName() {
@@ -47,6 +50,11 @@ public final class Dirent implements Serializable, Comparable<Dirent> {
 
   public Type getType() {
     return type;
+  }
+
+  @Nullable
+  public FileStatus getStat() {
+    return stat;
   }
 
   @Override

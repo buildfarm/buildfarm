@@ -38,6 +38,7 @@ import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.Poller;
 import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.ReportResultStage;
+import build.buildfarm.worker.UploadManifest;
 import build.buildfarm.worker.WorkerContext;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
