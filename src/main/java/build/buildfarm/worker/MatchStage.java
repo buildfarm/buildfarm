@@ -60,15 +60,18 @@ public class MatchStage extends PipelineStage {
       workerContext.logInfo("MatchStage: Starting operation: " + operation.getName());
 
       try {
-        boolean fetched = fetch(operation);
-        if (fetched) {
+        OperationContext context = fetch(operation);
+        if (context != null) {
           workerContext.logInfo("MatchStage: Done with operation: " + operation.getName());
         } else {
           workerContext.logInfo("MatchStage: Operation fetch failed: " + operation.getName());
           output.release();
           workerContext.requeue(operation);
         }
-        return fetched;
+        if (context != null) {
+          output.put(context);
+        }
+        return context != null;
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         return false;
@@ -96,9 +99,9 @@ public class MatchStage extends PipelineStage {
     return directoriesIndex.build();
   }
 
-  private boolean fetch(Operation operation) throws InterruptedException {
+  private OperationContext fetch(Operation operation) throws InterruptedException {
     if (!operation.getMetadata().is(QueuedOperationMetadata.class)) {
-      return false;
+      return null;
     }
 
     QueuedOperationMetadata metadata;
@@ -106,7 +109,7 @@ public class MatchStage extends PipelineStage {
       metadata = operation.getMetadata().unpack(QueuedOperationMetadata.class);
     } catch (InvalidProtocolBufferException e) {
       e.printStackTrace();
-      return false;
+      return null;
     }
 
     Action action = metadata.getAction();
@@ -116,25 +119,24 @@ public class MatchStage extends PipelineStage {
       Duration maximum = workerContext.getMaximumActionTimeout();
       if (timeout.getSeconds() > maximum.getSeconds() ||
           (timeout.getSeconds() == maximum.getSeconds() && timeout.getNanos() > maximum.getNanos())) {
-        return false;
+        return null;
       }
     }
 
     Command command = metadata.getCommand();
     if (command.getArgumentsList().isEmpty()) {
-      return false;
+      return null;
     }
 
     Path execDir = workerContext.getRoot().resolve(operation.getName());
-    output.put(OperationContext.newBuilder()
+    return OperationContext.newBuilder()
         .setOperation(operation)
         .setExecDir(execDir)
         .setDirectoriesIndex(createDirectoriesIndex(metadata.getDirectoriesList(), workerContext.getDigestUtil()))
         .setMetadata(metadata.getExecuteOperationMetadata())
         .setAction(action)
         .setCommand(command)
-        .build());
-    return true;
+        .build();
   }
 
   @Override
