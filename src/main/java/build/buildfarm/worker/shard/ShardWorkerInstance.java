@@ -254,7 +254,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   private void matchResettable(Platform platform, Predicate<Operation> onMatch) throws InterruptedException, IOException {
-    while (!Thread.interrupted()) {
+    while (!Thread.currentThread().isInterrupted()) {
       try {
         String operationName = null;
         do {
