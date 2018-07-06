@@ -585,7 +585,7 @@ public class Worker {
       }
 
       @Override
-      public ByteString getBlob(Digest digest) throws InterruptedException, IOException {
+      public ByteString getBlob(Digest digest) throws IOException, InterruptedException {
         return casInstance.getBlob(digest);
       }
 

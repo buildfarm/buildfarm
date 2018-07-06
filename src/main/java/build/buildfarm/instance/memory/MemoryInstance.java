@@ -432,7 +432,7 @@ public class MemoryInstance extends AbstractServerInstance {
 
   @Override
   protected TokenizableIterator<Directory> createTreeIterator(
-      Digest rootDigest, String pageToken) throws InterruptedException, IOException {
+      Digest rootDigest, String pageToken) throws IOException, InterruptedException {
     return new TreeIterator(this::expectDirectory, rootDigest, pageToken);
   }
 

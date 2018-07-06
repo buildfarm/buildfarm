@@ -38,7 +38,7 @@ public class TreeIterator implements TokenizableIterator<Directory> {
   private final ArrayDeque<Digest> parentPath;
   private final Stack<Iterator<Digest>> pointers;
 
-  public TreeIterator(GetDirectoryFunction getDirectory, Digest rootDigest, String pageToken) throws InterruptedException, IOException {
+  public TreeIterator(GetDirectoryFunction getDirectory, Digest rootDigest, String pageToken) throws IOException, InterruptedException {
     this.getDirectory = getDirectory;
     parentPath = new ArrayDeque<Digest>();
     pointers = new Stack<Iterator<Digest>>();

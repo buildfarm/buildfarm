@@ -319,7 +319,7 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public InputStream newStreamInput(String name) throws InterruptedException, IOException {
+  public InputStream newStreamInput(String name) throws IOException, InterruptedException {
     Iterator<ReadResponse> replies = retrier.execute(() -> bsBlockingStub
         .get()
         .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
@@ -336,7 +336,7 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public ByteString getBlob(Digest blobDigest) throws InterruptedException, IOException {
+  public ByteString getBlob(Digest blobDigest) throws IOException, InterruptedException {
     try (InputStream in = newStreamInput(getBlobName(blobDigest))) {
       return ByteString.readFrom(in);
     } catch (StatusRuntimeException e) {
@@ -348,7 +348,7 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public ByteString getBlob(Digest blobDigest, long offset, long limit) throws InterruptedException, IOException {
+  public ByteString getBlob(Digest blobDigest, long offset, long limit) throws IOException, InterruptedException {
     try (InputStream in = newStreamInput(getBlobName(blobDigest))) {
       in.skip(offset);
       if (limit == 0) {

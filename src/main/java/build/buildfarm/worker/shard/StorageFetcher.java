@@ -30,7 +30,7 @@ class StorageFetcher implements Fetcher {
   }
 
   @Override
-  public ByteString fetchBlob(Digest blobDigest) throws InterruptedException, IOException {
+  public ByteString fetchBlob(Digest blobDigest) throws IOException, InterruptedException {
     synchronized (storage.acquire(blobDigest)) {
       // necessary, since storage.get would loop back to this function
       try {

@@ -722,7 +722,7 @@ public class CASFileCache implements ContentAddressableStorage {
 
   @FunctionalInterface
   interface InputStreamSupplier {
-    InputStream newInput() throws InterruptedException, IOException;
+    InputStream newInput() throws IOException, InterruptedException;
   }
 
   private void putImpl(

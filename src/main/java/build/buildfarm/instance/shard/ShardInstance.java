@@ -358,7 +358,7 @@ public class ShardInstance extends AbstractServerInstance {
     }
   }
 
-  private ByteString getBlobImpl(Digest blobDigest, long offset, long limit, boolean forValidation) throws InterruptedException, IOException {
+  private ByteString getBlobImpl(Digest blobDigest, long offset, long limit, boolean forValidation) throws IOException, InterruptedException {
     List<String> workersList = new ArrayList<>(Sets.intersection(backplane.getBlobLocationSet(blobDigest), backplane.getWorkerSet()));
     Collections.shuffle(workersList, rand);
     Deque<String> workers = new ArrayDeque(workersList);
@@ -390,12 +390,12 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @Override
-  protected ByteString getBlob(Digest blobDigest, boolean forValidation) throws InterruptedException, IOException {
+  protected ByteString getBlob(Digest blobDigest, boolean forValidation) throws IOException, InterruptedException {
     return getBlobImpl(blobDigest, 0, 0, forValidation);
   }
 
   @Override
-  public ByteString getBlob(Digest blobDigest, long offset, long limit) throws InterruptedException, IOException {
+  public ByteString getBlob(Digest blobDigest, long offset, long limit) throws IOException, InterruptedException {
     return getBlobImpl(blobDigest, offset, limit, false);
   }
 
@@ -505,7 +505,7 @@ public class ShardInstance extends AbstractServerInstance {
   protected int getTreeDefaultPageSize() { return 1024; }
   protected int getTreeMaxPageSize() { return 1024; }
   protected TokenizableIterator<Directory> createTreeIterator(
-      Digest rootDigest, String pageToken) throws InterruptedException, IOException {
+      Digest rootDigest, String pageToken) throws IOException, InterruptedException {
     final GetDirectoryFunction getDirectoryFunction;
     Iterable<Directory> directories = backplane.getTree(rootDigest);
     if (directories != null) {

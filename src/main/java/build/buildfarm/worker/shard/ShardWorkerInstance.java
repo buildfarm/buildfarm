@@ -161,7 +161,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   // write through fetch with local lookup
-  public ByteString fetchBlob(Digest blobDigest) throws InterruptedException, IOException {
+  public ByteString fetchBlob(Digest blobDigest) throws IOException, InterruptedException {
     return fetcher.fetchBlob(blobDigest);
   }
 
@@ -178,7 +178,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   protected TokenizableIterator<Directory> createTreeIterator(
-      Digest rootDigest, String pageToken) throws InterruptedException, IOException {
+      Digest rootDigest, String pageToken) throws IOException, InterruptedException {
     final GetDirectoryFunction getDirectoryFunction;
     Iterable<Directory> directories = backplane.getTree(rootDigest);
     if (directories != null) {
@@ -206,7 +206,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
       int pageSize,
       String pageToken,
       ImmutableList.Builder<Directory> directories,
-      boolean acceptMissing) throws InterruptedException, IOException {
+      boolean acceptMissing) throws IOException, InterruptedException {
     if (pageSize == 0) {
       pageSize = 1024; // getTreeDefaultPageSize();
     }
@@ -253,7 +253,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
     throw new UnsupportedOperationException();
   }
 
-  private void matchResettable(Platform platform, MatchListener listener) throws InterruptedException, IOException {
+  private void matchResettable(Platform platform, MatchListener listener) throws IOException, InterruptedException {
     boolean complete = false;
     while (!complete && !Thread.currentThread().isInterrupted()) {
       try {
@@ -287,7 +287,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
     }
   }
 
-  private void matchInterruptible(Platform platform, MatchListener listener) throws InterruptedException, IOException {
+  private void matchInterruptible(Platform platform, MatchListener listener) throws IOException, InterruptedException {
     matchResettable(platform, listener);
     if (Thread.interrupted()) {
       throw new InterruptedException();
@@ -390,7 +390,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
     }
   }
 
-  public void cacheOperationActionInputTree(String operationName) throws InterruptedException, IOException {
+  public void cacheOperationActionInputTree(String operationName) throws IOException, InterruptedException {
     Operation operation = getOperation(operationName);
     Action action = expectAction(operation);
     Digest inputRoot = action.getInputRootDigest();

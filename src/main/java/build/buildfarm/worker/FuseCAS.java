@@ -268,7 +268,7 @@ public class FuseCAS extends FuseStubFS {
 
   @FunctionalInterface
   interface DirectoryEntryChildrenFetcher {
-    Map<String, Entry> apply(DirectoryEntry entry) throws InterruptedException, IOException;
+    Map<String, Entry> apply(DirectoryEntry entry) throws IOException, InterruptedException;
   }
 
   class CASDirectoryEntry extends DirectoryEntry {
@@ -353,13 +353,13 @@ public class FuseCAS extends FuseStubFS {
 
   @FunctionalInterface
   interface DirectoryEntryPathConsumer {
-    void accept(DirectoryEntry entry, String path) throws InterruptedException, IOException;
+    void accept(DirectoryEntry entry, String path) throws IOException, InterruptedException;
   }
 
   static private void resolveTopdir(
       String topdir,
       DirectoryEntry root,
-      DirectoryEntryPathConsumer onEntry) throws InterruptedException, IOException {
+      DirectoryEntryPathConsumer onEntry) throws IOException, InterruptedException {
     String[] components = topdir.split("/");
     int baseIndex = components.length - 1;
     while (baseIndex >= 0 && components[baseIndex].isEmpty()) {
@@ -411,7 +411,7 @@ public class FuseCAS extends FuseStubFS {
     }
   }
 
-  private Map<String, Entry> fetchChildren(DirectoryEntry dirEntry, Digest digest) throws InterruptedException, IOException {
+  private Map<String, Entry> fetchChildren(DirectoryEntry dirEntry, Digest digest) throws IOException, InterruptedException {
     Map<String, Entry> children = childrenCache.get(digest);
     if (children == null) {
       try {
@@ -439,7 +439,7 @@ public class FuseCAS extends FuseStubFS {
     return (dirEntry) -> fetchChildren(dirEntry, digest);
   }
 
-  public void createInputRoot(String topdir, Digest inputRoot) throws InterruptedException, IOException {
+  public void createInputRoot(String topdir, Digest inputRoot) throws IOException, InterruptedException {
     incMounts();
     resolveTopdir(topdir, root, (currentDir, base) -> {
       // FIXME duplicates?
@@ -447,7 +447,7 @@ public class FuseCAS extends FuseStubFS {
     });
   }
 
-  public void destroyInputRoot(String topdir) throws InterruptedException, IOException {
+  public void destroyInputRoot(String topdir) throws IOException, InterruptedException {
     resolveTopdir(topdir, root, (currentDir, base) -> {
       currentDir.removeChild(base);
     });

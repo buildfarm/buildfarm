@@ -447,7 +447,7 @@ public class Worker implements Instances {
       }
 
       @Override
-      public ByteString fetchBlob(Digest blobDigest) throws InterruptedException, IOException {
+      public ByteString fetchBlob(Digest blobDigest) throws IOException, InterruptedException {
         Set<String> workerSet = new HashSet<>(Sets.intersection(
             backplane.getBlobLocationSet(blobDigest),
             backplane.getWorkerSet()));
@@ -494,7 +494,7 @@ public class Worker implements Instances {
 
     Fetcher localPopulatingFetcher = new Fetcher() {
       @Override
-      public ByteString fetchBlob(Digest blobDigest) throws InterruptedException, IOException {
+      public ByteString fetchBlob(Digest blobDigest) throws IOException, InterruptedException {
         ByteString content = remoteFetcher.fetchBlob(blobDigest);
 
         // extra computations
@@ -517,7 +517,7 @@ public class Worker implements Instances {
 
       InputStreamFactory inputStreamFactory = new InputStreamFactory() {
         @Override
-        public InputStream newInput(Digest blobDigest) throws InterruptedException, IOException {
+        public InputStream newInput(Digest blobDigest) throws IOException, InterruptedException {
           // jank hax
           ByteString blob = new EmptyFetcher(new StorageFetcher(storage, remoteFetcher))
               .fetchBlob(blobDigest);
@@ -980,7 +980,7 @@ public class Worker implements Instances {
 
       // might want to split for removeDirectory and decrement references to avoid removing for streamed output
       @Override
-      public void destroyActionRoot(Path actionRoot) throws InterruptedException, IOException {
+      public void destroyActionRoot(Path actionRoot) throws IOException, InterruptedException {
         if (config.getUseFuseCas()) {
           String topdir = root.relativize(actionRoot).toString();
           fuseCAS.destroyInputRoot(topdir);

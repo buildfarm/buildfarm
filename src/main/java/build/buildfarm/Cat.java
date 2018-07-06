@@ -113,7 +113,7 @@ class Cat {
     }
   }
 
-  private static void printTree(Instance instance, Digest rootDigest) throws InterruptedException, IOException {
+  private static void printTree(Instance instance, Digest rootDigest) throws IOException, InterruptedException {
     ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
     String pageToken = "";
 

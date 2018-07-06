@@ -696,7 +696,7 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   @Override
-  public String dispatchOperation() throws InterruptedException, IOException {
+  public String dispatchOperation() throws IOException, InterruptedException {
     String operationName = null;
 
     try (Jedis jedis = getJedis()) {

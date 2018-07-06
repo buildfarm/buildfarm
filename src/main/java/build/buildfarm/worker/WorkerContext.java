@@ -54,7 +54,7 @@ public interface WorkerContext {
   boolean getStreamStderr();
   Duration getDefaultActionTimeout();
   Duration getMaximumActionTimeout();
-  ByteString getBlob(Digest digest) throws InterruptedException, IOException;
+  ByteString getBlob(Digest digest) throws IOException, InterruptedException;
   void createActionRoot(Path root, Map<Digest, Directory> directoriesIndex, Action action) throws IOException, InterruptedException;
   void destroyActionRoot(Path root) throws IOException, InterruptedException;
   Path getRoot();

@@ -184,7 +184,7 @@ public class Retrier {
    *
    * @param c The callable to execute.
    */
-  public <T> T execute(Callable<T> c) throws InterruptedException, IOException {
+  public <T> T execute(Callable<T> c) throws IOException, InterruptedException {
     Backoff backoff = backoffSupplier.get();
     while (true) {
       try {

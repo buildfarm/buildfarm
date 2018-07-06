@@ -208,7 +208,7 @@ public interface ShardBackplane {
    * dispatched operations.
    */
   @ThreadSafe
-  public String dispatchOperation() throws InterruptedException, IOException;
+  public String dispatchOperation() throws IOException, InterruptedException;
 
   /**
    * The state of operations is tracked in a series of lists representing the

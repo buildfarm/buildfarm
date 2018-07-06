@@ -49,8 +49,8 @@ public interface Instance {
       throws IOException, InterruptedException, StatusException;
 
   String getBlobName(Digest blobDigest);
-  ByteString getBlob(Digest blobDigest) throws InterruptedException, IOException;
-  ByteString getBlob(Digest blobDigest, long offset, long limit) throws InterruptedException, IOException;
+  ByteString getBlob(Digest blobDigest) throws IOException, InterruptedException;
+  ByteString getBlob(Digest blobDigest, long offset, long limit) throws IOException, InterruptedException;
   Digest putBlob(ByteString blob)
       throws IOException, InterruptedException, StatusException;
   String getTree(
@@ -58,9 +58,9 @@ public interface Instance {
       int pageSize,
       String pageToken,
       ImmutableList.Builder<Directory> directories,
-      boolean acceptMissing) throws InterruptedException, IOException; 
+      boolean acceptMissing) throws IOException, InterruptedException;
   OutputStream getStreamOutput(String name);
-  InputStream newStreamInput(String name) throws InterruptedException, IOException;
+  InputStream newStreamInput(String name) throws IOException, InterruptedException;
 
   void execute(
       Action action,

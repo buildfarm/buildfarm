@@ -80,7 +80,7 @@ public class FuseCASTest {
   }
 
   @Test
-  public void getattrRegular() throws InterruptedException, IOException {
+  public void getattrRegular() throws IOException, InterruptedException {
     fuseCAS.createInputRoot("test", Digest.newBuilder().setHash("/test").build());
     FileStat fileStat = createFileStat();
     assertThat(fuseCAS.getattr("/test/file", fileStat)).isEqualTo(0);
@@ -89,39 +89,39 @@ public class FuseCASTest {
   }
 
   @Test
-  public void createInputRootMakesDirectory() throws InterruptedException, IOException {
+  public void createInputRootMakesDirectory() throws IOException, InterruptedException {
     fuseCAS.createInputRoot("test", Digest.newBuilder().build());
     assertThat(fuseCAS.getattr("/test", createFileStat())).isEqualTo(0);
   }
 
   @Test
-  public void createInputRootEmptyTopdirThrows() throws InterruptedException, IOException {
+  public void createInputRootEmptyTopdirThrows() throws IOException, InterruptedException {
     exception.expect(IllegalArgumentException.class);
     fuseCAS.createInputRoot("", Digest.newBuilder().build());
   }
 
   @Test
-  public void createInputRootEmptyAfterSlashes() throws InterruptedException, IOException {
+  public void createInputRootEmptyAfterSlashes() throws IOException, InterruptedException {
     exception.expect(IllegalArgumentException.class);
     fuseCAS.createInputRoot("///", Digest.newBuilder().build());
   }
 
   @Test
-  public void createInputRootFileAsDirectoryThrows() throws InterruptedException, IOException {
+  public void createInputRootFileAsDirectoryThrows() throws IOException, InterruptedException {
     fuseCAS.createInputRoot("test", Digest.newBuilder().setHash("/test").build());
     exception.expect(IllegalArgumentException.class);
     fuseCAS.createInputRoot("test/file/subdir", Digest.newBuilder().build());
   }
 
   @Test
-  public void createInputRootEmptyComponentsIgnored() throws InterruptedException, IOException {
+  public void createInputRootEmptyComponentsIgnored() throws IOException, InterruptedException {
     fuseCAS.createInputRoot("/test/", Digest.newBuilder().setHash("/test").build());
     exception.expect(IllegalArgumentException.class);
     fuseCAS.createInputRoot("test/file/subdir", Digest.newBuilder().build());
   }
 
   @Test
-  public void destroyInputRootRemovesDirectory() throws InterruptedException, IOException {
+  public void destroyInputRootRemovesDirectory() throws IOException, InterruptedException {
     fuseCAS.createInputRoot("test", Digest.newBuilder().build());
     fuseCAS.destroyInputRoot("test");
     assertThat(fuseCAS.getattr("/test", createFileStat())).isEqualTo(-ErrorCodes.ENOENT());
@@ -133,7 +133,7 @@ public class FuseCASTest {
   }
 
   @Test
-  public void readlinkIsNotSymlink() throws InterruptedException, IOException {
+  public void readlinkIsNotSymlink() throws IOException, InterruptedException {
     fuseCAS.createInputRoot("test", Digest.newBuilder().build());
     assertThat(fuseCAS.readlink("/test", null, 0)).isEqualTo(-ErrorCodes.EINVAL());
   }
@@ -221,7 +221,7 @@ public class FuseCASTest {
   }
 
   @Test
-  public void mkdirExists() throws InterruptedException, IOException {
+  public void mkdirExists() throws IOException, InterruptedException {
     fuseCAS.createInputRoot("test", Digest.newBuilder().setHash("/test").build());
     assertThat(fuseCAS.mkdir("/test", 0755)).isEqualTo(-ErrorCodes.EEXIST());
   }
@@ -298,7 +298,7 @@ public class FuseCASTest {
   }
 
   @Test
-  public void truncateReadOnlyFile() throws InterruptedException, IOException {
+  public void truncateReadOnlyFile() throws IOException, InterruptedException {
     fuseCAS.createInputRoot("test", Digest.newBuilder().setHash("/test").build());
     assertThat(fuseCAS.truncate("/test/file", 1024)).isEqualTo(-ErrorCodes.EPERM());
   }
@@ -336,7 +336,7 @@ public class FuseCASTest {
   }
 
   @Test
-  public void writeReadOnly() throws InterruptedException, IOException {
+  public void writeReadOnly() throws IOException, InterruptedException {
     fuseCAS.createInputRoot("test", Digest.newBuilder().setHash("/test").build());
     FuseFileInfo fi = new SystemFuseFileInfo();
     fi.flags.set(0);
@@ -412,7 +412,7 @@ public class FuseCASTest {
   }
 
   @Test
-  public void readInputRooted() throws InterruptedException, IOException {
+  public void readInputRooted() throws IOException, InterruptedException {
     fuseCAS.createInputRoot("test", Digest.newBuilder().setHash("/test").build());
     byte[] data = new byte[6];
     u8[] array = Struct.arrayOf(Runtime.getSystemRuntime(), u8.class, data.length);
@@ -452,7 +452,7 @@ public class FuseCASTest {
   }
 
   @Test
-  public void fallocateReadOnly() throws InterruptedException, IOException {
+  public void fallocateReadOnly() throws IOException, InterruptedException {
     fuseCAS.createInputRoot("test", Digest.newBuilder().setHash("/test").build());
     assertThat(fuseCAS.fallocate(
         "/test/file",

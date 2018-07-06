@@ -53,7 +53,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
 
   private void readBlob(
       ReadRequest request,
-      StreamObserver<ReadResponse> responseObserver) throws InterruptedException, IOException {
+      StreamObserver<ReadResponse> responseObserver) throws IOException, InterruptedException {
     String resourceName = request.getResourceName();
     Instance instance;
     try {
@@ -91,7 +91,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
 
   private void readOperationStream(
       ReadRequest request,
-      StreamObserver<ReadResponse> responseObserver) throws InterruptedException, IOException {
+      StreamObserver<ReadResponse> responseObserver) throws IOException, InterruptedException {
     String resourceName = request.getResourceName();
 
     Instance instance;

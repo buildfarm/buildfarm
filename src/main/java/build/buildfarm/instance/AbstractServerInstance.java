@@ -138,16 +138,16 @@ public abstract class AbstractServerInstance implements Instance {
         DigestUtil.toString(blobDigest));
   }
 
-  protected ByteString getBlob(Digest blobDigest, boolean forValidation) throws InterruptedException, IOException { return getBlob(blobDigest); }
+  protected ByteString getBlob(Digest blobDigest, boolean forValidation) throws IOException, InterruptedException { return getBlob(blobDigest); }
 
   @Override
-  public final ByteString getBlob(Digest blobDigest) throws InterruptedException, IOException {
+  public final ByteString getBlob(Digest blobDigest) throws IOException, InterruptedException {
     return getBlob(blobDigest, 0, 0);
   }
 
   @Override
   public ByteString getBlob(Digest blobDigest, long offset, long limit)
-      throws InterruptedException, IOException, IndexOutOfBoundsException {
+      throws IOException, IndexOutOfBoundsException, InterruptedException {
     if (blobDigest.getSizeBytes() == 0) {
       if (offset == 0 && limit >= 0) {
         return ByteString.EMPTY;
@@ -210,13 +210,13 @@ public abstract class AbstractServerInstance implements Instance {
   protected abstract int getTreeDefaultPageSize();
   protected abstract int getTreeMaxPageSize();
   protected abstract TokenizableIterator<Directory> createTreeIterator(
-      Digest rootDigest, String pageToken) throws InterruptedException, IOException;
+      Digest rootDigest, String pageToken) throws IOException, InterruptedException;
 
   @Override
   public String getTree(
       Digest rootDigest, int pageSize, String pageToken,
       ImmutableList.Builder<Directory> directories,
-      boolean acceptMissing) throws InterruptedException, IOException {
+      boolean acceptMissing) throws IOException, InterruptedException {
     if (pageSize == 0) {
       pageSize = getTreeDefaultPageSize();
     }
@@ -355,7 +355,7 @@ public abstract class AbstractServerInstance implements Instance {
     visited.add(directoryDigest);
   }
 
-  protected Iterable<Directory> getTreeDirectories(Digest inputRoot) throws InterruptedException, IOException {
+  protected Iterable<Directory> getTreeDirectories(Digest inputRoot) throws IOException, InterruptedException {
     ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
 
     TokenizableIterator<Directory> iterator = createTreeIterator(inputRoot, /* pageToken=*/ "");

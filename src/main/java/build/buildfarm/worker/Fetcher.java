@@ -19,5 +19,5 @@ import com.google.protobuf.ByteString;
 import java.io.IOException;
 
 public interface Fetcher {
-  ByteString fetchBlob(Digest blobDigest) throws InterruptedException, IOException;
+  ByteString fetchBlob(Digest blobDigest) throws IOException, InterruptedException;
 }
