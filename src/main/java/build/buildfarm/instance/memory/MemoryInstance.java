@@ -136,7 +136,7 @@ public class MemoryInstance extends AbstractServerInstance {
 
   @Override
   protected void enqueueOperation(Operation operation) {
-    synchronized(queuedOperations) {
+    synchronized (queuedOperations) {
       Preconditions.checkState(!Iterables.any(queuedOperations, (queuedOperation) -> queuedOperation.getName().equals(operation.getName())));
       queuedOperations.add(operation);
     }
@@ -144,7 +144,7 @@ public class MemoryInstance extends AbstractServerInstance {
 
   @Override
   protected void updateOperationWatchers(Operation operation) {
-    synchronized(watchers) {
+    synchronized (watchers) {
       List<Predicate<Operation>> operationWatchers =
           watchers.get(operation.getName());
       if (operationWatchers != null) {
@@ -297,7 +297,7 @@ public class MemoryInstance extends AbstractServerInstance {
   protected boolean matchOperation(Operation operation) throws InterruptedException {
     ImmutableList.Builder<Worker> rejectedWorkers = new ImmutableList.Builder<>();
     boolean dispatched = false;
-    synchronized(workers) {
+    synchronized (workers) {
       while (!dispatched && !workers.isEmpty()) {
         Worker worker = workers.remove(0);
         if (!satisfiesRequirements(worker.getPlatform(), operation)) {
@@ -335,7 +335,7 @@ public class MemoryInstance extends AbstractServerInstance {
     }
     Iterables.addAll(queuedOperations, rejectedOperations.build());
     if (!matched) {
-      synchronized(workers) {
+      synchronized (workers) {
         listener.onWaitStart();
         workers.add(new Worker(platform, listener));
       }
@@ -383,7 +383,7 @@ public class MemoryInstance extends AbstractServerInstance {
       }
     }
     Operation completedOperation = null;
-    synchronized(watchers) {
+    synchronized (watchers) {
       List<Predicate<Operation>> operationWatchers = watchers.get(operationName);
       if (operationWatchers == null) {
         /* we can race on the synchronization and miss a done, where the

@@ -34,7 +34,7 @@ public class Watchdog implements Runnable {
 
   public void run() {
     try {
-      synchronized(this) {
+      synchronized (this) {
         start = System.nanoTime();
         while (!stopped && timeoutNanos > 0) {
           this.wait(timeoutNanos / 1000000L, (int) (timeoutNanos % 1000000L));

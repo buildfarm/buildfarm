@@ -639,7 +639,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   protected void updateOperationWatchers(Operation operation) {
     if (operation.getDone()) {
-      synchronized(operationLock(operation.getName())) {
+      synchronized (operationLock(operation.getName())) {
         completedOperations.put(operation.getName(), operation);
         outstandingOperations.remove(operation.getName());
       }
@@ -650,7 +650,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public Operation getOperation(String name) {
-    synchronized(operationLock(name)) {
+    synchronized (operationLock(name)) {
       Operation operation = completedOperations.get(name);
       if (operation == null) {
         operation = outstandingOperations.get(name);
@@ -689,7 +689,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public void deleteOperation(String name) {
-    synchronized(operationLock(name)) {
+    synchronized (operationLock(name)) {
       Operation deletedOperation = completedOperations.remove(name);
       if (deletedOperation == null &&
           outstandingOperations.containsKey(name)) {

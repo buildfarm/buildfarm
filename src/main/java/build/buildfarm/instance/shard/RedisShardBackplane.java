@@ -194,7 +194,7 @@ public class RedisShardBackplane implements ShardBackplane {
   @Override
   public boolean watchOperation(String operationName, Predicate<Operation> watcher) throws IOException {
     Operation completedOperation = null;
-    synchronized(watchers) {
+    synchronized (watchers) {
       List<Predicate<Operation>> operationWatchers = watchers.get(operationName);
       if (operationWatchers == null) {
         /* we can race on the synchronization and miss a done, where the
