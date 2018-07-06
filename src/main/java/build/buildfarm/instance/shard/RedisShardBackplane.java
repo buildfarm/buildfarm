@@ -545,18 +545,19 @@ public class RedisShardBackplane implements ShardBackplane {
             .build());
   }
 
-  private Operation getOperation(Jedis jedis, String operationName) {
+  private String getOperation(Jedis jedis, String operationName) {
     String json = jedis.get(operationKey(operationName));
     if (json == null) {
       return null;
     }
-    return parseOperationJson(json);
+    return json;
   }
 
   @Override
   public Operation getOperation(String operationName) throws IOException {
+    String json;
     try (Jedis jedis = getJedis()) {
-      return getOperation(jedis, operationName);
+      json = getOperation(jedis, operationName);
     } catch (JedisConnectionException e) {
       Throwable cause = e.getCause();
       if (cause instanceof IOException) {
@@ -564,6 +565,7 @@ public class RedisShardBackplane implements ShardBackplane {
       }
       throw new IOException(e);
     }
+    return parseOperationJson(json);
   }
 
   @Override
@@ -585,6 +587,13 @@ public class RedisShardBackplane implements ShardBackplane {
       return false;
     }
 
+    String publishOperation;
+    if (publish) {
+      publishOperation = operationPrinter.print(onPublish.apply(operation));
+    } else {
+      publishOperation = null;
+    }
+
     try (Jedis jedis = getJedis()) {
       if (complete) {
         completeOperation(jedis, operation.getName());
@@ -594,9 +603,7 @@ public class RedisShardBackplane implements ShardBackplane {
         queueOperation(jedis, operation.getName());
       }
       if (publish) {
-        jedis.publish(
-            config.getOperationChannelName(),
-            operationPrinter.print(onPublish.apply(operation)));
+        jedis.publish(config.getOperationChannelName(), publishOperation);
       }
     } catch (JedisConnectionException e) {
       Throwable cause = e.getCause();
@@ -813,21 +820,20 @@ public class RedisShardBackplane implements ShardBackplane {
 
   @Override
   public void putTree(Digest inputRoot, Iterable<Directory> directories) throws IOException {
+    String treeValue = JsonFormat.printer().print(GetTreeResponse.newBuilder()
+        .addAllDirectories(directories)
+        .build());
     try (Jedis jedis = getJedis()) {
       jedis.setex(
           treeKey(inputRoot),
           config.getTreeExpire(),
-          JsonFormat.printer().print(GetTreeResponse.newBuilder()
-              .addAllDirectories(directories)
-              .build()));
+          treeValue);
     } catch (JedisConnectionException e) {
       Throwable cause = e.getCause();
       if (cause instanceof IOException) {
         throw (IOException) cause;
       }
       throw new IOException(e);
-    } catch (InvalidProtocolBufferException e) {
-      e.printStackTrace();
     }
   }
 
