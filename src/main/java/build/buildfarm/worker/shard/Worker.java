@@ -34,6 +34,7 @@ import build.buildfarm.server.Instances;
 import build.buildfarm.server.ContentAddressableStorageService;
 import build.buildfarm.server.ByteStreamService;
 import build.buildfarm.worker.CASFileCache;
+import build.buildfarm.worker.Dirent;
 import build.buildfarm.worker.ExecuteActionStage;
 import build.buildfarm.worker.Fetcher;
 import build.buildfarm.worker.FuseCAS;
@@ -46,6 +47,7 @@ import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.Poller;
 import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.ReportResultStage;
+import build.buildfarm.worker.UploadManifest;
 import build.buildfarm.worker.WorkerContext;
 import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.v1test.QueuedOperationMetadata;
@@ -108,6 +110,7 @@ import java.util.Set;
 import java.util.Stack;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -1048,6 +1051,8 @@ public class Worker implements Instances {
     if (config.getUseFuseCas()) {
       System.err.println("Umounting Fuse");
       fuseCAS.stop();
+    } else {
+      fileCache.stop();
     }
     if (server != null) {
       System.err.println("Shutting down the server");
@@ -1093,7 +1098,36 @@ public class Worker implements Instances {
 
       backplane.removeWorker(config.getPublicName());
 
+      ImmutableList.Builder<Path> builder = new ImmutableList.Builder<>();
+
       if (!config.getUseFuseCas()) {
+        List<Dirent> dirents = null;
+        try {
+          dirents = UploadManifest.readdir(root, /* followSymlinks= */ false);
+
+          // only valid path under root is cache
+          for (Dirent dirent : dirents) {
+            String name = dirent.getName();
+            Path child = root.resolve(name);
+            if (!child.equals(fileCache.getRoot())) {
+              try {
+                final Path tmpPath;
+                if (name.endsWith(".tmp")) {
+                  tmpPath = child;
+                } else {
+                  tmpPath = root.resolve(name + ".tmp");
+                  Files.move(child, tmpPath);
+                }
+                builder.add(tmpPath);
+              } catch (IOException e) {
+                e.printStackTrace();
+              }
+            }
+          }
+        } catch (IOException e) {
+          e.printStackTrace();
+        }
+
         ImmutableList.Builder<Digest> blobDigests = new ImmutableList.Builder<>();
         fileCache.start(blobDigests::add);
         backplane.addBlobsLocation(blobDigests.build(), config.getPublicName());
@@ -1101,6 +1135,21 @@ public class Worker implements Instances {
 
       server.start();
       backplane.addWorker(config.getPublicName());
+
+      List<Path> invalidDirectories = builder.build();
+      if (!invalidDirectories.isEmpty()) {
+        ExecutorService pool = Executors.newFixedThreadPool(32);
+        for (Path path : invalidDirectories) {
+          pool.execute(() -> {
+            try {
+              CASFileCache.removeDirectory(path);
+            } catch (IOException e) {
+              e.printStackTrace();
+            }
+          });
+        }
+        pool.shutdown();
+      }
     } catch (Exception e) {
       stop();
       e.printStackTrace();

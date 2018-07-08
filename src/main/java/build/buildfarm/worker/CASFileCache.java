@@ -44,6 +44,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -62,6 +63,7 @@ public class CASFileCache implements ContentAddressableStorage {
   private final Map<Path, Object> mutexes = new HashMap<>();
   private final Consumer<Digest> onPut;
   private final Consumer<Iterable<Digest>> onExpire;
+  private final ExecutorService removeDirectoryPool = Executors.newFixedThreadPool(32);
 
   private transient long sizeInBytes = 0;
   private transient Entry header = new SentinelEntry();
@@ -302,6 +304,20 @@ public class CASFileCache implements ContentAddressableStorage {
     start(onPut);
   }
 
+  public void stop() {
+    removeDirectoryPool.shutdown();
+    while (!removeDirectoryPool.isTerminated()) {
+      try {
+        if (!removeDirectoryPool.awaitTermination(60, TimeUnit.SECONDS)) {
+          removeDirectoryPool.shutdownNow();
+        }
+      } catch (InterruptedException e) {
+        removeDirectoryPool.shutdownNow();
+        Thread.currentThread().interrupt();
+      }
+    }
+  }
+
   private Directory computeDirectory(
       Path path,
       Map<Object, Entry> fileKeys,
@@ -403,7 +419,8 @@ public class CASFileCache implements ContentAddressableStorage {
 
     ExecutorService pool = Executors.newFixedThreadPool(32);
 
-    // to be threaded...
+    ImmutableList.Builder<Path> invalidDirectories = new ImmutableList.Builder<>();
+
     Map<Object, Entry> fileKeys = fileKeysBuilder.build();
     for (Path path : directories.build()) {
       pool.execute(() -> {
@@ -423,11 +440,7 @@ public class CASFileCache implements ContentAddressableStorage {
             }
           }
         } else {
-          try {
-            removeDirectory(path);
-          } catch (IOException e) {
-            e.printStackTrace();
-          }
+          invalidDirectories.add(path);
         }
       });
     }
@@ -436,6 +449,22 @@ public class CASFileCache implements ContentAddressableStorage {
       System.out.println("Waiting for directory population to complete");
       pool.awaitTermination(60, TimeUnit.SECONDS);
     }
+
+    for (Path path : invalidDirectories.build()) {
+      removeDirectoryAsync(path);
+    }
+  }
+
+  private void removeDirectoryAsync(Path path) throws IOException {
+    Path tmpPath = path.resolveSibling(path.getFileName() + ".tmp." + UUID.randomUUID().toString());
+    Files.move(path, tmpPath);
+    removeDirectoryPool.execute(() -> {
+      try {
+        removeDirectory(tmpPath);
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+    });
   }
 
   private static String digestFilename(Digest digest) {
@@ -486,6 +515,10 @@ public class CASFileCache implements ContentAddressableStorage {
 
   public synchronized void decrementReferences(Iterable<Path> inputFiles, Iterable<Digest> inputDirectories) {
     decrementReferencesSynchronized(inputFiles, inputDirectories);
+  }
+
+  public Path getRoot() {
+    return root;
   }
 
   public Path getPath(String filename) {
@@ -615,7 +648,7 @@ public class CASFileCache implements ContentAddressableStorage {
     }
 
     purgeDirectoryFromInputs(digest, e.inputs);
-    removeDirectory(getDirectoryPath(digest));
+    removeDirectoryAsync(getDirectoryPath(digest));
   }
 
   /** must be called in synchronized context */
@@ -627,7 +660,7 @@ public class CASFileCache implements ContentAddressableStorage {
       ImmutableList.Builder<Path> inputsBuilder) throws IOException, InterruptedException {
     if (Files.exists(path)) {
       if (Files.isDirectory(path)) {
-        removeDirectory(path);
+        removeDirectoryAsync(path);
       } else {
         Files.delete(path);
       }
@@ -695,7 +728,7 @@ public class CASFileCache implements ContentAddressableStorage {
         purgeDirectoryFromInputs(digest, inputs); // this might not need (this) synchronized
         decrementReferencesSynchronized(inputs, ImmutableList.<Digest>of());
       }
-      removeDirectory(path);
+      removeDirectoryAsync(path);
       throw e;
     }
 

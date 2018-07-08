@@ -668,6 +668,7 @@ public class Worker {
     if (Thread.interrupted()) {
       throw new InterruptedException();
     }
+    fileCache.stop();
   }
 
   private static WorkerConfig toWorkerConfig(Readable input, WorkerOptions options) throws IOException {
