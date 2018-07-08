@@ -830,6 +830,11 @@ public class ShardInstance extends AbstractServerInstance {
     try {
       backplane.putOperation(operation, ExecuteOperationMetadata.Stage.UNKNOWN);
     } catch (IOException e) {
+      try {
+        backplane.deleteOperation(operation.getName());
+      } catch (IOException deleteEx) {
+        deleteEx.printStackTrace();
+      }
       throw Status.fromThrowable(e).asRuntimeException();
     }
 
@@ -869,6 +874,11 @@ public class ShardInstance extends AbstractServerInstance {
     try {
       backplane.putOperation(queuedOperation, ExecuteOperationMetadata.Stage.QUEUED);
     } catch (IOException e) {
+      try {
+        backplane.deleteOperation(operation.getName());
+      } catch (IOException deleteEx) {
+        deleteEx.printStackTrace();
+      }
       // cleanup? retry?
       throw Status.fromThrowable(e).asRuntimeException();
     }
