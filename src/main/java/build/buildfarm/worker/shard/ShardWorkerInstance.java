@@ -27,6 +27,7 @@ import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ShardWorkerInstanceConfig;
 import build.buildfarm.worker.Fetcher;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.devtools.remoteexecution.v1test.Action;
@@ -253,37 +254,40 @@ public class ShardWorkerInstance extends AbstractServerInstance {
     throw new UnsupportedOperationException();
   }
 
-  private void matchResettable(Platform platform, MatchListener listener) throws IOException, InterruptedException {
-    boolean complete = false;
-    while (!complete && !Thread.currentThread().isInterrupted()) {
+  @VisibleForTesting
+  public String dispatchOperation(MatchListener listener) throws IOException, InterruptedException {
+    for (;;) {
+      listener.onWaitStart();
       try {
-        String operationName = null;
-        do {
-          listener.onWaitStart();
-          operationName = backplane.dispatchOperation();
-          listener.onWaitEnd();
-        } while (operationName == null);
-
-        // FIXME platform match
-        if (listener.onOperationName(operationName)) {
-          Operation operation = backplane.getOperation(operationName);
-          if (operation == null) {
-            backplane.completeOperation(operationName);
-            operation = Operation.newBuilder()
-                .setName(operationName)
-                .setDone(true)
-                .build();
-          }
-          listener.onOperation(operation);
+        String operationName = backplane.dispatchOperation();
+        if (operationName != null) {
+          return operationName;
         }
-        complete = true;
       } catch (SocketTimeoutException e) {
         // ignore
       } catch (SocketException e) {
-        if (!e.getMessage().equals("Connection reset")) {
+        if (e.getMessage() == null || !e.getMessage().equals("Connection reset")) {
           throw e;
         }
       }
+      listener.onWaitEnd();
+    }
+  }
+
+  private void matchResettable(Platform platform, MatchListener listener) throws IOException, InterruptedException {
+    String operationName = dispatchOperation(listener);
+
+    // FIXME platform match
+    if (listener.onOperationName(operationName)) {
+      // onOperation must be called after this point, or we must throw
+      Operation operation = getOperation(operationName);
+      if (operation == null) {
+        operation = Operation.newBuilder()
+            .setName(operationName)
+            .setDone(true)
+            .build();
+      }
+      listener.onOperation(operation);
     }
   }
 
@@ -347,7 +351,19 @@ public class ShardWorkerInstance extends AbstractServerInstance {
 
   @Override
   public Operation getOperation(String name) {
-    throw new UnsupportedOperationException();
+    for (;;) {
+      try {
+        return backplane.getOperation(name);
+      } catch (SocketTimeoutException e) {
+        // ignore
+      } catch (SocketException e) {
+        if (e.getMessage() == null || !e.getMessage().equals("Connection reset")) {
+          throw Status.fromThrowable(e).asRuntimeException();
+        }
+      } catch (IOException e) {
+        throw Status.fromThrowable(e).asRuntimeException();
+      }
+    }
   }
 
   @Override
