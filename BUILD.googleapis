@@ -75,7 +75,10 @@ java_proto_library(
 
 java_proto_library(
     name = "google_devtools_remoteexecution_v1test_remote_execution_java_proto",
-    deps = [":google_devtools_remoteexecution_v1test_remote_execution_proto"],
+    deps = [
+        ":google_devtools_remoteexecution_v1test_remote_execution_proto",
+        ":google_longrunning_operations_proto",
+    ],
 )
 
 java_proto_library(
@@ -114,10 +117,7 @@ java_grpc_library(
 java_grpc_library(
     name = "google_devtools_remoteexecution_v1test_remote_execution_java_grpc",
     srcs = [":google_devtools_remoteexecution_v1test_remote_execution_proto"],
-    deps = [
-        ":google_devtools_remoteexecution_v1test_remote_execution_java_proto",
-        ":google_longrunning_operations_java_proto",
-    ],
+    deps = [":google_devtools_remoteexecution_v1test_remote_execution_java_proto"],
 )
 
 proto_library(
