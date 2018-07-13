@@ -30,6 +30,8 @@ import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.OperationIteratorToken;
 import build.buildfarm.v1test.ShardInstanceConfig;
 import build.buildfarm.v1test.QueuedOperationMetadata;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -76,8 +78,10 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -92,8 +96,12 @@ public class ShardInstance extends AbstractServerInstance {
   private final Thread dispatchedMonitor;
   private final ListeningScheduledExecutorService retryScheduler =
       MoreExecutors.listeningDecorator(Executors.newScheduledThreadPool(1));
-  private final Map<Digest, Directory> directoryCache = new ConcurrentLRUCache<>(64 * 1024);
-  private final ConcurrentMap<Digest, Command> commandCache = new ConcurrentLRUCache<>(64 * 1024);
+  private final Cache<Digest, Directory> directoryCache = CacheBuilder.newBuilder()
+      .maximumSize(64 * 1024)
+      .build();
+  private final Cache<Digest, Command> commandCache = CacheBuilder.newBuilder()
+      .maximumSize(64 * 1024)
+      .build();
   private final Random rand = new Random();
 
   public ShardInstance(String name, DigestUtil digestUtil, ShardInstanceConfig config, Runnable onStop) throws InterruptedException, ConfigurationException {
@@ -467,22 +475,26 @@ public class ShardInstance extends AbstractServerInstance {
         }
         boolean known = false;
         try {
-          if (commandCache.get(digest) == null) {
-            Command command = Command.parseFrom(blob);
-            commandCache.put(digest, command);
-          }
+          commandCache.get(digest, new Callable<Command>() {
+            @Override
+            public Command call() throws IOException {
+              return Command.parseFrom(blob);
+            }
+          });
           known = true;
-        } catch (InvalidProtocolBufferException e) {
+        } catch (ExecutionException e) {
           /* not a command */
         }
         if (!known) {
           try {
-            if (directoryCache.get(digest) == null) {
-              Directory directory = Directory.parseFrom(blob);
-              directoryCache.put(digest, directory);
-            }
+            directoryCache.get(digest, new Callable<Directory>() {
+              @Override
+              public Directory call() throws IOException {
+                return Directory.parseFrom(blob);
+              }
+            });
             known = true;
-          } catch (InvalidProtocolBufferException e) {
+          } catch (ExecutionException e) {
             /* not a directory */
           }
         }
@@ -559,37 +571,42 @@ public class ShardInstance extends AbstractServerInstance {
     return expectDirectory(directoryBlobDigest);
   }
 
+  interface DirectoryFetch {
+    Directory fetch(Digest digest) throws InterruptedException;
+  }
+
   @Override
   protected Directory expectDirectory(Digest directoryBlobDigest) throws InterruptedException {
-    Directory directory = directoryCache.get(directoryBlobDigest);
-    if (directory == null) {
-      directory = super.expectDirectory(directoryBlobDigest);
-      if (directory != null) {
-        directoryCache.put(directoryBlobDigest, directory);
-      }
+    try {
+      final DirectoryFetch fetcher = super::expectDirectory;
+      return directoryCache.get(directoryBlobDigest, new Callable<Directory>() {
+        @Override
+        public Directory call() throws InterruptedException {
+          return fetcher.fetch(directoryBlobDigest);
+        }
+      });
+    } catch (ExecutionException e) {
+      return null;
     }
-    return directory;
+  }
+
+  interface CommandFetch {
+    Command fetch(Digest digest) throws InterruptedException;
   }
 
   @Override
   protected Command expectCommand(Digest commandBlobDigest) throws InterruptedException {
-    Command command = commandCache.get(commandBlobDigest);
-    if (command == null) {
-      command = super.expectCommand(commandBlobDigest);
-      if (command == null) {
-        try {
-          // should probably prevent the round trip to redis here with the results
-          checkMissingBlob(commandBlobDigest, true);
-          command = super.expectCommand(commandBlobDigest);
-        } catch (IOException e) {
-          e.printStackTrace();
+    try {
+      final CommandFetch fetcher = super::expectCommand;
+      return commandCache.get(commandBlobDigest, new Callable<Command>() {
+        @Override
+        public Command call() throws InterruptedException {
+          return fetcher.fetch(commandBlobDigest);
         }
-      }
-      if (command != null) {
-        commandCache.put(commandBlobDigest, command);
-      }
+      });
+    } catch (ExecutionException e) {
+      return null;
     }
-    return command;
   }
 
   private void removeMalfunctioningWorker(String worker, Exception e, String context) {
