@@ -63,7 +63,6 @@ import redis.clients.jedis.exceptions.JedisConnectionException;
 
 public class RedisShardBackplane implements ShardBackplane {
   private final RedisShardBackplaneConfig config;
-  private final Map<String, List<Predicate<Operation>>> watchers = new ConcurrentHashMap<>();
   private final Function<Operation, Operation> onPublish;
   private final Function<Operation, Operation> onComplete;
   private final Runnable onUnsubscribe;
@@ -110,17 +109,50 @@ public class RedisShardBackplane implements ShardBackplane {
     pool = new JedisPool(jedisPoolConfig, redisURI, /* connectionTimeout=*/ 30000, /* soTimeout=*/ 30000);
   }
 
+  public void updateWatchedIfDone(Jedis jedis) {
+    List<String> operationChannels = operationSubscriber.watchedOperationChannels();
+    if (operationChannels.isEmpty()) {
+      return;
+    }
+
+    System.out.println("RedisShardBackplane::updateWatchedIfDone: Checking on open watches");
+
+    List<Map.Entry<String, Response<String>>> operations = new ArrayList(operationChannels.size());
+    Pipeline p = jedis.pipelined();
+    for (String operationName : Iterables.transform(operationChannels, RedisShardBackplane::parseOperationChannel)) {
+      operations.add(new AbstractMap.SimpleEntry<>(
+          operationName,
+          p.get(operationKey(operationName))));
+    }
+    p.sync();
+
+    int iRemainingIncomplete = 20;
+    for (Map.Entry<String, Response<String>> entry : operations) {
+      String json = entry.getValue().get();
+      Operation operation = json == null
+          ? null : RedisShardBackplane.parseOperationJson(json);
+      String operationName = entry.getKey();
+      if (operation == null || operation.getDone()) {
+        System.out.println("RedisShardBackplane::updateWatchedIfDone: Operation " + operationName + " done due to " + (operation == null ? "null" : "completed"));
+        operationSubscriber.onOperation(operationChannel(operationName), operation);
+      } else if (iRemainingIncomplete > 0) {
+        System.out.println("RedisShardBackplane::updateWatchedIfDone: Operation " + operationName);
+        iRemainingIncomplete--;
+      }
+    }
+  }
+
   private void startSubscriptionThread() {
-    operationSubscriber = new OperationSubscriber(watchers, this::operationKey);
+    operationSubscriber = new OperationSubscriber();
 
     operationSubscription = new RedisShardSubscription(
-        config.getOperationChannelName(),
         operationSubscriber,
         /* onUnsubscribe=*/ () -> {
           subscriptionThread = null;
           onUnsubscribe.run();
         },
-        /* onReset=*/ operationSubscriber::updateWatchedIfDone,
+        /* onReset=*/ this::updateWatchedIfDone,
+        /* subscriptions=*/ operationSubscriber::watchedOperationChannels,
         this::getJedis);
 
     // use Executors...
@@ -133,7 +165,7 @@ public class RedisShardBackplane implements ShardBackplane {
         try {
           TimeUnit.SECONDS.sleep(30);
           try (Jedis jedis = getJedis()) {
-            operationSubscriber.updateWatchedIfDone(jedis);
+            updateWatchedIfDone(jedis);
           }
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
@@ -170,32 +202,7 @@ public class RedisShardBackplane implements ShardBackplane {
 
   @Override
   public boolean watchOperation(String operationName, Predicate<Operation> watcher) throws IOException {
-    Operation completedOperation = null;
-    synchronized (watchers) {
-      List<Predicate<Operation>> operationWatchers = watchers.get(operationName);
-      if (operationWatchers == null) {
-        /* we can race on the synchronization and miss a done, where the
-         * watchers list has been removed, making it necessary to check for the
-         * operation within this context */
-        Operation operation = getOperation(operationName);
-        if (operation == null) {
-          return false;
-        } else if (operation.getDone()) {
-          completedOperation = operation;
-        } else {
-          operationWatchers = new ArrayList<Predicate<Operation>>();
-          watchers.put(operationName, operationWatchers);
-        }
-      }
-      // could still be null with a done
-      if (operationWatchers != null) {
-        operationWatchers.add(watcher);
-      }
-    }
-    if (completedOperation != null) {
-      return watcher.test(completedOperation);
-    }
-
+    operationSubscriber.watch(operationChannel(operationName), watcher);
     return true;
   }
 
@@ -594,16 +601,17 @@ public class RedisShardBackplane implements ShardBackplane {
       publishOperation = null;
     }
 
+    String name = operation.getName();
     try (Jedis jedis = getJedis()) {
       if (complete) {
-        completeOperation(jedis, operation.getName());
+        completeOperation(jedis, name);
       }
-      jedis.setex(operationKey(operation.getName()), config.getOperationExpire(), json);
+      jedis.setex(operationKey(name), config.getOperationExpire(), json);
       if (queue) {
-        queueOperation(jedis, operation.getName());
+        queueOperation(jedis, name);
       }
       if (publish) {
-        jedis.publish(config.getOperationChannelName(), publishOperation);
+        jedis.publish(operationChannel(name), publishOperation);
       }
     } catch (JedisConnectionException e) {
       Throwable cause = e.getCause();
@@ -816,6 +824,14 @@ public class RedisShardBackplane implements ShardBackplane {
 
   private String operationKey(String operationName) {
     return config.getOperationPrefix() + ":" + operationName;
+  }
+
+  private String operationChannel(String operationName) {
+    return config.getOperationChannelPrefix() + ":" + operationName;
+  }
+
+  public static String parseOperationChannel(String channel) {
+    return channel.split(":")[1];
   }
 
   @Override

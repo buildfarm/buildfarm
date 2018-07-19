@@ -103,7 +103,7 @@ message RedisShardBackplaneConfig {
   int32 operation_expire = 6;
   string queued_operations_list_name = 7;
   string dispatched_operations_hash_name = 8;
-  string operation_channel_name = 9;
+  string operation_channel_prefix = 9;
   string cas_prefix = 10;
   int32 cas_expire = 11;
   string tree_prefix = 12;

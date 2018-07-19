@@ -14,15 +14,27 @@
 
 package build.buildfarm.instance.shard;
 
+import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Multimaps;
+import com.google.common.collect.SetMultimap;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.longrunning.Operation;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executors;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import redis.clients.jedis.Client;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPubSub;
 import redis.clients.jedis.Pipeline;
@@ -30,94 +42,96 @@ import redis.clients.jedis.Response;
 
 class OperationSubscriber extends JedisPubSub {
 
-  private final Map<String, List<Predicate<Operation>>> watchers;
-  private final Function<String, String> toOperationKey;
+  private final SetMultimap<String, Predicate<Operation>> watchers =
+      Multimaps.<String, Predicate<Operation>>synchronizedSetMultimap(HashMultimap.<String, Predicate<Operation>>create());
+  private final ListeningExecutorService executorService =
+      MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(32));
 
-  OperationSubscriber(Map<String, List<Predicate<Operation>>> watchers, Function<String, String> toOperationKey) {
-    this.watchers = watchers;
-    this.toOperationKey = toOperationKey;
-  }
-
-  public List<String> watchedOperationNames() {
-    Set<String> operationNameSet;
+  public List<String> watchedOperationChannels() {
     synchronized (watchers) {
-      operationNameSet = watchers.keySet();
-    }
-    int size = operationNameSet.size();
-    if (size == 0) {
-      return ImmutableList.of();
-    }
-
-    return new ArrayList<>(operationNameSet);
-  }
-
-  public void updateWatchedIfDone(Jedis jedis) {
-    List<String> operationNames = watchedOperationNames();
-    if (operationNames.size() == 0) {
-      return;
-    }
-
-    System.out.println("OperationSubscriber::updateWatchedIfDone: Checking on " + operationNames.size() + " open watches");
-
-    List<Map.Entry<String, Response<String>>> operations = new ArrayList(operationNames.size());
-    Pipeline p = jedis.pipelined();
-    for (String operationName : operationNames) {
-      operations.add(new AbstractMap.SimpleEntry<>(
-          operationName,
-          p.get(toOperationKey.apply(operationName))));
-    }
-    p.sync();
-
-    int iRemainingIncomplete = 20;
-    for (Map.Entry<String, Response<String>> entry : operations) {
-      String json = entry.getValue().get();
-      Operation operation = json == null
-          ? null : RedisShardBackplane.parseOperationJson(json);
-      String operationName = entry.getKey();
-      if (operation == null || operation.getDone()) {
-        System.out.println("OperationSubscriber::updateWatchedIfDone: Operation " + operationName + " done due to " + (operation == null ? "null" : "completed"));
-        onOperation(operationName, operation);
-      } else if (iRemainingIncomplete > 0) {
-        System.out.println("OperationSubscriber::updateWatchedIfDone: Operation " + operationName);
-        iRemainingIncomplete--;
-      }
+      return new ArrayList<>(watchers.keySet());
     }
   }
 
-  public void onOperation(String name, Operation operation) {
+  // synchronizing on these because the client has been observed to
+  // cause protocol desynchronization for multiple concurrent calls
+  @Override
+  public synchronized void subscribe(String... channels) {
+    super.subscribe(channels);
+  }
+
+  @Override
+  public synchronized void unsubscribe(String... channels) {
+    super.unsubscribe(channels);
+  }
+
+  public void watch(String channel, Predicate<Operation> watcher) {
+    // use prefix
+    boolean hasSubscribed = watchers.containsKey(channel);
+    watchers.put(channel, watcher);
+    if (!hasSubscribed) {
+      subscribe(channel);
+    }
+  }
+
+  public void onOperation(String channel, Operation operation) {
+    Set<Predicate<Operation>> operationWatchers = watchers.get(channel);
+    boolean complete = operation == null || operation.getDone();
+    ImmutableList.Builder<ListenableFuture<Boolean>> removedFutures =
+        new ImmutableList.Builder<>();
     synchronized (watchers) {
-      List<Predicate<Operation>> operationWatchers =
-          watchers.get(name);
-      if (operationWatchers == null)
-        return;
-
-      boolean done = operation == null || operation.getDone();
-      if (done) {
-        watchers.remove(name);
-      }
-
-      long unfilteredWatcherCount = operationWatchers.size();
-      ImmutableList.Builder<Predicate<Operation>> filteredWatchers = new ImmutableList.Builder<>();
-      long filteredWatcherCount = 0;
       for (Predicate<Operation> watcher : operationWatchers) {
-        if (watcher.test(operation) && !done) {
-          filteredWatchers.add(watcher);
-          filteredWatcherCount++;
+        ListenableFuture<Boolean> watcherFuture = executorService.submit(new Callable<Boolean>() {
+          public Boolean call() {
+            return watcher.test(operation) && !complete;
+          }
+        });
+        ListenableFuture<Boolean> removeFuture = Futures.transform(watcherFuture, (stillWatching) -> {
+          if (stillWatching) {
+            return false;
+          }
+
+          synchronized (watchers) {
+            operationWatchers.remove(watcher);
+          }
+          return true;
+        }, executorService);
+        removedFutures.add(removeFuture);
+      }
+    }
+
+    Futures.addCallback(Futures.allAsList(removedFutures.build()), new FutureCallback<List<Boolean>>() {
+      @Override
+      public void onSuccess(List<Boolean> results) {
+        if (Iterables.all(results, (result) -> result)) {
+          unsubscribe(channel);
         }
       }
 
-      if (!done && filteredWatcherCount != unfilteredWatcherCount) {
-        watchers.put(operation.getName(), new ArrayList<>(filteredWatchers.build()));
+      @Override
+      public void onFailure(Throwable t) {
+        t.printStackTrace();
       }
-    }
+    }, executorService);
   }
 
   @Override
   public void onMessage(String channel, String message) {
     Operation operation = message == null
         ? null : RedisShardBackplane.parseOperationJson(message);
-    String operationName = message == null
-        ? channel : operation.getName();
-    onOperation(operationName, operation);
+    onOperation(channel, operation);
+  }
+
+  @Override
+  public void onSubscribe(String channel, int subscribedChannels) {
+  }
+
+  @Override
+  public void proceed(Client client, String... channels) {
+    if (channels.length == 0) {
+      channels = new String[1];
+      channels[0] = "placeholder-shard-subscription";
+    }
+    super.proceed(client, channels);
   }
 }

@@ -17,6 +17,7 @@ package build.buildfarm.instance.shard;
 import java.io.IOException;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import redis.clients.jedis.Jedis;
@@ -24,23 +25,23 @@ import redis.clients.jedis.JedisPubSub;
 import redis.clients.jedis.exceptions.JedisConnectionException;
 
 class RedisShardSubscription implements Runnable {
-  private final String channel;
   private final JedisPubSub subscriber;
   private final Runnable onUnsubscribe;
   private final Consumer<Jedis> onReset;
+  private final Supplier<List<String>> subscriptions;
   private final Supplier<Jedis> jedisFactory;
   private boolean done = false;
 
   RedisShardSubscription(
-      String channel,
       JedisPubSub subscriber,
       Runnable onUnsubscribe,
       Consumer<Jedis> onReset,
+      Supplier<List<String>> subscriptions,
       Supplier<Jedis> jedisFactory) {
-    this.channel = channel;
     this.subscriber = subscriber;
     this.onUnsubscribe = onUnsubscribe;
     this.onReset = onReset;
+    this.subscriptions = subscriptions;
     this.jedisFactory = jedisFactory;
   }
 
@@ -53,7 +54,7 @@ class RedisShardSubscription implements Runnable {
       if (isReset) {
         onReset.accept(jedis);
       }
-      jedis.subscribe(subscriber, channel);
+      jedis.subscribe(subscriber, subscriptions.get().toArray(new String[0]));
     } catch (JedisConnectionException e) {
       Throwable cause = e.getCause();
       if (cause instanceof IOException) {
@@ -77,7 +78,7 @@ class RedisShardSubscription implements Runnable {
         throw e;
       }
     }
-    System.err.println("RedisShardSubscription(" + channel + ") Unexpected subscribe return, reconnecting...");
+    System.err.println("RedisShardSubscription: Unexpected subscribe return, reconnecting...");
   }
 
   private void mainLoop() throws IOException {
@@ -98,7 +99,7 @@ class RedisShardSubscription implements Runnable {
       mainLoop();
     } catch (Exception e) {
       e.printStackTrace();
-      System.err.println("RedisShardSubscription(" + channel + ") Calling onUnsubscribe...");
+      System.err.println("RedisShardSubscription: Calling onUnsubscribe...");
       onUnsubscribe.run();
     }
   }

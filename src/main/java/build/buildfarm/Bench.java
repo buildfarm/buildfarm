@@ -54,7 +54,7 @@ class Bench {
                 .setOperationPrefix("Operation")
                 .setQueuedOperationsListName("QueuedOperations")
                 .setDispatchedOperationsHashName("DispatchedOperations")
-                .setOperationChannelName("OperationChannel")
+                .setOperationChannelPrefix("OperationChannel")
                 .setCasPrefix("ContentAddressableStorage")
                 .setTreePrefix("Tree")
                 .build())
