@@ -364,6 +364,34 @@ public class StubInstance implements Instance {
   }
 
   @Override
+  public void getBlob(Digest blobDigest, long offset, long limit, StreamObserver<ByteString> blobObserver) {
+    bsStub.get()
+        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
+        .read(
+            ReadRequest.newBuilder()
+                .setResourceName(getBlobName(blobDigest))
+                .setReadOffset(offset)
+                .setReadLimit(limit)
+                .build(),
+            new StreamObserver<ReadResponse>() {
+              @Override
+              public void onNext(ReadResponse response) {
+                blobObserver.onNext(response.getData());
+              }
+
+              @Override
+              public void onCompleted() {
+                blobObserver.onCompleted();
+              }
+
+              @Override
+              public void onError(Throwable t) {
+                blobObserver.onError(t);
+              }
+            });
+  }
+
+  @Override
   public Digest putBlob(ByteString blob)
       throws IOException, IllegalArgumentException, InterruptedException {
     Digest digest = digestUtil.compute(blob);

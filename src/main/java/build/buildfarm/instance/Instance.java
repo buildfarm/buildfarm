@@ -26,6 +26,7 @@ import com.google.devtools.remoteexecution.v1test.Platform;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import io.grpc.StatusException;
+import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -51,6 +52,7 @@ public interface Instance {
   String getBlobName(Digest blobDigest);
   ByteString getBlob(Digest blobDigest) throws IOException, InterruptedException;
   ByteString getBlob(Digest blobDigest, long offset, long limit) throws IOException, InterruptedException;
+  void getBlob(Digest blobDigest, long offset, long limit, StreamObserver<ByteString> blobObserver);
   Digest putBlob(ByteString blob)
       throws IOException, InterruptedException, StatusException;
   String getTree(

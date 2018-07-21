@@ -26,6 +26,7 @@ java_library(
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "//3rdparty/jvm/io/grpc:grpc_core",
+        "//3rdparty/jvm/io/grpc:grpc_stub",
         "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
         "@googleapis//:google_longrunning_operations_java_proto",
     ],

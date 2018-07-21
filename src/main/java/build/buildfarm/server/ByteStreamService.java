@@ -65,28 +65,38 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
 
     Digest digest = UrlPath.parseBlobDigest(resourceName, instance.getDigestUtil());
 
-    ByteString blob = instance.getBlob(
-        digest, request.getReadOffset(), request.getReadLimit());
-    if (blob == null) {
-      responseObserver.onError(Status.NOT_FOUND.asException());
-      return;
-    }
+    instance.getBlob(
+        digest,
+        request.getReadOffset(),
+        request.getReadLimit(),
+        new StreamObserver<ByteString>() {
+          @Override
+          public void onNext(ByteString nextChunk) {
+            ByteString remaining = nextChunk;
+            while (remaining.size() >= DEFAULT_CHUNK_SIZE) {
+              ByteString chunk = remaining.substring(0, (int) DEFAULT_CHUNK_SIZE);
+              remaining = remaining.substring(chunk.size());
+              responseObserver.onNext(ReadResponse.newBuilder()
+                  .setData(chunk)
+                  .build());
+            }
+            if (!remaining.isEmpty()) {
+              responseObserver.onNext(ReadResponse.newBuilder()
+                  .setData(remaining)
+                  .build());
+            }
+          }
 
-    while (!blob.isEmpty()) {
-      ByteString chunk;
-      if (blob.size() < DEFAULT_CHUNK_SIZE) {
-        chunk = blob;
-        blob = ByteString.EMPTY;
-      } else {
-        chunk = blob.substring(0, (int) DEFAULT_CHUNK_SIZE);
-        blob = blob.substring((int) DEFAULT_CHUNK_SIZE);
-      }
-      responseObserver.onNext(ReadResponse.newBuilder()
-          .setData(chunk)
-          .build());
-    }
+          @Override
+          public void onError(Throwable t) {
+            responseObserver.onError(Status.fromThrowable(t).asException());
+          }
 
-    responseObserver.onCompleted();
+          @Override
+          public void onCompleted() {
+            responseObserver.onCompleted();
+          }
+        });
   }
 
   private void readOperationStream(

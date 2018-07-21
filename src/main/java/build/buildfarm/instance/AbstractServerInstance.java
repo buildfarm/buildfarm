@@ -40,6 +40,7 @@ import io.grpc.Status;
 import io.grpc.Status.Code;
 import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
+import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Map;
@@ -173,6 +174,18 @@ public abstract class AbstractServerInstance implements Instance {
 
     return blob.getData().substring(
         (int) offset, (int) (endIndex > blob.size() ? blob.size() : endIndex));
+  }
+
+  @Override
+  public void getBlob(Digest blobDigest, long offset, long limit, StreamObserver<ByteString> blobObserver) {
+    try {
+      ByteString blob = getBlob(blobDigest, offset, limit);
+
+      blobObserver.onNext(blob);
+      blobObserver.onCompleted();
+    } catch (IOException|InterruptedException e) {
+      blobObserver.onError(e);
+    }
   }
 
   @Override

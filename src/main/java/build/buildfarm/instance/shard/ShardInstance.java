@@ -38,7 +38,9 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.MoreExecutors;
+import com.google.common.util.concurrent.SettableFuture;
 import com.google.devtools.remoteexecution.v1test.Action;
 import com.google.devtools.remoteexecution.v1test.ActionResult;
 import com.google.devtools.remoteexecution.v1test.Command;
@@ -63,6 +65,7 @@ import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
+import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -332,79 +335,141 @@ public class ShardInstance extends AbstractServerInstance {
     throw new UnsupportedOperationException();
   }
 
-  private ByteString fetchBlobFromWorker(Digest blobDigest, Deque<String> workers, long offset, long limit) throws IOException, InterruptedException {
+  private void fetchBlobFromWorker(
+      Digest blobDigest,
+      Deque<String> workers,
+      long offset,
+      long limit,
+      StreamObserver<ByteString> blobObserver) {
     String worker = workers.removeFirst();
-    try {
-      for (;;) {
-        try {
-          return workerStub(worker).getBlob(blobDigest, offset, limit);
-        } catch (RetryException e) {
-          Throwable cause = e.getCause();
-          if (cause instanceof StatusRuntimeException) {
-            throw (StatusRuntimeException) e.getCause();
-          }
-          throw e;
+    workerStub(worker).getBlob(blobDigest, offset, limit, new StreamObserver<ByteString>() {
+      @Override
+      public void onNext(ByteString nextChunk) {
+        blobObserver.onNext(nextChunk);
+      }
+
+      @Override
+      public void onError(Throwable t) {
+        Status status = Status.fromThrowable(t);
+        if (Context.current().isCancelled()) {
+          blobObserver.onError(t);
+          return;
+        }
+        if (status.getCode() == Code.UNAVAILABLE) {
+          removeMalfunctioningWorker(worker, t, "getBlob(" + DigestUtil.toString(blobDigest) + ")");
+        } else if (status.getCode() == Code.NOT_FOUND) {
+          System.out.println(worker + " did not contain " + DigestUtil.toString(blobDigest));
+          // ignore this, the worker will update the backplane eventually
+        } else if (status.getCode() == Code.CANCELLED /* yes, gross */ || SHARD_IS_RETRIABLE.test(status)) {
+          // why not, always
+          workers.addLast(worker);
+        } else {
+          blobObserver.onError(t);
+          return;
+        }
+
+        if (workers.isEmpty()) {
+          blobObserver.onError(Status.NOT_FOUND.asException());
+        } else {
+          fetchBlobFromWorker(blobDigest, workers, offset, limit, blobObserver);
         }
       }
-    } catch (StatusRuntimeException e) {
-      Status status = Status.fromThrowable(e);
-      if (Context.current().isCancelled()) {
-        throw e;
+
+      @Override
+      public void onCompleted() {
+        blobObserver.onCompleted();
       }
-      if (status.getCode() == Code.UNAVAILABLE) {
-        removeMalfunctioningWorker(worker, e, "getBlob(" + DigestUtil.toString(blobDigest) + ")");
-      } else if (status.getCode() == Code.NOT_FOUND) {
-        System.out.println(worker + " did not contain " + DigestUtil.toString(blobDigest));
-        // ignore this, the worker will update the backplane eventually
-      } else if (status.getCode() == Code.CANCELLED /* yes, gross */ || SHARD_IS_RETRIABLE.test(status)) {
-        // why not, always
-        workers.addLast(worker);
-      } else {
-        throw e;
-      }
-      return null;
-    }
+    });
   }
 
-  private ByteString getBlobImpl(Digest blobDigest, long offset, long limit, boolean forValidation) throws IOException, InterruptedException {
-    List<String> workersList = new ArrayList<>(Sets.intersection(backplane.getBlobLocationSet(blobDigest), backplane.getWorkerSet()));
+  private void getBlobImpl(Digest blobDigest, long offset, long limit, StreamObserver<ByteString> blobObserver) {
+    List<String> workersList;
+    try {
+      workersList = new ArrayList<>(Sets.intersection(backplane.getBlobLocationSet(blobDigest), backplane.getWorkerSet()));
+    } catch (IOException e) {
+      blobObserver.onError(e);
+      return;
+    }
     Collections.shuffle(workersList, rand);
     Deque<String> workers = new ArrayDeque(workersList);
-    boolean triedCheck = false;
 
-    ByteString content;
-    do {
-      if (workers.isEmpty()) {
-        if (forValidation) {
-          System.out.println("No location for getBlobImpl(" + DigestUtil.toString(blobDigest) + ", " + offset + ", " + limit + ")");
-        }
-        if (triedCheck) {
-          return null;
-        }
+    fetchBlobFromWorker(blobDigest, workers, offset, limit, new StreamObserver<ByteString>() {
+      boolean triedCheck = false;
 
-        workersList.clear();
-        workersList.addAll(checkMissingBlob(blobDigest, true));
-        Collections.shuffle(workersList, rand);
-        workers = new ArrayDeque(workersList);
-        content = null;
-
-        triedCheck = true;
-      } else {
-        content = fetchBlobFromWorker(blobDigest, workers, offset, limit);
+      @Override
+      public void onNext(ByteString nextChunk) {
+        blobObserver.onNext(nextChunk);
       }
-    } while (content == null);
 
-    return content;
-  }
+      @Override
+      public void onError(Throwable t) {
+        Status status = Status.fromThrowable(t);
+        if (status.getCode() == Code.NOT_FOUND && !triedCheck) {
+          triedCheck = true;
+          workersList.clear();
+          try {
+            workersList.addAll(checkMissingBlob(blobDigest, true));
+          } catch (IOException e) {
+            blobObserver.onError(e);
+            return;
+          }
+          if (!workersList.isEmpty()) {
+            Collections.shuffle(workersList, rand);
+            final Deque<String> workers = new ArrayDeque(workersList);
+            fetchBlobFromWorker(blobDigest, workers, offset, limit, this);
+            return;
+          }
+        }
+        blobObserver.onError(t);
+      }
 
-  @Override
-  protected ByteString getBlob(Digest blobDigest, boolean forValidation) throws IOException, InterruptedException {
-    return getBlobImpl(blobDigest, 0, 0, forValidation);
+      @Override
+      public void onCompleted() {
+        blobObserver.onCompleted();
+      }
+    });
   }
 
   @Override
   public ByteString getBlob(Digest blobDigest, long offset, long limit) throws IOException, InterruptedException {
-    return getBlobImpl(blobDigest, offset, limit, false);
+    SettableFuture<ByteString> blobFuture = SettableFuture.create();
+    getBlobImpl(blobDigest, offset, limit, new StreamObserver<ByteString>() {
+      ByteString content = ByteString.EMPTY;
+
+      @Override
+      public void onNext(ByteString nextChunk) {
+        content = content.concat(nextChunk);
+      }
+
+      @Override
+      public void onError(Throwable t) {
+        blobFuture.setException(t);
+      }
+
+      @Override
+      public void onCompleted() {
+        blobFuture.set(content);
+      }
+    });
+    try {
+      return blobFuture.get();
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof IOException) {
+        throw (IOException) e.getCause();
+      }
+      if (e.getCause() instanceof InterruptedException) {
+        throw (InterruptedException) e.getCause();
+      }
+      if (e.getCause() instanceof RuntimeException) {
+        throw (RuntimeException) e.getCause();
+      }
+      throw new IOException(e.getCause());
+    }
+  }
+
+  @Override
+  public void getBlob(Digest blobDigest, long offset, long limit, StreamObserver<ByteString> blobObserver) {
+    getBlobImpl(blobDigest, offset, limit, blobObserver);
   }
 
   private static ManagedChannel createChannel(String target) {
@@ -609,14 +674,14 @@ public class ShardInstance extends AbstractServerInstance {
     }
   }
 
-  private void removeMalfunctioningWorker(String worker, Exception e, String context) {
+  private void removeMalfunctioningWorker(String worker, Throwable t, String context) {
     StubInstance instance = workerStubs.remove(worker);
     try {
       if (backplane.isWorker(worker)) {
         backplane.removeWorker(worker);
 
         System.out.println("Removing worker '" + worker + "' during(" + context + ") because of:");
-        e.printStackTrace();
+        t.printStackTrace();
       }
     } catch (IOException eIO) {
       throw Status.fromThrowable(eIO).asRuntimeException();
