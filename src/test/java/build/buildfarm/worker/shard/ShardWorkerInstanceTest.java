@@ -69,17 +69,6 @@ public class ShardWorkerInstanceTest {
         ShardWorkerInstanceConfig.getDefaultInstance());
   }
 
-  @Test
-  public void dispatchOperationIgnoresSocketTimeoutAndReset() throws IOException, InterruptedException {
-    when(backplane.dispatchOperation())
-        .thenThrow(SocketTimeoutException.class)
-        .thenThrow(new SocketException("Connection reset"))
-        .thenReturn("op");
-    MatchListener listener = mock(MatchListener.class);
-    assertThat(instance.dispatchOperation(listener)).isEqualTo("op");
-    verify(backplane, times(3)).dispatchOperation();
-  }
-
   @Test(expected = SocketException.class)
   public void dispatchOperationThrowsOnSocketException() throws IOException, InterruptedException {
     when(backplane.dispatchOperation())
@@ -96,16 +85,6 @@ public class ShardWorkerInstanceTest {
     MatchListener listener = mock(MatchListener.class);
     assertThat(instance.dispatchOperation(listener)).isEqualTo("op");
     verify(backplane, times(2)).dispatchOperation();
-  }
-
-  @Test
-  public void getOperationIgnoresSocketTimeoutAndReset() throws IOException {
-    when(backplane.getOperation(eq("op")))
-        .thenThrow(SocketTimeoutException.class)
-        .thenThrow(new SocketException("Connection reset"))
-        .thenReturn(Operation.getDefaultInstance());
-    assertThat(instance.getOperation("op")).isEqualTo(Operation.getDefaultInstance());
-    verify(backplane, times(3)).getOperation(eq("op"));
   }
 
   @Test(expected = StatusRuntimeException.class)

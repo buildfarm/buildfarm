@@ -43,6 +43,7 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 import io.grpc.Status;
+import io.grpc.Status.Code;
 import io.grpc.StatusRuntimeException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -263,10 +264,9 @@ public class ShardWorkerInstance extends AbstractServerInstance {
         if (operationName != null) {
           return operationName;
         }
-      } catch (SocketTimeoutException e) {
-        // ignore
-      } catch (SocketException e) {
-        if (e.getMessage() == null || !e.getMessage().equals("Connection reset")) {
+      } catch (IOException e) {
+        Status status = Status.fromThrowable(e);
+        if (status.getCode() != Code.UNAVAILABLE && status.getCode() != Code.DEADLINE_EXCEEDED) {
           throw e;
         }
       }
@@ -354,14 +354,11 @@ public class ShardWorkerInstance extends AbstractServerInstance {
     for (;;) {
       try {
         return backplane.getOperation(name);
-      } catch (SocketTimeoutException e) {
-        // ignore
-      } catch (SocketException e) {
-        if (e.getMessage() == null || !e.getMessage().equals("Connection reset")) {
-          throw Status.fromThrowable(e).asRuntimeException();
-        }
       } catch (IOException e) {
-        throw Status.fromThrowable(e).asRuntimeException();
+        Status status = Status.fromThrowable(e);
+        if (status.getCode() != Code.UNAVAILABLE && status.getCode() != Code.DEADLINE_EXCEEDED) {
+          throw status.asRuntimeException();
+        }
       }
     }
   }
