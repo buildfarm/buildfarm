@@ -17,6 +17,8 @@ package build.buildfarm.worker;
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 
 import build.buildfarm.common.DigestUtil;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.devtools.remoteexecution.v1test.Digest;
@@ -153,6 +155,10 @@ public class CASFileCache {
   }
 
   public synchronized void decrementReferences(Iterable<Path> inputFiles, Iterable<Digest> inputDirectories) {
+    decrementReferencesSynchronized(inputFiles, inputDirectories);
+  }
+
+  private void decrementReferencesSynchronized(Iterable<Path> inputFiles, Iterable<Digest> inputDirectories) {
     // decrement references and notify if any dropped to 0
     // insert after the last 0-reference count entry in list
     boolean entriesMadeAvailable = false;
@@ -183,7 +189,8 @@ public class CASFileCache {
     return root.resolve(filename);
   }
 
-  private Path getDirectoryPath(Digest digest) {
+  @VisibleForTesting
+  public Path getDirectoryPath(Digest digest) {
     return root.resolve(digestFilename(digest));
   }
 
@@ -222,18 +229,21 @@ public class CASFileCache {
   }
 
   /** must be called in synchronized context */
-  private void expireDirectory(Digest digest) throws IOException {
-    DirectoryEntry e = directoryStorage.remove(digest);
-    Path path = getDirectoryPath(digest);
-
-    for (Path input : e.inputs) {
+  private void purgeDirectoryFromInputs(Digest digest, Iterable<Path> inputs) {
+    for (Path input : inputs) {
       Entry fileEntry = storage.get(input);
 
       if (fileEntry != null) {
         fileEntry.containingDirectories.remove(digest);
       }
     }
-    removeDirectory(path);
+  }
+
+  /** must be called in synchronized context */
+  private void expireDirectory(Digest digest) throws IOException {
+    DirectoryEntry e = directoryStorage.remove(digest);
+    purgeDirectoryFromInputs(digest, e.inputs);
+    removeDirectory(getDirectoryPath(digest));
   }
 
   /** must be called in synchronized context */
@@ -243,7 +253,31 @@ public class CASFileCache {
     }
   }
 
-  /** must be called in synchronized context */
+  public void putFiles(
+      Iterable<FileNode> files,
+      Path path,
+      ImmutableList.Builder<Path> inputsBuilder) throws IOException, InterruptedException {
+    putDirectoryFiles(files, path, /* containingDirectory=*/ null, inputsBuilder);
+  }
+
+  private void putDirectoryFiles(
+      Iterable<FileNode> files,
+      Path path,
+      Digest containingDirectory,
+      ImmutableList.Builder<Path> inputsBuilder) throws IOException, InterruptedException {
+    for (FileNode fileNode : files) {
+      Path filePath = path.resolve(fileNode.getName());
+      if (fileNode.getDigest().getSizeBytes() != 0) {
+        Path fileCacheKey = put(fileNode.getDigest(), fileNode.getIsExecutable(), containingDirectory);
+        // FIXME this can die with 'too many links'... needs some cascading fallout
+        Files.createLink(filePath, fileCacheKey);
+        inputsBuilder.add(fileCacheKey);
+      } else {
+        Files.createFile(filePath);
+      }
+    }
+  }
+
   private void fetchDirectory(
       Digest containingDirectory,
       Path path,
@@ -252,16 +286,7 @@ public class CASFileCache {
       ImmutableList.Builder<Path> inputsBuilder) throws IOException, InterruptedException {
     Directory directory = directoriesIndex.get(digest);
     Files.createDirectory(path);
-    for (FileNode fileNode : directory.getFilesList()) {
-      if (fileNode.getDigest().getSizeBytes() != 0) {
-        Path fileCacheKey = put(fileNode.getDigest(), fileNode.getIsExecutable(), containingDirectory);
-        // FIXME this can die with 'too many links'... needs some cascading fallout
-        Files.createLink(path.resolve(fileNode.getName()), fileCacheKey);
-        inputsBuilder.add(fileCacheKey);
-      } else {
-        Files.createFile(path.resolve(fileNode.getName()));
-      }
-    }
+    putDirectoryFiles(directory.getFilesList(), path, containingDirectory, inputsBuilder);
     for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
       fetchDirectory(
           containingDirectory,
@@ -272,28 +297,52 @@ public class CASFileCache {
     }
   }
 
-  public synchronized Path putDirectory(
+  public Path putDirectory(
       Digest digest,
       Map<Digest, Directory> directoriesIndex) throws IOException, InterruptedException {
     Path path = getDirectoryPath(digest);
 
-    DirectoryEntry e = directoryStorage.get(digest);
-    if (e != null) {
-      incrementReferences(e.inputs);
-      return path;
+    synchronized (this) {
+      DirectoryEntry e = directoryStorage.get(digest);
+      if (e != null) {
+        incrementReferences(e.inputs);
+        return path;
+      }
     }
 
     ImmutableList.Builder<Path> inputsBuilder = new ImmutableList.Builder<>();
-    fetchDirectory(digest, path, digest, directoriesIndex, inputsBuilder);
+    try {
+      fetchDirectory(digest, path, digest, directoriesIndex, inputsBuilder);
+    } catch (IOException e) {
+      ImmutableList<Path> inputs = inputsBuilder.build();
+      synchronized (this) {
+        purgeDirectoryFromInputs(digest, inputs);
+        decrementReferencesSynchronized(inputs, ImmutableList.<Digest>of());
+      }
+      try {
+        removeDirectory(path);
+      } catch (IOException rmdirEx) {
+        // unexpected failure removing directory, log and maintain original exception
+        rmdirEx.printStackTrace();
+      }
+      throw e;
+    }
 
-    e = new DirectoryEntry(directoriesIndex.get(digest), inputsBuilder.build());
+    DirectoryEntry e = new DirectoryEntry(directoriesIndex.get(digest), inputsBuilder.build());
 
     directoryStorage.put(digest, e);
 
     return path;
   }
 
-  public Path put(Digest digest, boolean isExecutable, Digest containingDirectory) throws IOException, InterruptedException {
+  @VisibleForTesting
+  public Path put(Digest digest, boolean isExecutable) throws IOException, InterruptedException {
+    return put(digest, isExecutable, /* containingDirectory=*/ null);
+  }
+
+  private Path put(Digest digest, boolean isExecutable, Digest containingDirectory) throws IOException, InterruptedException {
+    Preconditions.checkState(digest.getSizeBytes() > 0, "file entries may not be empty");
+
     Path key = getKey(digest, isExecutable);
     ImmutableList.Builder<Path> expiredKeys = null;
 
@@ -323,17 +372,17 @@ public class CASFileCache {
       }
     }
 
-    Path tmpPath;
-    long copySize;
+    Path tmpPath = key.resolveSibling(key.getFileName() + ".tmp");
     try (InputStream in = inputStreamFactory.apply(digest)) {
       // FIXME make a validating file copy object and verify digest
-      tmpPath = key.resolveSibling(key.getFileName() + ".tmp");
-      copySize = Files.copy(in, tmpPath);
-    }
-
-    if (copySize != digest.getSizeBytes()) {
-      Files.delete(tmpPath);
-      return null;
+      long copySize = Files.copy(in, tmpPath);
+      if (copySize != digest.getSizeBytes()) {
+        Files.delete(tmpPath);
+        throw new IOException(String.format(
+            "invalid size copied for %s: was %d",
+            DigestUtil.toString(digest),
+            copySize));
+      }
     }
     setPermissions(tmpPath, isExecutable);
     Files.move(tmpPath, key, REPLACE_EXISTING);

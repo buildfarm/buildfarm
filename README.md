@@ -53,8 +53,7 @@ To have bazel use the bazel buildfarm configured using the example configs provi
 
 ```
 $ cat .bazelrc
-startup --host_jvm_args=-Dbazel.DigestFunction=SHA1
-build --spawn_strategy=remote --genrule_strategy=remote --strategy=Javac=remote --strategy=Closure=remote  --remote_executor=localhost:8980
+build --spawn_strategy=remote --genrule_strategy=remote --strategy=Javac=remote --strategy=Closure=remote --remote_executor=localhost:8980
 ```
 
 Then run your build as you would normally do.

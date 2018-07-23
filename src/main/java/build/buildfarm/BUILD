@@ -131,6 +131,7 @@ container_image(
         "--port",
         "8098"
     ],
+    visibility = ["//visibility:public"],
 )
 
 java_library(
@@ -251,4 +252,5 @@ container_image(
         "buildfarm-worker_deploy.jar",
         "/config/worker.config",
     ],
+    visibility = ["//visibility:public"],
 )

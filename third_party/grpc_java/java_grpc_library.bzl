@@ -1,6 +1,6 @@
 # Original source: https://github.com/grpc/grpc-java/blob/master/java_grpc_library.bzl
 #
-# Modified to use "@3rdparty//..." references to protobuf and gRPC instead.
+# Modified to use "@build_buildfarm//3rdparty/..." references to protobuf and gRPC instead.
 
 def _path_ignoring_repository(f):
   if (len(f.owner.workspace_root) == 0):
@@ -111,13 +111,13 @@ def java_grpc_library(name, srcs, deps, flavor=None,
   )
 
   added_deps = [
-      "@//3rdparty/jvm/io/grpc:grpc_core",
-      "@//3rdparty/jvm/io/grpc:grpc_stub",
-      "@//3rdparty/jvm/io/grpc:grpc_protobuf",
-      "@//3rdparty/jvm/com/google/guava",
+      "@build_buildfarm//3rdparty/jvm/io/grpc:grpc_core",
+      "@build_buildfarm//3rdparty/jvm/io/grpc:grpc_stub",
+      "@build_buildfarm//3rdparty/jvm/io/grpc:grpc_protobuf",
+      "@build_buildfarm//3rdparty/jvm/com/google/guava",
   ]
   if flavor == "normal":
-    added_deps += ["@//3rdparty/jvm/com/google/protobuf:protobuf_java"]
+    added_deps += ["@build_buildfarm//3rdparty/jvm/com/google/protobuf:protobuf_java"]
   else:
     fail("Unknown flavor type", "flavor")
 
@@ -126,7 +126,7 @@ def java_grpc_library(name, srcs, deps, flavor=None,
       srcs = [gensource_name],
       visibility = visibility,
       deps = [
-          "@//3rdparty/jvm/com/google/code/findbugs:jsr305",
+          "@build_buildfarm//3rdparty/jvm/com/google/code/findbugs:jsr305",
       ] + deps + added_deps,
       **kwargs
   )
