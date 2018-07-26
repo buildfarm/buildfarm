@@ -138,6 +138,7 @@ public class Worker implements Instances {
   private final ListeningScheduledExecutorService retryScheduler =
       MoreExecutors.listeningDecorator(Executors.newScheduledThreadPool(1));
   private final Set<String> activeOperations = new ConcurrentSkipListSet<>();
+  private static final int shutdownWaitTimeInMillis = 10000;
 
   @Override
   public Instance getFromBlob(String blobName) throws InstanceNotFoundException { return instance; }
@@ -1057,6 +1058,14 @@ public class Worker implements Instances {
     if (server != null) {
       System.err.println("Shutting down the server");
       server.shutdown();
+
+      try {
+        server.awaitTermination(shutdownWaitTimeInMillis, TimeUnit.MILLISECONDS);
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+      } finally {
+        server.shutdownNow();
+      }
     }
     backplane.stop();
   }
@@ -1087,6 +1096,14 @@ public class Worker implements Instances {
     pipeline.join();
     if (server != null) {
       server.shutdown();
+
+      try {
+        server.awaitTermination(shutdownWaitTimeInMillis, TimeUnit.MILLISECONDS);
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+      } finally {
+        server.shutdownNow();
+      }
     }
     backplane.stop();
   }
