@@ -401,6 +401,16 @@ public class StubInstance implements Instance {
   }
 
   @Override
+  public ChunkObserver getWriteBlobObserver(Digest blobDigest) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public ChunkObserver getWriteOperationStreamObserver(String operationStream) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public String getTree(
       Digest rootDigest,
       int pageSize,

@@ -104,7 +104,8 @@ public class MemoryInstance extends AbstractServerInstance {
         contentAddressableStorage,
         /*actionCache=*/ new DelegateCASMap<ActionKey, ActionResult>(contentAddressableStorage, ActionResult.parser(), digestUtil),
         outstandingOperations,
-        /*completedOperations=*/ new DelegateCASMap<String, Operation>(contentAddressableStorage, Operation.parser(), digestUtil));
+        /*completedOperations=*/ new DelegateCASMap<String, Operation>(contentAddressableStorage, Operation.parser(), digestUtil),
+        /*activeBlobWrites=*/ new ConcurrentHashMap<Digest, ByteString>());
     this.config = config;
     watchers = new ConcurrentHashMap<String, List<Predicate<Operation>>>();
     streams = new HashMap<String, ByteStringStreamSource>();

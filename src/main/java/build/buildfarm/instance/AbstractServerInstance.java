@@ -23,6 +23,8 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.SettableFuture;
 import com.google.devtools.remoteexecution.v1test.Action;
 import com.google.devtools.remoteexecution.v1test.ActionResult;
 import com.google.devtools.remoteexecution.v1test.Command;
@@ -54,6 +56,7 @@ public abstract class AbstractServerInstance implements Instance {
   protected final Map<ActionKey, ActionResult> actionCache;
   protected final Map<String, Operation> outstandingOperations;
   protected final Map<String, Operation> completedOperations;
+  protected final Map<Digest, ByteString> activeBlobWrites;
   protected final DigestUtil digestUtil;
 
   private static final String DUPLICATE_FILE_NODE =
@@ -94,13 +97,15 @@ public abstract class AbstractServerInstance implements Instance {
       ContentAddressableStorage contentAddressableStorage,
       Map<ActionKey, ActionResult> actionCache,
       Map<String, Operation> outstandingOperations,
-      Map<String, Operation> completedOperations) {
+      Map<String, Operation> completedOperations,
+      Map<Digest, ByteString> activeBlobWrites) {
     this.name = name;
+    this.digestUtil = digestUtil;
     this.contentAddressableStorage = contentAddressableStorage;
     this.actionCache = actionCache;
     this.outstandingOperations = outstandingOperations;
     this.completedOperations = completedOperations;
-    this.digestUtil = digestUtil;
+    this.activeBlobWrites = activeBlobWrites;
   }
 
   @Override
@@ -196,6 +201,65 @@ public abstract class AbstractServerInstance implements Instance {
     Blob blob = new Blob(content, digestUtil);
     contentAddressableStorage.put(blob);
     return blob.getDigest();
+  }
+
+  @Override
+  public ChunkObserver getWriteBlobObserver(Digest blobDigest) {
+    // what should the locking semantics be here??
+    activeBlobWrites.putIfAbsent(blobDigest, ByteString.EMPTY);
+    return new ChunkObserver() {
+      SettableFuture<Long> committedFuture = SettableFuture.create();
+
+      @Override
+      public long getCommittedSize() {
+        return activeBlobWrites.get(blobDigest).size();
+      }
+
+      @Override
+      public ListenableFuture<Long> getCommittedFuture() {
+        return committedFuture;
+      }
+
+      @Override
+      public void reset() {
+        activeBlobWrites.put(blobDigest, ByteString.EMPTY);
+      }
+
+      @Override
+      public void onNext(ByteString chunk) {
+        activeBlobWrites.put(blobDigest, activeBlobWrites.get(blobDigest).concat(chunk));
+      }
+
+      @Override
+      public void onError(Throwable t) {
+        activeBlobWrites.remove(blobDigest);
+        committedFuture.setException(t);
+      }
+
+      @Override
+      public void onCompleted() {
+        ByteString content = activeBlobWrites.get(blobDigest);
+        // yup, redundant, need to compute this inline
+        Preconditions.checkState(digestUtil.compute(content).equals(blobDigest));
+        try {
+          putBlob(content);
+        } catch (StatusException e) {
+          throw Status.fromThrowable(e).asRuntimeException();
+        } catch (IOException e) {
+          throw Status.INTERNAL.withCause(e).asRuntimeException();
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw Status.CANCELLED.withCause(e).asRuntimeException();
+        }
+        committedFuture.set((long) content.size());
+        activeBlobWrites.remove(blobDigest);
+      }
+    };
+  }
+
+  @Override
+  public ChunkObserver getWriteOperationStreamObserver(String operationStream) {
+    throw new UnsupportedOperationException();
   }
 
   @Override

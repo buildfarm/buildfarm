@@ -17,6 +17,7 @@ package build.buildfarm.instance;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.devtools.remoteexecution.v1test.Action;
 import com.google.devtools.remoteexecution.v1test.ActionResult;
 import com.google.devtools.remoteexecution.v1test.Digest;
@@ -55,6 +56,8 @@ public interface Instance {
   void getBlob(Digest blobDigest, long offset, long limit, StreamObserver<ByteString> blobObserver);
   Digest putBlob(ByteString blob)
       throws IOException, InterruptedException, StatusException;
+  ChunkObserver getWriteBlobObserver(Digest blobDigest);
+  ChunkObserver getWriteOperationStreamObserver(String operationStream);
   String getTree(
       Digest rootDigest,
       int pageSize,
@@ -115,5 +118,13 @@ public interface Instance {
     @Override public boolean onOperation(Operation operation) {
       return onMatch.test(operation);
     }
+  }
+
+  public static interface ChunkObserver extends StreamObserver<ByteString> {
+    long getCommittedSize();
+
+    void reset();
+
+    ListenableFuture<Long> getCommittedFuture();
   }
 }

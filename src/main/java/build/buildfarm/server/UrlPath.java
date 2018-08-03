@@ -118,12 +118,15 @@ public class UrlPath {
     return digestUtil.build(hash, size);
   }
 
-  public static Digest parseUploadBlobDigest(String resourceName, DigestUtil digestUtil)
+  public static Digest parseUploadBlobDigest(String resourceName)
       throws NumberFormatException {
     String[] components = resourceName.split("/");
     String hash = components[components.length - 2];
     long size = Long.parseLong(components[components.length - 1]);
-    return digestUtil.build(hash, size);
+    return Digest.newBuilder()
+        .setHash(hash)
+        .setSizeBytes(size)
+        .build();
   }
 
   public static String parseOperationStream(String resourceName) {

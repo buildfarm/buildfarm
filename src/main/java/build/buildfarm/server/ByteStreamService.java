@@ -14,8 +14,12 @@
 
 package build.buildfarm.server;
 
+import static com.google.common.base.Preconditions.checkState;
+
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.instance.Instance.ChunkObserver;
+import build.buildfarm.server.UrlPath.ResourceOperation;
 import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusResponse;
@@ -23,6 +27,8 @@ import com.google.bytestream.ByteStreamProto.ReadRequest;
 import com.google.bytestream.ByteStreamProto.ReadResponse;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
@@ -34,7 +40,6 @@ import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -156,15 +161,8 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
     }
 
     try {
-      Optional<UrlPath.ResourceOperation> resourceOperation = Optional.empty();
-      try {
-        resourceOperation = Optional.of(UrlPath.detectResourceOperation(resourceName));
-      } catch (IllegalArgumentException e) {
-        String description = e.getLocalizedMessage();
-        responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(description).asException());
-        return;
-      }
-      switch (resourceOperation.get()) {
+      ResourceOperation resourceOperation = UrlPath.detectResourceOperation(resourceName);
+      switch (resourceOperation) {
       case Blob:
         readBlob(request, responseObserver);
         break;
@@ -176,11 +174,13 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
             "ByteStreamServer:read "
             + resourceName
             + ": unknown resource type");
-        String description = "Invalid service";
-        responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(description).asException());
-        break;
+        throw new ServiceNotFoundException(resourceName);
       }
-    } catch(InterruptedException|IOException e) {
+    } catch (IllegalArgumentException|ServiceNotFoundException e) {
+      responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getLocalizedMessage()).asException());
+    } catch (InterruptedException e) {
+      // do nothing
+    } catch (IOException e) {
       responseObserver.onError(Status.fromThrowable(e).asException());
     }
   }
@@ -191,30 +191,54 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
       StreamObserver<QueryWriteStatusResponse> responseObserver) {
     String resourceName = request.getResourceName();
 
-    Optional<UrlPath.ResourceOperation> resourceOperation = Optional.empty();
     try {
-      resourceOperation = Optional.of(UrlPath.detectResourceOperation(resourceName));
-    } catch (IllegalArgumentException e) {
-      String description = e.getLocalizedMessage();
-      responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(description).asException());
-      return;
+      ResourceOperation resourceOperation = UrlPath.detectResourceOperation(resourceName);
+      switch (resourceOperation) {
+      case UploadBlob:
+        responseObserver.onError(Status.UNIMPLEMENTED.asException());
+        break;
+      case OperationStream:
+        responseObserver.onError(Status.UNIMPLEMENTED.asException());
+        break;
+      default:
+        logger.info(
+            "ByteStreamServer:query "
+            + resourceName
+            + ": unknown resource type");
+        throw new ServiceNotFoundException(resourceName);
+      }
+    } catch (IllegalArgumentException|ServiceNotFoundException e) {
+      responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(e.getLocalizedMessage()).asException());
     }
+  }
 
-    switch (resourceOperation.get()) {
+  ChunkObserver getWriteBlobObserver(String resourceName) throws InstanceNotFoundException {
+    Instance instance = instances.getFromUploadBlob(resourceName);
+
+    Digest digest = UrlPath.parseUploadBlobDigest(resourceName);
+    return instance.getWriteBlobObserver(digest);
+  }
+
+  ChunkObserver getWriteOperationStreamObserver(String resourceName) throws InstanceNotFoundException {
+    Instance instance = instances.getFromOperationStream(resourceName);
+
+    String operationStream = UrlPath.parseOperationStream(resourceName);
+    return instance.getWriteOperationStreamObserver(operationStream);
+  }
+
+  ChunkObserver getChunkObserver(String resourceName) throws InstanceNotFoundException, ServiceNotFoundException {
+    ResourceOperation resourceOperation = UrlPath.detectResourceOperation(resourceName);
+    switch (resourceOperation) {
     case UploadBlob:
-      responseObserver.onError(Status.UNIMPLEMENTED.asException());
-      break;
+      return getWriteBlobObserver(resourceName);
     case OperationStream:
-      responseObserver.onError(Status.UNIMPLEMENTED.asException());
-      break;
+      return getWriteOperationStreamObserver(resourceName);
     default:
       logger.info(
-          "ByteStreamServer:query "
+          "ByteStreamServer:write "
           + resourceName
           + ": unknown resource type");
-      String description = "Invalid service";
-      responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(description).asException());
-      break;
+      throw new ServiceNotFoundException(resourceName);
     }
   }
 
@@ -222,202 +246,89 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
   public StreamObserver<WriteRequest> write(
       final StreamObserver<WriteResponse> responseObserver) {
     return new StreamObserver<WriteRequest>() {
-      long committed_size = 0;
-      ByteString data = null;
-      boolean finished = false;
-      boolean failed = false;
-      String writeResourceName = null;
-
-      Digest digest;
-
-      private void writeBlob(
-          WriteRequest request, StreamObserver<WriteResponse> responseObserver)
-          throws InterruptedException {
-        try {
-          Instance instance = instances.getFromUploadBlob(writeResourceName);
-
-          writeInstanceBlob(request, responseObserver, instance);
-        } catch (InstanceNotFoundException e) {
-          responseObserver.onError(BuildFarmInstances.toStatusException(e));
-          failed = true;
-        }
-      }
-
-      private void writeInstanceBlob(
-          WriteRequest request, StreamObserver<WriteResponse> responseObserver,
-          Instance instance)
-          throws InterruptedException {
-        if (data == null) {
-          digest = UrlPath.parseUploadBlobDigest(writeResourceName, instance.getDigestUtil());
-          if (digest == null) {
-            logger.info(
-                "ByteStreamServer:write "
-                + writeResourceName
-                + ": invalid digest format");
-            String description = "Could not parse digest of: " + writeResourceName;
-            responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
-            failed = true;
-            return;
-          }
-          data = active_write_requests.get(writeResourceName);
-          if (data != null) {
-            committed_size = data.size();
-          }
-        }
-        if (request.getWriteOffset() != committed_size) {
-          logger.info(
-              "ByteStreamServer:"
-              + writeResourceName
-              + ": offset("
-              + request.getWriteOffset()
-              + ") != committed_size("
-              + committed_size
-              + ")");
-          String description = "Write offset invalid: " + request.getWriteOffset();
-          responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
-          failed = true;
-          return;
-        }
-        ByteString chunk = request.getData();
-        if (data == null) {
-          data = chunk;
-          committed_size = data.size();
-          active_write_requests.put(writeResourceName, data);
-        } else {
-          data = data.concat(chunk);
-          committed_size += chunk.size();
-        }
-        if (request.getFinishWrite()) {
-          active_write_requests.remove(writeResourceName);
-          Digest blobDigest = instance.getDigestUtil().compute(data);
-          if (!blobDigest.equals(digest)) {
-            logger.info(
-                "ByteStreamServer:"
-                + writeResourceName
-                + ": blobDigest("
-                + blobDigest.getHash()
-                + ") != "
-                + digest.getHash());
-            String description = String.format("Digest mismatch %s <-> %s", DigestUtil.toString(blobDigest), DigestUtil.toString(digest));
-            responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
-            failed = true;
-          } else {
-            try {
-              instance.putBlob(data);
-            } catch (Throwable t) {
-              responseObserver.onError(Status.fromThrowable(t).asException());
-              failed = true;
-            }
-          }
-        }
-      }
-
-      private void writeOperationStream(
-          WriteRequest request, StreamObserver<WriteResponse> responseObserver) throws IOException {
-        try {
-          Instance instance = instances.getFromOperationStream(writeResourceName);
-
-          String operationStream = UrlPath.parseOperationStream(writeResourceName);
-
-          OutputStream outputStream = instance.getStreamOutput(operationStream);
-          request.getData().writeTo(outputStream);
-          if (request.getFinishWrite()) {
-            outputStream.close();
-          }
-        } catch (InstanceNotFoundException e) {
-          responseObserver.onError(BuildFarmInstances.toStatusException(e));
-        }
-      }
+      String resourceName;
+      ChunkObserver chunkObserver = null;
 
       @Override
-      public void onNext(WriteRequest request) {
-        if (finished) {
-          // FIXME does bytestream have a standard status for this invalid request?
-          responseObserver.onError(new StatusException(Status.OUT_OF_RANGE));
-          failed = true;
-        } else {
-          String resourceName = request.getResourceName();
-          if (resourceName.isEmpty()) {
-            if (writeResourceName == null) {
-              logger.info(
-                  "ByteStreamServer:write: resource name not specified on first write");
-              String description = "Missing resource name in request";
-              responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
-              failed = true;
-            } else {
-              resourceName = writeResourceName;
-            }
-          } else if (writeResourceName == null) {
-            writeResourceName = resourceName;
-          } else if (!writeResourceName.equals(resourceName)) {
-            logger.info(
-                "ByteStreamServer:write: resource name does not match first request");
-            String description = String.format("Previous resource name changed while handling request. %s -> %s", writeResourceName, resourceName);
-            responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(description).asException());
-            failed = true;
-          }
-        }
-
-        if (failed) {
-          return;
-        }
-        
-        Optional<UrlPath.ResourceOperation> resourceOperation = Optional.empty();
-        try {
-          resourceOperation = Optional.of(UrlPath.detectResourceOperation(writeResourceName));
-        } catch (IllegalArgumentException e) {
-          String description = e.getLocalizedMessage();
-          responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(description).asException());
-          failed = true;
-        }
-
-        if (failed) {
-          return;
-        }
-
-        try {
-          switch (resourceOperation.get()) {
-          case UploadBlob:
-            writeBlob(request, responseObserver);
-            finished = request.getFinishWrite();
-            break;
-          case OperationStream:
-            writeOperationStream(request, responseObserver);
-            finished = request.getFinishWrite();
-            break;
-          default:
-            logger.info(
-                "ByteStreamServer:write "
-                + writeResourceName
-                + ": unknown resource type");
-            responseObserver.onError(Status.INVALID_ARGUMENT.asException());
-            failed = true;
-            break;
-          }
-        } catch(InterruptedException e) {
-          responseObserver.onError(Status.fromThrowable(e).asException());
-          failed = true;
-        } catch(IOException e) {
-          responseObserver.onError(Status.fromThrowable(e).asException());
-          failed = true;
-        }
+      public void onCompleted() {
       }
 
       @Override
       public void onError(Throwable t) {
-        // has the connection closed at this point?
-        failed = true;
+        if (chunkObserver != null) {
+          chunkObserver.onError(t);
+          chunkObserver = null;
+        }
+      }
+
+      void validateRequest(WriteRequest request) {
+        String requestResourceName = request.getResourceName();
+        if (!requestResourceName.isEmpty() && !resourceName.equals(requestResourceName)) {
+          logger.warning(
+              String.format("ByteStreamServer:write:%s: resource name (%s) does not match first request", resourceName, requestResourceName));
+          throw new IllegalArgumentException(String.format("Previous resource name changed while handling request. %s -> %s", resourceName, requestResourceName));
+        }
+        if (request.getWriteOffset() != chunkObserver.getCommittedSize()) {
+          logger.warning(
+              String.format("ByteStreamServer:write:%s: offset(%d) != committed_size(%d)", resourceName, request.getWriteOffset(), chunkObserver.getCommittedSize()));
+          throw new IllegalArgumentException("Write offset invalid: " + request.getWriteOffset());
+        }
+
+        // finish write, digest compare, etc
       }
 
       @Override
-      public void onCompleted() {
-        if (failed)
-          return;
+      public void onNext(WriteRequest request) {
+        checkState(
+            request.getFinishWrite() || request.getData().size() != 0,
+            "write onNext supplied with empty WriteRequest for " + request.getResourceName() + " at " + request.getWriteOffset());
+        if (request.getData().size() != 0) {
+          try {
+            if (chunkObserver == null) {
+              resourceName = request.getResourceName();
+              if (resourceName.isEmpty()) {
+                logger.warning("ByteStreamServer:write: resource name not specified on first write");
+                throw new IllegalArgumentException("Missing resource name in request");
+              }
+              chunkObserver = getChunkObserver(resourceName);
+              Futures.addCallback(chunkObserver.getCommittedFuture(), new FutureCallback<Long>() {
+                @Override
+                public void onFailure(Throwable t) {
+                  System.err.println("During upload of " + resourceName + ":");
+                  t.printStackTrace();
+                  responseObserver.onError(t);
+                }
 
-        responseObserver.onNext(WriteResponse.newBuilder()
-            .setCommittedSize(committed_size)
-            .build());
-        responseObserver.onCompleted();
+                @Override
+                public void onSuccess(Long committedSize) {
+                  responseObserver.onNext(WriteResponse.newBuilder()
+                      .setCommittedSize(committedSize)
+                      .build());
+                  responseObserver.onCompleted();
+                }
+              });
+            }
+
+            if (chunkObserver.getCommittedSize() != 0 && request.getWriteOffset() == 0) {
+              chunkObserver.reset();
+            }
+            validateRequest(request);
+
+            chunkObserver.onNext(request.getData());
+          } catch (IllegalArgumentException|InstanceNotFoundException|ServiceNotFoundException e) {
+            Throwable t = Status.INVALID_ARGUMENT.withDescription(e.getLocalizedMessage()).asException();
+            responseObserver.onError(t);
+            if (chunkObserver != null) {
+              chunkObserver.onError(t);
+            }
+            return;
+          }
+        }
+
+        if (request.getFinishWrite()) {
+          chunkObserver.onCompleted();
+          chunkObserver = null;
+        }
       }
     };
   }

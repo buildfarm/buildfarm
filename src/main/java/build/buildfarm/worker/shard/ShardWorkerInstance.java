@@ -67,7 +67,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
       Fetcher fetcher,
       ContentAddressableStorage contentAddressableStorage,
       ShardWorkerInstanceConfig config) throws ConfigurationException {
-    super(name, digestUtil, null, null, null, null);
+    super(name, digestUtil, null, null, null, null, null);
     this.config = config;
     this.backplane = backplane;
     this.fetcher = fetcher;

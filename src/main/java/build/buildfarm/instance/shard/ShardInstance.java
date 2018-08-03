@@ -108,7 +108,7 @@ public class ShardInstance extends AbstractServerInstance {
   private final Random rand = new Random();
 
   public ShardInstance(String name, DigestUtil digestUtil, ShardInstanceConfig config, Runnable onStop) throws InterruptedException, ConfigurationException {
-    super(name, digestUtil, null, null, null, null);
+    super(name, digestUtil, null, null, null, null, null);
     this.config = config;
     this.onStop = onStop;
     ShardInstanceConfig.BackplaneCase backplaneCase = config.getBackplaneCase();

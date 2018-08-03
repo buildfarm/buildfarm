@@ -22,6 +22,7 @@ import static java.util.Collections.singletonList;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
+import build.buildfarm.common.DigestUtil;
 import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
@@ -110,6 +111,15 @@ public class ByteStreamUploader {
     this.callTimeoutSecs = callTimeoutSecs;
     this.retrier = retrier;
     this.retryService = retryService;
+  }
+
+  public static String getResourceName(String upload, @Nullable String instanceName, Digest digest) {
+    String resourceName =
+        format("uploads/%s/blobs/%s", upload, DigestUtil.toString(digest));
+    if (!Strings.isNullOrEmpty(instanceName)) {
+      resourceName = instanceName + "/" + resourceName;
+    }
+    return resourceName;
   }
 
   /**
@@ -331,6 +341,10 @@ public class ByteStreamUploader {
       this.listener = listener;
     }
 
+    private String newResourceName(Digest digest) {
+      return getResourceName(UUID.randomUUID().toString(), instanceName, digest);
+    }
+
     void start() {
       CallOptions callOptions =
           CallOptions.DEFAULT
@@ -404,17 +418,6 @@ public class ByteStreamUploader {
                   }
                 }
               }
-            }
-
-            private String newResourceName(Digest digest) {
-              String resourceName =
-                  format(
-                      "uploads/%s/blobs/%s/%d",
-                      UUID.randomUUID(), digest.getHash(), digest.getSizeBytes());
-              if (!Strings.isNullOrEmpty(instanceName)) {
-                resourceName = instanceName + "/" + resourceName;
-              }
-              return resourceName;
             }
           };
       call.start(callListener, new Metadata());
