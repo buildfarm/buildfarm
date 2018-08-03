@@ -6,13 +6,25 @@ package(
 
 java_library(
     name = "common",
-    srcs = glob(["common/**/*.java"]),
+    srcs = glob(["common/*.java"]),
     deps = [
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
         "@googleapis//:google_longrunning_operations_java_proto",
+    ],
+)
+
+java_library(
+    name = "common-cache",
+    srcs = glob(["common/cache/*.java"]),
+    deps = [
+        "//3rdparty/jvm/com/google/code/findbugs:jsr305",
+        "//3rdparty/jvm/com/google/errorprone:error_prone_annotations",
+        "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/com/google/j2objc:j2objc_annotations",
+        "//3rdparty/jvm/org/checkerframework:checker_qual",
     ],
 )
 
