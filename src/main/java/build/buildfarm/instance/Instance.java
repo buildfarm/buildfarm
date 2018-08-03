@@ -64,7 +64,7 @@ public interface Instance {
       String pageToken,
       ImmutableList.Builder<Directory> directories,
       boolean acceptMissing) throws IOException, InterruptedException;
-  OutputStream getStreamOutput(String name);
+  CommittingOutputStream getStreamOutput(String name, long expectedSize);
   InputStream newStreamInput(String name, long offset) throws IOException, InterruptedException;
 
   void execute(
@@ -126,5 +126,9 @@ public interface Instance {
     void reset();
 
     ListenableFuture<Long> getCommittedFuture();
+  }
+
+  public static abstract class CommittingOutputStream extends OutputStream {
+    public abstract ListenableFuture<Long> getCommittedFuture();
   }
 }

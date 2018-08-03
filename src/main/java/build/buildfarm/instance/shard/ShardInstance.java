@@ -701,7 +701,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @Override
-  public OutputStream getStreamOutput(String name) {
+  public CommittingOutputStream getStreamOutput(String name, long expectedSize) {
     throw new UnsupportedOperationException();
   }
 

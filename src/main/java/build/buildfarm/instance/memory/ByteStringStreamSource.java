@@ -14,22 +14,25 @@
 
 package build.buildfarm.instance.memory;
 
+import build.buildfarm.instance.Instance.CommittingOutputStream;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
 import java.io.InputStream;
-import java.io.OutputStream;
 
 class ByteStringStreamSource {
-  private final Runnable onClose;
-  private final OutputStream outputStream;
+  private final CommittingOutputStream outputStream;
 
   private final Object bufferSync;
   private ByteString buffer;
   private boolean closed;
 
-  public ByteStringStreamSource(Runnable onClose) {
-    this.onClose = onClose;
+  public ByteStringStreamSource() {
     buffer = ByteString.EMPTY;
-    outputStream = new OutputStream() {
+    outputStream = new CommittingOutputStream() {
+      long committedSize = 0;
+      SettableFuture<Long> committedFuture = SettableFuture.create();
+
       @Override
       public void write(int b) {
         byte[] buf = new byte[1];
@@ -48,6 +51,7 @@ class ByteStringStreamSource {
           buffer = buffer.concat(ByteString.copyFrom(b, off, len));
           bufferSync.notifyAll();
         }
+        committedSize += len;
       }
 
       @Override
@@ -56,7 +60,12 @@ class ByteStringStreamSource {
           closed = true;
           bufferSync.notifyAll();
         }
-        onClose.run();
+        committedFuture.set(committedSize);
+      }
+
+      @Override
+      public ListenableFuture<Long> getCommittedFuture() {
+        return committedFuture;
       }
     };
     bufferSync = new Object();
@@ -67,7 +76,7 @@ class ByteStringStreamSource {
     return closed;
   }
 
-  public OutputStream getOutputStream() {
+  public CommittingOutputStream getOutputStream() {
     return outputStream;
   }
 

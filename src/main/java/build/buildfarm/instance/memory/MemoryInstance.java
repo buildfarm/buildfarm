@@ -29,6 +29,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.io.BaseEncoding;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.devtools.remoteexecution.v1test.Action;
 import com.google.devtools.remoteexecution.v1test.ActionResult;
 import com.google.devtools.remoteexecution.v1test.Digest;
@@ -119,14 +120,15 @@ public class MemoryInstance extends AbstractServerInstance {
   private ByteStringStreamSource getSource(String name) {
     ByteStringStreamSource source = streams.get(name);
     if (source == null) {
-      source = new ByteStringStreamSource(() -> streams.remove(name));
+      source = new ByteStringStreamSource();
+      source.getOutputStream().getCommittedFuture().addListener(() -> streams.remove(name), MoreExecutors.directExecutor());
       streams.put(name, source);
     }
     return source;
   }
 
   @Override
-  public OutputStream getStreamOutput(String name) {
+  public CommittingOutputStream getStreamOutput(String name, long expectedSize) {
     return getSource(name).getOutputStream();
   }
 

@@ -638,7 +638,7 @@ public class Worker {
       // doesn't belong in CAS or AC, must be in OQ
       @Override
       public OutputStream getStreamOutput(String name) {
-        return operationQueueInstance.getStreamOutput(name);
+        return operationQueueInstance.getStreamOutput(name, -1);
       }
 
       @Override

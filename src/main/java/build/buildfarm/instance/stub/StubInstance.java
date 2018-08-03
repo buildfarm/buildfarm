@@ -14,6 +14,8 @@
 
 package build.buildfarm.instance.stub;
 
+import static com.google.common.base.Preconditions.checkState;
+
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.instance.Instance;
@@ -33,6 +35,8 @@ import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.SettableFuture;
 import com.google.devtools.remoteexecution.v1test.Action;
 import com.google.devtools.remoteexecution.v1test.ActionCacheGrpc;
 import com.google.devtools.remoteexecution.v1test.ActionCacheGrpc.ActionCacheBlockingStub;
@@ -247,32 +251,37 @@ public class StubInstance implements Instance {
     return digests;
   }
 
+  /** expectedSize == -1 for unlimited */
   @Override
-  public OutputStream getStreamOutput(String name) {
-    return new OutputStream() {
+  public CommittingOutputStream getStreamOutput(String name, long expectedSize) {
+    return new CommittingOutputStream() {
+      SettableFuture<Long> committedFuture = SettableFuture.create();
       boolean closed = false;
       String resourceName = name;
-      long written_bytes = 0;
-      final AtomicReference<RuntimeException> exception = new AtomicReference<>(null);
+      long writtenBytes = 0;
       StreamObserver<WriteRequest> requestObserver = bsStub.get()
           .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
           .write(
               new StreamObserver<WriteResponse>() {
                 @Override
                 public void onNext(WriteResponse reply) {
+                  checkState(reply.getCommittedSize() == writtenBytes);
+                  requestObserver.onCompleted();
+                  committedFuture.set(reply.getCommittedSize());
                 }
 
                 @Override
                 public void onError(Throwable t) {
-                  exception.compareAndSet(
-                      null, Status.fromThrowable(t).asRuntimeException());
+                  committedFuture.setException(t);
                 }
 
                 @Override
                 public void onCompleted() {
                   if (!closed) {
-                    exception.compareAndSet(
-                        null, new RuntimeException("Server closed connection before output stream."));
+                    System.err.println("Server closed connection before output stream for " + resourceName + " at " + writtenBytes);
+                    // FIXME(werkt) better error, status
+                    committedFuture.setException(
+                        new RuntimeException("Server closed connection before output stream."));
                   }
                 }
               }
@@ -280,11 +289,12 @@ public class StubInstance implements Instance {
 
       @Override
       public void close() {
-        closed = true;
-        requestObserver.onNext(WriteRequest.newBuilder()
-            .setResourceName(resourceName)
-            .setFinishWrite(true)
-            .build());
+        if (!closed) {
+          closed = true;
+          requestObserver.onNext(WriteRequest.newBuilder()
+              .setFinishWrite(true)
+              .build());
+        }
       }
 
       @Override
@@ -299,21 +309,35 @@ public class StubInstance implements Instance {
         write(b, 0, b.length);
       }
 
+      boolean isFinishWrite(long sizeAfterWrite) {
+        return expectedSize < 0 ? false : (sizeAfterWrite >= expectedSize);
+      }
+
+      WriteRequest createWriteRequest(ByteString chunk, boolean finishWrite) {
+        WriteRequest.Builder builder = WriteRequest.newBuilder()
+            .setData(chunk)
+            .setWriteOffset(writtenBytes)
+            .setFinishWrite(finishWrite);
+        if (writtenBytes == 0) {
+          builder.setResourceName(resourceName);
+        }
+        return builder.build();
+      }
+
       @Override
       public void write(byte[] b, int off, int len) throws IOException {
         if (closed) {
-          throw new IOException();
+          throw new IOException("stream is closed");
         }
-        requestObserver.onNext(WriteRequest.newBuilder()
-            .setResourceName(resourceName)
-            .setData(ByteString.copyFrom(b, off, len))
-            .setWriteOffset(written_bytes)
-            .setFinishWrite(false)
-            .build());
-        if (exception.get() != null) {
-          throw exception.get();
-        }
-        written_bytes += len;
+        closed = isFinishWrite(writtenBytes + len);
+        WriteRequest request = createWriteRequest(ByteString.copyFrom(b, off, len), closed);
+        requestObserver.onNext(request);
+        writtenBytes += len;
+      }
+
+      @Override
+      public ListenableFuture<Long> getCommittedFuture() {
+        return committedFuture;
       }
     };
   }
