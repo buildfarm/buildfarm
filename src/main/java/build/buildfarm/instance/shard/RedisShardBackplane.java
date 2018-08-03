@@ -835,4 +835,11 @@ public class RedisShardBackplane implements ShardBackplane {
   public void removeTree(Digest inputRoot) throws IOException {
     withVoidBackplaneException((jedis) -> jedis.del(treeKey(inputRoot)));
   }
+
+  @Override
+  public boolean canQueue() throws IOException {
+    int maxQueueDepth = config.getMaxQueueDepth();
+    return maxQueueDepth < 0
+        || withBackplaneException((jedis) -> jedis.llen(config.getQueuedOperationsListName()) < maxQueueDepth);
+  }
 }

@@ -288,4 +288,10 @@ public interface ShardBackplane {
    */
   @ThreadSafe
   ActionCacheScanResult scanActionCache(String scanToken, int count) throws IOException;
+
+  /**
+   * Test for whether an operation may be queued
+   */
+  @ThreadSafe
+  boolean canQueue() throws IOException;
 }
