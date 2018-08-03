@@ -112,6 +112,7 @@ java_library(
         ":instance",
         ":server-instance",
         ":stub-instance",
+        "//3rdparty/jvm/com/google/code/findbugs:jsr305",
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java_util",

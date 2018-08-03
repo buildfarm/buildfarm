@@ -117,9 +117,10 @@ public class ShardInstance extends AbstractServerInstance {
       case BACKPLANE_NOT_SET:
         throw new IllegalArgumentException("Shard Backplane not set in config");
       case REDIS_SHARD_BACKPLANE_CONFIG:
-        backplane = new RedisShardBackplane(config.getRedisShardBackplaneConfig(), this::stripOperation, this::stripOperation, this::stop);
+        backplane = new RedisShardBackplane(config.getRedisShardBackplaneConfig(), this::stripOperation, this::stripOperation);
         break;
     }
+    backplane.setOnUnsubscribe(this::stop);
     workerStubs = new ConcurrentHashMap<>();
 
     if (config.getRunDispatchedMonitor()) {

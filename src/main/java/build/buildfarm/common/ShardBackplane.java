@@ -41,6 +41,14 @@ public interface ShardBackplane {
   }
 
   /**
+   * Register a runnable for when the backplane cannot guarantee watch deliveries.
+   *
+   * onSubscribe is called via the subscription thread, and is not called
+   * when operations are not listened to
+   */
+  Runnable setOnUnsubscribe(Runnable onUnsubscribe);
+
+  /**
    * Start the backplane's operation
    */
   @ThreadSafe

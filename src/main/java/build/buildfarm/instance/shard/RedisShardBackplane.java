@@ -57,6 +57,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
@@ -76,9 +77,9 @@ public class RedisShardBackplane implements ShardBackplane {
   private final RedisShardBackplaneConfig config;
   private final Function<Operation, Operation> onPublish;
   private final Function<Operation, Operation> onComplete;
-  private final Runnable onUnsubscribe;
   private final Pool<Jedis> pool;
 
+  private @Nullable Runnable onUnsubscribe = null;
   private Thread subscriptionThread = null;
   private Thread failsafeOperationThread = null;
   private OperationSubscriber operationSubscriber = null;
@@ -126,13 +127,11 @@ public class RedisShardBackplane implements ShardBackplane {
   public RedisShardBackplane(
       RedisShardBackplaneConfig config,
       Function<Operation, Operation> onPublish,
-      Function<Operation, Operation> onComplete,
-      Runnable onUnsubscribe) throws ConfigurationException {
+      Function<Operation, Operation> onComplete) throws ConfigurationException {
     this(
         config,
         onPublish,
         onComplete,
-        onUnsubscribe,
         new JedisPool(createJedisPoolConfig(config), parseRedisURI(config.getRedisUri()), /* connectionTimeout=*/ 30000, /* soTimeout=*/ 30000));
   }
 
@@ -140,13 +139,18 @@ public class RedisShardBackplane implements ShardBackplane {
       RedisShardBackplaneConfig config,
       Function<Operation, Operation> onPublish,
       Function<Operation, Operation> onComplete,
-      Runnable onUnsubscribe,
       JedisPool pool) {
     this.config = config;
     this.onPublish = onPublish;
     this.onComplete = onComplete;
-    this.onUnsubscribe = onUnsubscribe;
     this.pool = pool;
+  }
+
+  @Override
+  public Runnable setOnUnsubscribe(Runnable onUnsubscribe) {
+    Runnable oldOnUnsubscribe = this.onUnsubscribe;
+    this.onUnsubscribe = onUnsubscribe;
+    return oldOnUnsubscribe;
   }
 
   public void updateWatchedIfDone(Jedis jedis) {
@@ -189,7 +193,9 @@ public class RedisShardBackplane implements ShardBackplane {
         operationSubscriber,
         /* onUnsubscribe=*/ () -> {
           subscriptionThread = null;
-          onUnsubscribe.run();
+          if (onUnsubscribe != null) {
+            onUnsubscribe.run();
+          }
         },
         /* onReset=*/ this::updateWatchedIfDone,
         /* subscriptions=*/ operationSubscriber::watchedOperationChannels,
