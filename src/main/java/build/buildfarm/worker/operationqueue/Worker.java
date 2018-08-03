@@ -199,8 +199,8 @@ public class Worker {
     operationQueueInstance = createInstance(config.getOperationQueue(), digestUtil);
     InputStreamFactory inputStreamFactory = new InputStreamFactory() {
       @Override
-      public InputStream newInput(Digest digest) throws IOException, InterruptedException {
-        return casInstance.newStreamInput(casInstance.getBlobName(digest));
+      public InputStream newInput(Digest digest, long offset) throws IOException, InterruptedException {
+        return casInstance.newStreamInput(casInstance.getBlobName(digest), offset);
       }
     };
     fileCache = new CASFileCache(

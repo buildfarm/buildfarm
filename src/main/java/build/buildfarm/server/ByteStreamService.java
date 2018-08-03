@@ -119,17 +119,8 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
 
     String operationStream = UrlPath.parseOperationStream(resourceName);
 
-    InputStream input = instance.newStreamInput(operationStream);
     long readLimit = request.getReadLimit();
-    long readOffset = request.getReadOffset();
-    while (readOffset > 0) {
-      long n = input.skip(readOffset);
-      if (n == 0) {
-        responseObserver.onError(Status.OUT_OF_RANGE.asException());
-        return;
-      }
-      readOffset -= n;
-    }
+    InputStream input = instance.newStreamInput(operationStream, request.getReadOffset());
     boolean unlimitedReadLimit = readLimit == 0;
     byte[] buffer = new byte[(int) Math.min(readLimit, DEFAULT_CHUNK_SIZE)];
     int len;

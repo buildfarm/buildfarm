@@ -131,7 +131,7 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  public InputStream newStreamInput(String name) {
+  public InputStream newStreamInput(String name, long offset) {
     return getSource(name).openStream();
   }
 

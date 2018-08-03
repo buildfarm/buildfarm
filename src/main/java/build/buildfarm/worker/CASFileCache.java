@@ -747,7 +747,7 @@ public class CASFileCache implements ContentAddressableStorage {
         key,
         digest.getSizeBytes(),
         isExecutable,
-        () -> inputStreamFactory.newInput(digest),
+        () -> inputStreamFactory.newInput(digest, 0),
         containingDirectory,
         () -> onPut.accept(digest));
     return key;

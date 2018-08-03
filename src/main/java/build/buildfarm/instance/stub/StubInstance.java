@@ -319,11 +319,11 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public InputStream newStreamInput(String name) throws IOException, InterruptedException {
+  public InputStream newStreamInput(String name, long offset) throws IOException, InterruptedException {
     Iterator<ReadResponse> replies = retrier.execute(() -> bsBlockingStub
         .get()
         .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
-        .read(ReadRequest.newBuilder().setResourceName(name).build()));
+        .read(ReadRequest.newBuilder().setReadOffset(offset).setResourceName(name).build()));
     return new ByteStringIteratorInputStream(Iterators.transform(replies, (reply) -> reply.getData()), retrier);
   }
 
@@ -337,7 +337,7 @@ public class StubInstance implements Instance {
 
   @Override
   public ByteString getBlob(Digest blobDigest) throws IOException, InterruptedException {
-    try (InputStream in = newStreamInput(getBlobName(blobDigest))) {
+    try (InputStream in = newStreamInput(getBlobName(blobDigest), 0)) {
       return ByteString.readFrom(in);
     } catch (StatusRuntimeException e) {
       if (e.getStatus().equals(Status.NOT_FOUND)) {
@@ -349,8 +349,7 @@ public class StubInstance implements Instance {
 
   @Override
   public ByteString getBlob(Digest blobDigest, long offset, long limit) throws IOException, InterruptedException {
-    try (InputStream in = newStreamInput(getBlobName(blobDigest))) {
-      in.skip(offset);
+    try (InputStream in = newStreamInput(getBlobName(blobDigest), offset)) {
       if (limit == 0) {
         return ByteString.readFrom(in);
       }

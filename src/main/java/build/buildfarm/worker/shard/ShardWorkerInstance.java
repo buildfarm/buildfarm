@@ -241,7 +241,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  public InputStream newStreamInput(String name) {
+  public InputStream newStreamInput(String name, long offset) {
     throw new UnsupportedOperationException();
   }
 

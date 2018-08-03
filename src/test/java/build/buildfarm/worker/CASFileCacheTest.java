@@ -52,8 +52,8 @@ class CASFileCacheTest {
     fileCache = new CASFileCache(
         new InputStreamFactory() {
           @Override
-          public InputStream newInput(Digest digest) {
-            return blobs.get(digest).newInput();
+          public InputStream newInput(Digest digest, long offset) {
+            return blobs.get(digest).substring((int) offset).newInput();
           }
         },
         root,

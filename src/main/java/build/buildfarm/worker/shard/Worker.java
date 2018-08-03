@@ -521,7 +521,7 @@ public class Worker implements Instances {
 
       InputStreamFactory inputStreamFactory = new InputStreamFactory() {
         @Override
-        public InputStream newInput(Digest blobDigest) throws IOException, InterruptedException {
+        public InputStream newInput(Digest blobDigest, long offset) throws IOException, InterruptedException {
           // jank hax
           ByteString blob = new EmptyFetcher(new StorageFetcher(storage, remoteFetcher))
               .fetchBlob(blobDigest);
@@ -530,7 +530,7 @@ public class Worker implements Instances {
             return null;
           }
           
-          return blob.newInput();
+          return blob.substring((int) offset).newInput();
         }
       };
       Path casCacheDirectory = getValidCasCacheDirectory(config, root);

@@ -19,5 +19,5 @@ import java.io.IOException;
 import java.io.InputStream;
 
 public interface InputStreamFactory {
-  InputStream newInput(Digest digest) throws IOException, InterruptedException;
+  InputStream newInput(Digest digest, long offset) throws IOException, InterruptedException;
 }

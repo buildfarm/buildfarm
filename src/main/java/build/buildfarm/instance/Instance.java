@@ -65,7 +65,7 @@ public interface Instance {
       ImmutableList.Builder<Directory> directories,
       boolean acceptMissing) throws IOException, InterruptedException;
   OutputStream getStreamOutput(String name);
-  InputStream newStreamInput(String name) throws IOException, InterruptedException;
+  InputStream newStreamInput(String name, long offset) throws IOException, InterruptedException;
 
   void execute(
       Action action,
