@@ -23,6 +23,7 @@ import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.instance.GetDirectoryFunction;
 import build.buildfarm.instance.TokenizableIterator;
 import build.buildfarm.instance.TreeIterator;
+import build.buildfarm.instance.TreeIterator.DirectoryEntry;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ShardWorkerInstanceConfig;
@@ -179,7 +180,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
     return blob.getDigest();
   }
 
-  protected TokenizableIterator<Directory> createTreeIterator(
+  protected TokenizableIterator<DirectoryEntry> createTreeIterator(
       Digest rootDigest, String pageToken) throws IOException, InterruptedException {
     final GetDirectoryFunction getDirectoryFunction;
     Iterable<Directory> directories = backplane.getTree(rootDigest);
@@ -216,11 +217,12 @@ public class ShardWorkerInstance extends AbstractServerInstance {
       pageSize = 1024; // getTreeMaxPageSize();
     }
 
-    TokenizableIterator<Directory> iter =
+    TokenizableIterator<DirectoryEntry> iter =
         createTreeIterator(rootDigest, pageToken);
 
     while (iter.hasNext() && pageSize != 0) {
-      Directory directory = iter.next();
+      DirectoryEntry entry = iter.next();
+      Directory directory = entry.getDirectory();
       // If part of the tree is missing from the CAS, the server will return the
       // portion present and omit the rest.
       if (directory != null) {

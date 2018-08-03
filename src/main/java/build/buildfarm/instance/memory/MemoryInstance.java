@@ -21,6 +21,7 @@ import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.instance.TokenizableIterator;
 import build.buildfarm.instance.TreeIterator;
+import build.buildfarm.instance.TreeIterator.DirectoryEntry;
 import build.buildfarm.v1test.MemoryInstanceConfig;
 import build.buildfarm.v1test.OperationIteratorToken;
 import com.google.common.annotations.VisibleForTesting;
@@ -434,7 +435,7 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  protected TokenizableIterator<Directory> createTreeIterator(
+  protected TokenizableIterator<DirectoryEntry> createTreeIterator(
       Digest rootDigest, String pageToken) throws IOException, InterruptedException {
     return new TreeIterator(this::expectDirectory, rootDigest, pageToken);
   }

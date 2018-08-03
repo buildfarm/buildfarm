@@ -18,6 +18,7 @@ import build.buildfarm.common.ContentAddressableStorage;
 import build.buildfarm.common.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.instance.TreeIterator.DirectoryEntry;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableList;
@@ -286,7 +287,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   protected abstract int getTreeDefaultPageSize();
   protected abstract int getTreeMaxPageSize();
-  protected abstract TokenizableIterator<Directory> createTreeIterator(
+  protected abstract TokenizableIterator<DirectoryEntry> createTreeIterator(
       Digest rootDigest, String pageToken) throws IOException, InterruptedException;
 
   @Override
@@ -301,11 +302,10 @@ public abstract class AbstractServerInstance implements Instance {
       pageSize = getTreeMaxPageSize();
     }
 
-    TokenizableIterator<Directory> iter =
-        createTreeIterator(rootDigest, pageToken);
+    TokenizableIterator<DirectoryEntry> iter = createTreeIterator(rootDigest, pageToken);
 
     while (iter.hasNext() && pageSize != 0) {
-      Directory directory = iter.next();
+      Directory directory = iter.next().getDirectory();
       // If part of the tree is missing from the CAS, the server will return the
       // portion present and omit the rest.
       if (directory != null) {
@@ -366,10 +366,6 @@ public abstract class AbstractServerInstance implements Instance {
       Set<Digest> visited,
       Map<Digest, Directory> directoriesIndex,
       ImmutableSet.Builder<Digest> inputDigests) throws InterruptedException {
-    Preconditions.checkState(
-        directory != null,
-        MISSING_INPUT + " Directory [" + DigestUtil.toString(digestUtil.compute(directory)) + "]");
-
     Set<String> entryNames = new HashSet<>();
 
     String lastFileName = "";
@@ -427,7 +423,15 @@ public abstract class AbstractServerInstance implements Instance {
       Map<Digest, Directory> directoriesIndex,
       ImmutableSet.Builder<Digest> inputDigests) throws InterruptedException {
     path.push(directoryDigest);
-    validateActionInputDirectory(expectDirectory(directoryDigest), path, visited, directoriesIndex, inputDigests);
+
+    Directory directory = directoriesIndex.get(directoryDigest);
+    if (directory == null) {
+      directory = expectDirectory(directoryDigest);
+    }
+    Preconditions.checkState(
+        directory != null,
+        MISSING_INPUT + " Directory [" + DigestUtil.toString(directoryDigest) + "]");
+    validateActionInputDirectory(directory, path, visited, directoriesIndex, inputDigests);
     path.pop();
     visited.add(directoryDigest);
   }
@@ -435,12 +439,11 @@ public abstract class AbstractServerInstance implements Instance {
   protected Iterable<Directory> getTreeDirectories(Digest inputRoot) throws IOException, InterruptedException {
     ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
 
-    TokenizableIterator<Directory> iterator = createTreeIterator(inputRoot, /* pageToken=*/ "");
+    TokenizableIterator<DirectoryEntry> iterator = createTreeIterator(inputRoot, /* pageToken=*/ "");
     while (iterator.hasNext()) {
-      Directory directory = iterator.next();
-      if (directory == null) {
-        throw new IOException("missing directory");
-      }
+      DirectoryEntry entry = iterator.next();
+      Directory directory = entry.getDirectory();
+      Preconditions.checkState(directory != null, MISSING_INPUT + " Directory " + DigestUtil.toString(entry.getDigest()));
       directories.add(directory);
     }
 

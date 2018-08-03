@@ -21,6 +21,7 @@ import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.instance.GetDirectoryFunction;
 import build.buildfarm.instance.TokenizableIterator;
 import build.buildfarm.instance.TreeIterator;
+import build.buildfarm.instance.TreeIterator.DirectoryEntry;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Retrier;
 import build.buildfarm.instance.stub.Retrier.Backoff;
@@ -582,7 +583,7 @@ public class ShardInstance extends AbstractServerInstance {
 
   protected int getTreeDefaultPageSize() { return 1024; }
   protected int getTreeMaxPageSize() { return 1024; }
-  protected TokenizableIterator<Directory> createTreeIterator(
+  protected TokenizableIterator<DirectoryEntry> createTreeIterator(
       Digest rootDigest, String pageToken) throws IOException, InterruptedException {
     final GetDirectoryFunction getDirectoryFunction;
     Iterable<Directory> directories = backplane.getTree(rootDigest);

@@ -31,8 +31,9 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Stack;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 
-public class TreeIterator implements TokenizableIterator<Directory> {
+public class TreeIterator implements TokenizableIterator<TreeIterator.DirectoryEntry> {
   private final GetDirectoryFunction getDirectory;
   private Deque<Digest> path;
   private final ArrayDeque<Digest> parentPath;
@@ -98,8 +99,27 @@ public class TreeIterator implements TokenizableIterator<Directory> {
     }
   }
 
+  public class DirectoryEntry {
+    private final Digest digest;
+    @Nullable private final Directory directory;
+
+    DirectoryEntry(Digest digest, @Nullable Directory directory) {
+      this.digest = digest;
+      this.directory = directory;
+    }
+
+    public Digest getDigest() {
+      return digest;
+    }
+
+    @Nullable
+    public Directory getDirectory() {
+      return directory;
+    }
+  }
+
   @Override
-  public Directory next() throws NoSuchElementException {
+  public DirectoryEntry next() throws NoSuchElementException {
     Iterator<Digest> iter = pointers.peek();
     if (!iter.hasNext()) {
       throw new NoSuchElementException();
@@ -111,7 +131,13 @@ public class TreeIterator implements TokenizableIterator<Directory> {
      * removed. */
     Digest digest = iter.next();
     try {
-      Directory directory = getDirectory.apply(digest);
+      Directory directory;
+      try {
+        directory = getDirectory.apply(digest);
+      } catch (IOException e) {
+        directory = null;
+      }
+      DirectoryEntry entry = new DirectoryEntry(digest, directory);
       if (directory != null) {
         /* the path to a new iter set is the path to its parent */
         parentPath.addLast(digest);
@@ -119,13 +145,9 @@ public class TreeIterator implements TokenizableIterator<Directory> {
         pointers.push(Iterators.transform(
             directory.getDirectoriesList().iterator(),
             directoryNode -> directoryNode.getDigest()));
-      } else {
-        System.out.println("null directory - " + DigestUtil.toString(digest) + ": " + toNextPageToken());
       }
       advanceIterator();
-      return directory;
-    } catch (IOException e) {
-      throw new NoSuchElementException();
+      return entry;
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       return null;
