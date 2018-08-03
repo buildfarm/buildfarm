@@ -44,43 +44,43 @@ public interface ShardBackplane {
    * Start the backplane's operation
    */
   @ThreadSafe
-  public void start();
+  void start();
 
   /**
    * Stop the backplane's operation
    */
   @ThreadSafe
-  public void stop();
+  void stop();
 
   /**
    * Adds a worker's name to the set of active workers.
    */
   @ThreadSafe
-  public void addWorker(String workerName) throws IOException;
+  void addWorker(String workerName) throws IOException;
 
   /**
    * Removes a worker's name from the set of active workers.
    */
   @ThreadSafe
-  public void removeWorker(String workerName) throws IOException;
+  void removeWorker(String workerName) throws IOException;
 
   /**
    * Returns the name of a random worker from the set of active workers.
    */
   @ThreadSafe
-  public String getRandomWorker() throws IOException;
+  String getRandomWorker() throws IOException;
 
   /**
    * Returns a set of the names of all active workers.
    */
   @ThreadSafe
-  public Set<String> getWorkerSet() throws IOException;
+  Set<String> getWorkerSet() throws IOException;
 
   /**
    * Checks whether or not a worker name is in the set of active workers.
    */
   @ThreadSafe
-  public boolean isWorker(String workerName) throws IOException;
+  boolean isWorker(String workerName) throws IOException;
 
   /**
    * The AC stores full ActionResult objects in a hash map where the key is the
@@ -90,7 +90,7 @@ public interface ShardBackplane {
    * Retrieves and returns an action result from the hash map.
    */
   @ThreadSafe
-  public ActionResult getActionResult(ActionKey actionKey) throws IOException;
+  ActionResult getActionResult(ActionKey actionKey) throws IOException;
 
   /**
    * The AC stores full ActionResult objects in a hash map where the key is the
@@ -100,13 +100,13 @@ public interface ShardBackplane {
    * Remove an action result from the hash map.
    */
   @ThreadSafe
-  public void removeActionResult(ActionKey actionKey) throws IOException;
+  void removeActionResult(ActionKey actionKey) throws IOException;
 
   /**
    * Bulk remove action results
    */
   @ThreadSafe
-  public void removeActionResults(Iterable<ActionKey> actionKeys) throws IOException;
+  void removeActionResults(Iterable<ActionKey> actionKeys) throws IOException;
 
   /**
    * The AC stores full ActionResult objects in a hash map where the key is the
@@ -116,7 +116,7 @@ public interface ShardBackplane {
    * Stores an action result in the hash map.
    */
   @ThreadSafe
-  public void putActionResult(ActionKey actionKey, ActionResult actionResult) throws IOException;
+  void putActionResult(ActionKey actionKey, ActionResult actionResult) throws IOException;
 
   /**
    * The CAS is represented as a map where the key is the digest of the blob
@@ -126,7 +126,7 @@ public interface ShardBackplane {
    * Adds the name of a worker to the set of workers that store a blob.
    */
   @ThreadSafe
-  public void addBlobLocation(Digest blobDigest, String workerName) throws IOException;
+  void addBlobLocation(Digest blobDigest, String workerName) throws IOException;
 
   /**
    * The CAS is represented as a map where the key is the digest of the blob
@@ -136,7 +136,7 @@ public interface ShardBackplane {
    * Adds the name of a worker to the set of workers that store multiple blobs.
    */
   @ThreadSafe
-  public void addBlobsLocation(Iterable<Digest> blobDigest, String workerName) throws IOException;
+  void addBlobsLocation(Iterable<Digest> blobDigest, String workerName) throws IOException;
 
   /**
    * The CAS is represented as a map where the key is the digest of the blob
@@ -146,7 +146,7 @@ public interface ShardBackplane {
    * Removes the name of a worker from the set of workers that store a blob.
    */
   @ThreadSafe
-  public void removeBlobLocation(Digest blobDigest, String workerName) throws IOException;
+  void removeBlobLocation(Digest blobDigest, String workerName) throws IOException;
 
   /**
    * The CAS is represented as a map where the key is the digest of the blob
@@ -156,7 +156,7 @@ public interface ShardBackplane {
    * Removes the name of a worker from the set of workers that store multiple blobs.
    */
   @ThreadSafe
-  public void removeBlobsLocation(Iterable<Digest> blobDigests, String workerName) throws IOException;
+  void removeBlobsLocation(Iterable<Digest> blobDigests, String workerName) throws IOException;
 
   /**
    * The CAS is represented as a map where the key is the digest of the blob
@@ -166,7 +166,7 @@ public interface ShardBackplane {
    * Returns a random worker from the set of workers that store a blob.
    */
   @ThreadSafe
-  public String getBlobLocation(Digest blobDigest) throws IOException;
+  String getBlobLocation(Digest blobDigest) throws IOException;
 
   /**
    * The CAS is represented as a map where the key is the digest of the blob
@@ -176,10 +176,10 @@ public interface ShardBackplane {
    * Returns the set of the names of all workers that store a blob.
    */
   @ThreadSafe
-  public Set<String> getBlobLocationSet(Digest blobDigest) throws IOException;
+  Set<String> getBlobLocationSet(Digest blobDigest) throws IOException;
 
   @ThreadSafe
-  public Map<Digest, Set<String>> getBlobDigestsWorkers(Iterable<Digest> blobDigests) throws IOException;
+  Map<Digest, Set<String>> getBlobDigestsWorkers(Iterable<Digest> blobDigests) throws IOException;
 
   /**
    * Operations are stored in a hash map where the key is the name of the
@@ -188,7 +188,7 @@ public interface ShardBackplane {
    * Retrieves and returns an operation from the hash map.
    */
   @ThreadSafe
-  public Operation getOperation(String operationName) throws IOException;
+  Operation getOperation(String operationName) throws IOException;
 
   /**
    * Operations are stored in a hash map where the key is the name of the
@@ -197,7 +197,7 @@ public interface ShardBackplane {
    * Stores an operation in the hash map.
    */
   @ThreadSafe
-  public boolean putOperation(Operation operation, Stage stage) throws IOException;
+  boolean putOperation(Operation operation, Stage stage) throws IOException;
 
   /**
    * The state of operations is tracked in a series of lists representing the
@@ -208,7 +208,7 @@ public interface ShardBackplane {
    * dispatched operations.
    */
   @ThreadSafe
-  public String dispatchOperation() throws IOException, InterruptedException;
+  String dispatchOperation() throws IOException, InterruptedException;
 
   /**
    * The state of operations is tracked in a series of lists representing the
@@ -219,65 +219,65 @@ public interface ShardBackplane {
    * operation is still valid.
    */
   @ThreadSafe
-  public boolean pollOperation(String operationName, Stage stage, long requeueAt) throws IOException;
+  boolean pollOperation(String operationName, Stage stage, long requeueAt) throws IOException;
 
   /**
    * Complete an operation
    */
   @ThreadSafe
-  public void completeOperation(String operationName) throws IOException;
+  void completeOperation(String operationName) throws IOException;
 
   /**
    * Delete an operation
    */
   @ThreadSafe
-  public void deleteOperation(String operationName) throws IOException;
+  void deleteOperation(String operationName) throws IOException;
 
   /**
    * Register a watcher for an operation
    */
   @ThreadSafe
-  public boolean watchOperation(String operationName, Predicate<Operation> watcher) throws IOException;
+  boolean watchOperation(String operationName, Predicate<Operation> watcher) throws IOException;
 
   /**
    * Get all dispatched operations
    */
   @ThreadSafe
-  public ImmutableList<ShardDispatchedOperation> getDispatchedOperations() throws IOException;
+  ImmutableList<ShardDispatchedOperation> getDispatchedOperations() throws IOException;
 
   /**
    * Get all operations
    */
   @ThreadSafe
-  public Iterable<String> getOperations() throws IOException;
+  Iterable<String> getOperations() throws IOException;
 
   /**
    * Requeue a dispatched operation
    */
   @ThreadSafe
-  public void requeueDispatchedOperation(Operation operation) throws IOException;
+  void requeueDispatchedOperation(Operation operation) throws IOException;
 
   /**
    * Store a directory tree and all of its descendants
    */
   @ThreadSafe
-  public void putTree(Digest inputRoot, Iterable<Directory> directories) throws IOException;
+  void putTree(Digest inputRoot, Iterable<Directory> directories) throws IOException;
 
   /**
    * Retrieve a directory tree and all of its descendants
    */
   @ThreadSafe
-  public Iterable<Directory> getTree(Digest inputRoot) throws IOException;
+  Iterable<Directory> getTree(Digest inputRoot) throws IOException;
 
   /**
    * Destroy a cached directory tree of a completed operation
    */
   @ThreadSafe
-  public void removeTree(Digest inputRoot) throws IOException;
+  void removeTree(Digest inputRoot) throws IOException;
 
   /**
    * Page through action cache
    */
   @ThreadSafe
-  public ActionCacheScanResult scanActionCache(String scanToken, int count) throws IOException;
+  ActionCacheScanResult scanActionCache(String scanToken, int count) throws IOException;
 }
