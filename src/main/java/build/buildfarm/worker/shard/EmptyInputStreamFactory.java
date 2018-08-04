@@ -12,12 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker;
+package build.buildfarm.worker.shard;
 
+import build.buildfarm.worker.InputStreamFactory;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
+import java.io.InputStream;
 
-public interface Fetcher {
-  ByteString fetchBlob(Digest blobDigest) throws IOException, InterruptedException;
-}
+class EmptyInputStreamFactory implements InputStreamFactory {
+  private final InputStreamFactory delegate;
+
+  EmptyInputStreamFactory(InputStreamFactory delegate) {
+    this.delegate = delegate;
+  }
+
+  @Override
+  public InputStream newInput(Digest blobDigest, long offset) throws IOException, InterruptedException {
+    if (blobDigest.getSizeBytes() == 0) {
+      return ByteString.EMPTY.newInput();
+    }
+
+    return delegate.newInput(blobDigest, offset);
+  }
+};

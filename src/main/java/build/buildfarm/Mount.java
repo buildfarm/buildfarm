@@ -6,13 +6,14 @@ import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Retrier;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.worker.FuseCAS;
-import build.buildfarm.worker.Fetcher;
+import build.buildfarm.worker.InputStreamFactory;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
@@ -42,17 +43,19 @@ class Mount {
 
     Path cwd = Paths.get(".");
 
-    FuseCAS fuse = new FuseCAS(cwd.resolve(args[3]), new Fetcher() {
+    FuseCAS fuse = new FuseCAS(cwd.resolve(args[3]), new InputStreamFactory() {
       Map<Digest, ByteString> cache = new HashMap<>();
 
-      public synchronized ByteString fetchBlob(Digest blobDigest) {
+      public synchronized InputStream newInput(Digest blobDigest, long offset) {
         if (cache.containsKey(blobDigest)) {
-          return cache.get(blobDigest);
+          return cache.get(blobDigest).substring((int) offset).newInput();
         }
         try {
           ByteString value = instance.getBlob(blobDigest);
-          cache.put(blobDigest, value);
-          return value;
+          if (offset == 0) {
+            cache.put(blobDigest, value);
+          }
+          return value.newInput();
         } catch (IOException e) {
           return null;
         } catch (InterruptedException e) {

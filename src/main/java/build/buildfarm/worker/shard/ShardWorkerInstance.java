@@ -25,6 +25,7 @@ import build.buildfarm.instance.TreeIterator.DirectoryEntry;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ShardWorkerInstanceConfig;
+import build.buildfarm.worker.InputStreamFactory;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -44,6 +45,7 @@ import com.google.protobuf.util.JsonFormat;
 import io.grpc.Status;
 import io.grpc.Status.Code;
 import io.grpc.StatusRuntimeException;
+import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -57,17 +59,20 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   private final ShardWorkerInstanceConfig config;
   private final ShardBackplane backplane;
   private final ContentAddressableStorage contentAddressableStorage;
+  private final InputStreamFactory inputStreamFactory;
 
   public ShardWorkerInstance(
       String name,
       DigestUtil digestUtil,
       ShardBackplane backplane,
       ContentAddressableStorage contentAddressableStorage,
+      InputStreamFactory inputStreamFactory,
       ShardWorkerInstanceConfig config) throws ConfigurationException {
     super(name, digestUtil, null, null, null, null, null);
     this.config = config;
     this.backplane = backplane;
     this.contentAddressableStorage = contentAddressableStorage;
+    this.inputStreamFactory = inputStreamFactory;
   }
 
   @Override
@@ -127,31 +132,49 @@ public class ShardWorkerInstance extends AbstractServerInstance {
     throw new UnsupportedOperationException();
   }
 
-  private ByteString getBlobImpl(Digest blobDigest) {
-    if (contentAddressableStorage.contains(blobDigest)) {
-      Blob blob = contentAddressableStorage.get(blobDigest);
-      if (blob == null) {
-        return null;
+  private void getBlob(InputStream input, long remaining, long limit, StreamObserver<ByteString> blobObserver) {
+    try {
+      if (limit == 0 || limit > remaining) {
+        limit = remaining;
       }
-      return blob.getData();
+      // slice up into 1M chunks
+      long chunkSize = Math.min(1024 * 1024, limit);
+      byte[] chunk = new byte[(int) chunkSize];
+      while (limit > 0) {
+        int n = input.read(chunk);
+        blobObserver.onNext(ByteString.copyFrom(chunk, 0, n));
+        limit -= n;
+      }
+      blobObserver.onCompleted();
+    } catch (IOException e) {
+      blobObserver.onError(e);
     }
-    return null;
+  }
+
+  @Override
+  public void getBlob(Digest blobDigest, long offset, long limit, StreamObserver<ByteString> blobObserver) {
+    try (InputStream input = inputStreamFactory.newInput(blobDigest, offset)) {
+      getBlob(input, blobDigest.getSizeBytes() - offset, limit, blobObserver);
+    } catch (IOException e) {
+      blobObserver.onError(Status.NOT_FOUND.withCause(e).asException());
+      try {
+        backplane.removeBlobLocation(blobDigest, getName());
+      } catch (IOException backplaneException) {
+        backplaneException.printStackTrace();
+      }
+    } catch (InterruptedException e) {
+      blobObserver.onError(Status.CANCELLED.withCause(e).asException());
+    }
   }
 
   @Override
   public ByteString getBlob(Digest blobDigest, long offset, long limit) throws IOException {
-    ByteString content;
-    synchronized (contentAddressableStorage.acquire(blobDigest)) {
-      content = getBlobImpl(blobDigest);
-      try {
-        if (content == null) {
-          backplane.removeBlobLocation(blobDigest, getName());
-          return null;
-        }
-      } finally {
-        contentAddressableStorage.release(blobDigest);
-      }
+    Blob blob = contentAddressableStorage.get(blobDigest);
+    if (blob == null) {
+      backplane.removeBlobLocation(blobDigest, getName());
+      return null;
     }
+    ByteString content = blob.getData();
     if (offset != 0 || limit != 0) {
       content = content.substring((int) offset, (int) (limit == 0 ? (content.size() - offset) : (limit + offset)));
     }

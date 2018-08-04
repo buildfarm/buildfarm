@@ -21,6 +21,7 @@ import com.google.devtools.remoteexecution.v1test.Directory;
 import com.google.devtools.remoteexecution.v1test.FileNode;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.Charset;
 import jnr.constants.platform.OpenFlags;
 import jnr.ffi.Pointer;
@@ -50,9 +51,9 @@ public class FuseCASTest {
 
   @Before
   public void setUp() {
-    fuseCAS = new FuseCAS(null, new Fetcher() {
+    fuseCAS = new FuseCAS(null, new InputStreamFactory() {
       @Override
-      public ByteString fetchBlob(Digest blobDigest) {
+      public InputStream newInput(Digest blobDigest, long offset) {
         if( blobDigest.getHash().equals("/test") ) {
           return Directory.newBuilder()
             .addFiles(FileNode.newBuilder()
@@ -61,9 +62,9 @@ public class FuseCASTest {
                     .setHash("/test/file")
                     .setSizeBytes(content.size()))
                 .build())
-            .build().toByteString();
+            .build().toByteString().newInput();
         } else if( blobDigest.getHash().equals("/test/file") ) {
-          return content;
+          return content.newInput();
         }
         throw new UnsupportedOperationException();
       }

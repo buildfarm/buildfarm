@@ -15,33 +15,29 @@
 package build.buildfarm.worker.shard;
 
 import build.buildfarm.common.ContentAddressableStorage;
-import build.buildfarm.worker.Fetcher;
+import build.buildfarm.common.ContentAddressableStorage.Blob;
+import build.buildfarm.worker.InputStreamFactory;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.NoSuchFileException;
 
-class StorageFetcher implements Fetcher {
-  private final ContentAddressableStorage storage;
-  private final Fetcher delegate;
+class FailoverInputStreamFactory implements InputStreamFactory {
+  private final InputStreamFactory primary;
+  private final InputStreamFactory delegate;
 
-  StorageFetcher(ContentAddressableStorage storage, Fetcher delegate) {
-    this.storage = storage;
+  FailoverInputStreamFactory(InputStreamFactory primary, InputStreamFactory delegate) {
+    this.primary = primary;
     this.delegate = delegate;
   }
 
   @Override
-  public ByteString fetchBlob(Digest blobDigest) throws IOException, InterruptedException {
-    synchronized (storage.acquire(blobDigest)) {
-      // necessary, since storage.get would loop back to this function
-      try {
-        if (storage.contains(blobDigest)) {
-          return storage.get(blobDigest).getData();
-        }
-      } finally {
-        storage.release(blobDigest);
-      }
+  public InputStream newInput(Digest blobDigest, long offset) throws IOException, InterruptedException {
+    try {
+      return primary.newInput(blobDigest, offset);
+    } catch (NoSuchFileException e) {
+      return delegate.newInput(blobDigest, offset);
     }
-
-    return delegate.fetchBlob(blobDigest);
   }
 };

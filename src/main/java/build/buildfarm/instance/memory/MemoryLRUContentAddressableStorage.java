@@ -92,23 +92,6 @@ public class MemoryLRUContentAddressableStorage implements ContentAddressableSto
     storage.put(blob.getDigest(), header.before);
   }
 
-  @Override
-  public synchronized Object acquire(Digest digest) {
-    Object mutex = mutexes.get(digest);
-    if (mutex == null) {
-      mutex = new Object();
-      mutexes.put(digest, mutex);
-    }
-    return mutex;
-  }
-
-  @Override
-  public synchronized void release(Digest digest) {
-    // prevents this lock from being exclusive to other accesses, since it
-    // must now be present
-    mutexes.remove(digest);
-  }
-
   private void createEntry(Blob blob, Runnable onExpiration) {
     Entry e = new Entry(blob);
     if (onExpiration != null) {

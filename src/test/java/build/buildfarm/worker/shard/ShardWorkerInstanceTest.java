@@ -27,8 +27,8 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.instance.Instance.MatchListener;
-import build.buildfarm.worker.Fetcher;
 import build.buildfarm.v1test.ShardWorkerInstanceConfig;
+import build.buildfarm.worker.InputStreamFactory;
 import com.google.longrunning.Operation;
 import io.grpc.StatusRuntimeException;
 import java.io.IOException;
@@ -52,6 +52,9 @@ public class ShardWorkerInstanceTest {
   @Mock
   private ContentAddressableStorage storage;
 
+  @Mock
+  private InputStreamFactory inputStreamFactory;
+
   private ShardWorkerInstance instance;
 
   @Before
@@ -62,6 +65,7 @@ public class ShardWorkerInstanceTest {
         DIGEST_UTIL,
         backplane,
         storage,
+        inputStreamFactory,
         ShardWorkerInstanceConfig.getDefaultInstance());
   }
 

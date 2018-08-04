@@ -36,7 +36,6 @@ import build.buildfarm.server.ByteStreamService;
 import build.buildfarm.worker.CASFileCache;
 import build.buildfarm.worker.Dirent;
 import build.buildfarm.worker.ExecuteActionStage;
-import build.buildfarm.worker.Fetcher;
 import build.buildfarm.worker.FuseCAS;
 import build.buildfarm.worker.InputFetchStage;
 import build.buildfarm.worker.InputStreamFactory;
@@ -93,6 +92,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
@@ -127,7 +127,7 @@ public class Worker implements Instances {
   private final Server server;
   private final Path root;
   private final DigestUtil digestUtil;
-  private final ContentAddressableStorage storage;
+  private final InputStreamFactory storageInputStreamFactory;
   private final FuseCAS fuseCAS;
   private final CASFileCache fileCache;
   private final Pipeline pipeline;
@@ -367,25 +367,24 @@ public class Worker implements Instances {
         backplane = new RedisShardBackplane(config.getRedisShardBackplaneConfig(), this::stripOperation, this::stripQueuedOperation);
         break;
     }
-    Fetcher remoteFetcher = new Fetcher() {
+    InputStreamFactory remoteInputStreamFactory = new InputStreamFactory() {
       private Random rand = new Random();
 
-      private ByteString fetchBlobFromRemoteWorker(Digest blobDigest, Deque<String> workers) throws IOException, InterruptedException {
+      private InputStream fetchBlobFromRemoteWorker(Digest blobDigest, Deque<String> workers, long offset) throws IOException, InterruptedException {
         String worker = workers.removeFirst();
         try {
           for (;;) {
-            try {
-              return workerStub(worker).getBlob(blobDigest);
-            } catch (RetryException e) {
-              Throwable cause = e.getCause();
-              if (cause instanceof StatusRuntimeException) {
-                StatusRuntimeException sre = (StatusRuntimeException) e.getCause();
-                throw sre;
-              }
-              throw e;
+            Instance instance = workerStub(worker);
+
+            InputStream input = instance.newStreamInput(instance.getBlobName(blobDigest), offset);
+            // ensure that if the blob cannot be fetched, that we throw here
+            input.available();
+            if (Thread.interrupted()) {
+              throw new InterruptedException();
             }
+            return input;
           }
-        } catch (StatusRuntimeException e) {
+        } catch (RetryException e) {
           Status st = Status.fromThrowable(e);
           if (st.getCode().equals(Status.Code.UNAVAILABLE)) {
             backplane.removeBlobLocation(blobDigest, worker);
@@ -399,7 +398,7 @@ public class Worker implements Instances {
           } else {
             throw e;
           }
-          return null;
+          throw new NoSuchFileException(DigestUtil.toString(blobDigest));
         }
       }
 
@@ -422,7 +421,7 @@ public class Worker implements Instances {
               try {
                 resultDigests = createStubRetrier().execute(() -> workerStub(worker).findMissingBlobs(ImmutableList.<Digest>of(digest)));
                 if (Iterables.size(resultDigests) == 0) {
-                  System.out.println("Worker::RemoteFetcher::correctMissingBlob(" + DigestUtil.toString(digest) + "): Adding back to " + worker);
+                  System.out.println("Worker::RemoteInputStreamFactory::correctMissingBlob(" + DigestUtil.toString(digest) + "): Adding back to " + worker);
                   backplane.addBlobLocation(digest, worker);
                   foundWorkers.add(worker);
                 }
@@ -451,7 +450,7 @@ public class Worker implements Instances {
       }
 
       @Override
-      public ByteString fetchBlob(Digest blobDigest) throws IOException, InterruptedException {
+      public InputStream newInput(Digest blobDigest, long offset) throws IOException, InterruptedException {
         Set<String> workerSet = new HashSet<>(Sets.intersection(
             backplane.getBlobLocationSet(blobDigest),
             backplane.getWorkerSet()));
@@ -464,8 +463,7 @@ public class Worker implements Instances {
 
         boolean printFinal = false;
         boolean triedCheck = false;
-        ByteString content;
-        do {
+        for (;;) {
           if (workers.isEmpty()) {
             if (triedCheck) {
               // maybe just return null here
@@ -476,78 +474,74 @@ public class Worker implements Instances {
             workersList.addAll(correctMissingBlob(blobDigest));
             Collections.shuffle(workersList, rand);
             workers = new ArrayDeque(workersList);
-            content = null;
             triedCheck = true;
           } else {
             int sizeBeforeFetch = workers.size();
-            content = fetchBlobFromRemoteWorker(blobDigest, workers);
+            InputStream input = fetchBlobFromRemoteWorker(blobDigest, workers, offset);
             if (sizeBeforeFetch == workers.size()) {
               printFinal = true;
               System.out.println("Pushed worker to end of request list: " + workers.peekLast() + " for " + DigestUtil.toString(blobDigest));
             }
+            if (printFinal) {
+              System.out.println("fetch with retried loop succeeded for " + DigestUtil.toString(blobDigest));
+            }
+            return input;
           }
-        } while (content == null);
-
-        if (printFinal) {
-          System.out.println("fetch with retried loop succeeded for " + DigestUtil.toString(blobDigest));
         }
-
-        return content;
       }
     };
 
-    Fetcher localPopulatingFetcher = new Fetcher() {
-      @Override
-      public ByteString fetchBlob(Digest blobDigest) throws IOException, InterruptedException {
-        ByteString content = remoteFetcher.fetchBlob(blobDigest);
-
-        // extra computations
-        Blob blob = new Blob(content, digestUtil);
-        // here's hoping that our digest matches...
-        storage.put(blob);
-
-        return content;
-      }
-    };
-
+    final ContentAddressableStorage storage;
     if (config.getUseFuseCas()) {
       fileCache = null;
 
       storage = new MemoryLRUContentAddressableStorage(config.getCasMaxSizeBytes(), this::onStoragePut);
+      storageInputStreamFactory = (digest, offset) -> storage.get(digest).getData().substring((int) offset).newInput();
 
-      fuseCAS = new FuseCAS(root, new EmptyFetcher(new StorageFetcher(storage, localPopulatingFetcher)));
+      InputStreamFactory localPopulatingInputStreamFactory = new InputStreamFactory() {
+        @Override
+        public InputStream newInput(Digest blobDigest, long offset) throws IOException, InterruptedException {
+          ByteString content = ByteString.readFrom(remoteInputStreamFactory.newInput(blobDigest, offset));
+
+          if (offset == 0) {
+            // extra computations
+            Blob blob = new Blob(content, digestUtil);
+            // here's hoping that our digest matches...
+            storage.put(blob);
+          }
+
+          return content.newInput();
+        }
+      };
+      fuseCAS = new FuseCAS(root, new EmptyInputStreamFactory(new FailoverInputStreamFactory(storageInputStreamFactory, localPopulatingInputStreamFactory)));
     } else {
       fuseCAS = null;
 
-      InputStreamFactory inputStreamFactory = new InputStreamFactory() {
+      InputStreamFactory selfInputStreamChain = new InputStreamFactory() {
         @Override
         public InputStream newInput(Digest blobDigest, long offset) throws IOException, InterruptedException {
-          // jank hax
-          ByteString blob = new EmptyFetcher(new StorageFetcher(storage, remoteFetcher))
-              .fetchBlob(blobDigest);
-
-          if (blob == null) {
-            return null;
-          }
-          
-          return blob.substring((int) offset).newInput();
+          // oh the complication... using storage here requires us to be instantiated in this context
+          return new EmptyInputStreamFactory(new FailoverInputStreamFactory(storageInputStreamFactory, remoteInputStreamFactory))
+              .newInput(blobDigest, offset);
         }
       };
       Path casCacheDirectory = getValidCasCacheDirectory(config, root);
       fileCache = new CASFileCache(
-          inputStreamFactory,
+          selfInputStreamChain,
           root.resolve(casCacheDirectory),
           config.getCasCacheMaxSizeBytes(),
           digestUtil,
           this::onStoragePut,
           this::onStorageExpire);
       storage = fileCache;
+      storageInputStreamFactory = fileCache;
     }
     instance = new ShardWorkerInstance(
         config.getPublicName(),
         digestUtil,
         backplane,
         storage,
+        storageInputStreamFactory,
         config.getShardWorkerInstanceConfig());
 
     server = serverBuilder

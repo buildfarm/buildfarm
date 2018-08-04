@@ -53,7 +53,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-public class CASFileCache implements ContentAddressableStorage {
+public class CASFileCache implements ContentAddressableStorage, InputStreamFactory {
   private final InputStreamFactory inputStreamFactory;
   private final Path root;
   private final long maxSizeInBytes;
@@ -191,25 +191,46 @@ public class CASFileCache implements ContentAddressableStorage {
     }
   }
 
-  private Blob get(Digest digest, boolean isExecutable) throws IOException {
+  private InputStream newInput(Digest digest, long offset, boolean isExecutable) throws IOException, InterruptedException {
     try {
       Path blobPath = put(digest, isExecutable, /* containingDirectory=*/ null);
-      try (InputStream in = Files.newInputStream(blobPath)) {
-        return new Blob(ByteString.readFrom(in), digestUtil);
+      try {
+        InputStream input = Files.newInputStream(blobPath);
+        input.skip(offset);
+        return input;
       } finally {
         decrementReferences(ImmutableList.<Path>of(blobPath), ImmutableList.<Digest>of());
       }
-    } catch (java.nio.file.NoSuchFileException e) {
+    } catch (NoSuchFileException e) {
+      remove(digest, isExecutable);
+      throw e;
     } catch (IOException e) {
       if (!e.getMessage().equals("file not found")) {
         e.printStackTrace();
       }
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      return null;
+      remove(digest, isExecutable);
+      throw e;
     }
-    remove(digest, isExecutable);
-    return null;
+  }
+
+  @Override
+  public InputStream newInput(Digest digest, long offset) throws IOException, InterruptedException {
+    boolean isExecutable = false;
+    do {
+      Path key = getKey(digest, isExecutable);
+      Entry e = storage.get(key);
+      if (e != null) {
+        InputStream input = newInput(digest, offset, isExecutable);
+        if (input != null) {
+          synchronized (this) {
+            e.recordAccess(header);
+          }
+        }
+        return input;
+      }
+      isExecutable = !isExecutable;
+    } while (isExecutable != false);
+    throw new NoSuchFileException(DigestUtil.toString(digest));
   }
 
   @Override
@@ -217,20 +238,21 @@ public class CASFileCache implements ContentAddressableStorage {
     int retries = 5;
     while (retries > 0) {
       try {
-        if (contains(digest, false)) {
-          return get(digest, false);
+        try (InputStream input = newInput(digest, 0)) {
+          ByteString content = ByteString.readFrom(input);
+          return new Blob(content, digestUtil);
         }
-        return get(digest, true);
       } catch (IOException e) {
         e.printStackTrace();
         retries--;
-        continue;
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        return null;
       }
     }
     System.err.println(String.format("CASFileCache::get(%s): exceeded IOException retry", DigestUtil.toString(digest)));
     return null;
   }
-
 
   @Override
   public void put(Blob blob) {
@@ -255,16 +277,6 @@ public class CASFileCache implements ContentAddressableStorage {
   @Override
   public void put(Blob blob, Runnable onExpiration) {
     throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public Object acquire(Digest digest) {
-    return acquire(getKey(digest, false));
-  }
-
-  @Override
-  public void release(Digest digest) {
-    release(getKey(digest, false));
   }
 
   private synchronized Object acquire(Path key) {

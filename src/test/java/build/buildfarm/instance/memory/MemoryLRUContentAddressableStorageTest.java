@@ -70,56 +70,6 @@ public class MemoryLRUContentAddressableStorageTest {
     verify(mockOnExpiration, times(2)).run();
   }
 
-  private class DigestLockingRunnable implements Runnable {
-    private final Digest digest;
-    private final ContentAddressableStorage storage;
-    public boolean started = false;
-    public int runCount = 0;
-
-    DigestLockingRunnable(Digest digest, ContentAddressableStorage storage) {
-      this.digest = digest;
-      this.storage = storage;
-    }
-
-    @Override
-    public void run() {
-      started = true;
-      synchronized (storage.acquire(digest)) {
-        runCount++;
-        storage.release(digest);
-      }
-    }
-  }
-
-  @Test
-  public void entryLockConsistency() {
-    ContentAddressableStorage storage = new MemoryLRUContentAddressableStorage(10);
-
-    Digest lockDigest = Digest.newBuilder().build();
-    DigestLockingRunnable digestLockingRunnable =
-        new DigestLockingRunnable(lockDigest, storage);
-    Thread lockingThread = new Thread(digestLockingRunnable);
-    synchronized (storage.acquire(lockDigest)) {
-      lockingThread.start();
-      while (!digestLockingRunnable.started) {
-        try {
-          Thread.currentThread().sleep(10);
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupted();
-        }
-      }
-      storage.release(lockDigest);
-    }
-    while (digestLockingRunnable.runCount == 0) {
-      try {
-        Thread.currentThread().sleep(10);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupted();
-      }
-    }
-    assertThat(digestLockingRunnable.runCount).isEqualTo(1);
-  }
-
   @Test(expected = IllegalArgumentException.class)
   public void emptyPutThrowsIllegalArgumentException() {
     ContentAddressableStorage storage = new MemoryLRUContentAddressableStorage(10);

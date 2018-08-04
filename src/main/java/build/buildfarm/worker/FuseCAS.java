@@ -52,7 +52,7 @@ import ru.serce.jnrfuse.struct.Timespec;
 
 public class FuseCAS extends FuseStubFS {
   private final Path mountPath;
-  private final Fetcher fetcher;
+  private final InputStreamFactory inputStreamFactory;
   private final DirectoryEntry root;
   private final AtomicInteger fileHandleCounter = new AtomicInteger(1);
   private final Map<Integer, Entry> fileHandleEntries = new ConcurrentHashMap<>();
@@ -338,9 +338,9 @@ public class FuseCAS extends FuseStubFS {
     }
   }
 
-  public FuseCAS(Path mountPath, Fetcher fetcher) {
+  public FuseCAS(Path mountPath, InputStreamFactory inputStreamFactory) {
     this.mountPath = mountPath;
-    this.fetcher = fetcher;
+    this.inputStreamFactory = inputStreamFactory;
     root = new LocalDirectoryEntry();
   }
 
@@ -415,7 +415,7 @@ public class FuseCAS extends FuseStubFS {
     Map<String, Entry> children = childrenCache.get(digest);
     if (children == null) {
       try {
-        Directory directory = Directory.parseFrom(fetcher.fetchBlob(digest));
+        Directory directory = Directory.parseFrom(ByteString.readFrom(inputStreamFactory.newInput(digest, 0)));
 
         ImmutableMap.Builder<String, Entry> builder = new ImmutableMap.Builder<>();
 
@@ -810,7 +810,7 @@ public class FuseCAS extends FuseStubFS {
       DirectoryEntry dirEntry = containingDirectoryForPath(path);
       WriteFileEntry writeFileEntry = (FileWriteEntry) entry;
 
-      Digest digest = fetcher.putBlob(writeFileEntry.content);
+      Digest digest = inputStreamFactory.putBlob(writeFileEntry.content);
 
       dirEntry.putChild(name, new FileEntry(digest, writeFileEntry.executable);
     }
@@ -873,7 +873,7 @@ public class FuseCAS extends FuseStubFS {
       FileEntry fileEntry = (FileEntry) entry;
 
       try {
-        content = fetcher.fetchBlob(fileEntry.digest);
+        content = ByteString.readFrom(inputStreamFactory.newInput(fileEntry.digest, 0));
       } catch (InterruptedException e) {
         return -ErrorCodes.EINTR();
       } catch (IOException e) {
