@@ -19,6 +19,7 @@ import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.instance.GetDirectoryFunction;
+import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.TokenizableIterator;
 import build.buildfarm.instance.TreeIterator;
 import build.buildfarm.instance.TreeIterator.DirectoryEntry;
@@ -579,6 +580,163 @@ public class ShardInstance extends AbstractServerInstance {
         e.printStackTrace();
       }
     }
+  }
+
+  void updateCaches(Digest digest, ByteString blob) throws InterruptedException {
+    boolean known = false;
+    try {
+      commandCache.get(digest, new Callable<Command>() {
+        @Override
+        public Command call() throws IOException {
+          return Command.parseFrom(blob);
+        }
+      }).get();
+      known = true;
+    } catch (ExecutionException e) {
+      /* not a command */
+    }
+    if (!known) {
+      try {
+        directoryCache.get(digest, new Callable<Directory>() {
+          @Override
+          public Directory call() throws IOException {
+            return Directory.parseFrom(blob);
+          }
+        }).get();
+        known = true;
+      } catch (ExecutionException e) {
+        /* not a directory */
+      }
+    }
+  }
+
+  CommittingOutputStream createBlobOutputStream(Digest blobDigest) throws IOException {
+    // the name might very well be how bytestream is supposed to resume uploads...
+    Instance instance = workerStub(backplane.getRandomWorker());
+    String resourceName = String.format(
+        "uploads/%s/blobs/%s",
+        UUID.randomUUID(), DigestUtil.toString(blobDigest));
+    return instance.getStreamOutput(resourceName, blobDigest.getSizeBytes());
+  }
+
+  private class FailedChunkObserver implements ChunkObserver {
+    ListenableFuture<Long> failedFuture;
+
+    FailedChunkObserver(Throwable t) {
+      failedFuture = Futures.immediateFailedFuture(t);
+    }
+
+    @Override
+    public ListenableFuture<Long> getCommittedFuture() {
+      return failedFuture;
+    }
+
+    @Override
+    public long getCommittedSize() {
+      return 0l;
+    }
+
+    @Override
+    public void reset() {
+    }
+
+    @Override
+    public void onNext(ByteString chunk) {
+    }
+
+    @Override
+    public void onCompleted() {
+    }
+
+    @Override
+    public void onError(Throwable t) {
+      System.err.println("Received onError in failed chunkObserver");
+      t.printStackTrace();
+    }
+  }
+
+  public ChunkObserver getWriteBlobObserver(Digest blobDigest) {
+    final CommittingOutputStream initialOutput;
+    try {
+      initialOutput = createBlobOutputStream(blobDigest);
+    } catch (IOException e) {
+      return new FailedChunkObserver(e);
+    }
+
+    ChunkObserver chunkObserver = new ChunkObserver() {
+      long committedSize = 0l;
+      ByteString smallBlob = ByteString.EMPTY;
+      CommittingOutputStream out = initialOutput;
+
+      @Override
+      public long getCommittedSize() {
+        return committedSize;
+      }
+
+      @Override
+      public ListenableFuture<Long> getCommittedFuture() {
+        return out.getCommittedFuture();
+      }
+
+      @Override
+      public void reset() {
+        try {
+          out.close();
+          out = createBlobOutputStream(blobDigest);
+        } catch (IOException e) {
+          throw Status.INTERNAL.withCause(e).asRuntimeException();
+        }
+        committedSize = 0;
+        smallBlob = ByteString.EMPTY;
+      }
+
+      @Override
+      public void onNext(ByteString chunk) {
+        try {
+          chunk.writeTo(out);
+          committedSize += chunk.size();
+          if (smallBlob != null && committedSize < 4 * 1024 * 1024) {
+            smallBlob = smallBlob.concat(chunk);
+          } else {
+            smallBlob = null;
+          }
+        } catch (IOException e) {
+          throw Status.INTERNAL.withCause(e).asRuntimeException();
+        }
+      }
+
+      @Override
+      public void onCompleted() {
+        try {
+          // need to cancel the request if size or digest doesn't match
+          out.close();
+        } catch (IOException e) {
+          throw Status.INTERNAL.withCause(e).asRuntimeException();
+        }
+
+        try {
+          if (smallBlob != null) {
+            updateCaches(blobDigest, smallBlob);
+          }
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          throw Status.CANCELLED.withCause(e).asRuntimeException();
+        }
+      }
+
+      @Override
+      public void onError(Throwable t) {
+        try {
+          out.close(); // yup.
+        } catch (IOException e) {
+          // ignore?
+        }
+      }
+    };
+    Context.current().addListener((context) -> {
+      chunkObserver.onError(Status.CANCELLED.asRuntimeException());
+    }, MoreExecutors.directExecutor());
+    return chunkObserver;
   }
 
   protected int getTreeDefaultPageSize() { return 1024; }
