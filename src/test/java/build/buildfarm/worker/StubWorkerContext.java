@@ -27,7 +27,6 @@ import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.devtools.remoteexecution.v1test.Directory;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
 import com.google.longrunning.Operation;
-import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import java.io.OutputStream;
 import java.nio.file.Path;
@@ -55,7 +54,6 @@ class StubWorkerContext implements WorkerContext {
   @Override public boolean getStreamStderr() { throw new UnsupportedOperationException(); }
   @Override public Duration getDefaultActionTimeout() { throw new UnsupportedOperationException(); }
   @Override public Duration getMaximumActionTimeout() { throw new UnsupportedOperationException(); }
-  @Override public ByteString getBlob(Digest digest) { throw new UnsupportedOperationException(); }
   @Override public void createActionRoot(Path root, Map<Digest, Directory> directoriesIndex, Action action) { throw new UnsupportedOperationException(); }
   @Override public void destroyActionRoot(Path root) { throw new UnsupportedOperationException(); }
   @Override public Path getRoot() { throw new UnsupportedOperationException(); }

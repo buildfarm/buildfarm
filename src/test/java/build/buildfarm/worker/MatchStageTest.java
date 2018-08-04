@@ -26,7 +26,6 @@ import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
-import com.google.protobuf.ByteString;
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -75,14 +74,6 @@ public class MatchStageTest {
       @Override
       public void match(MatchListener listener) {
         assertThat(listener.onOperation(queue.remove(0))).isEqualTo(results.remove(0));
-      }
-
-      @Override
-      public ByteString getBlob(Digest digest) {
-        if (digest.getHash().equals("action")) {
-          return Action.newBuilder().build().toByteString();
-        }
-        return super.getBlob(digest);
       }
 
       @Override

@@ -547,7 +547,6 @@ public class Worker implements Instances {
         config.getPublicName(),
         digestUtil,
         backplane,
-        new EmptyFetcher(new StorageFetcher(storage, localPopulatingFetcher)),
         storage,
         config.getShardWorkerInstanceConfig());
 
@@ -766,11 +765,6 @@ public class Worker implements Instances {
       @Override
       public Duration getMaximumActionTimeout() {
         return null;
-      }
-
-      @Override
-      public ByteString getBlob(Digest digest) throws IOException, InterruptedException {
-        return instance.fetchBlob(digest);
       }
 
 			private int updateActionResultStdOutputs(

@@ -40,13 +40,14 @@ class DispatchedMonitor implements Runnable {
     while (true) {
       try {
         long now = System.currentTimeMillis(); /* FIXME sync */
+        boolean canQueueNow = backplane.canQueue();
         /* iterate over dispatched */
         for (ShardDispatchedOperation o : backplane.getDispatchedOperations()) {
           /* if now > dispatchedOperation.getExpiresAt() */
           if (now >= o.getRequeueAt()) {
             System.out.println("DispatchedMonitor: Testing " + o.getName() + " because " + now + " >= " + o.getRequeueAt());
             long startTime = System.nanoTime();
-            boolean shouldCancel = !onRequeue.test(o.getName());
+            boolean shouldCancel = !canQueueNow || !onRequeue.test(o.getName());
             if (Thread.interrupted()) {
               throw new InterruptedException();
             }

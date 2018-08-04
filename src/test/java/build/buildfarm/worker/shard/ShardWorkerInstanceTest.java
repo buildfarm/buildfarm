@@ -52,9 +52,6 @@ public class ShardWorkerInstanceTest {
   @Mock
   private ContentAddressableStorage storage;
 
-  @Mock
-  private Fetcher fetcher;
-
   private ShardWorkerInstance instance;
 
   @Before
@@ -64,7 +61,6 @@ public class ShardWorkerInstanceTest {
         "test",
         DIGEST_UTIL,
         backplane,
-        fetcher,
         storage,
         ShardWorkerInstanceConfig.getDefaultInstance());
   }

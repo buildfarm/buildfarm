@@ -110,6 +110,7 @@ java_library(
     srcs = glob(["instance/shard/*.java"]),
     deps = [
         ":common",
+        ":common-cache",
         ":instance",
         ":server-instance",
         ":stub-instance",

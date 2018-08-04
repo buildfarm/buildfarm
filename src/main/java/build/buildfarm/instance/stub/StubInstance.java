@@ -45,7 +45,7 @@ import com.google.devtools.remoteexecution.v1test.ContentAddressableStorageGrpc;
 import com.google.devtools.remoteexecution.v1test.ContentAddressableStorageGrpc.ContentAddressableStorageBlockingStub;
 import com.google.devtools.remoteexecution.v1test.ExecuteRequest;
 import com.google.devtools.remoteexecution.v1test.ExecutionGrpc;
-import com.google.devtools.remoteexecution.v1test.ExecutionGrpc.ExecutionBlockingStub;
+import com.google.devtools.remoteexecution.v1test.ExecutionGrpc.ExecutionFutureStub;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.devtools.remoteexecution.v1test.Directory;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
@@ -162,12 +162,12 @@ public class StubInstance implements Instance {
             }
           });
 
-  private final Supplier<ExecutionBlockingStub> executionBlockingStub =
+  private final Supplier<ExecutionFutureStub> executionFutureStub =
       Suppliers.memoize(
-          new Supplier<ExecutionBlockingStub>() {
+          new Supplier<ExecutionFutureStub>() {
             @Override
-            public ExecutionBlockingStub get() {
-              return ExecutionGrpc.newBlockingStub(channel);
+            public ExecutionFutureStub get() {
+              return ExecutionGrpc.newFutureStub(channel);
             }
           });
 
@@ -454,21 +454,14 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public void execute(
-      Action action,
-      boolean skipCacheLookup,
-      int totalInputFileCount,
-      long totalInputFileBytes,
-      Consumer<Operation> onOperation) {
-    onOperation.accept(executionBlockingStub
+  public ListenableFuture<Operation> execute(Action action, boolean skipCacheLookup) {
+    return executionFutureStub
         .get()
         .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
         .execute(ExecuteRequest.newBuilder()
             .setAction(action)
             .setSkipCacheLookup(skipCacheLookup)
-            .setTotalInputFileCount(totalInputFileCount)
-            .setTotalInputFileBytes(totalInputFileBytes)
-            .build()));
+            .build());
   }
 
   @Override

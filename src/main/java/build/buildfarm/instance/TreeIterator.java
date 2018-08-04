@@ -19,6 +19,7 @@ import build.buildfarm.instance.TokenizableIterator;
 import build.buildfarm.v1test.TreeIteratorToken;
 import com.google.common.collect.Iterators;
 import com.google.common.io.BaseEncoding;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.devtools.remoteexecution.v1test.Directory;
 import com.google.protobuf.ByteString;
@@ -34,19 +35,19 @@ import java.util.function.Function;
 import javax.annotation.Nullable;
 
 public class TreeIterator implements TokenizableIterator<TreeIterator.DirectoryEntry> {
-  private final GetDirectoryFunction getDirectory;
+  private final Function<Digest, ListenableFuture<Directory>> getDirectoryFuture;
   private Deque<Digest> path;
   private final ArrayDeque<Digest> parentPath;
   private final Stack<Iterator<Digest>> pointers;
 
-  public TreeIterator(GetDirectoryFunction getDirectory, Digest rootDigest, String pageToken) throws IOException, InterruptedException {
-    this.getDirectory = getDirectory;
+  public TreeIterator(Function<Digest, ListenableFuture<Directory>> getDirectoryFuture, Digest rootDigest, String pageToken) throws IOException, InterruptedException {
+    this.getDirectoryFuture = getDirectoryFuture;
     parentPath = new ArrayDeque<Digest>();
     pointers = new Stack<Iterator<Digest>>();
 
     Iterator<Digest> iter = Iterators.singletonIterator(rootDigest);
 
-    Directory directory = getDirectory.apply(rootDigest);
+    Directory directory = AbstractServerInstance.getUnchecked(getDirectoryFuture.apply(rootDigest));
 
     if (!pageToken.isEmpty()) {
       TreeIteratorToken token = parseToken(BaseEncoding.base64().decode(pageToken));
@@ -63,7 +64,7 @@ public class TreeIterator implements TokenizableIterator<TreeIterator.DirectoryE
         }
         parentPath.addLast(digest);
         pointers.push(iter);
-        directory = getDirectory.apply(digest);
+        directory = AbstractServerInstance.getUnchecked(getDirectoryFuture.apply(digest));
         if (directory == null) {
           // some directory data has disappeared, current iter
           // is correct and will be next directory fetched
@@ -131,12 +132,7 @@ public class TreeIterator implements TokenizableIterator<TreeIterator.DirectoryE
      * removed. */
     Digest digest = iter.next();
     try {
-      Directory directory;
-      try {
-        directory = getDirectory.apply(digest);
-      } catch (IOException e) {
-        directory = null;
-      }
+      Directory directory = AbstractServerInstance.getUnchecked(getDirectoryFuture.apply(digest));
       DirectoryEntry entry = new DirectoryEntry(digest, directory);
       if (directory != null) {
         /* the path to a new iter set is the path to its parent */

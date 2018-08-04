@@ -15,6 +15,8 @@
 package build.buildfarm.server;
 
 import build.buildfarm.instance.Instance;
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
 import com.google.devtools.remoteexecution.v1test.ExecuteRequest;
 import com.google.devtools.remoteexecution.v1test.ExecutionGrpc;
 import com.google.longrunning.Operation;
@@ -40,22 +42,26 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
       return;
     }
 
-    try {
-      instance.execute(
-          request.getAction(),
-          request.getSkipCacheLookup(),
-          request.getTotalInputFileCount(),
-          request.getTotalInputFileBytes(),
-          (operation) -> {
+    Futures.addCallback(
+        instance.execute(
+            request.getAction(),
+            request.getSkipCacheLookup()),
+        new FutureCallback<Operation>() {
+          @Override
+          public void onSuccess(Operation operation) {
             responseObserver.onNext(operation);
-            responseObserver.onCompleted();
-          });
-    } catch (InterruptedException e) {
-      responseObserver.onError(Status.fromThrowable(e).asException());
-    } catch (IllegalStateException e) {
-      e.printStackTrace();
-      responseObserver.onError(
-          Status.FAILED_PRECONDITION.withDescription(e.getMessage()).asException());
-    }
+            responseObserver.onCompleted(); // not in v2!
+          }
+
+          @Override
+          public void onFailure(Throwable t) {
+						if (t instanceof IllegalStateException) {
+							responseObserver.onError(
+									Status.FAILED_PRECONDITION.withDescription(t.getMessage()).asException());
+            } else if (!(t instanceof InterruptedException)) {
+              responseObserver.onError(t);
+            }
+          }
+        });
   }
 }

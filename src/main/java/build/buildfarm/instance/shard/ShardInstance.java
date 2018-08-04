@@ -17,6 +17,9 @@ package build.buildfarm.instance.shard;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.ShardBackplane;
+import build.buildfarm.common.cache.Cache;
+import build.buildfarm.common.cache.CacheBuilder;
+import build.buildfarm.common.cache.CacheLoader.InvalidCacheLoadException;
 import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.instance.GetDirectoryFunction;
 import build.buildfarm.instance.Instance;
@@ -32,13 +35,16 @@ import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.OperationIteratorToken;
 import build.buildfarm.v1test.ShardInstanceConfig;
 import build.buildfarm.v1test.QueuedOperationMetadata;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 import com.google.common.io.BaseEncoding;
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.MoreExecutors;
@@ -57,9 +63,11 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.Message;
 import com.google.protobuf.util.JsonFormat;
 import io.grpc.Channel;
 import io.grpc.Context;
+import io.grpc.Context.CancellableContext;
 import io.grpc.ManagedChannel;
 import io.grpc.Status;
 import io.grpc.Status.Code;
@@ -87,45 +95,92 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import javax.naming.ConfigurationException;
 
 public class ShardInstance extends AbstractServerInstance {
-  private final ShardInstanceConfig config;
   private final Runnable onStop;
   private final ShardBackplane backplane;
-  private final Map<String, StubInstance> workerStubs;
+  private final LoadingCache<String, Instance> workerStubs;
   private final Thread dispatchedMonitor;
-  private final ListeningScheduledExecutorService retryScheduler =
-      MoreExecutors.listeningDecorator(Executors.newScheduledThreadPool(1));
   private final Cache<Digest, Directory> directoryCache = CacheBuilder.newBuilder()
       .maximumSize(64 * 1024)
       .build();
   private final Cache<Digest, Command> commandCache = CacheBuilder.newBuilder()
       .maximumSize(64 * 1024)
       .build();
+  private final com.google.common.cache.RemovalListener<String, Instance> instanceRemovalListener = (removal) -> {
+    Instance instance = removal.getValue();
+    if (instance instanceof StubInstance) {
+      ManagedChannel channel = ((StubInstance) instance).getChannel();
+      channel.shutdownNow();
+      try {
+        channel.awaitTermination(0, TimeUnit.SECONDS);
+      } catch (InterruptedException intEx) {
+        /* impossible, 0 timeout */
+        Thread.currentThread().interrupt();
+      }
+    }
+  };
   private final Random rand = new Random();
+  private ExecutorService operationDeletionService = Executors.newSingleThreadExecutor();
 
-  public ShardInstance(String name, DigestUtil digestUtil, ShardInstanceConfig config, Runnable onStop) throws InterruptedException, ConfigurationException {
-    super(name, digestUtil, null, null, null, null, null);
-    this.config = config;
-    this.onStop = onStop;
+  public ShardInstance(String name, DigestUtil digestUtil, ShardInstanceConfig config, Runnable onStop)
+      throws InterruptedException, ConfigurationException {
+    this(
+        name,
+        digestUtil,
+        getBackplane(config),
+        config.getRunDispatchedMonitor(),
+        onStop,
+        new CacheLoader<String, Instance>() {
+          @Override
+          public Instance load(String worker) {
+          ManagedChannel channel = createChannel(worker);
+          return new StubInstance(
+              "", digestUtil, channel,
+              60 /* FIXME CONFIG */, TimeUnit.SECONDS,
+              createStubRetrier(),
+              null);
+          }
+        });
+  }
+
+  private static ShardBackplane getBackplane(ShardInstanceConfig config)
+      throws ConfigurationException {
     ShardInstanceConfig.BackplaneCase backplaneCase = config.getBackplaneCase();
     switch (backplaneCase) {
       default:
       case BACKPLANE_NOT_SET:
         throw new IllegalArgumentException("Shard Backplane not set in config");
       case REDIS_SHARD_BACKPLANE_CONFIG:
-        backplane = new RedisShardBackplane(config.getRedisShardBackplaneConfig(), this::stripOperation, this::stripOperation);
-        break;
+        return new RedisShardBackplane(config.getRedisShardBackplaneConfig(), ShardInstance::stripOperation, ShardInstance::stripOperation);
     }
-    backplane.setOnUnsubscribe(this::stop);
-    workerStubs = new ConcurrentHashMap<>();
+  }
 
-    if (config.getRunDispatchedMonitor()) {
+  public ShardInstance(
+      String name,
+      DigestUtil digestUtil,
+      ShardBackplane backplane,
+      boolean runDispatchedMonitor,
+      Runnable onStop,
+      CacheLoader<String, Instance> instanceLoader)
+      throws InterruptedException {
+    super(name, digestUtil, null, null, null, null, null);
+    this.backplane = backplane;
+    this.onStop = onStop;
+    backplane.setOnUnsubscribe(this::stop);
+    workerStubs = com.google.common.cache.CacheBuilder.newBuilder()
+      .removalListener(instanceRemovalListener)
+      .build(instanceLoader);
+
+    if (runDispatchedMonitor) {
       dispatchedMonitor = new Thread(new DispatchedMonitor(
           backplane,
           (operationName) -> {
@@ -164,8 +219,17 @@ public class ShardInstance extends AbstractServerInstance {
     if (dispatchedMonitor != null) {
       dispatchedMonitor.stop();
     }
+    operationDeletionService.shutdown();
     backplane.stop();
     onStop.run();
+    try {
+      if (!operationDeletionService.awaitTermination(10, TimeUnit.SECONDS)) {
+        System.err.println("Could not shut down operation deletion service, some operations may be zombies");
+      }
+      operationDeletionService.shutdownNow();
+    } catch (InterruptedException intEx) {
+      Thread.currentThread().interrupt();
+    }
   }
 
   @Override
@@ -496,22 +560,17 @@ public class ShardInstance extends AbstractServerInstance {
         SHARD_IS_RETRIABLE);
   }
 
-  private ByteStreamUploader createStubUploader(Channel channel) {
-    return new ByteStreamUploader("", channel, null, 300, createStubRetrier(), retryScheduler);
+  private static ByteStreamUploader createStubUploader(Channel channel, ListeningScheduledExecutorService service) {
+    return new ByteStreamUploader("", channel, null, 300, createStubRetrier(), service);
   }
 
-  private synchronized StubInstance workerStub(String worker) {
-    StubInstance instance = workerStubs.get(worker);
-    if (instance == null) {
-      ManagedChannel channel = createChannel(worker);
-      instance = new StubInstance(
-          "", digestUtil, channel,
-          60 /* FIXME CONFIG */, TimeUnit.SECONDS,
-          createStubRetrier(),
-          createStubUploader(channel));
-      workerStubs.put(worker, instance);
+  private synchronized Instance workerStub(String worker) {
+    try {
+      return workerStubs.get(worker);
+    } catch (ExecutionException e) {
+      e.printStackTrace();
+      return null;
     }
-    return instance;
   }
 
   @Override
@@ -535,6 +594,8 @@ public class ShardInstance extends AbstractServerInstance {
         Digest digest;
         try {
           digest = workerStub(worker).putBlob(blob);
+        } catch (StatusException e) {
+          throw Status.fromThrowable(e).asRuntimeException();
         } catch (RetryException e) {
           if (e.getCause() instanceof StatusRuntimeException) {
             throw (StatusRuntimeException) e.getCause();
@@ -548,7 +609,7 @@ public class ShardInstance extends AbstractServerInstance {
             public Command call() throws IOException {
               return Command.parseFrom(blob);
             }
-          });
+          }).get();
           known = true;
         } catch (ExecutionException e) {
           /* not a command */
@@ -560,7 +621,7 @@ public class ShardInstance extends AbstractServerInstance {
               public Directory call() throws IOException {
                 return Directory.parseFrom(blob);
               }
-            });
+            }).get();
             known = true;
           } catch (ExecutionException e) {
             /* not a directory */
@@ -743,15 +804,15 @@ public class ShardInstance extends AbstractServerInstance {
   protected int getTreeMaxPageSize() { return 1024; }
   protected TokenizableIterator<DirectoryEntry> createTreeIterator(
       Digest rootDigest, String pageToken) throws IOException, InterruptedException {
-    final GetDirectoryFunction getDirectoryFunction;
+    final Function<Digest, ListenableFuture<Directory>> getDirectoryFunction;
     Iterable<Directory> directories = backplane.getTree(rootDigest);
     if (directories != null) {
       // FIXME WE MUST VALIDATE THAT THIS DIRECTORIES TREE CONTAINS EVERY SINGLE DIGEST REQUESTED
-      getDirectoryFunction = new GetDirectoryFunction() {
+      getDirectoryFunction = new Function<Digest, ListenableFuture<Directory>>() {
         Map<Digest, Directory> index = createDirectoriesIndex(directories);
 
         @Override
-        public Directory apply(Digest digest) {
+        public ListenableFuture<Directory> apply(Digest digest) {
           Directory directory = index.get(digest);
           if (directory == null) {
             throw new IllegalStateException(
@@ -759,11 +820,11 @@ public class ShardInstance extends AbstractServerInstance {
                 + " was called on the cached tree entry for " + DigestUtil.toString(rootDigest)
                 + ", this is probably an error");
           }
-          return directory;
+          return Futures.immediateFuture(directory);
         }
       };
     } else {
-      getDirectoryFunction = this::recoveryExpectDirectory;
+      getDirectoryFunction = (directoryBlobDigest) -> expectDirectory(directoryBlobDigest);
     }
     return new TreeIterator(getDirectoryFunction, rootDigest, pageToken);
   }
@@ -782,81 +843,49 @@ public class ShardInstance extends AbstractServerInstance {
     return super.expectAction(operation);
   }
 
-  private Directory recoveryExpectDirectory(Digest directoryBlobDigest) throws InterruptedException {
-    Directory directory = expectDirectory(directoryBlobDigest);
-    if (directory == null) {
-      try {
-        // should probably prevent the round trip to redis here with the results
-        checkMissingBlob(directoryBlobDigest, true);
-      } catch (IOException e) {
-        e.printStackTrace();
-        return null;
+  interface Fetcher<T> {
+    T fetch() throws InterruptedException;
+  }
+
+  @Override
+  protected ListenableFuture<Directory> expectDirectory(Digest directoryBlobDigest) {
+    final Fetcher<Directory> fetcher = () -> getUnchecked(super.expectDirectory(directoryBlobDigest));
+    // is there a better interface to use for the cache with these nice futures?
+    return directoryCache.get(directoryBlobDigest, new Callable<Directory>() {
+      @Override
+      public Directory call() throws InterruptedException {
+        return fetcher.fetch();
       }
-    }
-    return expectDirectory(directoryBlobDigest);
-  }
-
-  interface DirectoryFetch {
-    Directory fetch(Digest digest) throws InterruptedException;
+    });
   }
 
   @Override
-  protected Directory expectDirectory(Digest directoryBlobDigest) throws InterruptedException {
-    try {
-      final DirectoryFetch fetcher = super::expectDirectory;
-      return directoryCache.get(directoryBlobDigest, new Callable<Directory>() {
-        @Override
-        public Directory call() throws InterruptedException {
-          return fetcher.fetch(directoryBlobDigest);
-        }
-      });
-    } catch (ExecutionException e) {
-      return null;
-    }
-  }
-
-  interface CommandFetch {
-    Command fetch(Digest digest) throws InterruptedException;
-  }
-
-  @Override
-  protected Command expectCommand(Digest commandBlobDigest) throws InterruptedException {
-    try {
-      final CommandFetch fetcher = super::expectCommand;
-      return commandCache.get(commandBlobDigest, new Callable<Command>() {
-        @Override
-        public Command call() throws InterruptedException {
-          return fetcher.fetch(commandBlobDigest);
-        }
-      });
-    } catch (ExecutionException e) {
-      return null;
-    }
+  protected ListenableFuture<Command> expectCommand(Digest commandBlobDigest) {
+    final Fetcher<Command> fetcher = () -> getUnchecked(super.expectCommand(commandBlobDigest));
+    return Futures.catching(
+        commandCache.get(commandBlobDigest, new Callable<Command>() {
+          @Override
+          public Command call() throws InterruptedException {
+            return fetcher.fetch();
+          }
+        }),
+        InvalidCacheLoadException.class,
+        (e) -> { return null; });
   }
 
   private void removeMalfunctioningWorker(String worker, Throwable t, String context) {
-    StubInstance instance = workerStubs.remove(worker);
     try {
       if (backplane.isWorker(worker)) {
         backplane.removeWorker(worker);
 
-        System.out.println("Removing worker '" + worker + "' during(" + context + ") because of:");
+        System.out.println("Removed worker '" + worker + "' during(" + context + ") because of:");
         t.printStackTrace();
       }
     } catch (IOException eIO) {
       throw Status.fromThrowable(eIO).asRuntimeException();
     }
 
-    if (instance != null) {
-      ManagedChannel channel = instance.getChannel();
-      channel.shutdownNow();
-      try {
-        channel.awaitTermination(0, TimeUnit.SECONDS);
-      } catch (InterruptedException intEx) {
-        /* impossible, 0 timeout */
-        Thread.currentThread().interrupt();
-      }
-    }
+    workerStubs.invalidate(worker);
   }
 
   @Override
@@ -869,82 +898,29 @@ public class ShardInstance extends AbstractServerInstance {
     throw new UnsupportedOperationException();
   }
 
-  private Operation buildQueuedOperation(Operation operation, Action action, Command command, Iterable<Directory> directories) {
-    QueuedOperationMetadata metadata = createQueuedOperationMetadata(action, command, directories);
-
-    metadata = metadata.toBuilder()
-        .setExecuteOperationMetadata(metadata.getExecuteOperationMetadata().toBuilder()
-            .setStage(ExecuteOperationMetadata.Stage.QUEUED)
-            .build())
-        .build();
-
-    return operation.toBuilder()
-        .setMetadata(Any.pack(metadata))
-        .build();
-  }
-
-  private QueuedOperationMetadata createQueuedOperationMetadata(Action action, Command command, Iterable<Directory> directories) {
-    return QueuedOperationMetadata.newBuilder()
+  private ListenableFuture<QueuedOperationMetadata> buildQueuedOperationMetadata(Action action, Executor executor) {
+    QueuedOperationMetadata.Builder queuedBuilder = QueuedOperationMetadata.newBuilder()
         .setAction(action)
-        .setCommand(command)
-        .addAllDirectories(directories)
         .setExecuteOperationMetadata(ExecuteOperationMetadata.newBuilder()
             .setActionDigest(digestUtil.compute(action))
-            .build())
-        .build();
+            .build());
+    return Futures.transform(
+        Futures.allAsList(
+            Futures.transform(insistCommand(action.getCommandDigest()), queuedBuilder::setCommand, executor),
+            Futures.transform(getTreeDirectories(action.getInputRootDigest()), queuedBuilder::addAllDirectories, executor)),
+        (result) -> queuedBuilder.build());
   }
 
   protected Operation createOperation(ActionKey actionKey) { throw new UnsupportedOperationException(); }
 
-  private Operation createOperation() {
+  private Operation createOperation(Message metadata) {
     String name = createOperationName(UUID.randomUUID().toString());
 
     return Operation.newBuilder()
         .setName(name)
         .setDone(false)
+        .setMetadata(Any.pack(metadata))
         .build();
-  }
-
-  public boolean validateOperation(String operationName, boolean validateDone) throws IOException, InterruptedException {
-    Operation operation = getOperation(operationName);
-    if (operation == null) {
-      System.out.println("Operation " + operationName + " no longer exists");
-      return false;
-    }
-    if (validateDone && operation.getDone()) {
-      System.out.println("Operation " + operation.getName() + " has already completed");
-      return false;
-    }
-    Action action = expectAction(operation);
-    if (action == null) {
-      System.out.println("Action for " + operation.getName() + " no longer exists");
-      return false;
-    }
-    boolean isQueuedOperationMetadata = operation.getMetadata().is(QueuedOperationMetadata.class);
-    Iterable<Directory> directories;
-    Command command;
-    if (isQueuedOperationMetadata) {
-      try {
-        QueuedOperationMetadata metadata = operation.getMetadata()
-            .unpack(QueuedOperationMetadata.class);
-        directories = metadata.getDirectoriesList();
-        command = metadata.getCommand();
-      } catch (InvalidProtocolBufferException e) {
-        e.printStackTrace();
-        return false;
-      }
-    } else {
-      directories = getTreeDirectories(action.getInputRootDigest());
-      command = expectCommand(action.getCommandDigest());
-    }
-    try {
-      validateAction(action, command, directories);
-    } catch (Exception e) {
-      // FIXME this should not be a catch all...
-      e.printStackTrace();
-      return false;
-    }
-    return true;
   }
 
   private boolean requeueOperation(String operationName) throws IOException, InterruptedException {
@@ -962,25 +938,25 @@ public class ShardInstance extends AbstractServerInstance {
       System.out.println("Action for " + operation.getName() + " no longer exists");
       return false;
     }
+    final QueuedOperationMetadata metadata;
     boolean isQueuedOperationMetadata = operation.getMetadata().is(QueuedOperationMetadata.class);
-    Iterable<Directory> directories;
-    Command command;
-    if (isQueuedOperationMetadata) {
+    if (operation.getMetadata().is(QueuedOperationMetadata.class)) {
       try {
-        QueuedOperationMetadata metadata = operation.getMetadata()
-            .unpack(QueuedOperationMetadata.class);
-        directories = metadata.getDirectoriesList();
-        command = metadata.getCommand();
+        metadata = operation.getMetadata().unpack(QueuedOperationMetadata.class);
       } catch (InvalidProtocolBufferException e) {
         e.printStackTrace();
         return false;
       }
     } else {
-      directories = getTreeDirectories(action.getInputRootDigest());
-      command = expectCommand(action.getCommandDigest());
+      try {
+        metadata = buildQueuedOperationMetadata(action, MoreExecutors.directExecutor()).get();
+      } catch (ExecutionException e) {
+        e.printStackTrace();
+        return false;
+      }
     }
     try {
-      validateAction(action, command, directories);
+      validateQueuedOperationMetadata(metadata);
     } catch (Exception e) {
       // FIXME this should not be a catch all...
       e.printStackTrace();
@@ -988,11 +964,9 @@ public class ShardInstance extends AbstractServerInstance {
     }
 
     if (!isQueuedOperationMetadata) {
-      Operation queuedOperation = buildQueuedOperation(
-          operation,
-          action,
-          command,
-          directories);
+      Operation queuedOperation = operation.toBuilder()
+          .setMetadata(Any.pack(metadata))
+          .build();
       backplane.putOperation(queuedOperation, ExecuteOperationMetadata.Stage.QUEUED);
     } else {
       backplane.requeueDispatchedOperation(operation);
@@ -1000,8 +974,7 @@ public class ShardInstance extends AbstractServerInstance {
     return true;
   }
 
-  @Override
-  protected ExecuteOperationMetadata expectExecuteOperationMetadata(
+  protected static ExecuteOperationMetadata expectExecuteOperationMetadata(
       Operation operation) {
     if (operation.getMetadata().is(QueuedOperationMetadata.class)) {
       try {
@@ -1018,112 +991,130 @@ public class ShardInstance extends AbstractServerInstance {
         return null;
       }
     } else {
-      return super.expectExecuteOperationMetadata(operation);
+      return AbstractServerInstance.expectExecuteOperationMetadata(operation);
     }
   }
 
   @Override
-  public void execute(
-      Action action,
-      boolean skipCacheLookup,
-      int totalInputFileCount,
-      long totalInputFileBytes,
-      Consumer<Operation> onOperation) throws InterruptedException {
-    Iterable<Directory> directories;
-    Command command;
+  public ListenableFuture<Operation> execute(Action action, boolean skipCacheLookup) {
     try {
-      directories = getTreeDirectories(action.getInputRootDigest());
-      command = expectCommand(action.getCommandDigest());
+      if (backplane.canQueue()) {
+        return queue(action, skipCacheLookup);
+      }
     } catch (IOException e) {
-      try {
-        System.out.println("execute invalid: " + JsonFormat.printer().print(action));
-      } catch (InvalidProtocolBufferException invalidProtoEx) {
-        invalidProtoEx.printStackTrace();
+      return Futures.immediateFailedFuture(e);
+    }
+    return Futures.immediateFailedFuture(Status.RESOURCE_EXHAUSTED.withDescription("cannot currently queue for execution").asRuntimeException());
+  }
+
+  @VisibleForTesting
+  public ListenableFuture<Operation> queue(Action action, boolean skipCacheLookup) {
+    ListenableFuture<QueuedOperationMetadata> queuedFuture = buildQueuedOperationMetadata(action, MoreExecutors.directExecutor());
+    ListenableFuture<QueuedOperationMetadata> validatedFuture = Futures.transformAsync(
+        queuedFuture,
+        (metadata) -> {
+          validateQueuedOperationMetadata(metadata);
+          return queuedFuture;
+        });
+    ListenableFuture<Operation> operationFuture = Futures.transform(validatedFuture, this::createOperation);
+
+    SettableFuture<Operation> executeFuture = SettableFuture.create();
+    Futures.addCallback(operationFuture, new FutureCallback<Operation>() {
+      @Override
+      public void onSuccess(Operation operation) {
+        operation = stripOperation(operation);
+        try {
+          // we can't respond until they could watch the thing
+          backplane.putOperation(operation, ExecuteOperationMetadata.Stage.UNKNOWN);
+          executeFuture.set(operation);
+        } catch (IOException e) {
+          e.printStackTrace();
+          onFailure(e);
+        }
       }
-      throw new IllegalStateException();
-    }
 
-    try {
-      validateAction(action, command, directories);
-      /* we could probably store this with the action key and just say that every
-       * outstanding action has its tree retained */
-      backplane.putTree(action.getInputRootDigest(), directories);
-    } catch (IOException e) {
-      throw Status.fromThrowable(e).asRuntimeException();
-    } catch (IllegalStateException e) {
-      try {
-        System.out.println("execute invalid: " + JsonFormat.printer().print(action));
-      } catch (InvalidProtocolBufferException invalidProtoEx) {
-        invalidProtoEx.printStackTrace();
+      @Override
+      public void onFailure(Throwable t) {
+        executeFuture.setException(t);
       }
-      throw e;
-    }
+    });
 
-    Operation operation = createOperation();
+    CancellableContext withCancellation = Context.ROOT.withCancellation();
+    withCancellation.run(() -> {
+      // nice to have for requeuing
+      Futures.addCallback(validatedFuture, new FutureCallback<QueuedOperationMetadata>() {
+        @Override
+        public void onSuccess(QueuedOperationMetadata metadata) {
+          try {
+            backplane.putTree(action.getInputRootDigest(), metadata.getDirectoriesList());
+          } catch (IOException e) {
+            e.printStackTrace();
+          }
+        }
 
-    /*
-    try {
-      System.out.println("execute(" + operation.getName() + "): " + JsonFormat.printer().print(action));
-    } catch (InvalidProtocolBufferException e) {
-      e.printStackTrace();
-    }
-    */
+        @Override
+        public void onFailure(Throwable t) {
+        }
+      });
 
-    try {
-      backplane.putOperation(operation, ExecuteOperationMetadata.Stage.UNKNOWN);
-    } catch (IOException e) {
-      try {
-        backplane.deleteOperation(operation.getName());
-      } catch (IOException deleteEx) {
-        deleteEx.printStackTrace();
-      }
-      throw Status.fromThrowable(e).asRuntimeException();
-    }
+      ByteString actionBlob = action.toByteString();
+      Digest actionDigest = digestUtil.compute(actionBlob);
+      ListenableFuture<Long> actionCommittedFuture = Futures.transformAsync(validatedFuture, (metadata) -> {
+        CommittingOutputStream out = createBlobOutputStream(actionDigest);
+        actionBlob.writeTo(out);
+        out.close(); // unnecessary given implementation
+        return out.getCommittedFuture();
+      });
 
-    try {
-      onOperation.accept(operation);
-    } catch (Exception e) {
-      try {
-        backplane.deleteOperation(operation.getName());
-      } catch (IOException deleteEx) {
-        deleteEx.printStackTrace();
-      }
-      e.printStackTrace();
-      throw e;
-    }
+      // onQueue call?
+      Futures.addCallback(
+          // need to have for requeuing
+          Futures.transformAsync(actionCommittedFuture, (committedSize) -> operationFuture),
+          new FutureCallback<Operation>() {
+            @Override
+            public void onSuccess(Operation operation) {
+              // if we ever do contexts here, we will need to do the right thing and make it withCancellation
+              try {
+                backplane.putOperation(operation, ExecuteOperationMetadata.Stage.QUEUED);
+              } catch (IOException e) {
+                deleteOperation(operation.getName());
+              }
+            }
 
-    // FIXME lookup
+            void deleteOperation(String operationName) {
+              operationDeletionService.execute(new Runnable() {
+                // we must make all efforts to delete this thing
+                int attempt = 1;
 
-    // make the action available to the worker
-    try {
-      putBlob(action.toByteString());
-    } catch (Exception e) {
-      try {
-        backplane.deleteOperation(operation.getName());
-      } catch (IOException deleteEx) {
-        deleteEx.printStackTrace();
-      }
-      e.printStackTrace();
-      throw e;
-    }
+                @Override
+                public void run() {
+                  try {
+                    backplane.deleteOperation(operationName);
+                  } catch (IOException e) {
+                    if (attempt % 100 == 0) {
+                      System.err.println(String.format("On attempt %d to delete %s: %s", attempt, operationName, e.getLocalizedMessage()));
+                    }
+                    // hopefully as deferred execution...
+                    operationDeletionService.execute(this);
+                    attempt++;
+                  }
+                }
+              });
+            }
 
-    final Operation queuedOperation = buildQueuedOperation(
-        operation,
-        action,
-        command,
-        directories);
-
-    try {
-      backplane.putOperation(queuedOperation, ExecuteOperationMetadata.Stage.QUEUED);
-    } catch (IOException e) {
-      try {
-        backplane.deleteOperation(operation.getName());
-      } catch (IOException deleteEx) {
-        deleteEx.printStackTrace();
-      }
-      // cleanup? retry?
-      throw Status.fromThrowable(e).asRuntimeException();
-    }
+            @Override
+            public void onFailure(Throwable t) {
+              try {
+                deleteOperation(executeFuture.get().getName());
+              } catch (ExecutionException e) {
+                // we never succesfully registered the operation
+              } catch (InterruptedException e) {
+                // nothing
+              }
+            }
+        });
+    });
+    return executeFuture;
   }
 
   @Override
@@ -1260,7 +1251,7 @@ public class ShardInstance extends AbstractServerInstance {
     }
   }
 
-  private Operation stripOperation(Operation operation) {
+  private static Operation stripOperation(Operation operation) {
     return operation.toBuilder()
         .setMetadata(Any.pack(expectExecuteOperationMetadata(operation)))
         .build();

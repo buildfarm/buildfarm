@@ -31,7 +31,6 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 public interface Instance {
@@ -67,12 +66,7 @@ public interface Instance {
   CommittingOutputStream getStreamOutput(String name, long expectedSize);
   InputStream newStreamInput(String name, long offset) throws IOException, InterruptedException;
 
-  void execute(
-      Action action,
-      boolean skipCacheLookup,
-      int totalInputFileCount,
-      long totalInputFileBytes,
-      Consumer<Operation> onOperation) throws InterruptedException;
+  ListenableFuture<Operation> execute(Action action, boolean skipCacheLookup);
   void match(Platform platform, MatchListener listener) throws InterruptedException;
   boolean putOperation(Operation operation) throws InterruptedException;
   boolean pollOperation(String operationName, Stage stage);

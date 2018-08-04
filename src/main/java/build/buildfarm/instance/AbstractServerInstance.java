@@ -19,11 +19,14 @@ import build.buildfarm.common.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.instance.TreeIterator.DirectoryEntry;
+import build.buildfarm.v1test.QueuedOperationMetadata;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.devtools.remoteexecution.v1test.Action;
@@ -39,6 +42,7 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.Parser;
 import io.grpc.Status;
 import io.grpc.Status.Code;
 import io.grpc.StatusException;
@@ -49,6 +53,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
+import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 
 public abstract class AbstractServerInstance implements Instance {
@@ -180,6 +185,33 @@ public abstract class AbstractServerInstance implements Instance {
 
     return blob.getData().substring(
         (int) offset, (int) (endIndex > blob.size() ? blob.size() : endIndex));
+  }
+
+  protected ListenableFuture<ByteString> getBlobFuture(Digest blobDigest) {
+    return getBlobFuture(blobDigest, /* offset=*/ 0, /* limit=*/ 0);
+  }
+
+  protected ListenableFuture<ByteString> getBlobFuture(Digest blobDigest, long offset, long limit) {
+    SettableFuture<ByteString> future = SettableFuture.create();
+    getBlob(blobDigest, offset, limit, new StreamObserver<ByteString>() {
+      ByteString content = ByteString.EMPTY;
+
+      @Override
+      public void onNext(ByteString chunk) {
+        content = content.concat(chunk);
+      }
+
+      @Override
+      public void onCompleted() {
+        future.set(content);
+      }
+
+      @Override
+      public void onError(Throwable t) {
+        future.setException(t);
+      }
+    });
+    return future;
   }
 
   @Override
@@ -416,6 +448,14 @@ public abstract class AbstractServerInstance implements Instance {
     }
   }
 
+  public static <V> V getUnchecked(ListenableFuture<V> future) throws InterruptedException {
+    try {
+      return future.get();
+    } catch (ExecutionException e) {
+      return null;
+    }
+  }
+
   private void validateActionInputDirectoryDigest(
       Digest directoryDigest,
       Stack<Digest> path,
@@ -426,7 +466,7 @@ public abstract class AbstractServerInstance implements Instance {
 
     Directory directory = directoriesIndex.get(directoryDigest);
     if (directory == null) {
-      directory = expectDirectory(directoryDigest);
+      directory = getUnchecked(expectDirectory(directoryDigest));
     }
     Preconditions.checkState(
         directory != null,
@@ -436,18 +476,22 @@ public abstract class AbstractServerInstance implements Instance {
     visited.add(directoryDigest);
   }
 
-  protected Iterable<Directory> getTreeDirectories(Digest inputRoot) throws IOException, InterruptedException {
+  protected ListenableFuture<Iterable<Directory>> getTreeDirectories(Digest inputRoot) {
     ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
 
-    TokenizableIterator<DirectoryEntry> iterator = createTreeIterator(inputRoot, /* pageToken=*/ "");
-    while (iterator.hasNext()) {
-      DirectoryEntry entry = iterator.next();
-      Directory directory = entry.getDirectory();
-      Preconditions.checkState(directory != null, MISSING_INPUT + " Directory " + DigestUtil.toString(entry.getDigest()));
-      directories.add(directory);
+    try {
+      TokenizableIterator<DirectoryEntry> iterator = createTreeIterator(inputRoot, /* pageToken=*/ "");
+      while (iterator.hasNext()) {
+        DirectoryEntry entry = iterator.next();
+        Directory directory = entry.getDirectory();
+        Preconditions.checkState(directory != null, MISSING_INPUT + " Directory " + DigestUtil.toString(entry.getDigest()));
+        directories.add(directory);
+      }
+    } catch (Exception e) {
+      return Futures.immediateFailedFuture(e);
     }
 
-    return directories.build();
+    return Futures.immediateFuture(directories.build());
   }
 
   protected Map<Digest, Directory> createDirectoriesIndex(Iterable<Directory> directories) {
@@ -468,17 +512,20 @@ public abstract class AbstractServerInstance implements Instance {
   protected Iterable<Digest> findMissingBlobs(Iterable<Digest> blobDigests, boolean forValidation) { return findMissingBlobs(blobDigests); }
 
   protected void validateAction(Action action) throws InterruptedException {
-    try {
-      validateAction(
-          action,
-          expectCommand(action.getCommandDigest()),
-          getTreeDirectories(action.getInputRootDigest()));
-    } catch (IOException e) {
-      throw new IllegalStateException(e);
-    }
+    validateAction(
+        action,
+        getUnchecked(expectCommand(action.getCommandDigest())),
+        getUnchecked(getTreeDirectories(action.getInputRootDigest())));
   }
 
-  protected void validateAction(Action action, Command command, Iterable<Directory> directories) throws InterruptedException {
+  protected void validateQueuedOperationMetadata(QueuedOperationMetadata metadata) throws InterruptedException {
+    validateAction(
+        metadata.getAction(),
+        metadata.getCommand(),
+        metadata.getDirectoriesList());
+  }
+
+  private void validateAction(Action action, Command command, Iterable<Directory> directories) throws InterruptedException {
     Digest actionDigest = digestUtil.compute(action);
     Digest commandDigest = action.getCommandDigest();
     ImmutableSet.Builder<Digest> inputDigestsBuilder = new ImmutableSet.Builder<>();
@@ -539,11 +586,21 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public void execute(
+  public ListenableFuture<Operation> execute(
+      Action action,
+      boolean skipCacheLookup) {
+    SettableFuture<Operation> executeFuture = SettableFuture.create();
+    try {
+      execute(action, skipCacheLookup, executeFuture::set);
+    } catch (InterruptedException e) {
+      executeFuture.setException(e);
+    }
+    return executeFuture;
+  }
+
+  private void execute(
       Action action,
       boolean skipCacheLookup,
-      int totalInputFileCount,
-      long totalInputFileBytes,
       Consumer<Operation> onOperation) throws InterruptedException {
     validateAction(action);
 
@@ -610,7 +667,7 @@ public abstract class AbstractServerInstance implements Instance {
     putOperation(operation);
   }
 
-  protected ExecuteOperationMetadata expectExecuteOperationMetadata(
+  protected static ExecuteOperationMetadata expectExecuteOperationMetadata(
       Operation operation) {
     try {
       return operation.getMetadata().unpack(ExecuteOperationMetadata.class);
@@ -633,28 +690,43 @@ public abstract class AbstractServerInstance implements Instance {
     return null;
   }
 
-  protected Directory expectDirectory(Digest directoryBlobDigest) throws InterruptedException {
-    try {
-      ByteString directoryBlob = getBlob(directoryBlobDigest, true);
-      if (directoryBlob != null) {
-        return Directory.parseFrom(directoryBlob);
+  private <T> ListenableFuture<T> parseFuture(Digest digest, Parser<T> parser) {
+    SettableFuture<T> future = SettableFuture.create();
+    Futures.addCallback(getBlobFuture(digest), new FutureCallback<ByteString>() {
+      @Override
+      public void onSuccess(ByteString blob) {
+        try {
+          future.set(parser.parseFrom(blob));
+        } catch (InvalidProtocolBufferException e) {
+          future.setException(e);
+        }
       }
-    } catch(IOException e) {
-      e.printStackTrace();
-    }
-    return null;
+
+      @Override
+      public void onFailure(Throwable t) {
+        future.setException(t);
+      }
+    });
+    return future;
   }
 
-  protected Command expectCommand(Digest commandBlobDigest) throws InterruptedException {
-    try {
-      ByteString commandBlob = getBlob(commandBlobDigest, true);
-      if (commandBlob != null) {
-        return Command.parseFrom(commandBlob);
-      }
-    } catch(IOException e) {
-      e.printStackTrace();
-    }
-    return null;
+  protected ListenableFuture<Directory> expectDirectory(Digest directoryBlobDigest) {
+    return parseFuture(directoryBlobDigest, Directory.parser());
+  }
+
+  protected ListenableFuture<Command> expectCommand(Digest commandBlobDigest) {
+    return parseFuture(commandBlobDigest, Command.parser());
+  }
+
+  protected ListenableFuture<Command> insistCommand(Digest commandBlobDigest) {
+    return Futures.transform(
+        expectCommand(commandBlobDigest),
+        (command) -> {
+          if (command != null) {
+            return command;
+          }
+          throw new IllegalStateException(MISSING_INPUT + " Command [" + DigestUtil.toString(commandBlobDigest) + "]");
+        });
   }
 
   protected boolean isCancelled(Operation operation) {

@@ -20,17 +20,15 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.instance.AbstractServerInstance;
-import build.buildfarm.instance.GetDirectoryFunction;
 import build.buildfarm.instance.TokenizableIterator;
-import build.buildfarm.instance.TreeIterator;
 import build.buildfarm.instance.TreeIterator.DirectoryEntry;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ShardWorkerInstanceConfig;
-import build.buildfarm.worker.Fetcher;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.devtools.remoteexecution.v1test.Action;
 import com.google.devtools.remoteexecution.v1test.ActionResult;
 import com.google.devtools.remoteexecution.v1test.Digest;
@@ -58,20 +56,17 @@ import javax.naming.ConfigurationException;
 public class ShardWorkerInstance extends AbstractServerInstance {
   private final ShardWorkerInstanceConfig config;
   private final ShardBackplane backplane;
-  private final Fetcher fetcher;
   private final ContentAddressableStorage contentAddressableStorage;
 
   public ShardWorkerInstance(
       String name,
       DigestUtil digestUtil,
       ShardBackplane backplane,
-      Fetcher fetcher,
       ContentAddressableStorage contentAddressableStorage,
       ShardWorkerInstanceConfig config) throws ConfigurationException {
     super(name, digestUtil, null, null, null, null, null);
     this.config = config;
     this.backplane = backplane;
-    this.fetcher = fetcher;
     this.contentAddressableStorage = contentAddressableStorage;
   }
 
@@ -163,11 +158,6 @@ public class ShardWorkerInstance extends AbstractServerInstance {
     return content;
   }
 
-  // write through fetch with local lookup
-  public ByteString fetchBlob(Digest blobDigest) throws IOException, InterruptedException {
-    return fetcher.fetchBlob(blobDigest);
-  }
-
   @Override
   public Digest putBlob(ByteString content) throws IOException {
     if (content.size() == 0) {
@@ -180,27 +170,8 @@ public class ShardWorkerInstance extends AbstractServerInstance {
     return blob.getDigest();
   }
 
-  protected TokenizableIterator<DirectoryEntry> createTreeIterator(
-      Digest rootDigest, String pageToken) throws IOException, InterruptedException {
-    final GetDirectoryFunction getDirectoryFunction;
-    Iterable<Directory> directories = backplane.getTree(rootDigest);
-    if (directories != null) {
-      getDirectoryFunction = createDirectoriesIndex(directories)::get;
-    } else {
-      getDirectoryFunction = (digest) -> expectDirectory(fetchBlob(digest));
-    }
-    return new TreeIterator(getDirectoryFunction, rootDigest, pageToken);
-  }
-
-  private Directory expectDirectory(ByteString directoryBlob) {
-    try {
-      if (directoryBlob != null) {
-        return Directory.parseFrom(directoryBlob);
-      }
-    } catch(IOException e) {
-      e.printStackTrace();
-    }
-    return null;
+  protected TokenizableIterator<DirectoryEntry> createTreeIterator(Digest rootDigest, String pageToken) {
+    throw new UnsupportedOperationException();
   }
 
   @Override
@@ -209,32 +180,8 @@ public class ShardWorkerInstance extends AbstractServerInstance {
       int pageSize,
       String pageToken,
       ImmutableList.Builder<Directory> directories,
-      boolean acceptMissing) throws IOException, InterruptedException {
-    if (pageSize == 0) {
-      pageSize = 1024; // getTreeDefaultPageSize();
-    }
-    if (pageSize >= 0 && pageSize > 1024 /* getTreeMaxPageSize() */) {
-      pageSize = 1024; // getTreeMaxPageSize();
-    }
-
-    TokenizableIterator<DirectoryEntry> iter =
-        createTreeIterator(rootDigest, pageToken);
-
-    while (iter.hasNext() && pageSize != 0) {
-      DirectoryEntry entry = iter.next();
-      Directory directory = entry.getDirectory();
-      // If part of the tree is missing from the CAS, the server will return the
-      // portion present and omit the rest.
-      if (directory != null) {
-        directories.add(directory);
-        if (pageSize > 0) {
-          pageSize--;
-        }
-      } else if (!acceptMissing) {
-        throw new IOException("directory not found");
-      }
-    }
-    return iter.toNextPageToken();
+      boolean acceptMissing) {
+    throw new UnsupportedOperationException();
   }
 
   @Override
@@ -248,12 +195,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  public void execute(
-      Action action,
-      boolean skipCacheLookup,
-      int totalInputFileCount,
-      long totalInputFileBytes,
-      Consumer<Operation> onOperation) {
+  public ListenableFuture<Operation> execute(Action action, boolean skipCacheLookup) {
     throw new UnsupportedOperationException();
   }
 
@@ -383,8 +325,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
     throw new UnsupportedOperationException();
   }
 
-  @Override
-  protected ExecuteOperationMetadata expectExecuteOperationMetadata(
+  protected static ExecuteOperationMetadata expectExecuteOperationMetadata(
       Operation operation) {
     if (operation.getMetadata().is(QueuedOperationMetadata.class)) {
       try {
@@ -401,15 +342,8 @@ public class ShardWorkerInstance extends AbstractServerInstance {
         return null;
       }
     } else {
-      return super.expectExecuteOperationMetadata(operation);
+      return AbstractServerInstance.expectExecuteOperationMetadata(operation);
     }
-  }
-
-  public void cacheOperationActionInputTree(String operationName) throws IOException, InterruptedException {
-    Operation operation = getOperation(operationName);
-    Action action = expectAction(operation);
-    Digest inputRoot = action.getInputRootDigest();
-    backplane.putTree(inputRoot, getTreeDirectories(inputRoot));
   }
 
   public Operation stripOperation(Operation operation) {

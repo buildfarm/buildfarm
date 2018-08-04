@@ -26,7 +26,6 @@ import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.devtools.remoteexecution.v1test.Directory;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
 import com.google.longrunning.Operation;
-import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -54,7 +53,6 @@ public interface WorkerContext {
   boolean getStreamStderr();
   Duration getDefaultActionTimeout();
   Duration getMaximumActionTimeout();
-  ByteString getBlob(Digest digest) throws IOException, InterruptedException;
   void createActionRoot(Path root, Map<Digest, Directory> directoriesIndex, Action action) throws IOException, InterruptedException;
   void destroyActionRoot(Path root) throws IOException, InterruptedException;
   Path getRoot();

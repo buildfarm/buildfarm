@@ -58,7 +58,6 @@ import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage
 import com.google.devtools.remoteexecution.v1test.FileNode;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
-import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.TextFormat;
@@ -582,11 +581,6 @@ public class Worker {
             config.getFileCasPolicy(),
             config.getStdoutCasPolicy(),
             config.getStderrCasPolicy());
-      }
-
-      @Override
-      public ByteString getBlob(Digest digest) throws IOException, InterruptedException {
-        return casInstance.getBlob(digest);
       }
 
       @Override
