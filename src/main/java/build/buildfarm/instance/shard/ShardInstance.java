@@ -941,6 +941,7 @@ public class ShardInstance extends AbstractServerInstance {
     Operation operation = getOperation(operationName);
     if (operation == null) {
       System.out.println("Operation " + operationName + " no longer exists");
+      backplane.deleteOperation(operationName); // signal watchers
       return false;
     }
     if (operation.getDone()) {
