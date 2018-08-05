@@ -83,6 +83,7 @@ import io.grpc.ManagedChannel;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.Status;
+import io.grpc.Status.Code;
 import io.grpc.StatusRuntimeException;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
@@ -387,11 +388,11 @@ public class Worker implements Instances {
           }
         } catch (RetryException e) {
           Status st = Status.fromThrowable(e);
-          if (st.getCode().equals(Status.Code.UNAVAILABLE)) {
+          if (st.getCode().equals(Code.UNAVAILABLE)) {
             backplane.removeBlobLocation(blobDigest, worker);
             // for now, leave this up to schedulers
             // removeMalfunctioningWorker(worker, e, "getBlob(" + DigestUtil.toString(blobDigest) + ")");
-          } else if (st.getCode().equals(Status.Code.NOT_FOUND)) {
+          } else if (st.getCode().equals(Code.NOT_FOUND)) {
             // ignore this, the worker will update the backplane eventually
           } else if (Retrier.DEFAULT_IS_RETRIABLE.test(st)) {
             // why not, always
@@ -1101,12 +1102,52 @@ public class Worker implements Instances {
     backplane.stop();
   }
 
+  private void removeWorker(String name) {
+    try {
+      backplane.removeWorker(name);
+    } catch (IOException e) {
+      Status status = Status.fromThrowable(e);
+      if (status.getCode() != Code.UNAVAILABLE && status.getCode() != Code.DEADLINE_EXCEEDED) {
+        throw status.asRuntimeException();
+      }
+      System.out.println("backplane was unavailable or overloaded, deferring removeWorker");
+    }
+  }
+
+  private void addBlobsLocation(List<Digest> digests, String name) {
+    for (;;) {
+      try {
+        backplane.addBlobsLocation(digests, name);
+        return;
+      } catch (IOException e) {
+        Status status = Status.fromThrowable(e);
+        if (status.getCode() != Code.UNAVAILABLE && status.getCode() != Code.DEADLINE_EXCEEDED) {
+          throw status.asRuntimeException();
+        }
+      }
+    }
+  }
+
+  private void addWorker(String name) {
+    for (;;) {
+      try {
+        backplane.addWorker(name);
+        return;
+      } catch (IOException e) {
+        Status status = Status.fromThrowable(e);
+        if (status.getCode() != Code.UNAVAILABLE && status.getCode() != Code.DEADLINE_EXCEEDED) {
+          throw status.asRuntimeException();
+        }
+      }
+    }
+  }
+
   @Override
   public void start() {
     try {
       backplane.start();
 
-      backplane.removeWorker(config.getPublicName());
+      removeWorker(config.getPublicName());
 
       ImmutableList.Builder<Path> builder = new ImmutableList.Builder<>();
 
@@ -1140,11 +1181,11 @@ public class Worker implements Instances {
 
         ImmutableList.Builder<Digest> blobDigests = new ImmutableList.Builder<>();
         fileCache.start(blobDigests::add);
-        backplane.addBlobsLocation(blobDigests.build(), config.getPublicName());
+        addBlobsLocation(blobDigests.build(), config.getPublicName());
       }
 
       server.start();
-      backplane.addWorker(config.getPublicName());
+      addWorker(config.getPublicName());
 
       List<Path> invalidDirectories = builder.build();
       if (!invalidDirectories.isEmpty()) {
