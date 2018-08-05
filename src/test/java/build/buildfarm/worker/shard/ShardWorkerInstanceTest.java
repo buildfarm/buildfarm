@@ -29,6 +29,7 @@ import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.v1test.ShardWorkerInstanceConfig;
 import build.buildfarm.worker.InputStreamFactory;
+import build.buildfarm.worker.OutputStreamFactory;
 import com.google.longrunning.Operation;
 import io.grpc.StatusRuntimeException;
 import java.io.IOException;
@@ -55,6 +56,9 @@ public class ShardWorkerInstanceTest {
   @Mock
   private InputStreamFactory inputStreamFactory;
 
+  @Mock
+  private OutputStreamFactory outputStreamFactory;
+
   private ShardWorkerInstance instance;
 
   @Before
@@ -66,6 +70,7 @@ public class ShardWorkerInstanceTest {
         backplane,
         storage,
         inputStreamFactory,
+        outputStreamFactory,
         ShardWorkerInstanceConfig.getDefaultInstance());
   }
 

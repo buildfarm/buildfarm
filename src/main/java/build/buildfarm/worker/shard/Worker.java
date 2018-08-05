@@ -41,6 +41,7 @@ import build.buildfarm.worker.InputFetchStage;
 import build.buildfarm.worker.InputStreamFactory;
 import build.buildfarm.worker.MatchStage;
 import build.buildfarm.worker.OutputDirectory;
+import build.buildfarm.worker.OutputStreamFactory;
 import build.buildfarm.worker.Pipeline;
 import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.Poller;
@@ -492,11 +493,13 @@ public class Worker implements Instances {
     };
 
     final ContentAddressableStorage storage;
+    final OutputStreamFactory outputStreamFactory;
     if (config.getUseFuseCas()) {
       fileCache = null;
 
       storage = new MemoryLRUContentAddressableStorage(config.getCasMaxSizeBytes(), this::onStoragePut);
       storageInputStreamFactory = (digest, offset) -> storage.get(digest).getData().substring((int) offset).newInput();
+      outputStreamFactory = (digest) -> { throw new UnsupportedOperationException(); };
 
       InputStreamFactory localPopulatingInputStreamFactory = new InputStreamFactory() {
         @Override
@@ -535,6 +538,7 @@ public class Worker implements Instances {
           this::onStorageExpire);
       storage = fileCache;
       storageInputStreamFactory = fileCache;
+      outputStreamFactory = fileCache;
     }
     instance = new ShardWorkerInstance(
         config.getPublicName(),
@@ -542,6 +546,7 @@ public class Worker implements Instances {
         backplane,
         storage,
         storageInputStreamFactory,
+        outputStreamFactory,
         config.getShardWorkerInstanceConfig());
 
     server = serverBuilder

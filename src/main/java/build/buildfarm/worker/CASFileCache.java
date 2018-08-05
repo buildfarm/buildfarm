@@ -15,6 +15,8 @@
 package build.buildfarm.worker;
 
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
+import static java.nio.file.StandardOpenOption.CREATE;
+import static java.nio.file.StandardOpenOption.TRUNCATE_EXISTING;
 
 import build.buildfarm.common.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
@@ -22,6 +24,11 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.io.ByteStreams;
+import com.google.common.util.concurrent.MoreExecutors;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.devtools.remoteexecution.v1test.Directory;
 import com.google.devtools.remoteexecution.v1test.DirectoryNode;
@@ -31,6 +38,7 @@ import io.grpc.StatusRuntimeException;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.FileVisitOption;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -51,16 +59,19 @@ import java.util.function.Supplier;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
-public class CASFileCache implements ContentAddressableStorage, InputStreamFactory {
+public class CASFileCache implements ContentAddressableStorage, InputStreamFactory, OutputStreamFactory {
   private final InputStreamFactory inputStreamFactory;
   private final Path root;
   private final long maxSizeInBytes;
   private final DigestUtil digestUtil;
   private final Map<Path, Entry> storage = new ConcurrentHashMap<>();
   private final Map<Digest, DirectoryEntry> directoryStorage = new HashMap<>();
-  private final Map<Path, Object> mutexes = new HashMap<>();
+  private final Map<Path, Lock> mutexes = new HashMap<>();
   private final Consumer<Digest> onPut;
   private final Consumer<Iterable<Digest>> onExpire;
   private final ExecutorService removeDirectoryPool = Executors.newFixedThreadPool(32);
@@ -143,26 +154,27 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
 
   private boolean contains(Digest digest, boolean isExecutable) throws IOException {
     Path key = getKey(digest, isExecutable);
-    synchronized (acquire(key)) {
-      try {
-        Entry e = storage.get(key);
-        if (e == null) {
+    Lock l = acquire(key);
+    l.lock();
+    try {
+      Entry e = storage.get(key);
+      if (e == null) {
+        return false;
+      }
+      synchronized (this) {
+        if (!entryExists(e)) {
+          Entry removedEntry = storage.remove(key);
+          if (removedEntry != null) {
+            unlinkEntry(removedEntry);
+          }
           return false;
         }
-        synchronized (this) {
-          if (!entryExists(e)) {
-            Entry removedEntry = storage.remove(key);
-            if (removedEntry != null) {
-              unlinkEntry(removedEntry);
-            }
-            return false;
-          }
-          e.recordAccess(header);
-          return true;
-        }
-      } finally {
-        release(key);
+        e.recordAccess(header);
+        return true;
       }
+    } finally {
+      release(key);
+      l.unlock();
     }
   }
 
@@ -258,13 +270,23 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
   public void put(Blob blob) {
     Path blobPath = getKey(blob.getDigest(), false);
     try {
-      putImpl(
-          blobPath,
-          blob.getDigest().getSizeBytes(),
-          /* isExecutable=*/ false,
-          () -> blob.getData().newInput(),
-          null,
-          () -> onPut.accept(blob.getDigest()));
+      OutputStream out =
+          putImpl(
+              blobPath,
+              blob.getDigest().getSizeBytes(),
+              /* isExecutable=*/ false,
+              null,
+              () -> onPut.accept(blob.getDigest()));
+      try {
+        if (out != null) {
+          blob.getData().writeTo(out);
+        }
+      } finally {
+        if (out != null) {
+          out.close();
+        }
+      }
+
       decrementReferences(ImmutableList.<Path>of(blobPath), ImmutableList.<Digest>of());
     } catch (IOException e) {
       /* unlikely, our stream comes from the blob */
@@ -275,14 +297,62 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
   }
 
   @Override
+  public OutputStream newOutput(Digest digest) throws IOException {
+    Path blobPath = getKey(digest, false);
+    final OutputStream out;
+    try {
+      out = putImpl(
+          blobPath,
+          digest.getSizeBytes(),
+          /* isExecutable=*/ false,
+          null,
+          () -> onPut.accept(digest));
+    } catch (InterruptedException e) {
+      throw new IOException(e);
+    }
+    if (out == null) {
+      decrementReferences(ImmutableList.<Path>of(blobPath), ImmutableList.<Digest>of());
+      return null;
+    }
+    return new OutputStream() {
+      @Override
+      public void close() throws IOException {
+        out.close();
+
+        decrementReferences(ImmutableList.<Path>of(blobPath), ImmutableList.<Digest>of());
+      }
+
+      @Override
+      public void flush() throws IOException {
+        out.flush();
+      }
+
+      @Override
+      public void write(byte[] b) throws IOException {
+        out.write(b);
+      }
+
+      @Override
+      public void write(byte[] b, int off, int len) throws IOException {
+        out.write(b, off, len);
+      }
+
+      @Override
+      public void write(int b) throws IOException {
+        out.write(b);
+      }
+    };
+  }
+
+  @Override
   public void put(Blob blob, Runnable onExpiration) {
     throw new UnsupportedOperationException();
   }
 
-  private synchronized Object acquire(Path key) {
-    Object mutex = mutexes.get(key);
+  private synchronized Lock acquire(Path key) {
+    Lock mutex = mutexes.get(key);
     if (mutex == null) {
-      mutex = new Object();
+      mutex = new ReentrantLock();
       mutexes.put(key, mutex);
     }
     return mutex;
@@ -404,22 +474,23 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
           }
           if (fileEntryKey != null) {
             Path key = fileEntryKey.getKey();
-            synchronized (acquire(key)) {
-              try {
-                if (storage.get(key) == null) {
-                  long now = System.nanoTime();
-                  Entry e = new Entry(key, size, null, now + 10000000000l);
-                  fileKeysBuilder.put(attrs.fileKey(), e);
-                  storage.put(e.key, e);
-                  onPut.accept(fileEntryKey.getDigest());
-                  synchronized (this) {
-                    e.decrementReference(header);
-                  }
-                  sizeInBytes += size;
+            Lock l = acquire(key);
+            l.lock();
+            try {
+              if (storage.get(key) == null) {
+                long now = System.nanoTime();
+                Entry e = new Entry(key, size, null, now + 10000000000l);
+                fileKeysBuilder.put(attrs.fileKey(), e);
+                storage.put(e.key, e);
+                onPut.accept(fileEntryKey.getDigest());
+                synchronized (this) {
+                  e.decrementReference(header);
                 }
-              } finally {
-                release(key);
+                sizeInBytes += size;
               }
+            } finally {
+              release(key);
+              l.unlock();
             }
           } else {
             Files.delete(file);
@@ -543,17 +614,18 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
 
   private void remove(Digest digest, boolean isExecutable) throws IOException {
     Path key = getKey(digest, isExecutable);
-    synchronized (acquire(key)) {
-      try {
-        Entry e = storage.remove(key);
-        if (e != null) {
-          synchronized (this) {
-            unlinkEntry(e);
-          }
+    Lock l = acquire(key);
+    l.lock();
+    try {
+      Entry e = storage.remove(key);
+      if (e != null) {
+        synchronized (this) {
+          unlinkEntry(e);
         }
-      } finally {
-        release(key);
       }
+    } finally {
+      release(key);
+      l.unlock();
     }
   }
 
@@ -755,13 +827,20 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
 
   public Path put(Digest digest, boolean isExecutable, Digest containingDirectory) throws IOException, InterruptedException {
     Path key = getKey(digest, isExecutable);
-    putImpl(
+    OutputStream out = putImpl(
         key,
         digest.getSizeBytes(),
         isExecutable,
-        () -> inputStreamFactory.newInput(digest, 0),
         containingDirectory,
         () -> onPut.accept(digest));
+    // already has it
+    if (out != null) {
+      try (InputStream in = inputStreamFactory.newInput(digest, 0)) {
+        ByteStreams.copy(in, out);
+      } finally {
+        out.close();
+      }
+    }
     return key;
   }
 
@@ -770,35 +849,121 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
     InputStream newInput() throws IOException, InterruptedException;
   }
 
-  private void putImpl(
+  private static final OutputStream DUPLICATE_OUTPUT_STREAM = new OutputStream() {
+    @Override
+    public void write(int b) {
+    }
+  };
+
+  private OutputStream putImpl(
       Path key,
       long blobSizeInBytes,
       boolean isExecutable,
-      InputStreamSupplier inSupplier,
       Digest containingDirectory,
       Runnable onInsert)
       throws IOException, InterruptedException {
-    synchronized (acquire(key)) {
+    // uhhh, should we just serialize all of these per key with a single executor?
+    // really want these executors to be named for the key...
+    ListeningExecutorService service = MoreExecutors.listeningDecorator(Executors.newSingleThreadExecutor());
+    Lock l = acquire(key);
+    ListenableFuture<OutputStream> future = service.submit(() -> {
+      l.lock();
+      final OutputStream out;
+      boolean outIsSet = false;
       try {
-        putImplSynchronized(
+        out = putImplSynchronized(
             key,
             blobSizeInBytes,
             isExecutable,
-            inSupplier,
             containingDirectory,
             onInsert);
-      } finally {
+        outIsSet = true;
+      } catch (IOException|InterruptedException e) {
         release(key);
+        throw e;
+      } finally {
+        if (!outIsSet) {
+          release(key);
+          l.unlock();
+        }
       }
+      return out;
+    });
+    final OutputStream out;
+    try {
+      out = future.get();
+    } catch (ExecutionException e) {
+      service.shutdownNow();
+      service.awaitTermination(10, TimeUnit.MINUTES);
+
+      Throwable cause = e.getCause();
+      while (cause != null) {
+        if (cause instanceof IOException) {
+          throw (IOException) cause;
+        }
+        if (cause instanceof InterruptedException) {
+          throw (InterruptedException) cause;
+        }
+        cause = e.getCause();
+      }
+      throw new UncheckedExecutionException(e);
     }
+    if (out == DUPLICATE_OUTPUT_STREAM) {
+      service.execute(() -> {
+        release(key);
+        l.unlock();
+      });
+      service.shutdown();
+      service.awaitTermination(10, TimeUnit.MINUTES);
+      return null;
+    }
+    return new OutputStream() {
+      @Override
+      public void close() throws IOException {
+        try {
+          out.close();
+        } finally {
+          service.execute(() -> {
+            release(key);
+            l.unlock();
+          });
+          service.shutdown();
+          try {
+            service.awaitTermination(10, TimeUnit.MINUTES);
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException(e);
+          }
+        }
+      }
+
+      @Override
+      public void flush() throws IOException {
+        out.flush();
+      }
+
+      @Override
+      public void write(byte[] b) throws IOException {
+        out.write(b);
+      }
+
+      @Override
+      public void write(byte[] b, int off, int len) throws IOException {
+        out.write(b, off, len);
+      }
+
+      @Override
+      public void write(int b) throws IOException {
+        out.write(b);
+      }
+    };
   }
 
   // must have key locked
-  private void putImplSynchronized(
+  private OutputStream putImplSynchronized(
       Path key,
       long blobSizeInBytes,
       boolean isExecutable,
-      InputStreamSupplier inSupplier,
       Digest containingDirectory,
       Runnable onInsert)
       throws IOException, InterruptedException {
@@ -819,7 +984,7 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
           e.containingDirectories.add(containingDirectory);
         }
         e.incrementReference();
-        return;
+        return DUPLICATE_OUTPUT_STREAM;
       }
 
       sizeInBytes += blobSizeInBytes;
@@ -853,31 +1018,54 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
       onExpire.accept(expiredDigests.build());
     }
 
-    Path tmpPath;
-    long copySize;
-    try (InputStream in = inSupplier.newInput()) {
-      // FIXME make a validating file copy object and verify digest
-      tmpPath = key.resolveSibling(key.getFileName() + ".tmp");
-      if (Files.exists(tmpPath)) {
-        Files.delete(tmpPath);
+    Path tmpPath = key.resolveSibling(key.getFileName() + ".tmp");
+    return new OutputStream() {
+      OutputStream tmpFile = Files.newOutputStream(tmpPath, CREATE, TRUNCATE_EXISTING);
+      long size = 0;
+
+      @Override
+      public void flush() throws IOException {
+        tmpFile.flush();
       }
-      copySize = Files.copy(in, tmpPath);
-    }
 
-    if (copySize != blobSizeInBytes) {
-      Files.delete(tmpPath);
-      throw new IOException("blob digest size mismatch, expected " + blobSizeInBytes + ", was " + copySize);
-    }
+      @Override
+      public void write(byte[] b) throws IOException {
+        tmpFile.write(b);
+        size += b.length;
+      }
 
-    setPermissions(tmpPath, isExecutable);
-    Files.move(tmpPath, key, REPLACE_EXISTING);
+      @Override
+      public void write(byte[] b, int off, int len) throws IOException {
+        tmpFile.write(b, off, len);
+        size += len;
+      }
 
-    Entry e = new Entry(key, blobSizeInBytes, containingDirectory, System.nanoTime() + 10000000000l);
+      @Override
+      public void write(int b) throws IOException {
+        tmpFile.write(b);
+        size++;
+      }
 
-    if (storage.put(key, e) != null) {
-      throw new IllegalStateException("storage conflict with existing key for " + key);
-    }
-    onInsert.run();
+      @Override
+      public void close() throws IOException {
+        tmpFile.close();
+
+        if (size != blobSizeInBytes) {
+          Files.delete(tmpPath);
+          throw new IOException("blob digest size mismatch, expected " + blobSizeInBytes + ", was " + size);
+        }
+
+        setPermissions(tmpPath, isExecutable);
+        Files.move(tmpPath, key, REPLACE_EXISTING);
+
+        Entry e = new Entry(key, blobSizeInBytes, containingDirectory, System.nanoTime() + 10000000000l);
+
+        if (storage.put(key, e) != null) {
+          throw new IllegalStateException("storage conflict with existing key for " + key);
+        }
+        onInsert.run();
+      }
+    };
   }
 
   private static void setPermissions(Path path, boolean isExecutable) throws IOException {
