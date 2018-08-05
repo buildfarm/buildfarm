@@ -457,11 +457,25 @@ public class ShardInstance extends AbstractServerInstance {
       blobObserver.onError(e);
       return;
     }
+    boolean emptyWorkerList = workersList.isEmpty();
+    if (workersList.isEmpty()) {
+      try {
+        // really need to make this async...
+        workersList.addAll(checkMissingBlob(blobDigest, true));
+      } catch (IOException e) {
+        blobObserver.onError(e);
+        return;
+      }
+      if (workersList.isEmpty()) {
+        blobObserver.onError(Status.NOT_FOUND.asException());
+        return;
+      }
+    }
     Collections.shuffle(workersList, rand);
     Deque<String> workers = new ArrayDeque(workersList);
 
     fetchBlobFromWorker(blobDigest, workers, offset, limit, new StreamObserver<ByteString>() {
-      boolean triedCheck = false;
+      boolean triedCheck = emptyWorkerList;
 
       @Override
       public void onNext(ByteString nextChunk) {
