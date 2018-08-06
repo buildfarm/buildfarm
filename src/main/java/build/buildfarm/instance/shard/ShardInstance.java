@@ -271,11 +271,6 @@ public class ShardInstance extends AbstractServerInstance {
     }
   }
 
-  @Override
-  public Iterable<Digest> findMissingBlobs(Iterable<Digest> blobDigests) {
-    return findMissingBlobs(blobDigests, false);
-  }
-
   public ImmutableList<String> checkMissingBlob(Digest digest, boolean correct) throws IOException {
     ImmutableList.Builder<String> foundWorkers = new ImmutableList.Builder<>();
     Deque<String> workers;
@@ -343,7 +338,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @Override
-  protected Iterable<Digest> findMissingBlobs(Iterable<Digest> blobDigests, boolean forValidation) {
+  public Iterable<Digest> findMissingBlobs(Iterable<Digest> blobDigests) {
     Iterable<Digest> nonEmptyDigests = Iterables.filter(blobDigests, (digest) -> digest.getSizeBytes() > 0);
     if (Iterables.isEmpty(nonEmptyDigests)) {
       return nonEmptyDigests;

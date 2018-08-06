@@ -150,8 +150,6 @@ public abstract class AbstractServerInstance implements Instance {
         DigestUtil.toString(blobDigest));
   }
 
-  protected ByteString getBlob(Digest blobDigest, boolean forValidation) throws IOException, InterruptedException { return getBlob(blobDigest); }
-
   @Override
   public final ByteString getBlob(Digest blobDigest) throws IOException, InterruptedException {
     return getBlob(blobDigest, 0, 0);
@@ -509,8 +507,6 @@ public abstract class AbstractServerInstance implements Instance {
     return directoriesIndex.build();
   }
 
-  protected Iterable<Digest> findMissingBlobs(Iterable<Digest> blobDigests, boolean forValidation) { return findMissingBlobs(blobDigests); }
-
   protected void validateAction(Action action) throws InterruptedException {
     validateAction(
         action,
@@ -533,38 +529,16 @@ public abstract class AbstractServerInstance implements Instance {
 
     Map<Digest, Directory> directoriesIndex = createDirectoriesIndex(directories);
 
-    // long startTime = System.nanoTime();
     validateActionInputDirectoryDigest(action.getInputRootDigest(), new Stack<>(), new HashSet<>(), directoriesIndex, inputDigestsBuilder);
-    /*
-    long endTime = System.nanoTime();
-    float ms = (endTime - startTime) / 1000000.0f;
-    System.out.println(String.format("AbstractServerInstance::validateAction(%s): validateActionInputs %gms", DigestUtil.toString(actionDigest), ms));
-    */
 
     Preconditions.checkState(command != null, MISSING_INPUT + " Command " + DigestUtil.toString(commandDigest));
 
     ImmutableSet<Digest> inputDigests = inputDigestsBuilder.build();
-    /*
-    long sizeInBytes = 0;
-    for (Digest input : inputDigests) {
-      sizeInBytes += input.getSizeBytes();
-    }
-    String executable = "(unspecified)";
-    if (command.getArgumentsList().size() > 0) {
-      executable = command.getArgumentsList().get(0);
-    }
-    System.out.println(String.format("Action Input Size %d: %s", sizeInBytes, executable));
-    */
 
     // A requested input (or the [Command][] of the [Action][]) was not found in
     // the [ContentAddressableStorage][].
     // startTime = System.nanoTime();
-    Iterable<Digest> missingBlobDigests = findMissingBlobs(inputDigests, true);
-    /*
-    endTime = System.nanoTime();
-    ms = (endTime - startTime) / 1000000.0f;
-    System.out.println(String.format("AbstractServerInstance::validateAction(%s): findMissingBlobs %gms", DigestUtil.toString(actionDigest), ms));
-    */
+    Iterable<Digest> missingBlobDigests = findMissingBlobs(inputDigests);
     if (!Iterables.isEmpty(missingBlobDigests)) {
       boolean elided = Iterables.size(missingBlobDigests) > 30;
       Preconditions.checkState(
