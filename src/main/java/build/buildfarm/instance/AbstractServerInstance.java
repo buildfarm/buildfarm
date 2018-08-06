@@ -647,20 +647,25 @@ public abstract class AbstractServerInstance implements Instance {
     try {
       return operation.getMetadata().unpack(ExecuteOperationMetadata.class);
     } catch(InvalidProtocolBufferException e) {
-      e.printStackTrace();
       return null;
     }
   }
 
   protected Action expectAction(Operation operation) throws InterruptedException {
     try {
-      ByteString actionBlob = getBlob(
-          expectExecuteOperationMetadata(operation).getActionDigest(), false);
+      ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
+      if (metadata == null) {
+        return null;
+      }
+      ByteString actionBlob = getBlob(metadata.getActionDigest());
       if (actionBlob != null) {
         return Action.parseFrom(actionBlob);
       }
     } catch(IOException e) {
-      e.printStackTrace();
+      Status status = Status.fromThrowable(e);
+      if (status.getCode() != Code.NOT_FOUND) {
+        e.printStackTrace();
+      }
     }
     return null;
   }
