@@ -590,7 +590,7 @@ public class Worker {
             action.getOutputDirectoriesList());
 
         if (Files.exists(root)) {
-          CASFileCache.removeDirectory(root);
+          fileCache.removeDirectoryAsync(root);
         }
         Files.createDirectories(root);
 
@@ -616,17 +616,12 @@ public class Worker {
         Iterable<Digest> inputDirectories = rootInputDirectories.remove(root);
 
         fileCache.decrementReferences(inputFiles, inputDirectories);
-        CASFileCache.removeDirectory(root);
+        fileCache.removeDirectoryAsync(root);
       }
 
       @Override
       public Path getRoot() {
         return root;
-      }
-
-      @Override
-      public void removeDirectory(Path path) throws IOException {
-        CASFileCache.removeDirectory(path);
       }
 
       // doesn't belong in CAS or AC, must be in OQ

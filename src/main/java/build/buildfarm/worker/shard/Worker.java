@@ -942,7 +942,7 @@ public class Worker implements Instances {
               action.getOutputDirectoriesList());
 
           if (Files.exists(actionRoot)) {
-            CASFileCache.removeDirectory(actionRoot);
+            fileCache.removeDirectoryAsync(actionRoot);
           }
           Files.createDirectories(actionRoot);
 
@@ -991,18 +991,13 @@ public class Worker implements Instances {
                 inputDirectories == null ? ImmutableList.<Digest>of() : inputDirectories);
           }
           if (Files.exists(actionRoot)) {
-            removeDirectory(actionRoot);
+            fileCache.removeDirectoryAsync(actionRoot);
           }
         }
       }
 
       public Path getRoot() {
         return root;
-      }
-
-      @Override
-      public void removeDirectory(Path path) throws IOException {
-        CASFileCache.removeDirectory(path);
       }
 
       @Override
@@ -1149,34 +1144,21 @@ public class Worker implements Instances {
 
       removeWorker(config.getPublicName());
 
-      ImmutableList.Builder<Path> builder = new ImmutableList.Builder<>();
-
       if (!config.getUseFuseCas()) {
         List<Dirent> dirents = null;
         try {
           dirents = UploadManifest.readdir(root, /* followSymlinks= */ false);
-
-          // only valid path under root is cache
-          for (Dirent dirent : dirents) {
-            String name = dirent.getName();
-            Path child = root.resolve(name);
-            if (!child.equals(fileCache.getRoot())) {
-              try {
-                final Path tmpPath;
-                if (name.endsWith(".tmp")) {
-                  tmpPath = child;
-                } else {
-                  tmpPath = root.resolve(name + ".tmp");
-                  Files.move(child, tmpPath);
-                }
-                builder.add(tmpPath);
-              } catch (IOException e) {
-                e.printStackTrace();
-              }
-            }
-          }
         } catch (IOException e) {
           e.printStackTrace();
+        }
+
+        // only valid path under root is cache
+        for (Dirent dirent : dirents) {
+          String name = dirent.getName();
+          Path child = root.resolve(name);
+          if (!child.equals(fileCache.getRoot())) {
+            fileCache.removeDirectoryAsync(root.resolve(name));
+          }
         }
 
         ImmutableList.Builder<Digest> blobDigests = new ImmutableList.Builder<>();
@@ -1186,21 +1168,6 @@ public class Worker implements Instances {
 
       server.start();
       addWorker(config.getPublicName());
-
-      List<Path> invalidDirectories = builder.build();
-      if (!invalidDirectories.isEmpty()) {
-        ExecutorService pool = Executors.newFixedThreadPool(32);
-        for (Path path : invalidDirectories) {
-          pool.execute(() -> {
-            try {
-              CASFileCache.removeDirectory(path);
-            } catch (IOException e) {
-              e.printStackTrace();
-            }
-          });
-        }
-        pool.shutdown();
-      }
     } catch (Exception e) {
       stop();
       e.printStackTrace();

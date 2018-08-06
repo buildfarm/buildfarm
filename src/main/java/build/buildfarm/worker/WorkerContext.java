@@ -56,7 +56,6 @@ public interface WorkerContext {
   void createActionRoot(Path root, Map<Digest, Directory> directoriesIndex, Action action) throws IOException, InterruptedException;
   void destroyActionRoot(Path root) throws IOException, InterruptedException;
   Path getRoot();
-  void removeDirectory(Path path) throws IOException;
   void uploadOutputs(ActionResult.Builder resultBuilder, Path actionRoot, Iterable<String> outputFiles, Iterable<String> outputDirs) throws IOException, InterruptedException;
   boolean putOperation(Operation operation, Action Action) throws IOException, InterruptedException;
   OutputStream getStreamOutput(String name);

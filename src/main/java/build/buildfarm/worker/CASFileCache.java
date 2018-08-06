@@ -20,6 +20,7 @@ import static java.nio.file.StandardOpenOption.TRUNCATE_EXISTING;
 
 import build.buildfarm.common.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -538,7 +539,7 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
     }
   }
 
-  private void removeDirectoryAsync(Path path) throws IOException {
+  public void removeDirectoryAsync(Path path) throws IOException {
     Path tmpPath = path.resolveSibling(path.getFileName() + ".tmp." + UUID.randomUUID().toString());
     Files.move(path, tmpPath);
     removeDirectoryPool.execute(() -> {
@@ -692,6 +693,7 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
     return e.key;
   }
 
+  @VisibleForTesting
   public static void removeDirectory(Path directory) throws IOException {
     Files.walkFileTree(directory, new SimpleFileVisitor<Path>() {
       @Override
