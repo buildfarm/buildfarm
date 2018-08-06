@@ -1173,7 +1173,6 @@ public class Worker implements Instances {
       e.printStackTrace();
       return;
     }
-    pipeline.start();
     Runtime.getRuntime().addShutdownHook(new Thread() {
       @Override
       public void run() {
@@ -1182,6 +1181,7 @@ public class Worker implements Instances {
         System.err.println("*** server shut down");
       }
     });
+    pipeline.start();
   }
 
   private static ShardWorkerConfig toShardWorkerConfig(Readable input, WorkerOptions options) throws IOException {
