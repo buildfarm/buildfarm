@@ -33,6 +33,7 @@ final class OperationContext {
   final ExecuteOperationMetadata metadata;
   final Action action;
   final Command command;
+  final Duration matchedIn;
   final Duration fetchedIn;
   final Duration executedIn;
 
@@ -43,6 +44,7 @@ final class OperationContext {
       ExecuteOperationMetadata metadata,
       Action action,
       Command command,
+      Duration matchedIn,
       Duration fetchedIn,
       Duration executedIn) {
     this.operation = operation;
@@ -51,6 +53,7 @@ final class OperationContext {
     this.metadata = metadata;
     this.action = action;
     this.command = command;
+    this.matchedIn = matchedIn;
     this.fetchedIn = fetchedIn;
     this.executedIn = executedIn;
   }
@@ -62,6 +65,7 @@ final class OperationContext {
     private ExecuteOperationMetadata metadata;
     private Action action;
     private Command command;
+    private Duration matchedIn;
     private Duration fetchedIn;
     private Duration executedIn;
 
@@ -72,6 +76,7 @@ final class OperationContext {
         ExecuteOperationMetadata metadata,
         Action action,
         Command command,
+        Duration matchedIn,
         Duration fetchedIn,
         Duration executedIn) {
       this.operation = operation;
@@ -80,6 +85,7 @@ final class OperationContext {
       this.metadata = metadata;
       this.action = action;
       this.command = command;
+      this.matchedIn = matchedIn;
       this.fetchedIn = fetchedIn;
       this.executedIn = executedIn;
     }
@@ -114,6 +120,11 @@ final class OperationContext {
       return this;
     }
 
+    public Builder setMatchedIn(Duration matchedIn) {
+      this.matchedIn = matchedIn;
+      return this;
+    }
+
     public Builder setFetchedIn(Duration fetchedIn) {
       this.fetchedIn = fetchedIn;
       return this;
@@ -132,6 +143,7 @@ final class OperationContext {
         metadata,
         action,
         command,
+        matchedIn,
         fetchedIn,
         executedIn);
     }
@@ -145,6 +157,7 @@ final class OperationContext {
         /* metadata=*/ null,
         /* action=*/ null,
         /* command=*/ null,
+        /* matchedIn=*/ null,
         /* fetchedIn=*/ null,
         /* executedIn=*/ null);
   }
@@ -157,6 +170,7 @@ final class OperationContext {
         metadata,
         action,
         command,
+        matchedIn,
         fetchedIn,
         executedIn);
   }

@@ -244,6 +244,8 @@ message CompletedOperationMetadata {
 
   string executed_on = 2;
 
+  google.protobuf.Duration matched_in = 7;
+
   google.protobuf.Duration fetched_in = 3;
 
   google.protobuf.Duration executed_in = 4;

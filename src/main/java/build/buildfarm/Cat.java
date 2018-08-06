@@ -208,6 +208,7 @@ class Cat {
         CompletedOperationMetadata completedMetadata = operation.getMetadata().unpack(CompletedOperationMetadata.class);
         System.out.println("  Completed At: " + new Date(completedMetadata.getCompletedAt()));
         System.out.println("  Executed On: " + completedMetadata.getExecutedOn());
+        System.out.println(String.format("  Matched In: %gms", Durations.toNanos(completedMetadata.getMatchedIn()) / 1000000.0));
         System.out.println(String.format("  Fetched In: %gms", Durations.toNanos(completedMetadata.getFetchedIn()) / 1000000.0));
         System.out.println(String.format("  Executed In: %gms", Durations.toNanos(completedMetadata.getExecutedIn()) / 1000000.0));
         System.out.println(String.format("  Reported In: %gms", Durations.toNanos(completedMetadata.getReportedIn()) / 1000000.0));
