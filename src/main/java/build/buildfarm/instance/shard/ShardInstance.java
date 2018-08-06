@@ -977,7 +977,7 @@ public class ShardInstance extends AbstractServerInstance {
       Operation queuedOperation = operation.toBuilder()
           .setMetadata(Any.pack(metadata))
           .build();
-      backplane.putOperation(queuedOperation, ExecuteOperationMetadata.Stage.QUEUED);
+      backplane.putOperation(queuedOperation, Stage.QUEUED);
     } else {
       backplane.requeueDispatchedOperation(operation);
     }
@@ -1035,7 +1035,7 @@ public class ShardInstance extends AbstractServerInstance {
         operation = stripOperation(operation);
         try {
           // we can't respond until they could watch the thing
-          backplane.putOperation(operation, ExecuteOperationMetadata.Stage.UNKNOWN);
+          backplane.putOperation(operation, Stage.UNKNOWN);
           executeFuture.set(operation);
         } catch (IOException e) {
           e.printStackTrace();
@@ -1085,7 +1085,7 @@ public class ShardInstance extends AbstractServerInstance {
             public void onSuccess(Operation operation) {
               // if we ever do contexts here, we will need to do the right thing and make it withCancellation
               try {
-                backplane.putOperation(operation, ExecuteOperationMetadata.Stage.QUEUED);
+                backplane.putOperation(operation, Stage.QUEUED);
               } catch (IOException e) {
                 deleteOperation(operation.getName());
               }
@@ -1140,7 +1140,7 @@ public class ShardInstance extends AbstractServerInstance {
         if (action != null) {
           backplane.removeTree(action.getInputRootDigest());
         }
-        return backplane.putOperation(operation, ExecuteOperationMetadata.Stage.COMPLETED);
+        return backplane.putOperation(operation, Stage.COMPLETED);
       } catch (IOException e) {
         throw Status.fromThrowable(e).asRuntimeException();
       }
