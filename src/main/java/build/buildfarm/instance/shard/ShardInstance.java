@@ -365,15 +365,12 @@ public class ShardInstance extends AbstractServerInstance {
         Thread.currentThread().interrupt();
         throw Status.CANCELLED.asRuntimeException();
       } catch (IOException e) {
-        e.printStackTrace();
-        throw Status.INTERNAL.asRuntimeException();
-      } catch (StatusRuntimeException e) {
         Status status = Status.fromThrowable(e);
         if (status.getCode() == Code.UNAVAILABLE) {
           removeMalfunctioningWorker(worker, e, "findMissingBlobs(...)");
-        } else if (Context.current().isCancelled()) {
+        } else if (status.getCode() == Code.CANCELLED || Context.current().isCancelled()) {
           // do nothing further if we're cancelled
-          throw e;
+          throw status.asRuntimeException();
         } else {
           e.printStackTrace();
         }
