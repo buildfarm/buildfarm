@@ -49,6 +49,7 @@ import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.util.AbstractMap;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -77,6 +78,7 @@ public class RedisShardBackplane implements ShardBackplane {
   private final RedisShardBackplaneConfig config;
   private final Function<Operation, Operation> onPublish;
   private final Function<Operation, Operation> onComplete;
+  private final Predicate<Operation> isPrequeued;
   private final Pool<Jedis> pool;
 
   private @Nullable Runnable onUnsubscribe = null;
@@ -127,11 +129,13 @@ public class RedisShardBackplane implements ShardBackplane {
   public RedisShardBackplane(
       RedisShardBackplaneConfig config,
       Function<Operation, Operation> onPublish,
-      Function<Operation, Operation> onComplete) throws ConfigurationException {
+      Function<Operation, Operation> onComplete,
+      Predicate<Operation> isPrequeued) throws ConfigurationException {
     this(
         config,
         onPublish,
         onComplete,
+        isPrequeued,
         new JedisPool(createJedisPoolConfig(config), parseRedisURI(config.getRedisUri()), /* connectionTimeout=*/ 30000, /* soTimeout=*/ 30000));
   }
 
@@ -139,10 +143,12 @@ public class RedisShardBackplane implements ShardBackplane {
       RedisShardBackplaneConfig config,
       Function<Operation, Operation> onPublish,
       Function<Operation, Operation> onComplete,
+      Predicate<Operation> isPrequeued,
       JedisPool pool) {
     this.config = config;
     this.onPublish = onPublish;
     this.onComplete = onComplete;
+    this.isPrequeued = isPrequeued;
     this.pool = pool;
   }
 
@@ -168,7 +174,10 @@ public class RedisShardBackplane implements ShardBackplane {
           operationName,
           p.get(operationKey(operationName))));
     }
+    Response<List<String>> prequeuedResponse = p.lrange(config.getPreQueuedOperationsListName(), 0, -1);
     p.sync();
+
+    Set<String> prequeued = new HashSet(prequeuedResponse.get());
 
     int iRemainingIncomplete = 20;
     for (Map.Entry<String, Response<String>> entry : operations) {
@@ -177,8 +186,11 @@ public class RedisShardBackplane implements ShardBackplane {
           ? null : RedisShardBackplane.parseOperationJson(json);
       String operationName = entry.getKey();
       if (operation == null || operation.getDone()) {
-        System.out.println("RedisShardBackplane::updateWatchedIfDone: Operation " + operationName + " done due to " + (operation == null ? "null" : "completed"));
         operationSubscriber.onOperation(operationChannel(operationName), operation);
+        System.out.println("RedisShardBackplane::updateWatchedIfDone: Operation " + operationName + " done due to " + (operation == null ? "null" : "completed"));
+      } else if (isPrequeued.test(operation) && !prequeued.contains(operation.getName())) {
+        prequeueOperation(jedis, operation.getName());
+        System.out.println("RedisShardBackplane::updateWatchedIfDone: Operation " + operationName + " reprequeued...");
       } else if (iRemainingIncomplete > 0) {
         System.out.println("RedisShardBackplane::updateWatchedIfDone: Operation " + operationName);
         iRemainingIncomplete--;
@@ -556,6 +568,7 @@ public class RedisShardBackplane implements ShardBackplane {
 
   @Override
   public boolean putOperation(Operation operation, Stage stage) throws IOException {
+    boolean prequeue = stage == Stage.UNKNOWN && !operation.getDone();
     boolean queue = stage == Stage.QUEUED;
     boolean complete = !queue && operation.getDone();
     boolean publish = !queue && stage != Stage.UNKNOWN;
@@ -589,11 +602,18 @@ public class RedisShardBackplane implements ShardBackplane {
       if (queue) {
         queueOperation(jedis, name);
       }
+      if (prequeue) {
+        prequeueOperation(jedis, name);
+      }
       if (publish) {
         jedis.publish(operationChannel(name), publishOperation);
       }
     });
     return true;
+  }
+
+  private void prequeueOperation(Jedis jedis, String operationName) {
+    jedis.lpush(config.getPreQueuedOperationsListName(), operationName);
   }
 
   private void queueOperation(Jedis jedis, String operationName) {
@@ -659,6 +679,30 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   @Override
+  public String deprequeueOperation() throws IOException, InterruptedException {
+    String operationName = withBackplaneException((jedis) -> {
+      List<String> result;
+      do {
+        result = jedis.brpop(1, config.getPreQueuedOperationsListName());
+        if (Thread.currentThread().isInterrupted()) {
+          return null;
+        }
+      } while (result == null || result.isEmpty());
+
+      if (result.size() == 2 && result.get(0).equals(config.getPreQueuedOperationsListName())) {
+        return result.get(1);
+      }
+      return null;
+    });
+
+    if (Thread.interrupted()) {
+      throw new InterruptedException();
+    }
+
+    return operationName;
+  }
+
+  @Override
   public String dispatchOperation() throws IOException, InterruptedException {
     String operationName = withBackplaneException((jedis) -> {
       List<String> result;
@@ -668,7 +712,7 @@ public class RedisShardBackplane implements ShardBackplane {
         if (Thread.currentThread().isInterrupted()) {
           return null;
         }
-      } while (result == null);
+      } while (result == null || result.isEmpty());
 
       if (result.size() == 2 && result.get(0).equals(config.getQueuedOperationsListName())) {
         return result.get(1);
@@ -728,6 +772,11 @@ public class RedisShardBackplane implements ShardBackplane {
       }
       return false;
     });
+  }
+
+  @Override
+  public void prequeueOperation(String operationName) throws IOException {
+    withVoidBackplaneException((jedis) -> prequeueOperation(jedis, operationName));
   }
 
   @Override
@@ -841,5 +890,12 @@ public class RedisShardBackplane implements ShardBackplane {
     int maxQueueDepth = config.getMaxQueueDepth();
     return maxQueueDepth < 0
         || withBackplaneException((jedis) -> jedis.llen(config.getQueuedOperationsListName()) < maxQueueDepth);
+  }
+
+  @Override
+  public boolean canPrequeue() throws IOException {
+    int maxPreQueueDepth = config.getMaxPreQueueDepth();
+    return maxPreQueueDepth < 0
+        || withBackplaneException((jedis) -> jedis.llen(config.getPreQueuedOperationsListName()) < maxPreQueueDepth);
   }
 }

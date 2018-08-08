@@ -45,6 +45,7 @@ import com.google.common.collect.Sets;
 import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.MoreExecutors;
@@ -70,6 +71,7 @@ import io.grpc.Context;
 import io.grpc.Context.CancellableContext;
 import io.grpc.ManagedChannel;
 import io.grpc.Status;
+import io.grpc.protobuf.StatusProto;
 import io.grpc.Status.Code;
 import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
@@ -130,6 +132,8 @@ public class ShardInstance extends AbstractServerInstance {
   };
   private final Random rand = new Random();
   private ExecutorService operationDeletionService = Executors.newSingleThreadExecutor();
+  private Thread operationQueuer;
+  private ListeningExecutorService operationTransformService = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(24));
 
   public ShardInstance(String name, DigestUtil digestUtil, ShardInstanceConfig config, Runnable onStop)
       throws InterruptedException, ConfigurationException {
@@ -138,6 +142,7 @@ public class ShardInstance extends AbstractServerInstance {
         digestUtil,
         getBackplane(config),
         config.getRunDispatchedMonitor(),
+        /* runOperationQueuer=*/ true,
         onStop,
         new CacheLoader<String, Instance>() {
           @Override
@@ -160,7 +165,11 @@ public class ShardInstance extends AbstractServerInstance {
       case BACKPLANE_NOT_SET:
         throw new IllegalArgumentException("Shard Backplane not set in config");
       case REDIS_SHARD_BACKPLANE_CONFIG:
-        return new RedisShardBackplane(config.getRedisShardBackplaneConfig(), ShardInstance::stripOperation, ShardInstance::stripOperation);
+        return new RedisShardBackplane(
+            config.getRedisShardBackplaneConfig(),
+            ShardInstance::stripOperation,
+            ShardInstance::stripOperation,
+            /* isPrequeued=*/ ShardInstance::isUnknown);
     }
   }
 
@@ -169,6 +178,7 @@ public class ShardInstance extends AbstractServerInstance {
       DigestUtil digestUtil,
       ShardBackplane backplane,
       boolean runDispatchedMonitor,
+      boolean runOperationQueuer,
       Runnable onStop,
       CacheLoader<String, Instance> instanceLoader)
       throws InterruptedException {
@@ -196,13 +206,69 @@ public class ShardInstance extends AbstractServerInstance {
           },
           (operationName) -> {
             try {
-              errorOperation(operationName, Code.FAILED_PRECONDITION);
+              errorOperation(operationName, com.google.rpc.Status.newBuilder()
+                  .setCode(com.google.rpc.Code.FAILED_PRECONDITION.getNumber())
+                  // details...
+                  .build());
             } catch (InterruptedException e) {
               Thread.currentThread().interrupt();
             }
           }));
     } else {
       dispatchedMonitor = null;
+    }
+
+    if (runOperationQueuer) {
+      operationQueuer = new Thread(new Runnable() {
+        void ensureCanQueue() throws IOException, InterruptedException {
+          while (!backplane.canQueue()) {
+            TimeUnit.MILLISECONDS.sleep(100);
+          }
+        }
+
+        void iterate() throws IOException, InterruptedException {
+          ensureCanQueue(); // wait for transition to canQueue state
+          String operationName = backplane.deprequeueOperation();
+          if (operationName == null) {
+            System.err.println("Got null from deprequeue...");
+          } else {
+            try {
+              Operation operation = backplane.getOperation(operationName);
+              if (operation == null) {
+                backplane.deleteOperation(operationName);
+              } else {
+                queue(operation);
+              }
+            } catch (IOException e) {
+              backplane.prequeueOperation(operationName);
+            }
+          }
+        }
+
+        @Override
+        public void run() {
+          System.out.println("OperationQueuer: Running");
+          try {
+            for (;;) {
+              try {
+                iterate();
+              } catch (IOException e) {
+                // problems interacting with backplane
+              }
+            }
+          } catch (InterruptedException e) {
+            // treat with exit
+          } catch (Throwable t) {
+            t.printStackTrace();
+          } finally {
+            System.out.println("OperationQueuer: Exiting");
+          }
+          operationQueuer = null;
+          stop();
+        }
+      });
+    } else {
+      operationQueuer = null;
     }
   }
 
@@ -212,14 +278,21 @@ public class ShardInstance extends AbstractServerInstance {
     if (dispatchedMonitor != null) {
       dispatchedMonitor.start();
     }
+    if (operationQueuer != null) {
+      operationQueuer.start();
+    }
   }
 
   @Override
   public void stop() {
+    if (operationQueuer != null) {
+      operationQueuer.stop();
+    }
     if (dispatchedMonitor != null) {
       dispatchedMonitor.stop();
     }
     operationDeletionService.shutdown();
+    operationTransformService.shutdown();
     backplane.stop();
     onStop.run();
     try {
@@ -227,6 +300,14 @@ public class ShardInstance extends AbstractServerInstance {
         System.err.println("Could not shut down operation deletion service, some operations may be zombies");
       }
       operationDeletionService.shutdownNow();
+    } catch (InterruptedException intEx) {
+      Thread.currentThread().interrupt();
+    }
+    try {
+      if (!operationTransformService.awaitTermination(10, TimeUnit.SECONDS)) {
+        System.err.println("Could not shut down operation transform service");
+      }
+      operationTransformService.shutdownNow();
     } catch (InterruptedException intEx) {
       Thread.currentThread().interrupt();
     }
@@ -910,10 +991,18 @@ public class ShardInstance extends AbstractServerInstance {
         .setExecuteOperationMetadata(ExecuteOperationMetadata.newBuilder()
             .setActionDigest(digestUtil.compute(action))
             .build());
+    return transformQueuedOperationMetadata(action.getCommandDigest(), action.getInputRootDigest(), queuedBuilder, executor);
+  }
+
+  private ListenableFuture<QueuedOperationMetadata> transformQueuedOperationMetadata(
+      Digest commandDigest,
+      Digest inputRootDigest,
+      QueuedOperationMetadata.Builder queuedBuilder,
+      Executor executor) {
     return Futures.transform(
         Futures.allAsList(
-            Futures.transform(insistCommand(action.getCommandDigest()), queuedBuilder::setCommand, executor),
-            Futures.transform(getTreeDirectories(action.getInputRootDigest()), queuedBuilder::addAllDirectories, executor)),
+            Futures.transform(insistCommand(commandDigest), queuedBuilder::setCommand, executor),
+            Futures.transform(getTreeDirectories(inputRootDigest), queuedBuilder::addAllDirectories, executor)),
         (result) -> queuedBuilder.build());
   }
 
@@ -924,7 +1013,6 @@ public class ShardInstance extends AbstractServerInstance {
 
     return Operation.newBuilder()
         .setName(name)
-        .setDone(false)
         .setMetadata(Any.pack(metadata))
         .build();
   }
@@ -983,32 +1071,19 @@ public class ShardInstance extends AbstractServerInstance {
     return true;
   }
 
-  protected static ExecuteOperationMetadata expectExecuteOperationMetadata(
-      Operation operation) {
-    if (operation.getMetadata().is(QueuedOperationMetadata.class)) {
-      try {
-        return operation.getMetadata().unpack(QueuedOperationMetadata.class).getExecuteOperationMetadata();
-      } catch(InvalidProtocolBufferException e) {
-        e.printStackTrace();
-        return null;
-      }
-    } else if (operation.getMetadata().is(CompletedOperationMetadata.class)) {
-      try {
-        return operation.getMetadata().unpack(CompletedOperationMetadata.class).getExecuteOperationMetadata();
-      } catch(InvalidProtocolBufferException e) {
-        e.printStackTrace();
-        return null;
-      }
-    } else {
-      return AbstractServerInstance.expectExecuteOperationMetadata(operation);
-    }
-  }
-
   @Override
   public ListenableFuture<Operation> execute(Action action, boolean skipCacheLookup) {
     try {
-      if (backplane.canQueue()) {
-        return queue(action, skipCacheLookup);
+      if (backplane.canPrequeue()) {
+        QueuedOperationMetadata metadata = QueuedOperationMetadata.newBuilder()
+            .setAction(action)
+            .setExecuteOperationMetadata(ExecuteOperationMetadata.newBuilder()
+                .setActionDigest(digestUtil.compute(action)))
+            .setSkipCacheLookup(skipCacheLookup)
+            .build();
+        Operation operation = createOperation(metadata);
+        backplane.putOperation(operation, Stage.UNKNOWN);
+        return Futures.immediateFuture(stripOperation(operation));
       }
     } catch (IOException e) {
       return Futures.immediateFailedFuture(e);
@@ -1017,113 +1092,117 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @VisibleForTesting
-  public ListenableFuture<Operation> queue(Action action, boolean skipCacheLookup) {
-    ListenableFuture<QueuedOperationMetadata> queuedFuture = buildQueuedOperationMetadata(action, MoreExecutors.directExecutor());
-    ListenableFuture<QueuedOperationMetadata> validatedFuture = Futures.transformAsync(
-        queuedFuture,
-        (metadata) -> {
-          validateQueuedOperationMetadata(metadata);
-          return queuedFuture;
-        });
-    ListenableFuture<Operation> operationFuture = Futures.transform(validatedFuture, this::createOperation);
+  public ListenableFuture<Void> queue(Operation operation) throws InterruptedException {
+    final QueuedOperationMetadata prequeueMetadata;
+    try {
+      prequeueMetadata = operation.getMetadata()
+          .unpack(QueuedOperationMetadata.class);
+    } catch (InvalidProtocolBufferException e) {
+      try {
+        cancelOperation(operation.getName());
+      } catch (IllegalStateException ex) {
+        e.printStackTrace();
+      }
+      return Futures.immediateFailedFuture(e);
+    }
 
-    SettableFuture<Operation> executeFuture = SettableFuture.create();
-    Futures.addCallback(operationFuture, new FutureCallback<Operation>() {
+    Action action = prequeueMetadata.getAction();
+    ListenableFuture<QueuedOperationMetadata> queuedFuture =
+        transformQueuedOperationMetadata(
+            action.getCommandDigest(),
+            action.getInputRootDigest(),
+            prequeueMetadata.toBuilder(),
+            operationTransformService);
+    ListenableFuture<QueuedOperationMetadata> validatedFuture = Futures.catching(
+        Futures.transformAsync(
+            queuedFuture,
+            (metadata) -> {
+              validateQueuedOperationMetadata(metadata);
+              return queuedFuture;
+            },
+            operationTransformService),
+        IllegalStateException.class,
+        // might be able to add proper details here
+        (e) -> { throw Status.FAILED_PRECONDITION.withDescription(e.getMessage()).asRuntimeException(); });
+    ListenableFuture<Operation> operationFuture = Futures.transform(
+        validatedFuture,
+        (metadata) -> operation.toBuilder().setMetadata(Any.pack(metadata)).build(),
+        operationTransformService);
+
+    // nice to have for requeuing
+    Futures.addCallback(validatedFuture, new FutureCallback<QueuedOperationMetadata>() {
       @Override
-      public void onSuccess(Operation operation) {
-        operation = stripOperation(operation);
+      public void onSuccess(QueuedOperationMetadata metadata) {
         try {
-          // we can't respond until they could watch the thing
-          backplane.putOperation(operation, Stage.UNKNOWN);
-          executeFuture.set(operation);
+          backplane.putTree(action.getInputRootDigest(), metadata.getDirectoriesList());
         } catch (IOException e) {
           e.printStackTrace();
-          onFailure(e);
         }
       }
 
       @Override
       public void onFailure(Throwable t) {
-        executeFuture.setException(t);
       }
-    });
+    }, operationTransformService);
 
-    CancellableContext withCancellation = Context.ROOT.withCancellation();
-    withCancellation.run(() -> {
-      // nice to have for requeuing
-      Futures.addCallback(validatedFuture, new FutureCallback<QueuedOperationMetadata>() {
-        @Override
-        public void onSuccess(QueuedOperationMetadata metadata) {
-          try {
-            backplane.putTree(action.getInputRootDigest(), metadata.getDirectoriesList());
-          } catch (IOException e) {
-            e.printStackTrace();
+    ByteString actionBlob = action.toByteString();
+    Digest actionDigest = digestUtil.compute(actionBlob);
+    ListenableFuture<Long> actionCommittedFuture = Futures.transformAsync(validatedFuture, (metadata) -> {
+      CommittingOutputStream out = createBlobOutputStream(actionDigest);
+      actionBlob.writeTo(out);
+      out.close(); // unnecessary given implementation
+      return out.getCommittedFuture();
+    }, operationTransformService);
+
+    SettableFuture<Void> queueFuture = SettableFuture.create();
+    // onQueue call?
+    Futures.addCallback(
+        // need to have for requeuing
+        Futures.transformAsync(actionCommittedFuture, (committedSize) -> operationFuture, operationTransformService),
+        new FutureCallback<Operation>() {
+          @Override
+          public void onSuccess(Operation operation) {
+            // if we ever do contexts here, we will need to do the right thing and make it withCancellation
+            try {
+              backplane.putOperation(operation, Stage.QUEUED);
+              queueFuture.set(null);
+            } catch (IOException e) {
+              onFailure(e.getCause());
+            }
           }
-        }
 
-        @Override
-        public void onFailure(Throwable t) {
-        }
-      });
+          void error(String operationName, Throwable t) {
+            com.google.rpc.Status status = com.google.rpc.Status.newBuilder()
+                .setCode(Status.fromThrowable(t).getCode().value())
+                .build();
+            operationDeletionService.execute(new Runnable() {
+              // we must make all efforts to delete this thing
+              int attempt = 1;
 
-      ByteString actionBlob = action.toByteString();
-      Digest actionDigest = digestUtil.compute(actionBlob);
-      ListenableFuture<Long> actionCommittedFuture = Futures.transformAsync(validatedFuture, (metadata) -> {
-        CommittingOutputStream out = createBlobOutputStream(actionDigest);
-        actionBlob.writeTo(out);
-        out.close(); // unnecessary given implementation
-        return out.getCommittedFuture();
-      });
-
-      // onQueue call?
-      Futures.addCallback(
-          // need to have for requeuing
-          Futures.transformAsync(actionCommittedFuture, (committedSize) -> operationFuture),
-          new FutureCallback<Operation>() {
-            @Override
-            public void onSuccess(Operation operation) {
-              // if we ever do contexts here, we will need to do the right thing and make it withCancellation
-              try {
-                backplane.putOperation(operation, Stage.QUEUED);
-              } catch (IOException e) {
-                deleteOperation(operation.getName());
-              }
-            }
-
-            void deleteOperation(String operationName) {
-              operationDeletionService.execute(new Runnable() {
-                // we must make all efforts to delete this thing
-                int attempt = 1;
-
-                @Override
-                public void run() {
-                  try {
-                    backplane.deleteOperation(operationName);
-                  } catch (IOException e) {
-                    if (attempt % 100 == 0) {
-                      System.err.println(String.format("On attempt %d to delete %s: %s", attempt, operationName, e.getLocalizedMessage()));
-                    }
-                    // hopefully as deferred execution...
-                    operationDeletionService.execute(this);
-                    attempt++;
+              @Override
+              public void run() {
+                try {
+                  errorOperation(operationName, status);
+                  queueFuture.setException(t);
+                } catch (StatusRuntimeException e) {
+                  if (attempt % 100 == 0) {
+                    System.err.println(String.format("On attempt %d to cancel %s: %s", attempt, operationName, e.getLocalizedMessage()));
                   }
+                  // hopefully as deferred execution...
+                  operationDeletionService.execute(this);
+                  attempt++;
+                } catch (InterruptedException e) {
                 }
-              });
-            }
-
-            @Override
-            public void onFailure(Throwable t) {
-              try {
-                deleteOperation(executeFuture.get().getName());
-              } catch (ExecutionException e) {
-                // we never succesfully registered the operation
-              } catch (InterruptedException e) {
-                // nothing
               }
-            }
-        });
-    });
-    return executeFuture;
+            });
+          }
+
+          @Override
+          public void onFailure(Throwable t) {
+            error(operation.getName(), t);
+          }
+      }, operationTransformService);
+    return queueFuture;
   }
 
   @Override

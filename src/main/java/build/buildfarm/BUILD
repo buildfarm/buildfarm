@@ -126,6 +126,7 @@ java_library(
         "//3rdparty/jvm/org/apache/commons:commons_pool2",
         "//3rdparty/jvm/redis/clients:jedis",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "@googleapis//:google_rpc_code_java_proto",
     ],
 )
 

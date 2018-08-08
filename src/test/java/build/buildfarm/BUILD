@@ -132,6 +132,8 @@ java_test(
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "//3rdparty/jvm/com/google/truth",
         "//3rdparty/jvm/io/grpc:grpc_core",
+        "//3rdparty/jvm/io/grpc:grpc_protobuf",
+        "//3rdparty/jvm/io/grpc:grpc_stub",
         "//3rdparty/jvm/org/mockito:mockito_core",
         "//3rdparty/jvm/redis/clients:jedis",
         "//src/main/java/build/buildfarm:common",
@@ -140,6 +142,7 @@ java_test(
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
         "@googleapis//:google_longrunning_operations_java_proto",
+        "@googleapis//:google_rpc_code_java_proto",
     ],
 )
 

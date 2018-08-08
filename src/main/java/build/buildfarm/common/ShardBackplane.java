@@ -207,6 +207,9 @@ public interface ShardBackplane {
   @ThreadSafe
   boolean putOperation(Operation operation, Stage stage) throws IOException;
 
+  @ThreadSafe
+  String deprequeueOperation() throws IOException, InterruptedException;
+
   /**
    * The state of operations is tracked in a series of lists representing the
    * order in which the work is to be processed (queued, dispatched, and
@@ -265,6 +268,10 @@ public interface ShardBackplane {
   @ThreadSafe
   void requeueDispatchedOperation(Operation operation) throws IOException;
 
+
+  @ThreadSafe
+  void prequeueOperation(String operationName) throws IOException;
+
   /**
    * Store a directory tree and all of its descendants
    */
@@ -294,4 +301,10 @@ public interface ShardBackplane {
    */
   @ThreadSafe
   boolean canQueue() throws IOException;
+
+  /**
+   * Test for whether an operation may be prequeued
+   */
+  @ThreadSafe
+  boolean canPrequeue() throws IOException;
 }

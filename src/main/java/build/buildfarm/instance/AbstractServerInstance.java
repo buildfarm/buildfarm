@@ -742,6 +742,10 @@ public abstract class AbstractServerInstance implements Instance {
     return metadata != null && metadata.getStage() == stage;
   }
 
+  protected static boolean isUnknown(Operation operation) {
+    return isStage(operation, Stage.UNKNOWN);
+  }
+
   protected static boolean isQueued(Operation operation) {
     return isStage(operation, Stage.QUEUED);
   }
@@ -851,13 +855,19 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public void cancelOperation(String name) throws InterruptedException {
-    errorOperation(name, Code.CANCELLED);
+    errorOperation(name, com.google.rpc.Status.newBuilder()
+        .setCode(com.google.rpc.Code.CANCELLED.getNumber())
+        .build());
   }
 
-  protected void errorOperation(String name, Code code) throws InterruptedException {
+  protected void errorOperation(String name, com.google.rpc.Status status) throws InterruptedException {
     Operation operation = getOperation(name);
     if (operation == null) {
-      throw new IllegalStateException("Trying to error nonexistent operation [" + name + "]");
+      // throw new IllegalStateException("Trying to error nonexistent operation [" + name + "]");
+      System.err.println("Erroring non-existent operation, will signal watchers");
+      operation = Operation.newBuilder()
+          .setName(name)
+          .build();
     }
     if (operation.getDone()) {
       throw new IllegalStateException("Trying to error already completed operation [" + name + "]");
@@ -871,9 +881,7 @@ public abstract class AbstractServerInstance implements Instance {
         .setMetadata(Any.pack(metadata.toBuilder()
             .setStage(Stage.COMPLETED)
             .build()))
-        .setError(com.google.rpc.Status.newBuilder()
-            .setCode(code.value())
-            .build());
+        .setError(status);
     putOperation(builder.build());
   }
 
