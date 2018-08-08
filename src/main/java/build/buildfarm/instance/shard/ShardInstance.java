@@ -929,6 +929,8 @@ public class ShardInstance extends AbstractServerInstance {
         .build();
   }
 
+  // there's optimization to be had here - we can just use the prequeue to requeue this
+  // just need to make it smart enough to see the construction already
   private boolean requeueOperation(String operationName) throws IOException, InterruptedException {
     Operation operation = getOperation(operationName);
     if (operation == null) {

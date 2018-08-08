@@ -14,6 +14,9 @@
 
 package build.buildfarm.worker.shard;
 
+import static build.buildfarm.worker.CASFileCache.getOrIOException;
+import static com.google.common.util.concurrent.Futures.allAsList;
+
 import build.buildfarm.common.ContentAddressableStorage;
 import build.buildfarm.common.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
@@ -59,6 +62,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 import com.google.common.io.ByteStreams;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.devtools.common.options.OptionsParser;
@@ -942,7 +946,7 @@ public class Worker implements Instances {
               action.getOutputDirectoriesList());
 
           if (Files.exists(actionRoot)) {
-            fileCache.removeDirectoryAsync(actionRoot);
+            getOrIOException(fileCache.removeDirectoryAsync(actionRoot));
           }
           Files.createDirectories(actionRoot);
 
@@ -991,7 +995,7 @@ public class Worker implements Instances {
                 inputDirectories == null ? ImmutableList.<Digest>of() : inputDirectories);
           }
           if (Files.exists(actionRoot)) {
-            fileCache.removeDirectoryAsync(actionRoot);
+            getOrIOException(fileCache.removeDirectoryAsync(actionRoot));
           }
         }
       }
@@ -1152,18 +1156,22 @@ public class Worker implements Instances {
           e.printStackTrace();
         }
 
+        ImmutableList.Builder<ListenableFuture<Void>> removeDirectoryFutures = new ImmutableList.Builder<>();
+
         // only valid path under root is cache
         for (Dirent dirent : dirents) {
           String name = dirent.getName();
           Path child = root.resolve(name);
           if (!child.equals(fileCache.getRoot())) {
-            fileCache.removeDirectoryAsync(root.resolve(name));
+            removeDirectoryFutures.add(fileCache.removeDirectoryAsync(root.resolve(name)));
           }
         }
 
         ImmutableList.Builder<Digest> blobDigests = new ImmutableList.Builder<>();
         fileCache.start(blobDigests::add);
         addBlobsLocation(blobDigests.build(), config.getPublicName());
+
+        getOrIOException(allAsList(removeDirectoryFutures.build()));
       }
 
       server.start();
