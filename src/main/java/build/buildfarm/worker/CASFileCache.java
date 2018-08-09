@@ -929,7 +929,7 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
         if (cause instanceof InterruptedException) {
           throw (InterruptedException) cause;
         }
-        cause = e.getCause();
+        cause = cause.getCause();
       }
       throw new UncheckedExecutionException(e);
     }
