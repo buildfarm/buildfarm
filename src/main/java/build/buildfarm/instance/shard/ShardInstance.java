@@ -522,7 +522,8 @@ public class ShardInstance extends AbstractServerInstance {
     });
   }
 
-  private void getBlobImpl(Digest blobDigest, long offset, long limit, StreamObserver<ByteString> blobObserver) {
+  @Override
+  public void getBlob(Digest blobDigest, long offset, long limit, StreamObserver<ByteString> blobObserver) {
     List<String> workersList;
     try {
       workersList = new ArrayList<>(Sets.intersection(backplane.getBlobLocationSet(blobDigest), backplane.getWorkerSet()));
@@ -587,7 +588,7 @@ public class ShardInstance extends AbstractServerInstance {
   @Override
   public ByteString getBlob(Digest blobDigest, long offset, long limit) throws IOException, InterruptedException {
     SettableFuture<ByteString> blobFuture = SettableFuture.create();
-    getBlobImpl(blobDigest, offset, limit, new StreamObserver<ByteString>() {
+    getBlob(blobDigest, offset, limit, new StreamObserver<ByteString>() {
       ByteString content = ByteString.EMPTY;
 
       @Override
@@ -619,11 +620,6 @@ public class ShardInstance extends AbstractServerInstance {
       }
       throw new IOException(e.getCause());
     }
-  }
-
-  @Override
-  public void getBlob(Digest blobDigest, long offset, long limit, StreamObserver<ByteString> blobObserver) {
-    getBlobImpl(blobDigest, offset, limit, blobObserver);
   }
 
   private static ManagedChannel createChannel(String target) {
