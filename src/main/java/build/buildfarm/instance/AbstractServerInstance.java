@@ -864,7 +864,7 @@ public abstract class AbstractServerInstance implements Instance {
     Operation operation = getOperation(name);
     if (operation == null) {
       // throw new IllegalStateException("Trying to error nonexistent operation [" + name + "]");
-      System.err.println("Erroring non-existent operation, will signal watchers");
+      System.err.println("Erroring non-existent operation " + name + ", will signal watchers");
       operation = Operation.newBuilder()
           .setName(name)
           .build();
@@ -876,13 +876,13 @@ public abstract class AbstractServerInstance implements Instance {
     if (metadata == null) {
       metadata = ExecuteOperationMetadata.getDefaultInstance();
     }
-    Operation.Builder builder = operation.toBuilder()
+    putOperation(operation.toBuilder()
         .setDone(true)
         .setMetadata(Any.pack(metadata.toBuilder()
             .setStage(Stage.COMPLETED)
             .build()))
-        .setError(status);
-    putOperation(builder.build());
+        .setError(status)
+        .build());
   }
 
   protected void expireOperation(Operation operation) throws InterruptedException {
