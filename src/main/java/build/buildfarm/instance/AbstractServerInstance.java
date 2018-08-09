@@ -19,6 +19,7 @@ import build.buildfarm.common.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.instance.TreeIterator.DirectoryEntry;
+import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
@@ -644,9 +645,24 @@ public abstract class AbstractServerInstance implements Instance {
 
   protected static ExecuteOperationMetadata expectExecuteOperationMetadata(
       Operation operation) {
+    if (operation.getMetadata().is(QueuedOperationMetadata.class)) {
+      try {
+        return operation.getMetadata().unpack(QueuedOperationMetadata.class).getExecuteOperationMetadata();
+      } catch(InvalidProtocolBufferException e) {
+        return null;
+      }
+    }
+    if (operation.getMetadata().is(CompletedOperationMetadata.class)) {
+      try {
+        return operation.getMetadata().unpack(CompletedOperationMetadata.class).getExecuteOperationMetadata();
+      } catch(InvalidProtocolBufferException e) {
+        return null;
+      }
+    }
     try {
       return operation.getMetadata().unpack(ExecuteOperationMetadata.class);
     } catch(InvalidProtocolBufferException e) {
+      e.printStackTrace();
       return null;
     }
   }
