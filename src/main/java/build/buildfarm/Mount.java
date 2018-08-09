@@ -1,5 +1,7 @@
 package build.buildfarm;
 
+import static build.buildfarm.instance.Utils.getBlob;
+
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.ByteStreamUploader;
@@ -51,7 +53,7 @@ class Mount {
           return cache.get(blobDigest).substring((int) offset).newInput();
         }
         try {
-          ByteString value = instance.getBlob(blobDigest);
+          ByteString value = getBlob(instance, blobDigest);
           if (offset == 0) {
             cache.put(blobDigest, value);
           }

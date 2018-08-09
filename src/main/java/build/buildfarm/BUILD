@@ -32,6 +32,7 @@ java_library(
     name = "instance",
     srcs = [
         "instance/Instance.java",
+        "instance/Utils.java",
     ],
     deps = [
         ":common",

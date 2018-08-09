@@ -152,12 +152,10 @@ public abstract class AbstractServerInstance implements Instance {
         DigestUtil.toString(blobDigest));
   }
 
-  @Override
   public final ByteString getBlob(Digest blobDigest) throws IOException, InterruptedException {
     return getBlob(blobDigest, 0, 0);
   }
 
-  @Override
   public ByteString getBlob(Digest blobDigest, long offset, long limit)
       throws IOException, IndexOutOfBoundsException, InterruptedException {
     if (blobDigest.getSizeBytes() == 0) {

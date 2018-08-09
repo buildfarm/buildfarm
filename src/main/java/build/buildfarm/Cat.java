@@ -1,5 +1,7 @@
 package build.buildfarm;
 
+import static build.buildfarm.instance.Utils.getBlob;
+
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.ByteStreamUploader;
@@ -272,7 +274,7 @@ class Cat {
         } else if (type.equals("Tree")) {
           printTree(instance, blobDigest);
         } else {
-          ByteString blob = instance.getBlob(blobDigest);
+          ByteString blob = getBlob(instance, blobDigest);
           if (type.equals("Action")) {
             printAction(blob);
           } else if (type.equals("Command")) {

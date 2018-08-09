@@ -360,33 +360,6 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public ByteString getBlob(Digest blobDigest) throws IOException, InterruptedException {
-    try (InputStream in = newStreamInput(getBlobName(blobDigest), 0)) {
-      return ByteString.readFrom(in);
-    } catch (StatusRuntimeException e) {
-      if (e.getStatus().equals(Status.NOT_FOUND)) {
-        return null;
-      }
-      throw e;
-    }
-  }
-
-  @Override
-  public ByteString getBlob(Digest blobDigest, long offset, long limit) throws IOException, InterruptedException {
-    try (InputStream in = newStreamInput(getBlobName(blobDigest), offset)) {
-      if (limit == 0) {
-        return ByteString.readFrom(in);
-      }
-      int len = (int) limit;
-      byte[] buf = new byte[len];
-      len = in.read(buf);
-      return ByteString.copyFrom(buf, 0, len);
-    } catch (IOException e) {
-      return null;
-    }
-  }
-
-  @Override
   public void getBlob(Digest blobDigest, long offset, long limit, StreamObserver<ByteString> blobObserver) {
     bsStub.get()
         .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)

@@ -50,8 +50,6 @@ public interface Instance {
       throws IOException, InterruptedException, StatusException;
 
   String getBlobName(Digest blobDigest);
-  ByteString getBlob(Digest blobDigest) throws IOException, InterruptedException;
-  ByteString getBlob(Digest blobDigest, long offset, long limit) throws IOException, InterruptedException;
   void getBlob(Digest blobDigest, long offset, long limit, StreamObserver<ByteString> blobObserver);
   Digest putBlob(ByteString blob)
       throws IOException, InterruptedException, StatusException;
