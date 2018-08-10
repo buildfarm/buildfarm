@@ -127,19 +127,25 @@ class Executor implements Runnable {
     poller.stop();
 
     long waitStartTime = System.nanoTime();
-    if (owner.output().claim()) {
-      operation = operation.toBuilder()
-          .setResponse(Any.pack(ExecuteResponse.newBuilder()
-              .setResult(resultBuilder.build())
-              .setStatus(com.google.rpc.Status.newBuilder()
-                  .setCode(statusCode.getNumber())
-                  .build())
-              .build()))
-          .build();
-      owner.output().put(operationContext.toBuilder()
+    operation = operation.toBuilder()
+        .setResponse(Any.pack(ExecuteResponse.newBuilder()
+            .setResult(resultBuilder.build())
+            .setStatus(com.google.rpc.Status.newBuilder()
+                .setCode(statusCode.getNumber())
+                .build())
+            .build()))
+        .build();
+    OperationContext reportOperationContext = operationContext.toBuilder()
           .setOperation(operation)
           .setExecutedIn(executedIn)
-          .build());
+          .build();
+    if (owner.output().claim()) {
+      try {
+        owner.output().put(reportOperationContext);
+      } catch (InterruptedException e) {
+        owner.output().release();
+        throw e;
+      }
     } else {
       // FIXME we need to release the action root
       workerContext.logInfo("Executor: Operation " + operation.getName() + " Failed to claim output");
