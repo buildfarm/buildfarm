@@ -1098,6 +1098,11 @@ public class Worker implements Instances {
         server.shutdownNow();
       }
     }
+    if (config.getUseFuseCas()) {
+      fuseCAS.stop();
+    } else {
+      fileCache.stop();
+    }
     backplane.stop();
   }
 
