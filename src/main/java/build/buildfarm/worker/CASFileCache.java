@@ -534,10 +534,8 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
           DirectoryEntry e = new DirectoryEntry(directory, inputs);
           synchronized (this) {
             directoryStorage.put(digest, e);
-          }
-          for (Path input : inputs) {
-            Entry entry = storage.get(input);
-            synchronized (entry.containingDirectories) {
+            for (Path input : inputs) {
+              Entry entry = storage.get(input);
               entry.containingDirectories.add(digest);
             }
           }
@@ -753,11 +751,8 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
       return immediateFuture(null);
     }
 
-    return transform(
-        allAsList(
-            removeDirectoryPool.submit(() -> purgeDirectoryFromInputs(digest, e.inputs)),
-            removeDirectoryAsync(getDirectoryPath(digest))),
-        (result) -> null);
+    purgeDirectoryFromInputs(digest, e.inputs);
+    return removeDirectoryAsync(getDirectoryPath(digest));
   }
 
   /** must be called in synchronized context */
@@ -834,7 +829,7 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
     } catch (IOException e) {
       ImmutableList<Path> inputs = inputsBuilder.build();
       synchronized (this) {
-        purgeDirectoryFromInputs(digest, inputs); // this might not need (this) synchronized
+        purgeDirectoryFromInputs(digest, inputs);
         decrementReferencesSynchronized(inputs, ImmutableList.<Digest>of());
       }
       removeDirectoryAsync(path);
