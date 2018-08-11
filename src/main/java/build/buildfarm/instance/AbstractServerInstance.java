@@ -566,6 +566,8 @@ public abstract class AbstractServerInstance implements Instance {
     SettableFuture<Operation> executeFuture = SettableFuture.create();
     try {
       execute(action, skipCacheLookup, executeFuture::set);
+    } catch (IllegalStateException e) {
+      executeFuture.setException(e);
     } catch (InterruptedException e) {
       executeFuture.setException(e);
     }
