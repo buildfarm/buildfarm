@@ -123,24 +123,6 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   protected int getListOperationsMaxPageSize() { return 1024; }
 
   @Override
-  public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs)
-      throws IOException, IllegalArgumentException, InterruptedException {
-    ImmutableList.Builder<Digest> digests = new ImmutableList.Builder<>();
-    for (ByteString content : blobs) {
-      if (content.size() == 0) {
-        digests.add(digestUtil.empty());
-        continue;
-      }
-
-      Blob blob = new Blob(content, digestUtil);
-      Digest blobDigest = blob.getDigest();
-      contentAddressableStorage.put(blob);
-      digests.add(blobDigest);
-    }
-    return digests.build();
-  }
-
-  @Override
   public String getBlobName(Digest blobDigest) {
     throw new UnsupportedOperationException();
   }
@@ -192,18 +174,6 @@ public class ShardWorkerInstance extends AbstractServerInstance {
       content = content.substring((int) offset, (int) (limit == 0 ? (content.size() - offset) : (limit + offset)));
     }
     return content;
-  }
-
-  @Override
-  public Digest putBlob(ByteString content) throws IOException {
-    if (content.size() == 0) {
-      return digestUtil.empty();
-    }
-
-    Blob blob = new Blob(content, digestUtil);
-    contentAddressableStorage.put(blob);
-
-    return blob.getDigest();
   }
 
   @Override

@@ -46,13 +46,8 @@ public interface Instance {
 
   Iterable<Digest> findMissingBlobs(Iterable<Digest> digests);
 
-  Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs)
-      throws IOException, InterruptedException, StatusException;
-
   String getBlobName(Digest blobDigest);
   void getBlob(Digest blobDigest, long offset, long limit, StreamObserver<ByteString> blobObserver);
-  Digest putBlob(ByteString blob)
-      throws IOException, InterruptedException, StatusException;
   ChunkObserver getWriteBlobObserver(Digest blobDigest);
   ChunkObserver getWriteOperationStreamObserver(String operationStream);
   String getTree(

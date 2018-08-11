@@ -357,6 +357,15 @@ public class Worker implements Instances {
     return inlineContentBytes;
   }
 
+  private void putAllBlobs(Iterable<ByteString> blobs) {
+    for (ByteString content : blobs) {
+      if (content.size() > 0) {
+        Blob blob = new Blob(content, digestUtil);
+        fileCache.put(blob);
+      }
+    }
+  }
+
   public Worker(ServerBuilder<?> serverBuilder, ShardWorkerConfig config) throws ConfigurationException {
     this.config = config;
     workerStubs = new HashMap<>();
@@ -922,7 +931,7 @@ public class Worker implements Instances {
 
         List<ByteString> blobs = contents.build();
         if (!blobs.isEmpty()) {
-          instance.putAllBlobs(blobs);
+          putAllBlobs(blobs);
         }
       }
 

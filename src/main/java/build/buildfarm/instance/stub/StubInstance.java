@@ -235,22 +235,6 @@ public class StubInstance implements Instance {
     return response.getMissingBlobDigestsList();
   }
 
-  @Override
-  public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs)
-      throws IOException, IllegalArgumentException, InterruptedException {
-    // sort of a blatant misuse - one chunker per input, query digests before exhausting iterators
-    ImmutableList.Builder<Chunker> builder = new ImmutableList.Builder<Chunker>();
-    for (ByteString blob : blobs) {
-      builder.add(new Chunker(blob, digestUtil.compute(blob)));
-    }
-    ImmutableList<Chunker> chunkers = builder.build();
-    List<Digest> digests = new ImmutableList.Builder<Digest>()
-        .addAll(Iterables.transform(chunkers, chunker -> chunker.digest()))
-        .build();
-    uploader.uploadBlobs(chunkers);
-    return digests;
-  }
-
   /** expectedSize == -1 for unlimited */
   @Override
   public CommittingOutputStream getStreamOutput(String name, long expectedSize) {
@@ -385,15 +369,6 @@ public class StubInstance implements Instance {
                 blobObserver.onError(t);
               }
             });
-  }
-
-  @Override
-  public Digest putBlob(ByteString blob)
-      throws IOException, IllegalArgumentException, InterruptedException {
-    Digest digest = digestUtil.compute(blob);
-    Chunker chunker = new Chunker(blob, digest);
-    uploader.uploadBlobs(Collections.singleton(chunker));
-    return digest;
   }
 
   @Override

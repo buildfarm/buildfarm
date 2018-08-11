@@ -464,12 +464,6 @@ public class ShardInstance extends AbstractServerInstance {
     return nonEmptyDigests;
   }
 
-  @Override
-  public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs)
-      throws IllegalArgumentException, InterruptedException, StatusException {
-    throw new UnsupportedOperationException();
-  }
-
   private void fetchBlobFromWorker(
       Digest blobDigest,
       Deque<String> workers,
@@ -648,76 +642,6 @@ public class ShardInstance extends AbstractServerInstance {
     } catch (ExecutionException e) {
       e.printStackTrace();
       return null;
-    }
-  }
-
-  @Override
-  public Digest putBlob(ByteString blob)
-      throws IllegalArgumentException, InterruptedException {
-    for(;;) {
-      String worker = null;
-      try {
-        try {
-          worker = backplane.getRandomWorker();
-        } catch (IOException e) {
-          throw Status.fromThrowable(e).asRuntimeException();
-        }
-
-        if (worker == null) {
-          // FIXME should be made into a retry operation, resulting in an IOException
-          // FIXME should we wait for a worker to become available?
-          throw Status.RESOURCE_EXHAUSTED.asRuntimeException();
-        }
-        // System.out.println("putBlob(" + DigestUtil.toString(digestUtil.compute(blob)) + ") => " + worker);
-        Digest digest;
-        try {
-          digest = workerStub(worker).putBlob(blob);
-        } catch (StatusException e) {
-          throw Status.fromThrowable(e).asRuntimeException();
-        } catch (RetryException e) {
-          if (e.getCause() instanceof StatusRuntimeException) {
-            throw (StatusRuntimeException) e.getCause();
-          }
-          throw e;
-        }
-        boolean known = false;
-        try {
-          commandCache.get(digest, new Callable<Command>() {
-            @Override
-            public Command call() throws IOException {
-              return Command.parseFrom(blob);
-            }
-          }).get();
-          known = true;
-        } catch (ExecutionException e) {
-          /* not a command */
-        }
-        if (!known) {
-          try {
-            directoryCache.get(digest, new Callable<Directory>() {
-              @Override
-              public Directory call() throws IOException {
-                return Directory.parseFrom(blob);
-              }
-            }).get();
-            known = true;
-          } catch (ExecutionException e) {
-            /* not a directory */
-          }
-        }
-        return digest;
-      } catch (StatusRuntimeException e) {
-        Status status = Status.fromThrowable(e);
-        if (status.getCode() == Code.UNAVAILABLE) {
-          removeMalfunctioningWorker(worker, e, "putBlob(" + DigestUtil.toString(digestUtil.compute(blob)) + ")");
-        } else if (Context.current().isCancelled()) {
-          throw e;
-        } else {
-          e.printStackTrace();
-        }
-      } catch (IOException e) {
-        e.printStackTrace();
-      }
     }
   }
 

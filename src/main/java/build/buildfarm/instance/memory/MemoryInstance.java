@@ -14,6 +14,8 @@
 
 package build.buildfarm.instance.memory;
 
+import static build.buildfarm.instance.Utils.putBlob;
+
 import build.buildfarm.common.Watchdog;
 import build.buildfarm.common.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
@@ -195,7 +197,7 @@ public class MemoryInstance extends AbstractServerInstance {
 
   @Override
   protected void onQueue(Operation operation, Action action) throws IOException, InterruptedException, StatusException {
-    putBlob(action.toByteString());
+    putBlob(this, digestUtil.compute(action), action.toByteString());
   }
 
   @Override

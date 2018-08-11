@@ -14,10 +14,22 @@
 
 package build.buildfarm.server;
 
+import static build.buildfarm.instance.Utils.putBlobFuture;
+import static com.google.common.util.concurrent.Futures.addCallback;
+import static com.google.common.util.concurrent.Futures.allAsList;
+import static com.google.common.util.concurrent.Futures.catching;
+import static com.google.common.util.concurrent.Futures.transform;
+
 import build.buildfarm.instance.Instance;
+import build.buildfarm.instance.Instance.ChunkObserver;
+import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.devtools.remoteexecution.v1test.BatchUpdateBlobsRequest;
 import com.google.devtools.remoteexecution.v1test.BatchUpdateBlobsResponse;
+import com.google.devtools.remoteexecution.v1test.BatchUpdateBlobsResponse.Response;
 import com.google.devtools.remoteexecution.v1test.ContentAddressableStorageGrpc;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.devtools.remoteexecution.v1test.Directory;
@@ -28,10 +40,10 @@ import com.google.devtools.remoteexecution.v1test.GetTreeResponse;
 import com.google.devtools.remoteexecution.v1test.UpdateBlobRequest;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
+import io.grpc.Status.Code;
 import io.grpc.StatusException;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
-import java.util.function.Function;
 
 public class ContentAddressableStorageService extends ContentAddressableStorageGrpc.ContentAddressableStorageImplBase {
   private final Instances instances;
@@ -59,6 +71,41 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
     responseObserver.onCompleted();
   }
 
+  private static com.google.rpc.Status statusForCode(Code code) {
+    return com.google.rpc.Status.newBuilder()
+        .setCode(code.value())
+        .build();
+  }
+
+  private static ListenableFuture<Response> toResponseFuture(ListenableFuture<Code> codeFuture, Digest digest) {
+    return transform(
+        codeFuture,
+        new Function<Code, Response>() {
+          @Override
+          public Response apply(Code code) {
+            return Response.newBuilder()
+                .setBlobDigest(digest)
+                .setStatus(statusForCode(code))
+                .build();
+          }
+        });
+  }
+
+  private static Iterable<ListenableFuture<Response>> putAllBlobs(Instance instance, Iterable<UpdateBlobRequest> requests) {
+    ImmutableList.Builder<ListenableFuture<Response>> responses = new ImmutableList.Builder<>();
+    for (UpdateBlobRequest request : requests) {
+      Digest digest = request.getContentDigest();
+      responses.add(
+          toResponseFuture(
+              catching(
+                  transform(putBlobFuture(instance, digest, request.getData()), (d) -> Code.OK),
+                  Throwable.class,
+                  (e) -> Status.fromThrowable(e).getCode()),
+              digest));
+    }
+    return responses.build();
+  }
+
   @Override
   public void batchUpdateBlobs(
       BatchUpdateBlobsRequest batchRequest,
@@ -71,44 +118,26 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
       return;
     }
 
-    ImmutableList.Builder<ByteString> validBlobsBuilder = new ImmutableList.Builder<>();
-    ImmutableList.Builder<BatchUpdateBlobsResponse.Response> responses =
-        new ImmutableList.Builder<>();
-    Function<com.google.rpc.Code, com.google.rpc.Status> statusForCode =
-        (code) -> com.google.rpc.Status.newBuilder()
-            .setCode(code.getNumber())
-            .build();
-    // FIXME do this validation through the instance interface
-    for (UpdateBlobRequest request : batchRequest.getRequestsList()) {
-      com.google.rpc.Status status;
-      Digest digest = request.getContentDigest();
-      if (digest.equals(instance.getDigestUtil().compute(request.getData()))) {
-        validBlobsBuilder.add(request.getData());
-        status = statusForCode.apply(com.google.rpc.Code.OK);
-      } else {
-        status = statusForCode.apply(com.google.rpc.Code.INVALID_ARGUMENT);
+    BatchUpdateBlobsResponse.Builder response = BatchUpdateBlobsResponse.newBuilder();
+    ListenableFuture<BatchUpdateBlobsResponse> responseFuture = transform(
+        allAsList(
+            Iterables.transform(
+                putAllBlobs(instance, batchRequest.getRequestsList()),
+                (future) -> transform(future, response::addResponses))),
+        (result) -> response.build());
+
+    addCallback(responseFuture, new FutureCallback<BatchUpdateBlobsResponse>() {
+      @Override
+      public void onSuccess(BatchUpdateBlobsResponse response) {
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
       }
-      responses.add(BatchUpdateBlobsResponse.Response.newBuilder()
-          .setBlobDigest(digest)
-          .setStatus(status)
-          .build());
-    }
 
-    try {
-      instance.putAllBlobs(validBlobsBuilder.build());
-    } catch (IOException|StatusException e) {
-      responseObserver.onError(Status.fromThrowable(e).asException());
-      return;
-    } catch (InterruptedException e) {
-      responseObserver.onError(Status.fromThrowable(e).asException());
-      Thread.currentThread().interrupt();
-      return;
-    }
-
-    responseObserver.onNext(BatchUpdateBlobsResponse.newBuilder()
-        .addAllResponses(responses.build())
-        .build());
-    responseObserver.onCompleted();
+      @Override
+      public void onFailure(Throwable t) {
+        responseObserver.onError(t);
+      }
+    });
   }
 
   @Override

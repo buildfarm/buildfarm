@@ -225,16 +225,6 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public Digest putBlob(ByteString content) throws IOException, InterruptedException, StatusException {
-    if (content.size() == 0) {
-      return digestUtil.empty();
-    }
-    Blob blob = new Blob(content, digestUtil);
-    contentAddressableStorage.put(blob);
-    return blob.getDigest();
-  }
-
-  @Override
   public ChunkObserver getWriteBlobObserver(Digest blobDigest) {
     // what should the locking semantics be here??
     activeBlobWrites.putIfAbsent(blobDigest, ByteString.EMPTY);
@@ -273,16 +263,14 @@ public abstract class AbstractServerInstance implements Instance {
         // yup, redundant, need to compute this inline
         Preconditions.checkState(digestUtil.compute(content).equals(blobDigest));
         try {
-          putBlob(content);
-        } catch (StatusException e) {
-          throw Status.fromThrowable(e).asRuntimeException();
-        } catch (IOException e) {
-          throw Status.INTERNAL.withCause(e).asRuntimeException();
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          throw Status.CANCELLED.withCause(e).asRuntimeException();
+          if (content.size() != 0) {
+            Blob blob = new Blob(content, digestUtil);
+            contentAddressableStorage.put(blob);
+          }
+          committedFuture.set((long) content.size());
+        } catch (Throwable t) {
+          committedFuture.setException(t);
         }
-        committedFuture.set((long) content.size());
         activeBlobWrites.remove(blobDigest);
       }
     };
@@ -291,16 +279,6 @@ public abstract class AbstractServerInstance implements Instance {
   @Override
   public ChunkObserver getWriteOperationStreamObserver(String operationStream) {
     throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs) throws IOException, InterruptedException, StatusException {
-    ImmutableList.Builder<Digest> blobDigestsBuilder =
-      new ImmutableList.Builder<Digest>();
-    for (ByteString blob : blobs) {
-      blobDigestsBuilder.add(putBlob(blob));
-    }
-    return blobDigestsBuilder.build();
   }
 
   @Override
