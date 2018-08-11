@@ -470,11 +470,6 @@ public class ShardInstance extends AbstractServerInstance {
     throw new UnsupportedOperationException();
   }
 
-  @Override
-  public String getBlobName(Digest blobDigest) {
-    throw new UnsupportedOperationException();
-  }
-
   private void fetchBlobFromWorker(
       Digest blobDigest,
       Deque<String> workers,
