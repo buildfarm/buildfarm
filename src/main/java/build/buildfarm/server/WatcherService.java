@@ -61,7 +61,10 @@ public class WatcherService extends WatcherGrpc.WatcherImplBase {
     } if (resumeMarker.isEmpty()) {
       watchInitialState = true;
     } else {
-      responseObserver.onError(Status.UNIMPLEMENTED.asException());
+      responseObserver.onError(
+          Status.UNIMPLEMENTED
+              .withDescription("Only empty or 'now' resume_markers are supported")
+              .asException());
       return;
     }
 
@@ -88,15 +91,20 @@ public class WatcherService extends WatcherGrpc.WatcherImplBase {
               return false;
             }
           } catch (StatusRuntimeException e) {
+            // no further responses should be necessary
             if (e.getStatus().getCode() != Status.Code.CANCELLED) {
-              throw e;
+              responseObserver.onError(Status.fromThrowable(e).asException());
             }
             return false;
           } catch (IllegalStateException e) {
-            e.printStackTrace();
-            // check for 'call is closed'?
+            // only indicator for this from ServerCallImpl layer
+            // no further responses should be necessary
+            if (!e.getMessage().equals("call is closed")) {
+              responseObserver.onError(Status.fromThrowable(e).asException());
+            }
             return false;
           }
+          // still watching
           return true;
         });
     if (!watching) {

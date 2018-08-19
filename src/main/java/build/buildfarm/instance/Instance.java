@@ -74,6 +74,11 @@ public interface Instance {
   void cancelOperation(String name) throws InterruptedException;
   void deleteOperation(String name);
 
+  // returns true if the operation will be handled in all cases through the
+  // watcher.
+  // The watcher returns true to indicate it is still able to process updates,
+  // and returns false when it is complete and no longer wants updates
+  // The watcher must not be tested again after it has returned false.
   boolean watchOperation(
       String operationName,
       boolean watchInitialState,

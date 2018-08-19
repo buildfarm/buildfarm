@@ -15,7 +15,12 @@
 package build.buildfarm.instance.memory;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyZeroInteractions;
 
 import build.buildfarm.common.ContentAddressableStorage;
 import build.buildfarm.common.ContentAddressableStorage.Blob;
@@ -26,23 +31,33 @@ import build.buildfarm.v1test.MemoryInstanceConfig;
 import com.google.common.collect.ImmutableList;
 import com.google.devtools.remoteexecution.v1test.Action;
 import com.google.devtools.remoteexecution.v1test.ActionResult;
+import com.google.devtools.remoteexecution.v1test.Digest;
+import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
 import com.google.longrunning.Operation;
+import com.google.protobuf.Any;
 import com.google.protobuf.Duration;
 import com.google.protobuf.util.Durations;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 
 @RunWith(JUnit4.class)
 public class MemoryInstanceTest {
   private Instance instance;
 
   private Map<String, Operation> outstandingOperations;
+  private Map<String, List<Predicate<Operation>>> watchers;
 
   @Mock
   private ContentAddressableStorage storage;
@@ -51,6 +66,7 @@ public class MemoryInstanceTest {
   public void setUp() throws Exception {
     MockitoAnnotations.initMocks(this);
     outstandingOperations = new HashMap<>();
+    watchers = new HashMap<>();
     MemoryInstanceConfig memoryInstanceConfig = MemoryInstanceConfig.newBuilder()
         .setListOperationsDefaultPageSize(1024)
         .setListOperationsMaxPageSize(16384)
@@ -67,6 +83,7 @@ public class MemoryInstanceTest {
         new DigestUtil(DigestUtil.HashFunction.SHA256),
         memoryInstanceConfig,
         storage,
+        watchers,
         outstandingOperations);
   }
 
@@ -157,5 +174,103 @@ public class MemoryInstanceTest {
         result);
     assertThat(instance.getActionResult(
         instance.getDigestUtil().computeActionKey(action))).isEqualTo(result);
+  }
+
+  @Test
+  public void missingOperationWatchInvertsWatchInitialState() {
+    Predicate<Operation> watcher = (Predicate<Operation>) mock(Predicate.class);
+    // a request for a watch on an operation that does not exist must
+    // invert watchInitialState to indicate that it will not call the watcher
+    // again if it has not handled the completed state
+    assertThat(instance.watchOperation(
+        "does-not-exist",
+        /* watchInitialState=*/ false,
+        watcher)).isTrue();
+    verifyZeroInteractions(watcher);
+
+    Predicate<Operation> watchInitialWatcher = (Predicate<Operation>) mock(Predicate.class);
+    when(watchInitialWatcher.test(eq(null))).thenReturn(true);
+    assertThat(instance.watchOperation(
+        "does-not-exist",
+        /* watchInitialState=*/ true,
+        watchInitialWatcher)).isFalse();
+    verify(watchInitialWatcher, times(1)).test(eq(null));
+  }
+
+  @Test
+  public void initialWatchWithCompletedSignalsWatching() {
+    Predicate<Operation> watcher = (Predicate<Operation>) mock(Predicate.class);
+    when(watcher.test(eq(null))).thenReturn(false);
+    assertThat(instance.watchOperation(
+        "does-not-exist",
+        /* watchInitialState=*/ true,
+        watcher)).isTrue();
+    verify(watcher, times(1)).test(eq(null));
+  }
+
+  @Test
+  public void watchOperationAddsWatcher() {
+    Operation operation = Operation.newBuilder()
+        .setName("my-watched-operation")
+        .build();
+    outstandingOperations.put(operation.getName(), operation);
+
+    List<Predicate<Operation>> operationWatchers = new ArrayList<>();
+    watchers.put(operation.getName(), operationWatchers);
+
+    Predicate<Operation> watcher = (Predicate<Operation>) mock(Predicate.class);
+    assertThat(instance.watchOperation(
+        operation.getName(),
+        /* watchInitialState=*/ false,
+        watcher)).isTrue();
+    assertThat(operationWatchers).containsExactly(watcher);
+  }
+
+  @Test
+  public void watchOpRaceLossInvertsTestOnInitial() {
+    Operation operation = Operation.newBuilder()
+        .setName("my-watched-operation")
+        .build();
+    Operation doneOperation = operation.toBuilder()
+        .setDone(true)
+        .build();
+
+    // as a result of the initial verified test, change the operation to done
+    Answer<Boolean> initialAnswer = new Answer<Boolean>() {
+      @Override
+      public Boolean answer(InvocationOnMock invocation) throws Throwable {
+        outstandingOperations.put(operation.getName(), doneOperation);
+        return true;
+      }
+    };
+    Predicate<Operation> watcher = (Predicate<Operation>) mock(Predicate.class);
+    when(watcher.test(eq(operation))).thenAnswer(initialAnswer);
+    when(watcher.test(eq(doneOperation))).thenReturn(false);
+
+    // set for each verification
+    outstandingOperations.put(operation.getName(), operation);
+
+    assertThat(instance.watchOperation(
+        operation.getName(),
+        /* watchInitialState=*/ true,
+        watcher)).isTrue();
+    verify(watcher, times(1)).test(eq(operation));
+    verify(watcher, times(1)).test(eq(doneOperation));
+
+    outstandingOperations.clear();
+
+    Predicate<Operation> unfazedWatcher = (Predicate<Operation>) mock(Predicate.class);
+    when(unfazedWatcher.test(eq(operation))).thenAnswer(initialAnswer);
+    // unfazed watcher is not bothered by the operation's change of done
+    when(unfazedWatcher.test(eq(doneOperation))).thenReturn(true);
+
+    // set for each verification
+    outstandingOperations.put(operation.getName(), operation);
+    assertThat(instance.watchOperation(
+        operation.getName(),
+        /* watchInitialState=*/ true,
+        unfazedWatcher)).isFalse();
+    verify(unfazedWatcher, times(1)).test(eq(operation));
+    verify(unfazedWatcher, times(1)).test(eq(doneOperation));
   }
 }

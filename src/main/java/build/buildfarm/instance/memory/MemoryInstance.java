@@ -92,6 +92,7 @@ public class MemoryInstance extends AbstractServerInstance {
         digestUtil,
         config,
         /*contentAddressableStorage=*/ new MemoryLRUContentAddressableStorage(config.getCasMaxSizeBytes()),
+        /*watchers=*/ new ConcurrentHashMap<String, List<Predicate<Operation>>>(),
         /*outstandingOperations=*/ new TreeMap<String, Operation>());
   }
 
@@ -101,6 +102,7 @@ public class MemoryInstance extends AbstractServerInstance {
       DigestUtil digestUtil,
       MemoryInstanceConfig config,
       ContentAddressableStorage contentAddressableStorage,
+      Map<String, List<Predicate<Operation>>> watchers,
       Map<String, Operation> outstandingOperations) {
     super(
         name,
@@ -111,7 +113,7 @@ public class MemoryInstance extends AbstractServerInstance {
         /*completedOperations=*/ new DelegateCASMap<String, Operation>(contentAddressableStorage, Operation.parser(), digestUtil),
         /*activeBlobWrites=*/ new ConcurrentHashMap<Digest, ByteString>());
     this.config = config;
-    watchers = new ConcurrentHashMap<String, List<Predicate<Operation>>>();
+    this.watchers = watchers;
     streams = new HashMap<String, ByteStringStreamSource>();
     queuedOperations = new ArrayList<Operation>();
     workers = new ArrayList<Worker>();
@@ -382,10 +384,12 @@ public class MemoryInstance extends AbstractServerInstance {
     if (watchInitialState) {
       Operation operation = getOperation(operationName);
       if (!watcher.test(operation)) {
-        return false;
-      }
-      if (operation.getDone()) {
+        // watcher processed completed state
         return true;
+      }
+      if (operation == null || operation.getDone()) {
+        // watcher did not process completed state
+        return false;
       }
     }
     Operation completedOperation = null;
@@ -396,18 +400,23 @@ public class MemoryInstance extends AbstractServerInstance {
          * watchers list has been removed, making it necessary to check for the
          * operation within this context */
         Operation operation = getOperation(operationName);
-        if (operation.getDone()) {
-          completedOperation = operation;
-        } else {
-          return false;
+        if (operation == null || !watchInitialState) {
+          // missing operation with no initial state requires no handling
+          // leave non-watchInitialState watchers of missing items to linger
+          return true;
         }
+        Preconditions.checkState(
+            operation.getDone(),
+            "watchers removed on incomplete operation");
+        completedOperation = operation;
+      } else {
+        operationWatchers.add(watcher);
+        return true;
       }
-      operationWatchers.add(watcher);
     }
-    if (completedOperation != null) {
-      return watcher.test(completedOperation);
-    }
-    return true;
+    // the failed watcher test indicates that it did not handle the
+    // completed state
+    return !watcher.test(completedOperation);
   }
 
   private List<Operation> sortedOperations() {
