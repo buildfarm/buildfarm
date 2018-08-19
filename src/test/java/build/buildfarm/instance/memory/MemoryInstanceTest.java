@@ -37,6 +37,7 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.Duration;
 import com.google.protobuf.util.Durations;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -214,8 +215,7 @@ public class MemoryInstanceTest {
         .build();
     outstandingOperations.put(operation.getName(), operation);
 
-    List<Predicate<Operation>> operationWatchers =
-        (List<Predicate<Operation>>) mock(List.class);
+    List<Predicate<Operation>> operationWatchers = new ArrayList<>();
     watchers.put(operation.getName(), operationWatchers);
 
     Predicate<Operation> watcher = (Predicate<Operation>) mock(Predicate.class);
@@ -223,7 +223,7 @@ public class MemoryInstanceTest {
         operation.getName(),
         /* watchInitialState=*/ false,
         watcher)).isTrue();
-    verify(operationWatchers, times(1)).add(eq(watcher));
+    assertThat(operationWatchers).containsExactly(watcher);
   }
 
   @Test
