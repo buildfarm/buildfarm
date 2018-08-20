@@ -27,9 +27,9 @@ new_http_archive(
 # The API that we implement.
 new_http_archive(
     name = "remote_apis",
-    sha256 = "e8d08e9c6aaebe00b4fadc50d4c2ff05f963281a84f569a36b6fe45627271f68",
-    url = "https://github.com/bazelbuild/remote-apis/archive/32cd933a7a7f3b4fe9c65e861f12aca5a642bb87.zip",
-    strip_prefix = "remote-apis-32cd933a7a7f3b4fe9c65e861f12aca5a642bb87",
+    sha256 = "865c6950a64b859cf211761330e5d13e6c4b54e22a454ae1195238594299de34",
+    url = "https://github.com/bazelbuild/remote-apis/archive/fdeb922b595df28650d12fc2335c4426df2fc726.zip",
+    strip_prefix = "remote-apis-fdeb922b595df28650d12fc2335c4426df2fc726",
     build_file = "BUILD.remote_apis",
 )
 
