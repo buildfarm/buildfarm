@@ -41,8 +41,8 @@ public class WatcherService extends WatcherGrpc.WatcherImplBase {
     Instance instance;
     try {
       instance = instances.getFromOperationName(operationName);
-    } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
+    } catch (InstanceNotFoundException e) {
+      responseObserver.onError(BuildFarmInstances.toStatusException(e));
       return;
     }
 
@@ -61,7 +61,10 @@ public class WatcherService extends WatcherGrpc.WatcherImplBase {
     } if (resumeMarker.isEmpty()) {
       watchInitialState = true;
     } else {
-      responseObserver.onError(new StatusException(Status.UNIMPLEMENTED));
+      responseObserver.onError(
+          Status.UNIMPLEMENTED
+              .withDescription("Only empty or 'now' resume_markers are supported")
+              .asException());
       return;
     }
 
@@ -85,17 +88,23 @@ public class WatcherService extends WatcherGrpc.WatcherImplBase {
             // would occur, or the operation is unknown
             if (operation == null || operation.getDone()) {
               responseObserver.onCompleted();
+              return false;
             }
-          } catch (StatusRuntimeException ex) {
-            if (ex.getStatus().getCode() != Status.Code.CANCELLED) {
-              throw ex;
+          } catch (StatusRuntimeException e) {
+            // no further responses should be necessary
+            if (e.getStatus().getCode() != Status.Code.CANCELLED) {
+              responseObserver.onError(Status.fromThrowable(e).asException());
             }
             return false;
-          } catch (IllegalStateException ex) {
-            ex.printStackTrace();
-            // check for 'call is closed'?
+          } catch (IllegalStateException e) {
+            // only indicator for this from ServerCallImpl layer
+            // no further responses should be necessary
+            if (!e.getMessage().equals("call is closed")) {
+              responseObserver.onError(Status.fromThrowable(e).asException());
+            }
             return false;
           }
+          // still watching
           return true;
         });
     if (!watching) {
