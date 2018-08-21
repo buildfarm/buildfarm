@@ -11,7 +11,7 @@ java_library(
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
-        "@remote_apis//:google_devtools_remote_execution_v2_remote_execution_java_proto",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )
 
@@ -25,7 +25,7 @@ java_library(
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "@googleapis//:google_longrunning_operations_java_proto",
-        "@remote_apis//:google_devtools_remote_execution_v2_remote_execution_java_proto",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )
 
@@ -48,7 +48,7 @@ java_library(
         "@googleapis//:google_longrunning_operations_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
         "@googleapis//:google_rpc_status_java_proto",
-        "@remote_apis//:google_devtools_remote_execution_v2_remote_execution_java_proto",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )
 
@@ -69,7 +69,7 @@ java_library(
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_longrunning_operations_java_proto",
         "@googleapis//:google_rpc_status_java_proto",
-        "@remote_apis//:google_devtools_remote_execution_v2_remote_execution_java_proto",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )
 
@@ -96,8 +96,8 @@ java_library(
         "@googleapis//:google_rpc_code_java_proto",
         "@googleapis//:google_watch_v1_java_grpc",
         "@googleapis//:google_watch_v1_java_proto",
-        "@remote_apis//:google_devtools_remote_execution_v2_remote_execution_java_grpc",
-        "@remote_apis//:google_devtools_remote_execution_v2_remote_execution_java_proto",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )
 
@@ -149,8 +149,8 @@ java_library(
         "@googleapis//:google_bytestream_bytestream_java_proto",
         "@googleapis//:google_longrunning_operations_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
-        "@remote_apis//:google_devtools_remote_execution_v2_remote_execution_java_grpc",
-        "@remote_apis//:google_devtools_remote_execution_v2_remote_execution_java_proto",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )
 
