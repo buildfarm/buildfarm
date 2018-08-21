@@ -119,7 +119,7 @@ public class Worker {
 
   private static HashFunction getValidHashFunction(WorkerConfig config) throws ConfigurationException {
     try {
-      return HashFunction.get(config.getHashFunction());
+      return HashFunction.get(config.getDigestFunction());
     } catch (IllegalArgumentException e) {
       throw new ConfigurationException("hash_function value unrecognized");
     }

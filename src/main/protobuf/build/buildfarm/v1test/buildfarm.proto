@@ -96,14 +96,7 @@ message MemoryInstanceConfig {
 message InstanceConfig {
   string name = 1;
 
-  enum HashFunction {
-    UNKNOWN = 0;
-    MD5 = 1;
-    SHA1 = 2;
-    SHA256 = 3;
-  }
-
-  HashFunction hash_function = 2;
+  build.bazel.remote.execution.v2.DigestFunction digest_function = 2;
 
   oneof type {
     MemoryInstanceConfig memory_instance_config = 3;
@@ -127,7 +120,7 @@ message InstanceEndpoint {
 }
 
 message WorkerConfig {
-  InstanceConfig.HashFunction hash_function = 1;
+  build.bazel.remote.execution.v2.DigestFunction digest_function = 1;
 
   // endpoint for all cas requests
   InstanceEndpoint content_addressable_storage = 2;

@@ -104,7 +104,7 @@ public class BuildFarmInstances implements Instances {
 
   private static HashFunction getValidHashFunction(InstanceConfig config) throws ConfigurationException {
     try {
-      return HashFunction.get(config.getHashFunction());
+      return HashFunction.get(config.getDigestFunction());
     } catch (IllegalArgumentException e) {
       throw new ConfigurationException("hash_function value unrecognized");
     }

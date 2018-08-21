@@ -18,13 +18,13 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.fail;
 
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.instance.stub.Chunker;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Retrier;
 import build.buildfarm.instance.stub.RetryException;
 import build.buildfarm.server.BuildFarmServer;
 import build.buildfarm.v1test.BuildFarmServerConfig;
-import build.buildfarm.v1test.InstanceConfig.HashFunction;
 import build.buildfarm.v1test.MemoryInstanceConfig;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.TakeOperationRequest;
@@ -39,6 +39,7 @@ import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse.Response;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteRequest;
@@ -104,7 +105,7 @@ public class BuildFarmServerTest {
         BuildFarmServerConfig.newBuilder().setPort(0);
     configBuilder.addInstancesBuilder()
         .setName("memory")
-        .setHashFunction(HashFunction.SHA256)
+        .setDigestFunction(DigestFunction.SHA256)
         .setMemoryInstanceConfig(memoryInstanceConfig);
 
     server = new BuildFarmServer(
@@ -123,7 +124,7 @@ public class BuildFarmServerTest {
 
   @Test
   public void findMissingBlobs() {
-    DigestUtil digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
+    DigestUtil digestUtil = new DigestUtil(HashFunction.SHA256);
     ByteString content = ByteString.copyFromUtf8("Hello, World!");
     Iterable<Digest> digests =
         Collections.singleton(digestUtil.compute(content));
@@ -142,7 +143,7 @@ public class BuildFarmServerTest {
 
   @Test
   public void batchUpdateBlobs() {
-    DigestUtil digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
+    DigestUtil digestUtil = new DigestUtil(HashFunction.SHA256);
     ByteString content = ByteString.copyFromUtf8("Hello, World!");
     Digest digest = digestUtil.compute(content);
     BatchUpdateBlobsRequest request = BatchUpdateBlobsRequest.newBuilder()
@@ -312,7 +313,7 @@ public class BuildFarmServerTest {
   }
 
   private Digest createAction(Function<Action, Action> onAction) throws RetryException, InterruptedException {
-    DigestUtil digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
+    DigestUtil digestUtil = new DigestUtil(HashFunction.SHA256);
     Command command = Command.newBuilder()
         .addArguments("echo")
         .build();
@@ -348,7 +349,7 @@ public class BuildFarmServerTest {
 
   @Test
   public void actionNotCached() {
-    DigestUtil digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
+    DigestUtil digestUtil = new DigestUtil(HashFunction.SHA256);
     GetActionResultRequest request = GetActionResultRequest.newBuilder()
         .setInstanceName("memory")
         .setActionDigest(digestUtil.empty())
