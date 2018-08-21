@@ -26,15 +26,20 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.ActionCacheUpdateCapabilities;
+import build.bazel.remote.execution.v2.CacheCapabilities;
+import build.bazel.remote.execution.v2.CacheCapabilities.SymlinkAbsolutePathStrategy;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteResponse;
+import build.bazel.remote.execution.v2.ExecutionCapabilities;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
+import build.bazel.remote.execution.v2.ServerCapabilities;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -797,5 +802,30 @@ public abstract class AbstractServerInstance implements Instance {
       return false;
     }
     return true;
+  }
+
+  protected CacheCapabilities getCacheCapabilities() {
+    return CacheCapabilities.newBuilder()
+        .addDigestFunction(digestUtil.getDigestFunction())
+        .setActionCacheUpdateCapabilities(ActionCacheUpdateCapabilities.newBuilder()
+            .setUpdateEnabled(true))
+        .setMaxBatchTotalSizeBytes(4 * 1024 * 1024)
+        .setSymlinkAbsolutePathStrategy(SymlinkAbsolutePathStrategy.DISALLOWED)
+        .build();
+  }
+
+  protected ExecutionCapabilities getExecutionCapabilities() {
+    return ExecutionCapabilities.newBuilder()
+        .setDigestFunction(digestUtil.getDigestFunction())
+        .setExecEnabled(true)
+        .build();
+  }
+
+  @Override
+  public ServerCapabilities getCapabilities() {
+    return ServerCapabilities.newBuilder()
+        .setCacheCapabilities(getCacheCapabilities())
+        .setExecutionCapabilities(getExecutionCapabilities())
+        .build();
   }
 }

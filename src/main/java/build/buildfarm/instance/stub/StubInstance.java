@@ -48,6 +48,7 @@ import build.bazel.remote.execution.v2.GetTreeRequest;
 import build.bazel.remote.execution.v2.GetTreeResponse;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
+import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.bazel.remote.execution.v2.UpdateActionResultRequest;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
@@ -403,6 +404,11 @@ public class StubInstance implements Instance {
 
   @Override
   public void cancelOperation(String operationName) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public ServerCapabilities getCapabilities() {
     throw new UnsupportedOperationException();
   }
 }

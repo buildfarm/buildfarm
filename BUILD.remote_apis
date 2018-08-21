@@ -19,3 +19,8 @@ java_grpc_library(
     srcs = ["//build/bazel/remote/execution/v2:remote_execution_proto"],
     deps = [":build_bazel_remote_execution_v2_remote_execution_java_proto"],
 )
+
+java_proto_library(
+    name = "build_bazel_semver_java_proto",
+    deps = ["//build/bazel/semver:semver_proto"],
+)

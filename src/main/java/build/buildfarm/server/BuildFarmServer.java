@@ -54,6 +54,7 @@ public class BuildFarmServer {
     instances = new BuildFarmInstances(config.getInstancesList(), defaultInstanceName);
     server = serverBuilder
         .addService(new ActionCacheService(instances))
+        .addService(new CapabilitiesService(instances))
         .addService(new ContentAddressableStorageService(instances))
         .addService(new ByteStreamService(instances))
         .addService(new ExecutionService(instances))

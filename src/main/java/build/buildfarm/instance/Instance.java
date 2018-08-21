@@ -24,6 +24,7 @@ import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import build.bazel.remote.execution.v2.Platform;
+import build.bazel.remote.execution.v2.ServerCapabilities;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
@@ -84,4 +85,6 @@ public interface Instance {
   boolean watchOperation(
       String operationName,
       Predicate<Operation> watcher);
+
+  ServerCapabilities getCapabilities();
 }
