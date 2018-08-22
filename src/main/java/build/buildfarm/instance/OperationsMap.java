@@ -15,6 +15,7 @@
 package build.buildfarm.instance;
 
 import com.google.longrunning.Operation;
+import java.util.Iterator;
 
 public interface OperationsMap {
   Operation remove(String name);
@@ -24,4 +25,6 @@ public interface OperationsMap {
   void put(String name, Operation operation) throws InterruptedException;
 
   Operation get(String name);
+
+  Iterator<Operation> iterator();
 }

@@ -67,7 +67,7 @@ public class MemoryInstance extends AbstractServerInstance {
   private final List<Worker> workers;
   private final Map<String, Watchdog> requeuers;
   private final Map<String, Watchdog> operationTimeoutDelays;
-  private final OutstandingOperations outstandingOperations;
+  private final OperationsMap outstandingOperations;
 
   private static final class Worker {
     private final Platform platform;
@@ -110,8 +110,9 @@ public class MemoryInstance extends AbstractServerInstance {
       return map.get(name);
     }
 
-    public Iterable<Operation> values() {
-      return map.values();
+    @Override
+    public Iterator<Operation> iterator() {
+      return map.values().iterator();
     }
   }
 
@@ -120,7 +121,7 @@ public class MemoryInstance extends AbstractServerInstance {
         name,
         digestUtil,
         config,
-        ContentAddressableStorage.create(config.getCasConfig()),
+        ContentAddressableStorages.create(config.getCasConfig()),
         /*watchers=*/ new ConcurrentHashMap<String, List<Predicate<Operation>>>(),
         new OutstandingOperations());
   }
@@ -132,7 +133,7 @@ public class MemoryInstance extends AbstractServerInstance {
       MemoryInstanceConfig config,
       ContentAddressableStorage contentAddressableStorage,
       Map<String, List<Predicate<Operation>>> watchers,
-      OutstandingOperations outstandingOperations) {
+      OperationsMap outstandingOperations) {
     super(
         name,
         digestUtil,
@@ -214,6 +215,11 @@ public class MemoryInstance extends AbstractServerInstance {
       @Override
       public Operation get(String name) {
         return map.get(name);
+      }
+
+      @Override
+      public Iterator<Operation> iterator() {
+        throw new UnsupportedOperationException();
       }
     };
   }
@@ -484,12 +490,6 @@ public class MemoryInstance extends AbstractServerInstance {
     return !watcher.test(completedOperation);
   }
 
-  private List<Operation> sortedOperations() {
-    return new ImmutableList.Builder<Operation>()
-        .addAll(outstandingOperations.values())
-        .build();
-  }
-
   @Override
   protected int getListOperationsDefaultPageSize() {
     return config.getListOperationsDefaultPageSize();
@@ -519,7 +519,7 @@ public class MemoryInstance extends AbstractServerInstance {
   @Override
   protected TokenizableIterator<Operation> createOperationsIterator(
       String pageToken) {
-    Iterator<Operation> iter = sortedOperations().iterator();
+    Iterator<Operation> iter = outstandingOperations.iterator();
     final OperationIteratorToken token;
     if (!pageToken.isEmpty()) {
       try {

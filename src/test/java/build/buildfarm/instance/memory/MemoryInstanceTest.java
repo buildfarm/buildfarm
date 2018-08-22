@@ -27,6 +27,7 @@ import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.instance.OperationsMap;
 import build.buildfarm.v1test.ActionCacheConfig;
 import build.buildfarm.v1test.DelegateCASConfig;
 import build.buildfarm.v1test.MemoryInstanceConfig;
@@ -58,7 +59,7 @@ import org.mockito.stubbing.Answer;
 public class MemoryInstanceTest {
   private Instance instance;
 
-  private MemoryInstance.OutstandingOperations outstandingOperations;
+  private OperationsMap outstandingOperations;
   private Map<String, List<Predicate<Operation>>> watchers;
 
   @Mock
@@ -106,7 +107,7 @@ public class MemoryInstanceTest {
   }
 
   @Test
-  public void listOperationsForOutstandingOperations() {
+  public void listOperationsForOutstandingOperations() throws InterruptedException {
     Operation operation = Operation.newBuilder()
         .setName("test-operation")
         .build();
@@ -126,7 +127,7 @@ public class MemoryInstanceTest {
   }
 
   @Test
-  public void listOperationsLimitsPages() {
+  public void listOperationsLimitsPages() throws InterruptedException {
     Operation testOperation1 = Operation.newBuilder()
         .setName("test-operation1")
         .build();
@@ -214,7 +215,7 @@ public class MemoryInstanceTest {
   }
 
   @Test
-  public void watchOperationAddsWatcher() {
+  public void watchOperationAddsWatcher() throws InterruptedException {
     Operation operation = Operation.newBuilder()
         .setName("my-watched-operation")
         .build();
@@ -232,7 +233,7 @@ public class MemoryInstanceTest {
   }
 
   @Test
-  public void watchOpRaceLossInvertsTestOnInitial() {
+  public void watchOpRaceLossInvertsTestOnInitial() throws InterruptedException {
     Operation operation = Operation.newBuilder()
         .setName("my-watched-operation")
         .build();
@@ -262,7 +263,8 @@ public class MemoryInstanceTest {
     verify(watcher, times(1)).test(eq(operation));
     verify(watcher, times(1)).test(eq(doneOperation));
 
-    outstandingOperations.clear();
+    // reset test
+    outstandingOperations.remove(operation.getName());
 
     Predicate<Operation> unfazedWatcher = (Predicate<Operation>) mock(Predicate.class);
     when(unfazedWatcher.test(eq(operation))).thenAnswer(initialAnswer);

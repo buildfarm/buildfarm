@@ -152,6 +152,7 @@ java_test(
         "//src/main/java/build/buildfarm:common",
         "//src/main/java/build/buildfarm:instance",
         "//src/main/java/build/buildfarm:memory-instance",
+        "//src/main/java/build/buildfarm:server-instance",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
         "@googleapis//:google_longrunning_operations_java_grpc",
