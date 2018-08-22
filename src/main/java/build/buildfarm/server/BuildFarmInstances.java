@@ -115,8 +115,7 @@ public class BuildFarmInstances implements Instances {
       String name = instanceConfig.getName();
       HashFunction hashFunction = getValidHashFunction(instanceConfig);
       DigestUtil digestUtil = new DigestUtil(hashFunction);
-      InstanceConfig.TypeCase typeCase = instanceConfig.getTypeCase();
-      switch (typeCase) {
+      switch (instanceConfig.getTypeCase()) {
         default:
         case TYPE_NOT_SET:
           throw new IllegalArgumentException("Instance type not set in config");

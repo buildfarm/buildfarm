@@ -14,8 +14,9 @@
 
 package build.buildfarm.instance;
 
-import build.buildfarm.common.ContentAddressableStorage;
-import build.buildfarm.common.ContentAddressableStorage.Blob;
+import build.buildfarm.ac.ActionCache;
+import build.buildfarm.cas.ContentAddressableStorage;
+import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import com.google.common.annotations.VisibleForTesting;
@@ -48,9 +49,9 @@ import java.util.function.Consumer;
 public abstract class AbstractServerInstance implements Instance {
   private final String name;
   protected final ContentAddressableStorage contentAddressableStorage;
-  protected final Map<ActionKey, ActionResult> actionCache;
-  protected final Map<String, Operation> outstandingOperations;
-  protected final Map<String, Operation> completedOperations;
+  protected final ActionCache actionCache;
+  protected final OperationsMap outstandingOperations;
+  protected final OperationsMap completedOperations;
   protected final DigestUtil digestUtil;
 
   private static final String DUPLICATE_FILE_NODE =
@@ -89,9 +90,9 @@ public abstract class AbstractServerInstance implements Instance {
       String name,
       DigestUtil digestUtil,
       ContentAddressableStorage contentAddressableStorage,
-      Map<ActionKey, ActionResult> actionCache,
-      Map<String, Operation> outstandingOperations,
-      Map<String, Operation> completedOperations) {
+      ActionCache actionCache,
+      OperationsMap outstandingOperations,
+      OperationsMap completedOperations) {
     this.name = name;
     this.contentAddressableStorage = contentAddressableStorage;
     this.actionCache = actionCache;
@@ -116,7 +117,7 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public void putActionResult(ActionKey actionKey, ActionResult actionResult) {
+  public void putActionResult(ActionKey actionKey, ActionResult actionResult) throws InterruptedException {
     actionCache.put(actionKey, actionResult);
   }
 
@@ -164,7 +165,8 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public Digest putBlob(ByteString content) throws IllegalArgumentException {
+  public Digest putBlob(ByteString content)
+      throws InterruptedException {
     if (content.size() == 0) {
       return digestUtil.empty();
     }
@@ -174,7 +176,8 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs) {
+  public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs)
+      throws InterruptedException {
     ImmutableList.Builder<Digest> blobDigestsBuilder =
       new ImmutableList.Builder<Digest>();
     for (ByteString blob : blobs) {
@@ -235,7 +238,7 @@ public abstract class AbstractServerInstance implements Instance {
   abstract protected Operation createOperation(ActionKey actionKey);
 
   // called when an operation will be queued for execution
-  protected void onQueue(Operation operation, Action action) {
+  protected void onQueue(Operation operation, Action action) throws InterruptedException {
   }
 
   private void stringsUniqueAndSortedPrecondition(
@@ -509,7 +512,7 @@ public abstract class AbstractServerInstance implements Instance {
       boolean skipCacheLookup,
       int totalInputFileCount,
       long totalInputFileBytes,
-      Consumer<Operation> onOperation) {
+      Consumer<Operation> onOperation) throws InterruptedException {
     validateAction(action);
 
     ActionKey actionKey = digestUtil.computeActionKey(action);
@@ -620,7 +623,7 @@ public abstract class AbstractServerInstance implements Instance {
   abstract protected void enqueueOperation(Operation operation);
 
   @Override
-  public boolean putOperation(Operation operation) {
+  public boolean putOperation(Operation operation) throws InterruptedException {
     if (isCancelled(operation)) {
       if (outstandingOperations.remove(operation.getName()) == null) {
         throw new IllegalStateException();
@@ -629,7 +632,7 @@ public abstract class AbstractServerInstance implements Instance {
       return true;
     }
     if (isExecuting(operation) &&
-        !outstandingOperations.containsKey(operation.getName())) {
+        !outstandingOperations.contains(operation.getName())) {
       return false;
     }
     if (isQueued(operation)) {
@@ -650,7 +653,7 @@ public abstract class AbstractServerInstance implements Instance {
    */
   protected abstract Object operationLock(String operationName);
 
-  protected void updateOperationWatchers(Operation operation) {
+  protected void updateOperationWatchers(Operation operation) throws InterruptedException {
     if (operation.getDone()) {
       synchronized(operationLock(operation.getName())) {
         completedOperations.put(operation.getName(), operation);
@@ -705,14 +708,14 @@ public abstract class AbstractServerInstance implements Instance {
     synchronized(operationLock(name)) {
       Operation deletedOperation = completedOperations.remove(name);
       if (deletedOperation == null &&
-          outstandingOperations.containsKey(name)) {
+          outstandingOperations.contains(name)) {
         throw new IllegalStateException();
       }
     }
   }
 
   @Override
-  public void cancelOperation(String name) {
+  public void cancelOperation(String name) throws InterruptedException {
     Operation operation = getOperation(name);
     putOperation(operation.toBuilder()
         .setDone(true)
@@ -722,7 +725,7 @@ public abstract class AbstractServerInstance implements Instance {
         .build());
   }
 
-  protected void expireOperation(Operation operation) {
+  protected void expireOperation(Operation operation) throws InterruptedException {
     ActionResult actionResult = ActionResult.newBuilder()
         .setExitCode(-1)
         .setStderrRaw(ByteString.copyFromUtf8(

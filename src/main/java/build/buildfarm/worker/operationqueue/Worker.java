@@ -413,7 +413,7 @@ public class Worker {
       }
 
       @Override
-      public boolean putOperation(Operation operation) {
+      public boolean putOperation(Operation operation) throws InterruptedException {
         return operationQueueInstance.putOperation(operation);
       }
 
@@ -424,7 +424,7 @@ public class Worker {
       }
 
       @Override
-      public void putActionResult(ActionKey actionKey, ActionResult actionResult) {
+      public void putActionResult(ActionKey actionKey, ActionResult actionResult) throws InterruptedException {
         acInstance.putActionResult(actionKey, actionResult);
       }
     };

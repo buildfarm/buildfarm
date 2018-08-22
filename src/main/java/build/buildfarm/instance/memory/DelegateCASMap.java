@@ -14,8 +14,8 @@
 
 package build.buildfarm.instance.memory;
 
-import build.buildfarm.common.ContentAddressableStorage;
-import build.buildfarm.common.ContentAddressableStorage.Blob;
+import build.buildfarm.cas.ContentAddressableStorage;
+import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
@@ -28,11 +28,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-class DelegateCASMap<K,V extends Message> implements Map<K,V> {
+class DelegateCASMap<K,V extends Message> {
   private final ContentAddressableStorage contentAddressableStorage;
   private final Parser<V> parser;
   private final DigestUtil digestUtil;
-  private final Map<K, Digest> digestMap;
+  private final Map<K, Digest> digestMap = new ConcurrentHashMap<>();
 
   public DelegateCASMap(
       ContentAddressableStorage contentAddressableStorage,
@@ -41,18 +41,15 @@ class DelegateCASMap<K,V extends Message> implements Map<K,V> {
     this.contentAddressableStorage = contentAddressableStorage;
     this.parser = parser;
     this.digestUtil = digestUtil;
-    digestMap = new ConcurrentHashMap<>();
   }
 
-  @Override
-  public V put(K key, V value) {
+  public V put(K key, V value) throws InterruptedException {
     Blob blob = new Blob(value.toByteString(), digestUtil);
     digestMap.put(key, blob.getDigest());
     contentAddressableStorage.put(blob, () -> digestMap.remove(key));
     return value;
   }
 
-  @Override
   public V get(Object key) {
     Digest valueDigest = digestMap.get(key);
     if (valueDigest == null) {
@@ -62,59 +59,10 @@ class DelegateCASMap<K,V extends Message> implements Map<K,V> {
     return expectValueType(valueDigest);
   }
 
-  @Override
-  public boolean isEmpty() {
-    return digestMap.isEmpty();
-  }
-
-  @Override
-  public int size() {
-    return digestMap.size();
-  }
-
-  @Override
   public boolean containsKey(Object key) {
     return digestMap.get(key) != null;
   }
 
-  @Override
-  public boolean containsValue(Object value) {
-    Preconditions.checkState(value instanceof Message);
-    return contentAddressableStorage.contains(digestUtil.compute((Message) value));
-  }
-
-  @Override
-  public Set<Map.Entry<K, V>> entrySet() {
-    return delegate().entrySet();
-  }
-
-  @Override
-  public Collection<V> values() {
-    return delegate().values();
-  }
-
-  @Override
-  public Set<K> keySet() {
-    return digestMap.keySet();
-  }
-
-  @Override
-  public void clear() {
-    digestMap.clear();
-  }
-
-  @Override
-  public void putAll(Map<? extends K,? extends V> m) {
-    Map<? extends K, Blob> blobs = Maps.transformValues(
-        m,
-        (value) -> new Blob(value.toByteString(), digestUtil));
-    for (Blob blob : blobs.values()) {
-      contentAddressableStorage.put(blob);
-    }
-    digestMap.putAll(Maps.transformValues(blobs, (blob) -> blob.getDigest()));
-  }
-
-  @Override
   public V remove(Object key) {
     Digest valueDigest = digestMap.remove(key);
     return expectValueType(valueDigest);
@@ -130,11 +78,5 @@ class DelegateCASMap<K,V extends Message> implements Map<K,V> {
     } catch (InvalidProtocolBufferException ex) {
       return null;
     }
-  }
-
-  private Map<K, V> delegate() {
-    return Maps.transformValues(
-        digestMap,
-        (valueDigest) -> expectValueType(valueDigest));
   }
 }

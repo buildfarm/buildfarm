@@ -53,6 +53,8 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
     } catch (IllegalStateException e) {
       responseObserver.onError(new StatusException(
           Status.FAILED_PRECONDITION.withDescription(e.getMessage())));
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
     }
   }
 }
