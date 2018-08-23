@@ -67,11 +67,15 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
     }
 
     ActionResult actionResult = request.getActionResult();
-    instance.putActionResult(
-        DigestUtil.asActionKey(request.getActionDigest()),
-        actionResult);
+    try {
+      instance.putActionResult(
+          DigestUtil.asActionKey(request.getActionDigest()),
+          actionResult);
 
-    responseObserver.onNext(actionResult);
-    responseObserver.onCompleted();
+      responseObserver.onNext(actionResult);
+      responseObserver.onCompleted();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
   }
 }

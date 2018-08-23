@@ -17,14 +17,14 @@ package build.buildfarm.instance.memory;
 import com.google.protobuf.Duration;
 
 public class Watchdog implements Runnable {
-  private final Runnable runnable;
+  private final InterruptingRunnable runnable;
   private final Duration petTimeout;
   private long timeoutNanos;
   private boolean stopped;
   private boolean done;
   private long start;
 
-  public Watchdog(Duration petTimeout, Runnable runnable) {
+  public Watchdog(Duration petTimeout, InterruptingRunnable runnable) {
     this.runnable = runnable;
     this.petTimeout = petTimeout;
     stopped = false;

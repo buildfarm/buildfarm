@@ -106,6 +106,8 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
       responseObserver.onError(Status.FAILED_PRECONDITION
           .withDescription(e.getMessage())
           .asException());
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
     }
   }
 }

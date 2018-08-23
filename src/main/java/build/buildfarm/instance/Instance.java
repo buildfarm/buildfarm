@@ -38,7 +38,7 @@ public interface Instance {
   DigestUtil getDigestUtil();
 
   ActionResult getActionResult(ActionKey actionKey);
-  void putActionResult(ActionKey actionKey, ActionResult actionResult);
+  void putActionResult(ActionKey actionKey, ActionResult actionResult) throws InterruptedException;
 
   Iterable<Digest> findMissingBlobs(Iterable<Digest> digests);
 
@@ -63,9 +63,9 @@ public interface Instance {
       boolean skipCacheLookup,
       ExecutionPolicy executionPolicy,
       ResultsCachePolicy resultsCachePolicy,
-      Predicate<Operation> onOperation);
-  void match(Platform platform, boolean requeueOnFailure, Predicate<Operation> onMatch);
-  boolean putOperation(Operation operation);
+      Predicate<Operation> onOperation) throws InterruptedException;
+  void match(Platform platform, boolean requeueOnFailure, Predicate<Operation> onMatch) throws InterruptedException;
+  boolean putOperation(Operation operation) throws InterruptedException;
   boolean pollOperation(String operationName, Stage stage);
   // returns nextPageToken suitable for list restart
   String listOperations(
@@ -74,7 +74,7 @@ public interface Instance {
       String filter,
       ImmutableList.Builder<Operation> operations);
   Operation getOperation(String name);
-  void cancelOperation(String name);
+  void cancelOperation(String name) throws InterruptedException;
   void deleteOperation(String name);
 
   // returns true if the operation will be handled in all cases through the

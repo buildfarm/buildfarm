@@ -14,11 +14,17 @@
 
 package build.buildfarm.instance.memory;
 
-import build.buildfarm.common.ContentAddressableStorage;
+import build.buildfarm.ac.ActionCache;
+import build.buildfarm.ac.GrpcActionCache;
+import build.buildfarm.cas.ContentAddressableStorage;
+import build.buildfarm.cas.ContentAddressableStorages;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.instance.AbstractServerInstance;
+import build.buildfarm.instance.OperationsMap;
 import build.buildfarm.instance.TokenizableIterator;
+import build.buildfarm.v1test.ActionCacheConfig;
+import build.buildfarm.v1test.GrpcACConfig;
 import build.buildfarm.v1test.MemoryInstanceConfig;
 import build.buildfarm.v1test.OperationIteratorToken;
 import com.google.common.annotations.VisibleForTesting;
@@ -39,6 +45,9 @@ import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
+import io.grpc.Channel;
+import io.grpc.netty.NegotiationType;
+import io.grpc.netty.NettyChannelBuilder;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
@@ -59,7 +68,7 @@ public class MemoryInstance extends AbstractServerInstance {
   private final List<Worker> workers;
   private final Map<String, Watchdog> requeuers;
   private final Map<String, Watchdog> operationTimeoutDelays;
-  private final Map<String, Operation> outstandingOperations;
+  private final OperationsMap outstandingOperations;
 
   private static final class Worker {
     private final Platform platform;
@@ -79,14 +88,43 @@ public class MemoryInstance extends AbstractServerInstance {
     }
   }
 
+  static class OutstandingOperations implements OperationsMap {
+    private final Map<String, Operation> map = new TreeMap<>();
+
+    @Override
+    public Operation remove(String name) {
+      return map.remove(name);
+    }
+
+    @Override
+    public boolean contains(String name) {
+      return map.containsKey(name);
+    }
+
+    @Override
+    public void put(String name, Operation operation) {
+      map.put(name, operation);
+    }
+
+    @Override
+    public Operation get(String name) {
+      return map.get(name);
+    }
+
+    @Override
+    public Iterator<Operation> iterator() {
+      return map.values().iterator();
+    }
+  }
+
   public MemoryInstance(String name, DigestUtil digestUtil, MemoryInstanceConfig config) {
     this(
         name,
         digestUtil,
         config,
-        /*contentAddressableStorage=*/ new MemoryLRUContentAddressableStorage(config.getCasMaxSizeBytes()),
+        ContentAddressableStorages.create(config.getCasConfig()),
         /*watchers=*/ new ConcurrentHashMap<String, List<Predicate<Operation>>>(),
-        /*outstandingOperations=*/ new TreeMap<String, Operation>());
+        new OutstandingOperations());
   }
 
   @VisibleForTesting
@@ -96,14 +134,14 @@ public class MemoryInstance extends AbstractServerInstance {
       MemoryInstanceConfig config,
       ContentAddressableStorage contentAddressableStorage,
       Map<String, List<Predicate<Operation>>> watchers,
-      Map<String, Operation> outstandingOperations) {
+      OperationsMap outstandingOperations) {
     super(
         name,
         digestUtil,
         contentAddressableStorage,
-        /*actionCache=*/ new DelegateCASMap<ActionKey, ActionResult>(contentAddressableStorage, ActionResult.parser(), digestUtil),
+        MemoryInstance.createActionCache(config.getActionCacheConfig(), contentAddressableStorage, digestUtil),
         outstandingOperations,
-        /*completedOperations=*/ new DelegateCASMap<String, Operation>(contentAddressableStorage, Operation.parser(), digestUtil));
+        MemoryInstance.createCompletedOperationMap(contentAddressableStorage, digestUtil));
     this.config = config;
     this.watchers = watchers;
     streams = new HashMap<String, ByteStringStreamSource>();
@@ -112,6 +150,79 @@ public class MemoryInstance extends AbstractServerInstance {
     requeuers = new HashMap<String, Watchdog>();
     operationTimeoutDelays = new HashMap<String, Watchdog>();
     this.outstandingOperations = outstandingOperations;
+  }
+
+  private static ActionCache createActionCache(ActionCacheConfig config, ContentAddressableStorage cas, DigestUtil digestUtil) {
+    switch (config.getTypeCase()) {
+      default:
+      case TYPE_NOT_SET:
+        throw new IllegalArgumentException("ActionCache config not set in config");
+      case GRPC:
+        return createGrpcActionCache(config.getGrpc());
+      case DELEGATE_CAS:
+        return createDelegateCASActionCache(cas, digestUtil);
+    }
+  }
+
+  private static Channel createChannel(String target) {
+    NettyChannelBuilder builder =
+        NettyChannelBuilder.forTarget(target)
+            .negotiationType(NegotiationType.PLAINTEXT);
+    return builder.build();
+  }
+
+  private static ActionCache createGrpcActionCache(GrpcACConfig config) {
+    Channel channel = createChannel(config.getTarget());
+    return new GrpcActionCache(config.getInstanceName(), channel);
+  }
+
+  private static ActionCache createDelegateCASActionCache(ContentAddressableStorage cas, DigestUtil digestUtil) {
+    return new ActionCache() {
+      DelegateCASMap<ActionKey, ActionResult> map =
+          new DelegateCASMap<>(cas, ActionResult.parser(), digestUtil);
+
+      @Override
+      public ActionResult get(ActionKey actionKey) {
+        return map.get(actionKey);
+      }
+
+      @Override
+      public void put(ActionKey actionKey, ActionResult actionResult) throws InterruptedException {
+        map.put(actionKey, actionResult);
+      }
+    };
+  }
+
+  private static OperationsMap createCompletedOperationMap(ContentAddressableStorage cas, DigestUtil digestUtil) {
+    return new OperationsMap() {
+      DelegateCASMap<String, Operation> map =
+          new DelegateCASMap<>(cas, Operation.parser(), digestUtil);
+
+      @Override
+      public Operation remove(String name) {
+        return map.remove(name);
+      }
+
+      @Override
+      public boolean contains(String name) {
+        return map.containsKey(name);
+      }
+
+      @Override
+      public void put(String name, Operation operation) throws InterruptedException {
+        map.put(name, operation);
+      }
+
+      @Override
+      public Operation get(String name) {
+        return map.get(name);
+      }
+
+      @Override
+      public Iterator<Operation> iterator() {
+        throw new UnsupportedOperationException();
+      }
+    };
   }
 
   private ByteStringStreamSource getSource(String name) {
@@ -141,7 +252,7 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  protected void updateOperationWatchers(Operation operation) {
+  protected void updateOperationWatchers(Operation operation) throws InterruptedException {
     synchronized(watchers) {
       List<Predicate<Operation>> operationWatchers =
           watchers.get(operation.getName());
@@ -188,7 +299,7 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  protected void onQueue(Operation operation, Action action) {
+  protected void onQueue(Operation operation, Action action) throws InterruptedException {
     putBlob(action.toByteString());
   }
 
@@ -218,7 +329,7 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  public boolean putOperation(Operation operation) {
+  public boolean putOperation(Operation operation) throws InterruptedException {
     if (!super.putOperation(operation)) {
       return false;
     }
@@ -295,7 +406,11 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  public void match(Platform platform, boolean requeueOnFailure, Predicate<Operation> onMatch) {
+  public void match(
+      Platform platform,
+      boolean requeueOnFailure,
+      Predicate<Operation> onMatch)
+      throws InterruptedException {
     synchronized(queuedOperations) {
       ImmutableList.Builder<Operation> rejectedOperations = new ImmutableList.Builder<Operation>();
       boolean matched = false;
@@ -382,12 +497,6 @@ public class MemoryInstance extends AbstractServerInstance {
     return !watcher.test(completedOperation);
   }
 
-  private List<Operation> sortedOperations() {
-    return new ImmutableList.Builder<Operation>()
-        .addAll(outstandingOperations.values())
-        .build();
-  }
-
   @Override
   protected int getListOperationsDefaultPageSize() {
     return config.getListOperationsDefaultPageSize();
@@ -417,7 +526,7 @@ public class MemoryInstance extends AbstractServerInstance {
   @Override
   protected TokenizableIterator<Operation> createOperationsIterator(
       String pageToken) {
-    Iterator<Operation> iter = sortedOperations().iterator();
+    Iterator<Operation> iter = outstandingOperations.iterator();
     final OperationIteratorToken token;
     if (!pageToken.isEmpty()) {
       try {

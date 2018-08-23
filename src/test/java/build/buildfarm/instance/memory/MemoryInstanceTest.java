@@ -22,11 +22,14 @@ import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 
-import build.buildfarm.common.ContentAddressableStorage;
-import build.buildfarm.common.ContentAddressableStorage.Blob;
+import build.buildfarm.cas.ContentAddressableStorage;
+import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.instance.OperationsMap;
+import build.buildfarm.v1test.ActionCacheConfig;
+import build.buildfarm.v1test.DelegateCASConfig;
 import build.buildfarm.v1test.MemoryInstanceConfig;
 import com.google.common.collect.ImmutableList;
 import build.bazel.remote.execution.v2.Action;
@@ -41,7 +44,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -55,7 +57,7 @@ import org.mockito.stubbing.Answer;
 public class MemoryInstanceTest {
   private Instance instance;
 
-  private Map<String, Operation> outstandingOperations;
+  private OperationsMap outstandingOperations;
   private Map<String, List<Predicate<Operation>>> watchers;
 
   @Mock
@@ -64,7 +66,7 @@ public class MemoryInstanceTest {
   @Before
   public void setUp() throws Exception {
     MockitoAnnotations.initMocks(this);
-    outstandingOperations = new HashMap<>();
+    outstandingOperations = new MemoryInstance.OutstandingOperations();
     watchers = new HashMap<>();
     MemoryInstanceConfig memoryInstanceConfig = MemoryInstanceConfig.newBuilder()
         .setListOperationsDefaultPageSize(1024)
@@ -75,6 +77,9 @@ public class MemoryInstanceTest {
         .setOperationCompletedDelay(Durations.fromSeconds(10))
         .setDefaultActionTimeout(Durations.fromSeconds(600))
         .setMaximumActionTimeout(Durations.fromSeconds(3600))
+        .setActionCacheConfig(ActionCacheConfig.newBuilder()
+            .setDelegateCas(DelegateCASConfig.getDefaultInstance())
+            .build())
         .build();
 
     instance = new MemoryInstance(
@@ -86,7 +91,7 @@ public class MemoryInstanceTest {
         outstandingOperations);
   }
 
-  @Test @Ignore
+  @Test
   public void listOperationsForEmptyOutstanding() {
     ImmutableList.Builder<Operation> operations = new ImmutableList.Builder<>();
 
@@ -99,8 +104,8 @@ public class MemoryInstanceTest {
     assertThat(operations.build()).isEmpty();
   }
 
-  @Test @Ignore
-  public void listOperationsForOutstandingOperations() {
+  @Test
+  public void listOperationsForOutstandingOperations() throws InterruptedException {
     Operation operation = Operation.newBuilder()
         .setName("test-operation")
         .build();
@@ -119,8 +124,8 @@ public class MemoryInstanceTest {
     assertThat(operations.build()).containsExactly(operation);
   }
 
-  @Test @Ignore
-  public void listOperationsLimitsPages() {
+  @Test
+  public void listOperationsLimitsPages() throws InterruptedException {
     Operation testOperation1 = Operation.newBuilder()
         .setName("test-operation1")
         .build();
@@ -153,7 +158,7 @@ public class MemoryInstanceTest {
     assertThat(operations.build()).containsExactly(testOperation1, testOperation2);
   }
 
-  @Test @Ignore
+  @Test
   public void actionCacheMissResult() {
     Action action = Action.getDefaultInstance();
 
@@ -161,8 +166,8 @@ public class MemoryInstanceTest {
           instance.getDigestUtil().computeActionKey(action))).isNull();
   }
 
-  @Test @Ignore
-  public void actionCacheRetrievableByActionKey() {
+  @Test
+  public void actionCacheRetrievableByActionKey() throws InterruptedException {
     ActionResult result = ActionResult.getDefaultInstance();
     when(storage.get(instance.getDigestUtil().compute(result)))
         .thenReturn(new Blob(result.toByteString(), instance.getDigestUtil()));
@@ -175,7 +180,7 @@ public class MemoryInstanceTest {
         instance.getDigestUtil().computeActionKey(action))).isEqualTo(result);
   }
 
-  @Test @Ignore
+  @Test
   public void missingOperationWatchInvertsWatcher() {
     Predicate<Operation> watcher = (Predicate<Operation>) mock(Predicate.class);
     when(watcher.test(eq(null))).thenReturn(true);
@@ -185,7 +190,7 @@ public class MemoryInstanceTest {
     verify(watcher, times(1)).test(eq(null));
   }
 
-  @Test @Ignore
+  @Test
   public void watchWithCompletedSignalsWatching() {
     Predicate<Operation> watcher = (Predicate<Operation>) mock(Predicate.class);
     when(watcher.test(eq(null))).thenReturn(false);
@@ -196,7 +201,7 @@ public class MemoryInstanceTest {
   }
 
   @Test
-  public void watchOperationAddsWatcher() {
+  public void watchOperationAddsWatcher() throws InterruptedException {
     Operation operation = Operation.newBuilder()
         .setName("my-watched-operation")
         .build();
@@ -213,8 +218,8 @@ public class MemoryInstanceTest {
     assertThat(operationWatchers).containsExactly(watcher);
   }
 
-  @Test @Ignore
-  public void watchOpRaceLossInvertsTestOnInitial() {
+  @Test
+  public void watchOpRaceLossInvertsTestOnInitial() throws InterruptedException {
     Operation operation = Operation.newBuilder()
         .setName("my-watched-operation")
         .build();
@@ -243,7 +248,8 @@ public class MemoryInstanceTest {
     verify(watcher, times(1)).test(eq(operation));
     verify(watcher, times(1)).test(eq(doneOperation));
 
-    outstandingOperations.clear();
+    // reset test
+    outstandingOperations.remove(operation.getName());
 
     Predicate<Operation> unfazedWatcher = (Predicate<Operation>) mock(Predicate.class);
     when(unfazedWatcher.test(eq(operation))).thenAnswer(initialAnswer);
