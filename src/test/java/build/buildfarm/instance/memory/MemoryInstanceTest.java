@@ -210,8 +210,7 @@ public class MemoryInstanceTest {
     List<Predicate<Operation>> operationWatchers = new ArrayList<>();
     watchers.put(operation.getName(), operationWatchers);
 
-    Predicate<Operation> watcher = (Predicate<Operation>) mock(Predicate.class);
-    when(watcher.test(eq(operation))).thenReturn(true);
+    Predicate<Operation> watcher = (o) -> true;
     assertThat(instance.watchOperation(
         operation.getName(),
         watcher)).isTrue();
