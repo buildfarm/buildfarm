@@ -309,19 +309,17 @@ public class BuildFarmServerTest {
   @Test(expected = StatusRuntimeException.class)
   public void actionWithExcessiveTimeoutFailsValidation()
       throws RetryException, InterruptedException, InvalidProtocolBufferException {
-    Digest actionDigestWithExcessiveTimeout = createAction(
-        (action) -> action.toBuilder()
-            .setTimeout(Duration.newBuilder().setSeconds(9000))
-            .build());
+    Digest actionDigestWithExcessiveTimeout = createAction(Action.newBuilder()
+        .setTimeout(Duration.newBuilder().setSeconds(9000)));
 
     executeAction(actionDigestWithExcessiveTimeout);
   }
 
   private Digest createSimpleAction() throws RetryException, InterruptedException {
-    return createAction((action) -> action);
+    return createAction(Action.newBuilder());
   }
 
-  private Digest createAction(Function<Action, Action> onAction) throws RetryException, InterruptedException {
+  private Digest createAction(Action.Builder actionBuilder) throws RetryException, InterruptedException {
     DigestUtil digestUtil = new DigestUtil(HashFunction.SHA256);
     Command command = Command.newBuilder()
         .addArguments("echo")
@@ -329,11 +327,10 @@ public class BuildFarmServerTest {
     Digest commandBlobDigest = digestUtil.compute(command);
     Directory root = Directory.getDefaultInstance();
     Digest rootBlobDigest = digestUtil.compute(root);
-    Action action = Action.newBuilder()
+    Action action = actionBuilder
         .setCommandDigest(commandBlobDigest)
         .setInputRootDigest(rootBlobDigest)
         .build();
-    action = onAction.apply(action);
     Digest actionDigest = digestUtil.compute(action);
     ByteStreamUploader uploader = new ByteStreamUploader("memory", inProcessChannel, null, 60, Retrier.NO_RETRIES, null);
 
