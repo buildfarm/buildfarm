@@ -137,7 +137,7 @@ public class DigestUtil {
   }
 
   public Digest compute(Path file) throws IOException {
-    return compute(file, Files.size(file));
+    return buildDigest(computeHash(file), Files.size(file));
   }
 
   private String computeHash(Path file) throws IOException {
@@ -147,10 +147,6 @@ public class DigestUtil {
         return Files.newInputStream(file);
       }
     }.hash(hashFn.getHash()).toString();
-  }
-
-  public Digest compute(Path file, long fileSize) throws IOException {
-    return buildDigest(computeHash(file), fileSize);
   }
 
   public Digest compute(ByteString blob) {

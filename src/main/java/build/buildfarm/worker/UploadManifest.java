@@ -94,10 +94,10 @@ class UploadManifest {
       if (stat.isDirectory()) {
         mismatchedOutput(file);
       } else if (stat.isFile()) {
-        addFile(file, stat.getSize(), policy);
+        addFile(file, policy);
       } else if (allowSymlinks && stat.isSymbolicLink()) {
         /** FIXME symlink to directory? */
-        addFile(file, -1, policy);
+        addFile(file, policy);
       } else {
         illegalOutput(file);
       }
@@ -162,11 +162,8 @@ class UploadManifest {
     }
   }
 
-  private void addFile(Path file, long size, CASInsertionPolicy policy) throws IOException {
-    if (size == -1) {
-      size = Files.size(file.toRealPath());
-    }
-    Digest digest = digestUtil.compute(file, size);
+  private void addFile(Path file, CASInsertionPolicy policy) throws IOException {
+    Digest digest = digestUtil.compute(file);
     OutputFile.Builder builder = result
         .addOutputFilesBuilder()
         .setPath(execRoot.relativize(file).toString())
