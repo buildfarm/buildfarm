@@ -70,7 +70,7 @@ public class MatchStage extends PipelineStage {
     }
 
     ByteString commandBlob = workerContext.getBlob(action.getCommandDigest());
-    if (actionBlob == null) {
+    if (commandBlob == null) {
       return false;
     }
 
