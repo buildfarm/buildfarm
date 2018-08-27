@@ -129,10 +129,10 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
       responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
       return;
     }
-    ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
 
     String pageToken = request.getPageToken();
     do {
+      ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
       String nextPageToken = instance.getTree(
           request.getRootDigest(), pageSize, pageToken, directories);
 
