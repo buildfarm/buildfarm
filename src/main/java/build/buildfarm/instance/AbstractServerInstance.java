@@ -528,10 +528,7 @@ public abstract class AbstractServerInstance implements Instance {
     try {
       action = Action.parseFrom(actionBlob);
     } catch (InvalidProtocolBufferException e) {
-      Preconditions.checkState(
-          false,
-          INVALID_DIGEST);
-      return;
+      throw new IllegalStateException(INVALID_DIGEST);
     }
 
     validateAction(action);
