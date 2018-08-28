@@ -3,7 +3,7 @@ syntax = "proto3";
 package build.buildfarm.v1test;
 
 import "google/api/annotations.proto";
-import "google/devtools/remoteexecution/v1test/remote_execution.proto";
+import "build/bazel/remote/execution/v2/remote_execution.proto";
 import "google/longrunning/operations.proto";
 import "google/protobuf/duration.proto";
 import "google/rpc/status.proto";
@@ -39,7 +39,7 @@ message TakeOperationRequest {
   // choose to execute the action on any worker satisfying the requirements, so
   // the client SHOULD ensure that running the action on any such worker will
   // have the same result.
-  google.devtools.remoteexecution.v1test.Platform platform = 5;
+  build.bazel.remote.execution.v2.Platform platform = 5;
 }
 
 message PollOperationRequest {
@@ -47,7 +47,7 @@ message PollOperationRequest {
   string operation_name = 2;
 
   // The current state of the worker
-  google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage stage = 3;
+  build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage stage = 3;
 }
 
 message BuildFarmServerConfig {
@@ -135,14 +135,7 @@ message MemoryInstanceConfig {
 message InstanceConfig {
   string name = 1;
 
-  enum HashFunction {
-    UNKNOWN = 0;
-    MD5 = 1;
-    SHA1 = 2;
-    SHA256 = 3;
-  }
-
-  HashFunction hash_function = 2;
+  build.bazel.remote.execution.v2.DigestFunction digest_function = 2;
 
   oneof type {
     MemoryInstanceConfig memory_instance_config = 3;
@@ -166,7 +159,7 @@ message InstanceEndpoint {
 }
 
 message WorkerConfig {
-  InstanceConfig.HashFunction hash_function = 1;
+  build.bazel.remote.execution.v2.DigestFunction digest_function = 1;
 
   // endpoint for all cas requests
   InstanceEndpoint content_addressable_storage = 2;
@@ -219,7 +212,7 @@ message WorkerConfig {
   google.protobuf.Duration operation_poll_period = 16;
 
   // initial platform used to match operations
-  google.devtools.remoteexecution.v1test.Platform platform = 17;
+  build.bazel.remote.execution.v2.Platform platform = 17;
 
   // execute width
   int32 execute_stage_width = 18;
@@ -240,7 +233,7 @@ message WorkerConfig {
 }
 
 message TreeIteratorToken {
-  repeated google.devtools.remoteexecution.v1test.Digest directories = 1;
+  repeated build.bazel.remote.execution.v2.Digest directories = 1;
 }
 
 message OperationIteratorToken {

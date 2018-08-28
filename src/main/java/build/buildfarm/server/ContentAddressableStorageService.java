@@ -16,16 +16,17 @@ package build.buildfarm.server;
 
 import build.buildfarm.instance.Instance;
 import com.google.common.collect.ImmutableList;
-import com.google.devtools.remoteexecution.v1test.BatchUpdateBlobsRequest;
-import com.google.devtools.remoteexecution.v1test.BatchUpdateBlobsResponse;
-import com.google.devtools.remoteexecution.v1test.ContentAddressableStorageGrpc;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.Directory;
-import com.google.devtools.remoteexecution.v1test.FindMissingBlobsRequest;
-import com.google.devtools.remoteexecution.v1test.FindMissingBlobsResponse;
-import com.google.devtools.remoteexecution.v1test.GetTreeRequest;
-import com.google.devtools.remoteexecution.v1test.GetTreeResponse;
-import com.google.devtools.remoteexecution.v1test.UpdateBlobRequest;
+import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
+import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest.Request;
+import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
+import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse.Response;
+import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
+import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
+import build.bazel.remote.execution.v2.GetTreeRequest;
+import build.bazel.remote.execution.v2.GetTreeResponse;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.StatusException;
@@ -72,24 +73,24 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
     }
 
     ImmutableList.Builder<ByteString> validBlobsBuilder = new ImmutableList.Builder<>();
-    ImmutableList.Builder<BatchUpdateBlobsResponse.Response> responses =
+    ImmutableList.Builder<Response> responses =
         new ImmutableList.Builder<>();
     Function<com.google.rpc.Code, com.google.rpc.Status> statusForCode =
         (code) -> com.google.rpc.Status.newBuilder()
             .setCode(code.getNumber())
             .build();
     // FIXME do this validation through the instance interface
-    for (UpdateBlobRequest request : batchRequest.getRequestsList()) {
+    for (Request request : batchRequest.getRequestsList()) {
       com.google.rpc.Status status;
-      Digest digest = request.getContentDigest();
+      Digest digest = request.getDigest();
       if (digest.equals(instance.getDigestUtil().compute(request.getData()))) {
         validBlobsBuilder.add(request.getData());
         status = statusForCode.apply(com.google.rpc.Code.OK);
       } else {
         status = statusForCode.apply(com.google.rpc.Code.INVALID_ARGUMENT);
       }
-      responses.add(BatchUpdateBlobsResponse.Response.newBuilder()
-          .setBlobDigest(digest)
+      responses.add(Response.newBuilder()
+          .setDigest(digest)
           .setStatus(status)
           .build());
     }
@@ -128,14 +129,19 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
       responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
       return;
     }
-    ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
-    String nextPageToken = instance.getTree(
-        request.getRootDigest(), pageSize, request.getPageToken(), directories);
 
-    responseObserver.onNext(GetTreeResponse.newBuilder()
-        .addAllDirectories(directories.build())
-        .setNextPageToken(nextPageToken)
-        .build());
+    String pageToken = request.getPageToken();
+    do {
+      ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
+      String nextPageToken = instance.getTree(
+          request.getRootDigest(), pageSize, pageToken, directories);
+
+      responseObserver.onNext(GetTreeResponse.newBuilder()
+          .addAllDirectories(directories.build())
+          .setNextPageToken(nextPageToken)
+          .build());
+      pageToken = nextPageToken;
+    } while (!pageToken.isEmpty());
     responseObserver.onCompleted();
   }
 }

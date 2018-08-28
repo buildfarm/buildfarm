@@ -33,21 +33,23 @@ import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
-import com.google.devtools.remoteexecution.v1test.Action;
-import com.google.devtools.remoteexecution.v1test.ActionCacheGrpc;
-import com.google.devtools.remoteexecution.v1test.ActionCacheGrpc.ActionCacheBlockingStub;
-import com.google.devtools.remoteexecution.v1test.ActionResult;
-import com.google.devtools.remoteexecution.v1test.ContentAddressableStorageGrpc;
-import com.google.devtools.remoteexecution.v1test.ContentAddressableStorageGrpc.ContentAddressableStorageBlockingStub;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.Directory;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
-import com.google.devtools.remoteexecution.v1test.FindMissingBlobsRequest;
-import com.google.devtools.remoteexecution.v1test.FindMissingBlobsResponse;
-import com.google.devtools.remoteexecution.v1test.GetTreeRequest;
-import com.google.devtools.remoteexecution.v1test.GetTreeResponse;
-import com.google.devtools.remoteexecution.v1test.Platform;
-import com.google.devtools.remoteexecution.v1test.UpdateActionResultRequest;
+import build.bazel.remote.execution.v2.ActionCacheGrpc;
+import build.bazel.remote.execution.v2.ActionCacheGrpc.ActionCacheBlockingStub;
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc;
+import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageBlockingStub;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecutionPolicy;
+import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
+import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
+import build.bazel.remote.execution.v2.GetTreeRequest;
+import build.bazel.remote.execution.v2.GetTreeResponse;
+import build.bazel.remote.execution.v2.Platform;
+import build.bazel.remote.execution.v2.ResultsCachePolicy;
+import build.bazel.remote.execution.v2.ServerCapabilities;
+import build.bazel.remote.execution.v2.UpdateActionResultRequest;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -64,7 +66,6 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 public class StubInstance implements Instance {
@@ -298,7 +299,7 @@ public class StubInstance implements Instance {
       int pageSize,
       String pageToken,
       ImmutableList.Builder<Directory> directories) {
-    GetTreeResponse response = contentAddressableStorageBlockingStub
+    Iterator<GetTreeResponse> replies = contentAddressableStorageBlockingStub
         .get()
         .getTree(GetTreeRequest.newBuilder()
             .setInstanceName(getName())
@@ -306,17 +307,23 @@ public class StubInstance implements Instance {
             .setPageSize(pageSize)
             .setPageToken(pageToken)
             .build());
-    directories.addAll(response.getDirectoriesList());
-    return response.getNextPageToken();
+    // new streaming interface doesn't really fit with what we're trying to do here...
+    String nextPageToken = "";
+    while (replies.hasNext()) {
+      GetTreeResponse response = replies.next();
+      directories.addAll(response.getDirectoriesList());
+      nextPageToken = response.getNextPageToken();
+    }
+    return nextPageToken;
   }
 
   @Override
   public void execute(
-      Action action,
+      Digest actionDigest,
       boolean skipCacheLookup,
-      int totalInputFileCount,
-      long totalInputFileBytes,
-      Consumer<Operation> onOperation) {
+      ExecutionPolicy executionPolicy,
+      ResultsCachePolicy resultsCachePolicy,
+      Predicate<Operation> onOperation) {
     throw new UnsupportedOperationException();
   }
 
@@ -374,7 +381,6 @@ public class StubInstance implements Instance {
   @Override
   public boolean watchOperation(
       String operationName,
-      boolean watchInitialState,
       Predicate<Operation> watcher) {
     return false;
   }
@@ -398,6 +404,11 @@ public class StubInstance implements Instance {
 
   @Override
   public void cancelOperation(String operationName) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public ServerCapabilities getCapabilities() {
     throw new UnsupportedOperationException();
   }
 }

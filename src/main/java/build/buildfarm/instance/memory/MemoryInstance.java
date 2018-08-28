@@ -33,12 +33,13 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.io.BaseEncoding;
-import com.google.devtools.remoteexecution.v1test.Action;
-import com.google.devtools.remoteexecution.v1test.ActionResult;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.Directory;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
-import com.google.devtools.remoteexecution.v1test.Platform;
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.Platform;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -382,12 +383,15 @@ public class MemoryInstance extends AbstractServerInstance {
 
   @Override
   protected boolean matchOperation(Operation operation) {
+    Command command = expectCommand(operation);
+    Preconditions.checkState(command != null, "command not found");
+
     ImmutableList.Builder<Worker> rejectedWorkers = new ImmutableList.Builder<>();
     boolean dispatched = false;
     synchronized(workers) {
       while (!dispatched && !workers.isEmpty()) {
         Worker worker = workers.remove(0);
-        if (!satisfiesRequirements(worker.getPlatform(), operation)) {
+        if (!satisfiesRequirements(worker.getPlatform(), command)) {
           rejectedWorkers.add(worker);
         } else {
           // worker onMatch false return indicates inviability
@@ -402,21 +406,30 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  public void match(Platform platform, boolean requeueOnFailure, Predicate<Operation> onMatch) {
+  public void match(
+      Platform platform,
+      boolean requeueOnFailure,
+      Predicate<Operation> onMatch)
+      throws InterruptedException {
     synchronized(queuedOperations) {
       ImmutableList.Builder<Operation> rejectedOperations = new ImmutableList.Builder<Operation>();
       boolean matched = false;
       while (!matched && !queuedOperations.isEmpty()) {
         Operation operation = queuedOperations.remove(0);
-        if (satisfiesRequirements(platform, operation)) {
-          matched = true;
-          if (onMatch.test(operation)) {
-            onDispatched(operation);
-          } else if (!requeueOnFailure) {
+        Command command = expectCommand(operation);
+        if (command == null) {
+          cancelOperation(operation.getName());
+        } else {
+          if (satisfiesRequirements(platform, command)) {
+            matched = true;
+            if (onMatch.test(operation)) {
+              onDispatched(operation);
+            } else if (!requeueOnFailure) {
+              rejectedOperations.add(operation);
+            }
+          } else {
             rejectedOperations.add(operation);
           }
-        } else {
-          rejectedOperations.add(operation);
         }
       }
       Iterables.addAll(queuedOperations, rejectedOperations.build());
@@ -428,8 +441,7 @@ public class MemoryInstance extends AbstractServerInstance {
     }
   }
 
-  private boolean satisfiesRequirements(Platform platform, Operation operation) {
-    Action action = expectAction(operation);
+  private boolean satisfiesRequirements(Platform platform, Command command) {
     // string compare only
     // no duplicate names
     ImmutableMap.Builder<String, String> provisionsBuilder =
@@ -438,7 +450,7 @@ public class MemoryInstance extends AbstractServerInstance {
       provisionsBuilder.put(property.getName(), property.getValue());
     }
     Map<String, String> provisions = provisionsBuilder.build();
-    for (Platform.Property property : action.getPlatform().getPropertiesList()) {
+    for (Platform.Property property : command.getPlatform().getPropertiesList()) {
       if (!provisions.containsKey(property.getName()) ||
           !provisions.get(property.getName()).equals(property.getValue())) {
         return false;
@@ -450,18 +462,15 @@ public class MemoryInstance extends AbstractServerInstance {
   @Override
   public boolean watchOperation(
       String operationName,
-      boolean watchInitialState,
       Predicate<Operation> watcher) {
-    if (watchInitialState) {
-      Operation operation = getOperation(operationName);
-      if (!watcher.test(operation)) {
-        // watcher processed completed state
-        return true;
-      }
-      if (operation == null || operation.getDone()) {
-        // watcher did not process completed state
-        return false;
-      }
+    Operation operation = getOperation(operationName);
+    if (!watcher.test(operation)) {
+      // watcher processed completed state
+      return true;
+    }
+    if (operation == null || operation.getDone()) {
+      // watcher did not process completed state
+      return false;
     }
     Operation completedOperation = null;
     synchronized(watchers) {
@@ -470,10 +479,8 @@ public class MemoryInstance extends AbstractServerInstance {
         /* we can race on the synchronization and miss a done, where the
          * watchers list has been removed, making it necessary to check for the
          * operation within this context */
-        Operation operation = getOperation(operationName);
-        if (operation == null || !watchInitialState) {
-          // missing operation with no initial state requires no handling
-          // leave non-watchInitialState watchers of missing items to linger
+        operation = getOperation(operationName);
+        if (operation == null) {
           return true;
         }
         Preconditions.checkState(

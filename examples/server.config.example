@@ -2,11 +2,11 @@
 instances {
   name: "default_memory_instance"
 
-  # the hash function for this instance, required
+  # the digest function for this instance, required
   # to match out of band between the client and server
   # since resource names must be determined on the client
   # for a valid upload
-  hash_function: SHA256
+  digest_function: SHA256
 
   # the implicit type specifier for this instance
   # a memory instance is volatile and has no persistent
@@ -68,8 +68,8 @@ instances {
 instances {
   name: "another_memory_instance"
 
-  # hash functions may be different between instances
-  hash_function: SHA1
+  # digest functions may be different between instances
+  digest_function: SHA1
 
   memory_instance_config: {
     list_operations_default_page_size: 1024

@@ -14,7 +14,7 @@
 
 package build.buildfarm.worker;
 
-import com.google.devtools.remoteexecution.v1test.Digest;
+import build.bazel.remote.execution.v2.Digest;
 import java.io.InputStream;
 import java.util.function.Function;
 
