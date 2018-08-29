@@ -27,6 +27,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.devtools.remoteexecution.v1test.ActionResult;
@@ -84,6 +85,7 @@ public class RedisShardBackplane implements ShardBackplane {
   private @Nullable Runnable onUnsubscribe = null;
   private Thread subscriptionThread = null;
   private Thread failsafeOperationThread = null;
+  private Set<String> previousPrequeued = ImmutableSet.of();
   private OperationSubscriber operationSubscriber = null;
   private RedisShardSubscription operationSubscription = null;
   private boolean poolStarted = false;
@@ -162,6 +164,7 @@ public class RedisShardBackplane implements ShardBackplane {
   public void updateWatchedIfDone(Jedis jedis) {
     List<String> operationChannels = operationSubscriber.watchedOperationChannels();
     if (operationChannels.isEmpty()) {
+      previousPrequeued = ImmutableSet.of();
       return;
     }
 
@@ -178,6 +181,7 @@ public class RedisShardBackplane implements ShardBackplane {
     p.sync();
 
     Set<String> prequeued = new HashSet(prequeuedResponse.get());
+    ImmutableSet.Builder<String> previousPrequeuedBuilder = new ImmutableSet.Builder<>();
 
     int iRemainingIncomplete = 20;
     for (Map.Entry<String, Response<String>> entry : operations) {
@@ -188,14 +192,19 @@ public class RedisShardBackplane implements ShardBackplane {
       if (operation == null || operation.getDone()) {
         operationSubscriber.onOperation(operationChannel(operationName), operation);
         System.out.println("RedisShardBackplane::updateWatchedIfDone: Operation " + operationName + " done due to " + (operation == null ? "null" : "completed"));
-      } else if (isPrequeued.test(operation) && !prequeued.contains(operation.getName())) {
-        prequeueOperation(jedis, operation.getName());
-        System.out.println("RedisShardBackplane::updateWatchedIfDone: Operation " + operationName + " reprequeued...");
+      } else if (!prequeued.contains(operation.getName()) && isPrequeued.test(operation)) {
+        if (previousPrequeued.contains(operation.getName())) {
+          prequeueOperation(jedis, operation.getName());
+          System.out.println("RedisShardBackplane::updateWatchedIfDone: Operation " + operationName + " reprequeued...");
+        } else {
+          previousPrequeuedBuilder.add(operation.getName());
+        }
       } else if (iRemainingIncomplete > 0) {
         System.out.println("RedisShardBackplane::updateWatchedIfDone: Operation " + operationName);
         iRemainingIncomplete--;
       }
     }
+    previousPrequeued = previousPrequeuedBuilder.build();
   }
 
   private void startSubscriptionThread() {
