@@ -85,6 +85,7 @@ public class WatcherService extends WatcherGrpc.WatcherImplBase {
             // would occur, or the operation is unknown
             if (operation == null || operation.getDone()) {
               responseObserver.onCompleted();
+              return false;
             }
           } catch (StatusRuntimeException e) {
             if (e.getStatus().getCode() != Status.Code.CANCELLED) {
