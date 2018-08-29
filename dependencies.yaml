@@ -49,7 +49,7 @@ dependencies:
       lang: java
       modules: [ "buffer", "codec", "codec-http", "codec-http2", "codec-socks", "common", "handler",
         "handler-proxy", "resolver", "transport" ]
-      version: "4.1.17.Final"
+      version: "4.1.22.Final"
 
   #
   io.grpc:
