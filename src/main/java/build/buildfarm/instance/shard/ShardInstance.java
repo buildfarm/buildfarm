@@ -1015,8 +1015,8 @@ public class ShardInstance extends AbstractServerInstance {
     } catch (InvalidProtocolBufferException e) {
       try {
         cancelOperation(operation.getName());
-      } catch (IllegalStateException ex) {
-        e.printStackTrace();
+      } catch (IllegalStateException cancelEx) {
+        cancelEx.printStackTrace();
       }
       return Futures.immediateFailedFuture(e);
     }
