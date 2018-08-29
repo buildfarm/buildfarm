@@ -97,6 +97,7 @@ public class ReportResultStage extends PipelineStage {
     CompletedOperationMetadata metadata = CompletedOperationMetadata.newBuilder()
         .setCompletedAt(completedAt)
         .setExecutedOn(workerContext.getName())
+        .setMatchedIn(operationContext.matchedIn)
         .setFetchedIn(operationContext.fetchedIn)
         .setExecutedIn(operationContext.executedIn)
         .setReportedIn(reportedIn)
