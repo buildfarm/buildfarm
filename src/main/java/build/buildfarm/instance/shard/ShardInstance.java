@@ -236,7 +236,7 @@ public class ShardInstance extends AbstractServerInstance {
               Operation operation = backplane.getOperation(operationName);
               if (operation == null) {
                 backplane.deleteOperation(operationName);
-              } else {
+              } else if (isUnknown(operation)) {
                 queue(operation);
               }
             } catch (IOException e) {
