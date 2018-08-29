@@ -49,7 +49,7 @@ class OperationSubscriber extends JedisPubSub {
 
   public List<String> watchedOperationChannels() {
     synchronized (watchers) {
-      return new ArrayList<>(watchers.keySet());
+      return ImmutableList.copyOf(watchers.keySet());
     }
   }
 
