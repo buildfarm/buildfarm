@@ -172,9 +172,20 @@ class Executor implements Runnable {
           (endTime - startTime) / 1000000.0f,
           waitTime / 1000000.0f));
     } catch (InterruptedException e) {
+      /* we can be interrupted when the poller fails */
+      try {
+        owner.error().put(operationContext);
+      } catch (InterruptedException errorEx) {
+        errorEx.printStackTrace();
+      }
       Thread.currentThread().interrupt();
     } catch (Exception e) {
       e.printStackTrace();
+      try {
+        owner.error().put(operationContext);
+      } catch (InterruptedException errorEx) {
+        errorEx.printStackTrace();
+      }
       throw e;
     } finally {
       owner.release();
