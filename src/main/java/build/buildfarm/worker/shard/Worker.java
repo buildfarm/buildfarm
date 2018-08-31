@@ -232,22 +232,6 @@ public class Worker implements Instances {
     return instance;
   }
 
-  /*
-  private void removeMalfunctioningWorkerClient(String worker) {
-    StubInstance instance = workerStubs.remove(worker);
-    if (instance != null) {
-      ManagedChannel channel = instance.getChannel();
-      channel.shutdownNow();
-      try {
-        channel.awaitTermination(0, TimeUnit.SECONDS);
-      } catch (InterruptedException intEx) {
-        // impossible, 0 timeout
-        Thread.currentThread().interrupt();
-      }
-    }
-  }
-  */
-
   private void fetchInputs(
       Path execDir,
       Digest directoryDigest,
@@ -263,20 +247,8 @@ public class Worker implements Instances {
 
     for (FileNode fileNode : directory.getFilesList()) {
       Path execPath = execDir.resolve(fileNode.getName());
-      /*
-      System.out.println(String.format("Worker::fetchInputs(%s) linking %s (%s)",
-            DigestUtil.toString(directoryDigest),
-            fileNode.getIsExecutable() ? ("*" + fileNode.getName() + "*") : fileNode.getName(),
-            DigestUtil.toString(fileNode.getDigest())));
-            */
       Path fileCacheKey = fileCache.put(fileNode.getDigest(), fileNode.getIsExecutable(), /* containingDirectory=*/ null);
       inputFiles.add(fileCacheKey);
-      /*
-      System.out.println(String.format("Worker::fetchInputs(%s) linking %s complete (%s)",
-            DigestUtil.toString(directoryDigest),
-            fileNode.getIsExecutable() ? ("*" + fileNode.getName() + "*") : fileNode.getName(),
-            DigestUtil.toString(fileNode.getDigest())));
-            */
       Files.createLink(execPath, fileCacheKey);
     }
 
@@ -288,34 +260,10 @@ public class Worker implements Instances {
       Path dirPath = execDir.resolve(name);
       if (childOutputDirectory != null || !config.getLinkInputDirectories()) {
         Files.createDirectories(dirPath);
-        /*
-        System.out.println(String.format("Worker::fetchInputs(%s) subdirectory %s (%s)",
-              DigestUtil.toString(directoryDigest),
-              name,
-              DigestUtil.toString(digest)));
-              */
         fetchInputs(dirPath, digest, directoriesIndex, childOutputDirectory, inputFiles, inputDirectories);
-        /*
-        System.out.println(String.format("Worker::fetchInputs(%s) subdirectory complete %s (%s)",
-              DigestUtil.toString(directoryDigest),
-              name,
-              DigestUtil.toString(digest)));
-              */
       } else {
-        /*
-        System.out.println(String.format("Worker::fetchInputs(%s) linkDirectory %s (%s)",
-              DigestUtil.toString(directoryDigest),
-              name,
-              DigestUtil.toString(digest)));
-              */
         linkDirectory(dirPath, digest, directoriesIndex);
         inputDirectories.add(digest);
-        /*
-        System.out.println(String.format("Worker::fetchInputs(%s) linkDirectory complete %s (%s)",
-              DigestUtil.toString(directoryDigest),
-              name,
-              DigestUtil.toString(digest)));
-              */
       }
     }
   }
