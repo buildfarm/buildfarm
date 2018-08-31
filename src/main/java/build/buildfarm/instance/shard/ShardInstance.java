@@ -975,13 +975,13 @@ public class ShardInstance extends AbstractServerInstance {
       return false;
     }
 
-    if (!isQueuedOperationMetadata) {
+    if (isQueuedOperationMetadata) {
+      backplane.requeueDispatchedOperation(operation);
+    } else {
       Operation queuedOperation = operation.toBuilder()
           .setMetadata(Any.pack(metadata))
           .build();
       backplane.putOperation(queuedOperation, Stage.QUEUED);
-    } else {
-      backplane.requeueDispatchedOperation(operation);
     }
     return true;
   }
