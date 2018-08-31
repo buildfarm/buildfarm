@@ -40,7 +40,7 @@ instances {
     cas_config: {
       memory: {
         # limit for CAS total content size in bytes
-        cas_max_size_bytes: 1073741824 # 1024 * 1024 * 1024
+        max_size_bytes: 1073741824 # 1024 * 1024 * 1024
       }
     }
 
