@@ -26,6 +26,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -471,8 +472,8 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   protected Map<Digest, Directory> createDirectoriesIndex(Iterable<Directory> directories) {
-    Set<Digest> directoryDigests = new HashSet<>();
-    ImmutableMap.Builder<Digest, Directory> directoriesIndex = new ImmutableMap.Builder<>();
+    Set<Digest> directoryDigests = Sets.newHashSet();
+    ImmutableMap.Builder<Digest, Directory> directoriesIndex = ImmutableMap.builder();
     for (Directory directory : directories) {
       // double compute here...
       Digest directoryDigest = digestUtil.compute(directory);
