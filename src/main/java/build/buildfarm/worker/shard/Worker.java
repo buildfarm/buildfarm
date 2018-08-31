@@ -336,24 +336,22 @@ public class Worker implements Instances {
       private InputStream fetchBlobFromRemoteWorker(Digest blobDigest, Deque<String> workers, long offset) throws IOException, InterruptedException {
         String worker = workers.removeFirst();
         try {
-          for (;;) {
-            Instance instance = workerStub(worker);
+          Instance instance = workerStub(worker);
 
-            InputStream input = instance.newStreamInput(instance.getBlobName(blobDigest), offset);
-            // ensure that if the blob cannot be fetched, that we throw here
-            input.available();
-            if (Thread.interrupted()) {
-              throw new InterruptedException();
-            }
-            return input;
+          InputStream input = instance.newStreamInput(instance.getBlobName(blobDigest), offset);
+          // ensure that if the blob cannot be fetched, that we throw here
+          input.available();
+          if (Thread.interrupted()) {
+            throw new InterruptedException();
           }
+          return input;
         } catch (RetryException e) {
           Status st = Status.fromThrowable(e);
           if (st.getCode().equals(Code.UNAVAILABLE)) {
             backplane.removeBlobLocation(blobDigest, worker);
             // for now, leave this up to schedulers
             // removeMalfunctioningWorker(worker, e, "getBlob(" + DigestUtil.toString(blobDigest) + ")");
-          } else if (st.getCode().equals(Code.NOT_FOUND)) {
+          } else if (st.getCode() == Code.NOT_FOUND) {
             // ignore this, the worker will update the backplane eventually
           } else if (Retrier.DEFAULT_IS_RETRIABLE.test(st)) {
             // why not, always
@@ -361,8 +359,8 @@ public class Worker implements Instances {
           } else {
             throw e;
           }
-          throw new NoSuchFileException(DigestUtil.toString(blobDigest));
         }
+        throw new NoSuchFileException(DigestUtil.toString(blobDigest));
       }
 
       private List<String> correctMissingBlob(Digest digest) throws IOException {
@@ -421,34 +419,33 @@ public class Worker implements Instances {
           backplane.removeBlobLocation(blobDigest, config.getPublicName());
         }
         List<String> workersList = new ArrayList<>(workerSet);
+        boolean emptyWorkerList = workersList.isEmpty();
+        if (workersList.isEmpty()) {
+          workersList.addAll(correctMissingBlob(blobDigest));
+          if (workersList.isEmpty()) {
+            throw new NoSuchFileException(DigestUtil.toString(blobDigest));
+          }
+        }
         Collections.shuffle(workersList, rand);
         Deque<String> workers = new ArrayDeque(workersList);
 
         boolean printFinal = false;
-        boolean triedCheck = false;
+        boolean triedCheck = workersList.isEmpty();
         for (;;) {
-          if (workers.isEmpty()) {
-            if (triedCheck) {
-              // maybe just return null here
-              throw new IOException("worker not found for blob " + DigestUtil.toString(blobDigest));
-            }
+          try {
+            return fetchBlobFromRemoteWorker(blobDigest, workers, offset);
+          } catch (IOException e) {
+            if (workers.isEmpty()) {
+              if (triedCheck) {
+                throw e;
+              }
 
-            workersList.clear();
-            workersList.addAll(correctMissingBlob(blobDigest));
-            Collections.shuffle(workersList, rand);
-            workers = new ArrayDeque(workersList);
-            triedCheck = true;
-          } else {
-            int sizeBeforeFetch = workers.size();
-            InputStream input = fetchBlobFromRemoteWorker(blobDigest, workers, offset);
-            if (sizeBeforeFetch == workers.size()) {
-              printFinal = true;
-              System.out.println("Pushed worker to end of request list: " + workers.peekLast() + " for " + DigestUtil.toString(blobDigest));
+              workersList.clear();
+              workersList.addAll(correctMissingBlob(blobDigest));
+              Collections.shuffle(workersList, rand);
+              workers = new ArrayDeque(workersList);
+              triedCheck = true;
             }
-            if (printFinal) {
-              System.out.println("fetch with retried loop succeeded for " + DigestUtil.toString(blobDigest));
-            }
-            return input;
           }
         }
       }
