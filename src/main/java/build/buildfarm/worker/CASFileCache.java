@@ -174,26 +174,30 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
   private boolean contains(Digest digest, boolean isExecutable) throws IOException {
     Path key = getKey(digest, isExecutable);
     Lock l = acquire(key);
-    l.lock();
-    try {
-      Entry e = storage.get(key);
-      if (e == null) {
-        return false;
-      }
-      synchronized (this) {
-        if (!entryExists(e)) {
-          Entry removedEntry = storage.remove(key);
-          if (removedEntry != null) {
-            unlinkEntry(removedEntry);
-          }
+    if (l.tryLock()) {
+      try {
+        Entry e = storage.get(key);
+        if (e == null) {
           return false;
         }
-        e.recordAccess(header);
-        return true;
+        synchronized (this) {
+          if (!entryExists(e)) {
+            Entry removedEntry = storage.remove(key);
+            if (removedEntry != null) {
+              unlinkEntry(removedEntry);
+            }
+            return false;
+          }
+          e.recordAccess(header);
+          return true;
+        }
+      } finally {
+        release(key);
+        l.unlock();
       }
-    } finally {
-      release(key);
-      l.unlock();
+    } else {
+      // extremely unlikely that we collide with an operation doing the remove that would have returned true
+      return false;
     }
   }
 
