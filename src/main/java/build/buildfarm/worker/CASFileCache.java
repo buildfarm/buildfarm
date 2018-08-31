@@ -857,6 +857,9 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
     if (out != null) {
       try (InputStream in = inputStreamFactory.newInput(digest, 0)) {
         ByteStreams.copy(in, out);
+      } catch (IOException e) {
+        e.printStackTrace(); // prevent burial by early end of stream during close
+        throw e;
       } finally {
         out.close();
       }
