@@ -28,12 +28,9 @@ import build.buildfarm.v1test.ShardWorkerInstanceConfig;
 import build.buildfarm.worker.InputStreamFactory;
 import build.buildfarm.worker.OutputStreamFactory;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.SettableFuture;
 import com.google.devtools.remoteexecution.v1test.Action;
 import com.google.devtools.remoteexecution.v1test.ActionResult;
 import com.google.devtools.remoteexecution.v1test.Digest;
@@ -66,11 +63,6 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   private final ContentAddressableStorage contentAddressableStorage;
   private final InputStreamFactory inputStreamFactory;
   private final OutputStreamFactory outputStreamFactory;
-
-  // FIXME close on eviction
-  private final Cache<Digest, ChunkObserver> activeBlobWriters = CacheBuilder.newBuilder()
-      .maximumSize(1024 * 1024)
-      .build();
 
   public ShardWorkerInstance(
       String name,
@@ -178,83 +170,12 @@ public class ShardWorkerInstance extends AbstractServerInstance {
 
   @Override
   public ChunkObserver getWriteBlobObserver(Digest blobDigest) {
-    try {
-      return activeBlobWriters.get(blobDigest, () -> new ChunkObserver() {
-        OutputStream stream = null;
-        long committedSize = 0;
-        boolean alreadyExists = false;
-        SettableFuture<Long> committedFuture = SettableFuture.create();
-
-        @Override
-        public long getCommittedSize() {
-          return committedSize;
-        }
-
-        @Override
-        public ListenableFuture<Long> getCommittedFuture() {
-          return committedFuture;
-        }
-
-        @Override
-        public void reset() {
-          if (stream != null) {
-            try {
-              stream.close();
-            } catch (IOException e) {
-              // ignore exception on reset
-            }
-          }
-          alreadyExists = false;
-          stream = null;
-
-          committedSize = 0;
-        }
-
-        @Override
-        public void onNext(ByteString chunk) {
-          try {
-            if (!alreadyExists && stream == null) {
-              stream = outputStreamFactory.newOutput(blobDigest);
-              alreadyExists = stream == null;
-            }
-            if (!alreadyExists) {
-              chunk.writeTo(stream);
-            }
-          } catch (IOException e) {
-            throw Status.INTERNAL.withCause(e).asRuntimeException();
-          }
-          committedSize += chunk.size();
-        }
-
-        @Override
-        public void onCompleted() {
-          activeBlobWriters.invalidate(blobDigest);
-          if (stream != null) {
-            try {
-              stream.close();
-            } catch (IOException e) {
-              throw Status.INTERNAL.withCause(e).asRuntimeException();
-            }
-          }
-          committedFuture.set(committedSize);
-        }
-
-        @Override
-        public void onError(Throwable t) {
-          activeBlobWriters.invalidate(blobDigest);
-          if (stream != null) {
-            try {
-              stream.close(); // relies on validity check in CAS
-            } catch (IOException e) {
-              // ignore?
-            }
-          }
-          committedFuture.setException(t);
-        }
-      });
-    } catch (ExecutionException e) {
-      throw Status.INTERNAL.withCause(e).asRuntimeException();
-    }
+    return new OutputStreamChunkObserver() {
+      @Override
+      protected OutputStream newOutput() throws IOException {
+        return outputStreamFactory.newOutput(blobDigest);
+      }
+    };
   }
 
   protected TokenizableIterator<DirectoryEntry> createTreeIterator(Digest rootDigest, String pageToken) {
