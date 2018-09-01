@@ -227,7 +227,9 @@ class Executor implements Runnable {
     int exitValue = -1;
     Process process;
     try {
-      process = processBuilder.start();
+      synchronized (this) {
+        process = processBuilder.start();
+      }
       process.getOutputStream().close();
     } catch(IOException e) {
       e.printStackTrace();
