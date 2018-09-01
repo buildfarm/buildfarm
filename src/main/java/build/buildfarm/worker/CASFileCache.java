@@ -894,9 +894,9 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
     ListeningExecutorService service = MoreExecutors.listeningDecorator(Executors.newSingleThreadExecutor());
     Lock l = acquire(key);
     ListenableFuture<OutputStream> future = service.submit(() -> {
-      l.lock();
       final OutputStream out;
       boolean outIsSet = false;
+      l.lock();
       try {
         out = putImplSynchronized(
             key,
@@ -905,9 +905,6 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
             containingDirectory,
             onInsert);
         outIsSet = true;
-      } catch (IOException|InterruptedException e) {
-        release(key);
-        throw e;
       } finally {
         if (!outIsSet) {
           release(key);
