@@ -313,10 +313,10 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
             chunkObserver.onNext(request.getData());
           } catch (IllegalArgumentException|InstanceNotFoundException|ServiceNotFoundException e) {
             Throwable t = Status.INVALID_ARGUMENT.withDescription(e.getLocalizedMessage()).asException();
-            responseObserver.onError(t);
             if (chunkObserver != null) {
               chunkObserver.onError(t);
             }
+            responseObserver.onError(t);
             return;
           }
         }
