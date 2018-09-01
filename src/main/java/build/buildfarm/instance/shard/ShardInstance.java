@@ -1087,8 +1087,11 @@ public class ShardInstance extends AbstractServerInstance {
           }
 
           void error(String operationName, Throwable t) {
+            Status st = Status.fromThrowable(t);
+            String description = st.getDescription();
             com.google.rpc.Status status = com.google.rpc.Status.newBuilder()
-                .setCode(Status.fromThrowable(t).getCode().value())
+                .setCode(st.getCode().value())
+                .setMessage(description == null ? "" : st.getDescription())
                 .build();
             operationDeletionService.execute(new Runnable() {
               // we must make all efforts to delete this thing
