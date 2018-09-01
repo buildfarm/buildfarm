@@ -242,6 +242,11 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
 
       @Override
       public void onCompleted() {
+        // I don't expect this to be true, but hopefully it will prevent us from missing a close
+        if (chunkObserver != null) {
+          chunkObserver.onCompleted();
+          chunkObserver = null;
+        }
       }
 
       @Override
