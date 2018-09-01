@@ -196,8 +196,8 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
         l.unlock();
       }
     } else {
-      // extremely unlikely that we collide with an operation doing the remove that would have returned true
-      return false;
+      // can't preserve the integrity, but if another of the contains has the lock, it is doing so
+      return storage.get(key) != null;
     }
   }
 
