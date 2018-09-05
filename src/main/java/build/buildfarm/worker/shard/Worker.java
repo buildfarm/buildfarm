@@ -226,6 +226,17 @@ public class Worker implements Instances {
         Retrier.DEFAULT_IS_RETRIABLE);
   }
 
+  private static Retrier createRedisRetrier() {
+    return new Retrier(
+        Backoff.exponential(
+              java.time.Duration.ofMillis(/*options.experimentalRemoteRetryStartDelayMillis=*/ 100),
+              java.time.Duration.ofMillis(/*options.experimentalRemoteRetryMaxDelayMillis=*/ 5000),
+              /*options.experimentalRemoteRetryMultiplier=*/ 2,
+              /*options.experimentalRemoteRetryJitter=*/ 0.1,
+              /*options.experimentalRemoteRetryMaxAttempts=*/ 5),
+          Retrier.REDIS_IS_RETRIABLE);
+    }
+
   private ByteStreamUploader createStubUploader(Channel channel) {
     return new ByteStreamUploader("", channel, null, 300, createStubRetrier(), retryScheduler);
   }
@@ -892,7 +903,7 @@ public class Worker implements Instances {
 
       @Override
       public boolean putOperation(Operation operation, Action action) throws IOException, InterruptedException {
-        boolean success = instance.putOperation(operation);
+        boolean success = putOperation(operation);
         if (success && operation.getDone()) {
           backplane.removeTree(action.getInputRootDigest());
         }
@@ -976,6 +987,17 @@ public class Worker implements Instances {
       @Override
       public OutputStream getStreamOutput(String name) {
         throw new UnsupportedOperationException();
+      }
+
+      private boolean putOperation(Operation operation) throws IOException {
+        try {
+          return createRedisRetrier().execute(() -> {
+            return instance.putOperation(operation);
+          });
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        }
+        return false;
       }
     };
 

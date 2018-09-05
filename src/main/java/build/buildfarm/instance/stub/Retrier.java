@@ -155,6 +155,18 @@ public class Retrier {
         }
       };
 
+  public static final Predicate<Status> REDIS_IS_RETRIABLE =
+      st -> {
+        switch (st.getCode()) {
+        case CANCELLED:
+          return !Thread.currentThread().isInterrupted();
+        case DEADLINE_EXCEEDED:
+          return true;
+        default:
+          return false;
+        }
+      };
+
   public static final Predicate<Status> RETRY_ALL = Predicates.alwaysTrue();
   public static final Predicate<Status> RETRY_NONE = Predicates.alwaysFalse();
   public static final Retrier NO_RETRIES = new Retrier(Backoff.NO_RETRIES, RETRY_NONE);
