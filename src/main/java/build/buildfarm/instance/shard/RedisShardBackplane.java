@@ -334,13 +334,11 @@ public class RedisShardBackplane implements ShardBackplane {
           status = Status.DEADLINE_EXCEEDED;
         } else if (cause instanceof IOException) {
           throw (IOException) cause;
+        } else {
+          cause = cause.getCause();
         }
-        cause = cause.getCause();
       }
-      if (cause != null) {
-        status = status.withCause(cause);
-      }
-      throw new IOException(status.asRuntimeException());
+      throw new IOException(status.withCause(cause == null ? e : cause).asRuntimeException());
     }
   }
 
