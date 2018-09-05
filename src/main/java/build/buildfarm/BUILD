@@ -93,19 +93,6 @@ java_library(
     ],
 )
 
-java_binary(
-    name = "bf-bench",
-    srcs = ["Bench.java"],
-    main_class = "build.buildfarm.Bench",
-    deps = [
-        ":common",
-        ":shard-instance",
-        "//3rdparty/jvm/com/google/protobuf:protobuf_java_util",
-        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
-        "@com_google_guava_guava//jar",
-    ],
-)
-
 java_library(
     name = "shard-instance",
     srcs = glob(["instance/shard/*.java"]),
@@ -376,29 +363,6 @@ java_binary(
         "//3rdparty/jvm/io/grpc:grpc_netty",
         "//3rdparty/jvm/io/grpc:grpc_protobuf",
         "//3rdparty/jvm/io/grpc:grpc_stub",
-        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
-        "@googleapis//:google_rpc_code_java_proto",
-    ],
-)
-
-java_binary(
-    name = "bf-clean",
-    srcs = ["Clean.java"],
-    main_class = "build.buildfarm.Clean",
-    deps = [
-        ":common",
-        ":instance",
-        ":stub-instance",
-        "//3rdparty/jvm/com/google/guava",
-        "//3rdparty/jvm/com/google/protobuf:protobuf_java",
-        "//3rdparty/jvm/com/google/protobuf:protobuf_java_util",
-        "//3rdparty/jvm/io/grpc:grpc_context",
-        "//3rdparty/jvm/io/grpc:grpc_core",
-        "//3rdparty/jvm/io/grpc:grpc_netty",
-        "//3rdparty/jvm/io/grpc:grpc_protobuf",
-        "//3rdparty/jvm/io/grpc:grpc_stub",
-        "//3rdparty/jvm/org/apache/commons:commons_pool2",
-        "//3rdparty/jvm/redis/clients:jedis",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
     ],
