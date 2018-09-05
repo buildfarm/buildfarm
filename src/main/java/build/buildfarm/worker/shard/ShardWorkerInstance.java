@@ -14,6 +14,9 @@
 
 package build.buildfarm.worker.shard;
 
+import static com.google.common.util.concurrent.Futures.transform;
+import static com.google.common.util.concurrent.Futures.allAsList;
+
 import build.buildfarm.common.ContentAddressableStorage;
 import build.buildfarm.common.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
@@ -60,7 +63,6 @@ import javax.naming.ConfigurationException;
 public class ShardWorkerInstance extends AbstractServerInstance {
   private final ShardWorkerInstanceConfig config;
   private final ShardBackplane backplane;
-  private final ContentAddressableStorage contentAddressableStorage;
   private final InputStreamFactory inputStreamFactory;
   private final OutputStreamFactory outputStreamFactory;
 
@@ -72,10 +74,9 @@ public class ShardWorkerInstance extends AbstractServerInstance {
       InputStreamFactory inputStreamFactory,
       OutputStreamFactory outputStreamFactory,
       ShardWorkerInstanceConfig config) throws ConfigurationException {
-    super(name, digestUtil, null, null, null, null, null);
+    super(name, digestUtil, contentAddressableStorage, null, null, null, null);
     this.config = config;
     this.backplane = backplane;
-    this.contentAddressableStorage = contentAddressableStorage;
     this.inputStreamFactory = inputStreamFactory;
     this.outputStreamFactory = outputStreamFactory;
   }
@@ -92,17 +93,6 @@ public class ShardWorkerInstance extends AbstractServerInstance {
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }
-  }
-
-  @Override
-  public Iterable<Digest> findMissingBlobs(Iterable<Digest> digests) {
-    ImmutableList.Builder<Digest> builder = new ImmutableList.Builder<>();
-    for (Digest digest : digests) {
-      if (!contentAddressableStorage.contains(digest)) {
-        builder.add(digest);
-      }
-    }
-    return builder.build();
   }
 
   @Override

@@ -19,6 +19,7 @@ import static com.google.common.util.concurrent.Futures.addCallback;
 import static com.google.common.util.concurrent.Futures.allAsList;
 import static com.google.common.util.concurrent.Futures.catching;
 import static com.google.common.util.concurrent.Futures.transform;
+import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Instance.ChunkObserver;
@@ -64,11 +65,23 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
       return;
     }
 
-    responseObserver.onNext(FindMissingBlobsResponse.newBuilder()
-        .addAllMissingBlobDigests(
-            instance.findMissingBlobs(request.getBlobDigestsList()))
-        .build());
-    responseObserver.onCompleted();
+    FindMissingBlobsResponse.Builder builder = FindMissingBlobsResponse.newBuilder();
+    addCallback(
+        transform(
+            instance.findMissingBlobs(request.getBlobDigestsList(), newDirectExecutorService()),
+            builder::addAllMissingBlobDigests),
+        new FutureCallback<FindMissingBlobsResponse.Builder>() {
+          @Override
+          public void onSuccess(FindMissingBlobsResponse.Builder builder) {
+            responseObserver.onNext(builder.build());
+            responseObserver.onCompleted();
+          }
+
+          @Override
+          public void onFailure(Throwable t) {
+            responseObserver.onError(t);
+          }
+        });
   }
 
   private static com.google.rpc.Status statusForCode(Code code) {

@@ -35,6 +35,7 @@ import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
+import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.devtools.remoteexecution.v1test.Action;
@@ -43,6 +44,7 @@ import com.google.devtools.remoteexecution.v1test.ActionCacheGrpc.ActionCacheBlo
 import com.google.devtools.remoteexecution.v1test.ActionResult;
 import com.google.devtools.remoteexecution.v1test.ContentAddressableStorageGrpc;
 import com.google.devtools.remoteexecution.v1test.ContentAddressableStorageGrpc.ContentAddressableStorageBlockingStub;
+import com.google.devtools.remoteexecution.v1test.ContentAddressableStorageGrpc.ContentAddressableStorageFutureStub;
 import com.google.devtools.remoteexecution.v1test.ExecuteRequest;
 import com.google.devtools.remoteexecution.v1test.ExecutionGrpc;
 import com.google.devtools.remoteexecution.v1test.ExecutionGrpc.ExecutionFutureStub;
@@ -78,6 +80,7 @@ import java.io.OutputStream;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -123,6 +126,15 @@ public class StubInstance implements Instance {
             @Override
             public ContentAddressableStorageBlockingStub get() {
               return ContentAddressableStorageGrpc.newBlockingStub(channel);
+            }
+          });
+
+  private final Supplier<ContentAddressableStorageFutureStub> contentAddressableStorageFutureStub =
+      Suppliers.memoize(
+          new Supplier<ContentAddressableStorageFutureStub>() {
+            @Override
+            public ContentAddressableStorageFutureStub get() {
+              return ContentAddressableStorageGrpc.newFutureStub(channel);
             }
           });
 
@@ -220,7 +232,7 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public Iterable<Digest> findMissingBlobs(Iterable<Digest> digests) {
+  public ListenableFuture<Iterable<Digest>> findMissingBlobs(Iterable<Digest> digests, ExecutorService service) {
     FindMissingBlobsRequest request = FindMissingBlobsRequest.newBuilder()
             .setInstanceName(getName())
             .addAllBlobDigests(digests)
@@ -228,11 +240,13 @@ public class StubInstance implements Instance {
     if (request.getSerializedSize() > 4 * 1024 * 1024) {
       throw new IllegalStateException("FINDMISSINGBLOBS IS TOO LARGE");
     }
-    FindMissingBlobsResponse response = contentAddressableStorageBlockingStub
-        .get()
-        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
-        .findMissingBlobs(request);
-    return response.getMissingBlobDigestsList();
+    // we could executor here, but it seems unnecessary
+    return Futures.transform(
+        contentAddressableStorageFutureStub
+            .get()
+            .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
+            .findMissingBlobs(request),
+        (response) -> response.getMissingBlobDigestsList());
   }
 
   /** expectedSize == -1 for unlimited */

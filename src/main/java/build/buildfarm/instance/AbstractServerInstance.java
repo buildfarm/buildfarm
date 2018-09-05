@@ -14,6 +14,11 @@
 
 package build.buildfarm.instance;
 
+import static com.google.common.util.concurrent.Futures.transform;
+import static com.google.common.util.concurrent.Futures.allAsList;
+import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
+import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
+
 import build.buildfarm.common.ContentAddressableStorage;
 import build.buildfarm.common.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
@@ -30,7 +35,9 @@ import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.SettableFuture;
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.devtools.remoteexecution.v1test.Action;
 import com.google.devtools.remoteexecution.v1test.ActionResult;
 import com.google.devtools.remoteexecution.v1test.Command;
@@ -52,11 +59,13 @@ import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
+import java.util.List;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 
 public abstract class AbstractServerInstance implements Instance {
@@ -283,15 +292,17 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public Iterable<Digest> findMissingBlobs(Iterable<Digest> digests) {
-    ImmutableList.Builder<Digest> missingBlobs = new ImmutableList.Builder<>();
-    for (Digest digest : digests) {
-      if (digest.getSizeBytes() == 0 || contentAddressableStorage.contains(digest)) {
-        continue;
-      }
-      missingBlobs.add(digest);
-    }
-    return missingBlobs.build();
+  public ListenableFuture<Iterable<Digest>> findMissingBlobs(Iterable<Digest> digests, ExecutorService service) {
+    ListeningExecutorService listeningService = listeningDecorator(service);
+    ImmutableList.Builder<Digest> builder = new ImmutableList.Builder<>();
+    ListenableFuture<List<Void>> missingOrNullBlobs = allAsList(
+        Iterables.transform(digests, (digest) -> listeningService.<Void>submit(() -> {
+          if (!contentAddressableStorage.contains(digest)) {
+            builder.add(digest);
+          }
+          return null;
+        })));
+    return transform(missingOrNullBlobs, (results) -> builder.build());
   }
 
   protected abstract int getTreeDefaultPageSize();
@@ -490,17 +501,25 @@ public abstract class AbstractServerInstance implements Instance {
     validateAction(
         action,
         getUnchecked(expectCommand(action.getCommandDigest())),
-        getUnchecked(getTreeDirectories(action.getInputRootDigest())));
+        getUnchecked(getTreeDirectories(action.getInputRootDigest())),
+        newDirectExecutorService());
   }
 
-  protected void validateQueuedOperationMetadata(QueuedOperationMetadata metadata) throws InterruptedException {
-    validateAction(
-        metadata.getAction(),
-        metadata.getCommand(),
-        metadata.getDirectoriesList());
+  protected ListenableFuture<QueuedOperationMetadata> validateQueuedOperationMetadata(QueuedOperationMetadata metadata, ExecutorService service) throws InterruptedException {
+    return transform(
+        validateAction(
+            metadata.getAction(),
+            metadata.getCommand(),
+            metadata.getDirectoriesList(),
+            service),
+        (result) -> metadata);
   }
 
-  private void validateAction(Action action, Command command, Iterable<Directory> directories) throws InterruptedException {
+  private ListenableFuture<Void> validateAction(
+      Action action,
+      Command command,
+      Iterable<Directory> directories,
+      ExecutorService service) throws InterruptedException {
     Digest actionDigest = digestUtil.compute(action);
     Digest commandDigest = action.getCommandDigest();
     ImmutableSet.Builder<Digest> inputDigestsBuilder = new ImmutableSet.Builder<>();
@@ -508,34 +527,36 @@ public abstract class AbstractServerInstance implements Instance {
 
     Map<Digest, Directory> directoriesIndex = createDirectoriesIndex(directories);
 
+    // needs futuring
     validateActionInputDirectoryDigest(action.getInputRootDigest(), new Stack<>(), new HashSet<>(), directoriesIndex, inputDigestsBuilder);
 
     Preconditions.checkState(command != null, MISSING_INPUT + " Command " + DigestUtil.toString(commandDigest));
 
     ImmutableSet<Digest> inputDigests = inputDigestsBuilder.build();
 
-    // A requested input (or the [Command][] of the [Action][]) was not found in
-    // the [ContentAddressableStorage][].
-    // startTime = System.nanoTime();
-    Iterable<Digest> missingBlobDigests = findMissingBlobs(inputDigests);
-    if (!Iterables.isEmpty(missingBlobDigests)) {
-      boolean elided = Iterables.size(missingBlobDigests) > 30;
-      Preconditions.checkState(
-          Iterables.isEmpty(missingBlobDigests),
-          MISSING_INPUT + " "
-              + Iterables.transform(Iterables.limit(missingBlobDigests, 30), (digest) -> DigestUtil.toString(digest))
-              + (elided ? "..." : ""));
-    }
+    return transform(
+        findMissingBlobs(inputDigests, service),
+        (missingBlobDigests) -> {
+          if (!Iterables.isEmpty(missingBlobDigests)) {
+            boolean elided = Iterables.size(missingBlobDigests) > 30;
+            Preconditions.checkState(
+                Iterables.isEmpty(missingBlobDigests),
+                MISSING_INPUT + " "
+                    + Iterables.transform(Iterables.limit(missingBlobDigests, 30), (digest) -> DigestUtil.toString(digest))
+                    + (elided ? "..." : ""));
+          }
 
-    // FIXME should input/output collisions (through directories) be another
-    // invalid action?
-    filesUniqueAndSortedPrecondition(action.getOutputFilesList());
-    filesUniqueAndSortedPrecondition(action.getOutputDirectoriesList());
-    environmentVariablesUniqueAndSortedPrecondition(
-        command.getEnvironmentVariablesList());
-    Preconditions.checkState(
-        !command.getArgumentsList().isEmpty(),
-        INVALID_DIGEST);
+          // FIXME should input/output collisions (through directories) be another
+          // invalid action?
+          filesUniqueAndSortedPrecondition(action.getOutputFilesList());
+          filesUniqueAndSortedPrecondition(action.getOutputDirectoriesList());
+          environmentVariablesUniqueAndSortedPrecondition(
+              command.getEnvironmentVariablesList());
+          Preconditions.checkState(
+              !command.getArgumentsList().isEmpty(),
+              INVALID_DIGEST);
+          return null;
+        }, service);
   }
 
   @Override
@@ -694,7 +715,7 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   protected ListenableFuture<Command> insistCommand(Digest commandBlobDigest) {
-    return Futures.transform(
+    return transform(
         expectCommand(commandBlobDigest),
         (command) -> {
           if (command != null) {

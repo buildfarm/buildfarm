@@ -15,6 +15,8 @@
 package build.buildfarm.instance.shard;
 
 import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
+import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage.UNKNOWN;
 import static com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage.QUEUED;
 import static com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage.COMPLETED;
@@ -53,6 +55,7 @@ import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -131,7 +134,7 @@ public class ShardInstanceTest {
 
     // janky - need a better supplier here
     // when(mockWorkerInstance.putBlob(eq(commandBlob))).thenReturn(commandDigest);
-    when(mockWorkerInstance.findMissingBlobs(eq(ImmutableList.of(commandDigest)))).thenReturn(ImmutableList.of());
+    when(mockWorkerInstance.findMissingBlobs(eq(ImmutableList.of(commandDigest)), any(ExecutorService.class))).thenReturn(immediateFuture(ImmutableList.of()));
 
     Action action = Action.newBuilder()
         .setCommandDigest(commandDigest)
@@ -158,7 +161,7 @@ public class ShardInstanceTest {
     Action action = createAction();
     Digest actionDigest = DIGEST_UTIL.compute(action);
     CommittingOutputStream mockCommittedOutputStream = mock(CommittingOutputStream.class);
-    when(mockCommittedOutputStream.getCommittedFuture()).thenReturn(Futures.immediateFailedFuture(Status.UNKNOWN.asRuntimeException()));
+    when(mockCommittedOutputStream.getCommittedFuture()).thenReturn(immediateFailedFuture(Status.UNKNOWN.asRuntimeException()));
 
     when(mockWorkerInstance.getStreamOutput(
         matches("^uploads/.*/blobs/" + DigestUtil.toString(actionDigest) + "$"),
@@ -205,7 +208,9 @@ public class ShardInstanceTest {
     Action action = createAction();
     Digest actionDigest = DIGEST_UTIL.compute(action);
     CommittingOutputStream mockCommittedOutputStream = mock(CommittingOutputStream.class);
-    when(mockCommittedOutputStream.getCommittedFuture()).thenReturn(Futures.immediateFuture(actionDigest.getSizeBytes()));
+    when(mockCommittedOutputStream.getCommittedFuture()).thenReturn(immediateFuture(actionDigest.getSizeBytes()));
+
+    when(mockWorkerInstance.findMissingBlobs(any(Iterable.class), any(ExecutorService.class))).thenReturn(immediateFuture(ImmutableList.of()));
 
     when(mockWorkerInstance.getStreamOutput(
         matches("^uploads/.*/blobs/" + DigestUtil.toString(actionDigest) + "$"),
@@ -215,7 +220,7 @@ public class ShardInstanceTest {
         .thenThrow(new IOException(Status.UNAVAILABLE.asRuntimeException()));
 
     Operation operation = Operation.newBuilder()
-        .setName("operation")
+        .setName("queueOperationPutFailureCancelsOperation")
         .setMetadata(Any.pack(QueuedOperationMetadata.newBuilder()
             .setAction(action)
             .setExecuteOperationMetadata(ExecuteOperationMetadata.newBuilder()
@@ -233,7 +238,7 @@ public class ShardInstanceTest {
       if (status.getCode() == Code.UNAVAILABLE) {
         unavailableExceptionCaught = true;
       } else {
-        e.getCause().printStackTrace();
+        throw e;
       }
     }
     assertThat(unavailableExceptionCaught).isTrue();

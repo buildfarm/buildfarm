@@ -36,6 +36,7 @@ import build.buildfarm.v1test.OperationIteratorToken;
 import build.buildfarm.v1test.ShardInstanceConfig;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Predicates;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
@@ -43,6 +44,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 import com.google.common.io.BaseEncoding;
+import com.google.common.util.concurrent.FluentFuture;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListeningExecutorService;
@@ -50,6 +52,7 @@ import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.devtools.remoteexecution.v1test.Action;
 import com.google.devtools.remoteexecution.v1test.ActionResult;
 import com.google.devtools.remoteexecution.v1test.Command;
@@ -330,8 +333,18 @@ public class ShardInstance extends AbstractServerInstance {
     // FIXME inline content
     Iterable<OutputFile> outputFiles = actionResult.getOutputFilesList();
     Iterable<Digest> outputDigests = Iterables.transform(outputFiles, (outputFile) -> outputFile.getDigest());
-    if (Iterables.isEmpty(findMissingBlobs(outputDigests))) {
-      return actionResult;
+    try {
+      if (Iterables.isEmpty(findMissingBlobs(outputDigests, MoreExecutors.newDirectExecutorService()).get())) {
+        return actionResult;
+      }
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof RuntimeException) {
+        throw (RuntimeException) e.getCause();
+      }
+      throw new UncheckedExecutionException(e.getCause());
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw Status.CANCELLED.asRuntimeException();
     }
 
     // some of our outputs are no longer in the CAS, remove the actionResult
@@ -352,77 +365,79 @@ public class ShardInstance extends AbstractServerInstance {
     }
   }
 
-  public ImmutableList<String> checkMissingBlob(Digest digest, boolean correct) throws IOException {
-    ImmutableList.Builder<String> foundWorkers = new ImmutableList.Builder<>();
-    Deque<String> workers;
+  public ListenableFuture<Iterable<String>> correctMissingBlob(Digest digest, ExecutorService service) throws IOException {
+    List<String> workers;
     Set<String> workerSet;
     try {
       workerSet = backplane.getWorkerSet();
-      List<String> workersList = new ArrayList<>(workerSet);
-      Collections.shuffle(workersList, rand);
-      workers = new ArrayDeque(workersList);
+      workers = new ArrayList<>(workerSet);
+      Collections.shuffle(workers, rand);
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }
 
     Set<String> originalLocationSet = backplane.getBlobLocationSet(digest);
-    System.out.println("ShardInstance::checkMissingBlob(" + DigestUtil.toString(digest) + "): Current set is: " + originalLocationSet);
+    System.out.println("ShardInstance::correctMissingBlob(" + DigestUtil.toString(digest) + "): Current set is: " + originalLocationSet);
 
-    for (String worker : workers) {
-      try {
-        Iterable<Digest> resultDigests = null;
-        while (resultDigests == null) {
-          try {
-            resultDigests = createStubRetrier().execute(() -> workerStub(worker).findMissingBlobs(ImmutableList.<Digest>of(digest)));
-            if (Iterables.size(resultDigests) == 0) {
-              System.out.println("ShardInstance::checkMissingBlob(" + DigestUtil.toString(digest) + "): Adding back to " + worker);
-              if (correct) {
-                backplane.addBlobLocation(digest, worker);
+    ListenableFuture<List<String>> workerResultsFuture = Futures.allAsList(
+        Iterables.transform(
+            workers,
+            (worker) -> checkMissingBlobOnWorker(digest, worker, service)));
+    return Futures.transform(
+        workerResultsFuture,
+        (workerResults) -> {
+          Set<String> found = ImmutableSet.copyOf(Iterables.filter(workerResults, Predicates.notNull()));
+          for (String worker : originalLocationSet) {
+            if (workerSet.contains(worker) && !found.contains(worker)) {
+              System.out.println("ShardInstance::correctMissingBlob(" + DigestUtil.toString(digest) + "): Removing from " + worker);
+              try {
+                backplane.removeBlobLocation(digest, worker);
+              } catch (IOException e) {
+                throw Status.INTERNAL.withCause(e).asRuntimeException();
               }
-              foundWorkers.add(worker);
             }
-          } catch (RetryException e) {
-            if (e.getCause() instanceof StatusRuntimeException) {
-              throw (StatusRuntimeException) e.getCause();
-            }
-            throw e;
           }
-        }
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw Status.CANCELLED.asRuntimeException();
-      } catch (IOException e) {
-        throw Status.INTERNAL.withDescription(e.getMessage()).asRuntimeException();
-      } catch (StatusRuntimeException e) {
-        Status status = Status.fromThrowable(e);
-        if (status.getCode() == Code.UNAVAILABLE) {
-          removeMalfunctioningWorker(worker, e, String.format("checkMissingBlobs(%s)", DigestUtil.toString(digest)));
-        } else if (Context.current().isCancelled()) {
-          // do nothing further if we're cancelled or timed out
-          throw e;
-        } else {
-          e.printStackTrace();
-        }
-      }
-    }
-    ImmutableList<String> found = foundWorkers.build();
+          return found;
+        },
+        service);
+  }
 
-    for (String worker : originalLocationSet) {
-      if (workerSet.contains(worker) && !found.contains(worker)) {
-        System.out.println("ShardInstance::checkMissingBlob(" + DigestUtil.toString(digest) + "): Removing from " + worker);
-        if (correct) {
-          backplane.removeBlobLocation(digest, worker);
-        }
-      }
-    }
-    return found;
+  private ListenableFuture<String> checkMissingBlobOnWorker(Digest digest, String worker, ExecutorService service) {
+    return FluentFuture.from(workerStub(worker).findMissingBlobs(ImmutableList.of(digest), service))
+        .transform(Iterables::isEmpty, MoreExecutors.directExecutor())
+        .transform(
+            (contains) -> {
+              if (contains) {
+                try {
+                  backplane.addBlobLocation(digest, worker);
+                } catch (IOException e) {
+                  throw Status.INTERNAL.withCause(e).asRuntimeException();
+                }
+                return worker;
+              }
+              return null;
+            }, service)
+        .catchingAsync(
+            Throwable.class,
+            (e) -> {
+              Status status = Status.fromThrowable(e);
+              if (status.getCode() == Code.UNAVAILABLE) {
+                removeMalfunctioningWorker(worker, e, "findMissingBlobs(...)");
+              } else if (status.getCode() == Code.CANCELLED || Context.current().isCancelled()) {
+                // do nothing further if we're cancelled
+                throw status.asRuntimeException();
+              } else if (SHARD_IS_RETRIABLE.test(status)) {
+                return checkMissingBlobOnWorker(digest, worker, service);
+              }
+              throw Status.INTERNAL.withCause(e).asRuntimeException();
+            }, service);
   }
 
   @Override
-  public Iterable<Digest> findMissingBlobs(Iterable<Digest> blobDigests) {
+  public ListenableFuture<Iterable<Digest>> findMissingBlobs(Iterable<Digest> blobDigests, ExecutorService service) {
     Iterable<Digest> nonEmptyDigests = Iterables.filter(blobDigests, (digest) -> digest.getSizeBytes() > 0);
     if (Iterables.isEmpty(nonEmptyDigests)) {
-      return nonEmptyDigests;
+      return Futures.immediateFuture(ImmutableList.of());
     }
 
     Deque<String> workers;
@@ -434,34 +449,45 @@ public class ShardInstance extends AbstractServerInstance {
       throw Status.fromThrowable(e).asRuntimeException();
     }
 
-    for (String worker : workers) {
-      try {
-        Iterable<Digest> workerDigests = nonEmptyDigests;
-        Iterable<Digest> workerMissingDigests = null;
-        while (workerMissingDigests == null) {
-          workerMissingDigests = createStubRetrier().execute(() -> workerStub(worker).findMissingBlobs(workerDigests));
-        }
-        nonEmptyDigests = workerMissingDigests;
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw Status.CANCELLED.asRuntimeException();
-      } catch (IOException e) {
-        Status status = Status.fromThrowable(e);
-        if (status.getCode() == Code.UNAVAILABLE) {
-          removeMalfunctioningWorker(worker, e, "findMissingBlobs(...)");
-        } else if (status.getCode() == Code.CANCELLED || Context.current().isCancelled()) {
-          // do nothing further if we're cancelled
-          throw status.asRuntimeException();
-        } else {
-          e.printStackTrace();
-        }
-      }
+    return findMissingBlobsOnWorker(nonEmptyDigests, workers, service);
+  }
 
-      if (Iterables.isEmpty(nonEmptyDigests)) {
-        break;
-      }
-    }
-    return nonEmptyDigests;
+  private ListenableFuture<Iterable<Digest>> findMissingBlobsOnWorker(Iterable<Digest> blobDigests, Deque<String> workers, ExecutorService service) {
+    String worker = workers.removeFirst();
+    // FIXME use FluentFuture
+    ListenableFuture<Iterable<Digest>> findMissingBlobsFuture = Futures.transformAsync(
+        workerStub(worker).findMissingBlobs(blobDigests, service),
+        (missingDigests) -> {
+          if (Iterables.isEmpty(missingDigests) || workers.isEmpty()) {
+            return Futures.immediateFuture(missingDigests);
+          }
+          return findMissingBlobsOnWorker(missingDigests, workers, service);
+        },
+        service);
+    return Futures.catchingAsync(
+        findMissingBlobsFuture,
+        Throwable.class,
+        (e) -> {
+          Status status = Status.fromThrowable(e);
+          if (status.getCode() == Code.UNAVAILABLE) {
+            removeMalfunctioningWorker(worker, e, "findMissingBlobs(...)");
+          } else if (status.getCode() == Code.CANCELLED || Context.current().isCancelled()) {
+            // do nothing further if we're cancelled
+            throw status.asRuntimeException();
+          } else if (SHARD_IS_RETRIABLE.test(status)) {
+            // why not, always
+            workers.addLast(worker);
+          } else {
+            throw Status.INTERNAL.withCause(e).asRuntimeException();
+          }
+
+          if (workers.isEmpty()) {
+            return Futures.immediateFuture(blobDigests);
+          } else {
+            return findMissingBlobsOnWorker(blobDigests, workers, service);
+          }
+        },
+        service);
   }
 
   private void fetchBlobFromWorker(
@@ -521,23 +547,25 @@ public class ShardInstance extends AbstractServerInstance {
       return;
     }
     boolean emptyWorkerList = workersList.isEmpty();
-    if (workersList.isEmpty()) {
+    final ListenableFuture<List<String>> populatedWorkerListFuture;
+    if (emptyWorkerList) {
       try {
-        // really need to make this async...
-        workersList.addAll(checkMissingBlob(blobDigest, true));
+        populatedWorkerListFuture = Futures.transform(
+            // should be sending this the blob location set and worker set we used
+            correctMissingBlob(blobDigest, MoreExecutors.newDirectExecutorService()),
+            (foundOnWorkers) -> {
+              Iterables.addAll(workersList, foundOnWorkers);
+              return workersList;
+            });
       } catch (IOException e) {
         blobObserver.onError(e);
         return;
       }
-      if (workersList.isEmpty()) {
-        blobObserver.onError(Status.NOT_FOUND.asException());
-        return;
-      }
+    } else {
+      populatedWorkerListFuture = Futures.immediateFuture(workersList);
     }
-    Collections.shuffle(workersList, rand);
-    Deque<String> workers = new ArrayDeque(workersList);
 
-    fetchBlobFromWorker(blobDigest, workers, offset, limit, new StreamObserver<ByteString>() {
+    StreamObserver<ByteString> chunkObserver = new StreamObserver<ByteString>() {
       boolean triedCheck = emptyWorkerList;
 
       @Override
@@ -551,27 +579,72 @@ public class ShardInstance extends AbstractServerInstance {
         if (status.getCode() == Code.NOT_FOUND && !triedCheck) {
           triedCheck = true;
           workersList.clear();
+          final ListenableFuture<List<String>> workersListFuture;
           try {
-            workersList.addAll(checkMissingBlob(blobDigest, true));
+            workersListFuture = Futures.transform(
+                correctMissingBlob(blobDigest, MoreExecutors.newDirectExecutorService()),
+                (foundOnWorkers) -> {
+                  Iterables.addAll(workersList, foundOnWorkers);
+                  return workersList;
+                });
           } catch (IOException e) {
             blobObserver.onError(e);
             return;
           }
-          if (!workersList.isEmpty()) {
-            Collections.shuffle(workersList, rand);
-            final Deque<String> workers = new ArrayDeque(workersList);
-            fetchBlobFromWorker(blobDigest, workers, offset, limit, this);
-            return;
-          }
+          final StreamObserver<ByteString> checkedChunkObserver = this;
+          Futures.addCallback(workersListFuture, new WorkersCallback(rand) {
+            @Override
+            public void onQueue(Deque<String> workers) {
+              fetchBlobFromWorker(blobDigest, workers, offset, limit, checkedChunkObserver);
+            }
+
+            @Override
+            public void onFailure(Throwable t) {
+              blobObserver.onError(t);
+            }
+          });
+        } else {
+          blobObserver.onError(t);
         }
-        blobObserver.onError(t);
       }
 
       @Override
       public void onCompleted() {
         blobObserver.onCompleted();
       }
+    };
+    Futures.addCallback(populatedWorkerListFuture, new WorkersCallback(rand) {
+      @Override
+      public void onQueue(Deque<String> workers) {
+        fetchBlobFromWorker(blobDigest, workers, offset, limit, chunkObserver);
+      }
+
+      @Override
+      public void onFailure(Throwable t) {
+        blobObserver.onError(t);
+      }
     });
+  }
+
+  public abstract static class WorkersCallback implements FutureCallback<List<String>> {
+    private final Random rand;
+
+    public WorkersCallback(Random rand) {
+      this.rand = rand;
+    }
+
+    @Override
+    public void onSuccess(List<String> workersList) {
+      if (workersList.isEmpty()) {
+        onFailure(Status.NOT_FOUND.asException());
+        return;
+      }
+
+      Collections.shuffle(workersList, rand);
+      onQueue(new ArrayDeque<String>(workersList));
+    }
+
+    protected abstract void onQueue(Deque<String> workers);
   }
 
   @Override
@@ -967,23 +1040,47 @@ public class ShardInstance extends AbstractServerInstance {
         return false;
       }
     }
-    try {
-      validateQueuedOperationMetadata(metadata);
-    } catch (Exception e) {
-      // FIXME this should not be a catch all...
-      e.printStackTrace();
-      return false;
-    }
+    SettableFuture<Boolean> requeuedFuture = SettableFuture.create();
+    Futures.addCallback(
+      validateQueuedOperationMetadata(metadata, operationTransformService),
+      new FutureCallback<QueuedOperationMetadata>() {
+        @Override
+        public void onSuccess(QueuedOperationMetadata metadata) {
+          try {
+            if (isQueuedOperationMetadata) {
+              backplane.requeueDispatchedOperation(operation);
+            } else {
+              Operation queuedOperation = operation.toBuilder()
+                  .setMetadata(Any.pack(metadata))
+                  .build();
+              backplane.putOperation(queuedOperation, Stage.QUEUED);
+            }
+            requeuedFuture.set(true);
+          } catch (IOException e) {
+            // we should probably be observing retriable backplane exceptions...
+            onFailure(e);
+          }
+        }
 
-    if (isQueuedOperationMetadata) {
-      backplane.requeueDispatchedOperation(operation);
-    } else {
-      Operation queuedOperation = operation.toBuilder()
-          .setMetadata(Any.pack(metadata))
-          .build();
-      backplane.putOperation(queuedOperation, Stage.QUEUED);
+        @Override
+        public void onFailure(Throwable t) {
+          t.printStackTrace();
+          requeuedFuture.set(false);
+        }
+      },
+      operationTransformService);
+
+    try {
+      return requeuedFuture.get();
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof IOException) {
+        throw (IOException) e.getCause();
+      }
+      if (e.getCause() instanceof RuntimeException) {
+        throw (RuntimeException) e.getCause();
+      }
+      throw new UncheckedExecutionException(e);
     }
-    return true;
   }
 
   @Override
@@ -1031,10 +1128,7 @@ public class ShardInstance extends AbstractServerInstance {
     ListenableFuture<QueuedOperationMetadata> validatedFuture = Futures.catching(
         Futures.transformAsync(
             queuedFuture,
-            (metadata) -> {
-              validateQueuedOperationMetadata(metadata);
-              return queuedFuture;
-            },
+            (metadata) -> validateQueuedOperationMetadata(metadata, operationTransformService),
             operationTransformService),
         IllegalStateException.class,
         // might be able to add proper details here
@@ -1045,20 +1139,23 @@ public class ShardInstance extends AbstractServerInstance {
         operationTransformService);
 
     // nice to have for requeuing
-    Futures.addCallback(validatedFuture, new FutureCallback<QueuedOperationMetadata>() {
-      @Override
-      public void onSuccess(QueuedOperationMetadata metadata) {
-        try {
-          backplane.putTree(action.getInputRootDigest(), metadata.getDirectoriesList());
-        } catch (IOException e) {
-          e.printStackTrace();
-        }
-      }
+    Futures.addCallback(
+        validatedFuture,
+        new FutureCallback<QueuedOperationMetadata>() {
+          @Override
+          public void onSuccess(QueuedOperationMetadata metadata) {
+            try {
+              backplane.putTree(action.getInputRootDigest(), metadata.getDirectoriesList());
+            } catch (IOException e) {
+              e.printStackTrace();
+            }
+          }
 
-      @Override
-      public void onFailure(Throwable t) {
-      }
-    }, operationTransformService);
+          @Override
+          public void onFailure(Throwable t) {
+          }
+        },
+        operationTransformService);
 
     ByteString actionBlob = action.toByteString();
     Digest actionDigest = digestUtil.compute(actionBlob);
