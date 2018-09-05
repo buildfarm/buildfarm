@@ -315,6 +315,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
             Throwable t = Status.INVALID_ARGUMENT.withDescription(e.getLocalizedMessage()).asException();
             if (chunkObserver != null) {
               chunkObserver.onError(t);
+              chunkObserver = null;
             }
             responseObserver.onError(t);
             return;
@@ -322,8 +323,17 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
         }
 
         if (request.getFinishWrite()) {
-          chunkObserver.onCompleted();
-          chunkObserver = null;
+          if (chunkObserver != null) {
+            chunkObserver.onCompleted();
+            chunkObserver = null;
+          } else if (request.getData().size() == 0) {
+            responseObserver.onNext(WriteResponse.newBuilder()
+                .setCommittedSize(0)
+                .build());
+            responseObserver.onCompleted();
+          } else {
+            responseObserver.onError(Status.INTERNAL.withDescription("ByteStreamServer:write: resource " + resourceName + " finished without a chunk observer").asException());
+          }
         }
       }
     };
