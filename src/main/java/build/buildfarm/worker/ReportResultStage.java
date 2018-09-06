@@ -67,7 +67,7 @@ public class ReportResultStage extends PipelineStage {
         "ReportResultStage",
         operationContext.operation.getName(),
         ExecuteOperationMetadata.Stage.EXECUTING,
-        () -> {});
+        () -> cancelTick());
 
     long reportStartAt = System.nanoTime();
 

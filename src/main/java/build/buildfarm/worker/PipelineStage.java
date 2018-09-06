@@ -23,6 +23,8 @@ public abstract class PipelineStage implements Runnable {
   private PipelineStage input;
   protected boolean claimed;
   private boolean closed;
+  private Thread tickThread = null;
+  private boolean tickCancelled = false;
 
   PipelineStage(String name, WorkerContext workerContext, PipelineStage output, PipelineStage error) {
     this.name = name;
@@ -56,20 +58,49 @@ public abstract class PipelineStage implements Runnable {
     }
   }
 
+  protected void cancelTick() {
+    // if we are not in a tick, this has no effect
+    // if we are in a tick, set the cancel flag, interrupt the tick thread
+    Thread cancelTickThread = tickThread;
+    if (cancelTickThread != null) {
+      tickCancelled = true;
+      cancelTickThread.interrupt();
+    }
+  }
+
+  private boolean tickCancelled() {
+    boolean isTickCancelled = tickCancelled;
+    tickCancelled = false;
+    return isTickCancelled;
+  }
+
   protected void iterate() throws InterruptedException {
-    long startTime, waitTime;
-    OperationContext operationContext, nextOperationContext;
+    long startTime, waitTime = 0;
+    OperationContext operationContext, nextOperationContext = null;
     try {
       operationContext = take();
       startTime = System.nanoTime();
-      nextOperationContext = tick(operationContext);
-      long waitStartTime = System.nanoTime();
-      if (nextOperationContext != null && output.claim()) {
+      boolean valid = false;
+      try {
+        tickThread = Thread.currentThread();
+        nextOperationContext = tick(operationContext);
+        long waitStartTime = System.nanoTime();
+        valid = nextOperationContext != null && output.claim();
+        waitTime = System.nanoTime() - waitStartTime;
+        tickThread = null;
+      } catch (InterruptedException e) {
+        boolean isTickCancelled = tickCancelled();
+        tickThread = null;
+        output.release();
+        if (!isTickCancelled) {
+          throw e;
+        }
+      }
+      if (valid) {
         output.put(nextOperationContext);
       } else {
         error.put(operationContext);
       }
-      waitTime = System.nanoTime() - waitStartTime;
     } finally {
       release();
     }

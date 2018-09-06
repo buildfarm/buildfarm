@@ -42,11 +42,12 @@ public class InputFetchStage extends PipelineStage {
 
   @Override
   protected OperationContext tick(OperationContext operationContext) throws InterruptedException {
-    // yeah, the poll fail should probably do something here...
+    final Thread fetchThread = Thread.currentThread();
     Poller poller = workerContext.createPoller(
         "InputFetchStage",
         operationContext.operation.getName(),
-        ExecuteOperationMetadata.Stage.QUEUED);
+        ExecuteOperationMetadata.Stage.QUEUED,
+        () -> cancelTick());
 
     workerContext.logInfo("InputFetchStage: Fetching inputs: " + operationContext.operation.getName());
 
