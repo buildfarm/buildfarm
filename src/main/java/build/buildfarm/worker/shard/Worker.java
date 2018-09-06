@@ -388,7 +388,7 @@ public class Worker implements Instances {
         }
 
         Set<String> originalLocationSet = backplane.getBlobLocationSet(digest);
-        System.out.println("ShardInstance::correctMissingBlob(" + DigestUtil.toString(digest) + "): Current set is: " + originalLocationSet);
+        System.out.println("RemoteInputStreamFactory::correctMissingBlob(" + DigestUtil.toString(digest) + "): Current set is: " + originalLocationSet);
 
         ListenableFuture<List<String>> workerResultsFuture = allAsList(
             Iterables.transform(
@@ -400,7 +400,7 @@ public class Worker implements Instances {
               Set<String> found = ImmutableSet.copyOf(Iterables.filter(workerResults, Predicates.notNull()));
               for (String worker : originalLocationSet) {
                 if (workerSet.contains(worker) && !found.contains(worker)) {
-                  System.out.println("ShardInstance::correctMissingBlob(" + DigestUtil.toString(digest) + "): Removing from " + worker);
+                  System.out.println("RemoteInputStreamFactory::correctMissingBlob(" + DigestUtil.toString(digest) + "): Removing from " + worker);
                   try {
                     backplane.removeBlobLocation(digest, worker);
                   } catch (IOException e) {
