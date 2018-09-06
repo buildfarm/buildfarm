@@ -637,11 +637,10 @@ public class ShardInstance extends AbstractServerInstance {
     public void onSuccess(List<String> workersList) {
       if (workersList.isEmpty()) {
         onFailure(Status.NOT_FOUND.asException());
-        return;
+      } else {
+        Collections.shuffle(workersList, rand);
+        onQueue(new ArrayDeque<String>(workersList));
       }
-
-      Collections.shuffle(workersList, rand);
-      onQueue(new ArrayDeque<String>(workersList));
     }
 
     protected abstract void onQueue(Deque<String> workers);
