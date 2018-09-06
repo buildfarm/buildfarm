@@ -1339,10 +1339,12 @@ public class ShardInstance extends AbstractServerInstance {
     if (watchInitialState) {
       Operation operation = getOperation(operationName);
       if (!watcher.test(operation)) {
-        return false;
+        // watcher processed completed state
+        return true;
       }
       if (operation == null || operation.getDone()) {
-        return true;
+        // watcher did not process completed state
+        return false;
       }
     }
 
