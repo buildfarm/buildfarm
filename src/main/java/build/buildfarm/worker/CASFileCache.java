@@ -560,7 +560,10 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
   }
 
   public ListenableFuture<Void> removeDirectoryAsync(Path path) throws IOException {
-    Path tmpPath = path.resolveSibling(path.getFileName() + ".tmp." + UUID.randomUUID().toString());
+    String suffix = UUID.randomUUID().toString();
+    Path filename = path.getFileName();
+    String tmpFilename = filename + ".tmp." + suffix;
+    Path tmpPath = path.resolveSibling(tmpFilename);
     Files.move(path, tmpPath);
     return removeDirectoryPool.submit(() ->  {
       try {
