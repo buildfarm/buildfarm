@@ -360,7 +360,6 @@ public class Worker implements Instances {
         } catch (RetryException e) {
           Status st = Status.fromThrowable(e);
           if (st.getCode().equals(Code.UNAVAILABLE)) {
-            backplane.removeBlobLocation(blobDigest, worker);
             // for now, leave this up to schedulers
             // removeMalfunctioningWorker(worker, e, "getBlob(" + DigestUtil.toString(blobDigest) + ")");
           } else if (st.getCode() == Code.NOT_FOUND) {
