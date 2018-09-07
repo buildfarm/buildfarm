@@ -408,30 +408,32 @@ public class Worker implements Instances {
           @Override
           public void onQueue(Deque<String> workers) {
             Set<String> locationSet = Sets.newHashSet(workers);
-            try {
-              inputStreamFuture.set(fetchBlobFromRemoteWorker(blobDigest, workers, offset));
-            } catch (IOException e) {
-              if (workers.isEmpty()) {
-                if (triedCheck) {
-                  onFailure(e);
-                }
-                triedCheck = true;
+            while (!workers.isEmpty()) {
+              try {
+                inputStreamFuture.set(fetchBlobFromRemoteWorker(blobDigest, workers, offset));
+              } catch (IOException e) {
+                if (workers.isEmpty()) {
+                  if (triedCheck) {
+                    onFailure(e);
+                  }
+                  triedCheck = true;
 
-                workersList.clear();
-                try {
-                  ListenableFuture<List<String>> checkedWorkerListFuture = transform(
-                      correctMissingBlob(backplane, workerSet, locationSet, (worker) -> workerStub(worker), blobDigest, newDirectExecutorService()),
-                      (foundOnWorkers) -> {
-                        Iterables.addAll(workersList, foundOnWorkers);
-                        return workersList;
-                      });
-                  addCallback(checkedWorkerListFuture, this);
-                } catch (IOException checkException) {
-                  onFailure(checkException);
+                  workersList.clear();
+                  try {
+                    ListenableFuture<List<String>> checkedWorkerListFuture = transform(
+                        correctMissingBlob(backplane, workerSet, locationSet, (worker) -> workerStub(worker), blobDigest, newDirectExecutorService()),
+                        (foundOnWorkers) -> {
+                          Iterables.addAll(workersList, foundOnWorkers);
+                          return workersList;
+                        });
+                    addCallback(checkedWorkerListFuture, this);
+                  } catch (IOException checkException) {
+                    onFailure(checkException);
+                  }
                 }
+              } catch (InterruptedException e) {
+                onFailure(e);
               }
-            } catch (InterruptedException e) {
-              onFailure(e);
             }
           }
 
