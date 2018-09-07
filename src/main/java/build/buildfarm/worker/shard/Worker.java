@@ -746,40 +746,40 @@ public class Worker implements Instances {
         return null;
       }
 
-			private int updateActionResultStdOutputs(
-					ActionResult.Builder resultBuilder,
-					ImmutableList.Builder<ByteString> contents,
-					int inlineContentBytes) {
-				ByteString stdoutRaw = resultBuilder.getStdoutRaw();
-				if (stdoutRaw.size() > 0) {
-					// reset to allow policy to determine inlining
-					resultBuilder.setStdoutRaw(ByteString.EMPTY);
-					inlineContentBytes = inlineOrDigest(
-							stdoutRaw,
-							getStdoutCasPolicy(),
-							contents,
-							inlineContentBytes,
-							getInlineContentLimit(),
-							() -> resultBuilder.setStdoutRaw(stdoutRaw),
-							(content) -> resultBuilder.setStdoutDigest(getDigestUtil().compute(content)));
-				}
+      private int updateActionResultStdOutputs(
+          ActionResult.Builder resultBuilder,
+          ImmutableList.Builder<ByteString> contents,
+          int inlineContentBytes) {
+        ByteString stdoutRaw = resultBuilder.getStdoutRaw();
+        if (stdoutRaw.size() > 0) {
+          // reset to allow policy to determine inlining
+          resultBuilder.setStdoutRaw(ByteString.EMPTY);
+          inlineContentBytes = inlineOrDigest(
+              stdoutRaw,
+              getStdoutCasPolicy(),
+              contents,
+              inlineContentBytes,
+              getInlineContentLimit(),
+              () -> resultBuilder.setStdoutRaw(stdoutRaw),
+              (content) -> resultBuilder.setStdoutDigest(getDigestUtil().compute(content)));
+        }
 
-				ByteString stderrRaw = resultBuilder.getStderrRaw();
-				if (stderrRaw.size() > 0) {
-					// reset to allow policy to determine inlining
-					resultBuilder.setStderrRaw(ByteString.EMPTY);
-					inlineContentBytes = inlineOrDigest(
-							stderrRaw,
-							getStderrCasPolicy(),
-							contents,
-							inlineContentBytes,
-							getInlineContentLimit(),
-							() -> resultBuilder.setStderrRaw(stdoutRaw),
-							(content) -> resultBuilder.setStderrDigest(getDigestUtil().compute(content)));
-				}
+        ByteString stderrRaw = resultBuilder.getStderrRaw();
+        if (stderrRaw.size() > 0) {
+          // reset to allow policy to determine inlining
+          resultBuilder.setStderrRaw(ByteString.EMPTY);
+          inlineContentBytes = inlineOrDigest(
+              stderrRaw,
+              getStderrCasPolicy(),
+              contents,
+              inlineContentBytes,
+              getInlineContentLimit(),
+              () -> resultBuilder.setStderrRaw(stdoutRaw),
+              (content) -> resultBuilder.setStderrDigest(getDigestUtil().compute(content)));
+        }
 
-				return inlineContentBytes;
-			}
+        return inlineContentBytes;
+      }
 
       @Override
       public void uploadOutputs(
