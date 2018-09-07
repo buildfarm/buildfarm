@@ -54,6 +54,7 @@ public class RedisShardBackplaneTest {
         (o) -> o,
         (o) -> o,
         (o) -> false,
+        (o) -> false,
         mockJedisPool);
     backplane.start();
     Status status = Status.UNKNOWN;
@@ -72,6 +73,7 @@ public class RedisShardBackplaneTest {
         (o) -> o,
         (o) -> o,
         (o) -> false,
+        (o) -> false,
         mockJedisPool);
     backplane.start();
     Status status = Status.UNKNOWN;
@@ -89,6 +91,7 @@ public class RedisShardBackplaneTest {
         RedisShardBackplaneConfig.getDefaultInstance(),
         (o) -> o,
         (o) -> o,
+        (o) -> false,
         (o) -> false,
         mockJedisPool);
     backplane.start();

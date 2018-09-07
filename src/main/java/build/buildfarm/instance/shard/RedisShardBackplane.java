@@ -80,12 +80,14 @@ public class RedisShardBackplane implements ShardBackplane {
   private final Function<Operation, Operation> onPublish;
   private final Function<Operation, Operation> onComplete;
   private final Predicate<Operation> isPrequeued;
+  private final Predicate<Operation> isDispatched;
   private final Pool<Jedis> pool;
 
   private @Nullable Runnable onUnsubscribe = null;
   private Thread subscriptionThread = null;
   private Thread failsafeOperationThread = null;
   private Set<String> previousPrequeued = ImmutableSet.of();
+  private Set<String> previousDispatched = ImmutableSet.of();
   private OperationSubscriber operationSubscriber = null;
   private RedisShardSubscription operationSubscription = null;
   private boolean poolStarted = false;
@@ -132,12 +134,14 @@ public class RedisShardBackplane implements ShardBackplane {
       RedisShardBackplaneConfig config,
       Function<Operation, Operation> onPublish,
       Function<Operation, Operation> onComplete,
-      Predicate<Operation> isPrequeued) throws ConfigurationException {
+      Predicate<Operation> isPrequeued,
+      Predicate<Operation> isDispatched) throws ConfigurationException {
     this(
         config,
         onPublish,
         onComplete,
         isPrequeued,
+        isDispatched,
         new JedisPool(createJedisPoolConfig(config), parseRedisURI(config.getRedisUri()), /* connectionTimeout=*/ 30000, /* soTimeout=*/ 30000));
   }
 
@@ -146,11 +150,13 @@ public class RedisShardBackplane implements ShardBackplane {
       Function<Operation, Operation> onPublish,
       Function<Operation, Operation> onComplete,
       Predicate<Operation> isPrequeued,
+      Predicate<Operation> isDispatched,
       JedisPool pool) {
     this.config = config;
     this.onPublish = onPublish;
     this.onComplete = onComplete;
     this.isPrequeued = isPrequeued;
+    this.isDispatched = isDispatched;
     this.pool = pool;
   }
 
@@ -165,6 +171,7 @@ public class RedisShardBackplane implements ShardBackplane {
     List<String> operationChannels = operationSubscriber.watchedOperationChannels();
     if (operationChannels.isEmpty()) {
       previousPrequeued = ImmutableSet.of();
+      previousDispatched = ImmutableSet.of();
       return;
     }
 
@@ -177,11 +184,16 @@ public class RedisShardBackplane implements ShardBackplane {
           operationName,
           p.get(operationKey(operationName))));
     }
+    Response<List<String>> queuedResponse = p.lrange(config.getQueuedOperationsListName(), 0, -1);
     Response<List<String>> prequeuedResponse = p.lrange(config.getPreQueuedOperationsListName(), 0, -1);
+    Response<Set<String>> dispatchedResponse = p.hkeys(config.getDispatchedOperationsHashName());
     p.sync();
 
+    Set<String> queued = new HashSet(queuedResponse.get());
     Set<String> prequeued = new HashSet(prequeuedResponse.get());
-    ImmutableSet.Builder<String> previousPrequeuedBuilder = new ImmutableSet.Builder<>();
+    Set<String> dispatched = dispatchedResponse.get();
+    ImmutableSet.Builder<String> previousPrequeuedBuilder = ImmutableSet.builder();
+    ImmutableSet.Builder<String> previousDispatchedBuilder = ImmutableSet.builder();
 
     int iRemainingIncomplete = 20;
     for (Map.Entry<String, Response<String>> entry : operations) {
@@ -192,12 +204,19 @@ public class RedisShardBackplane implements ShardBackplane {
       if (operation == null || operation.getDone()) {
         operationSubscriber.onOperation(operationChannel(operationName), operation);
         System.out.println("RedisShardBackplane::updateWatchedIfDone: Operation " + operationName + " done due to " + (operation == null ? "null" : "completed"));
-      } else if (!prequeued.contains(operation.getName()) && isPrequeued.test(operation)) {
-        if (previousPrequeued.contains(operation.getName())) {
-          prequeueOperation(jedis, operation.getName());
+      } else if (!prequeued.contains(operationName) && isPrequeued.test(operation)) {
+        if (previousPrequeued.contains(operationName)) {
+          prequeueOperation(jedis, operationName);
           System.out.println("RedisShardBackplane::updateWatchedIfDone: Operation " + operationName + " reprequeued...");
         } else {
-          previousPrequeuedBuilder.add(operation.getName());
+          previousPrequeuedBuilder.add(operationName);
+        }
+      } else if (!dispatched.contains(operationName) && !queued.contains(operationName) && isDispatched.test(operation)) {
+        if (previousDispatched.contains(operationName)) {
+          dispatchOperation(jedis, operationName, /* requeueAt=*/ 0);
+          System.out.println("RedisShardBackplane::updateWatchedIfDone: Operation " + operationName + " redispatched...");
+        } else {
+          previousDispatchedBuilder.add(operationName);
         }
       } else if (iRemainingIncomplete > 0) {
         System.out.println("RedisShardBackplane::updateWatchedIfDone: Operation " + operationName);
@@ -205,6 +224,7 @@ public class RedisShardBackplane implements ShardBackplane {
       }
     }
     previousPrequeued = previousPrequeuedBuilder.build();
+    previousDispatched = previousDispatchedBuilder.build();
   }
 
   private void startSubscriptionThread() {
@@ -751,25 +771,27 @@ public class RedisShardBackplane implements ShardBackplane {
     }
 
     // right here is an operation loss risk
+    long requeueAt = System.currentTimeMillis() + 30 * 1000;
+    if (!withBackplaneException((jedis) -> dispatchOperation(jedis, operationName, requeueAt))) {
+      return null;
+    }
+    return operationName;
+  }
 
+  private boolean dispatchOperation(Jedis jedis, String operationName, long requeueAt) {
     ShardDispatchedOperation o = ShardDispatchedOperation.newBuilder()
         .setName(operationName)
-        .setRequeueAt(System.currentTimeMillis() + 30 * 1000)
+        .setRequeueAt(requeueAt)
         .build();
     String json;
     try {
       json = JsonFormat.printer().print(o);
     } catch (InvalidProtocolBufferException e) {
       e.printStackTrace();
-      return null;
+      return false;
     }
-    /* if the operation is already in the dispatch list, don't requeue */
-    boolean dispatched = withBackplaneException((jedis) -> jedis.hsetnx(config.getDispatchedOperationsHashName(), operationName, json) == 1);
-    if (!dispatched) {
-      return null;
-    }
-
-    return operationName;
+    /* if the operation is already in the dispatch list, fail the dispatch */
+    return jedis.hsetnx(config.getDispatchedOperationsHashName(), operationName, json) == 1;
   }
 
   @Override

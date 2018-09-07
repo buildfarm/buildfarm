@@ -16,6 +16,8 @@ package build.buildfarm.instance.shard;
 
 import static build.buildfarm.instance.shard.Util.SHARD_IS_RETRIABLE;
 import static build.buildfarm.instance.shard.Util.correctMissingBlob;
+import static com.google.common.base.Predicates.or;
+import static com.google.common.base.Predicates.notNull;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
@@ -42,7 +44,6 @@ import build.buildfarm.v1test.OperationIteratorToken;
 import build.buildfarm.v1test.ShardInstanceConfig;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Predicates;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
@@ -177,7 +178,8 @@ public class ShardInstance extends AbstractServerInstance {
             config.getRedisShardBackplaneConfig(),
             ShardInstance::stripOperation,
             ShardInstance::stripOperation,
-            /* isPrequeued=*/ ShardInstance::isUnknown);
+            /* isPrequeued=*/ ShardInstance::isUnknown,
+            /* isExecuting=*/ or(ShardInstance::isExecuting, ShardInstance::isQueued));
     }
   }
 

@@ -339,7 +339,7 @@ public class Worker implements Instances {
       case BACKPLANE_NOT_SET:
         throw new IllegalArgumentException("Shard Backplane not set in config");
       case REDIS_SHARD_BACKPLANE_CONFIG:
-        backplane = new RedisShardBackplane(config.getRedisShardBackplaneConfig(), this::stripOperation, this::stripQueuedOperation, (o) -> false);
+        backplane = new RedisShardBackplane(config.getRedisShardBackplaneConfig(), this::stripOperation, this::stripQueuedOperation, (o) -> false, (o) -> false);
         break;
     }
     InputStreamFactory remoteInputStreamFactory = new InputStreamFactory() {
