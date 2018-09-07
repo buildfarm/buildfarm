@@ -467,6 +467,22 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   @Override
+  public void adjustBlobLocations(Digest blobDigest, Set<String> addWorkers, Set<String> removeWorkers) throws IOException {
+    String key = casKey(blobDigest);
+    withVoidBackplaneException((jedis) -> {
+      Transaction t = jedis.multi();
+      for (String workerName : addWorkers) {
+        t.sadd(key, workerName);
+      }
+      for (String workerName : removeWorkers) {
+        t.srem(key, workerName);
+      }
+      t.expire(key, config.getCasExpire());
+      t.exec();
+    });
+  }
+
+  @Override
   public void addBlobLocation(Digest blobDigest, String workerName) throws IOException {
     String key = casKey(blobDigest);
     withVoidBackplaneException((jedis) -> {

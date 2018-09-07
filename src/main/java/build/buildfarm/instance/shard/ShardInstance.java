@@ -14,6 +14,12 @@
 
 package build.buildfarm.instance.shard;
 
+import static build.buildfarm.instance.shard.Util.SHARD_IS_RETRIABLE;
+import static build.buildfarm.instance.shard.Util.correctMissingBlob;
+import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
+
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.ShardBackplane;
@@ -50,7 +56,6 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.devtools.remoteexecution.v1test.Action;
@@ -136,7 +141,7 @@ public class ShardInstance extends AbstractServerInstance {
   private final Random rand = new Random();
   private ExecutorService operationDeletionService = Executors.newSingleThreadExecutor();
   private Thread operationQueuer;
-  private ListeningExecutorService operationTransformService = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(24));
+  private ListeningExecutorService operationTransformService = listeningDecorator(Executors.newFixedThreadPool(24));
 
   public ShardInstance(String name, DigestUtil digestUtil, ShardInstanceConfig config, Runnable onStop)
       throws InterruptedException, ConfigurationException {
@@ -334,7 +339,7 @@ public class ShardInstance extends AbstractServerInstance {
     Iterable<OutputFile> outputFiles = actionResult.getOutputFilesList();
     Iterable<Digest> outputDigests = Iterables.transform(outputFiles, (outputFile) -> outputFile.getDigest());
     try {
-      if (Iterables.isEmpty(findMissingBlobs(outputDigests, MoreExecutors.newDirectExecutorService()).get())) {
+      if (Iterables.isEmpty(findMissingBlobs(outputDigests, newDirectExecutorService()).get())) {
         return actionResult;
       }
     } catch (ExecutionException e) {
@@ -363,74 +368,6 @@ public class ShardInstance extends AbstractServerInstance {
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }
-  }
-
-  public ListenableFuture<Iterable<String>> correctMissingBlob(Digest digest, ExecutorService service) throws IOException {
-    List<String> workers;
-    Set<String> workerSet;
-    try {
-      workerSet = backplane.getWorkerSet();
-      workers = new ArrayList<>(workerSet);
-      Collections.shuffle(workers, rand);
-    } catch (IOException e) {
-      throw Status.fromThrowable(e).asRuntimeException();
-    }
-
-    Set<String> originalLocationSet = backplane.getBlobLocationSet(digest);
-    System.out.println("ShardInstance::correctMissingBlob(" + DigestUtil.toString(digest) + "): Current set is: " + originalLocationSet);
-
-    ListenableFuture<List<String>> workerResultsFuture = Futures.allAsList(
-        Iterables.transform(
-            workers,
-            (worker) -> checkMissingBlobOnWorker(digest, worker, service)));
-    return Futures.transform(
-        workerResultsFuture,
-        (workerResults) -> {
-          Set<String> found = ImmutableSet.copyOf(Iterables.filter(workerResults, Predicates.notNull()));
-          for (String worker : originalLocationSet) {
-            if (workerSet.contains(worker) && !found.contains(worker)) {
-              System.out.println("ShardInstance::correctMissingBlob(" + DigestUtil.toString(digest) + "): Removing from " + worker);
-              try {
-                backplane.removeBlobLocation(digest, worker);
-              } catch (IOException e) {
-                throw Status.INTERNAL.withCause(e).asRuntimeException();
-              }
-            }
-          }
-          return found;
-        },
-        service);
-  }
-
-  private ListenableFuture<String> checkMissingBlobOnWorker(Digest digest, String worker, ExecutorService service) {
-    return FluentFuture.from(workerStub(worker).findMissingBlobs(ImmutableList.of(digest), service))
-        .transform(Iterables::isEmpty, MoreExecutors.directExecutor())
-        .transform(
-            (contains) -> {
-              if (contains) {
-                try {
-                  backplane.addBlobLocation(digest, worker);
-                } catch (IOException e) {
-                  throw Status.INTERNAL.withCause(e).asRuntimeException();
-                }
-                return worker;
-              }
-              return null;
-            }, service)
-        .catchingAsync(
-            Throwable.class,
-            (e) -> {
-              Status status = Status.fromThrowable(e);
-              if (status.getCode() == Code.UNAVAILABLE) {
-                removeMalfunctioningWorker(worker, e, "findMissingBlobs(...)");
-              } else if (status.getCode() == Code.CANCELLED || Context.current().isCancelled()) {
-                // do nothing further if we're cancelled
-                throw status.asRuntimeException();
-              } else if (SHARD_IS_RETRIABLE.test(status)) {
-                return checkMissingBlobOnWorker(digest, worker, service);
-              }
-              throw Status.INTERNAL.withCause(e).asRuntimeException();
-            }, service);
   }
 
   @Override
@@ -540,8 +477,12 @@ public class ShardInstance extends AbstractServerInstance {
   @Override
   public void getBlob(Digest blobDigest, long offset, long limit, StreamObserver<ByteString> blobObserver) {
     List<String> workersList;
+    Set<String> workerSet;
+    Set<String> locationSet;
     try {
-      workersList = new ArrayList<>(Sets.intersection(backplane.getBlobLocationSet(blobDigest), backplane.getWorkerSet()));
+      workerSet = backplane.getWorkerSet();
+      locationSet = backplane.getBlobLocationSet(blobDigest);
+      workersList = new ArrayList<>(Sets.intersection(locationSet, workerSet));
     } catch (IOException e) {
       blobObserver.onError(e);
       return;
@@ -552,7 +493,7 @@ public class ShardInstance extends AbstractServerInstance {
       try {
         populatedWorkerListFuture = Futures.transform(
             // should be sending this the blob location set and worker set we used
-            correctMissingBlob(blobDigest, MoreExecutors.newDirectExecutorService()),
+            correctMissingBlob(backplane, workerSet, locationSet, this::workerStub, blobDigest, newDirectExecutorService()),
             (foundOnWorkers) -> {
               Iterables.addAll(workersList, foundOnWorkers);
               return workersList;
@@ -582,7 +523,7 @@ public class ShardInstance extends AbstractServerInstance {
           final ListenableFuture<List<String>> workersListFuture;
           try {
             workersListFuture = Futures.transform(
-                correctMissingBlob(blobDigest, MoreExecutors.newDirectExecutorService()),
+                correctMissingBlob(backplane, workerSet, locationSet, (worker) -> workerStub(worker), blobDigest, newDirectExecutorService()),
                 (foundOnWorkers) -> {
                   Iterables.addAll(workersList, foundOnWorkers);
                   return workersList;
@@ -689,9 +630,6 @@ public class ShardInstance extends AbstractServerInstance {
             .negotiationType(NegotiationType.PLAINTEXT);
     return builder.build();
   }
-
-  private static final com.google.common.base.Predicate<Status> SHARD_IS_RETRIABLE =
-      st -> st.getCode() != Code.CANCELLED && Retrier.DEFAULT_IS_RETRIABLE.test(st);
 
   private static Retrier createStubRetrier() {
     return new Retrier(
@@ -870,7 +808,7 @@ public class ShardInstance extends AbstractServerInstance {
     };
     Context.current().addListener((context) -> {
       chunkObserver.onError(Status.CANCELLED.asRuntimeException());
-    }, MoreExecutors.directExecutor());
+    }, directExecutor());
     return chunkObserver;
   }
 
@@ -1033,7 +971,7 @@ public class ShardInstance extends AbstractServerInstance {
       }
     } else {
       try {
-        metadata = buildQueuedOperationMetadata(action, MoreExecutors.directExecutor()).get();
+        metadata = buildQueuedOperationMetadata(action, directExecutor()).get();
       } catch (ExecutionException e) {
         e.printStackTrace();
         return false;

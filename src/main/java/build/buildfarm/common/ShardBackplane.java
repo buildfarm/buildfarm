@@ -137,6 +137,12 @@ public interface ShardBackplane {
   void addBlobLocation(Digest blobDigest, String workerName) throws IOException;
 
   /**
+   * Remove or add workers to a blob's location set as requested
+   */
+  @ThreadSafe
+  public void adjustBlobLocations(Digest blobDigest, Set<String> addWorkers, Set<String> removeWorkers) throws IOException;
+
+  /**
    * The CAS is represented as a map where the key is the digest of the blob
    * that is being stored and the value is a set of the names of the workers
    * where that blob is stored.

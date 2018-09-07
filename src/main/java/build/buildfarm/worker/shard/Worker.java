@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker.shard;
 
+import static build.buildfarm.instance.shard.Util.correctMissingBlob;
 import static build.buildfarm.worker.CASFileCache.getOrIOException;
 import static com.google.common.util.concurrent.Futures.addCallback;
 import static com.google.common.util.concurrent.Futures.allAsList;
@@ -60,7 +61,6 @@ import build.buildfarm.worker.WorkerContext;
 import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ShardWorkerConfig;
-import com.google.common.base.Predicates;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableList;
@@ -68,7 +68,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 import com.google.common.io.ByteStreams;
-import com.google.common.util.concurrent.FluentFuture;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
@@ -376,87 +375,26 @@ public class Worker implements Instances {
         throw new NoSuchFileException(DigestUtil.toString(blobDigest));
       }
 
-      private ListenableFuture<Iterable<String>> correctMissingBlob(Digest digest, ExecutorService service) throws IOException {
-        List<String> workers;
+      @Override
+      public InputStream newInput(Digest blobDigest, long offset) throws IOException, InterruptedException {
         Set<String> workerSet;
+        Set<String> locationSet;
         try {
           workerSet = Sets.difference(backplane.getWorkerSet(), ImmutableSet.<String>of(config.getPublicName()));
-          workers = new ArrayList<>(workerSet);
-          Collections.shuffle(workers, rand);
+          locationSet = Sets.newHashSet(Sets.intersection(backplane.getBlobLocationSet(blobDigest), workerSet));
         } catch (IOException e) {
           throw Status.fromThrowable(e).asRuntimeException();
         }
 
-        Set<String> originalLocationSet = backplane.getBlobLocationSet(digest);
-        System.out.println("RemoteInputStreamFactory::correctMissingBlob(" + DigestUtil.toString(digest) + "): Current set is: " + originalLocationSet);
-
-        ListenableFuture<List<String>> workerResultsFuture = allAsList(
-            Iterables.transform(
-                workers,
-                (worker) -> checkMissingBlobOnWorker(digest, worker, service)));
-        return transform(
-            workerResultsFuture,
-            (workerResults) -> {
-              Set<String> found = ImmutableSet.copyOf(Iterables.filter(workerResults, Predicates.notNull()));
-              for (String worker : originalLocationSet) {
-                if (workerSet.contains(worker) && !found.contains(worker)) {
-                  System.out.println("RemoteInputStreamFactory::correctMissingBlob(" + DigestUtil.toString(digest) + "): Removing from " + worker);
-                  try {
-                    backplane.removeBlobLocation(digest, worker);
-                  } catch (IOException e) {
-                    throw Status.INTERNAL.withCause(e).asRuntimeException();
-                  }
-                }
-              }
-              return found;
-            },
-            service);
-      }
-
-      private ListenableFuture<String> checkMissingBlobOnWorker(Digest digest, String worker, ExecutorService service) {
-        return FluentFuture.from(workerStub(worker).findMissingBlobs(ImmutableList.of(digest), service))
-            .transform(Iterables::isEmpty, MoreExecutors.directExecutor())
-            .transform(
-                (contains) -> {
-                  if (contains) {
-                    try {
-                      backplane.addBlobLocation(digest, worker);
-                    } catch (IOException e) {
-                      throw Status.INTERNAL.withCause(e).asRuntimeException();
-                    }
-                    return worker;
-                  }
-                  return null;
-                }, service)
-            .catchingAsync(
-                Throwable.class,
-                (e) -> {
-                  Status status = Status.fromThrowable(e);
-                  if (status.getCode() == Code.UNAVAILABLE) {
-                  } else if (status.getCode() == Code.CANCELLED || Context.current().isCancelled()) {
-                    // do nothing further if we're cancelled
-                    throw status.asRuntimeException();
-                  } else if (SHARD_IS_RETRIABLE.test(status)) {
-                    return checkMissingBlobOnWorker(digest, worker, service);
-                  }
-                  throw Status.INTERNAL.withCause(e).asRuntimeException();
-                }, service);
-      }
-
-      @Override
-      public InputStream newInput(Digest blobDigest, long offset) throws IOException, InterruptedException {
-        Set<String> workerSet = new HashSet<>(Sets.intersection(
-            backplane.getBlobLocationSet(blobDigest),
-            backplane.getWorkerSet()));
-        if (workerSet.remove(config.getPublicName())) {
+        if (locationSet.remove(config.getPublicName())) {
           backplane.removeBlobLocation(blobDigest, config.getPublicName());
         }
-        List<String> workersList = new ArrayList<>(workerSet);
+        List<String> workersList = new ArrayList<>(locationSet);
         boolean emptyWorkerList = workersList.isEmpty();
         final ListenableFuture<List<String>> populatedWorkerListFuture;
         if (emptyWorkerList) {
           populatedWorkerListFuture = transform(
-              correctMissingBlob(blobDigest, newDirectExecutorService()),
+              correctMissingBlob(backplane, workerSet, locationSet, (worker) -> workerStub(worker), blobDigest, newDirectExecutorService()),
               (foundOnWorkers) -> {
                 Iterables.addAll(workersList, foundOnWorkers);
                 return workersList;
@@ -470,6 +408,7 @@ public class Worker implements Instances {
 
           @Override
           public void onQueue(Deque<String> workers) {
+            Set<String> locationSet = Sets.newHashSet(workers);
             try {
               inputStreamFuture.set(fetchBlobFromRemoteWorker(blobDigest, workers, offset));
             } catch (IOException e) {
@@ -482,7 +421,7 @@ public class Worker implements Instances {
                 workersList.clear();
                 try {
                   ListenableFuture<List<String>> checkedWorkerListFuture = transform(
-                      correctMissingBlob(blobDigest, newDirectExecutorService()),
+                      correctMissingBlob(backplane, workerSet, locationSet, (worker) -> workerStub(worker), blobDigest, newDirectExecutorService()),
                       (foundOnWorkers) -> {
                         Iterables.addAll(workersList, foundOnWorkers);
                         return workersList;
