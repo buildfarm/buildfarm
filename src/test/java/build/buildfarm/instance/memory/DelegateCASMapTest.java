@@ -17,10 +17,10 @@ package build.buildfarm.instance.memory;
 import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.Mockito.verifyZeroInteractions;
 
-import build.buildfarm.common.ContentAddressableStorage;
+import build.bazel.remote.execution.v2.ActionResult;
+import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
-import com.google.devtools.remoteexecution.v1test.ActionResult;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;

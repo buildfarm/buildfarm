@@ -12,22 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.instance.memory;
+package build.buildfarm.cas;
 
-import build.buildfarm.common.ContentAddressableStorage;
-import com.google.devtools.remoteexecution.v1test.Digest;
+import build.bazel.remote.execution.v2.Digest;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-class MemoryLRUContentAddressableStorage implements ContentAddressableStorage {
+class MemoryCAS implements ContentAddressableStorage {
   private final long maxSizeInBytes;
   private final Map<Digest, Entry> storage;
   private transient long sizeInBytes;
   private transient Entry header;
 
-  public MemoryLRUContentAddressableStorage(long maxSizeInBytes) {
+  public MemoryCAS(long maxSizeInBytes) {
     this.maxSizeInBytes = maxSizeInBytes;
     sizeInBytes = 0;
     header = new SentinelEntry();

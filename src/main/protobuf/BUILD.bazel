@@ -8,9 +8,9 @@ proto_library(
     deps = [
         "@com_google_protobuf//:duration_proto",
         "@googleapis//:google_api_annotations_proto",
-        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_proto",
         "@googleapis//:google_longrunning_operations_proto",
         "@googleapis//:google_rpc_status_proto",
+        "@remote_apis//build/bazel/remote/execution/v2:remote_execution_proto",
     ],
 )
 
@@ -18,9 +18,9 @@ java_proto_library(
     name = "build_buildfarm_v1test_buildfarm_java_proto",
     deps = [
         ":build_buildfarm_v1test_buildfarm_proto",
-        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_proto",
         "@googleapis//:google_longrunning_operations_proto",
         "@googleapis//:google_rpc_status_proto",
+        "@remote_apis//build/bazel/remote/execution/v2:remote_execution_proto",
     ],
 )
 

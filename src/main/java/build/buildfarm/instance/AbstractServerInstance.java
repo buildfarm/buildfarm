@@ -14,8 +14,9 @@
 
 package build.buildfarm.instance;
 
-import build.buildfarm.common.ContentAddressableStorage;
-import build.buildfarm.common.ContentAddressableStorage.Blob;
+import build.buildfarm.ac.ActionCache;
+import build.buildfarm.cas.ContentAddressableStorage;
+import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import com.google.common.annotations.VisibleForTesting;
@@ -24,15 +25,22 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
-import com.google.devtools.remoteexecution.v1test.Action;
-import com.google.devtools.remoteexecution.v1test.ActionResult;
-import com.google.devtools.remoteexecution.v1test.Command;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.Directory;
-import com.google.devtools.remoteexecution.v1test.DirectoryNode;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
-import com.google.devtools.remoteexecution.v1test.ExecuteResponse;
-import com.google.devtools.remoteexecution.v1test.FileNode;
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.ActionCacheUpdateCapabilities;
+import build.bazel.remote.execution.v2.CacheCapabilities;
+import build.bazel.remote.execution.v2.CacheCapabilities.SymlinkAbsolutePathStrategy;
+import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.DirectoryNode;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecuteResponse;
+import build.bazel.remote.execution.v2.ExecutionCapabilities;
+import build.bazel.remote.execution.v2.ExecutionPolicy;
+import build.bazel.remote.execution.v2.FileNode;
+import build.bazel.remote.execution.v2.ResultsCachePolicy;
+import build.bazel.remote.execution.v2.ServerCapabilities;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -43,14 +51,14 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
-import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 public abstract class AbstractServerInstance implements Instance {
   private final String name;
   protected final ContentAddressableStorage contentAddressableStorage;
-  protected final Map<ActionKey, ActionResult> actionCache;
-  protected final Map<String, Operation> outstandingOperations;
-  protected final Map<String, Operation> completedOperations;
+  protected final ActionCache actionCache;
+  protected final OperationsMap outstandingOperations;
+  protected final OperationsMap completedOperations;
   protected final DigestUtil digestUtil;
 
   private static final String DUPLICATE_FILE_NODE =
@@ -89,9 +97,9 @@ public abstract class AbstractServerInstance implements Instance {
       String name,
       DigestUtil digestUtil,
       ContentAddressableStorage contentAddressableStorage,
-      Map<ActionKey, ActionResult> actionCache,
-      Map<String, Operation> outstandingOperations,
-      Map<String, Operation> completedOperations) {
+      ActionCache actionCache,
+      OperationsMap outstandingOperations,
+      OperationsMap completedOperations) {
     this.name = name;
     this.contentAddressableStorage = contentAddressableStorage;
     this.actionCache = actionCache;
@@ -116,7 +124,7 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public void putActionResult(ActionKey actionKey, ActionResult actionResult) {
+  public void putActionResult(ActionKey actionKey, ActionResult actionResult) throws InterruptedException {
     actionCache.put(actionKey, actionResult);
   }
 
@@ -164,7 +172,8 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public Digest putBlob(ByteString content) throws IllegalArgumentException {
+  public Digest putBlob(ByteString content)
+      throws InterruptedException {
     if (content.size() == 0) {
       return digestUtil.empty();
     }
@@ -174,7 +183,8 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs) {
+  public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs)
+      throws InterruptedException {
     ImmutableList.Builder<Digest> blobDigestsBuilder =
       new ImmutableList.Builder<Digest>();
     for (ByteString blob : blobs) {
@@ -235,7 +245,7 @@ public abstract class AbstractServerInstance implements Instance {
   abstract protected Operation createOperation(ActionKey actionKey);
 
   // called when an operation will be queued for execution
-  protected void onQueue(Operation operation, Action action) {
+  protected void onQueue(Operation operation, Action action) throws InterruptedException {
   }
 
   private void stringsUniqueAndSortedPrecondition(
@@ -425,17 +435,6 @@ public abstract class AbstractServerInstance implements Instance {
           MISSING_INPUT);
     }
 
-    // FIXME should input/output collisions (through directories) be another
-    // invalid action?
-    filesUniqueAndSortedPrecondition(action.getOutputFilesList());
-    filesUniqueAndSortedPrecondition(action.getOutputDirectoriesList());
-
-    AbstractServerInstance.validateOutputs(
-        inputFilesBuilder.build(),
-        inputDirectoriesBuilder.build(),
-        Sets.newHashSet(action.getOutputFilesList()),
-        Sets.newHashSet(action.getOutputDirectoriesList()));
-
     Command command;
     try {
       command = Command.parseFrom(getBlob(commandDigest));
@@ -445,6 +444,18 @@ public abstract class AbstractServerInstance implements Instance {
           INVALID_DIGEST);
       return;
     }
+
+    // FIXME should input/output collisions (through directories) be another
+    // invalid action?
+    filesUniqueAndSortedPrecondition(command.getOutputFilesList());
+    filesUniqueAndSortedPrecondition(command.getOutputDirectoriesList());
+
+    AbstractServerInstance.validateOutputs(
+        inputFilesBuilder.build(),
+        inputDirectoriesBuilder.build(),
+        Sets.newHashSet(command.getOutputFilesList()),
+        Sets.newHashSet(command.getOutputDirectoriesList()));
+
     environmentVariablesUniqueAndSortedPrecondition(
         command.getEnvironmentVariablesList());
     Preconditions.checkState(
@@ -505,21 +516,31 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public void execute(
-      Action action,
+      Digest actionDigest,
       boolean skipCacheLookup,
-      int totalInputFileCount,
-      long totalInputFileBytes,
-      Consumer<Operation> onOperation) {
+      ExecutionPolicy executionPolicy,
+      ResultsCachePolicy resultsCachePolicy,
+      Predicate<Operation> watcher) throws InterruptedException {
+    ByteString actionBlob = getBlob(actionDigest);
+    Preconditions.checkState(actionBlob != null, INVALID_DIGEST);
+
+    Action action;
+    try {
+      action = Action.parseFrom(actionBlob);
+    } catch (InvalidProtocolBufferException e) {
+      throw new IllegalStateException(INVALID_DIGEST);
+    }
+
     validateAction(action);
 
-    ActionKey actionKey = digestUtil.computeActionKey(action);
+    ActionKey actionKey = DigestUtil.asActionKey(actionDigest);
     Operation operation = createOperation(actionKey);
     ExecuteOperationMetadata metadata =
       expectExecuteOperationMetadata(operation);
 
     putOperation(operation);
 
-    onOperation.accept(operation);
+    watchOperation(operation.getName(), watcher);
 
     Operation.Builder operationBuilder = operation.toBuilder();
     ActionResult actionResult = null;
@@ -584,6 +605,18 @@ public abstract class AbstractServerInstance implements Instance {
     }
   }
 
+  protected Command expectCommand(Operation operation) {
+    Action action = expectAction(operation);
+    if (action == null) {
+      return null;
+    }
+    try {
+      return Command.parseFrom(getBlob(action.getCommandDigest()));
+    } catch(InvalidProtocolBufferException ex) {
+      return null;
+    }
+  }
+
   protected Directory expectDirectory(Digest directoryBlobDigest) {
     try {
       ByteString directoryBlob = getBlob(directoryBlobDigest);
@@ -620,7 +653,7 @@ public abstract class AbstractServerInstance implements Instance {
   abstract protected void enqueueOperation(Operation operation);
 
   @Override
-  public boolean putOperation(Operation operation) {
+  public boolean putOperation(Operation operation) throws InterruptedException {
     if (isCancelled(operation)) {
       if (outstandingOperations.remove(operation.getName()) == null) {
         throw new IllegalStateException();
@@ -629,7 +662,7 @@ public abstract class AbstractServerInstance implements Instance {
       return true;
     }
     if (isExecuting(operation) &&
-        !outstandingOperations.containsKey(operation.getName())) {
+        !outstandingOperations.contains(operation.getName())) {
       return false;
     }
     if (isQueued(operation)) {
@@ -650,7 +683,7 @@ public abstract class AbstractServerInstance implements Instance {
    */
   protected abstract Object operationLock(String operationName);
 
-  protected void updateOperationWatchers(Operation operation) {
+  protected void updateOperationWatchers(Operation operation) throws InterruptedException {
     if (operation.getDone()) {
       synchronized(operationLock(operation.getName())) {
         completedOperations.put(operation.getName(), operation);
@@ -705,14 +738,14 @@ public abstract class AbstractServerInstance implements Instance {
     synchronized(operationLock(name)) {
       Operation deletedOperation = completedOperations.remove(name);
       if (deletedOperation == null &&
-          outstandingOperations.containsKey(name)) {
+          outstandingOperations.contains(name)) {
         throw new IllegalStateException();
       }
     }
   }
 
   @Override
-  public void cancelOperation(String name) {
+  public void cancelOperation(String name) throws InterruptedException {
     Operation operation = getOperation(name);
     putOperation(operation.toBuilder()
         .setDone(true)
@@ -722,7 +755,7 @@ public abstract class AbstractServerInstance implements Instance {
         .build());
   }
 
-  protected void expireOperation(Operation operation) {
+  protected void expireOperation(Operation operation) throws InterruptedException {
     ActionResult actionResult = ActionResult.newBuilder()
         .setExitCode(-1)
         .setStderrRaw(ByteString.copyFromUtf8(
@@ -769,5 +802,30 @@ public abstract class AbstractServerInstance implements Instance {
       return false;
     }
     return true;
+  }
+
+  protected CacheCapabilities getCacheCapabilities() {
+    return CacheCapabilities.newBuilder()
+        .addDigestFunction(digestUtil.getDigestFunction())
+        .setActionCacheUpdateCapabilities(ActionCacheUpdateCapabilities.newBuilder()
+            .setUpdateEnabled(true))
+        .setMaxBatchTotalSizeBytes(4 * 1024 * 1024)
+        .setSymlinkAbsolutePathStrategy(SymlinkAbsolutePathStrategy.DISALLOWED)
+        .build();
+  }
+
+  protected ExecutionCapabilities getExecutionCapabilities() {
+    return ExecutionCapabilities.newBuilder()
+        .setDigestFunction(digestUtil.getDigestFunction())
+        .setExecEnabled(true)
+        .build();
+  }
+
+  @Override
+  public ServerCapabilities getCapabilities() {
+    return ServerCapabilities.newBuilder()
+        .setCacheCapabilities(getCacheCapabilities())
+        .setExecutionCapabilities(getExecutionCapabilities())
+        .build();
   }
 }

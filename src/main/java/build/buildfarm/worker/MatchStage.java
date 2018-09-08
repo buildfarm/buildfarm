@@ -14,8 +14,9 @@
 
 package build.buildfarm.worker;
 
-import com.google.devtools.remoteexecution.v1test.Action;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
@@ -64,7 +65,19 @@ public class MatchStage extends PipelineStage {
 
     try {
       action = Action.parseFrom(actionBlob);
-    } catch (InvalidProtocolBufferException ex) {
+    } catch (InvalidProtocolBufferException e) {
+      return false;
+    }
+
+    ByteString commandBlob = workerContext.getBlob(action.getCommandDigest());
+    if (commandBlob == null) {
+      return false;
+    }
+
+    Command command;
+    try {
+      command = Command.parseFrom(commandBlob);
+    } catch (InvalidProtocolBufferException e) {
       return false;
     }
 
@@ -82,7 +95,8 @@ public class MatchStage extends PipelineStage {
           operation,
           execDir,
           metadata,
-          action));
+          action,
+          command));
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       return false;

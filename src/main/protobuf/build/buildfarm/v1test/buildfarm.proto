@@ -3,7 +3,7 @@ syntax = "proto3";
 package build.buildfarm.v1test;
 
 import "google/api/annotations.proto";
-import "google/devtools/remoteexecution/v1test/remote_execution.proto";
+import "build/bazel/remote/execution/v2/remote_execution.proto";
 import "google/longrunning/operations.proto";
 import "google/protobuf/duration.proto";
 import "google/rpc/status.proto";
@@ -39,7 +39,7 @@ message TakeOperationRequest {
   // choose to execute the action on any worker satisfying the requirements, so
   // the client SHOULD ensure that running the action on any such worker will
   // have the same result.
-  google.devtools.remoteexecution.v1test.Platform platform = 5;
+  build.bazel.remote.execution.v2.Platform platform = 5;
 }
 
 message PollOperationRequest {
@@ -47,7 +47,7 @@ message PollOperationRequest {
   string operation_name = 2;
 
   // The current state of the worker
-  google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage stage = 3;
+  build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage stage = 3;
 }
 
 message BuildFarmServerConfig {
@@ -56,6 +56,44 @@ message BuildFarmServerConfig {
   string default_instance_name = 3; // must be present in instances list or empty
 
   int32 port = 2;
+}
+
+message MemoryCASConfig {
+  // limit for CAS total content size
+  int64 max_size_bytes = 1;
+}
+
+message GrpcCASConfig {
+  // CAS resources must contain instance names
+  string instance_name = 1;
+
+  // grpc endpoint supporting CAS/BS
+  string target = 2;
+}
+
+message ContentAddressableStorageConfig {
+  oneof type {
+    MemoryCASConfig memory = 1;
+    GrpcCASConfig grpc = 2;
+  }
+}
+
+message DelegateCASConfig {
+}
+
+message GrpcACConfig {
+  // AC requests can contain instance names
+  string instance_name = 1;
+
+  // grpc endpoint supporting AC
+  string target = 2;
+}
+
+message ActionCacheConfig {
+  oneof type {
+    DelegateCASConfig delegate_cas = 1;
+    GrpcACConfig grpc = 2;
+  }
 }
 
 message MemoryInstanceConfig {
@@ -78,32 +116,26 @@ message MemoryInstanceConfig {
   // considered lost on a worker and is requeued
   google.protobuf.Duration operation_completed_delay = 6;
 
-  // limit for CAS total content size
-  int64 cas_max_size_bytes = 7;
-
   // default timeout for actions
   // if a timeout is unspecified for an action, this value
   // is imposed on it, after which the operation will be
   // cancelled
-  google.protobuf.Duration default_action_timeout = 8;
+  google.protobuf.Duration default_action_timeout = 7;
 
   // maximum selectable timeout
   // a maximum threshold for an action's specified timeout,
   // beyond which an action will be rejected for execution
-  google.protobuf.Duration maximum_action_timeout = 9;
+  google.protobuf.Duration maximum_action_timeout = 8;
+
+  ContentAddressableStorageConfig cas_config = 9;
+
+  ActionCacheConfig action_cache_config = 10;
 }
 
 message InstanceConfig {
   string name = 1;
 
-  enum HashFunction {
-    UNKNOWN = 0;
-    MD5 = 1;
-    SHA1 = 2;
-    SHA256 = 3;
-  }
-
-  HashFunction hash_function = 2;
+  build.bazel.remote.execution.v2.DigestFunction digest_function = 2;
 
   oneof type {
     MemoryInstanceConfig memory_instance_config = 3;
@@ -127,7 +159,7 @@ message InstanceEndpoint {
 }
 
 message WorkerConfig {
-  InstanceConfig.HashFunction hash_function = 1;
+  build.bazel.remote.execution.v2.DigestFunction digest_function = 1;
 
   // endpoint for all cas requests
   InstanceEndpoint content_addressable_storage = 2;
@@ -180,7 +212,7 @@ message WorkerConfig {
   google.protobuf.Duration operation_poll_period = 16;
 
   // initial platform used to match operations
-  google.devtools.remoteexecution.v1test.Platform platform = 17;
+  build.bazel.remote.execution.v2.Platform platform = 17;
 
   // execute width
   int32 execute_stage_width = 18;
@@ -201,7 +233,7 @@ message WorkerConfig {
 }
 
 message TreeIteratorToken {
-  repeated google.devtools.remoteexecution.v1test.Digest directories = 1;
+  repeated build.bazel.remote.execution.v2.Digest directories = 1;
 }
 
 message OperationIteratorToken {

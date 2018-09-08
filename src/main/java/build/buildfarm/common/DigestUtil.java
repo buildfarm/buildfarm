@@ -13,15 +13,15 @@
 // limitations under the License.
 package build.buildfarm.common;
 
-import build.buildfarm.v1test.InstanceConfig;
 import com.google.common.base.Preconditions;
 import com.google.common.hash.Funnels;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
 import com.google.common.io.ByteSource;
-import com.google.devtools.remoteexecution.v1test.Action;
-import com.google.devtools.remoteexecution.v1test.Digest;
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.DigestFunction;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Message;
 import java.io.ByteArrayOutputStream;
@@ -44,19 +44,33 @@ public class DigestUtil {
     private final com.google.common.hash.HashFunction hash;
     final HashCode empty;
 
-    HashFunction(com.google.common.hash.HashFunction hash) {
+    private HashFunction(com.google.common.hash.HashFunction hash) {
       this.hash = hash;
       empty = this.hash.newHasher().hash();
     }
 
-    public static HashFunction get(InstanceConfig.HashFunction hashFunction) throws IllegalArgumentException {
-      switch(hashFunction) {
+    public DigestFunction getDigestFunction() {
+      if (this == SHA256) {
+        return DigestFunction.SHA256;
+      }
+      if (this == SHA1) {
+        return DigestFunction.SHA1;
+      }
+      if (this == MD5) {
+        return DigestFunction.MD5;
+      }
+      return DigestFunction.UNKNOWN;
+    }
+
+    public static HashFunction get(DigestFunction digestFunction) {
+      switch(digestFunction) {
       default:
       case UNRECOGNIZED:
-        throw new IllegalArgumentException(hashFunction.toString());
-      case MD5: return MD5;
-      case SHA1: return SHA1;
+      case UNKNOWN:
+        throw new IllegalArgumentException(digestFunction.toString());
       case SHA256: return SHA256;
+      case SHA1: return SHA1;
+      case MD5: return MD5;
       }
     }
 
@@ -107,9 +121,9 @@ public class DigestUtil {
   private final Digest empty;
 
   public static DigestUtil forHash(String hashName) {
-    InstanceConfig.HashFunction hash = InstanceConfig.HashFunction.valueOf(
-        InstanceConfig.HashFunction.getDescriptor().findValueByName(hashName));
-    HashFunction hashFunction = HashFunction.get(hash);
+    DigestFunction digestFunction = DigestFunction.valueOf(
+        DigestFunction.getDescriptor().findValueByName(hashName));
+    HashFunction hashFunction = HashFunction.get(digestFunction);
     return new DigestUtil(hashFunction);
   }
 
@@ -118,8 +132,12 @@ public class DigestUtil {
     empty = buildDigest(hashFn.empty().toString(), 0);
   }
 
+  public DigestFunction getDigestFunction() {
+    return hashFn.getDigestFunction();
+  }
+
   public Digest compute(Path file) throws IOException {
-    return compute(file, Files.size(file));
+    return buildDigest(computeHash(file), Files.size(file));
   }
 
   private String computeHash(Path file) throws IOException {
@@ -129,10 +147,6 @@ public class DigestUtil {
         return Files.newInputStream(file);
       }
     }.hash(hashFn.getHash()).toString();
-  }
-
-  public Digest compute(Path file, long fileSize) throws IOException {
-    return buildDigest(computeHash(file), fileSize);
   }
 
   public Digest compute(ByteString blob) {

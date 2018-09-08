@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.instance.memory;
+package build.buildfarm.cas;
 
 import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.Mockito.mock;
@@ -20,21 +20,19 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-import build.buildfarm.instance.memory.MemoryLRUContentAddressableStorage;
-import build.buildfarm.common.ContentAddressableStorage;
-import build.buildfarm.common.ContentAddressableStorage.Blob;
+import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
-import com.google.devtools.remoteexecution.v1test.Digest;
+import build.bazel.remote.execution.v2.Digest;
 import com.google.protobuf.ByteString;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
-public class MemoryLRUContentAddressableStorageTest {
+public class MemoryCASTest {
   @Test
-  public void expireShouldCallOnExpiration() {
-    ContentAddressableStorage storage = new MemoryLRUContentAddressableStorage(10);
+  public void expireShouldCallOnExpiration() throws InterruptedException {
+    ContentAddressableStorage storage = new MemoryCAS(10);
 
     DigestUtil sha1DigestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
     Runnable mockOnExpiration = mock(Runnable.class);
@@ -45,8 +43,8 @@ public class MemoryLRUContentAddressableStorageTest {
   }
 
   @Test
-  public void expireShouldOccurAtLimitExactly() {
-    ContentAddressableStorage storage = new MemoryLRUContentAddressableStorage(11);
+  public void expireShouldOccurAtLimitExactly() throws InterruptedException {
+    ContentAddressableStorage storage = new MemoryCAS(11);
 
     DigestUtil sha1DigestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
     Runnable mockOnExpiration = mock(Runnable.class);
@@ -58,8 +56,8 @@ public class MemoryLRUContentAddressableStorageTest {
   }
 
   @Test
-  public void duplicateEntryRegistersMultipleOnExpiration() {
-    ContentAddressableStorage storage = new MemoryLRUContentAddressableStorage(10);
+  public void duplicateEntryRegistersMultipleOnExpiration() throws InterruptedException {
+    ContentAddressableStorage storage = new MemoryCAS(10);
 
     DigestUtil sha1DigestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
     Runnable mockOnExpiration = mock(Runnable.class);

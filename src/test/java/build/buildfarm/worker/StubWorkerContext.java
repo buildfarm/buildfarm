@@ -20,10 +20,11 @@ import build.buildfarm.worker.CASFileCache;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.v1test.CASInsertionPolicy;
-import com.google.devtools.remoteexecution.v1test.Action;
-import com.google.devtools.remoteexecution.v1test.ActionResult;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
@@ -51,7 +52,7 @@ class StubWorkerContext implements WorkerContext {
   @Override public Duration getMaximumActionTimeout() { throw new UnsupportedOperationException(); }
   @Override public ByteStreamUploader getUploader() { throw new UnsupportedOperationException(); }
   @Override public ByteString getBlob(Digest digest) { throw new UnsupportedOperationException(); }
-  @Override public void createActionRoot(Path root, Action action) { throw new UnsupportedOperationException(); }
+  @Override public void createActionRoot(Path root, Action action, Command command) { throw new UnsupportedOperationException(); }
   @Override public void destroyActionRoot(Path root) { throw new UnsupportedOperationException(); }
   @Override public Path getRoot() { throw new UnsupportedOperationException(); }
   @Override public void removeDirectory(Path path) { throw new UnsupportedOperationException(); }

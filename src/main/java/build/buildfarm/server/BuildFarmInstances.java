@@ -104,7 +104,7 @@ public class BuildFarmInstances implements Instances {
 
   private static HashFunction getValidHashFunction(InstanceConfig config) throws ConfigurationException {
     try {
-      return HashFunction.get(config.getHashFunction());
+      return HashFunction.get(config.getDigestFunction());
     } catch (IllegalArgumentException e) {
       throw new ConfigurationException("hash_function value unrecognized");
     }
@@ -115,8 +115,7 @@ public class BuildFarmInstances implements Instances {
       String name = instanceConfig.getName();
       HashFunction hashFunction = getValidHashFunction(instanceConfig);
       DigestUtil digestUtil = new DigestUtil(hashFunction);
-      InstanceConfig.TypeCase typeCase = instanceConfig.getTypeCase();
-      switch (typeCase) {
+      switch (instanceConfig.getTypeCase()) {
         default:
         case TYPE_NOT_SET:
           throw new IllegalArgumentException("Instance type not set in config");

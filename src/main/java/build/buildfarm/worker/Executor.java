@@ -15,10 +15,10 @@
 package build.buildfarm.worker;
 
 import com.google.common.io.ByteStreams;
-import com.google.devtools.remoteexecution.v1test.ActionResult;
-import com.google.devtools.remoteexecution.v1test.Command;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
-import com.google.devtools.remoteexecution.v1test.ExecuteResponse;
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecuteResponse;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -46,15 +46,6 @@ class Executor implements Runnable {
   }
 
   private void runInterruptible() throws InterruptedException {
-    Command command;
-    try {
-      command = Command.parseFrom(workerContext.getBlob(operationContext.action.getCommandDigest()));
-    } catch (InvalidProtocolBufferException ex) {
-      owner.error().put(operationContext);
-      owner.release();
-      return;
-    }
-
     ExecuteOperationMetadata executingMetadata = operationContext.metadata.toBuilder()
         .setStage(ExecuteOperationMetadata.Stage.EXECUTING)
         .build();
@@ -93,7 +84,7 @@ class Executor implements Runnable {
     try {
       statusCode = executeCommand(
           operationContext.execDir,
-          command,
+          operationContext.command,
           timeout,
           operationContext.metadata.getStdoutStreamName(),
           operationContext.metadata.getStderrStreamName(),
@@ -119,7 +110,8 @@ class Executor implements Runnable {
           operation,
           operationContext.execDir,
           operationContext.metadata,
-          operationContext.action));
+          operationContext.action,
+          operationContext.command));
     } else {
       owner.error().put(operationContext);
     }

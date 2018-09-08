@@ -6,12 +6,12 @@ package(
 
 java_library(
     name = "common",
-    srcs = glob(["common/**/*.java"]),
+    srcs = glob(["common/*.java"]),
     deps = [
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
-        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )
 
@@ -24,8 +24,8 @@ java_library(
         ":common",
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
-        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
         "@googleapis//:google_longrunning_operations_java_proto",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )
 
@@ -33,9 +33,12 @@ java_library(
     name = "server-instance",
     srcs = [
         "instance/AbstractServerInstance.java",
+        "instance/OperationsMap.java",
         "instance/TokenizableIterator.java",
     ],
     deps = [
+        ":ac",
+        ":cas",
         ":common",
         ":instance",
         "//3rdparty/jvm/com/google/guava",
@@ -45,10 +48,10 @@ java_library(
         "//3rdparty/jvm/io/grpc:grpc_netty",
         "//3rdparty/jvm/io/grpc:grpc_protobuf",
         "//3rdparty/jvm/io/grpc:grpc_stub",
-        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
         "@googleapis//:google_longrunning_operations_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
         "@googleapis//:google_rpc_status_java_proto",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )
 
@@ -56,6 +59,8 @@ java_library(
     name = "memory-instance",
     srcs = glob(["instance/memory/*.java"]),
     deps = [
+        ":ac",
+        ":cas",
         ":common",
         ":instance",
         ":server-instance",
@@ -67,9 +72,9 @@ java_library(
         "//3rdparty/jvm/io/grpc:grpc_protobuf",
         "//3rdparty/jvm/io/grpc:grpc_stub",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
-        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
         "@googleapis//:google_longrunning_operations_java_proto",
         "@googleapis//:google_rpc_status_java_proto",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )
 
@@ -92,12 +97,13 @@ java_library(
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_bytestream_bytestream_java_grpc",
         "@googleapis//:google_bytestream_bytestream_java_proto",
-        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_grpc",
-        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
         "@googleapis//:google_longrunning_operations_java_grpc",
         "@googleapis//:google_rpc_code_java_proto",
         "@googleapis//:google_watch_v1_java_grpc",
         "@googleapis//:google_watch_v1_java_proto",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+        "@remote_apis//:build_bazel_semver_java_proto",
     ],
 )
 
@@ -124,7 +130,7 @@ container_image(
         "buildfarm-server_deploy.jar",
         "/config/server.config",
         "--port",
-        "8098"
+        "8980"
     ],
     visibility = ["//visibility:public"],
 )
@@ -147,10 +153,10 @@ java_library(
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_bytestream_bytestream_java_grpc",
         "@googleapis//:google_bytestream_bytestream_java_proto",
-        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_grpc",
-        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
         "@googleapis//:google_longrunning_operations_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )
 
@@ -191,6 +197,36 @@ java_library(
         "//3rdparty/jvm/io/grpc:grpc_protobuf",
         "//3rdparty/jvm/io/grpc:grpc_stub",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+    ],
+)
+
+java_library(
+    name = "cas",
+    srcs = glob(["cas/*.java"]),
+    deps = [
+        ":common",
+        ":stub-instance",
+        "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java",
+        "//3rdparty/jvm/io/grpc:grpc_core",
+        "//3rdparty/jvm/io/grpc:grpc_netty",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "@googleapis//:google_bytestream_bytestream_java_grpc",
+        "@googleapis//:google_bytestream_bytestream_java_proto",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+    ],
+)
+
+java_library(
+    name = "ac",
+    srcs = glob(["ac/*.java"]),
+    deps = [
+        ":common",
+        "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/io/grpc:grpc_core",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )
 

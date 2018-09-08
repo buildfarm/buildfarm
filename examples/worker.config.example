@@ -1,8 +1,8 @@
-# the hash function for this worker, required
+# the digest function for this worker, required
 # to match out of band between the client and server
 # since resource names must be determined on the client
 # for a valid upload
-hash_function: SHA256
+digest_function: SHA256
 
 # the endpoint used to execute operations
 operation_queue: {

@@ -17,9 +17,9 @@ package build.buildfarm.worker;
 import static com.google.common.truth.Truth.assertThat;
 
 import build.buildfarm.v1test.WorkerConfig;
-import com.google.devtools.remoteexecution.v1test.Action;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -70,6 +70,9 @@ public class MatchStageTest {
 
       @Override
       public ByteString getBlob(Digest digest) {
+        if (digest.getSizeBytes() == 0) {
+          return ByteString.EMPTY;
+        }
         if (digest.getHash().equals("action")) {
           return Action.newBuilder().build().toByteString();
         }

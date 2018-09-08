@@ -17,18 +17,19 @@ package build.buildfarm.instance;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import com.google.common.collect.ImmutableList;
-import com.google.devtools.remoteexecution.v1test.Action;
-import com.google.devtools.remoteexecution.v1test.ActionResult;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.Directory;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
-import com.google.devtools.remoteexecution.v1test.Platform;
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.ExecutionPolicy;
+import build.bazel.remote.execution.v2.ResultsCachePolicy;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
+import build.bazel.remote.execution.v2.Platform;
+import build.bazel.remote.execution.v2.ServerCapabilities;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 public interface Instance {
@@ -37,7 +38,7 @@ public interface Instance {
   DigestUtil getDigestUtil();
 
   ActionResult getActionResult(ActionKey actionKey);
-  void putActionResult(ActionKey actionKey, ActionResult actionResult);
+  void putActionResult(ActionKey actionKey, ActionResult actionResult) throws InterruptedException;
 
   Iterable<Digest> findMissingBlobs(Iterable<Digest> digests);
 
@@ -58,13 +59,13 @@ public interface Instance {
   InputStream newStreamInput(String name);
 
   void execute(
-      Action action,
+      Digest actionDigest,
       boolean skipCacheLookup,
-      int totalInputFileCount,
-      long totalInputFileBytes,
-      Consumer<Operation> onOperation);
-  void match(Platform platform, boolean requeueOnFailure, Predicate<Operation> onMatch);
-  boolean putOperation(Operation operation);
+      ExecutionPolicy executionPolicy,
+      ResultsCachePolicy resultsCachePolicy,
+      Predicate<Operation> onOperation) throws InterruptedException;
+  void match(Platform platform, boolean requeueOnFailure, Predicate<Operation> onMatch) throws InterruptedException;
+  boolean putOperation(Operation operation) throws InterruptedException;
   boolean pollOperation(String operationName, Stage stage);
   // returns nextPageToken suitable for list restart
   String listOperations(
@@ -73,7 +74,7 @@ public interface Instance {
       String filter,
       ImmutableList.Builder<Operation> operations);
   Operation getOperation(String name);
-  void cancelOperation(String name);
+  void cancelOperation(String name) throws InterruptedException;
   void deleteOperation(String name);
 
   // returns true if the operation will be handled in all cases through the
@@ -83,6 +84,7 @@ public interface Instance {
   // The watcher must not be tested again after it has returned false.
   boolean watchOperation(
       String operationName,
-      boolean watchInitialState,
       Predicate<Operation> watcher);
+
+  ServerCapabilities getCapabilities();
 }

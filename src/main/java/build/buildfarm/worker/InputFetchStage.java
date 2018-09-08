@@ -14,7 +14,7 @@
 
 package build.buildfarm.worker;
 
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.BlockingQueue;
@@ -47,7 +47,7 @@ public class InputFetchStage extends PipelineStage {
 
     boolean success = true;
     try {
-      workerContext.createActionRoot(operationContext.execDir, operationContext.action);
+      workerContext.createActionRoot(operationContext.execDir, operationContext.action, operationContext.command);
     } catch (IOException e) {
       e.printStackTrace();
       success = false;

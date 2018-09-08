@@ -54,12 +54,12 @@ public class BuildFarmServer {
     instances = new BuildFarmInstances(config.getInstancesList(), defaultInstanceName);
     server = serverBuilder
         .addService(new ActionCacheService(instances))
+        .addService(new CapabilitiesService(instances))
         .addService(new ContentAddressableStorageService(instances))
         .addService(new ByteStreamService(instances))
         .addService(new ExecutionService(instances))
         .addService(new OperationQueueService(instances))
         .addService(new OperationsService(instances))
-        .addService(new WatcherService(instances))
         .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
         .build();
   }
