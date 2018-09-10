@@ -91,7 +91,9 @@ public abstract class PipelineStage implements Runnable {
       } catch (InterruptedException e) {
         boolean isTickCancelled = tickCancelled();
         tickThread = null;
-        output.release();
+        if (valid) {
+          output.release();
+        }
         if (!isTickCancelled) {
           throw e;
         }
