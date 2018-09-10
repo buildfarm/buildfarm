@@ -1072,7 +1072,11 @@ public class Worker implements Instances {
       server.awaitTermination();
     }
     */
-    pipeline.join();
+    try {
+      pipeline.join();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
     if (server != null) {
       server.shutdown();
 
@@ -1090,6 +1094,9 @@ public class Worker implements Instances {
       fileCache.stop();
     }
     backplane.stop();
+    if (Thread.interrupted()) {
+      throw new InterruptedException();
+    }
   }
 
   private void removeWorker(String name) {
