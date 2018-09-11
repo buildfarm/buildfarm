@@ -21,6 +21,7 @@ import static com.google.common.util.concurrent.Futures.allAsList;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.Futures.transformAsync;
+import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 
 import build.buildfarm.common.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
@@ -30,9 +31,9 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.io.ByteStreams;
-import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.devtools.remoteexecution.v1test.Directory;
@@ -65,6 +66,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -79,7 +81,11 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
   private final Map<Path, Lock> mutexes = new HashMap<>();
   private final Consumer<Digest> onPut;
   private final Consumer<Iterable<Digest>> onExpire;
-  private final ListeningExecutorService removeDirectoryPool = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(32));
+  private final ListeningExecutorService removeDirectoryPool =
+      listeningDecorator(
+          Executors.newFixedThreadPool(
+            /* nThreads=*/ 32,
+            new ThreadFactoryBuilder().setNameFormat("remove-directory-pool-%d").build()));
 
   private transient long sizeInBytes = 0;
   private transient Entry header = new SentinelEntry();
@@ -523,7 +529,9 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
       }
     });
 
-    ExecutorService pool = Executors.newFixedThreadPool(32);
+    ExecutorService pool = Executors.newFixedThreadPool(
+        /* nThreads=*/ 32,
+        new ThreadFactoryBuilder().setNameFormat("scan-cache-pool-%d").build());
 
     ImmutableList.Builder<Path> invalidDirectories = new ImmutableList.Builder<>();
 
@@ -893,8 +901,10 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
       Runnable onInsert)
       throws IOException, InterruptedException {
     // uhhh, should we just serialize all of these per key with a single executor?
-    // really want these executors to be named for the key...
-    ListeningExecutorService service = MoreExecutors.listeningDecorator(Executors.newSingleThreadExecutor());
+    ThreadFactory factory = new ThreadFactoryBuilder()
+        .setNameFormat(String.format("blob-%s-lock-manager", key.getFileName()))
+        .build();
+    ListeningExecutorService service = listeningDecorator(Executors.newSingleThreadExecutor(factory));
     Lock l = acquire(key);
     ListenableFuture<OutputStream> future = service.submit(() -> {
       final OutputStream out;
