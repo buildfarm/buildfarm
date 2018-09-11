@@ -135,7 +135,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
 
-public class Worker implements Instances {
+public class Worker {
   private static final Logger nettyLogger = Logger.getLogger("io.grpc.netty");
 
   private final ShardWorkerConfig config;
@@ -157,24 +157,6 @@ public class Worker implements Instances {
   private static final int shutdownWaitTimeInMillis = 10000;
   private static final com.google.common.base.Predicate<Status> SHARD_IS_RETRIABLE =
       st -> st.getCode() != Code.CANCELLED && Retrier.DEFAULT_IS_RETRIABLE.test(st);
-
-  @Override
-  public Instance getFromBlob(String blobName) throws InstanceNotFoundException { return instance; }
-
-  @Override
-  public Instance getFromUploadBlob(String uploadBlobName) throws InstanceNotFoundException { return instance; }
-
-  @Override
-  public Instance getFromOperationsCollectionName(String operationsCollectionName) throws InstanceNotFoundException { return instance; }
-
-  @Override
-  public Instance getFromOperationName(String operationName) throws InstanceNotFoundException { return instance; }
-
-  @Override
-  public Instance getFromOperationStream(String operationStream) throws InstanceNotFoundException { return instance; }
-
-  @Override
-  public Instance get(String name) throws InstanceNotFoundException { return instance; }
 
   public Worker(ShardWorkerConfig config) throws ConfigurationException {
     this(ServerBuilder.forPort(config.getPort()), config);
@@ -529,9 +511,10 @@ public class Worker implements Instances {
         outputStreamFactory,
         config.getShardWorkerInstanceConfig());
 
+    Instances instances = Instances.singular(instance);
     server = serverBuilder
-        .addService(new ContentAddressableStorageService(this))
-        .addService(new ByteStreamService(this))
+        .addService(new ContentAddressableStorageService(instances))
+        .addService(new ByteStreamService(instances))
         .build();
 
     // FIXME factor into pipeline factory/constructor
@@ -1019,14 +1002,12 @@ public class Worker implements Instances {
     pipeline.add(reportResultStage, 4);
   }
 
-  public void stop() {
+  public void stop() throws InterruptedException {
     System.err.println("Closing the pipeline");
     try {
       pipeline.close();
     } catch (InterruptedException e) {
-      backplane.stop(); // the pool must be signaled...
       Thread.currentThread().interrupt();
-      return;
     }
     if (config.getUseFuseCas()) {
       System.err.println("Umounting Fuse");
@@ -1047,6 +1028,9 @@ public class Worker implements Instances {
       }
     }
     backplane.stop();
+    if (Thread.interrupted()) {
+      throw new InterruptedException();
+    }
   }
 
   private void onStoragePut(Digest digest) {
@@ -1139,8 +1123,7 @@ public class Worker implements Instances {
     }
   }
 
-  @Override
-  public void start() {
+  public void start() throws InterruptedException {
     try {
       backplane.start();
 
@@ -1183,8 +1166,12 @@ public class Worker implements Instances {
       @Override
       public void run() {
         System.err.println("*** shutting down gRPC server since JVM is shutting down");
-        Worker.this.stop();
-        System.err.println("*** server shut down");
+        try {
+          Worker.this.stop();
+          System.err.println("*** server shut down");
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        }
       }
     });
     pipeline.start();
