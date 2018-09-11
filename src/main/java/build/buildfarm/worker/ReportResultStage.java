@@ -78,6 +78,7 @@ public class ReportResultStage extends PipelineStage {
           operationContext.action.getOutputFilesList(),
           operationContext.action.getOutputDirectoriesList());
     } catch (IOException e) {
+      poller.stop();
       throw new IllegalStateException(e);
     } catch (StatusRuntimeException e) {
       e.printStackTrace();
