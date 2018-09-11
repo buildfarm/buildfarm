@@ -155,8 +155,6 @@ public class Worker {
       MoreExecutors.listeningDecorator(Executors.newScheduledThreadPool(1));
   private final Set<String> activeOperations = new ConcurrentSkipListSet<>();
   private static final int shutdownWaitTimeInMillis = 10000;
-  private static final com.google.common.base.Predicate<Status> SHARD_IS_RETRIABLE =
-      st -> st.getCode() != Code.CANCELLED && Retrier.DEFAULT_IS_RETRIABLE.test(st);
 
   public Worker(ShardWorkerConfig config) throws ConfigurationException {
     this(ServerBuilder.forPort(config.getPort()), config);
