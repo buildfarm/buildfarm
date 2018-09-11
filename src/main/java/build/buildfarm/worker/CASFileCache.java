@@ -944,6 +944,10 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
         cause = cause.getCause();
       }
       throw new UncheckedExecutionException(e);
+    } catch (InterruptedException e) {
+      service.shutdownNow();
+      service.awaitTermination(10, TimeUnit.MINUTES);
+      throw e;
     }
     if (out == DUPLICATE_OUTPUT_STREAM) {
       service.execute(() -> {
