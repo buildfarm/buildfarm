@@ -206,7 +206,7 @@ public class Worker {
         Retrier.DEFAULT_IS_RETRIABLE);
   }
 
-  private static Retrier createRedisRetrier() {
+  private static Retrier createBackplaneRetrier() {
     return new Retrier(
         Backoff.exponential(
               java.time.Duration.ofMillis(/*options.experimentalRemoteRetryStartDelayMillis=*/ 100),
@@ -884,7 +884,7 @@ public class Worker {
 
       @Override
       public boolean putOperation(Operation operation, Action action) throws IOException, InterruptedException {
-        boolean success = putOperation(operation);
+        boolean success = createBackplaneRetrier().execute(() -> instance.putOperation(operation));
         if (success && operation.getDone()) {
           backplane.removeTree(action.getInputRootDigest());
         }
@@ -968,17 +968,6 @@ public class Worker {
       @Override
       public OutputStream getStreamOutput(String name) {
         throw new UnsupportedOperationException();
-      }
-
-      private boolean putOperation(Operation operation) throws IOException {
-        try {
-          return createRedisRetrier().execute(() -> {
-            return instance.putOperation(operation);
-          });
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-        }
-        return false;
       }
     };
 
