@@ -59,5 +59,5 @@ public interface WorkerContext {
   void uploadOutputs(ActionResult.Builder resultBuilder, Path actionRoot, Iterable<String> outputFiles, Iterable<String> outputDirs) throws IOException, InterruptedException;
   boolean putOperation(Operation operation, Action Action) throws IOException, InterruptedException;
   OutputStream getStreamOutput(String name);
-  void putActionResult(ActionKey actionKey, ActionResult actionResult);
+  void putActionResult(ActionKey actionKey, ActionResult actionResult) throws IOException, InterruptedException;
 }

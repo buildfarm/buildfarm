@@ -87,7 +87,16 @@ public class ReportResultStage extends PipelineStage {
 
     ActionResult result = resultBuilder.build();
     if (!operationContext.action.getDoNotCache() && resultBuilder.getExitCode() == 0) {
-      workerContext.putActionResult(DigestUtil.asActionKey(operationContext.metadata.getActionDigest()), result);
+      try {
+        workerContext.putActionResult(DigestUtil.asActionKey(operationContext.metadata.getActionDigest()), result);
+      } catch (IOException e) {
+        poller.stop();
+        return null;
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        poller.stop();
+        return null;
+      }
     }
 
     Duration reportedIn = Durations.fromNanos(System.nanoTime() - reportStartAt);

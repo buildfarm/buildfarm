@@ -961,8 +961,11 @@ public class Worker {
       }
 
       @Override
-      public void putActionResult(ActionKey actionKey, ActionResult actionResult) {
-        instance.putActionResult(actionKey, actionResult);
+      public void putActionResult(ActionKey actionKey, ActionResult actionResult) throws IOException, InterruptedException {
+        createBackplaneRetrier().execute(() -> {
+          instance.putActionResult(actionKey, actionResult);
+          return null;
+        });
       }
 
       @Override
