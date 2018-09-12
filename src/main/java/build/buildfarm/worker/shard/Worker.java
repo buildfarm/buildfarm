@@ -399,13 +399,15 @@ public class Worker {
           @Override
           public void onQueue(Deque<String> workers) {
             Set<String> locationSet = Sets.newHashSet(workers);
-            while (!workers.isEmpty()) {
+            boolean failed = false;
+            while (!failed && !workers.isEmpty()) {
               try {
                 inputStreamFuture.set(fetchBlobFromRemoteWorker(blobDigest, workers, offset));
               } catch (IOException e) {
                 if (workers.isEmpty()) {
                   if (triedCheck) {
                     onFailure(e);
+                    return;
                   }
                   triedCheck = true;
 
@@ -419,10 +421,12 @@ public class Worker {
                         });
                     addCallback(checkedWorkerListFuture, this);
                   } catch (IOException checkException) {
+                    failed = true;
                     onFailure(checkException);
                   }
                 }
               } catch (InterruptedException e) {
+                failed = true;
                 onFailure(e);
               }
             }
