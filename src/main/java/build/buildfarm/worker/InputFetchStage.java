@@ -42,12 +42,11 @@ public class InputFetchStage extends PipelineStage {
 
   @Override
   protected OperationContext tick(OperationContext operationContext) throws InterruptedException {
-    final Thread fetchThread = Thread.currentThread();
     Poller poller = workerContext.createPoller(
         "InputFetchStage",
         operationContext.operation.getName(),
         ExecuteOperationMetadata.Stage.QUEUED,
-        () -> cancelTick());
+        this::cancelTick);
 
     workerContext.logInfo("InputFetchStage: Fetching inputs: " + operationContext.operation.getName());
 
