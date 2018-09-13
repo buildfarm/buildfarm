@@ -883,7 +883,17 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
         e.printStackTrace(); // prevent burial by early end of stream during close
         throw e;
       } finally {
-        out.close();
+        try {
+          out.close();
+        } catch (IOException e) {
+          if (Thread.interrupted()) {
+            if (e.getCause() instanceof InterruptedException) {
+              throw (InterruptedException) e.getCause();
+            }
+            throw new InterruptedException();
+          }
+          throw e;
+        }
       }
     }
     return key;
