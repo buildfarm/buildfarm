@@ -78,7 +78,7 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
   private final DigestUtil digestUtil;
   private final Map<Path, Entry> storage = new ConcurrentHashMap<>();
   private final Map<Digest, DirectoryEntry> directoryStorage = new HashMap<>();
-  private final Map<Path, Lock> mutexes = new HashMap<>();
+  private final LockMap locks = new LockMap();
   private final Consumer<Digest> onPut;
   private final Consumer<Iterable<Digest>> onExpire;
   private final ListeningExecutorService removeDirectoryPool =
@@ -179,7 +179,7 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
 
   private boolean contains(Digest digest, boolean isExecutable) throws IOException {
     Path key = getKey(digest, isExecutable);
-    Lock l = acquire(key);
+    Lock l = locks.acquire(key);
     if (l.tryLock()) {
       try {
         Entry e = storage.get(key);
@@ -198,7 +198,7 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
           return true;
         }
       } finally {
-        release(key);
+        locks.release(key);
         l.unlock();
       }
     } else {
@@ -378,19 +378,23 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
     throw new UnsupportedOperationException();
   }
 
-  private synchronized Lock acquire(Path key) {
-    Lock mutex = mutexes.get(key);
-    if (mutex == null) {
-      mutex = new ReentrantLock();
-      mutexes.put(key, mutex);
-    }
-    return mutex;
-  }
+  private static final class LockMap {
+    private final Map<Path, Lock> mutexes = new HashMap<>();
 
-  private synchronized void release(Path key) {
-    // prevents this lock from being exclusive to other accesses, since it
-    // must now be present
-    mutexes.remove(key);
+    private synchronized Lock acquire(Path key) {
+      Lock mutex = mutexes.get(key);
+      if (mutex == null) {
+        mutex = new ReentrantLock();
+        mutexes.put(key, mutex);
+      }
+      return mutex;
+    }
+
+    private synchronized void release(Path key) {
+      // prevents this lock from being exclusive to other accesses, since it
+      // must now be present
+      mutexes.remove(key);
+    }
   }
 
   private static final class FileEntryKey {
@@ -503,7 +507,7 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
           }
           if (fileEntryKey != null) {
             Path key = fileEntryKey.getKey();
-            Lock l = acquire(key);
+            Lock l = locks.acquire(key);
             l.lock();
             try {
               if (storage.get(key) == null) {
@@ -518,7 +522,7 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
                 sizeInBytes += size;
               }
             } finally {
-              release(key);
+              locks.release(key);
               l.unlock();
             }
           } else {
@@ -646,7 +650,7 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
 
   private void remove(Digest digest, boolean isExecutable) throws IOException {
     Path key = getKey(digest, isExecutable);
-    Lock l = acquire(key);
+    Lock l = locks.acquire(key);
     l.lock();
     try {
       Entry e = storage.remove(key);
@@ -656,7 +660,7 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
         }
       }
     } finally {
-      release(key);
+      locks.release(key);
       l.unlock();
     }
   }
@@ -905,7 +909,7 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
         .setNameFormat(String.format("blob-%s-lock-manager", key.getFileName()))
         .build();
     ListeningExecutorService service = listeningDecorator(Executors.newSingleThreadExecutor(factory));
-    Lock l = acquire(key);
+    Lock l = locks.acquire(key);
     ListenableFuture<OutputStream> future = service.submit(() -> {
       final OutputStream out;
       boolean outIsSet = false;
@@ -920,7 +924,7 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
         outIsSet = true;
       } finally {
         if (!outIsSet) {
-          release(key);
+          locks.release(key);
           l.unlock();
         }
       }
@@ -951,7 +955,7 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
     }
     if (out == DUPLICATE_OUTPUT_STREAM) {
       service.execute(() -> {
-        release(key);
+        locks.release(key);
         l.unlock();
       });
       service.shutdown();
@@ -965,7 +969,7 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
           out.close();
         } finally {
           service.execute(() -> {
-            release(key);
+            locks.release(key);
             l.unlock();
           });
           service.shutdown();
