@@ -62,9 +62,12 @@ public interface ShardBackplane {
 
   /**
    * Adds a worker's name to the set of active workers.
+   *
+   * Returns true if the worker was newly added, and false if
+   * it was already a member of the set.
    */
   @ThreadSafe
-  void addWorker(String workerName) throws IOException;
+  boolean addWorker(String workerName) throws IOException;
 
   /**
    * Removes a worker's name from the set of active workers.

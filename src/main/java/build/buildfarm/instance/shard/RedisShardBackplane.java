@@ -295,8 +295,8 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   @Override
-  public void addWorker(String workerName) throws IOException {
-    withVoidBackplaneException((jedis) -> jedis.sadd(config.getWorkersSetName(), workerName));
+  public boolean addWorker(String workerName) throws IOException {
+    return withBackplaneException((jedis) -> jedis.sadd(config.getWorkersSetName(), workerName) == 1);
   }
 
   private static final String MISCONF_RESPONSE = "MISCONF";
