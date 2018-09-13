@@ -154,6 +154,7 @@ public class Worker {
   private final ListeningScheduledExecutorService retryScheduler =
       MoreExecutors.listeningDecorator(Executors.newScheduledThreadPool(1));
   private final Set<String> activeOperations = new ConcurrentSkipListSet<>();
+  private long workerRegistrationExpiresAt = 0;
   private static final int shutdownWaitTimeInMillis = 10000;
 
   public Worker(ShardWorkerConfig config) throws ConfigurationException {
@@ -1120,6 +1121,29 @@ public class Worker {
     }
   }
 
+  private void startFailsafeRegistration() {
+    new Thread(() -> {
+      try {
+        while (!server.isShutdown()) {
+          long now = System.currentTimeMillis();
+          if (now >= workerRegistrationExpiresAt) {
+            // worker must be registered to match
+            addWorker(config.getPublicName());
+            // update every 10 seconds
+            workerRegistrationExpiresAt = now + 10000;
+          }
+          TimeUnit.SECONDS.sleep(1);
+        }
+      } catch (InterruptedException e) {
+        try {
+          stop();
+        } catch (InterruptedException ie) {
+          // ignore
+        }
+      }
+    }).start();
+  }
+
   public void start() throws InterruptedException {
     try {
       backplane.start();
@@ -1153,7 +1177,7 @@ public class Worker {
       }
 
       server.start();
-      addWorker(config.getPublicName());
+      startFailsafeRegistration();
     } catch (Exception e) {
       stop();
       e.printStackTrace();
