@@ -972,7 +972,13 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
         l.unlock();
       });
       service.shutdown();
-      service.awaitTermination(10, TimeUnit.MINUTES);
+      try {
+        service.awaitTermination(10, TimeUnit.MINUTES);
+      } finally {
+        if (!service.isTerminated()) {
+          service.shutdownNow();
+        }
+      }
       return null;
     }
     return new OutputStream() {
@@ -989,6 +995,8 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
           try {
             service.awaitTermination(10, TimeUnit.MINUTES);
           } catch (InterruptedException e) {
+            service.shutdownNow();
+
             Thread.currentThread().interrupt();
             throw new IOException(e);
           }
