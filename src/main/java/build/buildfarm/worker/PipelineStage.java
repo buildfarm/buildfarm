@@ -24,7 +24,7 @@ public abstract class PipelineStage implements Runnable {
   protected boolean claimed;
   private boolean closed;
   private Thread tickThread = null;
-  private boolean tickCancelled = false;
+  private boolean tickCancelledFlag = false;
 
   PipelineStage(String name, WorkerContext workerContext, PipelineStage output, PipelineStage error) {
     this.name = name;
@@ -63,14 +63,14 @@ public abstract class PipelineStage implements Runnable {
     // if we are in a tick, set the cancel flag, interrupt the tick thread
     Thread cancelTickThread = tickThread;
     if (cancelTickThread != null) {
-      tickCancelled = true;
+      tickCancelledFlag = true;
       cancelTickThread.interrupt();
     }
   }
 
   private boolean tickCancelled() {
-    boolean isTickCancelled = tickCancelled;
-    tickCancelled = false;
+    boolean isTickCancelled = tickCancelledFlag;
+    tickCancelledFlag = false;
     return isTickCancelled;
   }
 
