@@ -378,14 +378,15 @@ public class RedisShardBackplane implements ShardBackplane {
 
   @Override
   public Set<String> getWorkerSet() throws IOException {
-    if (System.nanoTime() < workerSetExpiresAt) {
+    long now = System.currentTimeMillis();
+    if (now < workerSetExpiresAt) {
       return workerSet;
     }
 
     workerSet = withBackplaneException((jedis) -> jedis.smembers(config.getWorkersSetName()));
 
     // fetch every 3 seconds
-    workerSetExpiresAt = System.nanoTime() + 3000000000l;
+    workerSetExpiresAt = now + 3000;
     return workerSet;
   }
 
