@@ -843,16 +843,19 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
     }
 
     ImmutableList.Builder<Path> inputsBuilder = new ImmutableList.Builder<>();
+    boolean fetched = false;
     try {
       fetchDirectory(digest, path, digest, directoriesIndex, inputsBuilder);
-    } catch (IOException e) {
-      ImmutableList<Path> inputs = inputsBuilder.build();
-      synchronized (this) {
-        purgeDirectoryFromInputs(digest, inputs);
-        decrementReferencesSynchronized(inputs, ImmutableList.<Digest>of());
+      fetched = true;
+    } finally {
+      if (!fetched) {
+        ImmutableList<Path> inputs = inputsBuilder.build();
+        synchronized (this) {
+          purgeDirectoryFromInputs(digest, inputs);
+          decrementReferencesSynchronized(inputs, ImmutableList.<Digest>of());
+        }
+        removeDirectoryAsync(path);
       }
-      removeDirectoryAsync(path);
-      throw e;
     }
 
     DirectoryEntry e = new DirectoryEntry(directoriesIndex.get(digest), inputsBuilder.build());

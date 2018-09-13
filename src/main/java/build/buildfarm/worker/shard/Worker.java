@@ -914,6 +914,7 @@ public class Worker {
           ImmutableList.Builder<Digest> inputDirectories = new ImmutableList.Builder<>();
 
           System.out.println("WorkerContext::createActionRoot(" + DigestUtil.toString(action.getInputRootDigest()) + ") calling fetchInputs");
+          boolean fetched = false;
           try {
             fetchInputs(
                 actionRoot,
@@ -922,9 +923,11 @@ public class Worker {
                 outputDirectory,
                 inputFiles,
                 inputDirectories);
-          } catch (IOException e) {
-            fileCache.decrementReferences(inputFiles.build(), inputDirectories.build());
-            throw e;
+            fetched = true;
+          } finally {
+            if (!fetched) {
+              fileCache.decrementReferences(inputFiles.build(), inputDirectories.build());
+            }
           }
 
           rootInputFiles.put(actionRoot, inputFiles.build());
