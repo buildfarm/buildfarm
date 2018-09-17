@@ -14,6 +14,11 @@
 
 package build.buildfarm.instance.memory;
 
+import static com.google.common.collect.Multimaps.synchronizedSetMultimap;
+import static com.google.common.util.concurrent.Futures.addCallback;
+import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
+import static java.util.concurrent.Executors.newCachedThreadPool;
+
 import build.buildfarm.ac.ActionCache;
 import build.buildfarm.ac.GrpcActionCache;
 import build.buildfarm.cas.ContentAddressableStorage;
@@ -32,7 +37,12 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.MultimapBuilder;
+import com.google.common.collect.SetMultimap;
 import com.google.common.io.BaseEncoding;
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
@@ -55,20 +65,24 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 import java.util.function.Predicate;
 
 public class MemoryInstance extends AbstractServerInstance {
   private final MemoryInstanceConfig config;
-  private final Map<String, List<Predicate<Operation>>> watchers;
+  private final SetMultimap<String, Predicate<Operation>> watchers;
   private final Map<String, ByteStringStreamSource> streams;
   private final List<Operation> queuedOperations;
   private final List<Worker> workers;
   private final Map<String, Watchdog> requeuers;
   private final Map<String, Watchdog> operationTimeoutDelays;
   private final OperationsMap outstandingOperations;
+  private final ListeningExecutorService watcherService;
 
   private static final class Worker {
     private final Platform platform;
@@ -123,7 +137,12 @@ public class MemoryInstance extends AbstractServerInstance {
         digestUtil,
         config,
         ContentAddressableStorages.create(config.getCasConfig()),
-        /*watchers=*/ new ConcurrentHashMap<String, List<Predicate<Operation>>>(),
+        /* watchers=*/ synchronizedSetMultimap(
+            MultimapBuilder
+                .hashKeys()
+                .hashSetValues(/* expectedValuesPerKey=*/ 1)
+                .build()),
+        /* watcherService=*/ newCachedThreadPool(),
         new OutstandingOperations());
   }
 
@@ -133,7 +152,8 @@ public class MemoryInstance extends AbstractServerInstance {
       DigestUtil digestUtil,
       MemoryInstanceConfig config,
       ContentAddressableStorage contentAddressableStorage,
-      Map<String, List<Predicate<Operation>>> watchers,
+      SetMultimap<String, Predicate<Operation>> watchers,
+      ExecutorService watcherService,
       OperationsMap outstandingOperations) {
     super(
         name,
@@ -150,6 +170,7 @@ public class MemoryInstance extends AbstractServerInstance {
     requeuers = new HashMap<String, Watchdog>();
     operationTimeoutDelays = new HashMap<String, Watchdog>();
     this.outstandingOperations = outstandingOperations;
+    this.watcherService = listeningDecorator(watcherService);
   }
 
   private static ActionCache createActionCache(ActionCacheConfig config, ContentAddressableStorage cas, DigestUtil digestUtil) {
@@ -253,30 +274,32 @@ public class MemoryInstance extends AbstractServerInstance {
 
   @Override
   protected void updateOperationWatchers(Operation operation) throws InterruptedException {
-    synchronized(watchers) {
-      List<Predicate<Operation>> operationWatchers =
-          watchers.get(operation.getName());
-      if (operationWatchers != null) {
-        if (operation.getDone()) {
-          watchers.remove(operation.getName());
-        }
-        long unfilteredWatcherCount = operationWatchers.size();
-        super.updateOperationWatchers(operation);
-        ImmutableList.Builder<Predicate<Operation>> filteredWatchers = new ImmutableList.Builder<>();
-        long filteredWatcherCount = 0;
-        for (Predicate<Operation> watcher : operationWatchers) {
-          if (watcher.test(operation)) {
-            filteredWatchers.add(watcher);
-            filteredWatcherCount++;
+    super.updateOperationWatchers(operation);
+
+    Set<Predicate<Operation>> operationWatchers = watchers.get(operation.getName());
+    synchronized (watchers) {
+      for (Predicate<Operation> watcher : operationWatchers) {
+        ListenableFuture<Boolean> stillWatchingFuture = watcherService.submit(new Callable<Boolean>() {
+          @Override
+          public Boolean call() {
+            return watcher.test(operation) && !operation.getDone();
           }
-        }
-        if (!operation.getDone() && filteredWatcherCount != unfilteredWatcherCount) {
-          operationWatchers = new ArrayList<>();
-          Iterables.addAll(operationWatchers, filteredWatchers.build());
-          watchers.put(operation.getName(), operationWatchers);
-        }
-      } else {
-        throw new IllegalStateException();
+        });
+        addCallback(stillWatchingFuture, new FutureCallback<Boolean>() {
+          @Override
+          public void onSuccess(Boolean stillWatching) {
+            if (!stillWatching) {
+              synchronized (watchers) {
+                operationWatchers.remove(watcher);
+              }
+            }
+          }
+
+          @Override
+          public void onFailure(Throwable t) {
+            // ignore
+          }
+        }, watcherService);
       }
     }
   }
@@ -284,8 +307,6 @@ public class MemoryInstance extends AbstractServerInstance {
   @Override
   protected Operation createOperation(ActionKey actionKey) {
     String name = createOperationName(UUID.randomUUID().toString());
-
-    watchers.put(name, new ArrayList<Predicate<Operation>>());
 
     ExecuteOperationMetadata metadata = ExecuteOperationMetadata.newBuilder()
         .setActionDigest(actionKey.getDigest())
@@ -472,29 +493,13 @@ public class MemoryInstance extends AbstractServerInstance {
       // watcher did not process completed state
       return false;
     }
-    Operation completedOperation = null;
-    synchronized(watchers) {
-      List<Predicate<Operation>> operationWatchers = watchers.get(operationName);
-      if (operationWatchers == null) {
-        /* we can race on the synchronization and miss a done, where the
-         * watchers list has been removed, making it necessary to check for the
-         * operation within this context */
-        operation = getOperation(operationName);
-        if (operation == null) {
-          return true;
-        }
-        Preconditions.checkState(
-            operation.getDone(),
-            "watchers removed on incomplete operation");
-        completedOperation = operation;
-      } else {
-        operationWatchers.add(watcher);
-        return true;
-      }
+    watchers.put(operationName, watcher);
+    operation = getOperation(operationName);
+    if (operation == null || operation.getDone()) {
+      // guarantee at least once delivery
+      return !watcher.test(operation);
     }
-    // the failed watcher test indicates that it did not handle the
-    // completed state
-    return !watcher.test(completedOperation);
+    return true;
   }
 
   @Override

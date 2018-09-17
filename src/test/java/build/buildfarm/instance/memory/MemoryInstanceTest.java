@@ -14,7 +14,14 @@
 
 package build.buildfarm.instance.memory;
 
+import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.CACHE_CHECK;
+import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.COMPLETED;
+import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.EXECUTING;
+import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.QUEUED;
+import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.UNKNOWN;
+import static com.google.common.collect.Multimaps.synchronizedSetMultimap;
 import static com.google.common.truth.Truth.assertThat;
+import static java.util.concurrent.Executors.newFixedThreadPool;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -22,6 +29,8 @@ import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
@@ -32,6 +41,8 @@ import build.buildfarm.v1test.ActionCacheConfig;
 import build.buildfarm.v1test.DelegateCASConfig;
 import build.buildfarm.v1test.MemoryInstanceConfig;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.MultimapBuilder;
+import com.google.common.collect.SetMultimap;
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import com.google.longrunning.Operation;
@@ -58,7 +69,7 @@ public class MemoryInstanceTest {
   private Instance instance;
 
   private OperationsMap outstandingOperations;
-  private Map<String, List<Predicate<Operation>>> watchers;
+  private SetMultimap<String, Predicate<Operation>> watchers;
 
   @Mock
   private ContentAddressableStorage storage;
@@ -67,7 +78,11 @@ public class MemoryInstanceTest {
   public void setUp() throws Exception {
     MockitoAnnotations.initMocks(this);
     outstandingOperations = new MemoryInstance.OutstandingOperations();
-    watchers = new HashMap<>();
+    watchers = synchronizedSetMultimap(
+        MultimapBuilder
+            .hashKeys()
+            .hashSetValues(/* expectedValuesPerKey=*/ 1)
+            .build());
     MemoryInstanceConfig memoryInstanceConfig = MemoryInstanceConfig.newBuilder()
         .setListOperationsDefaultPageSize(1024)
         .setListOperationsMaxPageSize(16384)
@@ -88,6 +103,7 @@ public class MemoryInstanceTest {
         memoryInstanceConfig,
         storage,
         watchers,
+        newFixedThreadPool(1),
         outstandingOperations);
   }
 
@@ -207,14 +223,11 @@ public class MemoryInstanceTest {
         .build();
     outstandingOperations.put(operation.getName(), operation);
 
-    List<Predicate<Operation>> operationWatchers = new ArrayList<>();
-    watchers.put(operation.getName(), operationWatchers);
-
     Predicate<Operation> watcher = (o) -> true;
     assertThat(instance.watchOperation(
         operation.getName(),
         watcher)).isTrue();
-    assertThat(operationWatchers).containsExactly(watcher);
+    assertThat(watchers.get(operation.getName())).containsExactly(watcher);
   }
 
   @Test
@@ -262,5 +275,39 @@ public class MemoryInstanceTest {
         unfazedWatcher)).isFalse();
     verify(unfazedWatcher, times(1)).test(eq(operation));
     verify(unfazedWatcher, times(1)).test(eq(doneOperation));
+  }
+
+  private boolean putNovelOperation(Stage stage) throws InterruptedException {
+    return instance.putOperation(Operation.newBuilder()
+        .setName("does-not-exist")
+        .setMetadata(Any.pack(ExecuteOperationMetadata.newBuilder()
+            .setStage(stage)
+            .build()))
+        .build());
+  }
+
+  @Test
+  public void novelPutUnknownOperationReturnsTrue() throws InterruptedException {
+    assertThat(putNovelOperation(UNKNOWN)).isTrue();
+  }
+
+  @Test
+  public void novelPutCacheCheckOperationReturnsTrue() throws InterruptedException {
+    assertThat(putNovelOperation(CACHE_CHECK)).isTrue();
+  }
+
+  @Test
+  public void novelPutQueuedOperationReturnsTrue() throws InterruptedException {
+    assertThat(putNovelOperation(QUEUED)).isTrue();
+  }
+
+  @Test
+  public void novelPutExecutingOperationReturnsFalse() throws InterruptedException {
+    assertThat(putNovelOperation(EXECUTING)).isFalse();
+  }
+
+  @Test
+  public void novelPutCompletedOperationReturnsTrue() throws InterruptedException {
+    assertThat(putNovelOperation(COMPLETED)).isTrue();
   }
 }
