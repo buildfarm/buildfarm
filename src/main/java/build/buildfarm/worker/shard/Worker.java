@@ -400,10 +400,11 @@ public class Worker {
           @Override
           public void onQueue(Deque<String> workers) {
             Set<String> locationSet = Sets.newHashSet(workers);
-            boolean failed = false;
-            while (!failed && !workers.isEmpty()) {
+            boolean complete = false;
+            while (!complete && !workers.isEmpty()) {
               try {
                 inputStreamFuture.set(fetchBlobFromRemoteWorker(blobDigest, workers, offset));
+                complete = true;
               } catch (IOException e) {
                 if (workers.isEmpty()) {
                   if (triedCheck) {
@@ -421,13 +422,14 @@ public class Worker {
                           return workersList;
                         });
                     addCallback(checkedWorkerListFuture, this);
+                    complete = true;
                   } catch (IOException checkException) {
-                    failed = true;
+                    complete = true;
                     onFailure(checkException);
                   }
                 }
               } catch (InterruptedException e) {
-                failed = true;
+                complete = true;
                 onFailure(e);
               }
             }
@@ -448,6 +450,9 @@ public class Worker {
         } catch (ExecutionException e) {
           if (e.getCause() instanceof IOException) {
             throw (IOException) e.getCause();
+          }
+          if (e.getCause() instanceof InterruptedException) {
+            throw (InterruptedException) e.getCause();
           }
           if (e.getCause() instanceof RuntimeException) {
             throw (RuntimeException) e.getCause();
