@@ -43,6 +43,7 @@ import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.OperationIteratorToken;
 import build.buildfarm.v1test.ShardInstanceConfig;
 import build.buildfarm.v1test.QueuedOperationMetadata;
+import build.buildfarm.v1test.ExecutingOperationMetadata;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -917,12 +918,14 @@ public class ShardInstance extends AbstractServerInstance {
     throw new UnsupportedOperationException();
   }
 
-  private ListenableFuture<QueuedOperationMetadata> buildQueuedOperationMetadata(Action action, Executor executor) {
+  private ListenableFuture<QueuedOperationMetadata> buildQueuedOperationMetadata(
+      Action action, RequestMetadata requestMetadata, Executor executor) {
     QueuedOperationMetadata.Builder queuedBuilder = QueuedOperationMetadata.newBuilder()
         .setAction(action)
         .setExecuteOperationMetadata(ExecuteOperationMetadata.newBuilder()
             .setActionDigest(digestUtil.compute(action))
-            .build());
+            .build())
+        .setRequestMetadata(requestMetadata);
     return transformQueuedOperationMetadata(action.getCommandDigest(), action.getInputRootDigest(), queuedBuilder, executor);
   }
 
@@ -977,8 +980,21 @@ public class ShardInstance extends AbstractServerInstance {
         return false;
       }
     } else {
+      RequestMetadata requestMetadata;
+      if (operation.getMetadata().is(ExecutingOperationMetadata.class)) {
+        try {
+          // we should record where it was previously executing...
+          requestMetadata = operation.getMetadata().unpack(ExecutingOperationMetadata.class).getRequestMetadata();
+        } catch (InvalidProtocolBufferException e) {
+          e.printStackTrace();
+          return false;
+        }
+      } else {
+        // losing our attributability
+        requestMetadata = RequestMetadata.getDefaultInstance();
+      }
       try {
-        metadata = buildQueuedOperationMetadata(action, directExecutor()).get();
+        metadata = buildQueuedOperationMetadata(action, requestMetadata, directExecutor()).get();
       } catch (ExecutionException e) {
         e.printStackTrace();
         return false;
