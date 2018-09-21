@@ -14,12 +14,14 @@
 
 package build.buildfarm.server;
 
+import build.buildfarm.common.grpc.TracingMetadataUtils.ServerHeadersInterceptor;
 import build.buildfarm.v1test.BuildFarmServerConfig;
 import com.google.common.io.ByteStreams;
 import com.google.devtools.common.options.OptionsParser;
 import com.google.protobuf.TextFormat;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
+import io.grpc.ServerInterceptor;
 import io.grpc.util.TransmitStatusRuntimeExceptionInterceptor;
 import java.io.IOException;
 import java.io.InputStream;
@@ -55,6 +57,8 @@ public class BuildFarmServer {
     this.config = config;
     String defaultInstanceName = config.getDefaultInstanceName();
     instances = new BuildFarmInstances(config.getInstancesList(), defaultInstanceName, this::stop);
+
+    ServerInterceptor headersInterceptor = new ServerHeadersInterceptor();
     server = serverBuilder
         .addService(new ActionCacheService(instances))
         .addService(new ContentAddressableStorageService(instances))
@@ -64,6 +68,7 @@ public class BuildFarmServer {
         .addService(new OperationsService(instances))
         .addService(new WatcherService(instances))
         .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
+        .intercept(headersInterceptor)
         .build();
   }
 

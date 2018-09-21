@@ -69,6 +69,7 @@ import com.google.devtools.remoteexecution.v1test.Platform;
 import com.google.devtools.remoteexecution.v1test.UpdateBlobRequest;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
+import com.google.devtools.remoteexecution.v1test.RequestMetadata;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -1023,7 +1024,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @Override
-  public ListenableFuture<Operation> execute(Action action, boolean skipCacheLookup) {
+  public ListenableFuture<Operation> execute(Action action, boolean skipCacheLookup, RequestMetadata requestMetadata) {
     try {
       if (backplane.canPrequeue()) {
         QueuedOperationMetadata metadata = QueuedOperationMetadata.newBuilder()
@@ -1031,6 +1032,7 @@ public class ShardInstance extends AbstractServerInstance {
             .setExecuteOperationMetadata(ExecuteOperationMetadata.newBuilder()
                 .setActionDigest(digestUtil.compute(action)))
             .setSkipCacheLookup(skipCacheLookup)
+            .setRequestMetadata(requestMetadata)
             .build();
         Operation operation = createOperation(metadata);
         backplane.putOperation(operation, Stage.UNKNOWN);

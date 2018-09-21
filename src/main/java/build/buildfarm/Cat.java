@@ -8,6 +8,7 @@ import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Retrier;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.CompletedOperationMetadata;
+import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
@@ -22,6 +23,7 @@ import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
 import com.google.devtools.remoteexecution.v1test.ExecuteResponse;
 import com.google.devtools.remoteexecution.v1test.FileNode;
 import com.google.devtools.remoteexecution.v1test.OutputFile;
+import com.google.devtools.remoteexecution.v1test.RequestMetadata;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.util.Durations;
@@ -197,15 +199,32 @@ class Cat {
     } while(!pageToken.equals(""));
   }
 
+  private static void printRequestMetadata(RequestMetadata metadata) {
+    System.out.println("ToolDetails:");
+    System.out.println("  ToolName: " + metadata.getToolDetails().getToolName());
+    System.out.println("  ToolVersion: " + metadata.getToolDetails().getToolVersion());
+    System.out.println("ActionId: " + metadata.getActionId());
+    System.out.println("ToolInvocationId: " + metadata.getToolInvocationId());
+    System.out.println("CorrelatedInvocationsId: " + metadata.getCorrelatedInvocationsId());
+  }
+
   private static void printOperation(Operation operation) {
     System.out.println("Operation: " + operation.getName());
     System.out.println("Done: " + (operation.getDone() ? "true" : "false"));
     System.out.println("Metadata:");
     try {
       ExecuteOperationMetadata metadata;
+      RequestMetadata requestMetadata;
       if (operation.getMetadata().is(QueuedOperationMetadata.class)) {
         QueuedOperationMetadata queuedMetadata = operation.getMetadata().unpack(QueuedOperationMetadata.class);
         metadata = queuedMetadata.getExecuteOperationMetadata();
+        requestMetadata = queuedMetadata.getRequestMetadata();
+      } else if (operation.getMetadata().is(ExecutingOperationMetadata.class)) {
+        ExecutingOperationMetadata executingMetadata = operation.getMetadata().unpack(ExecutingOperationMetadata.class);
+        System.out.println("  Started At: " + new Date(executingMetadata.getStartedAt()));
+        System.out.println("  Executing On: " + executingMetadata.getExecutingOn());
+        metadata = executingMetadata.getExecuteOperationMetadata();
+        requestMetadata = executingMetadata.getRequestMetadata();
       } else if (operation.getMetadata().is(CompletedOperationMetadata.class)) {
         CompletedOperationMetadata completedMetadata = operation.getMetadata().unpack(CompletedOperationMetadata.class);
         System.out.println("  Completed At: " + new Date(completedMetadata.getCompletedAt()));
@@ -215,13 +234,18 @@ class Cat {
         System.out.println(String.format("  Executed In: %gms", Durations.toNanos(completedMetadata.getExecutedIn()) / 1000000.0));
         System.out.println(String.format("  Reported In: %gms", Durations.toNanos(completedMetadata.getReportedIn()) / 1000000.0));
         metadata = completedMetadata.getExecuteOperationMetadata();
+        requestMetadata = completedMetadata.getRequestMetadata();
       } else {
         metadata = operation.getMetadata().unpack(ExecuteOperationMetadata.class);
+        requestMetadata = null;
       }
       System.out.println("  Stage: " + metadata.getStage());
       System.out.println("  Action: " + DigestUtil.toString(metadata.getActionDigest()));
       System.out.println("  Stdout Stream: " + metadata.getStdoutStreamName());
       System.out.println("  Stderr Stream: " + metadata.getStderrStreamName());
+      if (requestMetadata != null) {
+        printRequestMetadata(requestMetadata);
+      }
     } catch (InvalidProtocolBufferException e) {
       System.out.println("  UNKNOWN TYPE: " + e.getMessage());
     }

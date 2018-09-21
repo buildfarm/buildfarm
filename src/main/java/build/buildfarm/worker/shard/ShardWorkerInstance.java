@@ -26,6 +26,7 @@ import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.instance.TokenizableIterator;
 import build.buildfarm.instance.TreeIterator.DirectoryEntry;
 import build.buildfarm.v1test.CompletedOperationMetadata;
+import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ShardWorkerInstanceConfig;
 import build.buildfarm.worker.InputStreamFactory;
@@ -41,6 +42,7 @@ import com.google.devtools.remoteexecution.v1test.Directory;
 import com.google.devtools.remoteexecution.v1test.Platform;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
+import com.google.devtools.remoteexecution.v1test.RequestMetadata;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -193,7 +195,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  public ListenableFuture<Operation> execute(Action action, boolean skipCacheLookup) {
+  public ListenableFuture<Operation> execute(Action action, boolean skipCacheLookup, RequestMetadata requestMetadata) {
     throw new UnsupportedOperationException();
   }
 
@@ -328,6 +330,13 @@ public class ShardWorkerInstance extends AbstractServerInstance {
     if (operation.getMetadata().is(QueuedOperationMetadata.class)) {
       try {
         return operation.getMetadata().unpack(QueuedOperationMetadata.class).getExecuteOperationMetadata();
+      } catch(InvalidProtocolBufferException e) {
+        e.printStackTrace();
+        return null;
+      }
+    } else if (operation.getMetadata().is(ExecutingOperationMetadata.class)) {
+      try {
+        return operation.getMetadata().unpack(ExecutingOperationMetadata.class).getExecuteOperationMetadata();
       } catch(InvalidProtocolBufferException e) {
         e.printStackTrace();
         return null;

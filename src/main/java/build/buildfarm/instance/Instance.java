@@ -24,6 +24,7 @@ import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.devtools.remoteexecution.v1test.Directory;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
 import com.google.devtools.remoteexecution.v1test.Platform;
+import com.google.devtools.remoteexecution.v1test.RequestMetadata;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import io.grpc.StatusException;
@@ -60,7 +61,7 @@ public interface Instance {
   CommittingOutputStream getStreamOutput(String name, long expectedSize);
   InputStream newStreamInput(String name, long offset) throws IOException, InterruptedException;
 
-  ListenableFuture<Operation> execute(Action action, boolean skipCacheLookup);
+  ListenableFuture<Operation> execute(Action action, boolean skipCacheLookup, RequestMetadata requestMetadata);
   void match(Platform platform, MatchListener listener) throws InterruptedException;
   boolean putOperation(Operation operation) throws InterruptedException;
   boolean pollOperation(String operationName, Stage stage);

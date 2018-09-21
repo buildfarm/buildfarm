@@ -18,6 +18,7 @@ import static com.google.common.base.Preconditions.checkState;
 
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.OperationQueueGrpc.OperationQueueBlockingStub;
@@ -57,6 +58,7 @@ import com.google.devtools.remoteexecution.v1test.GetActionResultRequest;
 import com.google.devtools.remoteexecution.v1test.GetTreeRequest;
 import com.google.devtools.remoteexecution.v1test.GetTreeResponse;
 import com.google.devtools.remoteexecution.v1test.Platform;
+import com.google.devtools.remoteexecution.v1test.RequestMetadata;
 import com.google.devtools.remoteexecution.v1test.UpdateActionResultRequest;
 import com.google.longrunning.CancelOperationRequest;
 import com.google.longrunning.DeleteOperationRequest;
@@ -416,9 +418,10 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public ListenableFuture<Operation> execute(Action action, boolean skipCacheLookup) {
+  public ListenableFuture<Operation> execute(Action action, boolean skipCacheLookup, RequestMetadata metadata) {
     return executionFutureStub
         .get()
+        .withInterceptors(TracingMetadataUtils.attachMetadataInterceptor(metadata))
         .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
         .execute(ExecuteRequest.newBuilder()
             .setAction(action)

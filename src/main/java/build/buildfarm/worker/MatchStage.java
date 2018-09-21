@@ -195,7 +195,8 @@ public class MatchStage extends PipelineStage {
         .setDirectoriesIndex(createDirectoriesIndex(metadata.getDirectoriesList(), workerContext.getDigestUtil()))
         .setMetadata(metadata.getExecuteOperationMetadata())
         .setAction(action)
-        .setCommand(command);
+        .setCommand(command)
+        .setRequestMetadata(metadata.getRequestMetadata());
 
     Duration matchedIn = Durations.fromNanos(System.nanoTime() - matchStartAt);
     return builder

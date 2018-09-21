@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker;
 
+import build.buildfarm.v1test.ExecutingOperationMetadata;
 import com.google.common.io.ByteStreams;
 import com.google.devtools.remoteexecution.v1test.ActionResult;
 import com.google.devtools.remoteexecution.v1test.Command;
@@ -47,14 +48,19 @@ class Executor implements Runnable {
   }
 
   private long runInterruptible() throws InterruptedException {
-    // workerContext.logInfo("Executor: Updating operation " + operationContext.operation.getName());
-
     ExecuteOperationMetadata executingMetadata = operationContext.metadata.toBuilder()
         .setStage(ExecuteOperationMetadata.Stage.EXECUTING)
         .build();
 
+    long startedAt = System.currentTimeMillis();
+
     Operation operation = operationContext.operation.toBuilder()
-        .setMetadata(Any.pack(executingMetadata))
+        .setMetadata(Any.pack(ExecutingOperationMetadata.newBuilder()
+            .setStartedAt(startedAt)
+            .setExecutingOn(workerContext.getName())
+            .setExecuteOperationMetadata(executingMetadata)
+            .setRequestMetadata(operationContext.requestMetadata)
+            .build()))
         .build();
 
     boolean operationUpdateSuccess = false;

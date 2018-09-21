@@ -29,6 +29,20 @@ java_library(
 )
 
 java_library(
+    name = "common-grpc",
+    srcs = glob(["common/grpc/*.java"]),
+    deps = [
+        "//3rdparty/jvm/com/google/code/findbugs:jsr305",
+        "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/io/grpc:grpc_context",
+        "//3rdparty/jvm/io/grpc:grpc_core",
+        "//3rdparty/jvm/io/grpc:grpc_protobuf",
+        "//3rdparty/jvm/io/grpc:grpc_stub",
+        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
+    ],
+)
+
+java_library(
     name = "instance",
     srcs = [
         "instance/Instance.java",
@@ -123,6 +137,7 @@ java_library(
     srcs = glob(["server/**/*.java"]),
     deps = [
         ":common",
+        ":common-grpc",
         ":instance",
         ":memory-instance",
         ":shard-instance",
@@ -179,6 +194,7 @@ java_library(
     srcs = glob(["instance/stub/*.java"]),
     deps = [
         ":common",
+        ":common-grpc",
         ":instance",
         "//3rdparty/jvm/com/google/code/findbugs:jsr305",
         "//3rdparty/jvm/com/google/guava",

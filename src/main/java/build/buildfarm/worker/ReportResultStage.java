@@ -114,6 +114,7 @@ public class ReportResultStage extends PipelineStage {
         .setExecuteOperationMetadata(operationContext.metadata.toBuilder()
             .setStage(ExecuteOperationMetadata.Stage.COMPLETED)
             .build())
+        .setRequestMetadata(operationContext.requestMetadata)
         .build();
 
     Operation operation = operationContext.operation.toBuilder()

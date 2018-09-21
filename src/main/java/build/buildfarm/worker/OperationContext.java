@@ -19,6 +19,7 @@ import com.google.devtools.remoteexecution.v1test.Directory;
 import com.google.devtools.remoteexecution.v1test.Action;
 import com.google.devtools.remoteexecution.v1test.Command;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
+import com.google.devtools.remoteexecution.v1test.RequestMetadata;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Duration;
 import java.nio.file.Path;
@@ -36,6 +37,7 @@ final class OperationContext {
   final Duration matchedIn;
   final Duration fetchedIn;
   final Duration executedIn;
+  final RequestMetadata requestMetadata;
 
   private OperationContext(
       Operation operation,
@@ -46,7 +48,8 @@ final class OperationContext {
       Command command,
       Duration matchedIn,
       Duration fetchedIn,
-      Duration executedIn) {
+      Duration executedIn,
+      RequestMetadata requestMetadata) {
     this.operation = operation;
     this.execDir = execDir;
     this.directoriesIndex = directoriesIndex;
@@ -56,6 +59,7 @@ final class OperationContext {
     this.matchedIn = matchedIn;
     this.fetchedIn = fetchedIn;
     this.executedIn = executedIn;
+    this.requestMetadata = requestMetadata;
   }
 
   public static class Builder {
@@ -68,6 +72,7 @@ final class OperationContext {
     private Duration matchedIn;
     private Duration fetchedIn;
     private Duration executedIn;
+    private RequestMetadata requestMetadata;
 
     private Builder(
         Operation operation,
@@ -78,7 +83,8 @@ final class OperationContext {
         Command command,
         Duration matchedIn,
         Duration fetchedIn,
-        Duration executedIn) {
+        Duration executedIn,
+        RequestMetadata requestMetadata) {
       this.operation = operation;
       this.execDir = execDir;
       this.directoriesIndex = directoriesIndex;
@@ -88,6 +94,7 @@ final class OperationContext {
       this.matchedIn = matchedIn;
       this.fetchedIn = fetchedIn;
       this.executedIn = executedIn;
+      this.requestMetadata = requestMetadata;
     }
 
     public Builder setOperation(Operation operation) {
@@ -135,6 +142,11 @@ final class OperationContext {
       return this;
     }
 
+    public Builder setRequestMetadata(RequestMetadata requestMetadata) {
+      this.requestMetadata = requestMetadata;
+      return this;
+    }
+
     public OperationContext build() {
       return new OperationContext(
         operation,
@@ -145,7 +157,8 @@ final class OperationContext {
         command,
         matchedIn,
         fetchedIn,
-        executedIn);
+        executedIn,
+        requestMetadata);
     }
   }
 
@@ -159,7 +172,8 @@ final class OperationContext {
         /* command=*/ null,
         /* matchedIn=*/ null,
         /* fetchedIn=*/ null,
-        /* executedIn=*/ null);
+        /* executedIn=*/ null,
+        /* requestMetadata=*/ null);
   }
 
   public Builder toBuilder() {
@@ -172,6 +186,7 @@ final class OperationContext {
         command,
         matchedIn,
         fetchedIn,
-        executedIn);
+        executedIn,
+        requestMetadata);
   }
 }

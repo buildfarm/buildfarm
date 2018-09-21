@@ -241,6 +241,18 @@ message QueuedOperationMetadata {
   google.devtools.remoteexecution.v1test.ExecuteOperationMetadata execute_operation_metadata = 4;
 
   bool skip_cache_lookup = 5;
+
+  google.devtools.remoteexecution.v1test.RequestMetadata request_metadata = 6;
+}
+
+message ExecutingOperationMetadata {
+  int64 started_at = 1;
+
+  string executing_on = 2;
+
+  google.devtools.remoteexecution.v1test.ExecuteOperationMetadata execute_operation_metadata = 3;
+
+  google.devtools.remoteexecution.v1test.RequestMetadata request_metadata = 4;
 }
 
 message CompletedOperationMetadata {
@@ -257,6 +269,8 @@ message CompletedOperationMetadata {
   google.protobuf.Duration reported_in = 5;
 
   google.devtools.remoteexecution.v1test.ExecuteOperationMetadata execute_operation_metadata = 6;
+
+  google.devtools.remoteexecution.v1test.RequestMetadata request_metadata = 8;
 }
 
 message InstanceConfig {

@@ -14,6 +14,7 @@
 
 package build.buildfarm.server;
 
+import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.instance.Instance;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
@@ -45,7 +46,8 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
     Futures.addCallback(
         instance.execute(
             request.getAction(),
-            request.getSkipCacheLookup()),
+            request.getSkipCacheLookup(),
+            TracingMetadataUtils.fromCurrentContext()),
         new FutureCallback<Operation>() {
           @Override
           public void onSuccess(Operation operation) {

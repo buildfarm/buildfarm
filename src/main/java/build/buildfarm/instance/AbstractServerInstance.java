@@ -25,6 +25,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.instance.TreeIterator.DirectoryEntry;
 import build.buildfarm.v1test.CompletedOperationMetadata;
+import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
@@ -48,6 +49,7 @@ import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
 import com.google.devtools.remoteexecution.v1test.ExecuteResponse;
 import com.google.devtools.remoteexecution.v1test.FileNode;
+import com.google.devtools.remoteexecution.v1test.RequestMetadata;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -562,10 +564,11 @@ public abstract class AbstractServerInstance implements Instance {
   @Override
   public ListenableFuture<Operation> execute(
       Action action,
-      boolean skipCacheLookup) {
+      boolean skipCacheLookup,
+      RequestMetadata metadata) {
     SettableFuture<Operation> executeFuture = SettableFuture.create();
     try {
-      execute(action, skipCacheLookup, executeFuture::set);
+      execute(action, skipCacheLookup, metadata, executeFuture::set);
     } catch (IllegalStateException e) {
       executeFuture.setException(e);
     } catch (InterruptedException e) {
@@ -577,6 +580,7 @@ public abstract class AbstractServerInstance implements Instance {
   private void execute(
       Action action,
       boolean skipCacheLookup,
+      RequestMetadata requestMetadata,
       Consumer<Operation> onOperation) throws InterruptedException {
     validateAction(action);
 
@@ -648,6 +652,13 @@ public abstract class AbstractServerInstance implements Instance {
     if (operation.getMetadata().is(QueuedOperationMetadata.class)) {
       try {
         return operation.getMetadata().unpack(QueuedOperationMetadata.class).getExecuteOperationMetadata();
+      } catch(InvalidProtocolBufferException e) {
+        return null;
+      }
+    }
+    if (operation.getMetadata().is(ExecutingOperationMetadata.class)) {
+      try {
+        return operation.getMetadata().unpack(ExecutingOperationMetadata.class).getExecuteOperationMetadata();
       } catch(InvalidProtocolBufferException e) {
         return null;
       }
