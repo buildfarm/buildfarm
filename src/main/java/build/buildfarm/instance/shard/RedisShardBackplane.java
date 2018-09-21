@@ -20,6 +20,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.v1test.CompletedOperationMetadata;
+import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.RedisShardBackplaneConfig;
 import build.buildfarm.v1test.ShardDispatchedOperation;
@@ -98,6 +99,7 @@ public class RedisShardBackplane implements ShardBackplane {
   private static final JsonFormat.Printer operationPrinter = JsonFormat.printer().usingTypeRegistry(
       JsonFormat.TypeRegistry.newBuilder()
           .add(CompletedOperationMetadata.getDescriptor())
+          .add(ExecutingOperationMetadata.getDescriptor())
           .add(ExecuteOperationMetadata.getDescriptor())
           .add(QueuedOperationMetadata.getDescriptor())
           .build());
@@ -592,6 +594,7 @@ public class RedisShardBackplane implements ShardBackplane {
         .usingTypeRegistry(
             JsonFormat.TypeRegistry.newBuilder()
                 .add(CompletedOperationMetadata.getDescriptor())
+                .add(ExecutingOperationMetadata.getDescriptor())
                 .add(ExecuteOperationMetadata.getDescriptor())
                 .add(QueuedOperationMetadata.getDescriptor())
                 .build())
