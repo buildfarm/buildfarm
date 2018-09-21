@@ -389,6 +389,10 @@ public class ShardInstance extends AbstractServerInstance {
       throw Status.fromThrowable(e).asRuntimeException();
     }
 
+    if (workers.isEmpty()) {
+      return Futures.immediateFuture(nonEmptyDigests);
+    }
+
     return findMissingBlobsOnWorker(nonEmptyDigests, workers, service);
   }
 
