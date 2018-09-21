@@ -588,12 +588,14 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   private static JsonFormat.Parser getOperationParser() {
-    return JsonFormat.parser().usingTypeRegistry(
-        JsonFormat.TypeRegistry.newBuilder()
-            .add(CompletedOperationMetadata.getDescriptor())
-            .add(ExecuteOperationMetadata.getDescriptor())
-            .add(QueuedOperationMetadata.getDescriptor())
-            .build());
+    return JsonFormat.parser()
+        .usingTypeRegistry(
+            JsonFormat.TypeRegistry.newBuilder()
+                .add(CompletedOperationMetadata.getDescriptor())
+                .add(ExecuteOperationMetadata.getDescriptor())
+                .add(QueuedOperationMetadata.getDescriptor())
+                .build())
+        .ignoringUnknownFields();
   }
 
   private String getOperation(Jedis jedis, String operationName) {
