@@ -162,6 +162,8 @@ message ExecutionWrapper {
   string path = 1;
 }
 
+// selectable controls for executions
+// a universal policy can be specified with an empty name
 message ExecutionPolicy {
   string name = 1;
 

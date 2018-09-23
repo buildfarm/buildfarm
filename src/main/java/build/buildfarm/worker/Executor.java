@@ -69,6 +69,10 @@ class Executor implements Runnable {
 
     Platform platform = operationContext.command.getPlatform();
     ImmutableList.Builder<ExecutionPolicy> policies = ImmutableList.builder();
+    ExecutionPolicy defaultPolicy = workerContext.getExecutionPolicy("");
+    if (defaultPolicy != null) {
+      policies.add(defaultPolicy);
+    }
     for (Property property : platform.getPropertiesList()) {
       if (property.getName().equals("execution-policy")) {
         policies.add(workerContext.getExecutionPolicy(property.getValue()));
