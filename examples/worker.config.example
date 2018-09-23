@@ -113,3 +113,11 @@ maximum_action_timeout: {
   seconds: 3600
   nanos: 0
 }
+
+# prefix command executions with this path
+#execution_policies: {
+#  name: "test"
+#  wrapper: {
+#    path: "/path/to/execution/wrapper"
+#  }
+#}

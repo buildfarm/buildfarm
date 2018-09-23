@@ -20,6 +20,7 @@ import build.buildfarm.worker.CASFileCache;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.v1test.CASInsertionPolicy;
+import build.buildfarm.v1test.ExecutionPolicy;
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
@@ -40,6 +41,7 @@ class StubWorkerContext implements WorkerContext {
   @Override public CASInsertionPolicy getStdoutCasPolicy() { throw new UnsupportedOperationException(); }
   @Override public CASInsertionPolicy getStderrCasPolicy() { throw new UnsupportedOperationException(); }
   @Override public DigestUtil getDigestUtil() { throw new UnsupportedOperationException(); }
+  @Override public ExecutionPolicy getExecutionPolicy(String name) { throw new UnsupportedOperationException(); }
   @Override public int getInlineContentLimit() { throw new UnsupportedOperationException(); }
   @Override public int getExecuteStageWidth() { throw new UnsupportedOperationException(); }
   @Override public int getTreePageSize() { throw new UnsupportedOperationException(); }
