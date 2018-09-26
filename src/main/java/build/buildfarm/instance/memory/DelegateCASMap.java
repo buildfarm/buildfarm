@@ -80,6 +80,9 @@ class DelegateCASMap<K,V extends Message> {
   public V remove(K key) {
     Digest valueDigest = digestMap.remove(key);
     if (valueDigest == null) {
+      if (emptyCache.getIfPresent(key) == null) {
+        return null;
+      }
       emptyCache.invalidate(key);
       valueDigest = digestUtil.empty();
     }
