@@ -73,8 +73,11 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Predicate;
+import java.util.logging.Logger;
 
 public class MemoryInstance extends AbstractServerInstance {
+  private final static Logger logger = Logger.getLogger(MemoryInstance.class.getName());
+
   private final MemoryInstanceConfig config;
   private final SetMultimap<String, Predicate<Operation>> watchers;
   private final Map<String, ByteStringStreamSource> streams =
@@ -586,5 +589,10 @@ public class MemoryInstance extends AbstractServerInstance {
      * simple instance-wide locking on the completed operations
      */
     return completedOperations;
+  }
+
+  @Override
+  protected Logger getLogger() {
+    return logger;
   }
 }

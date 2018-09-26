@@ -52,6 +52,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 import java.util.function.Predicate;
+import java.util.logging.Logger;
 
 public abstract class AbstractServerInstance implements Instance {
   private final String name;
@@ -539,6 +540,13 @@ public abstract class AbstractServerInstance implements Instance {
     ExecuteOperationMetadata metadata =
         expectExecuteOperationMetadata(operation);
 
+    getLogger().fine(
+        String.format(
+            "%s::execute(%s): %s",
+            getName(),
+            DigestUtil.toString(actionDigest),
+            operation.getName()));
+
     putOperation(operation);
 
     watchOperation(operation.getName(), watcher);
@@ -597,13 +605,24 @@ public abstract class AbstractServerInstance implements Instance {
     }
   }
 
-  protected Action expectAction(Operation operation) {
+  protected Action expectAction(Digest actionDigest) {
+    ByteString actionBlob = getBlob(actionDigest);
+    if (actionBlob == null) {
+      return null;
+    }
     try {
-      return Action.parseFrom(getBlob(
-          expectExecuteOperationMetadata(operation).getActionDigest()));
+      return Action.parseFrom(actionBlob);
     } catch (InvalidProtocolBufferException ex) {
       return null;
     }
+  }
+
+  protected Action expectAction(Operation operation) {
+    ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
+    if (metadata == null) {
+      return null;
+    }
+    return expectAction(metadata.getActionDigest());
   }
 
   protected Command expectCommand(Operation operation) {
@@ -655,15 +674,17 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public boolean putOperation(Operation operation) throws InterruptedException {
+    String name = operation.getName();
     if (isCancelled(operation)) {
-      if (outstandingOperations.remove(operation.getName()) == null) {
-        throw new IllegalStateException();
+      if (outstandingOperations.remove(name) == null) {
+        throw new IllegalStateException(
+            String.format("Operation %s was not in outstandingOperations", name));
       }
       updateOperationWatchers(operation);
       return true;
     }
     if (isExecuting(operation) &&
-        !outstandingOperations.contains(operation.getName())) {
+        !outstandingOperations.contains(name)) {
       return false;
     }
     if (isQueued(operation)) {
@@ -757,20 +778,41 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   public boolean requeueOperation(Operation operation) throws InterruptedException {
-    if(!isQueued(operation)) {
-      throw new IllegalStateException("Operation stage is not QUEUED");
+    String name = operation.getName();
+    if (!isQueued(operation)) {
+      throw new IllegalStateException(
+          String.format(
+              "Operation %s stage is not QUEUED",
+              name));
     }
 
-    Action action = expectAction(operation);
+    ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
+    if (metadata == null) {
+      throw new IllegalStateException(
+          String.format(
+              "Operation %s does not contain ExecuteOperationMetadata",
+              name));
+    }
+
+    Digest actionDigest = metadata.getActionDigest();
+
+    Action action = expectAction(actionDigest);
 
     try {
       validateAction(action);
     } catch (IllegalStateException e) {
-      errorOperation(operation.getName(), com.google.rpc.Status.newBuilder()
+      errorOperation(name, com.google.rpc.Status.newBuilder()
           .setCode(com.google.rpc.Code.FAILED_PRECONDITION.getNumber())
           .build());
       return false;
     }
+
+    getLogger().fine(
+        String.format(
+            "%s::requeueOperation(%s): %s",
+            getName(),
+            DigestUtil.toString(actionDigest),
+            name));
 
     return putOperation(operation);
   }
@@ -870,4 +912,6 @@ public abstract class AbstractServerInstance implements Instance {
         .setExecutionCapabilities(getExecutionCapabilities())
         .build();
   }
+
+  abstract protected Logger getLogger();
 }

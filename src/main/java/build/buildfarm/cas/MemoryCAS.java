@@ -19,8 +19,11 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Logger;
 
 class MemoryCAS implements ContentAddressableStorage {
+  private static final Logger logger = Logger.getLogger(MemoryCAS.class.getName());
+
   private final long maxSizeInBytes;
   private final Map<Digest, Entry> storage;
   private transient long sizeInBytes;
@@ -91,12 +94,13 @@ class MemoryCAS implements ContentAddressableStorage {
     }
 
     if (sizeInBytes > maxSizeInBytes) {
-      System.out.println(String.format(
-          "Out of nodes to remove, sizeInBytes = %d, maxSizeInBytes = %d, storage = %d, list = %d",
-          sizeInBytes,
-          maxSizeInBytes,
-          storage.size(),
-          size()));
+      logger.warning(
+          String.format(
+              "Out of nodes to remove, sizeInBytes = %d, maxSizeInBytes = %d, storage = %d, list = %d",
+              sizeInBytes,
+              maxSizeInBytes,
+              storage.size(),
+              size()));
     }
 
     createEntry(blob, onExpiration);

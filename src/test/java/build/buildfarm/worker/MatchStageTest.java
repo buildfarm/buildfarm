@@ -28,6 +28,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Predicate;
+import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
 import org.junit.Before;
 import org.junit.Test;
@@ -36,12 +37,19 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class MatchStageTest {
-  class PipelineSink extends PipelineStage {
-    Predicate<OperationContext> onPutShouldClose;
+  static class PipelineSink extends PipelineStage {
+    private static final Logger logger = Logger.getLogger(PipelineSink.class.getName());
+
+    private final Predicate<OperationContext> onPutShouldClose;
 
     PipelineSink(Predicate<OperationContext> onPutShouldClose) {
-      super(null, null, null);
+      super("Sink", null, null, null);
       this.onPutShouldClose = onPutShouldClose;
+    }
+
+    @Override
+    public Logger getLogger() {
+      return logger;
     }
 
     @Override

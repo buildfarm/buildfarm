@@ -52,15 +52,20 @@ import java.util.Stack;
 import java.util.function.Consumer;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.logging.Logger;
 
 public class ReportResultStage extends PipelineStage {
+  public static final Logger logger = Logger.getLogger(ReportResultStage.class.getName());
+
   private final BlockingQueue<OperationContext> queue;
 
   public static class NullStage extends PipelineStage {
-    public NullStage() {
-      super(null, null, null);
+    public NullStage(String name) {
+      super(name, null, null, null);
     }
 
+    @Override
+    public Logger getLogger() { return null; }
     @Override
     public boolean claim() { return true; }
     @Override
@@ -80,8 +85,13 @@ public class ReportResultStage extends PipelineStage {
   }
 
   public ReportResultStage(WorkerContext workerContext, PipelineStage error) {
-    super(workerContext, new NullStage(), error);
+    super("ReportResultStage", workerContext, new NullStage("Terminal"), error);
     queue = new ArrayBlockingQueue<>(1);
+  }
+
+  @Override
+  protected Logger getLogger() {
+    return logger;
   }
 
   @Override

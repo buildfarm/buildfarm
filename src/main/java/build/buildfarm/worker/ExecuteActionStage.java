@@ -19,15 +19,23 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.logging.Logger;
 
 public class ExecuteActionStage extends PipelineStage {
+  public static final Logger logger = Logger.getLogger(ExecuteActionStage.class.getName());
+
   private final Set<Thread> executors;
   private BlockingQueue<OperationContext> queue;
 
   public ExecuteActionStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
-    super(workerContext, output, error);
+    super("ExecuteActionStage", workerContext, output, error);
     queue = new ArrayBlockingQueue<>(1);
     executors = new HashSet<>();
+  }
+
+  @Override
+  protected Logger getLogger() {
+    return logger;
   }
 
   @Override
@@ -52,12 +60,34 @@ public class ExecuteActionStage extends PipelineStage {
     return true;
   }
 
-  @Override
-  public synchronized void release() {
+  public synchronized int removeAndNotify() {
     if (!executors.remove(Thread.currentThread())) {
-      throw new IllegalStateException();
+      throw new IllegalStateException("tried to remove unknown executor thread");
     }
     this.notify();
+    return executors.size();
+  }
+
+  private String getUsage(int size) {
+    return String.format("%s/%d", size, workerContext.getExecuteStageWidth());
+  }
+
+  private void logComplete(int size) {
+    logger.fine(String.format("%s: %s", name, getUsage(size)));
+  }
+
+  @Override
+  public void release() {
+    removeAndNotify();
+  }
+
+  public void releaseExecutor(String operationName, long usecs, long stallUSecs, int exitCode) {
+    int size = removeAndNotify();
+    logComplete(
+        operationName,
+        usecs,
+        stallUSecs,
+        String.format("exit code: %d, %d/%d", exitCode, size, workerContext.getExecuteStageWidth()));
   }
 
   @Override
@@ -67,11 +97,15 @@ public class ExecuteActionStage extends PipelineStage {
 
   @Override
   protected void iterate() throws InterruptedException {
-    Thread executor = new Thread(new Executor(workerContext, take(), this));
+    OperationContext operationContext = take();
+    Thread executor = new Thread(new Executor(workerContext, operationContext, this));
 
+    int size;
     synchronized(this) {
       executors.add(executor);
+      size = executors.size();
     }
+    logStart(operationContext.operation.getName(), getUsage(size));
 
     executor.start();
   }

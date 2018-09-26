@@ -18,8 +18,11 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Logger;
 
 public class Pipeline {
+  private static final Logger logger = Logger.getLogger(Pipeline.class.getName());
+
   private final Map<PipelineStage, Thread> stageThreads;
   private final Map<PipelineStage, Integer> stageClosePriorities;
   // FIXME ThreadGroup?
@@ -63,7 +66,7 @@ public class Pipeline {
             }
           }
           if (stageToClose != null && !stageToClose.isClosed()) {
-            System.out.println("Closing stage at priority " + maxPriority);
+            logger.info("Closing stage at priority " + maxPriority);
             stageToClose.close();
           }
         }
@@ -77,10 +80,10 @@ public class Pipeline {
           }
 
           if (!thread.isAlive()) {
-            System.out.println("Stage has exited at priority " + stageClosePriorities.get(stage));
+            logger.info("Stage has exited at priority " + stageClosePriorities.get(stage));
             inactiveStages.add(stage);
           } else if (stage.isClosed()) {
-            System.out.println("Interrupting unterminated closed thread at priority " + stageClosePriorities.get(stage));
+            logger.info("Interrupting unterminated closed thread at priority " + stageClosePriorities.get(stage));
             thread.interrupt();
           }
         }

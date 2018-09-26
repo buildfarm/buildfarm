@@ -78,9 +78,9 @@ public class BuildFarmServer {
     Runtime.getRuntime().addShutdownHook(new Thread() {
       @Override
       public void run() {
-        System.err.println("*** shutting down gRPC server since JVM is shutting down");
+        logger.info("*** shutting down gRPC server since JVM is shutting down");
         BuildFarmServer.this.stop();
-        System.err.println("*** server shut down");
+        logger.info("*** server shut down");
       }
     });
   }

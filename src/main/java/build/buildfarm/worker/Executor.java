@@ -16,10 +16,11 @@ package build.buildfarm.worker;
 
 import static com.google.common.collect.Iterables.filter;
 import static com.google.common.collect.Iterables.transform;
-import static com.google.common.collect.Lists.newArrayList;
 import static build.buildfarm.v1test.ExecutionPolicy.PolicyCase.WRAPPER;
+import static java.util.concurrent.TimeUnit.MICROSECONDS;
 
 import build.buildfarm.v1test.ExecutionPolicy;
+import com.google.common.base.Stopwatch;
 import com.google.common.io.ByteStreams;
 import com.google.common.collect.ImmutableList;
 import build.bazel.remote.execution.v2.ActionResult;
@@ -40,13 +41,16 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Logger;
 
 class Executor implements Runnable {
+  private static final Logger logger = Logger.getLogger(Executor.class.getName());
+  private static final OutputStream nullOutputStream = ByteStreams.nullOutputStream();
+
   private final WorkerContext workerContext;
   private final OperationContext operationContext;
   private final ExecuteActionStage owner;
-
-  private static final OutputStream nullOutputStream = ByteStreams.nullOutputStream();
+  private int exitCode = -1;
 
   Executor(WorkerContext workerContext, OperationContext operationContext, ExecuteActionStage owner) {
     this.workerContext = workerContext;
@@ -54,7 +58,7 @@ class Executor implements Runnable {
     this.owner = owner;
   }
 
-  private void runInterruptible() throws InterruptedException {
+  private long runInterruptible(Stopwatch stopwatch) throws InterruptedException {
     ExecuteOperationMetadata executingMetadata = operationContext.metadata.toBuilder()
         .setStage(ExecuteOperationMetadata.Stage.EXECUTING)
         .build();
@@ -64,9 +68,12 @@ class Executor implements Runnable {
         .build();
 
     if (!workerContext.putOperation(operation)) {
+      logger.warning(
+          String.format(
+              "Executor::run(%s): could not transition to EXECUTING",
+              operation.getName()));
       owner.error().put(operationContext);
-      owner.release();
-      return;
+      return 0;
     }
 
     Platform platform = operationContext.command.getPlatform();
@@ -114,12 +121,18 @@ class Executor implements Runnable {
     } catch (IOException ex) {
       poller.stop();
       owner.error().put(operationContext);
-      owner.release();
-      return;
+      return 0;
     }
+
+    logger.fine(
+        String.format(
+            "Executor::executeCommand(%s): Completed command: exit code %d",
+            operation.getName(),
+            resultBuilder.getExitCode()));
 
     poller.stop();
 
+    long executeUSecs = stopwatch.elapsed(MICROSECONDS);
     if (owner.output().claim()) {
       operation = operation.toBuilder()
           .setResponse(Any.pack(ExecuteResponse.newBuilder()
@@ -137,16 +150,23 @@ class Executor implements Runnable {
     } else {
       owner.error().put(operationContext);
     }
-
-    owner.release();
+    return stopwatch.elapsed(MICROSECONDS) - executeUSecs;
   }
 
   @Override
   public void run() {
+    long stallUSecs = 0;
+    Stopwatch stopwatch = Stopwatch.createStarted();
     try {
-      runInterruptible();
+      stallUSecs = runInterruptible(stopwatch);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
+    } finally {
+      owner.releaseExecutor(
+          operationContext.operation.getName(),
+          stopwatch.elapsed(MICROSECONDS),
+          stallUSecs,
+          exitCode);
     }
   }
 
@@ -190,7 +210,6 @@ class Executor implements Runnable {
     }
 
     long startNanoTime = System.nanoTime();
-    int exitValue = -1;
     Process process;
     try {
       process = processBuilder.start();
@@ -198,7 +217,7 @@ class Executor implements Runnable {
     } catch(IOException ex) {
       ex.printStackTrace();
       // again, should we do something else here??
-      resultBuilder.setExitCode(exitValue);
+      resultBuilder.setExitCode(exitCode);
       return Code.INVALID_ARGUMENT;
     }
 
@@ -214,12 +233,12 @@ class Executor implements Runnable {
 
     Code statusCode = Code.OK;
     if (timeout == null) {
-      exitValue = process.waitFor();
+      exitCode = process.waitFor();
     } else {
       long timeoutNanos = timeout.getSeconds() * 1000000000L + timeout.getNanos();
       long remainingNanoTime = timeoutNanos - (System.nanoTime() - startNanoTime);
       if (process.waitFor(remainingNanoTime, TimeUnit.NANOSECONDS)) {
-        exitValue = process.exitValue();
+        exitCode = process.exitValue();
       } else {
         process.destroyForcibly();
         process.waitFor(100, TimeUnit.MILLISECONDS); // fair trade, i think
@@ -235,7 +254,7 @@ class Executor implements Runnable {
     }
     stderrReaderThread.join();
     resultBuilder
-        .setExitCode(exitValue)
+        .setExitCode(exitCode)
         .setStdoutRaw(stdoutReader.getData())
         .setStderrRaw(stderrReader.getData());
     return statusCode;
