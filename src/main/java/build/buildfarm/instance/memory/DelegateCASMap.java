@@ -61,7 +61,7 @@ class DelegateCASMap<K,V extends Message> {
     return value;
   }
 
-  public V get(Object key) {
+  public V get(K key) {
     Digest valueDigest = digestMap.get(key);
     if (valueDigest == null) {
       valueDigest = emptyCache.getIfPresent(key);
@@ -73,11 +73,11 @@ class DelegateCASMap<K,V extends Message> {
     return expectValueType(valueDigest);
   }
 
-  public boolean containsKey(Object key) {
+  public boolean containsKey(K key) {
     return digestMap.containsKey(key) || emptyCache.getIfPresent(key) != null;
   }
 
-  public V remove(Object key) {
+  public V remove(K key) {
     Digest valueDigest = digestMap.remove(key);
     if (valueDigest == null) {
       emptyCache.invalidate(key);
