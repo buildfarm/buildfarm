@@ -1100,6 +1100,7 @@ public class ShardInstance extends AbstractServerInstance {
         operationTransformService);
 
     // nice to have for requeuing
+    /*
     Futures.addCallback(
         validatedFuture,
         new FutureCallback<QueuedOperationMetadata>() {
@@ -1117,6 +1118,7 @@ public class ShardInstance extends AbstractServerInstance {
           }
         },
         operationTransformService);
+        */
 
     ByteString actionBlob = action.toByteString();
     Digest actionDigest = digestUtil.compute(actionBlob);
