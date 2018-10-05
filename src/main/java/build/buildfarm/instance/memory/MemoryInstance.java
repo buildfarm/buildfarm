@@ -17,6 +17,7 @@ package build.buildfarm.instance.memory;
 import static com.google.common.collect.Multimaps.synchronizedSetMultimap;
 import static com.google.common.util.concurrent.Futures.addCallback;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
+import static java.util.Collections.synchronizedSortedMap;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 
 import build.buildfarm.ac.ActionCache;
@@ -76,11 +77,14 @@ import java.util.function.Predicate;
 public class MemoryInstance extends AbstractServerInstance {
   private final MemoryInstanceConfig config;
   private final SetMultimap<String, Predicate<Operation>> watchers;
-  private final Map<String, ByteStringStreamSource> streams;
-  private final List<Operation> queuedOperations;
-  private final List<Worker> workers;
-  private final Map<String, Watchdog> requeuers;
-  private final Map<String, Watchdog> operationTimeoutDelays;
+  private final Map<String, ByteStringStreamSource> streams =
+      new ConcurrentHashMap<String, ByteStringStreamSource>();
+  private final List<Operation> queuedOperations = new ArrayList<Operation>();
+  private final List<Worker> workers = new ArrayList<Worker>();
+  private final Map<String, Watchdog> requeuers =
+      new ConcurrentHashMap(new HashMap<String, Watchdog>());
+  private final Map<String, Watchdog> operationTimeoutDelays =
+      new ConcurrentHashMap(new HashMap<String, Watchdog>());
   private final OperationsMap outstandingOperations;
   private final ListeningExecutorService watcherService;
 
@@ -103,7 +107,8 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   static class OutstandingOperations implements OperationsMap {
-    private final Map<String, Operation> map = new TreeMap<>();
+    private final Map<String, Operation> map =
+        synchronizedSortedMap(new TreeMap<>());
 
     @Override
     public Operation remove(String name) {
@@ -164,11 +169,6 @@ public class MemoryInstance extends AbstractServerInstance {
         MemoryInstance.createCompletedOperationMap(contentAddressableStorage, digestUtil));
     this.config = config;
     this.watchers = watchers;
-    streams = new HashMap<String, ByteStringStreamSource>();
-    queuedOperations = new ArrayList<Operation>();
-    workers = new ArrayList<Worker>();
-    requeuers = new HashMap<String, Watchdog>();
-    operationTimeoutDelays = new HashMap<String, Watchdog>();
     this.outstandingOperations = outstandingOperations;
     this.watcherService = listeningDecorator(watcherService);
   }
@@ -267,7 +267,7 @@ public class MemoryInstance extends AbstractServerInstance {
 
   @Override
   protected void enqueueOperation(Operation operation) {
-    synchronized(queuedOperations) {
+    synchronized (queuedOperations) {
       queuedOperations.add(operation);
     }
   }
@@ -368,7 +368,13 @@ public class MemoryInstance extends AbstractServerInstance {
         operationTimeoutDelay.stop();
       }
     } else if (isExecuting(operation)) {
-      requeuers.get(operationName).pet();
+      Watchdog requeuer = requeuers.get(operationName);
+      if (requeuer == null) {
+        // restore a requeuer if a worker indicates they are executing
+        onDispatched(operation);
+      } else {
+        requeuer.pet();
+      }
 
       // Create a delayed fuse timed out failure
       // This is in effect if the worker does not respond
@@ -409,7 +415,7 @@ public class MemoryInstance extends AbstractServerInstance {
 
     ImmutableList.Builder<Worker> rejectedWorkers = new ImmutableList.Builder<>();
     boolean dispatched = false;
-    synchronized(workers) {
+    synchronized (workers) {
       while (!dispatched && !workers.isEmpty()) {
         Worker worker = workers.remove(0);
         if (!satisfiesRequirements(worker.getPlatform(), command)) {
@@ -432,7 +438,7 @@ public class MemoryInstance extends AbstractServerInstance {
       boolean requeueOnFailure,
       Predicate<Operation> onMatch)
       throws InterruptedException {
-    synchronized(queuedOperations) {
+    synchronized (queuedOperations) {
       ImmutableList.Builder<Operation> rejectedOperations = new ImmutableList.Builder<Operation>();
       boolean matched = false;
       while (!matched && !queuedOperations.isEmpty()) {
@@ -455,7 +461,7 @@ public class MemoryInstance extends AbstractServerInstance {
       }
       Iterables.addAll(queuedOperations, rejectedOperations.build());
       if (!matched) {
-        synchronized(workers) {
+        synchronized (workers) {
           workers.add(new Worker(platform, onMatch));
         }
       }
