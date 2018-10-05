@@ -14,8 +14,10 @@
 
 package build.buildfarm.worker;
 
-import static com.google.common.collect.Iterables.concat;
+import static com.google.common.collect.Iterables.filter;
+import static com.google.common.collect.Iterables.transform;
 import static com.google.common.collect.Lists.newArrayList;
+import static build.buildfarm.v1test.ExecutionPolicy.PolicyCase.WRAPPER;
 
 import build.buildfarm.v1test.ExecutionPolicy;
 import com.google.common.io.ByteStreams;
@@ -157,23 +159,15 @@ class Executor implements Runnable {
       ActionResult.Builder resultBuilder,
       Iterable<ExecutionPolicy> policies)
       throws IOException, InterruptedException {
-    Iterable<String> arguments = command.getArgumentsList();
-
-    for (ExecutionPolicy policy : policies) {
-      switch (policy.getPolicyCase()) {
-        default:
-        case POLICY_NOT_SET:
-          throw new IllegalArgumentException("Execution Policy not set in config");
-        case WRAPPER:
-          arguments = concat(
-              ImmutableList.of(policy.getWrapper().getPath()),
-              arguments);
-          break;
-      }
-    }
+    ImmutableList.Builder<String> arguments = ImmutableList.builder();
+    arguments.addAll(
+        transform(
+            filter(policies, (policy) -> policy.getPolicyCase() == WRAPPER),
+            (policy) -> policy.getWrapper().getPath()));
+    arguments.addAll(command.getArgumentsList());
 
     ProcessBuilder processBuilder =
-        new ProcessBuilder(newArrayList(arguments))
+        new ProcessBuilder(arguments.build())
             .directory(execDir.toAbsolutePath().toFile());
 
     Map<String, String> environment = processBuilder.environment();
