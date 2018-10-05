@@ -61,6 +61,7 @@ import io.grpc.netty.NettyChannelBuilder;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -103,7 +104,7 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   static class OutstandingOperations implements OperationsMap {
-    private final Map<String, Operation> map = new TreeMap<>();
+    private final Map<String, Operation> map = Collections.synchronizedSortedMap(new TreeMap<>());
 
     @Override
     public Operation remove(String name) {
