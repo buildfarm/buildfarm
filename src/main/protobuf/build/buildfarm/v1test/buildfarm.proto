@@ -158,6 +158,20 @@ message InstanceEndpoint {
   string instance_name = 2;
 }
 
+message ExecutionWrapper {
+  string path = 1;
+}
+
+// selectable controls for executions
+// a universal policy can be specified with an empty name
+message ExecutionPolicy {
+  string name = 1;
+
+  oneof policy {
+    ExecutionWrapper wrapper = 2;
+  }
+}
+
 message WorkerConfig {
   build.bazel.remote.execution.v2.DigestFunction digest_function = 1;
 
@@ -230,6 +244,10 @@ message WorkerConfig {
   // a maximum threshold for an action's specified timeout,
   // beyond which an action will be rejected for execution
   google.protobuf.Duration maximum_action_timeout = 21;
+
+  // available execution policies, will be used to match
+  // with an action's platform for selection
+  repeated ExecutionPolicy execution_policies = 22;
 }
 
 message TreeIteratorToken {

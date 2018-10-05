@@ -14,11 +14,20 @@
 
 package build.buildfarm.worker;
 
+import static com.google.common.collect.Iterables.filter;
+import static com.google.common.collect.Iterables.transform;
+import static com.google.common.collect.Lists.newArrayList;
+import static build.buildfarm.v1test.ExecutionPolicy.PolicyCase.WRAPPER;
+
+import build.buildfarm.v1test.ExecutionPolicy;
 import com.google.common.io.ByteStreams;
+import com.google.common.collect.ImmutableList;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteResponse;
+import build.bazel.remote.execution.v2.Platform;
+import build.bazel.remote.execution.v2.Platform.Property;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -60,6 +69,18 @@ class Executor implements Runnable {
       return;
     }
 
+    Platform platform = operationContext.command.getPlatform();
+    ImmutableList.Builder<ExecutionPolicy> policies = ImmutableList.builder();
+    ExecutionPolicy defaultPolicy = workerContext.getExecutionPolicy("");
+    if (defaultPolicy != null) {
+      policies.add(defaultPolicy);
+    }
+    for (Property property : platform.getPropertiesList()) {
+      if (property.getName().equals("execution-policy")) {
+        policies.add(workerContext.getExecutionPolicy(property.getValue()));
+      }
+    }
+
     final Thread executorThread = Thread.currentThread();
     Poller poller = workerContext.createPoller(
         "Executor",
@@ -88,7 +109,8 @@ class Executor implements Runnable {
           timeout,
           operationContext.metadata.getStdoutStreamName(),
           operationContext.metadata.getStderrStreamName(),
-          resultBuilder);
+          resultBuilder,
+          policies.build());
     } catch (IOException ex) {
       poller.stop();
       owner.error().put(operationContext);
@@ -134,10 +156,18 @@ class Executor implements Runnable {
       Duration timeout,
       String stdoutStreamName,
       String stderrStreamName,
-      ActionResult.Builder resultBuilder)
+      ActionResult.Builder resultBuilder,
+      Iterable<ExecutionPolicy> policies)
       throws IOException, InterruptedException {
+    ImmutableList.Builder<String> arguments = ImmutableList.builder();
+    arguments.addAll(
+        transform(
+            filter(policies, (policy) -> policy.getPolicyCase() == WRAPPER),
+            (policy) -> policy.getWrapper().getPath()));
+    arguments.addAll(command.getArgumentsList());
+
     ProcessBuilder processBuilder =
-        new ProcessBuilder(command.getArgumentsList())
+        new ProcessBuilder(arguments.build())
             .directory(execDir.toAbsolutePath().toFile());
 
     Map<String, String> environment = processBuilder.environment();

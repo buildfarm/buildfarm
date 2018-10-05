@@ -14,6 +14,8 @@
 
 package build.buildfarm.worker.operationqueue;
 
+import static com.google.common.collect.Maps.uniqueIndex;
+
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
@@ -23,6 +25,7 @@ import build.buildfarm.instance.stub.Retrier;
 import build.buildfarm.instance.stub.Retrier.Backoff;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.CASInsertionPolicy;
+import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.InstanceEndpoint;
 import build.buildfarm.v1test.WorkerConfig;
 import build.buildfarm.worker.CASFileCache;
@@ -51,6 +54,7 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import build.bazel.remote.execution.v2.FileNode;
+import build.bazel.remote.execution.v2.Platform;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -251,6 +255,16 @@ public class Worker {
     Files.createSymbolicLink(execPath, cachePath);
   }
 
+  public Platform getPlatform() {
+    Platform.Builder platform = config.getPlatform().toBuilder();
+    for (ExecutionPolicy policy : config.getExecutionPoliciesList()) {
+      platform.addPropertiesBuilder()
+        .setName("execution-policy")
+        .setValue(policy.getName());
+    }
+    return platform.build();
+  }
+
   public void start() throws InterruptedException {
     try {
       Files.createDirectories(root);
@@ -261,6 +275,10 @@ public class Worker {
     }
 
     WorkerContext workerContext = new WorkerContext() {
+      Map<String, ExecutionPolicy> policies = uniqueIndex(
+          config.getExecutionPoliciesList(),
+          (policy) -> policy.getName());
+
       @Override
       public Poller createPoller(String name, String operationName, Stage stage) {
         return createPoller(name, operationName, stage, () -> {});
@@ -285,9 +303,10 @@ public class Worker {
       }
 
       @Override
-      public void match(Predicate<Operation> onMatch) throws InterruptedException {
+      public void match(Predicate<Operation> onMatch)
+          throws InterruptedException {
         operationQueueInstance.match(
-            config.getPlatform(),
+            getPlatform(),
             config.getRequeueOnFailure(),
             onMatch);
       }
@@ -406,6 +425,11 @@ public class Worker {
       @Override
       public Path getRoot() {
         return root;
+      }
+
+      @Override
+      public ExecutionPolicy getExecutionPolicy(String name) {
+        return policies.get(name);
       }
 
       @Override

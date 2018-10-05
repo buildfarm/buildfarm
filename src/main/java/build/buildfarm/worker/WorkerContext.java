@@ -19,6 +19,7 @@ import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.v1test.CASInsertionPolicy;
+import build.buildfarm.v1test.ExecutionPolicy;
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
@@ -40,6 +41,7 @@ public interface WorkerContext {
   CASInsertionPolicy getStdoutCasPolicy();
   CASInsertionPolicy getStderrCasPolicy();
   DigestUtil getDigestUtil();
+  ExecutionPolicy getExecutionPolicy(String name);
   int getInlineContentLimit();
   int getExecuteStageWidth();
   int getTreePageSize();
