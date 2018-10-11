@@ -47,7 +47,6 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.rpc.Code;
 import io.grpc.Status;
-
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -207,7 +206,6 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   protected abstract int getTreeDefaultPageSize();
-
   protected abstract int getTreeMaxPageSize();
 
   protected abstract TokenizableIterator<Directory> createTreeIterator(
@@ -653,7 +651,6 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   abstract protected boolean matchOperation(Operation operation);
-
   abstract protected void enqueueOperation(Operation operation);
 
   @Override
@@ -710,9 +707,7 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   protected abstract int getListOperationsDefaultPageSize();
-
   protected abstract int getListOperationsMaxPageSize();
-
   protected abstract TokenizableIterator<Operation> createOperationsIterator(String pageToken);
 
   @Override
@@ -784,10 +779,7 @@ public abstract class AbstractServerInstance implements Instance {
   protected void errorOperation(String name, com.google.rpc.Status status) throws InterruptedException {
     Operation operation = getOperation(name);
     if (operation == null) {
-      // throw new IllegalStateException("Trying to error nonexistent operation [" + name + "]");
-      operation = Operation.newBuilder()
-          .setName(name)
-          .build();
+      throw new IllegalStateException("Trying to error nonexistent operation [" + name + "]");
     }
     if (operation.getDone()) {
       throw new IllegalStateException("Trying to error already completed operation [" + name + "]");

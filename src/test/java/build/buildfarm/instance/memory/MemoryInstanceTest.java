@@ -47,11 +47,9 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.Durations;
-
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
-
 import com.google.rpc.Code;
 import org.junit.Before;
 import org.junit.Test;
@@ -82,7 +80,7 @@ public class MemoryInstanceTest {
             .hashKeys()
             .hashSetValues(/* expectedValuesPerKey=*/ 1)
             .build());
-    watchersThreadPool =newFixedThreadPool(1);
+    watchersThreadPool = newFixedThreadPool(1);
     MemoryInstanceConfig memoryInstanceConfig = MemoryInstanceConfig.newBuilder()
         .setListOperationsDefaultPageSize(1024)
         .setListOperationsMaxPageSize(16384)
@@ -311,11 +309,7 @@ public class MemoryInstanceTest {
       assertThat(e.getMessage()).isEqualTo("Operation stage is not QUEUED");
     }
 
-    try {
-      instance.requeueOperation(queuedOperation);
-    } catch (IllegalStateException e) {
-      fail("Method should not throw if operation is QUEUED.");
-    }
+    instance.requeueOperation(queuedOperation);
   }
 
   private Operation createOperation(String name, Stage stage) {
