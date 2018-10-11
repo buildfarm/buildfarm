@@ -22,20 +22,18 @@ import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.UNK
 import static com.google.common.collect.Multimaps.synchronizedSetMultimap;
 import static com.google.common.truth.Truth.assertThat;
 import static java.util.concurrent.Executors.newFixedThreadPool;
+import static org.junit.Assert.fail;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
 
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
-import build.buildfarm.common.DigestUtil.HashFunction;
-import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.OperationsMap;
 import build.buildfarm.v1test.ActionCacheConfig;
 import build.buildfarm.v1test.DelegateCASConfig;
@@ -47,18 +45,16 @@ import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
-import com.google.protobuf.Duration;
+import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.Durations;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
+import com.google.rpc.Code;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.invocation.InvocationOnMock;
@@ -66,10 +62,11 @@ import org.mockito.stubbing.Answer;
 
 @RunWith(JUnit4.class)
 public class MemoryInstanceTest {
-  private Instance instance;
+  private MemoryInstance instance;
 
   private OperationsMap outstandingOperations;
   private SetMultimap<String, Predicate<Operation>> watchers;
+  private ExecutorService watchersThreadPool;
 
   @Mock
   private ContentAddressableStorage storage;
@@ -83,6 +80,7 @@ public class MemoryInstanceTest {
             .hashKeys()
             .hashSetValues(/* expectedValuesPerKey=*/ 1)
             .build());
+    watchersThreadPool = newFixedThreadPool(1);
     MemoryInstanceConfig memoryInstanceConfig = MemoryInstanceConfig.newBuilder()
         .setListOperationsDefaultPageSize(1024)
         .setListOperationsMaxPageSize(16384)
@@ -103,7 +101,7 @@ public class MemoryInstanceTest {
         memoryInstanceConfig,
         storage,
         watchers,
-        newFixedThreadPool(1),
+        watchersThreadPool,
         outstandingOperations);
   }
 
@@ -179,7 +177,7 @@ public class MemoryInstanceTest {
     Action action = Action.getDefaultInstance();
 
     assertThat(instance.getActionResult(
-          instance.getDigestUtil().computeActionKey(action))).isNull();
+        instance.getDigestUtil().computeActionKey(action))).isNull();
   }
 
   @Test
@@ -277,13 +275,54 @@ public class MemoryInstanceTest {
     verify(unfazedWatcher, times(1)).test(eq(doneOperation));
   }
 
-  private boolean putNovelOperation(Stage stage) throws InterruptedException {
-    return instance.putOperation(Operation.newBuilder()
-        .setName("does-not-exist")
+  @Test
+  public void requeueFailOnInvalid() throws InterruptedException, InvalidProtocolBufferException {
+    // These new operations are invalid as they're missing content.
+    Operation queuedOperation = createOperation("my-queued-operation", QUEUED);
+    outstandingOperations.put(queuedOperation.getName(), queuedOperation);
+
+    watchers.put(queuedOperation.getName(), new Predicate<Operation>() {
+      @Override
+      public boolean test(Operation operation) {
+        assertThat(operation.getError().getCode()).isEqualTo(Code.FAILED_PRECONDITION);
+        return false;
+      }
+    });
+
+    instance.requeueOperation(queuedOperation);
+
+    watchersThreadPool.shutdown();
+    watchersThreadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+  }
+
+  @Test
+  public void requeueFailOnNotQueued() throws InterruptedException, InvalidProtocolBufferException {
+    Operation queuedOperation = createOperation("my-queued-operation", QUEUED);
+    outstandingOperations.put(queuedOperation.getName(), queuedOperation);
+    Operation executingOperation = createOperation("my-executing-operation", EXECUTING);
+    outstandingOperations.put(executingOperation.getName(), executingOperation);
+
+    try {
+      instance.requeueOperation(executingOperation);
+      fail("Method should throw if operation is not QUEUED.");
+    } catch (IllegalStateException e) {
+      assertThat(e.getMessage()).isEqualTo("Operation stage is not QUEUED");
+    }
+
+    instance.requeueOperation(queuedOperation);
+  }
+
+  private Operation createOperation(String name, Stage stage) {
+    return Operation.newBuilder()
+        .setName(name)
         .setMetadata(Any.pack(ExecuteOperationMetadata.newBuilder()
             .setStage(stage)
             .build()))
-        .build());
+        .build();
+  }
+
+  private boolean putNovelOperation(Stage stage) throws InterruptedException {
+    return instance.putOperation(createOperation("does-not-exist", stage));
   }
 
   @Test
