@@ -59,7 +59,6 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import io.grpc.Channel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
-
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
