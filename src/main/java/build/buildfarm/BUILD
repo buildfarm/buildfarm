@@ -73,6 +73,7 @@ java_library(
         "//3rdparty/jvm/io/grpc:grpc_stub",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_longrunning_operations_java_proto",
+        "@googleapis//:google_rpc_code_java_proto",
         "@googleapis//:google_rpc_status_java_proto",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
@@ -110,27 +111,27 @@ java_library(
 java_binary(
     name = "buildfarm-server",
     main_class = "build.buildfarm.server.BuildFarmServer",
+    visibility = ["//visibility:public"],
     runtime_deps = [
         ":buildfarm",
     ],
-    visibility = ["//visibility:public"],
 )
 
 container_image(
     name = "server.container",
     base = "@java_base//image",
+    cmd = [
+        "buildfarm-server_deploy.jar",
+        "/config/server.config",
+        "--port",
+        "8980",
+    ],
     # leverage the implicit target of the buildfarm-server to get a fat jar.
     # this is simply a workaround for the fact that we have so many dependencies,
     # so we'd want some wrappy script. This seemed more straightforward.
     # https://docs.bazel.build/versions/master/be/java.html#java_binary_implicit_outputs
     files = [
-        ":buildfarm-server_deploy.jar"
-    ],
-    cmd = [
-        "buildfarm-server_deploy.jar",
-        "/config/server.config",
-        "--port",
-        "8980"
+        ":buildfarm-server_deploy.jar",
     ],
     visibility = ["//visibility:public"],
 )
@@ -184,10 +185,10 @@ java_library(
     name = "operationqueue-worker",
     srcs = glob(["worker/operationqueue/*.java"]),
     deps = [
-        ":worker",
         ":common",
         ":instance",
         ":stub-instance",
+        ":worker",
         "//3rdparty/jvm/com/github/pcj:google_options",
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
@@ -233,25 +234,25 @@ java_library(
 java_binary(
     name = "buildfarm-worker",
     main_class = "build.buildfarm.worker.operationqueue.Worker",
+    visibility = ["//visibility:public"],
     runtime_deps = [
         ":operationqueue-worker",
     ],
-    visibility = ["//visibility:public"],
 )
 
 container_image(
     name = "worker.container",
     base = "@java_base//image",
+    cmd = [
+        "buildfarm-worker_deploy.jar",
+        "/config/worker.config",
+    ],
     # leverage the implicit target of the buildfarm-server to get a fat jar.
     # this is simply a workaround for the fact that we have so many dependencies,
     # so we'd want some wrappy script. This seemed more straightforward.
     # https://docs.bazel.build/versions/master/be/java.html#java_binary_implicit_outputs
     files = [
         ":buildfarm-worker_deploy.jar",
-    ],
-    cmd = [
-        "buildfarm-worker_deploy.jar",
-        "/config/worker.config",
     ],
     visibility = ["//visibility:public"],
 )

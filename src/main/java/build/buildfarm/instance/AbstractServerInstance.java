@@ -47,6 +47,7 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.rpc.Code;
 import io.grpc.Status;
+
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -186,7 +187,7 @@ public abstract class AbstractServerInstance implements Instance {
   public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs)
       throws InterruptedException {
     ImmutableList.Builder<Digest> blobDigestsBuilder =
-      new ImmutableList.Builder<Digest>();
+        new ImmutableList.Builder<Digest>();
     for (ByteString blob : blobs) {
       blobDigestsBuilder.add(putBlob(blob));
     }
@@ -206,7 +207,9 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   protected abstract int getTreeDefaultPageSize();
+
   protected abstract int getTreeMaxPageSize();
+
   protected abstract TokenizableIterator<Directory> createTreeIterator(
       Digest rootDigest, String pageToken);
 
@@ -222,7 +225,7 @@ public abstract class AbstractServerInstance implements Instance {
     }
 
     TokenizableIterator<Directory> iter =
-      createTreeIterator(rootDigest, pageToken);
+        createTreeIterator(rootDigest, pageToken);
 
     while (iter.hasNext() && pageSize != 0) {
       Directory directory = iter.next();
@@ -478,8 +481,8 @@ public abstract class AbstractServerInstance implements Instance {
     // An output file cannot be a parent of another output file, be a child of a listed output directory, or have the same path as any of the listed output directories.
     for (String outputFile : outputFiles) {
       Preconditions.checkState(
-        !inputDirectories.contains(outputFile),
-        "output file is input directory");
+          !inputDirectories.contains(outputFile),
+          "output file is input directory");
       String currentPath = outputFile;
       while (currentPath != "") {
         final String dirname;
@@ -496,8 +499,8 @@ public abstract class AbstractServerInstance implements Instance {
     // An output directory cannot be a parent of another output directory, be a parent of a listed output file, or have the same path as any of the listed output files.
     for (String outputDir : outputDirectories) {
       Preconditions.checkState(
-        !inputFiles.contains(outputDir),
-        "output directory is input file");
+          !inputFiles.contains(outputDir),
+          "output directory is input file");
       String currentPath = outputDir;
       while (currentPath != "") {
         final String dirname;
@@ -536,7 +539,7 @@ public abstract class AbstractServerInstance implements Instance {
     ActionKey actionKey = DigestUtil.asActionKey(actionDigest);
     Operation operation = createOperation(actionKey);
     ExecuteOperationMetadata metadata =
-      expectExecuteOperationMetadata(operation);
+        expectExecuteOperationMetadata(operation);
 
     putOperation(operation);
 
@@ -591,7 +594,7 @@ public abstract class AbstractServerInstance implements Instance {
         operation.getMetadata().is(ExecuteOperationMetadata.class));
     try {
       return operation.getMetadata().unpack(ExecuteOperationMetadata.class);
-    } catch(InvalidProtocolBufferException ex) {
+    } catch (InvalidProtocolBufferException ex) {
       return null;
     }
   }
@@ -600,7 +603,7 @@ public abstract class AbstractServerInstance implements Instance {
     try {
       return Action.parseFrom(getBlob(
           expectExecuteOperationMetadata(operation).getActionDigest()));
-    } catch(InvalidProtocolBufferException ex) {
+    } catch (InvalidProtocolBufferException ex) {
       return null;
     }
   }
@@ -612,7 +615,7 @@ public abstract class AbstractServerInstance implements Instance {
     }
     try {
       return Command.parseFrom(getBlob(action.getCommandDigest()));
-    } catch(InvalidProtocolBufferException ex) {
+    } catch (InvalidProtocolBufferException ex) {
       return null;
     }
   }
@@ -623,7 +626,7 @@ public abstract class AbstractServerInstance implements Instance {
       if (directoryBlob != null) {
         return Directory.parseFrom(directoryBlob);
       }
-    } catch(InvalidProtocolBufferException ex) {
+    } catch (InvalidProtocolBufferException ex) {
     }
     return null;
   }
@@ -650,6 +653,7 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   abstract protected boolean matchOperation(Operation operation);
+
   abstract protected void enqueueOperation(Operation operation);
 
   @Override
@@ -677,7 +681,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   /**
    * per-operation lock factory/indexer method
-   *
+   * <p>
    * the lock retrieved for an operation will guard against races
    * during transfers/retrievals/removals
    */
@@ -685,7 +689,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   protected void updateOperationWatchers(Operation operation) throws InterruptedException {
     if (operation.getDone()) {
-      synchronized(operationLock(operation.getName())) {
+      synchronized (operationLock(operation.getName())) {
         completedOperations.put(operation.getName(), operation);
         outstandingOperations.remove(operation.getName());
       }
@@ -696,7 +700,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public Operation getOperation(String name) {
-    synchronized(operationLock(name)) {
+    synchronized (operationLock(name)) {
       Operation operation = completedOperations.get(name);
       if (operation == null) {
         operation = outstandingOperations.get(name);
@@ -706,7 +710,9 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   protected abstract int getListOperationsDefaultPageSize();
+
   protected abstract int getListOperationsMaxPageSize();
+
   protected abstract TokenizableIterator<Operation> createOperationsIterator(String pageToken);
 
   @Override
@@ -735,7 +741,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public void deleteOperation(String name) {
-    synchronized(operationLock(name)) {
+    synchronized (operationLock(name)) {
       Operation deletedOperation = completedOperations.remove(name);
       if (deletedOperation == null &&
           outstandingOperations.contains(name)) {
@@ -752,6 +758,50 @@ public abstract class AbstractServerInstance implements Instance {
         .setError(com.google.rpc.Status.newBuilder()
             .setCode(Code.CANCELLED.getNumber())
             .build())
+        .build());
+  }
+
+  public boolean requeueOperation(Operation operation) throws InterruptedException {
+    if(!isQueued(operation)) {
+      throw new IllegalStateException("Operation stage is not QUEUED");
+    }
+
+    Action action = expectAction(operation);
+
+    try {
+      validateAction(action);
+    } catch (IllegalStateException e) {
+      errorOperation(operation.getName(), com.google.rpc.Status.newBuilder()
+          .setCode(com.google.rpc.Code.FAILED_PRECONDITION.getNumber())
+          .build());
+      return false;
+    }
+
+    return putOperation(operation);
+  }
+
+
+  protected void errorOperation(String name, com.google.rpc.Status status) throws InterruptedException {
+    Operation operation = getOperation(name);
+    if (operation == null) {
+      // throw new IllegalStateException("Trying to error nonexistent operation [" + name + "]");
+      operation = Operation.newBuilder()
+          .setName(name)
+          .build();
+    }
+    if (operation.getDone()) {
+      throw new IllegalStateException("Trying to error already completed operation [" + name + "]");
+    }
+    ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
+    if (metadata == null) {
+      metadata = ExecuteOperationMetadata.getDefaultInstance();
+    }
+    putOperation(operation.toBuilder()
+        .setDone(true)
+        .setMetadata(Any.pack(metadata.toBuilder()
+            .setStage(ExecuteOperationMetadata.Stage.COMPLETED)
+            .build()))
+        .setError(status)
         .build());
   }
 

@@ -59,6 +59,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import io.grpc.Channel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
+
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
@@ -331,7 +332,7 @@ public class MemoryInstance extends AbstractServerInstance {
       Duration maximum = config.getMaximumActionTimeout();
       Preconditions.checkState(
           timeout.getSeconds() < maximum.getSeconds() ||
-          (timeout.getSeconds() == maximum.getSeconds() && timeout.getNanos() < maximum.getNanos()));
+              (timeout.getSeconds() == maximum.getSeconds() && timeout.getNanos() < maximum.getNanos()));
     }
 
     super.validateAction(action);
@@ -403,7 +404,7 @@ public class MemoryInstance extends AbstractServerInstance {
 
   private void onDispatched(Operation operation) {
     Duration timeout = config.getOperationPollTimeout();
-    Watchdog requeuer = new Watchdog(timeout, () -> putOperation(operation));
+    Watchdog requeuer = new Watchdog(timeout, () -> requeueOperation(operation));
     requeuers.put(operation.getName(), requeuer);
     new Thread(requeuer).start();
   }
@@ -472,7 +473,7 @@ public class MemoryInstance extends AbstractServerInstance {
     // string compare only
     // no duplicate names
     ImmutableMap.Builder<String, String> provisionsBuilder =
-      new ImmutableMap.Builder<String, String>();
+        new ImmutableMap.Builder<String, String>();
     for (Platform.Property property : platform.getPropertiesList()) {
       provisionsBuilder.put(property.getName(), property.getValue());
     }
