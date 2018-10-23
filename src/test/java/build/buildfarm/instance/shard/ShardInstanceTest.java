@@ -18,6 +18,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage.UNKNOWN;
+import static com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage.CACHE_CHECK;
 import static com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage.QUEUED;
 import static com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage.COMPLETED;
 import static io.grpc.Status.Code.CANCELLED;
@@ -26,10 +27,12 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.matches;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.ShardBackplane;
@@ -41,10 +44,12 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.Futures;
 import com.google.devtools.remoteexecution.v1test.Action;
+import com.google.devtools.remoteexecution.v1test.ActionResult;
 import com.google.devtools.remoteexecution.v1test.Command;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.devtools.remoteexecution.v1test.Directory;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
+import com.google.devtools.remoteexecution.v1test.OutputFile;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -254,5 +259,51 @@ public class ShardInstanceTest {
             .setCode(Code.UNAVAILABLE.value()))
         .build();
     verify(mockBackplane, times(1)).putOperation(eq(erroredOperation), eq(COMPLETED));
+  }
+
+  @Test
+  public void queueOperationCompletesOperationWithCachedActionResult() throws Exception {
+    ActionKey actionKey = DigestUtil.asActionKey(Digest.newBuilder()
+        .setHash("test")
+        .build());
+    Operation operation = Operation.newBuilder()
+        .setName("operationWithCachedActionResult")
+        .setMetadata(Any.pack(QueuedOperationMetadata.newBuilder()
+            .setExecuteOperationMetadata(ExecuteOperationMetadata.newBuilder()
+                .setActionDigest(actionKey.getDigest()))
+            .build()))
+        .build();
+
+    ActionResult actionResult = ActionResult.getDefaultInstance();
+
+    when(mockBackplane.getOperation(eq(operation.getName()))).thenReturn(operation);
+    when(mockBackplane.getActionResult(eq(actionKey))).thenReturn(actionResult);
+
+    instance.queue(operation).get();
+
+    verify(mockBackplane, times(1)).putOperation(any(Operation.class), eq(CACHE_CHECK));
+    verify(mockBackplane, never()).putOperation(any(Operation.class), eq(QUEUED));
+    verify(mockBackplane, times(1)).putOperation(any(Operation.class), eq(COMPLETED));
+  }
+
+  @Test
+  public void actionResultsWithMissingOutputsAreInvalidated() throws IOException {
+    ActionKey actionKey = DigestUtil.asActionKey(Digest.newBuilder()
+        .setHash("test")
+        .build());
+    ActionResult actionResult = ActionResult.newBuilder()
+        .addOutputFiles(
+            OutputFile.newBuilder()
+                .setPath("does-not-exist")
+                .setDigest(
+                    Digest.newBuilder()
+                        .setHash("dne")
+                        .setSizeBytes(1)))
+        .build();
+
+    when(mockBackplane.getActionResult(eq(actionKey))).thenReturn(actionResult);
+
+    assertThat(instance.getActionResult(actionKey)).isNull();
+    verify(mockBackplane, times(1)).removeActionResult(eq(actionKey));
   }
 }

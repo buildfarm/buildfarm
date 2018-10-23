@@ -70,6 +70,7 @@ import com.google.devtools.remoteexecution.v1test.Platform;
 import com.google.devtools.remoteexecution.v1test.UpdateBlobRequest;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
+import com.google.devtools.remoteexecution.v1test.ExecuteResponse;
 import com.google.devtools.remoteexecution.v1test.RequestMetadata;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
@@ -115,9 +116,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
 
 public class ShardInstance extends AbstractServerInstance {
+  private final static Logger logger = Logger.getLogger(ShardInstance.class.getName());
+
   private final Runnable onStop;
   private final ShardBackplane backplane;
   private final LoadingCache<String, Instance> workerStubs;
@@ -325,17 +329,12 @@ public class ShardInstance extends AbstractServerInstance {
     }
   }
 
-  @Override
-  public ActionResult getActionResult(ActionKey actionKey) {
+  private ActionResult getActionResultFromBackplane(ActionKey actionKey)
+      throws IOException {
     // System.out.println("getActionResult: " + DigestUtil.toString(actionKey.getDigest()));
-    ActionResult actionResult;
-    try {
-      actionResult = backplane.getActionResult(actionKey);
-    } catch (IOException e) {
-      throw Status.fromThrowable(e).asRuntimeException();
-    }
+    ActionResult actionResult = backplane.getActionResult(actionKey);
     if (actionResult == null) {
-      return actionResult;
+      return null;
     }
 
     // FIXME output dirs
@@ -357,12 +356,17 @@ public class ShardInstance extends AbstractServerInstance {
     }
 
     // some of our outputs are no longer in the CAS, remove the actionResult
+    backplane.removeActionResult(actionKey);
+    return null;
+  }
+
+  @Override
+  public ActionResult getActionResult(ActionKey actionKey) {
     try {
-      backplane.removeActionResult(actionKey);
+      return getActionResultFromBackplane(actionKey);
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }
-    return null;
   }
 
   @Override
@@ -952,32 +956,16 @@ public class ShardInstance extends AbstractServerInstance {
         .build();
   }
 
-  // there's optimization to be had here - we can just use the prequeue to requeue this
-  // just need to make it smart enough to see the construction already
-  private boolean requeueOperation(String operationName) throws IOException, InterruptedException {
-    Operation operation = getOperation(operationName);
-    if (operation == null) {
-      System.out.println("Operation " + operationName + " no longer exists");
-      backplane.deleteOperation(operationName); // signal watchers
-      return false;
-    }
-    if (operation.getDone()) {
-      System.out.println("Operation " + operation.getName() + " has already completed");
-      return false;
-    }
-    Action action = expectAction(operation);
-    if (action == null) {
-      System.out.println("Action for " + operation.getName() + " no longer exists");
-      return false;
-    }
+  private ListenableFuture<Boolean> validateAndRequeueOperation(
+      Operation operation, Action action) throws InterruptedException {
     final QueuedOperationMetadata metadata;
+
     boolean isQueuedOperationMetadata = operation.getMetadata().is(QueuedOperationMetadata.class);
-    if (operation.getMetadata().is(QueuedOperationMetadata.class)) {
+    if (isQueuedOperationMetadata) {
       try {
         metadata = operation.getMetadata().unpack(QueuedOperationMetadata.class);
       } catch (InvalidProtocolBufferException e) {
-        e.printStackTrace();
-        return false;
+        return Futures.immediateFailedFuture(e);
       }
     } else {
       RequestMetadata requestMetadata;
@@ -986,8 +974,7 @@ public class ShardInstance extends AbstractServerInstance {
           // we should record where it was previously executing...
           requestMetadata = operation.getMetadata().unpack(ExecutingOperationMetadata.class).getRequestMetadata();
         } catch (InvalidProtocolBufferException e) {
-          e.printStackTrace();
-          return false;
+          return Futures.immediateFailedFuture(e);
         }
       } else {
         // losing our attributability
@@ -996,10 +983,10 @@ public class ShardInstance extends AbstractServerInstance {
       try {
         metadata = buildQueuedOperationMetadata(action, requestMetadata, directExecutor()).get();
       } catch (ExecutionException e) {
-        e.printStackTrace();
-        return false;
+        return Futures.immediateFailedFuture(e.getCause());
       }
     }
+
     SettableFuture<Boolean> requeuedFuture = SettableFuture.create();
     Futures.addCallback(
       validateQueuedOperationMetadata(metadata, operationTransformService),
@@ -1029,6 +1016,54 @@ public class ShardInstance extends AbstractServerInstance {
         }
       },
       operationTransformService);
+    return requeuedFuture;
+  }
+
+  private boolean skipCacheLookup(Operation operation) {
+    if (!operation.getMetadata().is(QueuedOperationMetadata.class)) {
+      return false;
+    }
+    try {
+      return operation.getMetadata().unpack(QueuedOperationMetadata.class)
+          .getSkipCacheLookup();
+    } catch (InvalidProtocolBufferException e) {
+      return false;
+    }
+  }
+
+  // there's optimization to be had here - we can just use the prequeue to requeue this
+  // just need to make it smart enough to see the construction already
+  private boolean requeueOperation(String operationName) throws IOException, InterruptedException {
+    Operation operation = getOperation(operationName);
+    if (operation == null) {
+      logger.info("Operation " + operationName + " no longer exists");
+      backplane.deleteOperation(operationName); // signal watchers
+      return false;
+    }
+    if (operation.getDone()) {
+      logger.info("Operation " + operation.getName() + " has already completed");
+      return false;
+    }
+    ExecuteOperationMetadata executeOperationMetadata = expectExecuteOperationMetadata(operation);
+    if (executeOperationMetadata == null) {
+      logger.info("Operation " + operation.getName() + " does not contain ExecuteOperationMetadata");
+      return false;
+    }
+
+    ActionKey actionKey = DigestUtil.asActionKey(executeOperationMetadata.getActionDigest());
+    ListenableFuture<Boolean> requeuedFuture;
+    SettableFuture<Void> completeFuture = SettableFuture.create();
+    if (!skipCacheLookup(operation) && checkCache(actionKey, operation, executeOperationMetadata, completeFuture)) {
+      requeuedFuture = Futures.transform(completeFuture, (result) -> true);
+    } else {
+      Action action = expectAction(operation);
+      if (action == null) {
+        logger.info("Action for " + operation.getName() + " no longer exists");
+        return false;
+      }
+
+      requeuedFuture = validateAndRequeueOperation(operation, action);
+    }
 
     try {
       return requeuedFuture.get();
@@ -1064,6 +1099,73 @@ public class ShardInstance extends AbstractServerInstance {
     return Futures.immediateFailedFuture(Status.RESOURCE_EXHAUSTED.withDescription("cannot currently queue for execution").asRuntimeException());
   }
 
+  private void errorOperation(String operationName, Throwable t, SettableFuture<Void> errorFuture) {
+    Status st = Status.fromThrowable(t);
+    String description = st.getDescription();
+    com.google.rpc.Status status = com.google.rpc.Status.newBuilder()
+        .setCode(st.getCode().value())
+        .setMessage(description == null ? "" : st.getDescription())
+        .build();
+    operationDeletionService.execute(new Runnable() {
+      // we must make all efforts to delete this thing
+      int attempt = 1;
+
+      @Override
+      public void run() {
+        try {
+          errorOperation(operationName, status);
+          errorFuture.setException(t);
+        } catch (StatusRuntimeException e) {
+          if (attempt % 100 == 0) {
+            logger.severe(String.format("On attempt %d to cancel %s: %s", attempt, operationName, e.getLocalizedMessage()));
+          }
+          // hopefully as deferred execution...
+          operationDeletionService.execute(this);
+          attempt++;
+        } catch (InterruptedException e) {
+        }
+      }
+    });
+  }
+
+  private boolean checkCache(ActionKey actionKey, Operation operation, ExecuteOperationMetadata metadata, SettableFuture completeFuture) {
+    metadata = metadata.toBuilder()
+        .setStage(Stage.CACHE_CHECK)
+        .build();
+    try {
+      backplane.putOperation(
+          operation.toBuilder()
+              .setMetadata(Any.pack(metadata))
+              .build(),
+          metadata.getStage());
+
+      ActionResult actionResult = getActionResultFromBackplane(actionKey);
+      if (actionResult == null) {
+        return false;
+      }
+
+      metadata = metadata.toBuilder()
+          .setStage(Stage.COMPLETED)
+          .build();
+      Operation completedOperation = operation.toBuilder()
+          .setDone(true)
+          .setResponse(Any.pack(ExecuteResponse.newBuilder()
+              .setResult(actionResult)
+              .setStatus(com.google.rpc.Status.newBuilder()
+                  .setCode(Code.OK.value())
+                  .build())
+              .setCachedResult(true)
+              .build()))
+          .setMetadata(Any.pack(metadata))
+          .build();
+      backplane.putOperation(completedOperation, metadata.getStage());
+      completeFuture.set(null);
+    } catch (IOException e) {
+      errorOperation(operation.getName(), e, completeFuture);
+    }
+    return true;
+  }
+
   @VisibleForTesting
   public ListenableFuture<Void> queue(Operation operation) throws InterruptedException {
     final QueuedOperationMetadata prequeueMetadata;
@@ -1079,6 +1181,15 @@ public class ShardInstance extends AbstractServerInstance {
       return Futures.immediateFailedFuture(e);
     }
 
+    ExecuteOperationMetadata metadata = prequeueMetadata.getExecuteOperationMetadata();
+    ActionKey actionKey = DigestUtil.asActionKey(metadata.getActionDigest());
+
+    SettableFuture<Void> queueFuture = SettableFuture.create();
+    if (!prequeueMetadata.getSkipCacheLookup()
+        && checkCache(actionKey, operation, metadata, queueFuture)) {
+      return queueFuture;
+    }
+
     Action action = prequeueMetadata.getAction();
     ListenableFuture<QueuedOperationMetadata> queuedFuture =
         transformQueuedOperationMetadata(
@@ -1089,47 +1200,24 @@ public class ShardInstance extends AbstractServerInstance {
     ListenableFuture<QueuedOperationMetadata> validatedFuture = Futures.catching(
         Futures.transformAsync(
             queuedFuture,
-            (metadata) -> validateQueuedOperationMetadata(metadata, operationTransformService),
+            (queuedMetadata) -> validateQueuedOperationMetadata(queuedMetadata, operationTransformService),
             operationTransformService),
         IllegalStateException.class,
         // might be able to add proper details here
         (e) -> { throw Status.FAILED_PRECONDITION.withDescription(e.getMessage()).asRuntimeException(); });
     ListenableFuture<Operation> operationFuture = Futures.transform(
         validatedFuture,
-        (metadata) -> operation.toBuilder().setMetadata(Any.pack(metadata)).build(),
+        (queuedMetadata) -> operation.toBuilder().setMetadata(Any.pack(queuedMetadata)).build(),
         operationTransformService);
 
-    // nice to have for requeuing
-    /*
-    Futures.addCallback(
-        validatedFuture,
-        new FutureCallback<QueuedOperationMetadata>() {
-          @Override
-          public void onSuccess(QueuedOperationMetadata metadata) {
-            try {
-              backplane.putTree(action.getInputRootDigest(), metadata.getDirectoriesList());
-            } catch (IOException e) {
-              e.printStackTrace();
-            }
-          }
-
-          @Override
-          public void onFailure(Throwable t) {
-          }
-        },
-        operationTransformService);
-        */
-
-    ByteString actionBlob = action.toByteString();
-    Digest actionDigest = digestUtil.compute(actionBlob);
-    ListenableFuture<Long> actionCommittedFuture = Futures.transformAsync(validatedFuture, (metadata) -> {
-      CommittingOutputStream out = createBlobOutputStream(actionDigest);
-      actionBlob.writeTo(out);
-      out.close(); // unnecessary given implementation
-      return out.getCommittedFuture();
+    ListenableFuture<Long> actionCommittedFuture = Futures.transformAsync(validatedFuture, (queuedMetadata) -> {
+      ByteString actionBlob = action.toByteString();
+      try (CommittingOutputStream out = createBlobOutputStream(actionKey.getDigest())) {
+        actionBlob.writeTo(out);
+        return out.getCommittedFuture();
+      }
     }, operationTransformService);
 
-    SettableFuture<Void> queueFuture = SettableFuture.create();
     // onQueue call?
     Futures.addCallback(
         // need to have for requeuing
@@ -1146,38 +1234,9 @@ public class ShardInstance extends AbstractServerInstance {
             }
           }
 
-          void error(String operationName, Throwable t) {
-            Status st = Status.fromThrowable(t);
-            String description = st.getDescription();
-            com.google.rpc.Status status = com.google.rpc.Status.newBuilder()
-                .setCode(st.getCode().value())
-                .setMessage(description == null ? "" : st.getDescription())
-                .build();
-            operationDeletionService.execute(new Runnable() {
-              // we must make all efforts to delete this thing
-              int attempt = 1;
-
-              @Override
-              public void run() {
-                try {
-                  errorOperation(operationName, status);
-                  queueFuture.setException(t);
-                } catch (StatusRuntimeException e) {
-                  if (attempt % 100 == 0) {
-                    System.err.println(String.format("On attempt %d to cancel %s: %s", attempt, operationName, e.getLocalizedMessage()));
-                  }
-                  // hopefully as deferred execution...
-                  operationDeletionService.execute(this);
-                  attempt++;
-                } catch (InterruptedException e) {
-                }
-              }
-            });
-          }
-
           @Override
           public void onFailure(Throwable t) {
-            error(operation.getName(), t);
+            errorOperation(operation.getName(), t, queueFuture);
           }
       }, operationTransformService);
     return queueFuture;

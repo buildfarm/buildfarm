@@ -618,7 +618,7 @@ public abstract class AbstractServerInstance implements Instance {
               .setStatus(com.google.rpc.Status.newBuilder()
                   .setCode(Code.OK.value())
                   .build())
-              .setCachedResult(actionResult != null)
+              .setCachedResult(true)
               .build()));
     } else {
       try {
