@@ -989,7 +989,7 @@ public class ShardInstance extends AbstractServerInstance {
 
     SettableFuture<Boolean> requeuedFuture = SettableFuture.create();
     Futures.addCallback(
-      validateQueuedOperationMetadata(metadata, operationTransformService),
+      validateQueuedOperationMetadataAndInputs(metadata, operationTransformService),
       new FutureCallback<QueuedOperationMetadata>() {
         @Override
         public void onSuccess(QueuedOperationMetadata metadata) {
@@ -1198,9 +1198,12 @@ public class ShardInstance extends AbstractServerInstance {
             prequeueMetadata.toBuilder(),
             operationTransformService);
     ListenableFuture<QueuedOperationMetadata> validatedFuture = Futures.catching(
-        Futures.transformAsync(
+        Futures.transform(
             queuedFuture,
-            (queuedMetadata) -> validateQueuedOperationMetadata(queuedMetadata, operationTransformService),
+            (queuedMetadata) -> {
+              validateQueuedOperationMetadata(queuedMetadata);
+              return queuedMetadata;
+            },
             operationTransformService),
         IllegalStateException.class,
         // might be able to add proper details here

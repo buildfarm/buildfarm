@@ -387,7 +387,7 @@ public abstract class AbstractServerInstance implements Instance {
       Stack<Digest> path,
       Set<Digest> visited,
       Map<Digest, Directory> directoriesIndex,
-      ImmutableSet.Builder<Digest> inputDigests) throws InterruptedException {
+      ImmutableSet.Builder<Digest> inputDigests) {
     Set<String> entryNames = new HashSet<>();
 
     String lastFileName = "";
@@ -438,26 +438,15 @@ public abstract class AbstractServerInstance implements Instance {
     }
   }
 
-  public static <V> V getUnchecked(ListenableFuture<V> future) throws InterruptedException {
-    try {
-      return future.get();
-    } catch (ExecutionException e) {
-      return null;
-    }
-  }
-
   private void validateActionInputDirectoryDigest(
       Digest directoryDigest,
       Stack<Digest> path,
       Set<Digest> visited,
       Map<Digest, Directory> directoriesIndex,
-      ImmutableSet.Builder<Digest> inputDigests) throws InterruptedException {
+      ImmutableSet.Builder<Digest> inputDigests) {
     path.push(directoryDigest);
 
     Directory directory = directoriesIndex.get(directoryDigest);
-    if (directory == null) {
-      directory = getUnchecked(expectDirectory(directoryDigest));
-    }
     Preconditions.checkState(
         directory != null,
         MISSING_INPUT + " Directory [" + DigestUtil.toString(directoryDigest) + "]");
@@ -499,43 +488,7 @@ public abstract class AbstractServerInstance implements Instance {
     return directoriesIndex.build();
   }
 
-  protected void validateAction(Action action) throws InterruptedException {
-    validateAction(
-        action,
-        getUnchecked(expectCommand(action.getCommandDigest())),
-        getUnchecked(getTreeDirectories(action.getInputRootDigest())),
-        newDirectExecutorService());
-  }
-
-  protected ListenableFuture<QueuedOperationMetadata> validateQueuedOperationMetadata(QueuedOperationMetadata metadata, ExecutorService service) throws InterruptedException {
-    return transform(
-        validateAction(
-            metadata.getAction(),
-            metadata.getCommand(),
-            metadata.getDirectoriesList(),
-            service),
-        (result) -> metadata);
-  }
-
-  private ListenableFuture<Void> validateAction(
-      Action action,
-      Command command,
-      Iterable<Directory> directories,
-      ExecutorService service) throws InterruptedException {
-    Digest actionDigest = digestUtil.compute(action);
-    Digest commandDigest = action.getCommandDigest();
-    ImmutableSet.Builder<Digest> inputDigestsBuilder = new ImmutableSet.Builder<>();
-    inputDigestsBuilder.add(commandDigest);
-
-    Map<Digest, Directory> directoriesIndex = createDirectoriesIndex(directories);
-
-    // needs futuring
-    validateActionInputDirectoryDigest(action.getInputRootDigest(), new Stack<>(), new HashSet<>(), directoriesIndex, inputDigestsBuilder);
-
-    Preconditions.checkState(command != null, MISSING_INPUT + " Command " + DigestUtil.toString(commandDigest));
-
-    ImmutableSet<Digest> inputDigests = inputDigestsBuilder.build();
-
+  private ListenableFuture<Void> validateInputs(Iterable<Digest> inputDigests, ExecutorService service) {
     return transform(
         findMissingBlobs(inputDigests, service),
         (missingBlobDigests) -> {
@@ -547,18 +500,80 @@ public abstract class AbstractServerInstance implements Instance {
                     + Iterables.transform(Iterables.limit(missingBlobDigests, 30), (digest) -> DigestUtil.toString(digest))
                     + (elided ? "..." : ""));
           }
-
-          // FIXME should input/output collisions (through directories) be another
-          // invalid action?
-          filesUniqueAndSortedPrecondition(action.getOutputFilesList());
-          filesUniqueAndSortedPrecondition(action.getOutputDirectoriesList());
-          environmentVariablesUniqueAndSortedPrecondition(
-              command.getEnvironmentVariablesList());
-          Preconditions.checkState(
-              !command.getArgumentsList().isEmpty(),
-              INVALID_DIGEST);
           return null;
         }, service);
+  }
+
+  public static <V> V getUnchecked(ListenableFuture<V> future) throws InterruptedException {
+    try {
+      return future.get();
+    } catch (ExecutionException e) {
+      return null;
+    }
+  }
+
+  protected void validateAction(Action action) throws InterruptedException {
+    ImmutableSet.Builder<Digest> inputDigestsBuilder = ImmutableSet.builder();
+    validateAction(
+        action,
+        getUnchecked(expectCommand(action.getCommandDigest())),
+        getUnchecked(getTreeDirectories(action.getInputRootDigest())),
+        inputDigestsBuilder);
+    try {
+      validateInputs(inputDigestsBuilder.build(), newDirectExecutorService()).get();
+    } catch (ExecutionException e) {
+      throw new UncheckedExecutionException(e.getCause());
+    }
+  }
+
+  protected ListenableFuture<QueuedOperationMetadata> validateQueuedOperationMetadataAndInputs(
+      QueuedOperationMetadata metadata, ExecutorService service) throws InterruptedException {
+    ImmutableSet.Builder<Digest> inputDigestsBuilder = ImmutableSet.builder();
+    validateAction(
+        metadata.getAction(),
+        metadata.getCommand(),
+        metadata.getDirectoriesList(),
+        inputDigestsBuilder);
+    return transform(
+        validateInputs(inputDigestsBuilder.build(), service),
+        (result) -> metadata,
+        service);
+  }
+
+  protected void validateQueuedOperationMetadata(
+      QueuedOperationMetadata metadata) {
+    validateAction(
+        metadata.getAction(),
+        metadata.getCommand(),
+        metadata.getDirectoriesList(),
+        ImmutableSet.builder());
+  }
+
+  private void validateAction(
+      Action action,
+      Command command,
+      Iterable<Directory> directories,
+      ImmutableSet.Builder<Digest> inputDigestsBuilder) {
+    Digest actionDigest = digestUtil.compute(action);
+    Digest commandDigest = action.getCommandDigest();
+    inputDigestsBuilder.add(commandDigest);
+
+    Map<Digest, Directory> directoriesIndex = createDirectoriesIndex(directories);
+
+    // needs futuring
+    validateActionInputDirectoryDigest(action.getInputRootDigest(), new Stack<>(), new HashSet<>(), directoriesIndex, inputDigestsBuilder);
+
+    Preconditions.checkState(command != null, MISSING_INPUT + " Command " + DigestUtil.toString(commandDigest));
+
+    // FIXME should input/output collisions (through directories) be another
+    // invalid action?
+    filesUniqueAndSortedPrecondition(action.getOutputFilesList());
+    filesUniqueAndSortedPrecondition(action.getOutputDirectoriesList());
+    environmentVariablesUniqueAndSortedPrecondition(
+        command.getEnvironmentVariablesList());
+    Preconditions.checkState(
+        !command.getArgumentsList().isEmpty(),
+        INVALID_DIGEST);
   }
 
   @Override
