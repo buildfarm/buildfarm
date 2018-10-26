@@ -926,7 +926,7 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
     ListenableFuture<OutputStream> future = service.submit(() -> {
       final OutputStream out;
       boolean outIsSet = false;
-      l.lock();
+      l.lockInterruptibly();
       try {
         out = putImplSynchronized(
             key,
