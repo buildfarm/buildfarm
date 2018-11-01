@@ -14,9 +14,12 @@
 
 package build.buildfarm.worker;
 
+import static java.util.concurrent.TimeUnit.MICROSECONDS;
+
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import com.google.common.base.Stopwatch;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
@@ -25,22 +28,36 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.logging.Logger;
 
 public class MatchStage extends PipelineStage {
+  private static final Logger logger = Logger.getLogger(MatchStage.class.getName());
+
   public MatchStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
-    super(workerContext, output, error);
+    super("MatchStage", workerContext, output, error);
+  }
+
+  @Override
+  protected Logger getLogger() {
+    return logger;
   }
 
   @Override
   protected void iterate() throws InterruptedException {
+    Stopwatch stopwatch = Stopwatch.createStarted();
     if (!output.claim()) {
       return;
     }
+    long stallUSecs = stopwatch.elapsed(MICROSECONDS);
+    logStart();
     workerContext.match((operation) -> {
+      logStart(operation.getName());
       boolean fetched = fetch(operation);
+      long usecs = stopwatch.elapsed(MICROSECONDS);
       if (!fetched) {
         output.release();
       }
+      logComplete(operation.getName(), usecs, stallUSecs, fetched);
       return fetched;
     });
     // trigger stage shutdown if interrupted during fetch

@@ -306,7 +306,8 @@ public class MemoryInstanceTest {
       instance.requeueOperation(executingOperation);
       fail("Method should throw if operation is not QUEUED.");
     } catch (IllegalStateException e) {
-      assertThat(e.getMessage()).isEqualTo("Operation stage is not QUEUED");
+      assertThat(e.getMessage()).isEqualTo(
+          String.format("Operation %s stage is not QUEUED", executingOperation.getName()));
     }
 
     instance.requeueOperation(queuedOperation);

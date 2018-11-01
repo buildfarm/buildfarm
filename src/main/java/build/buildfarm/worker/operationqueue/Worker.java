@@ -454,7 +454,7 @@ public class Worker {
       }
     };
 
-    PipelineStage errorStage = new ReportResultStage.NullStage(); /* ErrorStage(); */
+    PipelineStage errorStage = new ReportResultStage.NullStage("ErrorStage"); /* ErrorStage(); */
     PipelineStage reportResultStage = new ReportResultStage(workerContext, errorStage);
     PipelineStage executeActionStage = new ExecuteActionStage(workerContext, reportResultStage, errorStage);
     reportResultStage.setInput(executeActionStage);

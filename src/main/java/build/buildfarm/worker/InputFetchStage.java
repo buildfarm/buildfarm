@@ -19,13 +19,21 @@ import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.logging.Logger;
 
 public class InputFetchStage extends PipelineStage {
+  private static final Logger logger = Logger.getLogger(InputFetchStage.class.getName());
+
   private final BlockingQueue<OperationContext> queue;
 
   public InputFetchStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
-    super(workerContext, output, error);
+    super("InputFetchStage", workerContext, output, error);
     queue = new ArrayBlockingQueue<>(1);
+  }
+
+  @Override
+  protected Logger getLogger() {
+    return logger;
   }
 
   @Override
