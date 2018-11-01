@@ -44,13 +44,14 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
 class Executor implements Runnable {
+  private static final int INCOMPLETE_EXIT_CODE = -1;
   private static final Logger logger = Logger.getLogger(Executor.class.getName());
   private static final OutputStream nullOutputStream = ByteStreams.nullOutputStream();
 
   private final WorkerContext workerContext;
   private final OperationContext operationContext;
   private final ExecuteActionStage owner;
-  private int exitCode = -1;
+  private int exitCode = INCOMPLETE_EXIT_CODE;
 
   Executor(WorkerContext workerContext, OperationContext operationContext, ExecuteActionStage owner) {
     this.workerContext = workerContext;
@@ -217,7 +218,7 @@ class Executor implements Runnable {
     } catch(IOException ex) {
       ex.printStackTrace();
       // again, should we do something else here??
-      resultBuilder.setExitCode(exitCode);
+      resultBuilder.setExitCode(INCOMPLETE_EXIT_CODE);
       return Code.INVALID_ARGUMENT;
     }
 
