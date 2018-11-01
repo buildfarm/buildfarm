@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker;
 
+import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.Watchdog;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;

@@ -71,8 +71,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-public class CASFileCache implements ContentAddressableStorage, InputStreamFactory, OutputStreamFactory {
-  private final InputStreamFactory inputStreamFactory;
+public abstract class CASFileCache implements ContentAddressableStorage, OutputStreamFactory {
   private final Path root;
   private final long maxSizeInBytes;
   private final DigestUtil digestUtil;
@@ -91,26 +90,23 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
   private transient Entry header = new SentinelEntry();
 
   public CASFileCache(
-      InputStreamFactory inputStreamFactory,
       Path root,
       long maxSizeInBytes,
       DigestUtil digestUtil) {
     this(
-        inputStreamFactory,
-        root, maxSizeInBytes,
+        root,
+        maxSizeInBytes,
         digestUtil,
         /* onPut=*/ (digest) -> {},
         /* onExpire=*/ (digests) -> {});
   }
 
   public CASFileCache(
-      InputStreamFactory inputStreamFactory,
       Path root,
       long maxSizeInBytes,
       DigestUtil digestUtil,
       Consumer<Digest> onPut,
       Consumer<Iterable<Digest>> onExpire) {
-    this.inputStreamFactory = inputStreamFactory;
     this.root = root;
     this.maxSizeInBytes = maxSizeInBytes;
     this.digestUtil = digestUtil;
@@ -877,7 +873,7 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
         () -> onPut.accept(digest));
     // already has it
     if (out != null) {
-      try (InputStream in = inputStreamFactory.newInput(digest, 0)) {
+      try (InputStream in = newExternalInput(digest, 0)) {
         ByteStreams.copy(in, out);
       } catch (IOException e) {
         e.printStackTrace(); // prevent burial by early end of stream during close
@@ -1251,4 +1247,6 @@ public class CASFileCache implements ContentAddressableStorage, InputStreamFacto
       this.inputs = inputs;
     }
   }
+
+  protected abstract InputStream newExternalInput(Digest digest, long offset) throws IOException, InterruptedException;
 }

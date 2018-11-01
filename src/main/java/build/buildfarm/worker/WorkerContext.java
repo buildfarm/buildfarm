@@ -44,7 +44,6 @@ public interface WorkerContext {
   CASInsertionPolicy getStdoutCasPolicy();
   CASInsertionPolicy getStderrCasPolicy();
   DigestUtil getDigestUtil();
-  int getInlineContentLimit();
   int getExecuteStageWidth();
   int getTreePageSize();
   boolean hasDefaultActionTimeout();
@@ -53,9 +52,8 @@ public interface WorkerContext {
   boolean getStreamStderr();
   Duration getDefaultActionTimeout();
   Duration getMaximumActionTimeout();
-  void createActionRoot(Path root, Map<Digest, Directory> directoriesIndex, Action action) throws IOException, InterruptedException;
-  void destroyActionRoot(Path root) throws IOException, InterruptedException;
-  Path getRoot();
+  Path createExecDir(String operationName, Map<Digest, Directory> directoriesIndex, Action action) throws IOException, InterruptedException;
+  void destroyExecDir(Path execDir) throws IOException, InterruptedException;
   void uploadOutputs(ActionResult.Builder resultBuilder, Path actionRoot, Iterable<String> outputFiles, Iterable<String> outputDirs) throws IOException, InterruptedException;
   boolean putOperation(Operation operation, Action Action) throws IOException, InterruptedException;
   OutputStream getStreamOutput(String name);

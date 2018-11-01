@@ -85,7 +85,7 @@ public interface ShardBackplane {
    * Returns a set of the names of all active workers.
    */
   @ThreadSafe
-  Set<String> getWorkerSet() throws IOException;
+  Set<String> getWorkers() throws IOException;
 
   /**
    * Checks whether or not a worker name is in the set of active workers.

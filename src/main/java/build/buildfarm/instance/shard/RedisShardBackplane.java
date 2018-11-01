@@ -379,7 +379,7 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   @Override
-  public Set<String> getWorkerSet() throws IOException {
+  public Set<String> getWorkers() throws IOException {
     long now = System.currentTimeMillis();
     if (now < workerSetExpiresAt) {
       return workerSet;

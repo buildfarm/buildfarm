@@ -17,8 +17,9 @@ package build.buildfarm.common;
 import build.buildfarm.common.ThreadSafety.ThreadSafe;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.protobuf.ByteString;
+import java.io.InputStream;
 
-public interface ContentAddressableStorage {
+public interface ContentAddressableStorage extends InputStreamFactory {
   /**
    * Blob storage for the CAS. This class should be used at all times when interacting with
    * complete blobs in order to cut down on independent digest computation.

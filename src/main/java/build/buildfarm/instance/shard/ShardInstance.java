@@ -120,7 +120,7 @@ import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
 
 public class ShardInstance extends AbstractServerInstance {
-  private final static Logger logger = Logger.getLogger(ShardInstance.class.getName());
+  private static final Logger logger = Logger.getLogger(ShardInstance.class.getName());
 
   private final Runnable onStop;
   private final ShardBackplane backplane;
@@ -387,7 +387,7 @@ public class ShardInstance extends AbstractServerInstance {
 
     Deque<String> workers;
     try {
-      List<String> workersList = new ArrayList<>(backplane.getWorkerSet());
+      List<String> workersList = new ArrayList<>(backplane.getWorkers());
       Collections.shuffle(workersList, rand);
       workers = new ArrayDeque(workersList);
     } catch (IOException e) {
@@ -492,7 +492,7 @@ public class ShardInstance extends AbstractServerInstance {
     Set<String> workerSet;
     Set<String> locationSet;
     try {
-      workerSet = backplane.getWorkerSet();
+      workerSet = backplane.getWorkers();
       locationSet = backplane.getBlobLocationSet(blobDigest);
       workersList = new ArrayList<>(Sets.intersection(locationSet, workerSet));
     } catch (IOException e) {

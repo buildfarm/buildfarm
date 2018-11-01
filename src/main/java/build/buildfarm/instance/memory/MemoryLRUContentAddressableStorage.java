@@ -17,6 +17,9 @@ package build.buildfarm.instance.memory;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.ContentAddressableStorage;
 import com.google.devtools.remoteexecution.v1test.Digest;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.NoSuchFileException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -59,6 +62,23 @@ public class MemoryLRUContentAddressableStorage implements ContentAddressableSto
     }
     e.recordAccess(header);
     return e.value;
+  }
+
+  @Override
+  public InputStream newInput(Digest digest, long offset) throws IOException {
+    // implicit int bounds compare against size bytes
+    if (offset < 0 || offset > digest.getSizeBytes()) {
+      throw new IndexOutOfBoundsException(
+          String.format(
+              "%d is out of bounds for blob %s",
+              offset,
+              DigestUtil.toString(digest)));
+    }
+    Blob blob = get(digest);
+    if (blob == null) {
+      throw new NoSuchFileException(DigestUtil.toString(digest));
+    }
+    return blob.getData().substring((int) offset).newInput();
   }
 
   @Override

@@ -17,8 +17,8 @@ package build.buildfarm.worker;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
 import com.google.protobuf.Duration;
 import com.google.protobuf.util.Durations;
-import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ArrayBlockingQueue;
 
@@ -53,9 +53,10 @@ public class InputFetchStage extends PipelineStage {
     long fetchStartAt = System.nanoTime();
 
     boolean success = true;
+    Path execDir;
     try {
-      workerContext.createActionRoot(
-          operationContext.execDir,
+      execDir = workerContext.createExecDir(
+          operationContext.operation.getName(),
           operationContext.directoriesIndex,
           operationContext.action);
     } catch (IOException e) {
@@ -68,6 +69,7 @@ public class InputFetchStage extends PipelineStage {
     Duration fetchedIn = Durations.fromNanos(System.nanoTime() - fetchStartAt);
 
     return operationContext.toBuilder()
+        .setExecDir(execDir)
         .setFetchedIn(fetchedIn)
         .build();
   }

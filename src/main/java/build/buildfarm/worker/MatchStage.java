@@ -188,10 +188,8 @@ public class MatchStage extends PipelineStage {
       return null;
     }
 
-    Path execDir = workerContext.getRoot().resolve(operation.getName());
     OperationContext.Builder builder = OperationContext.newBuilder()
         .setOperation(operation)
-        .setExecDir(execDir)
         .setDirectoriesIndex(createDirectoriesIndex(metadata.getDirectoriesList(), workerContext.getDigestUtil()))
         .setMetadata(metadata.getExecuteOperationMetadata())
         .setAction(action)

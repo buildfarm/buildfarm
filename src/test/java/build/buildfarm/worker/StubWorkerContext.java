@@ -45,7 +45,6 @@ class StubWorkerContext implements WorkerContext {
   @Override public CASInsertionPolicy getStdoutCasPolicy() { throw new UnsupportedOperationException(); }
   @Override public CASInsertionPolicy getStderrCasPolicy() { throw new UnsupportedOperationException(); }
   @Override public DigestUtil getDigestUtil() { throw new UnsupportedOperationException(); }
-  @Override public int getInlineContentLimit() { throw new UnsupportedOperationException(); }
   @Override public int getExecuteStageWidth() { throw new UnsupportedOperationException(); }
   @Override public int getTreePageSize() { throw new UnsupportedOperationException(); }
   @Override public boolean hasDefaultActionTimeout() { throw new UnsupportedOperationException(); }
@@ -54,9 +53,8 @@ class StubWorkerContext implements WorkerContext {
   @Override public boolean getStreamStderr() { throw new UnsupportedOperationException(); }
   @Override public Duration getDefaultActionTimeout() { throw new UnsupportedOperationException(); }
   @Override public Duration getMaximumActionTimeout() { throw new UnsupportedOperationException(); }
-  @Override public void createActionRoot(Path root, Map<Digest, Directory> directoriesIndex, Action action) { throw new UnsupportedOperationException(); }
-  @Override public void destroyActionRoot(Path root) { throw new UnsupportedOperationException(); }
-  @Override public Path getRoot() { throw new UnsupportedOperationException(); }
+  @Override public Path createExecDir(String operationName, Map<Digest, Directory> directoriesIndex, Action action) { throw new UnsupportedOperationException(); }
+  @Override public void destroyExecDir(Path execDir) { throw new UnsupportedOperationException(); }
   @Override public void uploadOutputs(ActionResult.Builder resultBuilder, Path actionRoot, Iterable<String> outputFiles, Iterable<String> outputDirs) { throw new UnsupportedOperationException(); }
   @Override public boolean putOperation(Operation operation, Action action) { throw new UnsupportedOperationException(); }
   @Override public OutputStream getStreamOutput(String name) { throw new UnsupportedOperationException(); }

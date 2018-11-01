@@ -3,12 +3,12 @@ package build.buildfarm;
 import static build.buildfarm.instance.Utils.getBlob;
 
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Retrier;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.worker.FuseCAS;
-import build.buildfarm.worker.InputStreamFactory;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.protobuf.ByteString;
 import io.grpc.ManagedChannel;

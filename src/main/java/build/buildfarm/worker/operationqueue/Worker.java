@@ -17,6 +17,7 @@ package build.buildfarm.worker.operationqueue;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
+import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.instance.stub.ByteStreamUploader;
@@ -30,7 +31,6 @@ import build.buildfarm.v1test.WorkerConfig;
 import build.buildfarm.worker.CASFileCache;
 import build.buildfarm.worker.ExecuteActionStage;
 import build.buildfarm.worker.InputFetchStage;
-import build.buildfarm.worker.InputStreamFactory;
 import build.buildfarm.worker.MatchStage;
 import build.buildfarm.worker.OutputDirectory;
 import build.buildfarm.worker.Pipeline;
@@ -202,7 +202,7 @@ public class Worker {
         return casInstance.newStreamInput(casInstance.getBlobName(digest), offset);
       }
     };
-    fileCache = new CASFileCache(
+    fileCache = new InjectedCASFileCache(
         inputStreamFactory,
         root.resolve(casCacheDirectory),
         config.getCasCacheMaxSizeBytes(),
@@ -504,11 +504,6 @@ public class Worker {
       }
 
       @Override
-      public int getInlineContentLimit() {
-        return config.getInlineContentLimit();
-      }
-
-      @Override
       public CASInsertionPolicy getFileCasPolicy() {
         return config.getFileCasPolicy();
       }
@@ -584,44 +579,41 @@ public class Worker {
       }
 
       @Override
-      public void createActionRoot(Path root, Map<Digest, Directory> directoriesIndex, Action action) throws IOException, InterruptedException {
+      public Path createExecDir(String operationName, Map<Digest, Directory> directoriesIndex, Action action) throws IOException, InterruptedException {
         OutputDirectory outputDirectory = OutputDirectory.parse(
             action.getOutputFilesList(),
             action.getOutputDirectoriesList());
 
-        if (Files.exists(root)) {
-          fileCache.removeDirectoryAsync(root);
+        Path execDir = root.resolve(operationName);
+        if (Files.exists(execDir)) {
+          fileCache.removeDirectoryAsync(execDir);
         }
-        Files.createDirectories(root);
+        Files.createDirectories(execDir);
 
         ImmutableList.Builder<Path> inputFiles = new ImmutableList.Builder<>();
         ImmutableList.Builder<Digest> inputDirectories = new ImmutableList.Builder<>();
 
         fetchInputs(
-            root,
+            execDir,
             action.getInputRootDigest(),
             outputDirectory,
             inputFiles,
             inputDirectories);
 
-        outputDirectory.stamp(root);
+        outputDirectory.stamp(execDir);
 
-        rootInputFiles.put(root, inputFiles.build());
-        rootInputDirectories.put(root, inputDirectories.build());
+        rootInputFiles.put(execDir, inputFiles.build());
+        rootInputDirectories.put(execDir, inputDirectories.build());
+        return execDir;
       }
 
       @Override
-      public void destroyActionRoot(Path root) throws IOException {
-        Iterable<Path> inputFiles = rootInputFiles.remove(root);
-        Iterable<Digest> inputDirectories = rootInputDirectories.remove(root);
+      public void destroyExecDir(Path execDir) throws IOException {
+        Iterable<Path> inputFiles = rootInputFiles.remove(execDir);
+        Iterable<Digest> inputDirectories = rootInputDirectories.remove(execDir);
 
         fileCache.decrementReferences(inputFiles, inputDirectories);
-        fileCache.removeDirectoryAsync(root);
-      }
-
-      @Override
-      public Path getRoot() {
-        return root;
+        fileCache.removeDirectoryAsync(execDir);
       }
 
       // doesn't belong in CAS or AC, must be in OQ

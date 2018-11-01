@@ -77,11 +77,6 @@ public class MatchStageTest {
       }
 
       @Override
-      public Path getRoot() {
-        return FileSystems.getDefault().getPath("tmp");
-      }
-
-      @Override
       public void requeue(Operation operation) {
         // ignore
       }

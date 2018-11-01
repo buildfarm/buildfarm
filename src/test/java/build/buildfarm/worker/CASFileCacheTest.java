@@ -49,16 +49,11 @@ class CASFileCacheTest {
   public void setUp() {
     digestUtil = new DigestUtil(HashFunction.SHA256);
     blobs = new HashMap<Digest, ByteString>();
-    fileCache = new CASFileCache(
-        new InputStreamFactory() {
-          @Override
-          public InputStream newInput(Digest digest, long offset) {
-            return blobs.get(digest).substring((int) offset).newInput();
-          }
-        },
-        root,
-        /* maxSizeInBytes=*/ 1024,
-        digestUtil);
+    fileCache = new CASFileCache(root, /* maxSizeInBytes=*/ 1024, digestUtil) {
+      protected InputStream newExternalInput(Digest digest, long offset) {
+        return blobs.get(digest).substring((int) offset).newInput();
+      }
+    };
   }
 
   @Test

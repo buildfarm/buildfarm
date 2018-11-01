@@ -1,4 +1,4 @@
-// Copyright 2017 The Bazel Authors. All rights reserved.
+// Copyright 2018 The Bazel Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker;
+package build.buildfarm.worker.shard;
 
-import com.google.devtools.remoteexecution.v1test.Digest;
+import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
 import java.io.IOException;
-import java.io.InputStream;
 
-public interface InputStreamFactory {
-  InputStream newInput(Digest digest, long offset) throws IOException, InterruptedException;
+@FunctionalInterface
+interface OperationPoller {
+  boolean poll(String name, Stage stage, long requeueAt) throws IOException;
 }

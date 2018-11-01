@@ -145,7 +145,7 @@ public class ReportResultStage extends PipelineStage {
   @Override
   protected void after(OperationContext operationContext) {
     try {
-      workerContext.destroyActionRoot(operationContext.execDir);
+      workerContext.destroyExecDir(operationContext.execDir);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     } catch (IOException e) {

@@ -73,7 +73,7 @@ class Executor implements Runnable {
     if (!operationUpdateSuccess) {
       workerContext.logInfo("Executor: Operation " + operation.getName() + " is no longer valid");
       try {
-        workerContext.destroyActionRoot(operationContext.execDir);
+        workerContext.destroyExecDir(operationContext.execDir);
       } catch (IOException destroyActionRootException) {
         destroyActionRootException.printStackTrace();
       }
@@ -117,7 +117,7 @@ class Executor implements Runnable {
     } catch (IOException e) {
       e.printStackTrace();
       try {
-        workerContext.destroyActionRoot(operationContext.execDir);
+        workerContext.destroyExecDir(operationContext.execDir);
       } catch (IOException destroyActionRootException) {
         destroyActionRootException.printStackTrace();
       }

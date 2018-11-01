@@ -360,6 +360,7 @@ java_binary(
     deps = [
         ":common",
         ":worker",
+        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
     ],
 )
 

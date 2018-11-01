@@ -116,9 +116,9 @@ public class ShardInstanceTest {
     Digest inputRootDigest = DIGEST_UTIL.compute(inputRoot);
     when(mockBackplane.getTree(eq(inputRootDigest))).thenReturn(ImmutableList.of(inputRoot));
 
-    ImmutableSet<String> workerSet = ImmutableSet.of(workerName);
+    ImmutableSet<String> workers = ImmutableSet.of(workerName);
     when(mockBackplane.getRandomWorker()).thenReturn(workerName);
-    when(mockBackplane.getWorkerSet()).thenReturn(workerSet);
+    when(mockBackplane.getWorkers()).thenReturn(workers);
 
     Command command = Command.newBuilder()
         .addAllArguments(ImmutableList.of("true"))
@@ -135,7 +135,7 @@ public class ShardInstanceTest {
         return null;
       }
     }).when(mockWorkerInstance).getBlob(eq(commandDigest), eq(0l), eq(0l), any(StreamObserver.class));
-    when(mockBackplane.getBlobLocationSet(eq(commandDigest))).thenReturn(workerSet);
+    when(mockBackplane.getBlobLocationSet(eq(commandDigest))).thenReturn(workers);
 
     // janky - need a better supplier here
     // when(mockWorkerInstance.putBlob(eq(commandBlob))).thenReturn(commandDigest);
@@ -156,7 +156,7 @@ public class ShardInstanceTest {
         return null;
       }
     }).when(mockWorkerInstance).getBlob(eq(actionDigest), eq(0l), eq(0l), any(StreamObserver.class));
-    when(mockBackplane.getBlobLocationSet(eq(actionDigest))).thenReturn(workerSet);
+    when(mockBackplane.getBlobLocationSet(eq(actionDigest))).thenReturn(workers);
 
     return action;
   }
