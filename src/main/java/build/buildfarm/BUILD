@@ -6,7 +6,7 @@ package(
 
 java_library(
     name = "common",
-    srcs = glob(["common/*.java"]),
+    srcs = glob(["common/*.java", "common/function/*.java"]),
     deps = [
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",

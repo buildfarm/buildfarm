@@ -41,7 +41,7 @@ public interface Instance {
   DigestUtil getDigestUtil();
 
   void start();
-  void stop();
+  void stop() throws InterruptedException;
 
   ActionResult getActionResult(ActionKey actionKey);
   void putActionResult(ActionKey actionKey, ActionResult actionResult);

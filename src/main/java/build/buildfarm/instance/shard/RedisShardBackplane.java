@@ -19,6 +19,7 @@ import static redis.clients.jedis.ScanParams.SCAN_POINTER_START;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.ShardBackplane;
+import build.buildfarm.common.function.InterruptingRunnable;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.QueuedOperationMetadata;
@@ -84,7 +85,7 @@ public class RedisShardBackplane implements ShardBackplane {
   private final Predicate<Operation> isDispatched;
   private final Pool<Jedis> pool;
 
-  private @Nullable Runnable onUnsubscribe = null;
+  private @Nullable InterruptingRunnable onUnsubscribe = null;
   private Thread subscriptionThread = null;
   private Thread failsafeOperationThread = null;
   private Set<String> previousPrequeued = ImmutableSet.of();
@@ -163,8 +164,8 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   @Override
-  public Runnable setOnUnsubscribe(Runnable onUnsubscribe) {
-    Runnable oldOnUnsubscribe = this.onUnsubscribe;
+  public InterruptingRunnable setOnUnsubscribe(InterruptingRunnable onUnsubscribe) {
+    InterruptingRunnable oldOnUnsubscribe = this.onUnsubscribe;
     this.onUnsubscribe = onUnsubscribe;
     return oldOnUnsubscribe;
   }
@@ -237,7 +238,7 @@ public class RedisShardBackplane implements ShardBackplane {
         /* onUnsubscribe=*/ () -> {
           subscriptionThread = null;
           if (onUnsubscribe != null) {
-            onUnsubscribe.run();
+            onUnsubscribe.runInterruptibly();
           }
         },
         /* onReset=*/ this::updateWatchedIfDone,

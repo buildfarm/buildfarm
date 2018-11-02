@@ -147,7 +147,7 @@ public class BuildFarmInstances implements Instances {
   }
 
   @Override
-  public void stop() {
+  public void stop() throws InterruptedException {
     for (Instance instance : instances.values()) {
       instance.stop();
     }

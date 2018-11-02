@@ -31,6 +31,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
@@ -101,9 +102,16 @@ public class BuildFarmServer {
       }
       stopping = true;
     }
-    instances.stop();
-    if (server != null) {
-      server.shutdown();
+    try {
+      instances.stop();
+      if (server != null) {
+        server.shutdown();
+      }
+      server.awaitTermination(10, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      if (server != null) {
+        server.shutdownNow();
+      }
     }
   }
 

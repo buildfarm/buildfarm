@@ -104,7 +104,7 @@ public class ShardInstanceTest {
   }
 
   @After
-  public void tearDown() {
+  public void tearDown() throws InterruptedException {
     instance.stop();
   }
 

@@ -16,6 +16,7 @@ package build.buildfarm.common;
 
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.ThreadSafety.ThreadSafe;
+import build.buildfarm.common.function.InterruptingRunnable;
 import build.buildfarm.v1test.ShardDispatchedOperation;
 import com.google.common.collect.ImmutableList;
 import com.google.devtools.remoteexecution.v1test.ActionResult;
@@ -42,11 +43,12 @@ public interface ShardBackplane {
 
   /**
    * Register a runnable for when the backplane cannot guarantee watch deliveries.
+   * This runnable may throw InterruptedException
    *
    * onSubscribe is called via the subscription thread, and is not called
    * when operations are not listened to
    */
-  Runnable setOnUnsubscribe(Runnable onUnsubscribe);
+  InterruptingRunnable setOnUnsubscribe(InterruptingRunnable onUnsubscribe);
 
   /**
    * Start the backplane's operation

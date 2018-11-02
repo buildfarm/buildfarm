@@ -21,6 +21,7 @@ import static com.google.common.base.Predicates.notNull;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
+import static java.util.logging.Level.SEVERE;
 
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
@@ -134,15 +135,10 @@ public class ShardInstance extends AbstractServerInstance {
       .build();
   private final com.google.common.cache.RemovalListener<String, Instance> instanceRemovalListener = (removal) -> {
     Instance instance = removal.getValue();
-    if (instance instanceof StubInstance) {
-      ManagedChannel channel = ((StubInstance) instance).getChannel();
-      channel.shutdownNow();
-      try {
-        channel.awaitTermination(0, TimeUnit.SECONDS);
-      } catch (InterruptedException intEx) {
-        /* impossible, 0 timeout */
-        Thread.currentThread().interrupt();
-      }
+    try {
+      instance.stop();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
     }
   };
   private final Random rand = new Random();
@@ -274,13 +270,19 @@ public class ShardInstance extends AbstractServerInstance {
             }
           } catch (InterruptedException e) {
             // treat with exit
+            operationQueuer = null;
+            return;
           } catch (Throwable t) {
             t.printStackTrace();
           } finally {
             System.out.println("OperationQueuer: Exiting");
           }
           operationQueuer = null;
-          stop();
+          try {
+            stop();
+          } catch (InterruptedException e) {
+            logger.log(SEVERE, "OperationQueuer: interrupted while waiting for stop", e);
+          }
         }
       });
     } else {
@@ -300,7 +302,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @Override
-  public void stop() {
+  public void stop() throws InterruptedException {
     if (operationQueuer != null) {
       operationQueuer.stop();
     }
@@ -311,22 +313,15 @@ public class ShardInstance extends AbstractServerInstance {
     operationTransformService.shutdown();
     backplane.stop();
     onStop.run();
-    try {
-      if (!operationDeletionService.awaitTermination(10, TimeUnit.SECONDS)) {
-        System.err.println("Could not shut down operation deletion service, some operations may be zombies");
-      }
-      operationDeletionService.shutdownNow();
-    } catch (InterruptedException intEx) {
-      Thread.currentThread().interrupt();
+    if (!operationDeletionService.awaitTermination(10, TimeUnit.SECONDS)) {
+      System.err.println("Could not shut down operation deletion service, some operations may be zombies");
     }
-    try {
-      if (!operationTransformService.awaitTermination(10, TimeUnit.SECONDS)) {
-        System.err.println("Could not shut down operation transform service");
-      }
-      operationTransformService.shutdownNow();
-    } catch (InterruptedException intEx) {
-      Thread.currentThread().interrupt();
+    operationDeletionService.shutdownNow();
+    if (!operationTransformService.awaitTermination(10, TimeUnit.SECONDS)) {
+      System.err.println("Could not shut down operation transform service");
     }
+    operationTransformService.shutdownNow();
+    workerStubs.invalidateAll();
   }
 
   private ActionResult getActionResultFromBackplane(ActionKey actionKey)

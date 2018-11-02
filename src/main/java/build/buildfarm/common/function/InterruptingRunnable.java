@@ -12,20 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker;
+package build.buildfarm.common.function;
 
-import build.buildfarm.common.function.InterruptingConsumer;
-import com.google.longrunning.Operation;
-
-public class PutOperationStage extends PipelineStage.NullStage {
-  private final InterruptingConsumer<Operation> onPut;
-
-  public PutOperationStage(InterruptingConsumer<Operation> onPut) {
-    this.onPut = onPut;
-  }
-
-  @Override
-  public void put(OperationContext operationContext) throws InterruptedException {
-    onPut.acceptInterruptibly(operationContext.operation);
-  }
+@FunctionalInterface
+public interface InterruptingRunnable {
+  void runInterruptibly() throws InterruptedException;
 }

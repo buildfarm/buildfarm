@@ -96,6 +96,7 @@ public class StubInstance implements Instance {
   private final ByteStreamUploader uploader;
   private final long deadlineAfter;
   private final TimeUnit deadlineAfterUnits;
+  private boolean isStopped = false;
 
   public StubInstance(
       String name,
@@ -195,18 +196,25 @@ public class StubInstance implements Instance {
     return digestUtil;
   }
 
-  public ManagedChannel getChannel() {
-    return channel;
-  }
-
   @Override
   public void start() { }
 
   @Override
-  public void stop() { }
+  public void stop() throws InterruptedException {
+    isStopped = true;
+    channel.shutdownNow();
+    channel.awaitTermination(0, TimeUnit.SECONDS);
+  }
+
+  private void throwIfStopped() {
+    if (isStopped) {
+      throw new IllegalStateException("instance has been stopped");
+    }
+  }
 
   @Override
   public ActionResult getActionResult(ActionKey actionKey) {
+    throwIfStopped();
     try {
       return actionCacheBlockingStub.get()
           .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
@@ -224,6 +232,7 @@ public class StubInstance implements Instance {
 
   @Override
   public void putActionResult(ActionKey actionKey, ActionResult actionResult) {
+    throwIfStopped();
     actionCacheBlockingStub.get()
         .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
         .updateActionResult(UpdateActionResultRequest.newBuilder()
@@ -235,6 +244,7 @@ public class StubInstance implements Instance {
 
   @Override
   public ListenableFuture<Iterable<Digest>> findMissingBlobs(Iterable<Digest> digests, ExecutorService service) {
+    throwIfStopped();
     FindMissingBlobsRequest request = FindMissingBlobsRequest.newBuilder()
             .setInstanceName(getName())
             .addAllBlobDigests(digests)
@@ -254,6 +264,7 @@ public class StubInstance implements Instance {
   /** expectedSize == -1 for unlimited */
   @Override
   public CommittingOutputStream getStreamOutput(String name, long expectedSize) {
+    throwIfStopped();
     return new CommittingOutputStream() {
       SettableFuture<Long> committedFuture = SettableFuture.create();
       boolean closed = false;
@@ -344,6 +355,7 @@ public class StubInstance implements Instance {
 
   @Override
   public InputStream newStreamInput(String name, long offset) throws IOException, InterruptedException {
+    throwIfStopped();
     Iterator<ReadResponse> replies = retrier.execute(() -> bsBlockingStub
         .get()
         .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
@@ -361,6 +373,7 @@ public class StubInstance implements Instance {
 
   @Override
   public void getBlob(Digest blobDigest, long offset, long limit, StreamObserver<ByteString> blobObserver) {
+    throwIfStopped();
     bsStub.get()
         .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
         .read(
@@ -404,6 +417,7 @@ public class StubInstance implements Instance {
       String pageToken,
       ImmutableList.Builder<Directory> directories,
       boolean acceptMissing) {
+    throwIfStopped();
     GetTreeResponse response = contentAddressableStorageBlockingStub
         .get()
         .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
@@ -419,6 +433,7 @@ public class StubInstance implements Instance {
 
   @Override
   public ListenableFuture<Operation> execute(Action action, boolean skipCacheLookup, RequestMetadata metadata) {
+    throwIfStopped();
     return executionFutureStub
         .get()
         .withInterceptors(TracingMetadataUtils.attachMetadataInterceptor(metadata))
@@ -431,6 +446,7 @@ public class StubInstance implements Instance {
 
   @Override
   public void match(Platform platform, MatchListener listener) throws InterruptedException {
+    throwIfStopped();
     TakeOperationRequest request = TakeOperationRequest.newBuilder()
         .setInstanceName(getName())
         .setPlatform(platform)
@@ -449,6 +465,7 @@ public class StubInstance implements Instance {
 
   @Override
   public boolean putOperation(Operation operation) {
+    throwIfStopped();
     return operationQueueBlockingStub
         .get()
         .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
@@ -460,6 +477,7 @@ public class StubInstance implements Instance {
   public boolean pollOperation(
       String operationName,
       ExecuteOperationMetadata.Stage stage) {
+    throwIfStopped();
     return operationQueueBlockingStub
         .get()
         .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
@@ -475,14 +493,14 @@ public class StubInstance implements Instance {
       String operationName,
       boolean watchInitialState,
       Predicate<Operation> watcher) {
-    return false;
+    throw new UnsupportedOperationException();
   }
 
   @Override
   public String listOperations(
       int pageSize, String pageToken, String filter,
       ImmutableList.Builder<Operation> operations) {
-
+    throwIfStopped();
     ListOperationsResponse response =
         operationsBlockingStub.get()
             .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
@@ -498,6 +516,7 @@ public class StubInstance implements Instance {
 
   @Override
   public Operation getOperation(String operationName) {
+    throwIfStopped();
     return operationsBlockingStub.get()
         .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
         .getOperation(GetOperationRequest.newBuilder()
@@ -507,6 +526,7 @@ public class StubInstance implements Instance {
 
   @Override
   public void deleteOperation(String operationName) {
+    throwIfStopped();
     operationsBlockingStub.get()
         .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
         .deleteOperation(DeleteOperationRequest.newBuilder()
@@ -516,6 +536,7 @@ public class StubInstance implements Instance {
 
   @Override
   public void cancelOperation(String operationName) {
+    throwIfStopped();
     operationsBlockingStub.get()
         .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
         .cancelOperation(CancelOperationRequest.newBuilder()

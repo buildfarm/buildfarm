@@ -132,7 +132,7 @@ public abstract class AbstractServerInstance implements Instance {
   public void start() { }
 
   @Override
-  public void stop() { }
+  public void stop() throws InterruptedException { }
 
   @Override
   public String getName() {

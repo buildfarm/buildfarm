@@ -14,19 +14,25 @@
 
 package build.buildfarm.instance.shard;
 
+import static java.util.logging.Level.INFO;
+
+import build.buildfarm.common.function.InterruptingRunnable;
 import java.io.IOException;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.logging.Logger;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPubSub;
 import redis.clients.jedis.exceptions.JedisConnectionException;
 
 class RedisShardSubscription implements Runnable {
+  private final static Logger logger = Logger.getLogger(RedisShardSubscription.class.getName());
+
   private final JedisPubSub subscriber;
-  private final Runnable onUnsubscribe;
+  private final InterruptingRunnable onUnsubscribe;
   private final Consumer<Jedis> onReset;
   private final Supplier<List<String>> subscriptions;
   private final Supplier<Jedis> jedisFactory;
@@ -34,7 +40,7 @@ class RedisShardSubscription implements Runnable {
 
   RedisShardSubscription(
       JedisPubSub subscriber,
-      Runnable onUnsubscribe,
+      InterruptingRunnable onUnsubscribe,
       Consumer<Jedis> onReset,
       Supplier<List<String>> subscriptions,
       Supplier<Jedis> jedisFactory) {
@@ -98,9 +104,11 @@ class RedisShardSubscription implements Runnable {
     try {
       mainLoop();
     } catch (Exception e) {
-      e.printStackTrace();
-      System.err.println("RedisShardSubscription: Calling onUnsubscribe...");
-      onUnsubscribe.run();
+      logger.log(INFO, "RedisShardSubscription: Calling onUnsubscribe...", e);
+      try {
+        onUnsubscribe.runInterruptibly();
+      } catch (InterruptedException intEx) {
+      }
     }
   }
 }
