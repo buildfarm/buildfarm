@@ -231,6 +231,14 @@ message ShardDispatchedOperation {
   int64 expire_at = 3;
 }
 
+message ProfiledQueuedOperationMetadata {
+  QueuedOperationMetadata queued_metadata = 1;
+
+  google.protobuf.Duration transformed_in = 2;
+
+  google.protobuf.Duration validated_in = 3;
+}
+
 message QueuedOperationMetadata {
   google.devtools.remoteexecution.v1test.Action action = 1;
 

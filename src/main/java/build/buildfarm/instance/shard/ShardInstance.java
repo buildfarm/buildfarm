@@ -21,6 +21,7 @@ import static com.google.common.base.Predicates.notNull;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
+import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.logging.Level.SEVERE;
 
 import build.buildfarm.common.DigestUtil;
@@ -44,8 +45,10 @@ import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.OperationIteratorToken;
 import build.buildfarm.v1test.ShardInstanceConfig;
 import build.buildfarm.v1test.QueuedOperationMetadata;
+import build.buildfarm.v1test.ProfiledQueuedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Stopwatch;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
@@ -76,6 +79,7 @@ import com.google.devtools.remoteexecution.v1test.RequestMetadata;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
+import com.google.protobuf.util.Durations;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Message;
 import com.google.protobuf.util.JsonFormat;
@@ -232,28 +236,58 @@ public class ShardInstance extends AbstractServerInstance {
 
     if (runOperationQueuer) {
       operationQueuer = new Thread(new Runnable() {
+        Stopwatch stopwatch = Stopwatch.createUnstarted();
+
         void ensureCanQueue() throws IOException, InterruptedException {
           while (!backplane.canQueue()) {
+            stopwatch.stop();
             TimeUnit.MILLISECONDS.sleep(100);
+            stopwatch.start();
           }
         }
 
         void iterate() throws IOException, InterruptedException {
           ensureCanQueue(); // wait for transition to canQueue state
+          stopwatch.stop();
+          long canQueueUSecs = stopwatch.elapsed(MICROSECONDS);
           String operationName = backplane.deprequeueOperation();
           if (operationName == null) {
-            System.err.println("Got null from deprequeue...");
-          } else {
-            try {
-              Operation operation = backplane.getOperation(operationName);
-              if (operation == null) {
-                backplane.deleteOperation(operationName);
-              } else if (isUnknown(operation)) {
-                queue(operation);
-              }
-            } catch (IOException e) {
-              backplane.prequeueOperation(operationName);
+            logger.severe("OperationQueuer: Got null from deprequeue...");
+            return;
+          }
+
+          try {
+            Operation operation = backplane.getOperation(operationName);
+            long operationFetchUSecs = stopwatch.elapsed(MICROSECONDS) - canQueueUSecs;
+            if (operation == null) {
+              backplane.deleteOperation(operationName);
+              long operationDeleteUSecs = stopwatch.elapsed(MICROSECONDS) - operationFetchUSecs - canQueueUSecs;
+              logger.severe(
+                  String.format(
+                      "OperationQueuer: Operation missing: %dus in canQueue, %dus in opfetch, %dus in delete",
+                      canQueueUSecs,
+                      operationFetchUSecs,
+                      operationDeleteUSecs));
+            } else if (isUnknown(operation)) {
+              queue(operation);
+              long operationTransformDispatchUSecs = stopwatch.elapsed(MICROSECONDS) - operationFetchUSecs - canQueueUSecs;
+              logger.info(
+                  String.format(
+                      "OperationQueuer: Dispatched To Transform: %dus in canQueue, %dus in opfetch, %dus in transform dispatch",
+                      canQueueUSecs,
+                      operationFetchUSecs,
+                      operationTransformDispatchUSecs));
             }
+          } catch (IOException e) {
+            long failUSecs = stopwatch.elapsed(MICROSECONDS) - canQueueUSecs;
+            backplane.prequeueOperation(operationName);
+            long prequeueUSecs = stopwatch.elapsed(MICROSECONDS) - failUSecs - canQueueUSecs;
+            logger.severe(
+                String.format(
+                    "OperationQueuer: Failed: %dus in canQueue, %dus before failure, %dus reprequeing",
+                    canQueueUSecs,
+                    failUSecs,
+                    prequeueUSecs));
           }
         }
 
@@ -262,10 +296,13 @@ public class ShardInstance extends AbstractServerInstance {
           System.out.println("OperationQueuer: Running");
           try {
             for (;;) {
+              stopwatch.start();
               try {
                 iterate();
               } catch (IOException e) {
                 // problems interacting with backplane
+              } finally {
+                stopwatch.reset();
               }
             }
           } catch (InterruptedException e) {
@@ -1179,25 +1216,48 @@ public class ShardInstance extends AbstractServerInstance {
     ExecuteOperationMetadata metadata = prequeueMetadata.getExecuteOperationMetadata();
     ActionKey actionKey = DigestUtil.asActionKey(metadata.getActionDigest());
 
+    // FIXME make this async and trigger the early return
+    Stopwatch stopwatch = Stopwatch.createStarted();
     SettableFuture<Void> queueFuture = SettableFuture.create();
     if (!prequeueMetadata.getSkipCacheLookup()
         && checkCache(actionKey, operation, metadata, queueFuture)) {
+      long checkCacheUSecs = stopwatch.elapsed(MICROSECONDS);
+      logger.info(
+          String.format(
+              "ShardInstance(%s): checkCache(%s): %dus elapsed",
+              getName(),
+              operation.getName(),
+              checkCacheUSecs));
       return queueFuture;
     }
+    long checkCacheUSecs = stopwatch.elapsed(MICROSECONDS);
 
     Action action = prequeueMetadata.getAction();
-    ListenableFuture<QueuedOperationMetadata> queuedFuture =
-        transformQueuedOperationMetadata(
-            action.getCommandDigest(),
-            action.getInputRootDigest(),
-            prequeueMetadata.toBuilder(),
+    Stopwatch transformStopwatch = Stopwatch.createStarted();
+    long startTransformUSecs = stopwatch.elapsed(MICROSECONDS);
+    ListenableFuture<ProfiledQueuedOperationMetadata.Builder> queuedFuture =
+        Futures.transform(
+            transformQueuedOperationMetadata(
+                action.getCommandDigest(),
+                action.getInputRootDigest(),
+                prequeueMetadata.toBuilder(),
+                operationTransformService),
+            (queuedMetadata) -> ProfiledQueuedOperationMetadata.newBuilder().setQueuedMetadata(queuedMetadata).setTransformedIn(Durations.fromMicros(stopwatch.elapsed(MICROSECONDS) - startTransformUSecs)),
             operationTransformService);
-    ListenableFuture<QueuedOperationMetadata> validatedFuture = Futures.catching(
+    logger.info(
+        String.format(
+            "ShardInstance(%s): transformQueuedOperationMetadata(%s): %dus",
+            getName(),
+            operation.getName(),
+            transformStopwatch.elapsed(MICROSECONDS)));
+    ListenableFuture<ProfiledQueuedOperationMetadata.Builder> validatedFuture = Futures.catching(
         Futures.transform(
             queuedFuture,
-            (queuedMetadata) -> {
-              validateQueuedOperationMetadata(queuedMetadata);
-              return queuedMetadata;
+            (profiledQueuedMetadata) -> {
+              long startValidateUSecs = stopwatch.elapsed(MICROSECONDS);
+              validateQueuedOperationMetadata(profiledQueuedMetadata.getQueuedMetadata());
+              return profiledQueuedMetadata
+                .setValidatedIn(Durations.fromMicros(stopwatch.elapsed(MICROSECONDS) - startValidateUSecs));
             },
             operationTransformService),
         IllegalStateException.class,
@@ -1205,7 +1265,7 @@ public class ShardInstance extends AbstractServerInstance {
         (e) -> { throw Status.FAILED_PRECONDITION.withDescription(e.getMessage()).asRuntimeException(); });
     ListenableFuture<Operation> operationFuture = Futures.transform(
         validatedFuture,
-        (queuedMetadata) -> operation.toBuilder().setMetadata(Any.pack(queuedMetadata)).build(),
+        (profiledQueuedMetadata) -> operation.toBuilder().setMetadata(Any.pack(profiledQueuedMetadata.build())).build(),
         operationTransformService);
 
     ListenableFuture<Long> actionCommittedFuture = Futures.transformAsync(validatedFuture, (queuedMetadata) -> {
@@ -1225,7 +1285,22 @@ public class ShardInstance extends AbstractServerInstance {
           public void onSuccess(Operation operation) {
             // if we ever do contexts here, we will need to do the right thing and make it withCancellation
             try {
+              ProfiledQueuedOperationMetadata profiledQueuedMetadata = operation.getMetadata().unpack(ProfiledQueuedOperationMetadata.class);
+              operation = operation.toBuilder().setMetadata(Any.pack(profiledQueuedMetadata.getQueuedMetadata())).build();
+              long startQueueUSecs = stopwatch.elapsed(MICROSECONDS);
               backplane.putOperation(operation, Stage.QUEUED);
+              long elapsedUSecs = stopwatch.elapsed(MICROSECONDS);
+              long queueUSecs = elapsedUSecs - startQueueUSecs;
+              logger.info(
+                  String.format(
+                      "ShardInstance(%s): queue(%s): %d checkCache, %dus transform, %dus validate %dus queue, %dus elapsed",
+                      getName(),
+                      operation.getName(),
+                      checkCacheUSecs,
+                      Durations.toMicros(profiledQueuedMetadata.getTransformedIn()),
+                      Durations.toMicros(profiledQueuedMetadata.getValidatedIn()),
+                      queueUSecs,
+                      elapsedUSecs));
               queueFuture.set(null);
             } catch (IOException e) {
               onFailure(e.getCause());
