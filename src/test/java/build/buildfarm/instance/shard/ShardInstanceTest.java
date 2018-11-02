@@ -22,6 +22,7 @@ import static com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadat
 import static com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage.QUEUED;
 import static com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage.COMPLETED;
 import static io.grpc.Status.Code.CANCELLED;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
@@ -74,6 +75,7 @@ import org.mockito.stubbing.Answer;
 @RunWith(JUnit4.class)
 public class ShardInstanceTest {
   private static final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
+  private static final long QUEUE_TEST_TIMEOUT = 3;
 
   private ShardInstance instance;
 
@@ -162,6 +164,10 @@ public class ShardInstanceTest {
   }
 
   @Test
+  public void sentinel() {
+  }
+
+  @Test
   public void queueActionPutFailureErrorsOperation() throws Exception {
     Action action = createAction();
     Digest actionDigest = DIGEST_UTIL.compute(action);
@@ -185,7 +191,7 @@ public class ShardInstanceTest {
 
     boolean unknownExceptionCaught = false;
     try {
-      instance.queue(operation).get();
+      instance.queue(operation).get(QUEUE_TEST_TIMEOUT, SECONDS);
     } catch (ExecutionException e) {
       Status status = Status.fromThrowable(e);
       if (status.getCode() == Code.UNKNOWN) {
@@ -234,10 +240,12 @@ public class ShardInstanceTest {
         .build();
 
     when(mockBackplane.getOperation(eq(operation.getName()))).thenReturn(operation);
+    when(mockBackplane.canQueue()).thenReturn(true);
 
     boolean unavailableExceptionCaught = false;
     try {
-      instance.queue(operation).get();
+      // anything more would be unreasonable
+      instance.queue(operation).get(QUEUE_TEST_TIMEOUT, SECONDS);
     } catch (ExecutionException e) {
       Status status = Status.fromThrowable(e);
       if (status.getCode() == Code.UNAVAILABLE) {

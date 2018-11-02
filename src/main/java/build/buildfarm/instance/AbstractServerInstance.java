@@ -455,10 +455,10 @@ public abstract class AbstractServerInstance implements Instance {
     visited.add(directoryDigest);
   }
 
-  protected ListenableFuture<Iterable<Directory>> getTreeDirectories(Digest inputRoot) {
-    ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
+  protected ListenableFuture<Iterable<Directory>> getTreeDirectories(Digest inputRoot, ListeningExecutorService service) {
+    return service.submit(() -> {
+      ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
 
-    try {
       TokenizableIterator<DirectoryEntry> iterator = createTreeIterator(inputRoot, /* pageToken=*/ "");
       while (iterator.hasNext()) {
         DirectoryEntry entry = iterator.next();
@@ -466,11 +466,9 @@ public abstract class AbstractServerInstance implements Instance {
         Preconditions.checkState(directory != null, MISSING_INPUT + " Directory " + DigestUtil.toString(entry.getDigest()));
         directories.add(directory);
       }
-    } catch (Exception e) {
-      return Futures.immediateFailedFuture(e);
-    }
 
-    return Futures.immediateFuture(directories.build());
+      return directories.build();
+    });
   }
 
   protected Map<Digest, Directory> createDirectoriesIndex(Iterable<Directory> directories) {
@@ -517,7 +515,7 @@ public abstract class AbstractServerInstance implements Instance {
     validateAction(
         action,
         getUnchecked(expectCommand(action.getCommandDigest())),
-        getUnchecked(getTreeDirectories(action.getInputRootDigest())),
+        getUnchecked(getTreeDirectories(action.getInputRootDigest(), newDirectExecutorService())),
         inputDigestsBuilder);
     try {
       validateInputs(inputDigestsBuilder.build(), newDirectExecutorService()).get();

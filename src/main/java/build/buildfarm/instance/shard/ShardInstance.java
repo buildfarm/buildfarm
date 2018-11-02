@@ -238,16 +238,8 @@ public class ShardInstance extends AbstractServerInstance {
       operationQueuer = new Thread(new Runnable() {
         Stopwatch stopwatch = Stopwatch.createUnstarted();
 
-        void ensureCanQueue() throws IOException, InterruptedException {
-          while (!backplane.canQueue()) {
-            stopwatch.stop();
-            TimeUnit.MILLISECONDS.sleep(100);
-            stopwatch.start();
-          }
-        }
-
         void iterate() throws IOException, InterruptedException {
-          ensureCanQueue(); // wait for transition to canQueue state
+          ensureCanQueue(stopwatch); // wait for transition to canQueue state
           stopwatch.stop();
           long canQueueUSecs = stopwatch.elapsed(MICROSECONDS);
           String operationName = backplane.deprequeueOperation();
@@ -324,6 +316,14 @@ public class ShardInstance extends AbstractServerInstance {
       });
     } else {
       operationQueuer = null;
+    }
+  }
+
+  private void ensureCanQueue(Stopwatch stopwatch) throws IOException, InterruptedException {
+    while (!backplane.canQueue()) {
+      stopwatch.stop();
+      TimeUnit.MILLISECONDS.sleep(100);
+      stopwatch.start();
     }
   }
 
@@ -955,26 +955,27 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   private ListenableFuture<QueuedOperationMetadata> buildQueuedOperationMetadata(
-      Action action, RequestMetadata requestMetadata, Executor executor) {
+      Action action, RequestMetadata requestMetadata, ListeningExecutorService service) {
     QueuedOperationMetadata.Builder queuedBuilder = QueuedOperationMetadata.newBuilder()
         .setAction(action)
         .setExecuteOperationMetadata(ExecuteOperationMetadata.newBuilder()
             .setActionDigest(digestUtil.compute(action))
             .build())
         .setRequestMetadata(requestMetadata);
-    return transformQueuedOperationMetadata(action.getCommandDigest(), action.getInputRootDigest(), queuedBuilder, executor);
+    return transformQueuedOperationMetadata(action.getCommandDigest(), action.getInputRootDigest(), queuedBuilder, service);
   }
 
   private ListenableFuture<QueuedOperationMetadata> transformQueuedOperationMetadata(
       Digest commandDigest,
       Digest inputRootDigest,
       QueuedOperationMetadata.Builder queuedBuilder,
-      Executor executor) {
+      ListeningExecutorService service) {
     return Futures.transform(
         Futures.allAsList(
-            Futures.transform(insistCommand(commandDigest), queuedBuilder::setCommand, executor),
-            Futures.transform(getTreeDirectories(inputRootDigest), queuedBuilder::addAllDirectories, executor)),
-        (result) -> queuedBuilder.build());
+            Futures.transform(insistCommand(commandDigest), queuedBuilder::setCommand, service),
+            Futures.transform(getTreeDirectories(inputRootDigest, service), queuedBuilder::addAllDirectories, service)),
+        (result) -> queuedBuilder.build(),
+        service);
   }
 
   protected Operation createOperation(ActionKey actionKey) { throw new UnsupportedOperationException(); }
@@ -1013,7 +1014,7 @@ public class ShardInstance extends AbstractServerInstance {
         requestMetadata = RequestMetadata.getDefaultInstance();
       }
       try {
-        metadata = buildQueuedOperationMetadata(action, requestMetadata, directExecutor()).get();
+        metadata = buildQueuedOperationMetadata(action, requestMetadata, newDirectExecutorService()).get();
       } catch (ExecutionException e) {
         return Futures.immediateFailedFuture(e.getCause());
       }
@@ -1032,12 +1033,15 @@ public class ShardInstance extends AbstractServerInstance {
               Operation queuedOperation = operation.toBuilder()
                   .setMetadata(Any.pack(metadata))
                   .build();
+              ensureCanQueue(Stopwatch.createStarted());
               backplane.putOperation(queuedOperation, Stage.QUEUED);
             }
             requeuedFuture.set(true);
           } catch (IOException e) {
             // we should probably be observing retriable backplane exceptions...
             onFailure(e);
+          } catch (InterruptedException e) {
+            // ignore
           }
         }
 
@@ -1287,6 +1291,7 @@ public class ShardInstance extends AbstractServerInstance {
             try {
               ProfiledQueuedOperationMetadata profiledQueuedMetadata = operation.getMetadata().unpack(ProfiledQueuedOperationMetadata.class);
               operation = operation.toBuilder().setMetadata(Any.pack(profiledQueuedMetadata.getQueuedMetadata())).build();
+              ensureCanQueue(stopwatch);
               long startQueueUSecs = stopwatch.elapsed(MICROSECONDS);
               backplane.putOperation(operation, Stage.QUEUED);
               long elapsedUSecs = stopwatch.elapsed(MICROSECONDS);
@@ -1304,6 +1309,8 @@ public class ShardInstance extends AbstractServerInstance {
               queueFuture.set(null);
             } catch (IOException e) {
               onFailure(e.getCause());
+            } catch (InterruptedException e) {
+              // ignore
             }
           }
 
