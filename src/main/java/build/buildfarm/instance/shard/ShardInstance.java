@@ -1031,7 +1031,10 @@ public class ShardInstance extends AbstractServerInstance {
               backplane.requeueDispatchedOperation(operation);
             } else {
               Operation queuedOperation = operation.toBuilder()
-                  .setMetadata(Any.pack(metadata))
+                  .setMetadata(Any.pack(metadata.toBuilder()
+                      .setExecuteOperationMetadata(metadata.getExecuteOperationMetadata().toBuilder()
+                          .setStage(Stage.QUEUED))
+                      .build()))
                   .build();
               ensureCanQueue(Stopwatch.createStarted());
               backplane.putOperation(queuedOperation, Stage.QUEUED);
@@ -1246,7 +1249,9 @@ public class ShardInstance extends AbstractServerInstance {
                 action.getInputRootDigest(),
                 prequeueMetadata.toBuilder(),
                 operationTransformService),
-            (queuedMetadata) -> ProfiledQueuedOperationMetadata.newBuilder().setQueuedMetadata(queuedMetadata).setTransformedIn(Durations.fromMicros(stopwatch.elapsed(MICROSECONDS) - startTransformUSecs)),
+            (queuedMetadata) -> ProfiledQueuedOperationMetadata.newBuilder()
+                .setQueuedMetadata(queuedMetadata)
+                .setTransformedIn(Durations.fromMicros(stopwatch.elapsed(MICROSECONDS) - startTransformUSecs)),
             operationTransformService);
     logger.info(
         String.format(
@@ -1290,7 +1295,13 @@ public class ShardInstance extends AbstractServerInstance {
             // if we ever do contexts here, we will need to do the right thing and make it withCancellation
             try {
               ProfiledQueuedOperationMetadata profiledQueuedMetadata = operation.getMetadata().unpack(ProfiledQueuedOperationMetadata.class);
-              operation = operation.toBuilder().setMetadata(Any.pack(profiledQueuedMetadata.getQueuedMetadata())).build();
+              operation = operation.toBuilder()
+                  .setMetadata(
+                      Any.pack(
+                          profiledQueuedMetadata.getQueuedMetadata().toBuilder()
+                              .setExecuteOperationMetadata(metadata.toBuilder().setStage(Stage.QUEUED))
+                              .build()))
+                  .build();
               ensureCanQueue(stopwatch);
               long startQueueUSecs = stopwatch.elapsed(MICROSECONDS);
               backplane.putOperation(operation, Stage.QUEUED);
