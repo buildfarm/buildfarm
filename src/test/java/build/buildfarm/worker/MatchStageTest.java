@@ -16,6 +16,7 @@ package build.buildfarm.worker;
 
 import static com.google.common.truth.Truth.assertThat;
 
+import build.buildfarm.common.function.InterruptingConsumer;
 import build.buildfarm.v1test.WorkerConfig;
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Digest;
@@ -68,12 +69,16 @@ public class MatchStageTest {
   @Test
   public void fetchFailureReentry() throws ConfigurationException {
     List<Operation> queue = new ArrayList<>();
-    List<Boolean> results = new ArrayList<>();
 
     WorkerContext workerContext = new StubWorkerContext() {
       @Override
-      public void match(Predicate<Operation> onMatch) {
-        assertThat(onMatch.test(queue.remove(0))).isEqualTo(results.remove(0));
+      public void match(InterruptingConsumer<Operation> onMatch) throws InterruptedException {
+        onMatch.accept(queue.remove(0));
+      }
+
+      @Override
+      public void requeue(Operation operation) {
+        assertThat(operation.getName()).isEqualTo("bad");
       }
 
       @Override
@@ -97,7 +102,6 @@ public class MatchStageTest {
         .setName("bad")
         // inspire InvalidProtocolBufferException from operation metadata unpack
         .build());
-    results.add(false);
 
     queue.add(Operation.newBuilder()
         .setName("good")
@@ -105,7 +109,6 @@ public class MatchStageTest {
             .setActionDigest(Digest.newBuilder().setHash("action").build())
             .build()))
         .build());
-    results.add(true);
 
     final PipelineStage output = new PipelineSink((operationContext) -> operationContext.operation.getName().equals("good"));
 

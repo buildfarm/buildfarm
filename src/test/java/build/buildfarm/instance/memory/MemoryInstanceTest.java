@@ -51,6 +51,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import com.google.rpc.Code;
+import com.google.rpc.Status;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -313,13 +314,46 @@ public class MemoryInstanceTest {
     instance.requeueOperation(queuedOperation);
   }
 
-  private Operation createOperation(String name, Stage stage) {
+  @Test
+  public void requeueFailureNotifiesWatchers() throws InterruptedException {
+    ExecuteOperationMetadata metadata = ExecuteOperationMetadata.newBuilder()
+        .setStage(QUEUED)
+        .build();
+    Operation queuedOperation = createOperation("my-queued-operation", metadata);
+    outstandingOperations.put(queuedOperation.getName(), queuedOperation);
+    Operation erroredOperation = queuedOperation.toBuilder()
+        .setDone(true)
+        .setMetadata(Any.pack(metadata.toBuilder()
+            .setStage(COMPLETED)
+            .build()))
+        .setError(Status.newBuilder()
+            .setCode(Code.FAILED_PRECONDITION.getNumber())
+            .build())
+        .build();
+    Predicate<Operation> watcher = mock(Predicate.class);
+    when(watcher.test(eq(queuedOperation))).thenReturn(true);
+    when(watcher.test(eq(erroredOperation))).thenReturn(false);
+    assertThat(instance.watchOperation(queuedOperation.getName(), watcher)).isTrue();
+    assertThat(instance.requeueOperation(queuedOperation)).isFalse();
+    watchersThreadPool.shutdown();
+    watchersThreadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+    verify(watcher, times(1)).test(eq(queuedOperation));
+    verify(watcher, times(1)).test(eq(erroredOperation));
+  }
+
+  private Operation createOperation(String name, ExecuteOperationMetadata metadata) {
     return Operation.newBuilder()
         .setName(name)
-        .setMetadata(Any.pack(ExecuteOperationMetadata.newBuilder()
-            .setStage(stage)
-            .build()))
+        .setMetadata(Any.pack(metadata))
         .build();
+  }
+
+  private Operation createOperation(String name, Stage stage) {
+    return createOperation(
+        name,
+        ExecuteOperationMetadata.newBuilder()
+            .setStage(stage)
+            .build());
   }
 
   private boolean putNovelOperation(Stage stage) throws InterruptedException {

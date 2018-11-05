@@ -12,11 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.instance.memory;
-
-import com.google.protobuf.Duration;
+package build.buildfarm.common.function;
 
 @FunctionalInterface
-interface InterruptingRunnable {
-  void run() throws InterruptedException;
+public interface InterruptingConsumer<T> {
+  void accept(T t) throws InterruptedException;
 }

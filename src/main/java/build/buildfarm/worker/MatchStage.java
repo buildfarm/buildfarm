@@ -56,14 +56,10 @@ public class MatchStage extends PipelineStage {
       long usecs = stopwatch.elapsed(MICROSECONDS);
       if (!fetched) {
         output.release();
+        workerContext.requeue(operation);
       }
       logComplete(operation.getName(), usecs, stallUSecs, fetched);
-      return fetched;
     });
-    // trigger stage shutdown if interrupted during fetch
-    if (Thread.interrupted()) {
-      throw new InterruptedException();
-    }
   }
 
   private boolean fetch(Operation operation) {

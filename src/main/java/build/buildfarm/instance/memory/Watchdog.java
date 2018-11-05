@@ -14,6 +14,7 @@
 
 package build.buildfarm.instance.memory;
 
+import build.buildfarm.common.function.InterruptingRunnable;
 import com.google.protobuf.Duration;
 
 public class Watchdog implements Runnable {
