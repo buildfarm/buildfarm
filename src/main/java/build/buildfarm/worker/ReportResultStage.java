@@ -61,33 +61,8 @@ public class ReportResultStage extends PipelineStage {
 
   private final BlockingQueue<OperationContext> queue;
 
-  public static class NullStage extends PipelineStage {
-    public NullStage(String name) {
-      super(name, null, null, null);
-    }
-
-    @Override
-    public Logger getLogger() { return null; }
-    @Override
-    public boolean claim() { return true; }
-    @Override
-    public void release() { }
-    @Override
-    public OperationContext take() { throw new UnsupportedOperationException(); }
-    @Override
-    public void put(OperationContext operation) { }
-    @Override
-    public void setInput(PipelineStage input) { }
-    @Override
-    public void run() { }
-    @Override
-    public void close() { }
-    @Override
-    public boolean isClosed() { return false; }
-  }
-
-  public ReportResultStage(WorkerContext workerContext, PipelineStage error) {
-    super("ReportResultStage", workerContext, new NullStage("Terminal"), error);
+  public ReportResultStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
+    super("ReportResultStage", workerContext, output, error);
     queue = new ArrayBlockingQueue<>(1);
   }
 
