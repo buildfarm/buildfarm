@@ -15,6 +15,7 @@
 package build.buildfarm.worker.shard;
 
 import static java.util.logging.Level.SEVERE;
+import static java.util.concurrent.TimeUnit.DAYS;
 
 import build.buildfarm.common.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
@@ -43,6 +44,7 @@ import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
+import io.grpc.Deadline;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -109,11 +111,11 @@ class ShardWorkerContext implements WorkerContext {
 
   @Override
   public Poller createPoller(String name, String operationName, Stage stage) {
-    return createPoller(name, operationName, stage, () -> {});
+    return createPoller(name, operationName, stage, () -> {}, Deadline.after(10, DAYS));
   }
 
   @Override
-  public Poller createPoller(String name, String operationName, Stage stage, Runnable onFailure) {
+  public Poller createPoller(String name, String operationName, Stage stage, Runnable onFailure, Deadline deadline) {
     Poller poller = new Poller(
         operationPollPeriod,
         () -> {
@@ -129,7 +131,12 @@ class ShardWorkerContext implements WorkerContext {
             onFailure.run();
           }
           return success;
-        });
+        },
+        () -> {
+          logInfo(name + ": poller: Deadline expired for " + operationName);
+          onFailure.run();
+        },
+        deadline);
     new Thread(poller).start();
     return poller;
   }

@@ -14,27 +14,52 @@
 
 package build.buildfarm.worker;
 
+import static java.util.concurrent.TimeUnit.MICROSECONDS;
+
+import com.google.common.base.Preconditions;
 import com.google.protobuf.Duration;
+import com.google.protobuf.util.Durations;
+import io.grpc.Deadline;
 import java.util.function.BooleanSupplier;
 
 public class Poller implements Runnable {
   private final Duration period;
   private final BooleanSupplier poll;
+  private final Runnable onExpiry;
+  private final Deadline deadline;
   private boolean running;
 
-  public Poller(Duration period, BooleanSupplier poll) {
+  public Poller(Duration period, BooleanSupplier poll, Runnable onExpiry, Deadline deadline) {
     this.period = period;
     this.poll = poll;
+    this.onExpiry = onExpiry;
+    this.deadline = deadline;
+    Preconditions.checkState(period.getSeconds() > 0 || period.getNanos() >= 1000);
     running = true;
+  }
+
+  private Deadline getPeriodDeadline() {
+    long periodMicros = period.getSeconds() * 1000000 + period.getNanos() / 1000;
+    return Deadline.after(periodMicros, MICROSECONDS);
+  }
+
+  private Duration getWaitTime() {
+    Deadline waitDeadline = deadline.minimum(getPeriodDeadline());
+    return Durations.fromMicros(waitDeadline.timeRemaining(MICROSECONDS));
   }
 
   @Override
   public synchronized void run() {
     while (running) {
       try {
+        Duration waitTime = getWaitTime();
         this.wait(
-            period.getSeconds() * 1000 + period.getNanos() / 1000000,
-            period.getNanos() % 1000000);
+            waitTime.getSeconds() * 1000 + waitTime.getNanos() / 1000000,
+            waitTime.getNanos() % 1000000);
+        if (deadline.isExpired()) {
+          onExpiry.run();
+          stop();
+        }
         if (running) {
           // FP interface with distinct returns, do not memoize!
           running = poll.getAsBoolean();

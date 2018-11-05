@@ -28,6 +28,7 @@ import com.google.devtools.remoteexecution.v1test.Directory;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Duration;
+import io.grpc.Deadline;
 import java.io.OutputStream;
 import java.nio.file.Path;
 import java.util.Map;
@@ -36,7 +37,7 @@ import java.util.function.Predicate;
 class StubWorkerContext implements WorkerContext {
   @Override public String getName() { throw new UnsupportedOperationException(); }
   @Override public Poller createPoller(String name, String operationName, Stage stage) { throw new UnsupportedOperationException(); }
-  @Override public Poller createPoller(String name, String operationName, Stage stage, Runnable onFailure) { throw new UnsupportedOperationException(); }
+  @Override public Poller createPoller(String name, String operationName, Stage stage, Runnable onFailure, Deadline deadline) { throw new UnsupportedOperationException(); }
   @Override public void match(MatchListener listener) { throw new UnsupportedOperationException(); }
   @Override public void requeue(Operation operation) { throw new UnsupportedOperationException(); }
   @Override public void deactivate(Operation operation) { throw new UnsupportedOperationException(); }

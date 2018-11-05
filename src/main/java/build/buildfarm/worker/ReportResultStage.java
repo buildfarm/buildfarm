@@ -14,6 +14,8 @@
 
 package build.buildfarm.worker;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
+
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import com.google.common.collect.Iterables;
@@ -24,11 +26,12 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
-import io.grpc.StatusRuntimeException;
 import com.google.protobuf.util.Durations;
+import io.grpc.Deadline;
+import io.grpc.StatusRuntimeException;
 import java.io.IOException;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 
 public class ReportResultStage extends PipelineStage {
   private final BlockingQueue<OperationContext> queue;
@@ -67,7 +70,8 @@ public class ReportResultStage extends PipelineStage {
         "ReportResultStage",
         operationContext.operation.getName(),
         ExecuteOperationMetadata.Stage.EXECUTING,
-        this::cancelTick);
+        this::cancelTick,
+        Deadline.after(60, SECONDS));
 
     long reportStartAt = System.nanoTime();
 

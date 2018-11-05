@@ -14,6 +14,8 @@
 
 package build.buildfarm.worker.operationqueue;
 
+import static java.util.concurrent.TimeUnit.DAYS;
+
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
@@ -62,6 +64,7 @@ import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.TextFormat;
 import io.grpc.Channel;
+import io.grpc.Deadline;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
@@ -404,11 +407,11 @@ public class Worker {
 
       @Override
       public Poller createPoller(String name, String operationName, Stage stage) {
-        return createPoller(name, operationName, stage, () -> {});
+        return createPoller(name, operationName, stage, () -> {}, Deadline.after(10, DAYS));
       }
 
       @Override
-      public Poller createPoller(String name, String operationName, Stage stage, Runnable onFailure) {
+      public Poller createPoller(String name, String operationName, Stage stage, Runnable onFailure, Deadline deadline) {
         Poller poller = new Poller(config.getOperationPollPeriod(), () -> {
               boolean success = operationQueueInstance.pollOperation(operationName, stage);
               logInfo(name + ": poller: Completed Poll for " + operationName + ": " + (success ? "OK" : "Failed"));
@@ -416,7 +419,9 @@ public class Worker {
                 onFailure.run();
               }
               return success;
-            });
+            },
+            onFailure,
+            deadline);
         new Thread(poller).start();
         return poller;
       }

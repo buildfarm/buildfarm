@@ -14,6 +14,9 @@
 
 package build.buildfarm.worker;
 
+import static java.util.concurrent.TimeUnit.DAYS;
+import static java.util.concurrent.TimeUnit.MICROSECONDS;
+
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import com.google.common.io.ByteStreams;
 import com.google.devtools.remoteexecution.v1test.ActionResult;
@@ -27,6 +30,7 @@ import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.Durations;
 import com.google.rpc.Code;
+import io.grpc.Deadline;
 import java.nio.file.Path;
 import java.io.IOException;
 import java.io.InputStream;
@@ -82,11 +86,6 @@ class Executor implements Runnable {
     }
 
     final Thread executorThread = Thread.currentThread();
-    Poller poller = workerContext.createPoller(
-        "Executor",
-        operation.getName(),
-        ExecuteOperationMetadata.Stage.EXECUTING,
-        () -> executorThread.interrupt());
 
     Duration timeout;
     if (operationContext.action.hasTimeout()) {
@@ -98,6 +97,23 @@ class Executor implements Runnable {
     if (timeout == null && workerContext.hasDefaultActionTimeout()) {
       timeout = workerContext.getDefaultActionTimeout();
     }
+
+    Deadline pollDeadline;
+    if (timeout == null) {
+      pollDeadline = Deadline.after(10, DAYS);
+    } else {
+      pollDeadline = Deadline.after(
+          // 10s of padding for the timeout in question, so that we can guarantee cleanup
+          (timeout.getSeconds() + 10) * 1000000 + timeout.getNanos() / 1000,
+          MICROSECONDS);
+    }
+
+    Poller poller = workerContext.createPoller(
+        "Executor",
+        operation.getName(),
+        ExecuteOperationMetadata.Stage.EXECUTING,
+        () -> executorThread.interrupt(),
+        pollDeadline);
 
     /* execute command */
     workerContext.logInfo("Executor: Operation " + operation.getName() + " Executing command");

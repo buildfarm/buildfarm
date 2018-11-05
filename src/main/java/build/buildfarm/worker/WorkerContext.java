@@ -27,6 +27,7 @@ import com.google.devtools.remoteexecution.v1test.Directory;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Duration;
+import io.grpc.Deadline;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Path;
@@ -35,7 +36,7 @@ import java.util.Map;
 public interface WorkerContext {
   String getName();
   Poller createPoller(String name, String operationName, Stage stage);
-  Poller createPoller(String name, String operationName, Stage stage, Runnable onFailure);
+  Poller createPoller(String name, String operationName, Stage stage, Runnable onFailure, Deadline deadline);
   void match(MatchListener listener) throws InterruptedException;
   void requeue(Operation operation) throws InterruptedException;
   void deactivate(Operation operation);

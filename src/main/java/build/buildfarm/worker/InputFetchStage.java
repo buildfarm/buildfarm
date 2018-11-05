@@ -14,13 +14,16 @@
 
 package build.buildfarm.worker;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
+
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
 import com.google.protobuf.Duration;
 import com.google.protobuf.util.Durations;
+import io.grpc.Deadline;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 
 public class InputFetchStage extends PipelineStage {
   private final BlockingQueue<OperationContext> queue;
@@ -46,7 +49,8 @@ public class InputFetchStage extends PipelineStage {
         "InputFetchStage",
         operationContext.operation.getName(),
         ExecuteOperationMetadata.Stage.QUEUED,
-        this::cancelTick);
+        this::cancelTick,
+        Deadline.after(60, SECONDS));
 
     workerContext.logInfo("InputFetchStage: Fetching inputs: " + operationContext.operation.getName());
 
