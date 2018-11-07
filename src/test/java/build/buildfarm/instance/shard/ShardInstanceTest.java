@@ -172,7 +172,8 @@ public class ShardInstanceTest {
     Action action = createAction();
     Digest actionDigest = DIGEST_UTIL.compute(action);
     CommittingOutputStream mockCommittedOutputStream = mock(CommittingOutputStream.class);
-    when(mockCommittedOutputStream.getCommittedFuture()).thenReturn(immediateFailedFuture(Status.UNKNOWN.asRuntimeException()));
+    StatusRuntimeException commitException = Status.UNKNOWN.asRuntimeException();
+    when(mockCommittedOutputStream.getCommittedFuture()).thenReturn(immediateFailedFuture(commitException));
 
     when(mockWorkerInstance.getStreamOutput(
         matches("^uploads/.*/blobs/" + DigestUtil.toString(actionDigest) + "$"),
@@ -184,6 +185,7 @@ public class ShardInstanceTest {
             .setAction(action)
             .setExecuteOperationMetadata(ExecuteOperationMetadata.newBuilder()
                 .setActionDigest(actionDigest))
+            .setSkipCacheLookup(true)
             .build()))
         .build();
 
@@ -209,7 +211,8 @@ public class ShardInstanceTest {
             .setStage(COMPLETED)
             .build()))
         .setError(com.google.rpc.Status.newBuilder()
-            .setCode(Code.UNKNOWN.value()))
+            .setCode(commitException.getStatus().getCode().value())
+            .setMessage(commitException.getMessage()))
         .build();
     verify(mockBackplane, times(1)).putOperation(eq(erroredOperation), eq(COMPLETED));
   }
@@ -227,8 +230,9 @@ public class ShardInstanceTest {
         matches("^uploads/.*/blobs/" + DigestUtil.toString(actionDigest) + "$"),
         eq(actionDigest.getSizeBytes()))).thenReturn(mockCommittedOutputStream);
 
+    StatusRuntimeException queueException = Status.UNAVAILABLE.asRuntimeException();
     when(mockBackplane.putOperation(any(Operation.class), eq(QUEUED)))
-        .thenThrow(new IOException(Status.UNAVAILABLE.asRuntimeException()));
+        .thenThrow(new IOException(queueException));
 
     Operation operation = Operation.newBuilder()
         .setName("queueOperationPutFailureCancelsOperation")
@@ -236,6 +240,7 @@ public class ShardInstanceTest {
             .setAction(action)
             .setExecuteOperationMetadata(ExecuteOperationMetadata.newBuilder()
                 .setActionDigest(actionDigest))
+            .setSkipCacheLookup(true)
             .build()))
         .build();
 
@@ -264,7 +269,8 @@ public class ShardInstanceTest {
             .setStage(COMPLETED)
             .build()))
         .setError(com.google.rpc.Status.newBuilder()
-            .setCode(Code.UNAVAILABLE.value()))
+            .setCode(queueException.getStatus().getCode().value())
+            .setMessage(queueException.getMessage()))
         .build();
     verify(mockBackplane, times(1)).putOperation(eq(erroredOperation), eq(COMPLETED));
   }

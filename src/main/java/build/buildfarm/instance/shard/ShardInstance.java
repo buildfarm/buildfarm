@@ -83,6 +83,7 @@ import com.google.protobuf.util.Durations;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Message;
 import com.google.protobuf.util.JsonFormat;
+import com.google.rpc.PreconditionFailure;
 import io.grpc.Channel;
 import io.grpc.Context;
 import io.grpc.Context.CancellableContext;
@@ -209,23 +210,21 @@ public class ShardInstance extends AbstractServerInstance {
     if (runDispatchedMonitor) {
       dispatchedMonitor = new Thread(new DispatchedMonitor(
           backplane,
-          (operationName) -> {
+          (operationName, statusBuilder) -> {
             try {
-              return requeueOperation(operationName);
+              return requeueOperation(operationName, statusBuilder);
             } catch (IOException e) {
-              e.printStackTrace();
+              statusBuilder.mergeFrom(StatusProto.fromThrowable(e));
+              logger.log(SEVERE, "error while requeueing " + operationName, e);
               return false;
             } catch (InterruptedException e) {
               Thread.currentThread().interrupt();
               return true;
             }
           },
-          (operationName) -> {
+          (operationName, status) -> {
             try {
-              errorOperation(operationName, com.google.rpc.Status.newBuilder()
-                  .setCode(com.google.rpc.Code.FAILED_PRECONDITION.getNumber())
-                  // details...
-                  .build());
+              errorOperation(operationName, status);
             } catch (InterruptedException e) {
               Thread.currentThread().interrupt();
             }
@@ -990,7 +989,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   private ListenableFuture<Boolean> validateAndRequeueOperation(
-      Operation operation, Action action) throws InterruptedException {
+      Operation operation, Action action, com.google.rpc.Status.Builder status) throws InterruptedException {
     final QueuedOperationMetadata metadata;
 
     boolean isQueuedOperationMetadata = operation.getMetadata().is(QueuedOperationMetadata.class);
@@ -1021,8 +1020,9 @@ public class ShardInstance extends AbstractServerInstance {
     }
 
     SettableFuture<Boolean> requeuedFuture = SettableFuture.create();
+    PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
     Futures.addCallback(
-      validateQueuedOperationMetadataAndInputs(metadata, operationTransformService),
+      validateQueuedOperationMetadataAndInputs(metadata, preconditionFailure, operationTransformService),
       new FutureCallback<QueuedOperationMetadata>() {
         @Override
         public void onSuccess(QueuedOperationMetadata metadata) {
@@ -1050,7 +1050,10 @@ public class ShardInstance extends AbstractServerInstance {
 
         @Override
         public void onFailure(Throwable t) {
-          t.printStackTrace();
+          if (!preconditionFailure.getViolationsList().isEmpty()) {
+            status.addDetails(Any.pack(preconditionFailure.build()));
+          }
+          logger.log(SEVERE, "error while transforming for requeueing " + operation.getName(), t);
           requeuedFuture.set(false);
         }
       },
@@ -1072,10 +1075,11 @@ public class ShardInstance extends AbstractServerInstance {
 
   // there's optimization to be had here - we can just use the prequeue to requeue this
   // just need to make it smart enough to see the construction already
-  private boolean requeueOperation(String operationName) throws IOException, InterruptedException {
+  private boolean requeueOperation(String operationName, com.google.rpc.Status.Builder statusBuilder) throws IOException, InterruptedException {
     Operation operation = getOperation(operationName);
     if (operation == null) {
       logger.info("Operation " + operationName + " no longer exists");
+      statusBuilder.setCode(com.google.rpc.Code.NOT_FOUND.getNumber());
       backplane.deleteOperation(operationName); // signal watchers
       return false;
     }
@@ -1101,7 +1105,7 @@ public class ShardInstance extends AbstractServerInstance {
         return false;
       }
 
-      requeuedFuture = validateAndRequeueOperation(operation, action);
+      requeuedFuture = validateAndRequeueOperation(operation, action, statusBuilder);
     }
 
     try {
@@ -1138,13 +1142,10 @@ public class ShardInstance extends AbstractServerInstance {
     return Futures.immediateFailedFuture(Status.RESOURCE_EXHAUSTED.withDescription("cannot currently queue for execution").asRuntimeException());
   }
 
-  private void errorOperation(String operationName, Throwable t, SettableFuture<Void> errorFuture) {
-    Status st = Status.fromThrowable(t);
-    String description = st.getDescription();
-    com.google.rpc.Status status = com.google.rpc.Status.newBuilder()
-        .setCode(st.getCode().value())
-        .setMessage(description == null ? "" : st.getDescription())
-        .build();
+  private void errorOperation(String operationName, Throwable t, com.google.rpc.Status.Builder status, SettableFuture<Void> errorFuture) {
+    status
+        .setCode(Status.fromThrowable(t).getCode().value())
+        .setMessage(t.getMessage());
     operationDeletionService.execute(new Runnable() {
       // we must make all efforts to delete this thing
       int attempt = 1;
@@ -1152,7 +1153,7 @@ public class ShardInstance extends AbstractServerInstance {
       @Override
       public void run() {
         try {
-          errorOperation(operationName, status);
+          errorOperation(operationName, status.build());
           errorFuture.setException(t);
         } catch (StatusRuntimeException e) {
           if (attempt % 100 == 0) {
@@ -1200,7 +1201,7 @@ public class ShardInstance extends AbstractServerInstance {
       backplane.putOperation(completedOperation, metadata.getStage());
       completeFuture.set(null);
     } catch (IOException e) {
-      errorOperation(operation.getName(), e, completeFuture);
+      errorOperation(operation.getName(), e, com.google.rpc.Status.newBuilder(), completeFuture);
     }
     return true;
   }
@@ -1259,19 +1260,23 @@ public class ShardInstance extends AbstractServerInstance {
             getName(),
             operation.getName(),
             transformStopwatch.elapsed(MICROSECONDS)));
+    com.google.rpc.Status.Builder status = com.google.rpc.Status.newBuilder();
+    PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
     ListenableFuture<ProfiledQueuedOperationMetadata.Builder> validatedFuture = Futures.catching(
         Futures.transform(
             queuedFuture,
             (profiledQueuedMetadata) -> {
               long startValidateUSecs = stopwatch.elapsed(MICROSECONDS);
-              validateQueuedOperationMetadata(profiledQueuedMetadata.getQueuedMetadata());
+              validateQueuedOperationMetadata(profiledQueuedMetadata.getQueuedMetadata(), preconditionFailure);
               return profiledQueuedMetadata
                 .setValidatedIn(Durations.fromMicros(stopwatch.elapsed(MICROSECONDS) - startValidateUSecs));
             },
             operationTransformService),
         IllegalStateException.class,
-        // might be able to add proper details here
-        (e) -> { throw Status.FAILED_PRECONDITION.withDescription(e.getMessage()).asRuntimeException(); });
+        (e) -> {
+          status.addDetails(Any.pack(preconditionFailure.build()));
+          throw Status.FAILED_PRECONDITION.withDescription(e.getMessage()).asRuntimeException();
+        });
     ListenableFuture<Operation> operationFuture = Futures.transform(
         validatedFuture,
         (profiledQueuedMetadata) -> operation.toBuilder().setMetadata(Any.pack(profiledQueuedMetadata.build())).build(),
@@ -1327,7 +1332,7 @@ public class ShardInstance extends AbstractServerInstance {
 
           @Override
           public void onFailure(Throwable t) {
-            errorOperation(operation.getName(), t, queueFuture);
+            errorOperation(operation.getName(), t, status, queueFuture);
           }
       }, operationTransformService);
     return queueFuture;

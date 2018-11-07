@@ -68,6 +68,7 @@ java_library(
         "instance/TreeIterator.java",
     ],
     deps = [
+        "@googleapis//:google_rpc_error_details_java_proto",
         ":common",
         ":instance",
         "//3rdparty/jvm/com/google/code/findbugs:jsr305",
@@ -90,11 +91,13 @@ java_library(
     name = "memory-instance",
     srcs = glob(["instance/memory/*.java"]),
     deps = [
+        "@googleapis//:google_rpc_error_details_java_proto",
         ":common",
         ":instance",
         ":server-instance",
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java_util",
         "//3rdparty/jvm/io/grpc:grpc_context",
         "//3rdparty/jvm/io/grpc:grpc_core",
         "//3rdparty/jvm/io/grpc:grpc_netty",
@@ -111,6 +114,7 @@ java_library(
     name = "shard-instance",
     srcs = glob(["instance/shard/*.java"]),
     deps = [
+        "@googleapis//:google_rpc_error_details_java_proto",
         ":common",
         ":common-cache",
         ":instance",

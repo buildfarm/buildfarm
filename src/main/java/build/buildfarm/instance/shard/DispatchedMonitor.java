@@ -16,19 +16,24 @@ package build.buildfarm.instance.shard;
 
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.v1test.ShardDispatchedOperation;
+import com.google.rpc.Code;
+import com.google.rpc.Status;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
-import java.util.function.Predicate;
+import java.util.function.BiConsumer;
+import java.util.function.BiPredicate;
+import java.util.logging.Logger;
 
 class DispatchedMonitor implements Runnable {
+  private final static Logger logger = Logger.getLogger(DispatchedMonitor.class.getName());
+
   private final ShardBackplane backplane;
-  private final Predicate<String> onRequeue;
-  private final Consumer<String> onCancel;
+  private final BiPredicate<String, Status.Builder> onRequeue;
+  private final BiConsumer<String, Status> onCancel;
 
   DispatchedMonitor(
       ShardBackplane backplane,
-      Predicate<String> onRequeue,
-      Consumer<String> onCancel) {
+      BiPredicate<String, Status.Builder> onRequeue,
+      BiConsumer<String, Status> onCancel) {
     this.backplane = backplane;
     this.onRequeue = onRequeue;
     this.onCancel = onCancel;
@@ -36,7 +41,7 @@ class DispatchedMonitor implements Runnable {
 
   @Override
   public synchronized void run() {
-    System.out.println("DispatchedMonitor: Running");
+    logger.info("DispatchedMonitor: Running");
     while (true) {
       try {
         long now = System.currentTimeMillis(); /* FIXME sync */
@@ -45,24 +50,26 @@ class DispatchedMonitor implements Runnable {
         for (ShardDispatchedOperation o : backplane.getDispatchedOperations()) {
           /* if now > dispatchedOperation.getExpiresAt() */
           if (now >= o.getRequeueAt()) {
-            System.out.println("DispatchedMonitor: Testing " + o.getName() + " because " + now + " >= " + o.getRequeueAt());
+            logger.info("DispatchedMonitor: Testing " + o.getName() + " because " + now + " >= " + o.getRequeueAt());
             long startTime = System.nanoTime();
-            boolean shouldCancel = !canQueueNow || !onRequeue.test(o.getName());
+            Status.Builder statusBuilder = Status.newBuilder()
+                .setCode(Code.UNKNOWN.getNumber());
+            boolean shouldCancel = !canQueueNow || !onRequeue.test(o.getName(), statusBuilder);
             if (Thread.interrupted()) {
               throw new InterruptedException();
             }
             long endTime = System.nanoTime();
             float ms = (endTime - startTime) / 1000000.0f;
-            System.out.println(String.format("DispatchedMonitor::run: onRequeue(%s) %gms", o.getName(), ms));
+            logger.info(String.format("DispatchedMonitor::run: onRequeue(%s) %gms", o.getName(), ms));
             if (shouldCancel) {
               backplane.completeOperation(o.getName());
-              System.out.println("DispatchedMonitor: Cancel " + o.getName());
-              onCancel.accept(o.getName());
+              logger.info("DispatchedMonitor: Cancel " + o.getName());
+              onCancel.accept(o.getName(), statusBuilder.build());
               if (Thread.interrupted()) {
                 throw new InterruptedException();
               }
             } else {
-              System.out.println("DispatchedMonitor: Requeued " + o.getName());
+              logger.info("DispatchedMonitor: Requeued " + o.getName());
             }
           }
         }
@@ -74,6 +81,6 @@ class DispatchedMonitor implements Runnable {
         e.printStackTrace();
       }
     }
-    System.out.println("DispatchedMonitor: Exiting");
+    logger.info("DispatchedMonitor: Exiting");
   }
 }

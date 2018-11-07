@@ -65,12 +65,14 @@ java_test(
         "//3rdparty/jvm/io/grpc:grpc_context",
         "//3rdparty/jvm/io/grpc:grpc_core",
         "//3rdparty/jvm/io/grpc:grpc_netty",
+        "@googleapis//:google_rpc_error_details_java_proto",
         "//3rdparty/jvm/io/grpc:grpc_protobuf",
         "//3rdparty/jvm/io/grpc:grpc_stub",
         "//3rdparty/jvm/org/mockito:mockito_core",
         "//src/main/java/build/buildfarm",
         "//src/main/java/build/buildfarm:common",
         "//src/main/java/build/buildfarm:instance",
+        "//src/main/java/build/buildfarm:server-instance",
         "//src/main/java/build/buildfarm:stub-instance",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
@@ -119,6 +121,24 @@ java_test(
         "//src/main/java/build/buildfarm:shard-worker",
         "//src/main/java/build/buildfarm:worker",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+    ],
+)
+
+java_test(
+    name = "instance-tests",
+    size = "small",
+    srcs = glob(["instance/*.java"]),
+    test_class = "build.buildfarm.AllTests",
+    deps = [
+        ":test_runner",
+        "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/com/google/truth",
+        "//src/main/java/build/buildfarm:common",
+        "//src/main/java/build/buildfarm:instance",
+        "//src/main/java/build/buildfarm:server-instance",
+        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
+        "@googleapis//:google_longrunning_operations_java_proto",
+        "@googleapis//:google_rpc_error_details_java_proto",
     ],
 )
 

@@ -16,6 +16,7 @@ package build.buildfarm.server;
 
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.fail;
+import static build.buildfarm.instance.AbstractServerInstance.VIOLATION_TYPE_INVALID;
 
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.stub.Chunker;
@@ -39,6 +40,7 @@ import com.google.devtools.remoteexecution.v1test.Command;
 import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.devtools.remoteexecution.v1test.Directory;
 import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
+import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
 import com.google.devtools.remoteexecution.v1test.ExecuteRequest;
 import com.google.devtools.remoteexecution.v1test.ExecutionGrpc;
 import com.google.devtools.remoteexecution.v1test.FindMissingBlobsRequest;
@@ -57,6 +59,8 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.rpc.Code;
+import com.google.rpc.PreconditionFailure;
+import com.google.rpc.PreconditionFailure.Violation;
 import io.grpc.ManagedChannel;
 import io.grpc.StatusRuntimeException;
 import io.grpc.inprocess.InProcessChannelBuilder;
@@ -218,11 +222,7 @@ public class BuildFarmServerTest {
         OperationsGrpc.newBlockingStub(inProcessChannel);
 
     // should be available with cancelled state
-    GetOperationRequest getRequest = GetOperationRequest.newBuilder()
-        .setName(operation.getName())
-        .build();
-
-    Operation preCancelOperation = operationsStub.getOperation(getRequest);
+    Operation preCancelOperation = getOperation(operation.getName());
 
     assertThat(preCancelOperation.getDone()).isFalse();
 
@@ -232,7 +232,7 @@ public class BuildFarmServerTest {
 
     operationsStub.cancelOperation(cancelRequest);
 
-    Operation cancelledOperation = operationsStub.getOperation(getRequest);
+    Operation cancelledOperation = getOperation(operation.getName());
 
     assertThat(cancelledOperation.getDone()).isTrue();
     assertThat(cancelledOperation.getResultCase()).isEqualTo(Operation.ResultCase.ERROR);
@@ -294,14 +294,41 @@ public class BuildFarmServerTest {
         .getCode()).isEqualTo(Code.UNAVAILABLE.getNumber());
   }
 
-  @Test(expected = StatusRuntimeException.class)
+  private Operation getOperation(String name) {
+    GetOperationRequest getRequest = GetOperationRequest.newBuilder()
+        .setName(name)
+        .build();
+
+    OperationsGrpc.OperationsBlockingStub operationsStub =
+        OperationsGrpc.newBlockingStub(inProcessChannel);
+
+    return operationsStub.getOperation(getRequest);
+  }
+
+  @Test
   public void actionWithExcessiveTimeoutFailsValidation()
       throws RetryException, InterruptedException, InvalidProtocolBufferException {
     Action actionWithExcessiveTimeout = createSimpleAction().toBuilder()
         .setTimeout(Duration.newBuilder().setSeconds(9000))
         .build();
 
-    executeAction(actionWithExcessiveTimeout);
+    Operation operation = executeAction(actionWithExcessiveTimeout);
+
+    Operation failedOperation = getOperation(operation.getName());
+    assertThat(failedOperation.getDone()).isTrue();
+    assertThat(
+        failedOperation
+            .getMetadata()
+            .unpack(ExecuteOperationMetadata.class).getStage())
+        .isEqualTo(Stage.COMPLETED);
+    assertThat(failedOperation.getError().getCode())
+        .isEqualTo(Code.FAILED_PRECONDITION.getNumber());
+    assertThat(failedOperation.getError().getDetailsCount()).isEqualTo(1);
+    PreconditionFailure preconditionFailure = failedOperation
+        .getError().getDetailsList().get(0).unpack(PreconditionFailure.class);
+    assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
+    Violation violation = preconditionFailure.getViolationsList().get(0);
+    assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
   }
 
   private Action createSimpleAction() throws RetryException, InterruptedException {

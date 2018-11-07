@@ -44,6 +44,8 @@ import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.util.Durations;
+import com.google.rpc.PreconditionFailure;
 import io.grpc.StatusException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -67,6 +69,9 @@ public class MemoryInstance extends AbstractServerInstance {
   private final Map<String, Watchdog> requeuers;
   private final Map<String, Watchdog> operationTimeoutDelays;
   private final Map<String, Operation> outstandingOperations;
+
+  private static final String TIMEOUT_OUT_OF_BOUNDS =
+      "A timeout specified is out of bounds with a configured range";
 
   private static final class Worker {
     private final Platform platform;
@@ -203,16 +208,22 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  protected void validateAction(Action action) throws InterruptedException {
+  protected void validateAction(
+      Action action,
+      PreconditionFailure.Builder preconditionFailure) throws InterruptedException {
     if (action.hasTimeout() && config.hasMaximumActionTimeout()) {
       Duration timeout = action.getTimeout();
       Duration maximum = config.getMaximumActionTimeout();
-      Preconditions.checkState(
-          timeout.getSeconds() < maximum.getSeconds() ||
-          (timeout.getSeconds() == maximum.getSeconds() && timeout.getNanos() < maximum.getNanos()));
+      if (timeout.getSeconds() > maximum.getSeconds() ||
+          (timeout.getSeconds() == maximum.getSeconds() && timeout.getNanos() > maximum.getNanos())) {
+        preconditionFailure.addViolationsBuilder()
+            .setType(VIOLATION_TYPE_INVALID)
+            .setSubject(TIMEOUT_OUT_OF_BOUNDS)
+            .setDescription(Durations.toString(timeout) + " > " + Durations.toString(maximum));
+      }
     }
 
-    super.validateAction(action);
+    super.validateAction(action, preconditionFailure);
   }
 
   @Override
