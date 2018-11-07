@@ -169,7 +169,6 @@ public class DigestUtil {
 
   /**
    * Assumes that the given Digest is a valid digest of an Action, and creates an ActionKey wrapper.
-   * This should not be called on the client side!
    */
   public static ActionKey asActionKey(Digest digest) {
     return new ActionKey(digest);
