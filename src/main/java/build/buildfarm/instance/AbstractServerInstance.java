@@ -377,7 +377,7 @@ public abstract class AbstractServerInstance implements Instance {
   protected void onQueue(Operation operation, Action action) throws IOException, InterruptedException, StatusException {
   }
 
-  private void stringsUniqueAndSortedPrecondition(
+  private static void stringsUniqueAndSortedPrecondition(
       Iterable<String> strings,
       String duplicateViolationMessage,
       String unsortedViolationMessage,
@@ -400,7 +400,7 @@ public abstract class AbstractServerInstance implements Instance {
     }
   }
 
-  private void filesUniqueAndSortedPrecondition(
+  private static void filesUniqueAndSortedPrecondition(
       Iterable<String> files, PreconditionFailure.Builder preconditionFailure) {
     stringsUniqueAndSortedPrecondition(
         files,
@@ -409,7 +409,7 @@ public abstract class AbstractServerInstance implements Instance {
         preconditionFailure);
   }
 
-  private void environmentVariablesUniqueAndSortedPrecondition(
+  private static void environmentVariablesUniqueAndSortedPrecondition(
       Iterable<Command.EnvironmentVariable> environmentVariables,
       PreconditionFailure.Builder preconditionFailure) {
     stringsUniqueAndSortedPrecondition(
@@ -421,7 +421,7 @@ public abstract class AbstractServerInstance implements Instance {
         preconditionFailure);
   }
 
-  private void enumerateActionInputDirectory(
+  private static void enumerateActionInputDirectory(
       String directoryPath,
       Directory directory,
       Map<Digest, Directory> directoriesIndex,
@@ -450,7 +450,7 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @VisibleForTesting
-  public void validateActionInputDirectory(
+  public static void validateActionInputDirectory(
       String directoryPath,
       Directory directory,
       Stack<Digest> pathDigests,
@@ -545,7 +545,7 @@ public abstract class AbstractServerInstance implements Instance {
     }
   }
 
-  private void validateActionInputDirectoryDigest(
+  private static void validateActionInputDirectoryDigest(
       String directoryPath,
       Digest directoryDigest,
       Stack<Digest> pathDigests,
