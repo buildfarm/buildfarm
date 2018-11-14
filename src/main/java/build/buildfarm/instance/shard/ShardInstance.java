@@ -1178,6 +1178,7 @@ public class ShardInstance extends AbstractServerInstance {
           operationDeletionService.execute(this);
           attempt++;
         } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
         }
       }
     });
