@@ -43,6 +43,7 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
+import com.google.rpc.PreconditionFailure;
 import io.grpc.Status;
 import io.grpc.Status.Code;
 import java.io.IOException;
@@ -106,6 +107,7 @@ public class RedisShardBackplane implements ShardBackplane {
           .add(ExecutingOperationMetadata.getDescriptor())
           .add(ExecuteOperationMetadata.getDescriptor())
           .add(QueuedOperationMetadata.getDescriptor())
+          .add(PreconditionFailure.getDescriptor())
           .build());
 
   private static class JedisMisconfigurationException extends JedisDataException {
@@ -601,6 +603,7 @@ public class RedisShardBackplane implements ShardBackplane {
                 .add(ExecutingOperationMetadata.getDescriptor())
                 .add(ExecuteOperationMetadata.getDescriptor())
                 .add(QueuedOperationMetadata.getDescriptor())
+                .add(PreconditionFailure.getDescriptor())
                 .build())
         .ignoringUnknownFields();
   }
