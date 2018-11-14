@@ -16,7 +16,7 @@ package build.buildfarm.instance;
 
 import static com.google.common.truth.Truth.assertThat;
 import static build.buildfarm.instance.AbstractServerInstance.DIRECTORY_NOT_SORTED;
-import static build.buildfarm.instance.AbstractServerInstance.DUPLICATE_FILE_NODE;
+import static build.buildfarm.instance.AbstractServerInstance.DUPLICATE_DIRENT;
 import static build.buildfarm.instance.AbstractServerInstance.VIOLATION_TYPE_INVALID;
 
 import build.bazel.remote.execution.v2.Digest;
@@ -159,7 +159,7 @@ public class AbstractServerInstanceTest {
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
     Violation violation = preconditionFailure.getViolationsList().get(0);
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
-    assertThat(violation.getSubject()).isEqualTo(DUPLICATE_FILE_NODE);
+    assertThat(violation.getSubject()).isEqualTo(DUPLICATE_DIRENT);
   }
 
   @Test

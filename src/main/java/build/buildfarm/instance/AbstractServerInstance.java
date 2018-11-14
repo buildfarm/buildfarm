@@ -95,7 +95,7 @@ public abstract class AbstractServerInstance implements Instance {
   protected final Map<Digest, ByteString> activeBlobWrites;
   protected final DigestUtil digestUtil;
 
-  public static final String DUPLICATE_FILE_NODE =
+  public static final String DUPLICATE_DIRENT =
       "One of the input `Directory` has multiple entries with the same file name. This will also"
           + " occur if the worker filesystem considers two names to be the same, such as two names"
           + " that vary only by case on a case-insensitive filesystem, or two names with the same"
@@ -404,7 +404,7 @@ public abstract class AbstractServerInstance implements Instance {
       Iterable<String> files, PreconditionFailure.Builder preconditionFailure) {
     stringsUniqueAndSortedPrecondition(
         files,
-        DUPLICATE_FILE_NODE,
+        DUPLICATE_DIRENT,
         DIRECTORY_NOT_SORTED,
         preconditionFailure);
   }
@@ -468,7 +468,7 @@ public abstract class AbstractServerInstance implements Instance {
       if (entryNames.contains(fileName)) {
         preconditionFailure.addViolationsBuilder()
             .setType(VIOLATION_TYPE_INVALID)
-            .setSubject(DUPLICATE_FILE_NODE)
+            .setSubject(DUPLICATE_DIRENT)
             .setDescription(fileName);
       } else if (lastFileName.compareTo(fileName) > 0) {
         preconditionFailure.addViolationsBuilder()
@@ -495,7 +495,7 @@ public abstract class AbstractServerInstance implements Instance {
       if (entryNames.contains(directoryName)) {
         preconditionFailure.addViolationsBuilder()
             .setType(VIOLATION_TYPE_INVALID)
-            .setSubject(DUPLICATE_FILE_NODE)
+            .setSubject(DUPLICATE_DIRENT)
             .setDescription(directoryName);
       } else if (lastFileName.compareTo(directoryName) > 0) {
         preconditionFailure.addViolationsBuilder()
