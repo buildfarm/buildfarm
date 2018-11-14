@@ -165,12 +165,12 @@ public class ShardInstance extends AbstractServerInstance {
         new CacheLoader<String, Instance>() {
           @Override
           public Instance load(String worker) {
-          ManagedChannel channel = createChannel(worker);
-          return new StubInstance(
-              "", digestUtil, channel,
-              60 /* FIXME CONFIG */, TimeUnit.SECONDS,
-              createStubRetrier(),
-              null);
+            ManagedChannel channel = createChannel(worker);
+            return new StubInstance(
+                "", digestUtil, channel,
+                60 /* FIXME CONFIG */, TimeUnit.SECONDS,
+                createStubRetrier(),
+                null);
           }
         });
   }
@@ -206,8 +206,8 @@ public class ShardInstance extends AbstractServerInstance {
     this.onStop = onStop;
     backplane.setOnUnsubscribe(this::stop);
     workerStubs = com.google.common.cache.CacheBuilder.newBuilder()
-      .removalListener(instanceRemovalListener)
-      .build(instanceLoader);
+        .removalListener(instanceRemovalListener)
+        .build(instanceLoader);
 
     if (runDispatchedMonitor) {
       dispatchedMonitor = new Thread(new DispatchedMonitor(

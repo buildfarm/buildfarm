@@ -711,7 +711,6 @@ public abstract class AbstractServerInstance implements Instance {
     ImmutableSet.Builder<String> inputDirectoriesBuilder = ImmutableSet.builder();
     ImmutableSet.Builder<String> inputFilesBuilder = ImmutableSet.builder();
 
-    // needs futuring
     validateActionInputDirectoryDigest(
         "",
         action.getInputRootDigest(),
