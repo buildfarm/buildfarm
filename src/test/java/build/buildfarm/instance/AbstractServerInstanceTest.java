@@ -21,11 +21,15 @@ import static build.buildfarm.instance.AbstractServerInstance.VIOLATION_TYPE_INV
 
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.Platform;
+import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.instance.TreeIterator.DirectoryEntry;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -43,6 +47,8 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class AbstractServerInstanceTest {
   private static final Logger logger = Logger.getLogger(AbstractServerInstanceTest.class.getName());
+
+  private static final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
 
   class DummyServerInstance extends AbstractServerInstance {
     protected Logger getLogger() {
@@ -160,6 +166,7 @@ public class AbstractServerInstanceTest {
     Violation violation = preconditionFailure.getViolationsList().get(0);
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
     assertThat(violation.getSubject()).isEqualTo(DUPLICATE_DIRENT);
+    assertThat(violation.getDescription()).isEqualTo("/: foo");
   }
 
   @Test
@@ -179,6 +186,81 @@ public class AbstractServerInstanceTest {
         /* pathDigests=*/ new Stack<>(),
         /* visited=*/ Sets.newHashSet(),
         /* directoriesIndex=*/ Maps.newHashMap(),
+        /* inputFiles=*/ ImmutableSet.builder(),
+        /* inputDirectories=*/ ImmutableSet.builder(),
+        /* inputDigests=*/ ImmutableSet.builder(),
+        preconditionFailure);
+
+    assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
+    Violation violation = preconditionFailure.getViolationsList().get(0);
+    assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
+    assertThat(violation.getSubject()).isEqualTo(DIRECTORY_NOT_SORTED);
+    assertThat(violation.getDescription()).isEqualTo("/: foo > bar");
+  }
+
+  @Test
+  public void duplicateDirectoryInputIsInvalid() {
+    AbstractServerInstance instance = new DummyServerInstance();
+
+    Directory emptyDirectory = Directory.getDefaultInstance();
+    Digest emptyDirectoryDigest = DIGEST_UTIL.compute(emptyDirectory);
+    PreconditionFailure.Builder preconditionFailure =
+        PreconditionFailure.newBuilder();
+    instance.validateActionInputDirectory(
+        /* directoryPath=*/ "",
+        Directory.newBuilder()
+            .addAllDirectories(
+                ImmutableList.of(
+                    DirectoryNode.newBuilder()
+                        .setName("foo")
+                        .setDigest(emptyDirectoryDigest)
+                        .build(),
+                    DirectoryNode.newBuilder()
+                        .setName("foo")
+                        .setDigest(emptyDirectoryDigest)
+                        .build()))
+            .build(),
+        /* pathDigests=*/ new Stack<>(),
+        /* visited=*/ Sets.newHashSet(),
+        /* directoriesIndex=*/ ImmutableMap.of(emptyDirectoryDigest, emptyDirectory),
+        /* inputFiles=*/ ImmutableSet.builder(),
+        /* inputDirectories=*/ ImmutableSet.builder(),
+        /* inputDigests=*/ ImmutableSet.builder(),
+        preconditionFailure);
+
+    assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
+    assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
+    Violation violation = preconditionFailure.getViolationsList().get(0);
+    assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
+    assertThat(violation.getSubject()).isEqualTo(DUPLICATE_DIRENT);
+    assertThat(violation.getDescription()).isEqualTo("/: foo");
+  }
+
+  @Test
+  public void unsortedDirectoryInputIsInvalid() {
+    AbstractServerInstance instance = new DummyServerInstance();
+
+    Directory emptyDirectory = Directory.getDefaultInstance();
+    Digest emptyDirectoryDigest = DIGEST_UTIL.compute(emptyDirectory);
+    PreconditionFailure.Builder preconditionFailure =
+        PreconditionFailure.newBuilder();
+    instance.validateActionInputDirectory(
+        /* directoryPath=*/ "",
+        Directory.newBuilder()
+            .addAllDirectories(
+                ImmutableList.of(
+                    DirectoryNode.newBuilder()
+                        .setName("foo")
+                        .setDigest(emptyDirectoryDigest)
+                        .build(),
+                    DirectoryNode.newBuilder()
+                        .setName("bar")
+                        .setDigest(emptyDirectoryDigest)
+                        .build()))
+            .build(),
+        /* pathDigests=*/ new Stack<>(),
+        /* visited=*/ Sets.newHashSet(),
+        /* directoriesIndex=*/ ImmutableMap.of(emptyDirectoryDigest, emptyDirectory),
         /* inputFiles=*/ ImmutableSet.builder(),
         /* inputDirectories=*/ ImmutableSet.builder(),
         /* inputDigests=*/ ImmutableSet.builder(),

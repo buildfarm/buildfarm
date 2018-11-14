@@ -391,7 +391,7 @@ public abstract class AbstractServerInstance implements Instance {
             .setSubject(duplicateViolationMessage)
             .setDescription(string);
       }
-      if (direction < 0) {
+      if (direction > 0) {
         preconditionFailure.addViolationsBuilder()
             .setType(VIOLATION_TYPE_INVALID)
             .setSubject(unsortedViolationMessage)
@@ -469,7 +469,7 @@ public abstract class AbstractServerInstance implements Instance {
         preconditionFailure.addViolationsBuilder()
             .setType(VIOLATION_TYPE_INVALID)
             .setSubject(DUPLICATE_DIRENT)
-            .setDescription(fileName);
+            .setDescription("/" + directoryPath + ": " + fileName);
       } else if (lastFileName.compareTo(fileName) > 0) {
         preconditionFailure.addViolationsBuilder()
             .setType(VIOLATION_TYPE_INVALID)
@@ -496,12 +496,12 @@ public abstract class AbstractServerInstance implements Instance {
         preconditionFailure.addViolationsBuilder()
             .setType(VIOLATION_TYPE_INVALID)
             .setSubject(DUPLICATE_DIRENT)
-            .setDescription(directoryName);
-      } else if (lastFileName.compareTo(directoryName) > 0) {
+            .setDescription("/" + directoryPath + ": " + directoryName);
+      } else if (lastDirectoryName.compareTo(directoryName) > 0) {
         preconditionFailure.addViolationsBuilder()
             .setType(VIOLATION_TYPE_INVALID)
             .setSubject(DIRECTORY_NOT_SORTED)
-            .setDescription(directoryPath + ": " + lastDirectoryName + " > " + directoryName);
+            .setDescription("/" + directoryPath + ": " + lastDirectoryName + " > " + directoryName);
       }
       /* FIXME serverside validity check? regex?
       Preconditions.checkState(
@@ -511,13 +511,13 @@ public abstract class AbstractServerInstance implements Instance {
       lastDirectoryName = directoryName;
       entryNames.add(directoryName);
 
-      if (pathDigests.contains(directoryNode.getDigest())) {
+      Digest directoryDigest = directoryNode.getDigest();
+      if (pathDigests.contains(directoryDigest)) {
         preconditionFailure.addViolationsBuilder()
             .setType(VIOLATION_TYPE_INVALID)
             .setSubject(DIRECTORY_CYCLE_DETECTED)
-            .setDescription(directoryPath + ": " + directoryName);
+            .setDescription("/" + directoryPath + ": " + directoryName);
       } else {
-        Digest directoryDigest = directoryNode.getDigest();
         String subDirectoryPath = directoryPath.isEmpty()
             ? directoryName
             : (directoryPath + "/" + directoryName);
@@ -534,12 +534,16 @@ public abstract class AbstractServerInstance implements Instance {
               inputDigests,
               preconditionFailure);
         } else {
-          enumerateActionInputDirectory(
-              subDirectoryPath,
-              directoriesIndex.get(directoryDigest),
-              directoriesIndex,
-              inputFiles,
-              inputDirectories);
+          Directory subDirectory = directoriesIndex.get(directoryDigest);
+          if (subDirectory != null) {
+            enumerateActionInputDirectory(
+                subDirectoryPath,
+                directoriesIndex.get(directoryDigest),
+                directoriesIndex,
+                inputFiles,
+                inputDirectories);
+          }
+          // null directory case will be handled by input missing in validateActionInputDirectoryDigest
         }
       }
     }
