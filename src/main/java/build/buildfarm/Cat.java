@@ -1,6 +1,7 @@
 package build.buildfarm;
 
 import static build.buildfarm.instance.Utils.getBlob;
+import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
@@ -34,6 +35,7 @@ import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import java.io.IOException;
 import java.util.Date;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 class Cat {
@@ -111,6 +113,14 @@ class Cat {
     }
     if (!result.hasStderrDigest()) {
       indentOut(indentLevel, "Stderr Digest: " + DigestUtil.toString(result.getStderrDigest()));
+    }
+  }
+
+  private static void printFindMissing(Instance instance, Digest digest) throws ExecutionException, InterruptedException {
+    Iterable<Digest> missingDigests = instance.findMissingBlobs(ImmutableList.of(digest), newDirectExecutorService()).get();
+
+    for (Digest missingDigest : missingDigests) {
+      System.out.println("Missing: " + DigestUtil.toString(missingDigest));
     }
   }
 
@@ -290,7 +300,9 @@ class Cat {
         printOperation(instance.getOperation(args[i]));
       } else {
         Digest blobDigest = DigestUtil.parseDigest(args[i]);
-        if (type.equals("ActionResult")) {
+        if (type.equals("Missing")) {
+          printFindMissing(instance, blobDigest);
+        } else if (type.equals("ActionResult")) {
           printActionResult(instance.getActionResult(DigestUtil.asActionKey(blobDigest)), 0);
         } else if (type.equals("Tree")) {
           printTree(instance, blobDigest);

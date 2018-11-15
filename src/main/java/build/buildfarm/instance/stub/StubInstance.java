@@ -262,7 +262,8 @@ public class StubInstance implements Instance {
             .get()
             .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
             .findMissingBlobs(request),
-        (response) -> response.getMissingBlobDigestsList());
+        (response) -> response.getMissingBlobDigestsList(),
+        service);
   }
 
   /** expectedSize == -1 for unlimited */
