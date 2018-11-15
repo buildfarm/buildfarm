@@ -451,7 +451,7 @@ public class ShardInstance extends AbstractServerInstance {
         Throwable.class,
         (e) -> {
           Status status = Status.fromThrowable(e);
-          if (status.getCode() == Code.UNAVAILABLE) {
+          if (status.getCode() == Code.UNAVAILABLE || status.getCode() == Code.UNIMPLEMENTED) {
             removeMalfunctioningWorker(worker, e, "findMissingBlobs(...)");
           } else if (status.getCode() == Code.CANCELLED || Context.current().isCancelled()) {
             // do nothing further if we're cancelled
