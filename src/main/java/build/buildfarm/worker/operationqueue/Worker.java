@@ -14,7 +14,10 @@
 
 package build.buildfarm.worker.operationqueue;
 
+import static build.buildfarm.worker.CASFileCache.getInterruptiblyOrIOException;
 import static com.google.common.collect.Maps.uniqueIndex;
+import static com.google.common.util.concurrent.Futures.allAsList;
+import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.logging.Level.SEVERE;
 
@@ -257,7 +260,13 @@ public class Worker {
       throw new IOException("Directory " + DigestUtil.toString(inputRoot) + " is not in input index");
     }
 
-    fileCache.putFiles(directory.getFilesList(), execDir, inputFiles);
+    getInterruptiblyOrIOException(
+        allAsList(
+            fileCache.putFiles(
+                directory.getFilesList(),
+                execDir,
+                inputFiles,
+                newDirectExecutorService())));
     for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
       Digest digest = directoryNode.getDigest();
       String name = directoryNode.getName();
@@ -278,7 +287,11 @@ public class Worker {
       Path execPath,
       Digest digest,
       Map<Digest, Directory> directoriesIndex) throws IOException, InterruptedException {
-    Path cachePath = fileCache.putDirectory(digest, directoriesIndex);
+    Path cachePath = getInterruptiblyOrIOException(
+        fileCache.putDirectory(
+            digest,
+            directoriesIndex,
+            newDirectExecutorService()));
     Files.createSymbolicLink(execPath, cachePath);
   }
 

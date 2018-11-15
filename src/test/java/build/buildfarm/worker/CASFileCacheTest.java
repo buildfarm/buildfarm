@@ -14,7 +14,9 @@
 
 package build.buildfarm.worker;
 
+import static build.buildfarm.worker.CASFileCache.getInterruptiblyOrIOException;
 import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
@@ -142,7 +144,8 @@ class CASFileCacheTest {
     Map<Digest, Directory> directoriesIndex = ImmutableMap.of(
         dirDigest, directory,
         subdirDigest, subDirectory);
-    Path dirPath = fileCache.putDirectory(dirDigest, directoriesIndex);
+    Path dirPath = getInterruptiblyOrIOException(
+        fileCache.putDirectory(dirDigest, directoriesIndex, newDirectExecutorService()));
     assertThat(Files.isDirectory(dirPath)).isTrue();
     assertThat(Files.exists(dirPath.resolve("file"))).isTrue();
     assertThat(Files.isDirectory(dirPath.resolve("subdir"))).isTrue();
@@ -174,7 +177,11 @@ class CASFileCacheTest {
         subdirDigest, subDirectory);
     boolean exceptionHandled = false;
     try {
-      fileCache.putDirectory(dirDigest, directoriesIndex);
+      getInterruptiblyOrIOException(
+          fileCache.putDirectory(
+              dirDigest,
+              directoriesIndex,
+              newDirectExecutorService()));
     } catch (IOException e) {
       assertThat(e.getMessage()).isEqualTo("NOT_FOUND");
       exceptionHandled = true;
