@@ -107,7 +107,7 @@ public class MatchStage extends PipelineStage {
 
       try {
         long matchingAtUSecs = stopwatch.elapsed(MICROSECONDS);
-        OperationContext context = match(operation, operationNamedAtUSecs);
+        OperationContext context = match(operation, stopwatch, operationNamedAtUSecs);
         long matchedInUSecs = stopwatch.elapsed(MICROSECONDS) - matchingAtUSecs;
         logComplete(operation.getName(), matchedInUSecs, waitDuration, context != null);
         if (context == null) {
@@ -160,7 +160,10 @@ public class MatchStage extends PipelineStage {
     return directoriesIndex.build();
   }
 
-  private OperationContext match(Operation operation, long matchStartAt) throws InterruptedException {
+  private OperationContext match(
+      Operation operation,
+      Stopwatch stopwatch,
+      long matchStartAtUSecs) throws InterruptedException {
     if (!operation.getMetadata().is(QueuedOperationMetadata.class)) {
       return null;
     }
@@ -199,7 +202,7 @@ public class MatchStage extends PipelineStage {
         .setResultsCachePolicy(metadata.getResultsCachePolicy())
         .setRequestMetadata(metadata.getRequestMetadata());
 
-    Duration matchedIn = Durations.fromNanos(System.nanoTime() - matchStartAt);
+    Duration matchedIn = Durations.fromMicros(stopwatch.elapsed(MICROSECONDS) - matchStartAtUSecs);
     return builder
         .setMatchedIn(matchedIn)
         .build();
