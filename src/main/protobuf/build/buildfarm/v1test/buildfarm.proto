@@ -214,7 +214,7 @@ message WorkerConfig {
   // policy for process output files
   CASInsertionPolicy file_cas_policy = 13;
 
-  bool requeue_on_failure = 14;
+  reserved 14;
 
   // page size for getTree request
   uint32 tree_page_size = 15;

@@ -68,7 +68,6 @@ public interface Instance {
   void match(Platform platform, InterruptingPredicate<Operation> onMatch) throws InterruptedException;
   boolean putOperation(Operation operation) throws InterruptedException;
   boolean putAndValidateOperation(Operation operation) throws InterruptedException;
-  boolean requeueOperation(Operation operation) throws InterruptedException;
   boolean pollOperation(String operationName, Stage stage);
   // returns nextPageToken suitable for list restart
   String listOperations(

@@ -64,8 +64,6 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
           responseObserver.onError(ex);
         }
       }
-      // requeue
-      instance.requeueOperation(operation);
       return false;
     };
   }

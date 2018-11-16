@@ -19,9 +19,12 @@ import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.COM
 import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.EXECUTING;
 import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.QUEUED;
 import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.UNKNOWN;
+import static build.buildfarm.instance.AbstractServerInstance.INVALID_DIGEST;
 import static com.google.common.collect.Multimaps.synchronizedSetMultimap;
 import static com.google.common.truth.Truth.assertThat;
 import static java.util.concurrent.Executors.newFixedThreadPool;
+import static java.util.concurrent.TimeUnit.MICROSECONDS;
+import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
@@ -29,6 +32,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 
+import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import build.buildfarm.cas.ContentAddressableStorage;
@@ -48,10 +53,11 @@ import com.google.protobuf.Any;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.Durations;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 import com.google.rpc.Code;
 import com.google.rpc.Status;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -63,6 +69,17 @@ import org.mockito.stubbing.Answer;
 
 @RunWith(JUnit4.class)
 public class MemoryInstanceTest {
+  private final DigestUtil DIGEST_UTIL = new DigestUtil(DigestUtil.HashFunction.SHA256);
+  private final Command simpleCommand = Command.newBuilder()
+      .addArguments("true")
+      .build();
+  private final Digest simpleCommandDigest =
+      DIGEST_UTIL.compute(simpleCommand);
+  private final Action simpleAction = Action.newBuilder()
+      .setCommandDigest(simpleCommandDigest)
+      .build();
+  private final Digest simpleActionDigest = DIGEST_UTIL.compute(simpleAction);
+
   private MemoryInstance instance;
 
   private OperationsMap outstandingOperations;
@@ -98,12 +115,18 @@ public class MemoryInstanceTest {
 
     instance = new MemoryInstance(
         "memory",
-        new DigestUtil(DigestUtil.HashFunction.SHA256),
+        DIGEST_UTIL,
         memoryInstanceConfig,
         storage,
         watchers,
         watchersThreadPool,
         outstandingOperations);
+  }
+
+  @After
+  public void tearDown() throws Exception {
+    watchersThreadPool.shutdown();
+    watchersThreadPool.awaitTermination(Long.MAX_VALUE, NANOSECONDS);
   }
 
   @Test
@@ -282,34 +305,36 @@ public class MemoryInstanceTest {
     Operation queuedOperation = createOperation("my-queued-operation", QUEUED);
     outstandingOperations.put(queuedOperation.getName(), queuedOperation);
 
+    AtomicInteger code = new AtomicInteger(Code.OK.getNumber());
     watchers.put(queuedOperation.getName(), new Predicate<Operation>() {
       @Override
       public boolean test(Operation operation) {
-        assertThat(operation.getError().getCode()).isEqualTo(Code.FAILED_PRECONDITION);
+        code.set(operation.getError().getCode());
         return false;
       }
     });
 
     instance.requeueOperation(queuedOperation);
 
-    watchersThreadPool.shutdown();
-    watchersThreadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+    boolean done = false;
+    int waits = 0;
+    while (!done) {
+      assertThat(waits < 10).isTrue();
+      MICROSECONDS.sleep(10);
+      waits++;
+      synchronized (watchers) {
+        if (!watchers.containsKey(queuedOperation.getName())) {
+          done = true;
+        }
+      }
+    }
+    assertThat(code.get()).isEqualTo(Code.FAILED_PRECONDITION.getNumber());
   }
 
   @Test
-  public void requeueFailOnNotQueued() throws InterruptedException, InvalidProtocolBufferException {
+  public void requeueSucceedsOnQueued() throws InterruptedException, InvalidProtocolBufferException {
     Operation queuedOperation = createOperation("my-queued-operation", QUEUED);
     outstandingOperations.put(queuedOperation.getName(), queuedOperation);
-    Operation executingOperation = createOperation("my-executing-operation", EXECUTING);
-    outstandingOperations.put(executingOperation.getName(), executingOperation);
-
-    try {
-      instance.requeueOperation(executingOperation);
-      fail("Method should throw if operation is not QUEUED.");
-    } catch (IllegalStateException e) {
-      assertThat(e.getMessage()).isEqualTo(
-          String.format("Operation %s stage is not QUEUED", executingOperation.getName()));
-    }
 
     instance.requeueOperation(queuedOperation);
   }
@@ -328,6 +353,7 @@ public class MemoryInstanceTest {
             .build()))
         .setError(Status.newBuilder()
             .setCode(Code.FAILED_PRECONDITION.getNumber())
+            .setMessage(INVALID_DIGEST)
             .build())
         .build();
     Predicate<Operation> watcher = mock(Predicate.class);
@@ -335,8 +361,20 @@ public class MemoryInstanceTest {
     when(watcher.test(eq(erroredOperation))).thenReturn(false);
     assertThat(instance.watchOperation(queuedOperation.getName(), watcher)).isTrue();
     assertThat(instance.requeueOperation(queuedOperation)).isFalse();
-    watchersThreadPool.shutdown();
-    watchersThreadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+
+    boolean done = false;
+    int waits = 0;
+    while (!done) {
+      assertThat(waits < 10).isTrue();
+      MICROSECONDS.sleep(10);
+      waits++;
+      synchronized (watchers) {
+        if (!watchers.containsKey(queuedOperation.getName())) {
+          done = true;
+        }
+      }
+    }
+
     verify(watcher, times(1)).test(eq(queuedOperation));
     verify(watcher, times(1)).test(eq(erroredOperation));
   }
@@ -352,11 +390,14 @@ public class MemoryInstanceTest {
     return createOperation(
         name,
         ExecuteOperationMetadata.newBuilder()
+            .setActionDigest(simpleActionDigest)
             .setStage(stage)
             .build());
   }
 
   private boolean putNovelOperation(Stage stage) throws InterruptedException {
+    when(storage.get(simpleActionDigest)).thenReturn(new Blob(simpleAction.toByteString(), simpleActionDigest));
+    when(storage.get(simpleCommandDigest)).thenReturn(new Blob(simpleCommand.toByteString(), simpleCommandDigest));
     return instance.putOperation(createOperation("does-not-exist", stage));
   }
 

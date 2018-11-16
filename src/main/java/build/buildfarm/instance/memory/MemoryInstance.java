@@ -397,13 +397,7 @@ public class MemoryInstance extends AbstractServerInstance {
             .setNanos(actionTimeout.getNanos() + delay.getNanos())
             .build();
         // this is an overuse of Watchdog, we will never pet it
-        Watchdog operationTimeoutDelay = new Watchdog(timeout, () -> {
-          try {
-            expireOperation(operation);
-          } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-          }
-        });
+        Watchdog operationTimeoutDelay = new Watchdog(timeout, () -> expireOperation(operation));
         operationTimeoutDelays.put(operationName, operationTimeoutDelay);
         new Thread(operationTimeoutDelay).start();
       }
@@ -420,7 +414,10 @@ public class MemoryInstance extends AbstractServerInstance {
 
   @Override
   protected boolean matchOperation(Operation operation) throws InterruptedException {
-    Command command = expectCommand(operation);
+    Action action = expectAction(operation);
+    Preconditions.checkState(action != null, "action not found");
+
+    Command command = expectCommand(action.getCommandDigest());
     Preconditions.checkState(command != null, "command not found");
 
     ImmutableList.Builder<Worker> rejectedWorkers = new ImmutableList.Builder<>();
@@ -450,18 +447,20 @@ public class MemoryInstance extends AbstractServerInstance {
     while (!matched && !queuedOperations.isEmpty()) {
       Operation operation = queuedOperations.remove(0);
       Command command = expectCommand(operation);
-      if (command == null) {
-        cancelOperation(operation.getName());
-      } else if (satisfiesRequirements(platform, command)) {
+      boolean dispatched = false;
+      if (command != null && satisfiesRequirements(platform, command)) {
         matched = true;
-        if (onMatch.test(operation)) {
-          onDispatched(operation);
-        }
+        dispatched = onMatch.test(operation);
+      }
+      if (dispatched) {
+        onDispatched(operation);
       } else {
         rejectedOperations.add(operation);
       }
     }
-    Iterables.addAll(queuedOperations, rejectedOperations.build());
+    for (Operation operation : rejectedOperations.build()) {
+      requeueOperation(operation);
+    }
     if (!matched) {
       synchronized(workers) {
         workers.add(new Worker(platform, onMatch));

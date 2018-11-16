@@ -88,7 +88,7 @@ public abstract class AbstractServerInstance implements Instance {
   private static final String MISSING_INPUT =
       "A requested input (or the `Command` of the `Action`) was not found in the CAS.";
 
-  private static final String INVALID_DIGEST = "A `Digest` in the input tree is invalid.";
+  public static final String INVALID_DIGEST = "A `Digest` in the input tree is invalid.";
 
   private static final String INVALID_FILE_NAME =
       "One of the input `PathNode`s has an invalid name, such as a name containing a `/` character"
@@ -631,8 +631,16 @@ public abstract class AbstractServerInstance implements Instance {
     if (action == null) {
       return null;
     }
+    return expectCommand(action.getCommandDigest());
+  }
+
+  protected Command expectCommand(Digest commandDigest) {
+    ByteString commandBlob = getBlob(commandDigest);
+    if (commandBlob == null) {
+      return null;
+    }
     try {
-      return Command.parseFrom(getBlob(action.getCommandDigest()));
+      return Command.parseFrom(commandBlob);
     } catch (InvalidProtocolBufferException ex) {
       return null;
     }
@@ -786,35 +794,33 @@ public abstract class AbstractServerInstance implements Instance {
     return putOperation(operation);
   }
 
-  @Override
+  @VisibleForTesting
   public boolean requeueOperation(Operation operation) throws InterruptedException {
     String name = operation.getName();
     ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
     if (metadata == null) {
       // ensure that watchers are notified
+      String message = String.format(
+          "Operation %s does not contain ExecuteOperationMetadata",
+          name);
       errorOperation(name, com.google.rpc.Status.newBuilder()
           .setCode(com.google.rpc.Code.FAILED_PRECONDITION.getNumber())
+          .setMessage(message)
           .build());
-      throw new IllegalStateException(
-          String.format(
-              "Operation %s does not contain ExecuteOperationMetadata",
-              name));
+      return false;
     }
-
-    // valid metadata should mean that we revalidate in dispatched
-    Preconditions.checkState(
-        metadata.getStage() == Stage.QUEUED,
-        String.format("Operation %s stage is not QUEUED", name));
 
     Digest actionDigest = metadata.getActionDigest();
 
     Action action = expectAction(actionDigest);
 
     try {
+      Preconditions.checkState(action != null, MISSING_INPUT);
       validateAction(action);
     } catch (IllegalStateException e) {
       errorOperation(name, com.google.rpc.Status.newBuilder()
           .setCode(com.google.rpc.Code.FAILED_PRECONDITION.getNumber())
+          .setMessage(e.getMessage())
           .build());
       return false;
     }

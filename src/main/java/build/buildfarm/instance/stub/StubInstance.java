@@ -335,7 +335,7 @@ public class StubInstance implements Instance {
         .setInstanceName(getName())
         .setPlatform(platform)
         .build());
-    boolean success = onMatch.test(operation);
+    onMatch.test(operation);
   }
 
   @Override
@@ -348,11 +348,6 @@ public class StubInstance implements Instance {
 
   @Override
   public boolean putAndValidateOperation(Operation operation) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
-  public boolean requeueOperation(Operation operation) {
     throw new UnsupportedOperationException();
   }
 
