@@ -50,15 +50,16 @@ import org.junit.Before;
 import org.junit.Test;
 
 public class UploadOutputsTest {
+  private static final DigestUtil DIGEST_UTIL = new DigestUtil(DigestUtil.HashFunction.SHA256);
+
   private final Configuration config;
 
   private FileSystem fileSystem;
   private Path root;
+  private ActionResult.Builder resultBuilder;
 
   @Mock
   private ByteStreamUploader mockUploader;
-
-  private DigestUtil digestUtil;
 
   protected UploadOutputsTest(Configuration config) {
     this.config = config.toBuilder()
@@ -73,8 +74,9 @@ public class UploadOutputsTest {
     fileSystem = Jimfs.newFileSystem(config);
     root = Iterables.getFirst(fileSystem.getRootDirectories(), null);
 
-    digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
     fileSystem = Jimfs.newFileSystem(config);
+
+    resultBuilder = ActionResult.newBuilder();
   }
 
   @Test
@@ -82,28 +84,19 @@ public class UploadOutputsTest {
       throws IOException, StatusException, InterruptedException {
     Files.createDirectory(root.resolve("foo"));
     // maybe make some files...
-    ActionResult.Builder resultBuilder = ActionResult.newBuilder();
-    Worker.uploadOutputs(
-        resultBuilder,
-        digestUtil,
-        root,
+    uploadOutputs(
         ImmutableList.<String>of(),
-        ImmutableList.<String>of("foo"),
-        mockUploader,
-        /* inlineContentLimit=*/ 0,
-        CASInsertionPolicy.ALWAYS_INSERT,
-        CASInsertionPolicy.ALWAYS_INSERT,
-        CASInsertionPolicy.ALWAYS_INSERT);
+        ImmutableList.<String>of("foo"));
     Tree emptyTree = Tree.newBuilder()
         .setRoot(Directory.getDefaultInstance())
         .build();
     verify(mockUploader)
         .uploadBlobs(eq(ImmutableList.<Chunker>of(
-            new Chunker(emptyTree.toByteString(), digestUtil.compute(emptyTree)))));
+            new Chunker(emptyTree.toByteString(), DIGEST_UTIL.compute(emptyTree)))));
     assertThat(resultBuilder.getOutputDirectoriesList()).containsExactly(
         OutputDirectory.newBuilder()
             .setPath("foo")
-            .setTreeDigest(digestUtil.compute(emptyTree))
+            .setTreeDigest(DIGEST_UTIL.compute(emptyTree))
             .build());
   }
 
@@ -115,35 +108,26 @@ public class UploadOutputsTest {
     Path file = topdir.resolve("bar");
     Files.createFile(file);
     // maybe make some files...
-    ActionResult.Builder resultBuilder = ActionResult.newBuilder();
-    Worker.uploadOutputs(
-        resultBuilder,
-        digestUtil,
-        root,
+    uploadOutputs(
         ImmutableList.<String>of(),
-        ImmutableList.<String>of("foo"),
-        mockUploader,
-        /* inlineContentLimit=*/ 0,
-        CASInsertionPolicy.ALWAYS_INSERT,
-        CASInsertionPolicy.ALWAYS_INSERT,
-        CASInsertionPolicy.ALWAYS_INSERT);
+        ImmutableList.<String>of("foo"));
     Tree tree = Tree.newBuilder()
         .setRoot(Directory.newBuilder()
             .addFiles(FileNode.newBuilder()
                 .setName("bar")
-                .setDigest(digestUtil.empty())
+                .setDigest(DIGEST_UTIL.empty())
                 .setIsExecutable(Files.isExecutable(file))
                 .build())
             .build())
         .build();
     verify(mockUploader)
         .uploadBlobs(eq(ImmutableList.<Chunker>of(
-            new Chunker(ByteString.EMPTY, digestUtil.empty()),
-            new Chunker(tree.toByteString(), digestUtil.compute(tree)))));
+            new Chunker(ByteString.EMPTY, DIGEST_UTIL.empty()),
+            new Chunker(tree.toByteString(), DIGEST_UTIL.compute(tree)))));
     assertThat(resultBuilder.getOutputDirectoriesList()).containsExactly(
         OutputDirectory.newBuilder()
             .setPath("foo")
-            .setTreeDigest(digestUtil.compute(tree))
+            .setTreeDigest(DIGEST_UTIL.compute(tree))
             .build());
   }
 
@@ -157,22 +141,13 @@ public class UploadOutputsTest {
     Path file = subdir.resolve("baz");
     Files.createFile(file);
     // maybe make some files...
-    ActionResult.Builder resultBuilder = ActionResult.newBuilder();
-    Worker.uploadOutputs(
-        resultBuilder,
-        digestUtil,
-        root,
+    uploadOutputs(
         ImmutableList.<String>of(),
-        ImmutableList.<String>of("foo"),
-        mockUploader,
-        /* inlineContentLimit=*/ 0,
-        CASInsertionPolicy.ALWAYS_INSERT,
-        CASInsertionPolicy.ALWAYS_INSERT,
-        CASInsertionPolicy.ALWAYS_INSERT);
+        ImmutableList.<String>of("foo"));
     Directory subDirectory = Directory.newBuilder()
         .addFiles(FileNode.newBuilder()
             .setName("baz")
-            .setDigest(digestUtil.empty())
+            .setDigest(DIGEST_UTIL.empty())
             .setIsExecutable(Files.isExecutable(file))
             .build())
         .build();
@@ -180,41 +155,66 @@ public class UploadOutputsTest {
         .setRoot(Directory.newBuilder()
             .addDirectories(DirectoryNode.newBuilder()
                 .setName("bar")
-                .setDigest(digestUtil.compute(subDirectory))
+                .setDigest(DIGEST_UTIL.compute(subDirectory))
                 .build())
             .build())
         .addChildren(subDirectory)
         .build();
     verify(mockUploader)
         .uploadBlobs(eq(ImmutableList.<Chunker>of(
-            new Chunker(ByteString.EMPTY, digestUtil.empty()),
-            new Chunker(tree.toByteString(), digestUtil.compute(tree)))));
+            new Chunker(ByteString.EMPTY, DIGEST_UTIL.empty()),
+            new Chunker(tree.toByteString(), DIGEST_UTIL.compute(tree)))));
     assertThat(resultBuilder.getOutputDirectoriesList()).containsExactly(
         OutputDirectory.newBuilder()
             .setPath("foo")
-            .setTreeDigest(digestUtil.compute(tree))
+            .setTreeDigest(DIGEST_UTIL.compute(tree))
             .build());
   }
 
   @Test
   public void uploadOutputsIgnoresMissingOutputDirectories()
       throws IOException, StatusException, InterruptedException {
-    ActionResult.Builder resultBuilder = ActionResult.newBuilder();
-    Worker.uploadOutputs(
-        resultBuilder,
-        digestUtil,
-        root,
+    uploadOutputs(
         ImmutableList.<String>of(),
-        ImmutableList.<String>of("foo"),
-        mockUploader,
-        /* inlineContentLimit=*/ 0,
-        CASInsertionPolicy.ALWAYS_INSERT,
-        CASInsertionPolicy.ALWAYS_INSERT,
-        CASInsertionPolicy.ALWAYS_INSERT);
+        ImmutableList.<String>of("foo"));
     Tree emptyTree = Tree.newBuilder()
         .setRoot(Directory.getDefaultInstance())
         .build();
     verify(mockUploader, never())
         .uploadBlobs(any());
+  }
+
+  private void uploadOutputs(
+      Iterable<String> files,
+      Iterable<String> directories) throws IOException, InterruptedException {
+    Worker.uploadOutputs(
+        resultBuilder,
+        DIGEST_UTIL,
+        root,
+        files,
+        directories,
+        mockUploader,
+        /* inlineContentLimit=*/ 0,
+        CASInsertionPolicy.ALWAYS_INSERT,
+        CASInsertionPolicy.ALWAYS_INSERT,
+        CASInsertionPolicy.ALWAYS_INSERT);
+  }
+
+  @Test(expected=IllegalStateException.class)
+  public void uploadOutputsThrowsIllegalStateExceptionWhenOutputFileIsDirectory()
+      throws IOException, InterruptedException {
+    Files.createDirectory(root.resolve("foo"));
+    uploadOutputs(
+        ImmutableList.<String>of("foo"),
+        ImmutableList.<String>of());
+  }
+
+  @Test(expected=IllegalStateException.class)
+  public void uploadOutputsThrowsIllegalStateExceptionWhenOutputDirectoryIsFile()
+      throws IOException, InterruptedException {
+    Files.createFile(root.resolve("foo"));
+    uploadOutputs(
+        ImmutableList.<String>of(),
+        ImmutableList.<String>of("foo"));
   }
 }
