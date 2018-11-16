@@ -988,8 +988,8 @@ public abstract class CASFileCache implements ContentAddressableStorage, OutputS
     }
     // already has it
     return listeningDecorator(service).submit(() -> {
-      try (InputStream in = newExternalInput(digest, 0)) {
-        ByteStreams.copy(in, out);
+      try {
+        Downloader.copy((offset) -> newExternalInput(digest, offset), out);
       } catch (IOException e) {
         out.cancel();
         logger.log(SEVERE, "error copying to entry from " + DigestUtil.toString(digest), e); // prevent burial by early end of stream during close
