@@ -164,6 +164,7 @@ public class Worker {
         config.getOperationPollPeriod(),
         backplane::pollOperation,
         config.getInlineContentLimit(),
+        config.getInputFetchStageWidth(),
         config.getExecuteStageWidth(),
         execFileSystem,
         config.getExecutionPoliciesList(),

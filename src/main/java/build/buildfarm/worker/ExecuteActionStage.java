@@ -85,7 +85,7 @@ public class ExecuteActionStage extends PipelineStage {
         operationName,
         usecs,
         stallUSecs,
-        String.format("exit code: %d, %d/%d", exitCode, size, workerContext.getExecuteStageWidth()));
+        String.format("exit code: %d, %s", exitCode, getUsage(size)));
   }
 
   @Override

@@ -49,6 +49,7 @@ public interface WorkerContext {
   DigestUtil getDigestUtil();
   ExecutionPolicy getExecutionPolicy(String name);
   int getExecuteStageWidth();
+  int getInputFetchStageWidth();
   int getTreePageSize();
   boolean hasDefaultActionTimeout();
   boolean hasMaximumActionTimeout();

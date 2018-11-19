@@ -891,6 +891,45 @@ public abstract class CASFileCache implements ContentAddressableStorage, OutputS
       ExecutorService service) {
     Path path = getDirectoryPath(digest);
 
+    Lock l = locks.acquire(path);
+    ThreadFactory factory = new ThreadFactoryBuilder()
+        .setNameFormat(String.format("directory-%s-lock-manager", path.getFileName()))
+        .build();
+    ListeningExecutorService lockService = listeningDecorator(Executors.newSingleThreadExecutor(factory));
+
+    ListenableFuture<Path> putFuture = transformAsync(
+        lockService.submit(() -> {
+          l.lockInterruptibly();
+          return path;
+        }),
+        (lockedPath) -> putDirectorySynchronized(lockedPath, digest, directoriesIndex, service),
+        service);
+    putFuture.addListener(
+        () -> {
+          lockService.execute(() -> {
+            locks.release(path);
+            l.unlock();
+          });
+          lockService.shutdown();
+          try {
+            lockService.awaitTermination(10, TimeUnit.MINUTES);
+          } catch (InterruptedException e) {
+            // ignore
+          } finally {
+            if (!lockService.isTerminated()) {
+              lockService.shutdownNow();
+            }
+          }
+        },
+        service);
+    return putFuture;
+  }
+
+  private ListenableFuture<Path> putDirectorySynchronized(
+      Path path,
+      Digest digest,
+      Map<Digest, Directory> directoriesIndex,
+      ExecutorService service) {
     ListenableFuture<Void> expireFuture;
     synchronized (this) {
       DirectoryEntry e = directoryStorage.get(digest);

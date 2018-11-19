@@ -115,8 +115,6 @@ class Executor implements Runnable {
       }
     }
 
-    final Thread executorThread = Thread.currentThread();
-
     Duration timeout;
     if (operationContext.action.hasTimeout()) {
       timeout = operationContext.action.getTimeout();
@@ -138,6 +136,7 @@ class Executor implements Runnable {
           MICROSECONDS);
     }
 
+    final Thread executorThread = Thread.currentThread();
     Poller poller = workerContext.createPoller(
         "Executor",
         operation.getName(),

@@ -48,6 +48,7 @@ class StubWorkerContext implements WorkerContext {
   @Override public CASInsertionPolicy getStderrCasPolicy() { throw new UnsupportedOperationException(); }
   @Override public DigestUtil getDigestUtil() { throw new UnsupportedOperationException(); }
   @Override public ExecutionPolicy getExecutionPolicy(String name) { throw new UnsupportedOperationException(); }
+  @Override public int getInputFetchStageWidth() { throw new UnsupportedOperationException(); }
   @Override public int getExecuteStageWidth() { throw new UnsupportedOperationException(); }
   @Override public int getTreePageSize() { throw new UnsupportedOperationException(); }
   @Override public boolean hasDefaultActionTimeout() { throw new UnsupportedOperationException(); }

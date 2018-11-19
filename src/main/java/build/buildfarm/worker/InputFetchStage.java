@@ -14,15 +14,9 @@
 
 package build.buildfarm.worker;
 
-import static java.util.concurrent.TimeUnit.SECONDS;
-import static java.util.logging.Level.SEVERE;
-
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
-import com.google.protobuf.Duration;
-import com.google.protobuf.util.Durations;
-import io.grpc.Deadline;
-import java.io.IOException;
-import java.nio.file.Path;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Sets;
+import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.logging.Logger;
@@ -30,6 +24,7 @@ import java.util.logging.Logger;
 public class InputFetchStage extends PipelineStage {
   private static final Logger logger = Logger.getLogger(InputFetchStage.class.getName());
 
+  private final Set<Thread> fetchers = Sets.newHashSet();
   private final BlockingQueue<OperationContext> queue = new ArrayBlockingQueue<>(1);
 
   public InputFetchStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
@@ -52,39 +47,64 @@ public class InputFetchStage extends PipelineStage {
   }
 
   @Override
-  protected OperationContext tick(OperationContext operationContext) throws InterruptedException {
-    String operationName = operationContext.operation.getName();
-    Poller poller = workerContext.createPoller(
-        "InputFetchStage",
-        operationName,
-        ExecuteOperationMetadata.Stage.QUEUED,
-        this::cancelTick,
-        Deadline.after(60, SECONDS));
-
-    workerContext.logInfo("InputFetchStage: Fetching inputs: " + operationContext.operation.getName());
-
-    long fetchStartAt = System.nanoTime();
-
-    boolean success = true;
-    Path execDir;
-    try {
-      execDir = workerContext.createExecDir(
-          operationName,
-          operationContext.directoriesIndex,
-          operationContext.action,
-          operationContext.command);
-    } catch (IOException e) {
-      logger.log(SEVERE, "error creating exec dir for " + operationName, e);
-      return null;
-    } finally {
-      poller.stop();
+  public synchronized boolean claim() throws InterruptedException {
+    if (isClosed()) {
+      return false;
     }
 
-    Duration fetchedIn = Durations.fromNanos(System.nanoTime() - fetchStartAt);
+    while (fetchers.size() >= workerContext.getInputFetchStageWidth()) {
+      wait();
+    }
+    return true;
+  }
 
-    return operationContext.toBuilder()
-        .setExecDir(execDir)
-        .setFetchedIn(fetchedIn)
-        .build();
+  public synchronized int removeAndNotify() {
+    if (!fetchers.remove(Thread.currentThread())) {
+      throw new IllegalStateException("tried to remove unknown fetcher thread");
+    }
+    this.notify();
+    return fetchers.size();
+  }
+
+  private String getUsage(int size) {
+    return String.format("%s/%d", size, workerContext.getInputFetchStageWidth());
+  }
+
+  private void logComplete(int size) {
+    logger.info(String.format("%s: %s", name, getUsage(size)));
+  }
+
+  @Override
+  public void release() {
+    removeAndNotify();
+  }
+
+  public void releaseInputFetcher(String operationName, long usecs, long stallUSecs, boolean success) {
+    int size = removeAndNotify();
+    logComplete(
+        operationName,
+        usecs,
+        stallUSecs,
+        String.format("%s, %s", success ? "Success" : "Failure", getUsage(size)));
+  }
+
+  @Override
+  protected synchronized boolean isClaimed() {
+    return Iterables.any(fetchers, (fetcher) -> fetcher.isAlive());
+  }
+
+  @Override
+  protected void iterate() throws InterruptedException {
+    OperationContext operationContext = take();
+    Thread fetcher = new Thread(new InputFetcher(workerContext, operationContext, this));
+
+    int size;
+    synchronized(this) {
+      fetchers.add(fetcher);
+      size = fetchers.size();
+    }
+    logStart(operationContext.operation.getName(), getUsage(size));
+
+    fetcher.start();
   }
 }

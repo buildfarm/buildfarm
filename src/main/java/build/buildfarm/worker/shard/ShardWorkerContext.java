@@ -73,6 +73,7 @@ class ShardWorkerContext implements WorkerContext {
   private final Duration operationPollPeriod;
   private final OperationPoller operationPoller;
   private final int inlineContentLimit;
+  private final int inputFetchStageWidth;
   private final int executeStageWidth;
   private final ExecFileSystem execFileSystem;
   private final Map<String, ExecutionPolicy> policies;
@@ -85,6 +86,7 @@ class ShardWorkerContext implements WorkerContext {
       Duration operationPollPeriod,
       OperationPoller operationPoller,
       int inlineContentLimit,
+      int inputFetchStageWidth,
       int executeStageWidth,
       ExecFileSystem execFileSystem,
       Iterable<ExecutionPolicy> policies,
@@ -93,6 +95,7 @@ class ShardWorkerContext implements WorkerContext {
     this.operationPollPeriod = operationPollPeriod;
     this.operationPoller = operationPoller;
     this.inlineContentLimit = inlineContentLimit;
+    this.inputFetchStageWidth = inputFetchStageWidth;
     this.executeStageWidth = executeStageWidth;
     this.execFileSystem = execFileSystem;
     this.policies = uniqueIndex(policies, (policy) -> policy.getName());
@@ -278,6 +281,11 @@ class ShardWorkerContext implements WorkerContext {
   @Override
   public CASInsertionPolicy getStderrCasPolicy() {
     return CASInsertionPolicy.ALWAYS_INSERT;
+  }
+
+  @Override
+  public int getInputFetchStageWidth() {
+    return inputFetchStageWidth;
   }
 
   @Override

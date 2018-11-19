@@ -243,6 +243,9 @@ message ShardWorkerConfig {
   // action results
   int32 inline_content_limit = 15;
 
+  // input fetch width
+  int32 input_fetch_stage_width = 26;
+
   // execute width
   int32 execute_stage_width = 16;
 
@@ -444,6 +447,9 @@ message WorkerConfig {
 
   // initial platform used to match operations
   build.bazel.remote.execution.v2.Platform platform = 17;
+
+  // input fetch width
+  int32 input_fetch_stage_width = 23;
 
   // execute width
   int32 execute_stage_width = 18;

@@ -541,6 +541,11 @@ public class Worker {
       }
 
       @Override
+      public int getInputFetchStageWidth() {
+        return config.getInputFetchStageWidth();
+      }
+
+      @Override
       public int getExecuteStageWidth() {
         return config.getExecuteStageWidth();
       }
