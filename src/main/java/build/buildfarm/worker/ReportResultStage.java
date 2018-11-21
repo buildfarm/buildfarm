@@ -21,16 +21,16 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.devtools.remoteexecution.v1test.Action;
-import com.google.devtools.remoteexecution.v1test.ActionResult;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.Directory;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
-import com.google.devtools.remoteexecution.v1test.ExecuteResponse;
-import com.google.devtools.remoteexecution.v1test.FileNode;
-import com.google.devtools.remoteexecution.v1test.OutputDirectory;
-import com.google.devtools.remoteexecution.v1test.OutputFile;
-import com.google.devtools.remoteexecution.v1test.Tree;
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecuteResponse;
+import build.bazel.remote.execution.v2.FileNode;
+import build.bazel.remote.execution.v2.OutputDirectory;
+import build.bazel.remote.execution.v2.OutputFile;
+import build.bazel.remote.execution.v2.Tree;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -52,15 +52,20 @@ import java.util.Stack;
 import java.util.function.Consumer;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.logging.Logger;
 
 public class ReportResultStage extends PipelineStage {
+  public static final Logger logger = Logger.getLogger(ReportResultStage.class.getName());
+
   private final BlockingQueue<OperationContext> queue;
 
   public static class NullStage extends PipelineStage {
-    public NullStage() {
-      super(null, null, null);
+    public NullStage(String name) {
+      super(name, null, null, null);
     }
 
+    @Override
+    public Logger getLogger() { return null; }
     @Override
     public boolean claim() { return true; }
     @Override
@@ -80,8 +85,13 @@ public class ReportResultStage extends PipelineStage {
   }
 
   public ReportResultStage(WorkerContext workerContext, PipelineStage error) {
-    super(workerContext, new NullStage(), error);
+    super("ReportResultStage", workerContext, new NullStage("Terminal"), error);
     queue = new ArrayBlockingQueue<>(1);
+  }
+
+  @Override
+  protected Logger getLogger() {
+    return logger;
   }
 
   @Override
@@ -184,8 +194,8 @@ public class ReportResultStage extends PipelineStage {
       uploadOutputs(
           resultBuilder,
           operationContext.execDir,
-          operationContext.action.getOutputFilesList(),
-          operationContext.action.getOutputDirectoriesList());
+          operationContext.command.getOutputFilesList(),
+          operationContext.command.getOutputDirectoriesList());
     } catch (IllegalStateException e) {
       status
           .setCode(Code.FAILED_PRECONDITION.getNumber())
@@ -223,7 +233,8 @@ public class ReportResultStage extends PipelineStage {
         operation,
         operationContext.execDir,
         metadata,
-        operationContext.action);
+        operationContext.action,
+        operationContext.command);
   }
 
   @Override

@@ -15,18 +15,73 @@
 package build.buildfarm.server;
 
 import build.buildfarm.instance.Instance;
-import com.google.devtools.remoteexecution.v1test.ExecuteRequest;
-import com.google.devtools.remoteexecution.v1test.ExecutionGrpc;
+import build.bazel.remote.execution.v2.ExecuteRequest;
+import build.bazel.remote.execution.v2.ExecutionGrpc;
+import build.bazel.remote.execution.v2.WaitExecutionRequest;
 import com.google.longrunning.Operation;
+import io.grpc.Context;
 import io.grpc.Status;
-import io.grpc.StatusException;
+import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
+import java.util.function.Predicate;
 
 public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
   private final Instances instances;
 
   public ExecutionService(Instances instances) {
     this.instances = instances;
+  }
+
+  private Predicate<Operation> createWatcher(StreamObserver<Operation> responseObserver) {
+    return (operation) -> {
+      if (Context.current().isCancelled()) {
+        return false;
+      }
+      try {
+        if (operation != null) {
+          responseObserver.onNext(operation);
+        }
+        if (operation == null || operation.getDone()) {
+          responseObserver.onCompleted();
+          return false;
+        }
+      } catch (StatusRuntimeException e) {
+        // no further responses should be necessary
+        if (e.getStatus().getCode() != Status.Code.CANCELLED) {
+          responseObserver.onError(Status.fromThrowable(e).asException());
+        }
+        return false;
+      } catch (IllegalStateException e) {
+        // only indicator for this from ServerCallImpl layer
+        // no further responses should be necessary
+        if (!e.getMessage().equals("call is closed")) {
+          responseObserver.onError(Status.fromThrowable(e).asException());
+        }
+        return false;
+      }
+      // still watching
+      return true;
+    };
+  }
+
+  @Override
+  public void waitExecution(
+      WaitExecutionRequest request, StreamObserver<Operation> responseObserver) {
+    String operationName = request.getName();
+    Instance instance;
+    try {
+      instance = instances.getFromOperationName(operationName);
+    } catch (InstanceNotFoundException e) {
+      responseObserver.onError(BuildFarmInstances.toStatusException(e));
+      return;
+    }
+
+    boolean watching = instance.watchOperation(
+        operationName,
+        createWatcher(responseObserver));
+    if (!watching) {
+      responseObserver.onCompleted();
+    }
   }
 
   @Override
@@ -42,17 +97,17 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
 
     try {
       instance.execute(
-          request.getAction(),
+          request.getActionDigest(),
           request.getSkipCacheLookup(),
-          request.getTotalInputFileCount(),
-          request.getTotalInputFileBytes(),
-          (operation) -> {
-            responseObserver.onNext(operation);
-            responseObserver.onCompleted();
-          });
+          request.getExecutionPolicy(),
+          request.getResultsCachePolicy(),
+          createWatcher(responseObserver));
     } catch (IllegalStateException e) {
-      responseObserver.onError(new StatusException(
-          Status.FAILED_PRECONDITION.withDescription(e.getMessage())));
+      responseObserver.onError(Status.FAILED_PRECONDITION
+          .withDescription(e.getMessage())
+          .asException());
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
     }
   }
 }

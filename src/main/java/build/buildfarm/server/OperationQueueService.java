@@ -18,7 +18,7 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.PollOperationRequest;
 import build.buildfarm.v1test.TakeOperationRequest;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -27,6 +27,7 @@ import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
+import java.util.function.Predicate;
 
 public class OperationQueueService extends OperationQueueGrpc.OperationQueueImplBase {
   private final Instances instances;
@@ -35,19 +36,8 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
     this.instances = instances;
   }
 
-  @Override
-  public void take(
-      TakeOperationRequest request,
-      StreamObserver<Operation> responseObserver) {
-    Instance instance;
-    try {
-      instance = instances.get(request.getInstanceName());
-    } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
-      return;
-    }
-
-    instance.match(request.getPlatform(), /*requeueOnFailure=*/ true, (final Operation operation) -> {
+  private Predicate<Operation> createOnMatch(StreamObserver<Operation> responseObserver) {
+    return (operation) -> {
       // so this is interesting - the stdout injection belongs here, because
       // we use this criteria to select the format for stream/blob differentiation
       try {
@@ -65,15 +55,35 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
         responseObserver.onCompleted();
         return true;
       } catch(InvalidProtocolBufferException ex) {
-        responseObserver.onError(new StatusException(Status.INTERNAL));
+        responseObserver.onError(Status.INTERNAL.asException());
         // should we update operation?
       } catch(StatusRuntimeException ex) {
-        if (ex.getStatus().getCode() != Status.Code.CANCELLED) {
-          throw ex;
+        Status status = Status.fromThrowable(ex);
+        if (status.getCode() != Status.Code.CANCELLED) {
+          responseObserver.onError(ex);
         }
       }
       return false;
-    });
+    };
+  }
+
+  @Override
+  public void take(
+      TakeOperationRequest request,
+      StreamObserver<Operation> responseObserver) {
+    Instance instance;
+    try {
+      instance = instances.get(request.getInstanceName());
+    } catch (InstanceNotFoundException ex) {
+      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
+      return;
+    }
+
+    try {
+      instance.match(request.getPlatform(), /*requeueOnFailure=*/ true, createOnMatch(responseObserver));
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
   }
 
   @Override
@@ -88,12 +98,16 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
       return;
     }
 
-    boolean ok = instance.putOperation(operation);
-    Code code = ok ? Code.OK : Code.UNAVAILABLE;
-    responseObserver.onNext(com.google.rpc.Status.newBuilder()
-        .setCode(code.getNumber())
-        .build());
-    responseObserver.onCompleted();
+    try {
+      boolean ok = instance.putOperation(operation);
+      Code code = ok ? Code.OK : Code.UNAVAILABLE;
+      responseObserver.onNext(com.google.rpc.Status.newBuilder()
+          .setCode(code.getNumber())
+          .build());
+      responseObserver.onCompleted();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
   }
 
   @Override

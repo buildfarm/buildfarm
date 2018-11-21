@@ -14,19 +14,19 @@
 
 package build.buildfarm.proxy.http;
 
+import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
+import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest.Request;
+import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
+import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
+import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
+import build.bazel.remote.execution.v2.GetTreeRequest;
+import build.bazel.remote.execution.v2.GetTreeResponse;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator;
 import com.google.common.collect.ImmutableList;
-import com.google.devtools.remoteexecution.v1test.BatchUpdateBlobsRequest;
-import com.google.devtools.remoteexecution.v1test.BatchUpdateBlobsResponse;
-import com.google.devtools.remoteexecution.v1test.ContentAddressableStorageGrpc;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.Directory;
-import com.google.devtools.remoteexecution.v1test.FindMissingBlobsRequest;
-import com.google.devtools.remoteexecution.v1test.FindMissingBlobsResponse;
-import com.google.devtools.remoteexecution.v1test.GetTreeRequest;
-import com.google.devtools.remoteexecution.v1test.GetTreeResponse;
-import com.google.devtools.remoteexecution.v1test.UpdateBlobRequest;
 import com.google.protobuf.ByteString;
 import io.grpc.Metadata;
 import io.grpc.Status;
@@ -83,21 +83,21 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
         (code) -> com.google.rpc.Status.newBuilder()
             .setCode(code.getNumber())
             .build();
-    for (UpdateBlobRequest request : batchRequest.getRequestsList()) {
-      Digest digest = request.getContentDigest();
+    for (Request request : batchRequest.getRequestsList()) {
+      Digest digest = request.getDigest();
       try {
         simpleBlobStore.put(
             digest.getHash(),
             digest.getSizeBytes(),
             request.getData().newInput());
         responses.add(BatchUpdateBlobsResponse.Response.newBuilder()
-            .setBlobDigest(digest)
+            .setDigest(digest)
             .setStatus(statusForCode.apply(com.google.rpc.Code.OK))
             .build());
       } catch (IOException e) {
         StatusException statusException = Status.fromThrowable(e).asException();
         responses.add(BatchUpdateBlobsResponse.Response.newBuilder()
-            .setBlobDigest(digest)
+            .setDigest(digest)
             .setStatus(StatusProto.fromThrowable(statusException))
             .build());
       } catch (InterruptedException e) {

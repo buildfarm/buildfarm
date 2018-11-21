@@ -14,6 +14,8 @@
 
 package build.buildfarm.worker.operationqueue;
 
+import static com.google.common.collect.Maps.uniqueIndex;
+
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
@@ -23,6 +25,7 @@ import build.buildfarm.instance.stub.Retrier;
 import build.buildfarm.instance.stub.Retrier.Backoff;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.CASInsertionPolicy;
+import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.InstanceEndpoint;
 import build.buildfarm.v1test.WorkerConfig;
 import build.buildfarm.worker.CASFileCache;
@@ -43,13 +46,15 @@ import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.devtools.common.options.OptionsParser;
-import com.google.devtools.remoteexecution.v1test.Action;
-import com.google.devtools.remoteexecution.v1test.ActionResult;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.Directory;
-import com.google.devtools.remoteexecution.v1test.DirectoryNode;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
-import com.google.devtools.remoteexecution.v1test.FileNode;
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.DirectoryNode;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
+import build.bazel.remote.execution.v2.FileNode;
+import build.bazel.remote.execution.v2.Platform;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -118,7 +123,7 @@ public class Worker {
 
   private static HashFunction getValidHashFunction(WorkerConfig config) throws ConfigurationException {
     try {
-      return HashFunction.get(config.getHashFunction());
+      return HashFunction.get(config.getDigestFunction());
     } catch (IllegalArgumentException e) {
       throw new ConfigurationException("hash_function value unrecognized");
     }
@@ -250,6 +255,16 @@ public class Worker {
     Files.createSymbolicLink(execPath, cachePath);
   }
 
+  public Platform getPlatform() {
+    Platform.Builder platform = config.getPlatform().toBuilder();
+    for (ExecutionPolicy policy : config.getExecutionPoliciesList()) {
+      platform.addPropertiesBuilder()
+        .setName("execution-policy")
+        .setValue(policy.getName());
+    }
+    return platform.build();
+  }
+
   public void start() throws InterruptedException {
     try {
       Files.createDirectories(root);
@@ -260,6 +275,10 @@ public class Worker {
     }
 
     WorkerContext workerContext = new WorkerContext() {
+      Map<String, ExecutionPolicy> policies = uniqueIndex(
+          config.getExecutionPoliciesList(),
+          (policy) -> policy.getName());
+
       @Override
       public Poller createPoller(String name, String operationName, Stage stage) {
         return createPoller(name, operationName, stage, () -> {});
@@ -284,9 +303,10 @@ public class Worker {
       }
 
       @Override
-      public void match(Predicate<Operation> onMatch) throws InterruptedException {
+      public void match(Predicate<Operation> onMatch)
+          throws InterruptedException {
         operationQueueInstance.match(
-            config.getPlatform(),
+            getPlatform(),
             config.getRequeueOnFailure(),
             onMatch);
       }
@@ -367,10 +387,10 @@ public class Worker {
       }
 
       @Override
-      public void createActionRoot(Path root, Action action) throws IOException, InterruptedException {
+      public void createActionRoot(Path root, Action action, Command command) throws IOException, InterruptedException {
         OutputDirectory outputDirectory = OutputDirectory.parse(
-            action.getOutputFilesList(),
-            action.getOutputDirectoriesList());
+            command.getOutputFilesList(),
+            command.getOutputDirectoriesList());
 
         if (Files.exists(root)) {
           CASFileCache.removeDirectory(root);
@@ -408,12 +428,17 @@ public class Worker {
       }
 
       @Override
+      public ExecutionPolicy getExecutionPolicy(String name) {
+        return policies.get(name);
+      }
+
+      @Override
       public void removeDirectory(Path path) throws IOException {
         CASFileCache.removeDirectory(path);
       }
 
       @Override
-      public boolean putOperation(Operation operation) {
+      public boolean putOperation(Operation operation) throws InterruptedException {
         return operationQueueInstance.putOperation(operation);
       }
 
@@ -424,12 +449,12 @@ public class Worker {
       }
 
       @Override
-      public void putActionResult(ActionKey actionKey, ActionResult actionResult) {
+      public void putActionResult(ActionKey actionKey, ActionResult actionResult) throws InterruptedException {
         acInstance.putActionResult(actionKey, actionResult);
       }
     };
 
-    PipelineStage errorStage = new ReportResultStage.NullStage(); /* ErrorStage(); */
+    PipelineStage errorStage = new ReportResultStage.NullStage("ErrorStage"); /* ErrorStage(); */
     PipelineStage reportResultStage = new ReportResultStage(workerContext, errorStage);
     PipelineStage executeActionStage = new ExecuteActionStage(workerContext, reportResultStage, errorStage);
     reportResultStage.setInput(executeActionStage);

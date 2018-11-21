@@ -14,12 +14,24 @@
 
 package build.buildfarm.instance.memory;
 
-import build.buildfarm.common.ContentAddressableStorage;
+import static com.google.common.collect.Multimaps.synchronizedSetMultimap;
+import static com.google.common.util.concurrent.Futures.addCallback;
+import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
+import static java.util.Collections.synchronizedSortedMap;
+import static java.util.concurrent.Executors.newCachedThreadPool;
+
+import build.buildfarm.ac.ActionCache;
+import build.buildfarm.ac.GrpcActionCache;
+import build.buildfarm.cas.ContentAddressableStorage;
+import build.buildfarm.cas.ContentAddressableStorages;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator;
 import build.buildfarm.instance.AbstractServerInstance;
+import build.buildfarm.instance.OperationsMap;
+import build.buildfarm.v1test.ActionCacheConfig;
+import build.buildfarm.v1test.GrpcACConfig;
 import build.buildfarm.v1test.MemoryInstanceConfig;
 import build.buildfarm.v1test.OperationIteratorToken;
 import com.google.common.annotations.VisibleForTesting;
@@ -27,18 +39,27 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.MultimapBuilder;
+import com.google.common.collect.SetMultimap;
 import com.google.common.io.BaseEncoding;
-import com.google.devtools.remoteexecution.v1test.Action;
-import com.google.devtools.remoteexecution.v1test.ActionResult;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.Directory;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
-import com.google.devtools.remoteexecution.v1test.Platform;
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.Platform;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
+import io.grpc.Channel;
+import io.grpc.netty.NegotiationType;
+import io.grpc.netty.NettyChannelBuilder;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -47,20 +68,30 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 import java.util.function.Predicate;
+import java.util.logging.Logger;
 
 public class MemoryInstance extends AbstractServerInstance {
+  private final static Logger logger = Logger.getLogger(MemoryInstance.class.getName());
+
   private final MemoryInstanceConfig config;
-  private final Map<String, List<Predicate<Operation>>> watchers;
-  private final Map<String, ByteStringStreamSource> streams;
-  private final List<Operation> queuedOperations;
-  private final List<Worker> workers;
-  private final Map<String, Watchdog> requeuers;
-  private final Map<String, Watchdog> operationTimeoutDelays;
-  private final Map<String, Operation> outstandingOperations;
+  private final SetMultimap<String, Predicate<Operation>> watchers;
+  private final Map<String, ByteStringStreamSource> streams =
+      new ConcurrentHashMap<String, ByteStringStreamSource>();
+  private final List<Operation> queuedOperations = new ArrayList<Operation>();
+  private final List<Worker> workers = new ArrayList<Worker>();
+  private final Map<String, Watchdog> requeuers =
+      new ConcurrentHashMap(new HashMap<String, Watchdog>());
+  private final Map<String, Watchdog> operationTimeoutDelays =
+      new ConcurrentHashMap(new HashMap<String, Watchdog>());
+  private final OperationsMap outstandingOperations;
+  private final ListeningExecutorService watcherService;
 
   private static final class Worker {
     private final Platform platform;
@@ -80,13 +111,49 @@ public class MemoryInstance extends AbstractServerInstance {
     }
   }
 
+  static class OutstandingOperations implements OperationsMap {
+    private final Map<String, Operation> map =
+        synchronizedSortedMap(new TreeMap<>());
+
+    @Override
+    public Operation remove(String name) {
+      return map.remove(name);
+    }
+
+    @Override
+    public boolean contains(String name) {
+      return map.containsKey(name);
+    }
+
+    @Override
+    public void put(String name, Operation operation) {
+      map.put(name, operation);
+    }
+
+    @Override
+    public Operation get(String name) {
+      return map.get(name);
+    }
+
+    @Override
+    public Iterator<Operation> iterator() {
+      return map.values().iterator();
+    }
+  }
+
   public MemoryInstance(String name, DigestUtil digestUtil, MemoryInstanceConfig config) {
     this(
         name,
         digestUtil,
         config,
-        /*contentAddressableStorage=*/ new MemoryLRUContentAddressableStorage(config.getCasMaxSizeBytes()),
-        /*outstandingOperations=*/ new TreeMap<String, Operation>());
+        ContentAddressableStorages.create(config.getCasConfig()),
+        /* watchers=*/ synchronizedSetMultimap(
+            MultimapBuilder
+                .hashKeys()
+                .hashSetValues(/* expectedValuesPerKey=*/ 1)
+                .build()),
+        /* watcherService=*/ newCachedThreadPool(),
+        new OutstandingOperations());
   }
 
   @VisibleForTesting
@@ -95,22 +162,93 @@ public class MemoryInstance extends AbstractServerInstance {
       DigestUtil digestUtil,
       MemoryInstanceConfig config,
       ContentAddressableStorage contentAddressableStorage,
-      Map<String, Operation> outstandingOperations) {
+      SetMultimap<String, Predicate<Operation>> watchers,
+      ExecutorService watcherService,
+      OperationsMap outstandingOperations) {
     super(
         name,
         digestUtil,
         contentAddressableStorage,
-        /*actionCache=*/ new DelegateCASMap<ActionKey, ActionResult>(contentAddressableStorage, ActionResult.parser(), digestUtil),
+        MemoryInstance.createActionCache(config.getActionCacheConfig(), contentAddressableStorage, digestUtil),
         outstandingOperations,
-        /*completedOperations=*/ new DelegateCASMap<String, Operation>(contentAddressableStorage, Operation.parser(), digestUtil));
+        MemoryInstance.createCompletedOperationMap(contentAddressableStorage, digestUtil));
     this.config = config;
-    watchers = new ConcurrentHashMap<String, List<Predicate<Operation>>>();
-    streams = new HashMap<String, ByteStringStreamSource>();
-    queuedOperations = new ArrayList<Operation>();
-    workers = new ArrayList<Worker>();
-    requeuers = new HashMap<String, Watchdog>();
-    operationTimeoutDelays = new HashMap<String, Watchdog>();
+    this.watchers = watchers;
     this.outstandingOperations = outstandingOperations;
+    this.watcherService = listeningDecorator(watcherService);
+  }
+
+  private static ActionCache createActionCache(ActionCacheConfig config, ContentAddressableStorage cas, DigestUtil digestUtil) {
+    switch (config.getTypeCase()) {
+      default:
+      case TYPE_NOT_SET:
+        throw new IllegalArgumentException("ActionCache config not set in config");
+      case GRPC:
+        return createGrpcActionCache(config.getGrpc());
+      case DELEGATE_CAS:
+        return createDelegateCASActionCache(cas, digestUtil);
+    }
+  }
+
+  private static Channel createChannel(String target) {
+    NettyChannelBuilder builder =
+        NettyChannelBuilder.forTarget(target)
+            .negotiationType(NegotiationType.PLAINTEXT);
+    return builder.build();
+  }
+
+  private static ActionCache createGrpcActionCache(GrpcACConfig config) {
+    Channel channel = createChannel(config.getTarget());
+    return new GrpcActionCache(config.getInstanceName(), channel);
+  }
+
+  private static ActionCache createDelegateCASActionCache(ContentAddressableStorage cas, DigestUtil digestUtil) {
+    return new ActionCache() {
+      DelegateCASMap<ActionKey, ActionResult> map =
+          new DelegateCASMap<>(cas, ActionResult.parser(), digestUtil);
+
+      @Override
+      public ActionResult get(ActionKey actionKey) {
+        return map.get(actionKey);
+      }
+
+      @Override
+      public void put(ActionKey actionKey, ActionResult actionResult) throws InterruptedException {
+        map.put(actionKey, actionResult);
+      }
+    };
+  }
+
+  private static OperationsMap createCompletedOperationMap(ContentAddressableStorage cas, DigestUtil digestUtil) {
+    return new OperationsMap() {
+      DelegateCASMap<String, Operation> map =
+          new DelegateCASMap<>(cas, Operation.parser(), digestUtil);
+
+      @Override
+      public Operation remove(String name) {
+        return map.remove(name);
+      }
+
+      @Override
+      public boolean contains(String name) {
+        return map.containsKey(name);
+      }
+
+      @Override
+      public void put(String name, Operation operation) throws InterruptedException {
+        map.put(name, operation);
+      }
+
+      @Override
+      public Operation get(String name) {
+        return map.get(name);
+      }
+
+      @Override
+      public Iterator<Operation> iterator() {
+        throw new UnsupportedOperationException();
+      }
+    };
   }
 
   private ByteStringStreamSource getSource(String name) {
@@ -134,37 +272,39 @@ public class MemoryInstance extends AbstractServerInstance {
 
   @Override
   protected void enqueueOperation(Operation operation) {
-    synchronized(queuedOperations) {
+    synchronized (queuedOperations) {
       queuedOperations.add(operation);
     }
   }
 
   @Override
-  protected void updateOperationWatchers(Operation operation) {
-    synchronized(watchers) {
-      List<Predicate<Operation>> operationWatchers =
-          watchers.get(operation.getName());
-      if (operationWatchers != null) {
-        if (operation.getDone()) {
-          watchers.remove(operation.getName());
-        }
-        long unfilteredWatcherCount = operationWatchers.size();
-        super.updateOperationWatchers(operation);
-        ImmutableList.Builder<Predicate<Operation>> filteredWatchers = new ImmutableList.Builder<>();
-        long filteredWatcherCount = 0;
-        for (Predicate<Operation> watcher : operationWatchers) {
-          if (watcher.test(operation)) {
-            filteredWatchers.add(watcher);
-            filteredWatcherCount++;
+  protected void updateOperationWatchers(Operation operation) throws InterruptedException {
+    super.updateOperationWatchers(operation);
+
+    Set<Predicate<Operation>> operationWatchers = watchers.get(operation.getName());
+    synchronized (watchers) {
+      for (Predicate<Operation> watcher : operationWatchers) {
+        ListenableFuture<Boolean> stillWatchingFuture = watcherService.submit(new Callable<Boolean>() {
+          @Override
+          public Boolean call() {
+            return watcher.test(operation) && !operation.getDone();
           }
-        }
-        if (!operation.getDone() && filteredWatcherCount != unfilteredWatcherCount) {
-          operationWatchers = new ArrayList<>();
-          Iterables.addAll(operationWatchers, filteredWatchers.build());
-          watchers.put(operation.getName(), operationWatchers);
-        }
-      } else {
-        throw new IllegalStateException();
+        });
+        addCallback(stillWatchingFuture, new FutureCallback<Boolean>() {
+          @Override
+          public void onSuccess(Boolean stillWatching) {
+            if (!stillWatching) {
+              synchronized (watchers) {
+                operationWatchers.remove(watcher);
+              }
+            }
+          }
+
+          @Override
+          public void onFailure(Throwable t) {
+            // ignore
+          }
+        }, watcherService);
       }
     }
   }
@@ -172,8 +312,6 @@ public class MemoryInstance extends AbstractServerInstance {
   @Override
   protected Operation createOperation(ActionKey actionKey) {
     String name = createOperationName(UUID.randomUUID().toString());
-
-    watchers.put(name, new ArrayList<Predicate<Operation>>());
 
     ExecuteOperationMetadata metadata = ExecuteOperationMetadata.newBuilder()
         .setActionDigest(actionKey.getDigest())
@@ -187,7 +325,7 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  protected void onQueue(Operation operation, Action action) {
+  protected void onQueue(Operation operation, Action action) throws InterruptedException {
     putBlob(action.toByteString());
   }
 
@@ -198,7 +336,7 @@ public class MemoryInstance extends AbstractServerInstance {
       Duration maximum = config.getMaximumActionTimeout();
       Preconditions.checkState(
           timeout.getSeconds() < maximum.getSeconds() ||
-          (timeout.getSeconds() == maximum.getSeconds() && timeout.getNanos() < maximum.getNanos()));
+              (timeout.getSeconds() == maximum.getSeconds() && timeout.getNanos() < maximum.getNanos()));
     }
 
     super.validateAction(action);
@@ -217,7 +355,7 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  public boolean putOperation(Operation operation) {
+  public boolean putOperation(Operation operation) throws InterruptedException {
     if (!super.putOperation(operation)) {
       return false;
     }
@@ -235,7 +373,13 @@ public class MemoryInstance extends AbstractServerInstance {
         operationTimeoutDelay.stop();
       }
     } else if (isExecuting(operation)) {
-      requeuers.get(operationName).pet();
+      Watchdog requeuer = requeuers.get(operationName);
+      if (requeuer == null) {
+        // restore a requeuer if a worker indicates they are executing
+        onDispatched(operation);
+      } else {
+        requeuer.pet();
+      }
 
       // Create a delayed fuse timed out failure
       // This is in effect if the worker does not respond
@@ -264,19 +408,22 @@ public class MemoryInstance extends AbstractServerInstance {
 
   private void onDispatched(Operation operation) {
     Duration timeout = config.getOperationPollTimeout();
-    Watchdog requeuer = new Watchdog(timeout, () -> putOperation(operation));
+    Watchdog requeuer = new Watchdog(timeout, () -> requeueOperation(operation));
     requeuers.put(operation.getName(), requeuer);
     new Thread(requeuer).start();
   }
 
   @Override
   protected boolean matchOperation(Operation operation) {
+    Command command = expectCommand(operation);
+    Preconditions.checkState(command != null, "command not found");
+
     ImmutableList.Builder<Worker> rejectedWorkers = new ImmutableList.Builder<>();
     boolean dispatched = false;
-    synchronized(workers) {
+    synchronized (workers) {
       while (!dispatched && !workers.isEmpty()) {
         Worker worker = workers.remove(0);
-        if (!satisfiesRequirements(worker.getPlatform(), operation)) {
+        if (!satisfiesRequirements(worker.getPlatform(), command)) {
           rejectedWorkers.add(worker);
         } else {
           // worker onMatch false return indicates inviability
@@ -291,43 +438,51 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  public void match(Platform platform, boolean requeueOnFailure, Predicate<Operation> onMatch) {
-    synchronized(queuedOperations) {
+  public void match(
+      Platform platform,
+      boolean requeueOnFailure,
+      Predicate<Operation> onMatch)
+      throws InterruptedException {
+    synchronized (queuedOperations) {
       ImmutableList.Builder<Operation> rejectedOperations = new ImmutableList.Builder<Operation>();
       boolean matched = false;
       while (!matched && !queuedOperations.isEmpty()) {
         Operation operation = queuedOperations.remove(0);
-        if (satisfiesRequirements(platform, operation)) {
-          matched = true;
-          if (onMatch.test(operation)) {
-            onDispatched(operation);
-          } else if (!requeueOnFailure) {
+        Command command = expectCommand(operation);
+        if (command == null) {
+          cancelOperation(operation.getName());
+        } else {
+          if (satisfiesRequirements(platform, command)) {
+            matched = true;
+            if (onMatch.test(operation)) {
+              onDispatched(operation);
+            } else if (!requeueOnFailure) {
+              rejectedOperations.add(operation);
+            }
+          } else {
             rejectedOperations.add(operation);
           }
-        } else {
-          rejectedOperations.add(operation);
         }
       }
       Iterables.addAll(queuedOperations, rejectedOperations.build());
       if (!matched) {
-        synchronized(workers) {
+        synchronized (workers) {
           workers.add(new Worker(platform, onMatch));
         }
       }
     }
   }
 
-  private boolean satisfiesRequirements(Platform platform, Operation operation) {
-    Action action = expectAction(operation);
+  private boolean satisfiesRequirements(Platform platform, Command command) {
     // string compare only
     // no duplicate names
     ImmutableMap.Builder<String, String> provisionsBuilder =
-      new ImmutableMap.Builder<String, String>();
+        new ImmutableMap.Builder<String, String>();
     for (Platform.Property property : platform.getPropertiesList()) {
       provisionsBuilder.put(property.getName(), property.getValue());
     }
     Map<String, String> provisions = provisionsBuilder.build();
-    for (Platform.Property property : action.getPlatform().getPropertiesList()) {
+    for (Platform.Property property : command.getPlatform().getPropertiesList()) {
       if (!provisions.containsKey(property.getName()) ||
           !provisions.get(property.getName()).equals(property.getValue())) {
         return false;
@@ -339,43 +494,23 @@ public class MemoryInstance extends AbstractServerInstance {
   @Override
   public boolean watchOperation(
       String operationName,
-      boolean watchInitialState,
       Predicate<Operation> watcher) {
-    if (watchInitialState) {
-      Operation operation = getOperation(operationName);
-      if (!watcher.test(operation)) {
-        return false;
-      }
-      if (operation.getDone()) {
-        return true;
-      }
+    Operation operation = getOperation(operationName);
+    if (!watcher.test(operation)) {
+      // watcher processed completed state
+      return true;
     }
-    Operation completedOperation = null;
-    synchronized(watchers) {
-      List<Predicate<Operation>> operationWatchers = watchers.get(operationName);
-      if (operationWatchers == null) {
-        /* we can race on the synchronization and miss a done, where the
-         * watchers list has been removed, making it necessary to check for the
-         * operation within this context */
-        Operation operation = getOperation(operationName);
-        if (operation.getDone()) {
-          completedOperation = operation;
-        } else {
-          return false;
-        }
-      }
-      operationWatchers.add(watcher);
+    if (operation == null || operation.getDone()) {
+      // watcher did not process completed state
+      return false;
     }
-    if (completedOperation != null) {
-      return watcher.test(completedOperation);
+    watchers.put(operationName, watcher);
+    operation = getOperation(operationName);
+    if (operation == null || operation.getDone()) {
+      // guarantee at least once delivery
+      return !watcher.test(operation);
     }
     return true;
-  }
-
-  private List<Operation> sortedOperations() {
-    return new ImmutableList.Builder<Operation>()
-        .addAll(outstandingOperations.values())
-        .build();
   }
 
   @Override
@@ -407,7 +542,7 @@ public class MemoryInstance extends AbstractServerInstance {
   @Override
   protected TokenizableIterator<Operation> createOperationsIterator(
       String pageToken) {
-    Iterator<Operation> iter = sortedOperations().iterator();
+    Iterator<Operation> iter = outstandingOperations.iterator();
     final OperationIteratorToken token;
     if (!pageToken.isEmpty()) {
       try {
@@ -456,5 +591,10 @@ public class MemoryInstance extends AbstractServerInstance {
      * simple instance-wide locking on the completed operations
      */
     return completedOperations;
+  }
+
+  @Override
+  protected Logger getLogger() {
+    return logger;
   }
 }

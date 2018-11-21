@@ -17,9 +17,9 @@ package build.buildfarm.worker;
 import static com.google.common.truth.Truth.assertThat;
 
 import build.buildfarm.v1test.WorkerConfig;
-import com.google.devtools.remoteexecution.v1test.Action;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -28,6 +28,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Predicate;
+import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
 import org.junit.Before;
 import org.junit.Test;
@@ -36,12 +37,19 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class MatchStageTest {
-  class PipelineSink extends PipelineStage {
-    Predicate<OperationContext> onPutShouldClose;
+  static class PipelineSink extends PipelineStage {
+    private static final Logger logger = Logger.getLogger(PipelineSink.class.getName());
+
+    private final Predicate<OperationContext> onPutShouldClose;
 
     PipelineSink(Predicate<OperationContext> onPutShouldClose) {
-      super(null, null, null);
+      super("Sink", null, null, null);
       this.onPutShouldClose = onPutShouldClose;
+    }
+
+    @Override
+    public Logger getLogger() {
+      return logger;
     }
 
     @Override
@@ -70,6 +78,9 @@ public class MatchStageTest {
 
       @Override
       public ByteString getBlob(Digest digest) {
+        if (digest.getSizeBytes() == 0) {
+          return ByteString.EMPTY;
+        }
         if (digest.getHash().equals("action")) {
           return Action.newBuilder().build().toByteString();
         }

@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.common;
+package build.buildfarm.cas;
 
+import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.ThreadSafety.ThreadSafe;
-import com.google.devtools.remoteexecution.v1test.Digest;
+import build.bazel.remote.execution.v2.Digest;
 import com.google.protobuf.ByteString;
 
 public interface ContentAddressableStorage {
@@ -28,8 +29,13 @@ public interface ContentAddressableStorage {
     private final ByteString data;
 
     public Blob(ByteString data, DigestUtil digestUtil) {
-      digest = digestUtil.compute(data);
       this.data = data;
+      digest = digestUtil.compute(data);
+    }
+
+    public Blob(ByteString data, Digest digest) {
+      this.data = data;
+      this.digest = digest;
     }
 
     public Digest getDigest() {
@@ -59,7 +65,7 @@ public interface ContentAddressableStorage {
 
   /** Insert a blob into the CAS. */
   @ThreadSafe
-  void put(Blob blob);
+  void put(Blob blob) throws InterruptedException;
 
   /**
    * Insert a value into the CAS with expiration callback.
@@ -71,5 +77,5 @@ public interface ContentAddressableStorage {
    * guaranteed for invocation.
    */
   @ThreadSafe
-  void put(Blob blob, Runnable onExpiration);
+  void put(Blob blob, Runnable onExpiration) throws InterruptedException;
 }

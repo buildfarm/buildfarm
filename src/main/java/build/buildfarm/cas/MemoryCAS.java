@@ -12,22 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.instance.memory;
+package build.buildfarm.cas;
 
-import build.buildfarm.common.ContentAddressableStorage;
-import com.google.devtools.remoteexecution.v1test.Digest;
+import build.bazel.remote.execution.v2.Digest;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Logger;
 
-class MemoryLRUContentAddressableStorage implements ContentAddressableStorage {
+class MemoryCAS implements ContentAddressableStorage {
+  private static final Logger logger = Logger.getLogger(MemoryCAS.class.getName());
+
   private final long maxSizeInBytes;
   private final Map<Digest, Entry> storage;
   private transient long sizeInBytes;
   private transient Entry header;
 
-  public MemoryLRUContentAddressableStorage(long maxSizeInBytes) {
+  public MemoryCAS(long maxSizeInBytes) {
     this.maxSizeInBytes = maxSizeInBytes;
     sizeInBytes = 0;
     header = new SentinelEntry();
@@ -92,12 +94,13 @@ class MemoryLRUContentAddressableStorage implements ContentAddressableStorage {
     }
 
     if (sizeInBytes > maxSizeInBytes) {
-      System.out.println(String.format(
-          "Out of nodes to remove, sizeInBytes = %d, maxSizeInBytes = %d, storage = %d, list = %d",
-          sizeInBytes,
-          maxSizeInBytes,
-          storage.size(),
-          size()));
+      logger.warning(
+          String.format(
+              "Out of nodes to remove, sizeInBytes = %d, maxSizeInBytes = %d, storage = %d, list = %d",
+              sizeInBytes,
+              maxSizeInBytes,
+              storage.size(),
+              size()));
     }
 
     createEntry(blob, onExpiration);

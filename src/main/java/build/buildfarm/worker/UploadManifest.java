@@ -18,11 +18,11 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.stub.Chunker;
 import build.buildfarm.v1test.CASInsertionPolicy;
 import com.google.common.collect.Lists;
-import com.google.devtools.remoteexecution.v1test.ActionResult;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.Directory;
-import com.google.devtools.remoteexecution.v1test.OutputFile;
-import com.google.devtools.remoteexecution.v1test.Tree;
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.OutputFile;
+import build.bazel.remote.execution.v2.Tree;
 import com.google.protobuf.ByteString;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -94,10 +94,10 @@ class UploadManifest {
       if (stat.isDirectory()) {
         mismatchedOutput(file);
       } else if (stat.isFile()) {
-        addFile(file, stat.getSize(), policy);
+        addFile(file, policy);
       } else if (allowSymlinks && stat.isSymbolicLink()) {
         /** FIXME symlink to directory? */
-        addFile(file, -1, policy);
+        addFile(file, policy);
       } else {
         illegalOutput(file);
       }
@@ -162,30 +162,14 @@ class UploadManifest {
     }
   }
 
-  private void addFile(Path file, long size, CASInsertionPolicy policy) throws IOException {
+  private void addFile(Path file, CASInsertionPolicy policy) throws IOException {
+    Digest digest = digestUtil.compute(file);
     OutputFile.Builder builder = result
         .addOutputFilesBuilder()
         .setPath(execRoot.relativize(file).toString())
-        .setIsExecutable(Files.isExecutable(file));
-    if (size == -1) {
-      size = Files.size(file.toRealPath());
-    }
-    boolean withinLimit = inlineContentBytes + size <= inlineContentLimit;
-    final Digest digest;
-    if (withinLimit) {
-      InputStream inputStream = Files.newInputStream(file);
-      ByteString content = ByteString.readFrom(inputStream);
-      digest = digestUtil.compute(content);
-      builder.setContent(content);
-      inlineContentBytes += digest.getSizeBytes();
-    } else {
-      digest = digestUtil.compute(file, size);
-    }
-    if (policy.equals(CASInsertionPolicy.ALWAYS_INSERT)
-        || (!withinLimit && policy.equals(CASInsertionPolicy.INSERT_ABOVE_LIMIT))) {
-      builder.setDigest(digest);
-      digestToFile.put(digest, file);
-    }
+        .setIsExecutable(Files.isExecutable(file))
+        .setDigest(digest);
+    digestToFile.put(digest, file);
   }
 
   private void addDirectory(Path dir) throws IllegalStateException, IOException {

@@ -15,7 +15,7 @@
 package build.buildfarm.common;
 
 import com.google.common.collect.Iterables;
-import com.google.devtools.remoteexecution.v1test.Digest;
+import build.bazel.remote.execution.v2.Digest;
 import java.util.Arrays;
 
 public class UrlPath {
@@ -112,22 +112,30 @@ public class UrlPath {
   public static Digest parseBlobDigest(String resourceName) {
     String[] components = resourceName.split("/");
     String hash = components[components.length - 2];
-    long size = Long.parseLong(components[components.length - 1]);
-    return Digest.newBuilder()
-        .setHash(hash)
-        .setSizeBytes(size)
-        .build();
+    try {
+      long size = Long.parseLong(components[components.length - 1]);
+      return Digest.newBuilder()
+          .setHash(hash)
+          .setSizeBytes(size)
+          .build();
+    } catch (NumberFormatException e) {
+      return null;
+    }
   }
 
   public static Digest parseUploadBlobDigest(String resourceName)
       throws NumberFormatException {
     String[] components = resourceName.split("/");
     String hash = components[components.length - 2];
-    long size = Long.parseLong(components[components.length - 1]);
-    return Digest.newBuilder()
-        .setHash(hash)
-        .setSizeBytes(size)
-        .build();
+    try {
+      long size = Long.parseLong(components[components.length - 1]);
+      return Digest.newBuilder()
+          .setHash(hash)
+          .setSizeBytes(size)
+          .build();
+    } catch (NumberFormatException e) {
+      return null;
+    }
   }
 
   public static String parseOperationStream(String resourceName) {

@@ -14,11 +14,21 @@
 
 package build.buildfarm.worker;
 
+import static com.google.common.collect.Iterables.filter;
+import static com.google.common.collect.Iterables.transform;
+import static build.buildfarm.v1test.ExecutionPolicy.PolicyCase.WRAPPER;
+import static java.util.concurrent.TimeUnit.MICROSECONDS;
+
+import build.buildfarm.v1test.ExecutionPolicy;
+import com.google.common.base.Stopwatch;
 import com.google.common.io.ByteStreams;
-import com.google.devtools.remoteexecution.v1test.ActionResult;
-import com.google.devtools.remoteexecution.v1test.Command;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
-import com.google.devtools.remoteexecution.v1test.ExecuteResponse;
+import com.google.common.collect.ImmutableList;
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecuteResponse;
+import build.bazel.remote.execution.v2.Platform;
+import build.bazel.remote.execution.v2.Platform.Property;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -31,13 +41,17 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Logger;
 
 class Executor implements Runnable {
+  private static final int INCOMPLETE_EXIT_CODE = -1;
+  private static final Logger logger = Logger.getLogger(Executor.class.getName());
+  private static final OutputStream nullOutputStream = ByteStreams.nullOutputStream();
+
   private final WorkerContext workerContext;
   private final OperationContext operationContext;
   private final ExecuteActionStage owner;
-
-  private static final OutputStream nullOutputStream = ByteStreams.nullOutputStream();
+  private int exitCode = INCOMPLETE_EXIT_CODE;
 
   Executor(WorkerContext workerContext, OperationContext operationContext, ExecuteActionStage owner) {
     this.workerContext = workerContext;
@@ -45,16 +59,7 @@ class Executor implements Runnable {
     this.owner = owner;
   }
 
-  private void runInterruptible() throws InterruptedException {
-    Command command;
-    try {
-      command = Command.parseFrom(workerContext.getBlob(operationContext.action.getCommandDigest()));
-    } catch (InvalidProtocolBufferException ex) {
-      owner.error().put(operationContext);
-      owner.release();
-      return;
-    }
-
+  private long runInterruptible(Stopwatch stopwatch) throws InterruptedException {
     ExecuteOperationMetadata executingMetadata = operationContext.metadata.toBuilder()
         .setStage(ExecuteOperationMetadata.Stage.EXECUTING)
         .build();
@@ -64,9 +69,24 @@ class Executor implements Runnable {
         .build();
 
     if (!workerContext.putOperation(operation)) {
+      logger.warning(
+          String.format(
+              "Executor::run(%s): could not transition to EXECUTING",
+              operation.getName()));
       owner.error().put(operationContext);
-      owner.release();
-      return;
+      return 0;
+    }
+
+    Platform platform = operationContext.command.getPlatform();
+    ImmutableList.Builder<ExecutionPolicy> policies = ImmutableList.builder();
+    ExecutionPolicy defaultPolicy = workerContext.getExecutionPolicy("");
+    if (defaultPolicy != null) {
+      policies.add(defaultPolicy);
+    }
+    for (Property property : platform.getPropertiesList()) {
+      if (property.getName().equals("execution-policy")) {
+        policies.add(workerContext.getExecutionPolicy(property.getValue()));
+      }
     }
 
     final Thread executorThread = Thread.currentThread();
@@ -93,20 +113,27 @@ class Executor implements Runnable {
     try {
       statusCode = executeCommand(
           operationContext.execDir,
-          command,
+          operationContext.command,
           timeout,
           operationContext.metadata.getStdoutStreamName(),
           operationContext.metadata.getStderrStreamName(),
-          resultBuilder);
+          resultBuilder,
+          policies.build());
     } catch (IOException ex) {
       poller.stop();
       owner.error().put(operationContext);
-      owner.release();
-      return;
+      return 0;
     }
+
+    logger.fine(
+        String.format(
+            "Executor::executeCommand(%s): Completed command: exit code %d",
+            operation.getName(),
+            resultBuilder.getExitCode()));
 
     poller.stop();
 
+    long executeUSecs = stopwatch.elapsed(MICROSECONDS);
     if (owner.output().claim()) {
       operation = operation.toBuilder()
           .setResponse(Any.pack(ExecuteResponse.newBuilder()
@@ -119,20 +146,28 @@ class Executor implements Runnable {
           operation,
           operationContext.execDir,
           operationContext.metadata,
-          operationContext.action));
+          operationContext.action,
+          operationContext.command));
     } else {
       owner.error().put(operationContext);
     }
-
-    owner.release();
+    return stopwatch.elapsed(MICROSECONDS) - executeUSecs;
   }
 
   @Override
   public void run() {
+    long stallUSecs = 0;
+    Stopwatch stopwatch = Stopwatch.createStarted();
     try {
-      runInterruptible();
+      stallUSecs = runInterruptible(stopwatch);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
+    } finally {
+      owner.releaseExecutor(
+          operationContext.operation.getName(),
+          stopwatch.elapsed(MICROSECONDS),
+          stallUSecs,
+          exitCode);
     }
   }
 
@@ -142,10 +177,18 @@ class Executor implements Runnable {
       Duration timeout,
       String stdoutStreamName,
       String stderrStreamName,
-      ActionResult.Builder resultBuilder)
+      ActionResult.Builder resultBuilder,
+      Iterable<ExecutionPolicy> policies)
       throws IOException, InterruptedException {
+    ImmutableList.Builder<String> arguments = ImmutableList.builder();
+    arguments.addAll(
+        transform(
+            filter(policies, (policy) -> policy.getPolicyCase() == WRAPPER),
+            (policy) -> policy.getWrapper().getPath()));
+    arguments.addAll(command.getArgumentsList());
+
     ProcessBuilder processBuilder =
-        new ProcessBuilder(command.getArgumentsList())
+        new ProcessBuilder(arguments.build())
             .directory(execDir.toAbsolutePath().toFile());
 
     Map<String, String> environment = processBuilder.environment();
@@ -168,7 +211,6 @@ class Executor implements Runnable {
     }
 
     long startNanoTime = System.nanoTime();
-    int exitValue = -1;
     Process process;
     try {
       process = processBuilder.start();
@@ -176,7 +218,7 @@ class Executor implements Runnable {
     } catch(IOException ex) {
       ex.printStackTrace();
       // again, should we do something else here??
-      resultBuilder.setExitCode(exitValue);
+      resultBuilder.setExitCode(INCOMPLETE_EXIT_CODE);
       return Code.INVALID_ARGUMENT;
     }
 
@@ -192,12 +234,12 @@ class Executor implements Runnable {
 
     Code statusCode = Code.OK;
     if (timeout == null) {
-      exitValue = process.waitFor();
+      exitCode = process.waitFor();
     } else {
       long timeoutNanos = timeout.getSeconds() * 1000000000L + timeout.getNanos();
       long remainingNanoTime = timeoutNanos - (System.nanoTime() - startNanoTime);
       if (process.waitFor(remainingNanoTime, TimeUnit.NANOSECONDS)) {
-        exitValue = process.exitValue();
+        exitCode = process.exitValue();
       } else {
         process.destroyForcibly();
         process.waitFor(100, TimeUnit.MILLISECONDS); // fair trade, i think
@@ -213,7 +255,7 @@ class Executor implements Runnable {
     }
     stderrReaderThread.join();
     resultBuilder
-        .setExitCode(exitValue)
+        .setExitCode(exitCode)
         .setStdoutRaw(stdoutReader.getData())
         .setStderrRaw(stderrReader.getData());
     return statusCode;

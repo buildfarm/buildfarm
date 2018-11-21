@@ -1,4 +1,4 @@
-// Copyright 2017 The Bazel Authors. All rights reserved.
+// Copyright 2018 The Bazel Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,11 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker;
+package build.buildfarm.instance;
 
-import build.bazel.remote.execution.v2.Digest;
-import java.io.InputStream;
-import java.util.function.Function;
+import com.google.longrunning.Operation;
+import java.util.Iterator;
 
-public interface InputStreamFactory extends Function<Digest, InputStream> {
+public interface OperationsMap {
+  Operation remove(String name);
+
+  boolean contains(String name);
+
+  void put(String name, Operation operation) throws InterruptedException;
+
+  Operation get(String name);
+
+  Iterator<Operation> iterator();
 }

@@ -14,23 +14,26 @@
 
 package build.buildfarm.worker;
 
+import static java.util.concurrent.TimeUnit.MICROSECONDS;
+
+import com.google.common.base.Stopwatch;
+import java.util.logging.Logger;
+
 public abstract class PipelineStage implements Runnable {
+  protected final String name;
   protected final WorkerContext workerContext;
   protected final PipelineStage output;
   private final PipelineStage error;
 
-  private PipelineStage input;
-  protected boolean claimed;
-  private boolean closed;
+  private PipelineStage input = null;
+  protected boolean claimed = false;
+  private boolean closed = false;
 
-  PipelineStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
+  PipelineStage(String name, WorkerContext workerContext, PipelineStage output, PipelineStage error) {
+    this.name = name;
     this.workerContext = workerContext;
     this.output = output;
     this.error = error;
-
-    input = null;
-    claimed = false;
-    closed = false;
   }
 
   public void setInput(PipelineStage input) {
@@ -56,18 +59,56 @@ public abstract class PipelineStage implements Runnable {
 
   protected void iterate() throws InterruptedException {
     OperationContext operationContext;
+    OperationContext nextOperationContext = null;
+    long stallUSecs = 0;
+    Stopwatch stopwatch = Stopwatch.createUnstarted();
     try {
       operationContext = take();
-      OperationContext nextOperationContext = tick(operationContext);
+      logStart(operationContext.operation.getName());
+      stopwatch.start();
+      nextOperationContext = tick(operationContext);
+      long tickUSecs = stopwatch.elapsed(MICROSECONDS);
       if (nextOperationContext != null && output.claim()) {
         output.put(nextOperationContext);
       } else {
         error.put(operationContext);
       }
+      stallUSecs = stopwatch.elapsed(MICROSECONDS) - tickUSecs;
     } finally {
       release();
     }
     after(operationContext);
+    long usecs = stopwatch.elapsed(MICROSECONDS);
+    logComplete(operationContext.operation.getName(), usecs, stallUSecs, nextOperationContext != null);
+  }
+
+  private String logIterateId(String operationName) {
+    return String.format("%s::iterate(%s)", name, operationName);
+  }
+
+  protected void logStart() {
+    logStart("");
+  }
+
+  protected void logStart(String operationName) {
+    logStart(operationName, "Starting");
+  }
+
+  protected void logStart(String operationName, String message) {
+    getLogger().fine(String.format("%s: %s", logIterateId(operationName), message));
+  }
+
+  protected void logComplete(String operationName, long usecs, long stallUSecs, boolean success) {
+    logComplete(operationName, usecs, stallUSecs, success ? "Success" : "Failed");
+  }
+
+  protected void logComplete(String operationName, long usecs, long stallUSecs, String status) {
+    getLogger().fine(String.format(
+        "%s: %gms (%gms stalled) %s",
+        logIterateId(operationName),
+        usecs / 1000.0f,
+        stallUSecs / 1000.0f,
+        status));
   }
 
   protected OperationContext tick(OperationContext operationContext) throws InterruptedException {
@@ -112,6 +153,7 @@ public abstract class PipelineStage implements Runnable {
     return this.error;
   }
 
+  abstract Logger getLogger();
   abstract OperationContext take() throws InterruptedException;
   abstract void put(OperationContext operationContext) throws InterruptedException;
 }

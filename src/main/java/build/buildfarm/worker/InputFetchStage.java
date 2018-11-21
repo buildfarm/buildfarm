@@ -14,18 +14,26 @@
 
 package build.buildfarm.worker;
 
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.logging.Logger;
 
 public class InputFetchStage extends PipelineStage {
+  private static final Logger logger = Logger.getLogger(InputFetchStage.class.getName());
+
   private final BlockingQueue<OperationContext> queue;
 
   public InputFetchStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
-    super(workerContext, output, error);
+    super("InputFetchStage", workerContext, output, error);
     queue = new ArrayBlockingQueue<>(1);
+  }
+
+  @Override
+  protected Logger getLogger() {
+    return logger;
   }
 
   @Override
@@ -47,7 +55,7 @@ public class InputFetchStage extends PipelineStage {
 
     boolean success = true;
     try {
-      workerContext.createActionRoot(operationContext.execDir, operationContext.action);
+      workerContext.createActionRoot(operationContext.execDir, operationContext.action, operationContext.command);
     } catch (IOException e) {
       e.printStackTrace();
       success = false;
