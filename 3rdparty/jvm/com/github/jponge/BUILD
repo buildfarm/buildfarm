@@ -1,7 +1,7 @@
 java_library(
-    name = "jackson_core",
+    name = "lzma_java",
     exports = [
-        "//external:jar/com/fasterxml/jackson/core/jackson_core"
+        "//external:jar/com/github/jponge/lzma_java"
     ],
     visibility = [
         "//3rdparty/jvm:__subpackages__"

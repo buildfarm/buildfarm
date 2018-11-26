@@ -1,7 +1,7 @@
 java_library(
-    name = "jackson_core",
+    name = "log4j_api",
     exports = [
-        "//external:jar/com/fasterxml/jackson/core/jackson_core"
+        "//external:jar/org/apache/logging/log4j/log4j_api"
     ],
     visibility = [
         "//3rdparty/jvm:__subpackages__"

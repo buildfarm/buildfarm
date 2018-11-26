@@ -16,6 +16,7 @@ package build.buildfarm.instance.memory;
 
 import static com.google.common.collect.Multimaps.synchronizedSetMultimap;
 import static com.google.common.util.concurrent.Futures.addCallback;
+import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static java.util.Collections.synchronizedSortedMap;
 import static java.util.concurrent.Executors.newCachedThreadPool;
@@ -536,7 +537,7 @@ public class MemoryInstance extends AbstractServerInstance {
   @Override
   protected TokenizableIterator<Directory> createTreeIterator(
       Digest rootDigest, String pageToken) throws IOException, InterruptedException {
-    return new TreeIterator(this::getBlob, rootDigest, pageToken);
+    return new TreeIterator((digest) -> immediateFuture(getBlob(digest)), rootDigest, pageToken);
   }
 
   @Override

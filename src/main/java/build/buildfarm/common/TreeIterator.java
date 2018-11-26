@@ -17,6 +17,8 @@ package build.buildfarm.common;
 import build.buildfarm.v1test.TreeIteratorToken;
 import com.google.common.collect.Iterators;
 import com.google.common.io.BaseEncoding;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import com.google.protobuf.ByteString;
@@ -28,6 +30,8 @@ import java.util.Deque;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Stack;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.function.Function;
 
 public class TreeIterator implements TokenizableIterator<Directory> {
@@ -38,7 +42,19 @@ public class TreeIterator implements TokenizableIterator<Directory> {
 
   @FunctionalInterface
   public interface GetBlobFunction {
-    ByteString apply(Digest digest) throws IOException, InterruptedException;
+    ListenableFuture<ByteString> apply(Digest digest);
+  }
+
+  private static <T> T getIOUnchecked(Future<T> future)
+      throws IOException, InterruptedException {
+    try {
+      return future.get();
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof IOException) {
+        throw (IOException) e.getCause();
+      }
+      throw new UncheckedExecutionException(e.getCause());
+    }
   }
 
   public TreeIterator(GetBlobFunction getBlob, Digest rootDigest, String pageToken)
@@ -49,7 +65,7 @@ public class TreeIterator implements TokenizableIterator<Directory> {
 
     Iterator<Digest> iter = Iterators.singletonIterator(rootDigest);
 
-    Directory directory = expectDirectory(getBlob.apply(rootDigest));
+    Directory directory = expectDirectory(getIOUnchecked(getBlob.apply(rootDigest)));
 
     if (!pageToken.isEmpty()) {
       TreeIteratorToken token = parseToken(BaseEncoding.base64().decode(pageToken));
@@ -66,7 +82,7 @@ public class TreeIterator implements TokenizableIterator<Directory> {
         }
         parentPath.addLast(digest);
         pointers.push(iter);
-        directory = expectDirectory(getBlob.apply(digest));
+        directory = expectDirectory(getIOUnchecked(getBlob.apply(digest)));
         if (directory == null) {
           // some directory data has disappeared, current iter
           // is correct and will be next directory fetched
@@ -116,7 +132,7 @@ public class TreeIterator implements TokenizableIterator<Directory> {
     Digest digest = iter.next();
     Directory directory;
     try {
-      directory = expectDirectory(getBlob.apply(digest));
+      directory = expectDirectory(getIOUnchecked(getBlob.apply(digest)));
       if (directory != null) {
         /* the path to a new iter set is the path to its parent */
         parentPath.addLast(digest);

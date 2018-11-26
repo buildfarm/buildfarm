@@ -56,8 +56,9 @@ public class HttpProxy {
       @Nullable Credentials creds,
       HttpProxyOptions options) throws URISyntaxException, SSLException {
     this.options = options;
-    SimpleBlobStore simpleBlobStore = new HttpBlobStore(
+    SimpleBlobStore simpleBlobStore = HttpBlobStore.create(
         URI.create(options.httpCache),
+        /* remoteMaxConnections=*/ 0,
         (int) SECONDS.toMillis(options.timeout),
         creds);
     server = serverBuilder

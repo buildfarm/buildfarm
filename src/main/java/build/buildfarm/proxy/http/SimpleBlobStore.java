@@ -14,6 +14,7 @@
 
 package build.buildfarm.proxy.http;
 
+import com.google.common.util.concurrent.ListenableFuture;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -36,7 +37,7 @@ public interface SimpleBlobStore {
    *
    * @return {@code true} if the {@code key} was found. {@code false} otherwise.
    */
-  boolean get(String key, OutputStream out) throws IOException, InterruptedException;
+  ListenableFuture<Boolean> get(String key, OutputStream out);
 
   /**
    * Fetches the BLOB associated with the {@code key} from the Action Cache and writes it to {@code
@@ -52,7 +53,7 @@ public interface SimpleBlobStore {
   /**
    * Uploads a BLOB (as {@code in}) with length {@code length} indexed by {@code key} to the CAS.
    *
-   * <p>The caller is responsible to close {@code in}.
+   * <p>This function results in a close of {@code in}.
    */
   void put(String key, long length, InputStream in) throws IOException, InterruptedException;
 

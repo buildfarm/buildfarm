@@ -14,6 +14,10 @@
 
 package build.buildfarm.proxy.http;
 
+import static com.google.common.util.concurrent.Futures.addCallback;
+import static com.google.common.util.concurrent.Futures.transform;
+import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
+
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.UrlPath;
 import com.google.bytestream.ByteStreamGrpc;
@@ -23,6 +27,8 @@ import com.google.bytestream.ByteStreamProto.ReadRequest;
 import com.google.bytestream.ByteStreamProto.ReadResponse;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.StatusException;
@@ -37,7 +43,7 @@ import java.util.Map;
 import java.util.Optional;
 
 public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
-  private static final long DEFAULT_CHUNK_SIZE = 1024 * 16;
+  private static final int DEFAULT_CHUNK_SIZE = 1024 * 16;
 
   private final Map<String, ByteString> active_write_requests;
   private final SimpleBlobStore simpleBlobStore;
@@ -47,28 +53,66 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
     this.simpleBlobStore = simpleBlobStore;
   }
 
-  private ByteString getBlob(Digest blobDigest, long offset, long limit)
-      throws IOException, IndexOutOfBoundsException, InterruptedException {
+  private ListenableFuture<Boolean> getBlob(
+      Digest blobDigest,
+      long offset,
+      long limit,
+      OutputStream out) {
     int size = (int) blobDigest.getSizeBytes();
-    ByteArrayOutputStream stream = new ByteArrayOutputStream(size);
-    if (!simpleBlobStore.get(blobDigest.getHash(), stream)) {
-      return null;
-    }
-
-    ByteString blob = ByteString.copyFrom(stream.toByteArray());
-
-    if (offset < 0
-        || (blob.isEmpty() && offset > 0)
-        || (!blob.isEmpty() && offset >= size)
+    if (offset < 0 || size < 0
+        || (size == 0 && offset > 0)
+        || (size > 0 && offset >= size)
         || limit < 0) {
-      throw new IndexOutOfBoundsException();
+      return immediateFailedFuture(new IndexOutOfBoundsException());
     }
 
-    long endIndex = offset + (limit > 0 ? limit : (size - offset));
+    OutputStream skipLimitOut = new OutputStream() {
+      long skipBytesRemaining = offset;
+      long writeBytesRemaining = limit > 0 ? limit : (size - offset);
 
-    return blob.substring(
-        (int) offset,
-        (int) (endIndex > size ? size : endIndex));
+      @Override
+      public void close() throws IOException {
+        writeBytesRemaining = 0;
+
+        out.close();
+      }
+
+      @Override
+      public void flush() throws IOException {
+        out.flush();
+      }
+
+      @Override
+      public void write(byte[] b) throws IOException {
+        write(b, 0, b.length);
+      }
+
+      @Override
+      public void write(byte[] b, int off, int len) throws IOException {
+        if (skipBytesRemaining >= len) {
+          skipBytesRemaining -= len;
+        } else if (writeBytesRemaining > 0) {
+          off += skipBytesRemaining;
+          // technically an error to int-cast
+          len = Math.min((int) writeBytesRemaining, (int) (len - skipBytesRemaining));
+          out.write(b, off, len);
+          skipBytesRemaining = 0;
+          writeBytesRemaining -= len;
+        }
+      }
+
+      @Override
+      public void write(int b) throws IOException {
+        if (skipBytesRemaining > 0) {
+          skipBytesRemaining--;
+        } else if (writeBytesRemaining > 0) {
+          out.write(b);
+          writeBytesRemaining--;
+        }
+      }
+    };
+
+    return simpleBlobStore.get(blobDigest.getHash(), skipLimitOut);
   }
 
   private void readBlob(
@@ -79,27 +123,91 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
 
     Digest digest = UrlPath.parseBlobDigest(resourceName);
 
-    ByteString blob = getBlob(digest, request.getReadOffset(), request.getReadLimit());
-    if (blob == null) {
-      responseObserver.onError(new StatusException(Status.NOT_FOUND));
-      return;
-    }
+    OutputStream responseOut = new OutputStream() {
+      byte[] buffer = new byte[DEFAULT_CHUNK_SIZE];
+      int buflen = 0;
 
-    while (!blob.isEmpty()) {
-      ByteString chunk;
-      if (blob.size() < DEFAULT_CHUNK_SIZE) {
-        chunk = blob;
-        blob = ByteString.EMPTY;
-      } else {
-        chunk = blob.substring(0, (int) DEFAULT_CHUNK_SIZE);
-        blob = blob.substring((int) DEFAULT_CHUNK_SIZE);
+      @Override
+      public void close() {
+        flush();
       }
-      responseObserver.onNext(ReadResponse.newBuilder()
-          .setData(chunk)
-          .build());
-    }
 
-    responseObserver.onCompleted();
+      @Override
+      public void flush() {
+        if (buflen > 0) {
+          responseObserver.onNext(ReadResponse.newBuilder()
+              .setData(ByteString.copyFrom(buffer, 0, buflen))
+              .build());
+          buflen = 0;
+        }
+      }
+
+      @Override
+      public void write(byte[] b) {
+        write(b, 0, b.length);
+      }
+
+      @Override
+      public void write(byte[] b, int off, int len) {
+        while (buflen + len >= buffer.length) {
+          int copylen = buffer.length - buflen;
+          System.arraycopy(b, off, buffer, buflen, copylen);
+          buflen = buffer.length;
+          flush();
+          len -= copylen;
+          off += copylen;
+          if (len == 0) {
+            return;
+          }
+        }
+        System.arraycopy(b, off, buffer, buflen, len);
+        buflen += len;
+      }
+
+      @Override
+      public void write(int b) {
+        buffer[buflen++] = (byte) b;
+        if (buflen == buffer.length) {
+          flush();
+        }
+      }
+    };
+
+    addCallback(
+        getBlob(
+            digest,
+            request.getReadOffset(),
+            request.getReadLimit(),
+            responseOut),
+        new FutureCallback<Boolean>() {
+          private void onError(Status status) {
+            responseObserver.onError(status.asException());
+          }
+
+          @Override
+          public void onSuccess(Boolean success) {
+            if (success) {
+              try {
+                responseOut.close();
+                responseObserver.onCompleted();
+              } catch (IOException e) {
+                onError(Status.fromThrowable(e));
+              }
+            } else {
+              onError(Status.NOT_FOUND);
+            }
+          }
+
+          @Override
+          public void onFailure(Throwable t) {
+            try {
+              responseOut.close();
+            } catch (IOException ioException) {
+              ioException.printStackTrace();
+            }
+            onError(Status.fromThrowable(t));
+          }
+        });
   }
 
   @Override

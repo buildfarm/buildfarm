@@ -14,6 +14,9 @@
 
 package build.buildfarm.proxy.http;
 
+import static com.google.common.util.concurrent.Futures.catching;
+import static com.google.common.util.concurrent.Futures.transform;
+
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest.Request;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
@@ -127,10 +130,12 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
         new TreeIterator(
             (digest) -> {
               ByteArrayOutputStream stream = new ByteArrayOutputStream((int) digest.getSizeBytes());
-              if (!simpleBlobStore.get(digest.getHash(), stream)) {
-                return null;
-              }
-              return ByteString.copyFrom(stream.toByteArray());
+              return transform(
+                  catching(
+                      simpleBlobStore.get(digest.getHash(), stream),
+                      Throwable.class,
+                      (e) -> false),
+                  (success) -> success ? ByteString.copyFrom(stream.toByteArray()) : null);
             }, rootDigest, pageToken);
 
     while (iter.hasNext() && pageSize != 0) {

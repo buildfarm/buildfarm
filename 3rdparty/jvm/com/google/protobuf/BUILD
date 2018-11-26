@@ -1,24 +1,28 @@
 java_library(
     name = "protobuf_java",
-    visibility = [
-        "//visibility:public",
-    ],
     exports = [
-        "//external:jar/com/google/protobuf/protobuf_java",
+        "//external:jar/com/google/protobuf/protobuf_java"
     ],
+    visibility = [
+        "//visibility:public"
+    ]
 )
+
+
 
 java_library(
     name = "protobuf_java_util",
-    visibility = [
-        "//visibility:public",
-    ],
     exports = [
-        "//external:jar/com/google/protobuf/protobuf_java_util",
+        "//external:jar/com/google/protobuf/protobuf_java_util"
     ],
     runtime_deps = [
-        ":protobuf_java",
-        "//3rdparty/jvm/com/google/code/gson",
-        "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/com/google/code/gson:gson",
+        "//3rdparty/jvm/com/google/guava:guava",
+        ":protobuf_java"
     ],
+    visibility = [
+        "//visibility:public"
+    ]
 )
+
+

@@ -1,7 +1,7 @@
 java_library(
-    name = "jackson_core",
+    name = "jzlib",
     exports = [
-        "//external:jar/com/fasterxml/jackson/core/jackson_core"
+        "//external:jar/com/jcraft/jzlib"
     ],
     visibility = [
         "//3rdparty/jvm:__subpackages__"

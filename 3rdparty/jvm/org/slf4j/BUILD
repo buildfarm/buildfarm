@@ -1,7 +1,7 @@
 java_library(
-    name = "jackson_core",
+    name = "slf4j_api",
     exports = [
-        "//external:jar/com/fasterxml/jackson/core/jackson_core"
+        "//external:jar/org/slf4j/slf4j_api"
     ],
     visibility = [
         "//3rdparty/jvm:__subpackages__"

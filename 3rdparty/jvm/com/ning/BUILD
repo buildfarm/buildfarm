@@ -1,7 +1,7 @@
 java_library(
-    name = "jackson_core",
+    name = "compress_lzf",
     exports = [
-        "//external:jar/com/fasterxml/jackson/core/jackson_core"
+        "//external:jar/com/ning/compress_lzf"
     ],
     visibility = [
         "//3rdparty/jvm:__subpackages__"
