@@ -25,6 +25,9 @@ import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.util.Durations;
@@ -35,6 +38,9 @@ import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import java.io.IOException;
 import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -124,7 +130,8 @@ class Cat {
     }
   }
 
-  private static void printTree(Instance instance, Digest rootDigest) throws IOException, InterruptedException {
+  private static List<Directory> fetchTree(Instance instance, Digest rootDigest)
+      throws IOException, InterruptedException {
     ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
     String pageToken = "";
 
@@ -132,7 +139,84 @@ class Cat {
       pageToken = instance.getTree(rootDigest, 1024, pageToken, directories, false);
     } while (!pageToken.isEmpty());
 
-    for (Directory directory : directories.build()) {
+    return directories.build();
+  }
+
+  private static Map<Digest, Directory> createDirectoriesIndex(
+      Iterable<Directory> directories,
+      DigestUtil digestUtil) {
+    Set<Digest> directoryDigests = Sets.newHashSet();
+    ImmutableMap.Builder<Digest, Directory> directoriesIndex = ImmutableMap.builder();
+    for (Directory directory : directories) {
+      // double compute here...
+      Digest directoryDigest = digestUtil.compute(directory);
+      if (!directoryDigests.add(directoryDigest)) {
+        continue;
+      }
+      directoriesIndex.put(directoryDigest, directory);
+    }
+
+    return directoriesIndex.build();
+  }
+
+  private static long computeDirectoryWeights(
+      Digest directoryDigest,
+      Map<Digest, Directory> directoriesIndex,
+      Map<Digest, Long> directoryWeights) {
+    long weight = directoryDigest.getSizeBytes();
+    Directory directory = directoriesIndex.get(directoryDigest);
+    if (directory != null) {
+      for (DirectoryNode dirNode : directory.getDirectoriesList()) {
+        if (directoryWeights.containsKey(dirNode.getDigest())) {
+          weight += directoryWeights.get(dirNode.getDigest());
+        } else {
+          weight += computeDirectoryWeights(dirNode.getDigest(), directoriesIndex, directoryWeights);
+        }
+      }
+      // filenodes are already computed
+    }
+    directoryWeights.put(directoryDigest, weight);
+    return weight;
+  }
+
+  private static void printTreeAt(int indentLevel, Directory directory, Map<Digest, Directory> directoriesIndex, long totalWeight, Map<Digest, Long> directoryWeights) {
+    for (DirectoryNode dirNode : directory.getDirectoriesList()) {
+      Directory subDirectory = directoriesIndex.get(dirNode.getDigest());
+      long weight = directoryWeights.get(dirNode.getDigest());
+      String displayName = String.format(
+          "%s/ %d (%d%%)",
+          dirNode.getName(),
+          weight,
+          (int) (weight * 100.0 / totalWeight));
+      indentOut(indentLevel, displayName);
+      if (subDirectory == null) {
+        indentOut(indentLevel+1, "DIRECTORY MISSING FROM CAS");
+      } else {
+        printTreeAt(indentLevel+1, directoriesIndex.get(dirNode.getDigest()), directoriesIndex, totalWeight, directoryWeights);
+      }
+    }
+    for (FileNode fileNode : directory.getFilesList()) {
+      String name = fileNode.getName();
+      String displayName = name;
+      if (fileNode.getIsExecutable()) {
+        displayName += "*";
+      }
+      indentOut(indentLevel, displayName);
+    }
+  }
+
+  private static void printTreeLayout(Instance instance, DigestUtil digestUtil, Digest rootDigest) throws IOException, InterruptedException {
+    Map<Digest, Directory> directoriesIndex = createDirectoriesIndex(
+        fetchTree(instance, rootDigest), digestUtil);
+
+    Map<Digest, Long> directoryWeights = Maps.newHashMap();
+    long totalWeight = computeDirectoryWeights(rootDigest, directoriesIndex, directoryWeights);
+
+    printTreeAt(0, directoriesIndex.get(rootDigest), directoriesIndex, totalWeight, directoryWeights);
+  }
+
+  private static void printTree(Instance instance, Digest rootDigest) throws IOException, InterruptedException {
+    for (Directory directory : fetchTree(instance, rootDigest)) {
       System.out.println("Directory: " + DigestUtil.toString(instance.getDigestUtil().compute(directory)));
       printDirectory(1, directory);
     }
@@ -306,6 +390,8 @@ class Cat {
           printActionResult(instance.getActionResult(DigestUtil.asActionKey(blobDigest)), 0);
         } else if (type.equals("Tree")) {
           printTree(instance, blobDigest);
+        } else if (type.equals("TreeLayout")) {
+          printTreeLayout(instance, digestUtil, blobDigest);
         } else {
           ByteString blob = getBlob(instance, blobDigest);
           if (type.equals("Action")) {
