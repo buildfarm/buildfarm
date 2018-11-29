@@ -1475,7 +1475,7 @@ public class ShardInstance extends AbstractServerInstance {
       String operationName,
       Predicate<Operation> watcher) {
     Operation operation = getOperation(operationName);
-    if (!watcher.test(operation)) {
+    if (!watcher.test(stripOperation(operation))) {
       // watcher processed completed state
       return true;
     }
@@ -1492,8 +1492,12 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   private static Operation stripOperation(Operation operation) {
+    ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
+    if (metadata == null) {
+      metadata = ExecuteOperationMetadata.getDefaultInstance();
+    }
     return operation.toBuilder()
-        .setMetadata(Any.pack(expectExecuteOperationMetadata(operation)))
+        .setMetadata(Any.pack(metadata))
         .build();
   }
 
