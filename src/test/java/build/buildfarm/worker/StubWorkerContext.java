@@ -16,6 +16,7 @@ package build.buildfarm.worker;
 
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.function.InterruptingConsumer;
 import build.buildfarm.worker.CASFileCache;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.ByteStreamUploader;
@@ -36,7 +37,8 @@ import java.util.function.Predicate;
 class StubWorkerContext implements WorkerContext {
   @Override public Poller createPoller(String name, String operationName, Stage stage) { throw new UnsupportedOperationException(); }
   @Override public Poller createPoller(String name, String operationName, Stage stage, Runnable onFailure) { throw new UnsupportedOperationException(); }
-  @Override public void match(Predicate<Operation> onMatch) { throw new UnsupportedOperationException(); }
+  @Override public void match(InterruptingConsumer<Operation> onMatch) throws InterruptedException { throw new UnsupportedOperationException(); }
+  @Override public void requeue(Operation operation) { throw new UnsupportedOperationException(); }
   @Override public CASInsertionPolicy getFileCasPolicy() { throw new UnsupportedOperationException(); }
   @Override public CASInsertionPolicy getStdoutCasPolicy() { throw new UnsupportedOperationException(); }
   @Override public CASInsertionPolicy getStderrCasPolicy() { throw new UnsupportedOperationException(); }

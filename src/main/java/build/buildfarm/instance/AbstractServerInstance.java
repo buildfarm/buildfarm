@@ -35,6 +35,7 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecutionCapabilities;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
@@ -87,7 +88,7 @@ public abstract class AbstractServerInstance implements Instance {
   private static final String MISSING_INPUT =
       "A requested input (or the `Command` of the `Action`) was not found in the CAS.";
 
-  private static final String INVALID_DIGEST = "A `Digest` in the input tree is invalid.";
+  public static final String INVALID_DIGEST = "A `Digest` in the input tree is invalid.";
 
   private static final String INVALID_FILE_NAME =
       "One of the input `PathNode`s has an invalid name, such as a name containing a `/` character"
@@ -555,7 +556,7 @@ public abstract class AbstractServerInstance implements Instance {
     ActionResult actionResult = null;
     if (!skipCacheLookup) {
       metadata = metadata.toBuilder()
-          .setStage(ExecuteOperationMetadata.Stage.CACHE_CHECK)
+          .setStage(Stage.CACHE_CHECK)
           .build();
       putOperation(operationBuilder
           .setMetadata(Any.pack(metadata))
@@ -565,7 +566,7 @@ public abstract class AbstractServerInstance implements Instance {
 
     if (actionResult != null) {
       metadata = metadata.toBuilder()
-          .setStage(ExecuteOperationMetadata.Stage.COMPLETED)
+          .setStage(Stage.COMPLETED)
           .build();
       operationBuilder
           .setDone(true)
@@ -579,7 +580,7 @@ public abstract class AbstractServerInstance implements Instance {
     } else {
       onQueue(operation, action);
       metadata = metadata.toBuilder()
-          .setStage(ExecuteOperationMetadata.Stage.QUEUED)
+          .setStage(Stage.QUEUED)
           .build();
     }
 
@@ -630,8 +631,16 @@ public abstract class AbstractServerInstance implements Instance {
     if (action == null) {
       return null;
     }
+    return expectCommand(action.getCommandDigest());
+  }
+
+  protected Command expectCommand(Digest commandDigest) {
+    ByteString commandBlob = getBlob(commandDigest);
+    if (commandBlob == null) {
+      return null;
+    }
     try {
-      return Command.parseFrom(getBlob(action.getCommandDigest()));
+      return Command.parseFrom(commandBlob);
     } catch (InvalidProtocolBufferException ex) {
       return null;
     }
@@ -656,20 +665,20 @@ public abstract class AbstractServerInstance implements Instance {
 
   protected boolean isQueued(Operation operation) {
     return expectExecuteOperationMetadata(operation).getStage() ==
-        ExecuteOperationMetadata.Stage.QUEUED;
+        Stage.QUEUED;
   }
 
   protected boolean isExecuting(Operation operation) {
     return expectExecuteOperationMetadata(operation).getStage() ==
-        ExecuteOperationMetadata.Stage.EXECUTING;
+        Stage.EXECUTING;
   }
 
   protected boolean isComplete(Operation operation) {
     return expectExecuteOperationMetadata(operation).getStage() ==
-        ExecuteOperationMetadata.Stage.COMPLETED;
+        Stage.COMPLETED;
   }
 
-  abstract protected boolean matchOperation(Operation operation);
+  abstract protected boolean matchOperation(Operation operation) throws InterruptedException;
   abstract protected void enqueueOperation(Operation operation);
 
   @Override
@@ -777,21 +786,28 @@ public abstract class AbstractServerInstance implements Instance {
         .build());
   }
 
+  @Override
+  public boolean putAndValidateOperation(Operation operation) throws InterruptedException {
+    if (isQueued(operation)) {
+      return requeueOperation(operation);
+    }
+    return putOperation(operation);
+  }
+
+  @VisibleForTesting
   public boolean requeueOperation(Operation operation) throws InterruptedException {
     String name = operation.getName();
-    if (!isQueued(operation)) {
-      throw new IllegalStateException(
-          String.format(
-              "Operation %s stage is not QUEUED",
-              name));
-    }
-
     ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
     if (metadata == null) {
-      throw new IllegalStateException(
-          String.format(
-              "Operation %s does not contain ExecuteOperationMetadata",
-              name));
+      // ensure that watchers are notified
+      String message = String.format(
+          "Operation %s does not contain ExecuteOperationMetadata",
+          name);
+      errorOperation(name, com.google.rpc.Status.newBuilder()
+          .setCode(com.google.rpc.Code.FAILED_PRECONDITION.getNumber())
+          .setMessage(message)
+          .build());
+      return false;
     }
 
     Digest actionDigest = metadata.getActionDigest();
@@ -799,10 +815,12 @@ public abstract class AbstractServerInstance implements Instance {
     Action action = expectAction(actionDigest);
 
     try {
+      Preconditions.checkState(action != null, MISSING_INPUT);
       validateAction(action);
     } catch (IllegalStateException e) {
       errorOperation(name, com.google.rpc.Status.newBuilder()
           .setCode(com.google.rpc.Code.FAILED_PRECONDITION.getNumber())
+          .setMessage(e.getMessage())
           .build());
       return false;
     }
@@ -816,7 +834,6 @@ public abstract class AbstractServerInstance implements Instance {
 
     return putOperation(operation);
   }
-
 
   protected void errorOperation(String name, com.google.rpc.Status status) throws InterruptedException {
     Operation operation = getOperation(name);
@@ -833,7 +850,7 @@ public abstract class AbstractServerInstance implements Instance {
     putOperation(operation.toBuilder()
         .setDone(true)
         .setMetadata(Any.pack(metadata.toBuilder()
-            .setStage(ExecuteOperationMetadata.Stage.COMPLETED)
+            .setStage(Stage.COMPLETED)
             .build()))
         .setError(status)
         .build());
@@ -863,11 +880,8 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public boolean pollOperation(
-      String operationName,
-      ExecuteOperationMetadata.Stage stage) {
-    if (stage != ExecuteOperationMetadata.Stage.QUEUED
-        && stage != ExecuteOperationMetadata.Stage.EXECUTING) {
+  public boolean pollOperation(String operationName, Stage stage) {
+    if (stage != Stage.QUEUED && stage != Stage.EXECUTING) {
       return false;
     }
     Operation operation = getOperation(operationName);

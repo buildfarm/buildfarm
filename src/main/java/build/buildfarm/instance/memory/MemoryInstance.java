@@ -26,6 +26,7 @@ import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorages;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.function.InterruptingPredicate;
 import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.instance.OperationsMap;
 import build.buildfarm.instance.TokenizableIterator;
@@ -93,9 +94,9 @@ public class MemoryInstance extends AbstractServerInstance {
 
   private static final class Worker {
     private final Platform platform;
-    private final Predicate<Operation> onMatch;
+    private final InterruptingPredicate<Operation> onMatch;
 
-    Worker(Platform platform, Predicate<Operation> onMatch) {
+    Worker(Platform platform, InterruptingPredicate<Operation> onMatch) {
       this.platform = platform;
       this.onMatch = onMatch;
     }
@@ -104,7 +105,7 @@ public class MemoryInstance extends AbstractServerInstance {
       return platform;
     }
 
-    boolean test(Operation operation) {
+    boolean test(Operation operation) throws InterruptedException {
       return onMatch.test(operation);
     }
   }
@@ -412,8 +413,11 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  protected boolean matchOperation(Operation operation) {
-    Command command = expectCommand(operation);
+  protected boolean matchOperation(Operation operation) throws InterruptedException {
+    Action action = expectAction(operation);
+    Preconditions.checkState(action != null, "action not found");
+
+    Command command = expectCommand(action.getCommandDigest());
     Preconditions.checkState(command != null, "command not found");
 
     ImmutableList.Builder<Worker> rejectedWorkers = new ImmutableList.Builder<>();
@@ -435,39 +439,41 @@ public class MemoryInstance extends AbstractServerInstance {
     return dispatched;
   }
 
+  private void matchSynchronized(
+      Platform platform,
+      InterruptingPredicate<Operation> onMatch) throws InterruptedException {
+    ImmutableList.Builder<Operation> rejectedOperations = ImmutableList.builder();
+    boolean matched = false;
+    while (!matched && !queuedOperations.isEmpty()) {
+      Operation operation = queuedOperations.remove(0);
+      Command command = expectCommand(operation);
+      boolean dispatched = false;
+      if (command != null && satisfiesRequirements(platform, command)) {
+        matched = true;
+        dispatched = onMatch.test(operation);
+      }
+      if (dispatched) {
+        onDispatched(operation);
+      } else {
+        rejectedOperations.add(operation);
+      }
+    }
+    for (Operation operation : rejectedOperations.build()) {
+      requeueOperation(operation);
+    }
+    if (!matched) {
+      synchronized(workers) {
+        workers.add(new Worker(platform, onMatch));
+      }
+    }
+  }
+
   @Override
   public void match(
       Platform platform,
-      boolean requeueOnFailure,
-      Predicate<Operation> onMatch)
-      throws InterruptedException {
+      InterruptingPredicate<Operation> onMatch) throws InterruptedException {
     synchronized (queuedOperations) {
-      ImmutableList.Builder<Operation> rejectedOperations = new ImmutableList.Builder<Operation>();
-      boolean matched = false;
-      while (!matched && !queuedOperations.isEmpty()) {
-        Operation operation = queuedOperations.remove(0);
-        Command command = expectCommand(operation);
-        if (command == null) {
-          cancelOperation(operation.getName());
-        } else {
-          if (satisfiesRequirements(platform, command)) {
-            matched = true;
-            if (onMatch.test(operation)) {
-              onDispatched(operation);
-            } else if (!requeueOnFailure) {
-              rejectedOperations.add(operation);
-            }
-          } else {
-            rejectedOperations.add(operation);
-          }
-        }
-      }
-      Iterables.addAll(queuedOperations, rejectedOperations.build());
-      if (!matched) {
-        synchronized (workers) {
-          workers.add(new Worker(platform, onMatch));
-        }
-      }
+      matchSynchronized(platform, onMatch);
     }
   }
 
