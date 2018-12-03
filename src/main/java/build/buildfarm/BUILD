@@ -79,7 +79,7 @@ java_library(
 )
 
 java_library(
-    name = "buildfarm",
+    name = "server",
     srcs = glob(["server/**/*.java"]),
     deps = [
         ":common",
@@ -112,7 +112,7 @@ java_binary(
     main_class = "build.buildfarm.server.BuildFarmServer",
     visibility = ["//visibility:public"],
     runtime_deps = [
-        ":buildfarm",
+        ":server",
     ],
 )
 
@@ -258,8 +258,13 @@ container_image(
 
 java_binary(
     name = "buildfarm-http-proxy",
-    srcs = glob(["proxy/http/*.java"]),
     main_class = "build.buildfarm.proxy.http.HttpProxy",
+    runtime_deps = [":http-proxy"],
+)
+
+java_library(
+    name = "http-proxy",
+    srcs = glob(["proxy/http/*.java"]),
     deps = [
         ":common",
         "//3rdparty/jvm/com/github/pcj:google_options",
