@@ -14,6 +14,8 @@
 
 package build.buildfarm.worker;
 
+import static java.util.logging.Level.SEVERE;
+
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.stub.Chunker;
 import build.buildfarm.v1test.CASInsertionPolicy;
@@ -240,8 +242,9 @@ public class ReportResultStage extends PipelineStage {
   @Override
   protected void after(OperationContext operationContext) {
     try {
-      workerContext.removeDirectory(operationContext.execDir);
-    } catch (IOException ex) {
+      workerContext.destroyActionRoot(operationContext.execDir);
+    } catch (IOException e) {
+      logger.log(SEVERE, "error while destroying action root " + operationContext.execDir, e);
     }
   }
 }

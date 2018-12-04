@@ -18,6 +18,7 @@ import static com.google.common.collect.Iterables.filter;
 import static com.google.common.collect.Iterables.transform;
 import static build.buildfarm.v1test.ExecutionPolicy.PolicyCase.WRAPPER;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
+import static java.util.logging.Level.SEVERE;
 
 import build.buildfarm.v1test.ExecutionPolicy;
 import com.google.common.base.Stopwatch;
@@ -73,6 +74,11 @@ class Executor implements Runnable {
           String.format(
               "Executor::run(%s): could not transition to EXECUTING",
               operation.getName()));
+      try {
+        workerContext.destroyActionRoot(operationContext.execDir);
+      } catch (IOException e) {
+        logger.log(SEVERE, "error while destroying " + operationContext.execDir, e);
+      }
       owner.error().put(operationContext);
       return 0;
     }

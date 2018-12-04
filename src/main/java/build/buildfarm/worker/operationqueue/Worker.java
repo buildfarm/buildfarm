@@ -467,11 +467,6 @@ public class Worker {
       }
 
       @Override
-      public void removeDirectory(Path path) throws IOException {
-        CASFileCache.removeDirectory(path);
-      }
-
-      @Override
       public boolean putOperation(Operation operation) throws InterruptedException {
         return operationQueueInstance.putOperation(operation);
       }
