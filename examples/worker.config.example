@@ -63,11 +63,6 @@ stderr_cas_policy: ALWAYS_INSERT
 #   INSERT_ABOVE_LIMIT: output files are inserted into the CAS when it exceeds the inline limit above
 file_cas_policy: ALWAYS_INSERT
 
-# the worker will take it upon itself to requeue (exceptionally)
-# failed operations via the OperationQueue#put method with queued
-# status.
-requeue_on_failure: true
-
 # ContentAddressableStorage#getTree per-page directory count
 # value of '0' means let the server decide
 tree_page_size: 0
