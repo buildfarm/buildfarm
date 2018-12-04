@@ -16,6 +16,7 @@ package build.buildfarm.instance;
 
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.function.InterruptingPredicate;
 import com.google.common.collect.ImmutableList;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
@@ -65,8 +66,9 @@ public interface Instance {
       ExecutionPolicy executionPolicy,
       ResultsCachePolicy resultsCachePolicy,
       Predicate<Operation> onOperation) throws InterruptedException;
-  void match(Platform platform, boolean requeueOnFailure, Predicate<Operation> onMatch) throws InterruptedException;
+  void match(Platform platform, InterruptingPredicate<Operation> onMatch) throws InterruptedException;
   boolean putOperation(Operation operation) throws InterruptedException;
+  boolean putAndValidateOperation(Operation operation) throws InterruptedException;
   boolean pollOperation(String operationName, Stage stage);
   // returns nextPageToken suitable for list restart
   String listOperations(

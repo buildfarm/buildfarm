@@ -63,14 +63,6 @@ public class InputFetchStage extends PipelineStage {
 
     poller.stop();
 
-    if (!success) {
-      try {
-        workerContext.destroyActionRoot(operationContext.execDir);
-      } catch (IOException e) {
-        e.printStackTrace();
-      }
-    }
-
     return success ? operationContext : null;
   }
 }

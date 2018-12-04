@@ -15,6 +15,7 @@
 package build.buildfarm.server;
 
 import build.buildfarm.instance.Instance;
+import build.buildfarm.common.function.InterruptingPredicate;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.PollOperationRequest;
 import build.buildfarm.v1test.TakeOperationRequest;
@@ -27,7 +28,6 @@ import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
-import java.util.function.Predicate;
 
 public class OperationQueueService extends OperationQueueGrpc.OperationQueueImplBase {
   private final Instances instances;
@@ -36,7 +36,8 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
     this.instances = instances;
   }
 
-  private Predicate<Operation> createOnMatch(StreamObserver<Operation> responseObserver) {
+  private InterruptingPredicate<Operation> createOnMatch(
+      Instance instance, StreamObserver<Operation> responseObserver) {
     return (operation) -> {
       // so this is interesting - the stdout injection belongs here, because
       // we use this criteria to select the format for stream/blob differentiation
@@ -80,7 +81,9 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
     }
 
     try {
-      instance.match(request.getPlatform(), /*requeueOnFailure=*/ true, createOnMatch(responseObserver));
+      instance.match(
+          request.getPlatform(),
+          createOnMatch(instance, responseObserver));
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
@@ -99,10 +102,15 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
     }
 
     try {
-      boolean ok = instance.putOperation(operation);
+      boolean ok = instance.putAndValidateOperation(operation);
       Code code = ok ? Code.OK : Code.UNAVAILABLE;
       responseObserver.onNext(com.google.rpc.Status.newBuilder()
           .setCode(code.getNumber())
+          .build());
+      responseObserver.onCompleted();
+    } catch (IllegalStateException e) {
+      responseObserver.onNext(com.google.rpc.Status.newBuilder()
+          .setCode(Code.FAILED_PRECONDITION.getNumber())
           .build());
       responseObserver.onCompleted();
     } catch (InterruptedException e) {

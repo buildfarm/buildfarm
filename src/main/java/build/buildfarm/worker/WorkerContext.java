@@ -16,6 +16,7 @@ package build.buildfarm.worker;
 
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.function.InterruptingConsumer;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.v1test.CASInsertionPolicy;
@@ -36,7 +37,8 @@ import java.util.function.Predicate;
 public interface WorkerContext {
   Poller createPoller(String name, String operationName, Stage stage);
   Poller createPoller(String name, String operationName, Stage stage, Runnable onFailure);
-  void match(Predicate<Operation> onMatch) throws InterruptedException;
+  void match(InterruptingConsumer<Operation> onMatch) throws InterruptedException;
+  void requeue(Operation operation) throws InterruptedException;
   CASInsertionPolicy getFileCasPolicy();
   CASInsertionPolicy getStdoutCasPolicy();
   CASInsertionPolicy getStderrCasPolicy();

@@ -16,6 +16,7 @@ package build.buildfarm.instance.stub;
 
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.function.InterruptingPredicate;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.OperationQueueGrpc.OperationQueueBlockingStub;
@@ -327,34 +328,14 @@ public class StubInstance implements Instance {
     throw new UnsupportedOperationException();
   }
 
-  private void requeue(Operation operation) {
-    try {
-      ExecuteOperationMetadata metadata =
-          operation.getMetadata().unpack(ExecuteOperationMetadata.class);
-
-      ExecuteOperationMetadata executingMetadata = metadata.toBuilder()
-          .setStage(ExecuteOperationMetadata.Stage.QUEUED)
-          .build();
-
-      operation = operation.toBuilder()
-          .setMetadata(Any.pack(executingMetadata))
-          .build();
-      putOperation(operation);
-    } catch(InvalidProtocolBufferException ex) {
-      // operation is dropped on the floor
-    }
-  }
-
   @Override
-  public void match(Platform platform, boolean requeueOnFailure, Predicate<Operation> onMatch) {
-    Operation operation = operationQueueBlockingStub.get().take(TakeOperationRequest.newBuilder()
+  public void match(Platform platform, InterruptingPredicate<Operation> onMatch) throws InterruptedException {
+    Operation operation = operationQueueBlockingStub.get()
+        .take(TakeOperationRequest.newBuilder()
         .setInstanceName(getName())
         .setPlatform(platform)
         .build());
-    boolean successful = onMatch.test(operation);
-    if (!Thread.currentThread().isInterrupted() && !successful && requeueOnFailure) {
-      requeue(operation);
-    }
+    onMatch.test(operation);
   }
 
   @Override
@@ -363,6 +344,11 @@ public class StubInstance implements Instance {
         .get()
         .put(operation)
         .getCode() == Code.OK.getNumber();
+  }
+
+  @Override
+  public boolean putAndValidateOperation(Operation operation) {
+    throw new UnsupportedOperationException();
   }
 
   @Override

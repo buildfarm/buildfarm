@@ -19,6 +19,7 @@ import static com.google.common.collect.Maps.uniqueIndex;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
+import build.buildfarm.common.function.InterruptingConsumer;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Retrier;
@@ -52,6 +53,7 @@ import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.Platform;
@@ -59,6 +61,7 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
+import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.TextFormat;
 import io.grpc.Channel;
 import io.grpc.netty.NegotiationType;
@@ -303,16 +306,37 @@ public class Worker {
       }
 
       @Override
-      public void match(Predicate<Operation> onMatch)
+      public void match(InterruptingConsumer<Operation> onMatch)
           throws InterruptedException {
         operationQueueInstance.match(
             getPlatform(),
-            config.getRequeueOnFailure(),
-            onMatch);
+            (operation) -> {
+              onMatch.accept(operation);
+              return true;
+            });
       }
 
       @Override
-      public  int getInlineContentLimit() {
+      public void requeue(Operation operation) throws InterruptedException {
+        try {
+          ExecuteOperationMetadata metadata =
+              operation.getMetadata().unpack(ExecuteOperationMetadata.class);
+
+          ExecuteOperationMetadata executingMetadata = metadata.toBuilder()
+              .setStage(ExecuteOperationMetadata.Stage.QUEUED)
+              .build();
+
+          operation = operation.toBuilder()
+              .setMetadata(Any.pack(executingMetadata))
+              .build();
+          operationQueueInstance.putOperation(operation);
+        } catch (InvalidProtocolBufferException e) {
+          e.printStackTrace();
+        }
+      }
+
+      @Override
+      public int getInlineContentLimit() {
         return config.getInlineContentLimit();
       }
 
@@ -400,17 +424,27 @@ public class Worker {
         ImmutableList.Builder<Path> inputFiles = new ImmutableList.Builder<>();
         ImmutableList.Builder<Digest> inputDirectories = new ImmutableList.Builder<>();
 
-        fetchInputs(
-            root,
-            action.getInputRootDigest(),
-            outputDirectory,
-            inputFiles,
-            inputDirectories);
-
-        outputDirectory.stamp(root);
+        try {
+          fetchInputs(
+              root,
+              action.getInputRootDigest(),
+              outputDirectory,
+              inputFiles,
+              inputDirectories);
+        } catch (IOException e) {
+          fileCache.decrementReferences(inputFiles.build(), inputDirectories.build());
+          throw e;
+        }
 
         rootInputFiles.put(root, inputFiles.build());
         rootInputDirectories.put(root, inputDirectories.build());
+
+        try {
+          outputDirectory.stamp(root);
+        } catch (IOException e) {
+          destroyActionRoot(root);
+          throw e;
+        }
       }
 
       @Override
