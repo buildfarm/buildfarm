@@ -46,8 +46,6 @@ public interface WorkerContext {
   ExecutionPolicy getExecutionPolicy(String name);
   int getInlineContentLimit();
   int getExecuteStageWidth();
-  int getTreePageSize();
-  boolean getLinkInputDirectories();
   boolean hasDefaultActionTimeout();
   boolean hasMaximumActionTimeout();
   boolean getStreamStdout();

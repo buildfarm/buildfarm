@@ -361,16 +361,6 @@ public class Worker {
       }
 
       @Override
-      public int getTreePageSize() {
-        return config.getTreePageSize();
-      }
-
-      @Override
-      public boolean getLinkInputDirectories() {
-        return config.getLinkInputDirectories();
-      }
-
-      @Override
       public boolean hasDefaultActionTimeout() {
         return config.hasDefaultActionTimeout();
       }
