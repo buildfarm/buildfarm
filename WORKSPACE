@@ -63,5 +63,5 @@ container_pull(
   name = "java_base",
   registry = "gcr.io",
   repository = "distroless/java",
-  digest = "sha256:625c3584876171c6d786d8d8a74b2aaceac06fef450e7fd7322247464f118aa9",
+  digest = "sha256:8c1769cb253bdecc257470f7fba05446a55b70805fa686f227a11655a90dfe9e",
 )
