@@ -22,6 +22,7 @@ import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.ThreadSafety.ThreadSafe;
 import build.buildfarm.common.function.InterruptingRunnable;
 import build.buildfarm.v1test.ShardDispatchedOperation;
+import build.buildfarm.v1test.ShardWorker;
 import com.google.common.collect.ImmutableList;
 import com.google.longrunning.Operation;
 import java.io.IOException;
@@ -63,37 +64,28 @@ public interface ShardBackplane {
   void stop();
 
   /**
-   * Adds a worker's name to the set of active workers.
+   * Adds a worker to the set of active workers.
    *
    * Returns true if the worker was newly added, and false if
    * it was already a member of the set.
    */
   @ThreadSafe
-  boolean addWorker(String workerName) throws IOException;
+  boolean addWorker(ShardWorker shardWorker) throws IOException;
 
   /**
    * Removes a worker's name from the set of active workers.
+   *
+   * Return true if the worker was removed, and false if it
+   * was not a member of the set.
    */
   @ThreadSafe
-  void removeWorker(String workerName) throws IOException;
-
-  /**
-   * Returns the name of a random worker from the set of active workers.
-   */
-  @ThreadSafe
-  String getRandomWorker() throws IOException;
+  boolean removeWorker(String workerName) throws IOException;
 
   /**
    * Returns a set of the names of all active workers.
    */
   @ThreadSafe
   Set<String> getWorkers() throws IOException;
-
-  /**
-   * Checks whether or not a worker name is in the set of active workers.
-   */
-  @ThreadSafe
-  boolean isWorker(String workerName) throws IOException;
 
   /**
    * The AC stores full ActionResult objects in a hash map where the key is the

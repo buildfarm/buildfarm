@@ -141,7 +141,7 @@ message MemoryInstanceConfig {
 message RedisShardBackplaneConfig {
   string redis_uri = 1;
   int32 jedis_pool_max_total = 15;
-  string workers_set_name = 2;
+  string workers_hash_name = 2;
   string action_cache_prefix = 3;
   int32 action_cache_expire = 4;
   string operation_prefix = 5;
@@ -279,6 +279,12 @@ message ShardWorkerConfig {
   // available execution policies, will be used to match
   // with an action's platform for selection
   repeated ExecutionPolicy execution_policies = 25;
+}
+
+message ShardWorker {
+  string endpoint = 1;
+
+  int64 expire_at = 2;
 }
 
 message ShardDispatchedOperation {

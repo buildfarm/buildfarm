@@ -735,8 +735,20 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   CommittingOutputStream createBlobOutputStream(Digest blobDigest) throws IOException {
-    // the name might very well be how bytestream is supposed to resume uploads...
-    Instance instance = workerStub(backplane.getRandomWorker());
+    String worker = null;
+    while (worker == null) {
+      Set<String> workers = backplane.getWorkers();
+      if (workers.isEmpty()) {
+        throw new IOException("no available workers");
+      }
+      int index = rand.nextInt(workers.size());
+      // best case no allocation average n / 2 selection
+      Iterator<String> iter = workers.iterator();
+      while (iter.hasNext() && index-- >= 0) {
+        worker = iter.next();
+      }
+    }
+    Instance instance = workerStub(worker);
     String resourceName = String.format(
         "uploads/%s/blobs/%s",
         UUID.randomUUID(), DigestUtil.toString(blobDigest));
@@ -939,8 +951,7 @@ public class ShardInstance extends AbstractServerInstance {
 
   private void removeMalfunctioningWorker(String worker, Throwable t, String context) {
     try {
-      if (backplane.isWorker(worker)) {
-        backplane.removeWorker(worker);
+      if (backplane.removeWorker(worker)) {
         logger.log(WARNING, "Removed worker '" + worker + "' during(" + context + ") because of: {}", t);
       }
     } catch (IOException eIO) {

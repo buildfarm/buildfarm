@@ -41,6 +41,7 @@ import build.buildfarm.worker.ReportResultStage;
 import build.buildfarm.worker.WorkerContext;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ShardWorkerConfig;
+import build.buildfarm.v1test.ShardWorker;
 import com.google.common.base.Strings;
 import com.google.common.io.ByteStreams;
 import com.google.devtools.common.options.OptionsParser;
@@ -77,7 +78,6 @@ public class Worker {
   private final ExecFileSystem execFileSystem;
   private final Pipeline pipeline;
   private final ShardBackplane backplane;
-  private long workerRegistrationExpiresAt = 0;
   private static final int shutdownWaitTimeInMillis = 10000;
 
   public Worker(ShardWorkerConfig config) throws ConfigurationException {
@@ -330,10 +330,10 @@ public class Worker {
     }
   }
 
-  private void addWorker(String name) {
+  private void addWorker(ShardWorker worker) {
     for (;;) {
       try {
-        backplane.addWorker(name);
+        backplane.addWorker(worker);
         return;
       } catch (IOException e) {
         Status status = Status.fromThrowable(e);
@@ -345,23 +345,48 @@ public class Worker {
   }
 
   private void startFailsafeRegistration() {
-    new Thread(() -> {
-      try {
-        while (!server.isShutdown()) {
-          long now = System.currentTimeMillis();
-          if (now >= workerRegistrationExpiresAt) {
-            // worker must be registered to match
-            addWorker(config.getPublicName());
-            // update every 10 seconds
-            workerRegistrationExpiresAt = now + 10000;
-          }
-          TimeUnit.SECONDS.sleep(1);
+    String endpoint = config.getPublicName();
+    ShardWorker.Builder worker = ShardWorker.newBuilder()
+        .setEndpoint(endpoint);
+    int registrationIntervalMillis = 10000;
+    int registrationOffsetMillis = registrationIntervalMillis * 3;
+    new Thread(new Runnable() {
+      long workerRegistrationExpiresAt = 0;
+
+      ShardWorker nextRegistration(long now) {
+        return worker
+            .setExpireAt(now + registrationOffsetMillis)
+            .build();
+      }
+
+      long nextInterval(long now) {
+        return now + registrationIntervalMillis;
+      }
+
+      void registerIfExpired() {
+        long now = System.currentTimeMillis();
+        if (now >= workerRegistrationExpiresAt) {
+          // worker must be registered to match
+          addWorker(nextRegistration(now));
+          // update every 10 seconds
+          workerRegistrationExpiresAt = nextInterval(now);
         }
-      } catch (InterruptedException e) {
+      }
+
+      @Override
+      public void run() {
         try {
-          stop();
-        } catch (InterruptedException ie) {
-          // ignore
+          while (!server.isShutdown()) {
+            registerIfExpired();
+            TimeUnit.SECONDS.sleep(1);
+          }
+        } catch (InterruptedException e) {
+          try {
+            stop();
+          } catch (InterruptedException ie) {
+            logger.log(SEVERE, "interrupted while stopping worker", ie);
+            // ignore
+          }
         }
       }
     }).start();

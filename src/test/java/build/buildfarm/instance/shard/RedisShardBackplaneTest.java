@@ -16,9 +16,12 @@ package build.buildfarm.instance.shard;
 
 import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import build.buildfarm.v1test.RedisShardBackplaneConfig;
+import com.google.common.collect.ImmutableMap;
 import io.grpc.Status;
 import io.grpc.Status.Code;
 import java.io.IOException;
@@ -32,6 +35,7 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
+import redis.clients.jedis.Pipeline;
 import redis.clients.jedis.exceptions.JedisConnectionException;
 
 @RunWith(JUnit4.class)
@@ -44,11 +48,11 @@ public class RedisShardBackplaneTest {
   @Before
   public void setUp() {
     MockitoAnnotations.initMocks(this);
-    when(mockJedisPool.getResource()).thenReturn(mock(Jedis.class));
   }
 
   @Test
   public void withBackplaneExceptionEndOfStreamIsUnavailable() throws IOException, InterruptedException {
+    when(mockJedisPool.getResource()).thenReturn(mock(Jedis.class));
     backplane = new RedisShardBackplane(
         RedisShardBackplaneConfig.getDefaultInstance(),
         (o) -> o,
@@ -68,6 +72,7 @@ public class RedisShardBackplaneTest {
 
   @Test
   public void withBackplaneExceptionConnectionResetIsUnavailable() throws IOException, InterruptedException {
+    when(mockJedisPool.getResource()).thenReturn(mock(Jedis.class));
     backplane = new RedisShardBackplane(
         RedisShardBackplaneConfig.getDefaultInstance(),
         (o) -> o,
@@ -86,7 +91,9 @@ public class RedisShardBackplaneTest {
   }
 
   @Test
-  public void withBackplaneExceptionSocketTimeoutExceptionIsDeadlineExceeded() throws IOException, InterruptedException {
+  public void withBackplaneExceptionSocketTimeoutExceptionIsDeadlineExceeded()
+      throws IOException, InterruptedException {
+    when(mockJedisPool.getResource()).thenReturn(mock(Jedis.class));
     backplane = new RedisShardBackplane(
         RedisShardBackplaneConfig.getDefaultInstance(),
         (o) -> o,
@@ -102,5 +109,30 @@ public class RedisShardBackplaneTest {
       status = Status.fromThrowable(e);
     }
     assertThat(status.getCode()).isEqualTo(Code.DEADLINE_EXCEEDED);
+  }
+
+  @Test
+  public void workersWithInvalidProtobufAreRemoved() throws IOException {
+    RedisShardBackplaneConfig config = RedisShardBackplaneConfig.newBuilder()
+        .setWorkersHashName("Workers")
+        .build();
+    Jedis jedis = mock(Jedis.class);
+    when(mockJedisPool.getResource()).thenReturn(jedis);
+    when(jedis.hgetAll(config.getWorkersHashName())).thenReturn(ImmutableMap.of("foo", "foo"));
+    Pipeline pipeline = mock(Pipeline.class);
+    when(jedis.pipelined()).thenReturn(pipeline);
+    backplane = new RedisShardBackplane(
+        config,
+        (o) -> o,
+        (o) -> o,
+        (o) -> false,
+        (o) -> false,
+        mockJedisPool);
+    backplane.start();
+
+    assertThat(backplane.getWorkers()).isEmpty();
+    verify(jedis, times(1)).pipelined();
+    verify(pipeline, times(1)).hdel(config.getWorkersHashName(), "foo");
+    verify(pipeline, times(1)).sync();
   }
 }

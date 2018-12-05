@@ -124,7 +124,6 @@ public class ShardInstanceTest {
     when(mockBackplane.getTree(eq(inputRootDigest))).thenReturn(ImmutableList.of(inputRoot));
 
     ImmutableSet<String> workers = ImmutableSet.of(workerName);
-    when(mockBackplane.getRandomWorker()).thenReturn(workerName);
     when(mockBackplane.getWorkers()).thenReturn(workers);
 
     Command command = Command.newBuilder()

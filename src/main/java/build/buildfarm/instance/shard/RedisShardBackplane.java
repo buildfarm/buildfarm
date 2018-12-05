@@ -32,6 +32,7 @@ import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.RedisShardBackplaneConfig;
 import build.buildfarm.v1test.ShardDispatchedOperation;
+import build.buildfarm.v1test.ShardWorker;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -39,6 +40,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -303,8 +305,10 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   @Override
-  public boolean addWorker(String workerName) throws IOException {
-    return withBackplaneException((jedis) -> jedis.sadd(config.getWorkersSetName(), workerName) == 1);
+  public boolean addWorker(ShardWorker shardWorker) throws IOException {
+    String json = JsonFormat.printer().print(shardWorker);
+    return withBackplaneException(
+        (jedis) -> jedis.hset(config.getWorkersHashName(), shardWorker.getEndpoint(), json) == 1);
   }
 
   private static final String MISCONF_RESPONSE = "MISCONF";
@@ -371,36 +375,59 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   @Override
-  public void removeWorker(String workerName) throws IOException {
+  public boolean removeWorker(String workerName) throws IOException {
     if (workerSet != null) {
-      workerSet.remove(workerName);
+      if (!workerSet.remove(workerName)) {
+        return false;
+      }
     }
 
-    withVoidBackplaneException((jedis) -> jedis.srem(config.getWorkersSetName(), workerName));
-  }
-
-  @Override
-  public String getRandomWorker() throws IOException {
-    return withBackplaneException((jedis) -> jedis.srandmember(config.getWorkersSetName()));
+    return withBackplaneException((jedis) -> jedis.hdel(config.getWorkersHashName(), workerName) == 1);
   }
 
   @Override
   public Set<String> getWorkers() throws IOException {
     long now = System.currentTimeMillis();
-    if (now < workerSetExpiresAt) {
+    if (workerSet != null && now < workerSetExpiresAt) {
       return workerSet;
     }
 
-    workerSet = withBackplaneException((jedis) -> jedis.smembers(config.getWorkersSetName()));
+    workerSet = withBackplaneException((jedis) -> fetchAndExpireWorkers(jedis, now));
 
     // fetch every 3 seconds
     workerSetExpiresAt = now + 3000;
     return workerSet;
   }
 
-  @Override
-  public boolean isWorker(String workerName) throws IOException {
-    return withBackplaneException((jedis) -> jedis.sismember(config.getWorkersSetName(), workerName));
+  private Set<String> fetchAndExpireWorkers(Jedis jedis, long now) {
+    Set<String> workers = Sets.newHashSet();
+    ImmutableList.Builder<String> invalidWorkers = ImmutableList.builder();
+    for (Map.Entry<String, String> entry : jedis.hgetAll(config.getWorkersHashName()).entrySet()) {
+      String json = entry.getValue();
+      String name = entry.getKey();
+      try {
+        if (json == null) {
+          invalidWorkers.add(name);
+        } else {
+          ShardWorker.Builder builder = ShardWorker.newBuilder();
+          JsonFormat.parser().merge(json, builder);
+          ShardWorker worker = builder.build();
+          if (worker.getExpireAt() <= now) {
+            invalidWorkers.add(name);
+          } else {
+            workers.add(worker.getEndpoint());
+          }
+        }
+      } catch (InvalidProtocolBufferException e) {
+        invalidWorkers.add(name);
+      }
+    }
+    Pipeline p = jedis.pipelined();
+    for (String invalidWorker : invalidWorkers.build()) {
+      p.hdel(config.getWorkersHashName(), invalidWorker);
+    }
+    p.sync();
+    return workers;
   }
 
   private static ActionResult parseActionResult(String json) {
