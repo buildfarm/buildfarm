@@ -841,6 +841,7 @@ public abstract class CASFileCache implements ContentAddressableStorage, OutputS
       } else {
         putFuture = listeningDecorator(service).submit(() -> {
           Files.createFile(filePath);
+          // ignore executable
           return null;
         });
       }
