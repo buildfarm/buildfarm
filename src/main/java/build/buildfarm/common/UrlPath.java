@@ -22,12 +22,12 @@ public class UrlPath {
   public static class InvalidResourceNameException extends Exception {
     private final String resourceName;
 
-    InvalidResourceNameException(String resourceName, String message) {
+    public InvalidResourceNameException(String resourceName, String message) {
       super(message);
       this.resourceName = resourceName;
     }
 
-    InvalidResourceNameException(String resourceName, String message, Throwable cause) {
+    public InvalidResourceNameException(String resourceName, String message, Throwable cause) {
       super(message, cause);
       this.resourceName = resourceName;
     }
