@@ -52,7 +52,7 @@ public class InputFetchStage extends PipelineStage {
       return false;
     }
 
-    while (fetchers.size() >= workerContext.getInputFetchStageWidth()) {
+    while (fetchers.size() + queue.size() >= workerContext.getInputFetchStageWidth()) {
       wait();
     }
     return true;
@@ -99,7 +99,7 @@ public class InputFetchStage extends PipelineStage {
     Thread fetcher = new Thread(new InputFetcher(workerContext, operationContext, this));
 
     int size;
-    synchronized(this) {
+    synchronized (this) {
       fetchers.add(fetcher);
       size = fetchers.size();
     }

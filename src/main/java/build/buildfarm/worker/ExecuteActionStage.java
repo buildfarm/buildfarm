@@ -52,7 +52,7 @@ public class ExecuteActionStage extends PipelineStage {
       return false;
     }
 
-    while (executors.size() >= workerContext.getExecuteStageWidth()) {
+    while (executors.size() + queue.size() >= workerContext.getExecuteStageWidth()) {
       wait();
     }
     return true;
@@ -99,7 +99,7 @@ public class ExecuteActionStage extends PipelineStage {
     Thread executor = new Thread(new Executor(workerContext, operationContext, this));
 
     int size;
-    synchronized(this) {
+    synchronized (this) {
       executors.add(executor);
       size = executors.size();
     }
