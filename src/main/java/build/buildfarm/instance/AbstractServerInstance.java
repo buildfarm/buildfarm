@@ -41,6 +41,7 @@ import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.buildfarm.instance.TreeIterator.DirectoryEntry;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
+import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.ac.ActionCache;
 import build.buildfarm.cas.ContentAddressableStorage;
@@ -671,32 +672,34 @@ public abstract class AbstractServerInstance implements Instance {
     checkViolations(action, preconditionFailure.getViolationsList());
   }
 
-  protected ListenableFuture<QueuedOperationMetadata> validateQueuedOperationMetadataAndInputs(
-      QueuedOperationMetadata metadata, PreconditionFailure.Builder preconditionFailure, ExecutorService service) throws InterruptedException {
+  protected ListenableFuture<QueuedOperation> validateQueuedOperationAndInputs(
+      QueuedOperation queuedOperation,
+      PreconditionFailure.Builder preconditionFailure,
+      ExecutorService service) throws InterruptedException {
     ImmutableSet.Builder<Digest> inputDigestsBuilder = ImmutableSet.builder();
-    Action action = metadata.getAction();
+    Action action = queuedOperation.getAction();
     validateAction(
         action,
-        metadata.getCommand(),
-        metadata.getDirectoriesList(),
+        queuedOperation.getCommand(),
+        queuedOperation.getDirectoriesList(),
         inputDigestsBuilder,
         preconditionFailure);
     return transform(
         validateInputs(inputDigestsBuilder.build(), preconditionFailure, service),
         (result) -> {
           checkViolations(action, preconditionFailure.getViolationsList());
-          return metadata;
+          return queuedOperation;
         },
         service);
   }
 
-  protected void validateQueuedOperationMetadata(
-      QueuedOperationMetadata metadata, PreconditionFailure.Builder preconditionFailure) {
-    Action action = metadata.getAction();
+  protected void validateQueuedOperation(
+      QueuedOperation queuedOperation, PreconditionFailure.Builder preconditionFailure) {
+    Action action = queuedOperation.getAction();
     validateAction(
         action,
-        metadata.getCommand(),
-        metadata.getDirectoriesList(),
+        queuedOperation.getCommand(),
+        queuedOperation.getDirectoriesList(),
         ImmutableSet.builder(),
         preconditionFailure);
     checkViolations(action, preconditionFailure.getViolationsList());
@@ -949,28 +952,28 @@ public abstract class AbstractServerInstance implements Instance {
     if (operation.getMetadata().is(QueuedOperationMetadata.class)) {
       try {
         return operation.getMetadata().unpack(QueuedOperationMetadata.class).getExecuteOperationMetadata();
-      } catch(InvalidProtocolBufferException e) {
+      } catch (InvalidProtocolBufferException e) {
         return null;
       }
     }
     if (operation.getMetadata().is(ExecutingOperationMetadata.class)) {
       try {
         return operation.getMetadata().unpack(ExecutingOperationMetadata.class).getExecuteOperationMetadata();
-      } catch(InvalidProtocolBufferException e) {
+      } catch (InvalidProtocolBufferException e) {
         return null;
       }
     }
     if (operation.getMetadata().is(CompletedOperationMetadata.class)) {
       try {
         return operation.getMetadata().unpack(CompletedOperationMetadata.class).getExecuteOperationMetadata();
-      } catch(InvalidProtocolBufferException e) {
+      } catch (InvalidProtocolBufferException e) {
         return null;
       }
     }
     try {
       return operation.getMetadata().unpack(ExecuteOperationMetadata.class);
     } catch (InvalidProtocolBufferException e) {
-      logger.log(SEVERE, "error unpacking execute operation metadata for " + operation.getName(), e);
+      logger.log(SEVERE, "invalid execute operation metadata " + operation.getName(), e);
       return null;
     }
   }
@@ -985,7 +988,7 @@ public abstract class AbstractServerInstance implements Instance {
       if (actionBlob != null) {
         return Action.parseFrom(actionBlob);
       }
-    } catch(IOException e) {
+    } catch (IOException e) {
       Status status = Status.fromThrowable(e);
       if (status.getCode() != Code.NOT_FOUND) {
         logger.log(SEVERE, "error getting action for " + operation.getName(), e);
@@ -1024,6 +1027,10 @@ public abstract class AbstractServerInstance implements Instance {
 
   protected ListenableFuture<Action> expectAction(Digest actionBlobDigest) {
     return parseFuture(actionBlobDigest, Action.parser());
+  }
+
+  protected ListenableFuture<QueuedOperation> expectQueuedOperation(Digest queuedOperationBlobDigest) {
+    return parseFuture(queuedOperationBlobDigest, QueuedOperation.parser());
   }
 
   protected ListenableFuture<Command> insistCommand(Digest commandBlobDigest) {
@@ -1179,7 +1186,14 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public void cancelOperation(String name) throws InterruptedException {
-    errorOperation(name, com.google.rpc.Status.newBuilder()
+    Operation operation = getOperation(name);
+    if (operation == null) {
+      operation = Operation.newBuilder()
+          .setName(name)
+          .setMetadata(Any.pack(ExecuteOperationMetadata.getDefaultInstance()))
+          .build();
+    }
+    errorOperation(operation, com.google.rpc.Status.newBuilder()
         .setCode(com.google.rpc.Code.CANCELLED.getNumber())
         .build());
   }
@@ -1201,7 +1215,7 @@ public abstract class AbstractServerInstance implements Instance {
       String message = String.format(
           "Operation %s does not contain ExecuteOperationMetadata",
           name);
-      errorOperation(name, com.google.rpc.Status.newBuilder()
+      errorOperation(operation, com.google.rpc.Status.newBuilder()
           .setCode(com.google.rpc.Code.INTERNAL.getNumber())
           .setMessage(message)
           .build());
@@ -1213,7 +1227,7 @@ public abstract class AbstractServerInstance implements Instance {
       String message = String.format(
           "Operation %s stage is not QUEUED",
           name);
-      errorOperation(name, com.google.rpc.Status.newBuilder()
+      errorOperation(operation, com.google.rpc.Status.newBuilder()
           .setCode(com.google.rpc.Code.INTERNAL.getNumber())
           .setMessage(message)
           .build());
@@ -1225,7 +1239,7 @@ public abstract class AbstractServerInstance implements Instance {
     try {
       validateActionDigest(actionDigest, preconditionFailure);
     } catch (IllegalStateException e) {
-      errorOperation(name, com.google.rpc.Status.newBuilder()
+      errorOperation(operation, com.google.rpc.Status.newBuilder()
           .setCode(com.google.rpc.Code.FAILED_PRECONDITION.getNumber())
           .addDetails(Any.pack(preconditionFailure.build()))
           .build());
@@ -1242,15 +1256,7 @@ public abstract class AbstractServerInstance implements Instance {
     return putOperation(operation);
   }
 
-  protected void errorOperation(String name, com.google.rpc.Status status) throws InterruptedException {
-    Operation operation = getOperation(name);
-    if (operation == null) {
-      // throw new IllegalStateException("Trying to error nonexistent operation [" + name + "]");
-      logger.severe("Erroring non-existent operation " + name + ", will signal watchers");
-      operation = Operation.newBuilder()
-          .setName(name)
-          .build();
-    }
+  protected void errorOperation(Operation operation, com.google.rpc.Status status) throws InterruptedException {
     if (operation.getDone()) {
       throw new IllegalStateException("Trying to error already completed operation [" + name + "]");
     }

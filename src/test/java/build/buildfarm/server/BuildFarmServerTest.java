@@ -52,6 +52,7 @@ import build.buildfarm.v1test.MemoryInstanceConfig;
 import build.buildfarm.v1test.MemoryCASConfig;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.PollOperationRequest;
+import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.TakeOperationRequest;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -267,9 +268,12 @@ public class BuildFarmServerTest {
     OperationQueueGrpc.OperationQueueBlockingStub operationQueueStub =
         OperationQueueGrpc.newBlockingStub(inProcessChannel);
 
-    Operation givenOperation = operationQueueStub.take(takeRequest);
+    QueueEntry givenEntry = operationQueueStub.take(takeRequest);
+    String givenOperationName = givenEntry.getExecuteEntry().getOperationName();
 
-    assertThat(givenOperation.getName()).isEqualTo(operation.getName());
+    assertThat(givenOperationName).isEqualTo(operation.getName());
+
+    Operation givenOperation = getOperation(givenOperationName);
 
     // move the operation into EXECUTING stage
     ExecuteOperationMetadata executingMetadata =

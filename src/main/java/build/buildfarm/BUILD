@@ -6,7 +6,10 @@ package(
 
 java_library(
     name = "common",
-    srcs = glob(["common/*.java", "common/function/*.java"]),
+    srcs = glob([
+        "common/*.java",
+        "common/function/*.java",
+    ]),
     deps = [
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
@@ -54,6 +57,7 @@ java_library(
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "//3rdparty/jvm/io/grpc:grpc_core",
         "//3rdparty/jvm/io/grpc:grpc_stub",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_longrunning_operations_java_proto",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
@@ -257,12 +261,12 @@ java_library(
 container_image(
     name = "buildfarm-shard-worker.container",
     base = "@java_base//image",
-    files = [
-        ":buildfarm-shard-worker_deploy.jar",
-    ],
     cmd = [
         "buildfarm-shard-worker_deploy.jar",
         "/config/worker.config",
+    ],
+    files = [
+        ":buildfarm-shard-worker_deploy.jar",
     ],
 )
 

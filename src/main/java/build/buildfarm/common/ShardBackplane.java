@@ -21,7 +21,9 @@ import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.ThreadSafety.ThreadSafe;
 import build.buildfarm.common.function.InterruptingRunnable;
-import build.buildfarm.v1test.ShardDispatchedOperation;
+import build.buildfarm.v1test.DispatchedOperation;
+import build.buildfarm.v1test.ExecuteEntry;
+import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.ShardWorker;
 import com.google.common.collect.ImmutableList;
 import com.google.longrunning.Operation;
@@ -211,7 +213,7 @@ public interface ShardBackplane {
   boolean putOperation(Operation operation, Stage stage) throws IOException;
 
   @ThreadSafe
-  String deprequeueOperation() throws IOException, InterruptedException;
+  ExecuteEntry deprequeueOperation() throws IOException, InterruptedException;
 
   /**
    * The state of operations is tracked in a series of lists representing the
@@ -222,7 +224,7 @@ public interface ShardBackplane {
    * dispatched operations.
    */
   @ThreadSafe
-  String dispatchOperation() throws IOException, InterruptedException;
+  QueueEntry dispatchOperation() throws IOException, InterruptedException;
 
   /**
    * The state of operations is tracked in a series of lists representing the
@@ -233,7 +235,7 @@ public interface ShardBackplane {
    * operation is still valid.
    */
   @ThreadSafe
-  boolean pollOperation(String operationName, Stage stage, long requeueAt) throws IOException;
+  boolean pollOperation(QueueEntry queueEntry, Stage stage, long requeueAt) throws IOException;
 
   /**
    * Complete an operation
@@ -257,7 +259,7 @@ public interface ShardBackplane {
    * Get all dispatched operations
    */
   @ThreadSafe
-  ImmutableList<ShardDispatchedOperation> getDispatchedOperations() throws IOException;
+  ImmutableList<DispatchedOperation> getDispatchedOperations() throws IOException;
 
   /**
    * Get all operations
@@ -269,11 +271,14 @@ public interface ShardBackplane {
    * Requeue a dispatched operation
    */
   @ThreadSafe
-  void requeueDispatchedOperation(Operation operation) throws IOException;
+  void requeueDispatchedOperation(QueueEntry queueEntry) throws IOException;
 
 
   @ThreadSafe
-  void prequeueOperation(String operationName) throws IOException;
+  void prequeue(ExecuteEntry executeEntry, Operation operation) throws IOException;
+
+  @ThreadSafe
+  void queue(QueueEntry queueEntry, Operation operation) throws IOException;
 
   /**
    * Store a directory tree and all of its descendants

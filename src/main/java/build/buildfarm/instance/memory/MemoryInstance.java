@@ -22,23 +22,33 @@ import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.util.Collections.synchronizedSortedMap;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.Platform;
 import build.buildfarm.ac.ActionCache;
 import build.buildfarm.ac.GrpcActionCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorages;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
-import build.buildfarm.common.Watchdog;
 import build.buildfarm.common.function.InterruptingPredicate;
+import build.buildfarm.common.Watchdog;
 import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.instance.OperationsMap;
 import build.buildfarm.instance.TokenizableIterator;
 import build.buildfarm.instance.TreeIterator;
 import build.buildfarm.instance.TreeIterator.DirectoryEntry;
 import build.buildfarm.v1test.ActionCacheConfig;
+import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.GrpcACConfig;
 import build.buildfarm.v1test.MemoryInstanceConfig;
 import build.buildfarm.v1test.OperationIteratorToken;
+import build.buildfarm.v1test.QueueEntry;
+import build.buildfarm.v1test.QueuedOperation;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -47,17 +57,10 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.MultimapBuilder;
 import com.google.common.collect.SetMultimap;
 import com.google.common.io.BaseEncoding;
-import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
-import build.bazel.remote.execution.v2.Action;
-import build.bazel.remote.execution.v2.ActionResult;
-import build.bazel.remote.execution.v2.Command;
-import build.bazel.remote.execution.v2.Digest;
-import build.bazel.remote.execution.v2.Directory;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
-import build.bazel.remote.execution.v2.Platform;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -65,12 +68,12 @@ import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.Durations;
 import com.google.rpc.PreconditionFailure;
-import io.grpc.StatusException;
 import io.grpc.Channel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
-import java.io.IOException;
+import io.grpc.StatusException;
 import java.io.InputStream;
+import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -451,18 +454,24 @@ public class MemoryInstance extends AbstractServerInstance {
     new Thread(requeuer).start();
   }
 
-  private Command expectCommand(Operation operation) throws InterruptedException {
-    Action action = expectAction(operation);
-    return getUnchecked(expectCommand(action.getCommandDigest()));
-  }
-
   @Override
   protected boolean matchOperation(Operation operation) throws InterruptedException {
-    Action action = expectAction(operation);
+    ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
+    Preconditions.checkState(metadata != null, "metadata not found");
+
+    Action action = getUnchecked(expectAction(metadata.getActionDigest()));
     Preconditions.checkState(action != null, "action not found");
 
     Command command = getUnchecked(expectCommand(action.getCommandDigest()));
     Preconditions.checkState(command != null, "command not found");
+
+    QueuedOperation queuedOperation = QueuedOperation.newBuilder()
+        .setAction(action)
+        .setCommand(command)
+        // .addAllDirectories(directories)
+        .build();
+    ByteString queuedOperationBlob = queuedOperation.toByteString();
+    Digest queuedOperationDigest = getDigestUtil().compute(queuedOperationBlob);
 
     ImmutableList.Builder<Worker> rejectedWorkers = new ImmutableList.Builder<>();
     boolean dispatched = false;
@@ -472,9 +481,20 @@ public class MemoryInstance extends AbstractServerInstance {
         if (!satisfiesRequirements(worker.getPlatform(), command)) {
           rejectedWorkers.add(worker);
         } else {
-          // worker onMatch false return indicates inviability
-          if (dispatched = worker.getListener().onOperation(operation)) {
-            onDispatched(operation);
+          QueueEntry queueEntry = QueueEntry.newBuilder()
+              // FIXME find a way to get this properly populated...
+              .setExecuteEntry(ExecuteEntry.newBuilder()
+                  .setOperationName(operation.getName())
+                  .setActionDigest(metadata.getActionDigest())
+                  .setStdoutStreamName(metadata.getStdoutStreamName())
+                  .setStderrStreamName(metadata.getStderrStreamName()))
+              .setQueuedOperationDigest(queuedOperationDigest)
+              .build();
+          if (worker.getListener().onEntry(queueEntry)) {
+            dispatched = worker.getListener().onOperation(queuedOperation);
+            if (dispatched) {
+              onDispatched(operation);
+            }
           }
         }
       }
@@ -490,12 +510,39 @@ public class MemoryInstance extends AbstractServerInstance {
     boolean matched = false;
     while (!matched && !queuedOperations.isEmpty()) {
       Operation operation = queuedOperations.remove(0);
-      Command command = expectCommand(operation);
+      ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
+      Preconditions.checkState(metadata != null, "metadata not found");
+
+      Action action = getUnchecked(expectAction(metadata.getActionDigest()));
+      Preconditions.checkState(action != null, "action not found");
+
+      Command command = getUnchecked(expectCommand(action.getCommandDigest()));
+      Preconditions.checkState(command != null, "command not found");
+
       if (command == null) {
         cancelOperation(operation.getName());
       } else if (satisfiesRequirements(platform, command)) {
+        QueuedOperation queuedOperation = QueuedOperation.newBuilder()
+            .setAction(action)
+            .setCommand(command)
+            // .addAllDirectories(directories)
+            .build();
+        ByteString queuedOperationBlob = queuedOperation.toByteString();
+        Digest queuedOperationDigest = getDigestUtil().compute(queuedOperationBlob);
+
+        QueueEntry queueEntry = QueueEntry.newBuilder()
+            // FIXME find a way to get this properly populated...
+            .setExecuteEntry(ExecuteEntry.newBuilder()
+                .setOperationName(operation.getName())
+                .setActionDigest(metadata.getActionDigest())
+                .setStdoutStreamName(metadata.getStdoutStreamName())
+                .setStderrStreamName(metadata.getStderrStreamName()))
+            .setQueuedOperationDigest(queuedOperationDigest)
+            .build();
+
         matched = true;
-        if (listener.onOperation(operation)) {
+        if (listener.onEntry(queueEntry)
+            && listener.onOperation(queuedOperation)) {
           onDispatched(operation);
         }
       } else {

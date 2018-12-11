@@ -49,11 +49,12 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.instance.Instance.CommittingOutputStream;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.v1test.QueuedOperationMetadata;
+import build.buildfarm.v1test.ExecuteEntry;
+import build.buildfarm.v1test.QueueEntry;
 import com.google.common.cache.CacheLoader;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -141,6 +142,12 @@ public class ShardInstanceTest {
         return null;
       }
     }).when(mockWorkerInstance).getBlob(eq(commandDigest), eq(0l), eq(0l), any(StreamObserver.class));
+    doAnswer(new Answer<ListenableFuture<Iterable<Digest>>>() {
+      @Override
+      public ListenableFuture<Iterable<Digest>> answer(InvocationOnMock invocation) {
+        return immediateFuture((Iterable<Digest>) invocation.getArguments()[0]);
+      }
+    }).when(mockWorkerInstance).findMissingBlobs(any(Iterable.class), any(ExecutorService.class));
     when(mockBackplane.getBlobLocationSet(eq(commandDigest))).thenReturn(workers);
 
     // janky - need a better supplier here
@@ -177,21 +184,17 @@ public class ShardInstanceTest {
     Action action = createAction(false);
     Digest actionDigest = DIGEST_UTIL.compute(action);
 
-    Operation operation = Operation.newBuilder()
-        .setName("operation")
-        .setMetadata(Any.pack(QueuedOperationMetadata.newBuilder()
-            .setExecuteOperationMetadata(ExecuteOperationMetadata.newBuilder()
-                .setActionDigest(actionDigest))
-            .setSkipCacheLookup(true)
-            .build()))
+    ExecuteEntry executeEntry = ExecuteEntry.newBuilder()
+        .setOperationName("operation")
+        .setActionDigest(actionDigest)
+        .setSkipCacheLookup(true)
         .build();
 
-    when(mockBackplane.getOperation(eq(operation.getName()))).thenReturn(operation);
     when(mockBackplane.canQueue()).thenReturn(true);
 
     boolean unknownExceptionCaught = false;
     try {
-      instance.queue(operation).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
+      instance.queue(executeEntry).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
     } catch (ExecutionException e) {
       Status status = Status.fromThrowable(e);
       if (status.getCode() == Code.FAILED_PRECONDITION) {
@@ -213,7 +216,8 @@ public class ShardInstanceTest {
                     .setDescription("Action " + DigestUtil.toString(actionDigest)))
                 .build())))
         .build();
-    Operation erroredOperation = operation.toBuilder()
+    Operation erroredOperation = Operation.newBuilder()
+        .setName(executeEntry.getOperationName())
         .setDone(true)
         .setMetadata(Any.pack(ExecuteOperationMetadata.newBuilder()
             .setActionDigest(actionDigest)
@@ -234,29 +238,26 @@ public class ShardInstanceTest {
     when(mockWorkerInstance.findMissingBlobs(any(Iterable.class), any(ExecutorService.class))).thenReturn(immediateFuture(ImmutableList.of()));
 
     when(mockWorkerInstance.getStreamOutput(
-        matches("^uploads/.* /blobs/" + DigestUtil.toString(actionDigest) + "$"),
-        eq(actionDigest.getSizeBytes()))).thenReturn(mockCommittedOutputStream);
+        matches("^uploads/[^/]+/blobs/.*$"),
+        any(Long.class))).thenReturn(mockCommittedOutputStream);
 
     StatusRuntimeException queueException = Status.UNAVAILABLE.asRuntimeException();
-    when(mockBackplane.putOperation(any(Operation.class), eq(QUEUED)))
-        .thenThrow(new IOException(queueException));
+    doAnswer((invocation) -> {
+      throw new IOException(queueException);
+    }).when(mockBackplane).queue(any(QueueEntry.class), any(Operation.class));
 
-    Operation operation = Operation.newBuilder()
-        .setName("queueOperationPutFailureCancelsOperation")
-        .setMetadata(Any.pack(QueuedOperationMetadata.newBuilder()
-            .setExecuteOperationMetadata(ExecuteOperationMetadata.newBuilder()
-                .setActionDigest(actionDigest))
-            .setSkipCacheLookup(true)
-            .build()))
+    ExecuteEntry executeEntry = ExecuteEntry.newBuilder()
+        .setOperationName("queueOperationPutFailureCancelsOperation")
+        .setActionDigest(actionDigest)
+        .setSkipCacheLookup(true)
         .build();
 
-    when(mockBackplane.getOperation(eq(operation.getName()))).thenReturn(operation);
     when(mockBackplane.canQueue()).thenReturn(true);
 
     boolean unavailableExceptionCaught = false;
     try {
       // anything more would be unreasonable
-      instance.queue(operation).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
+      instance.queue(executeEntry).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
     } catch (ExecutionException e) {
       Status status = Status.fromThrowable(e);
       if (status.getCode() == Code.UNAVAILABLE) {
@@ -267,13 +268,14 @@ public class ShardInstanceTest {
     }
     assertThat(unavailableExceptionCaught).isTrue();
 
-    verify(mockBackplane, times(1)).putOperation(any(Operation.class), eq(QUEUED));
+    verify(mockBackplane, times(1)).queue(any(QueueEntry.class), any(Operation.class));
     ExecuteResponse executeResponse = ExecuteResponse.newBuilder()
         .setStatus(com.google.rpc.Status.newBuilder()
             .setCode(queueException.getStatus().getCode().value())
             .setMessage(queueException.getMessage()))
         .build();
-    Operation erroredOperation = operation.toBuilder()
+    Operation erroredOperation = Operation.newBuilder()
+        .setName(executeEntry.getOperationName())
         .setDone(true)
         .setMetadata(Any.pack(ExecuteOperationMetadata.newBuilder()
             .setActionDigest(actionDigest)
@@ -289,20 +291,16 @@ public class ShardInstanceTest {
     ActionKey actionKey = DigestUtil.asActionKey(Digest.newBuilder()
         .setHash("test")
         .build());
-    Operation operation = Operation.newBuilder()
-        .setName("operationWithCachedActionResult")
-        .setMetadata(Any.pack(QueuedOperationMetadata.newBuilder()
-            .setExecuteOperationMetadata(ExecuteOperationMetadata.newBuilder()
-                .setActionDigest(actionKey.getDigest()))
-            .build()))
+    ExecuteEntry executeEntry = ExecuteEntry.newBuilder()
+        .setOperationName("operationWithCachedActionResult")
+        .setActionDigest(actionKey.getDigest())
         .build();
 
     ActionResult actionResult = ActionResult.getDefaultInstance();
 
-    when(mockBackplane.getOperation(eq(operation.getName()))).thenReturn(operation);
     when(mockBackplane.getActionResult(eq(actionKey))).thenReturn(actionResult);
 
-    instance.queue(operation).get();
+    instance.queue(executeEntry).get();
 
     verify(mockBackplane, times(1)).putOperation(any(Operation.class), eq(CACHE_CHECK));
     verify(mockBackplane, never()).putOperation(any(Operation.class), eq(QUEUED));

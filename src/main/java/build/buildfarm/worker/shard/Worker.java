@@ -136,12 +136,13 @@ public class Worker {
         break;
     }
 
-    execFileSystem = createExecFileSystem(
+    InputStreamFactory remoteInputStreamFactory =
         new RemoteInputStreamFactory(
             config.getPublicName(),
             backplane,
             new Random(),
-            digestUtil));
+            digestUtil);
+    execFileSystem = createExecFileSystem(remoteInputStreamFactory);
 
     instance = new ShardWorkerInstance(
         config.getPublicName(),
@@ -166,7 +167,12 @@ public class Worker {
         config.getInlineContentLimit(),
         config.getInputFetchStageWidth(),
         config.getExecuteStageWidth(),
+        backplane,
         execFileSystem,
+        new EmptyInputStreamFactory(
+            new FailoverInputStreamFactory(
+                execFileSystem.getStorage(),
+                remoteInputStreamFactory)),
         config.getExecutionPoliciesList(),
         instance);
 

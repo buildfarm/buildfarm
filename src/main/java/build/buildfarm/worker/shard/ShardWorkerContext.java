@@ -15,6 +15,7 @@
 package build.buildfarm.worker.shard;
 
 import static com.google.common.collect.Maps.uniqueIndex;
+import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.logging.Level.SEVERE;
 import static java.util.logging.Level.WARNING;
@@ -33,6 +34,8 @@ import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.InputStreamFactory;
+import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.instance.stub.Retrier;
@@ -40,16 +43,22 @@ import build.buildfarm.instance.stub.Retrier.Backoff;
 import build.buildfarm.worker.Poller;
 import build.buildfarm.worker.RetryingMatchListener;
 import build.buildfarm.worker.WorkerContext;
+import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.v1test.ExecutionPolicy;
+import build.buildfarm.v1test.QueueEntry;
+import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Maps;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.grpc.Deadline;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -62,7 +71,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
-import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 
@@ -76,10 +84,12 @@ class ShardWorkerContext implements WorkerContext {
   private final int inlineContentLimit;
   private final int inputFetchStageWidth;
   private final int executeStageWidth;
+  private final ShardBackplane backplane;
   private final ExecFileSystem execFileSystem;
+  private final InputStreamFactory inputStreamFactory;
   private final Map<String, ExecutionPolicy> policies;
   private final Instance instance;
-  private final Set<String> activeOperations = new ConcurrentSkipListSet<>();
+  private final Map<String, QueueEntry> activeOperations = Maps.newConcurrentMap();
   
   ShardWorkerContext(
       String name,
@@ -89,7 +99,9 @@ class ShardWorkerContext implements WorkerContext {
       int inlineContentLimit,
       int inputFetchStageWidth,
       int executeStageWidth,
+      ShardBackplane backplane,
       ExecFileSystem execFileSystem,
+      InputStreamFactory inputStreamFactory,
       Iterable<ExecutionPolicy> policies,
       Instance instance) {
     this.name = name;
@@ -98,7 +110,9 @@ class ShardWorkerContext implements WorkerContext {
     this.inlineContentLimit = inlineContentLimit;
     this.inputFetchStageWidth = inputFetchStageWidth;
     this.executeStageWidth = executeStageWidth;
+    this.backplane = backplane;
     this.execFileSystem = execFileSystem;
+    this.inputStreamFactory = inputStreamFactory;
     this.policies = uniqueIndex(policies, (policy) -> policy.getName());
     this.instance = instance;
     this.platform = platform;
@@ -121,30 +135,31 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
-  public Poller createPoller(String name, String operationName, Stage stage) {
-    return createPoller(name, operationName, stage, () -> {}, Deadline.after(10, DAYS));
+  public Poller createPoller(String name, QueueEntry queueEntry, Stage stage) {
+    return createPoller(name, queueEntry, stage, () -> {}, Deadline.after(10, DAYS));
   }
 
   @Override
-  public Poller createPoller(String name, String operationName, Stage stage, Runnable onFailure, Deadline deadline) {
+  public Poller createPoller(String name, QueueEntry queueEntry, Stage stage, Runnable onFailure, Deadline deadline) {
+    String operationName = queueEntry.getExecuteEntry().getOperationName();
     Poller poller = new Poller(
         operationPollPeriod,
         () -> {
           boolean success = false;
           try {
-            success = operationPoller.poll(operationName, stage, System.currentTimeMillis() + 30 * 1000);
+            success = operationPoller.poll(queueEntry, stage, System.currentTimeMillis() + 30 * 1000);
           } catch (IOException e) {
             logger.log(SEVERE, "error polling " + operationName, e);
           }
 
-          logInfo(name + ": poller: Completed Poll for " + operationName + ": " + (success ? "OK" : "Failed"));
+          logger.info(format("%s: poller: Completed Poll for %s: %s", name, operationName, success ? "OK" : "Failed"));
           if (!success) {
             onFailure.run();
           }
           return success;
         },
         () -> {
-          logInfo(name + ": poller: Deadline expired for " + operationName);
+          logger.info(format("%s: poller: Deadline expired for %s", name, operationName));
           onFailure.run();
         },
         deadline);
@@ -157,15 +172,61 @@ class ShardWorkerContext implements WorkerContext {
     return instance.getDigestUtil();
   }
 
+  private ByteString getBlob(Digest digest) throws IOException, InterruptedException {
+    try (InputStream in = inputStreamFactory.newInput(digest, 0)) {
+      return ByteString.readFrom(in);
+    } catch (StatusRuntimeException e) {
+      if (e.getStatus().equals(Status.NOT_FOUND)) {
+        return null;
+      }
+      throw e;
+    }
+  }
+
+  private QueuedOperation getQueuedOperation(String name, Digest digest)
+      throws IOException, InterruptedException {
+    ByteString operationBlob = getBlob(digest);
+    if (operationBlob == null) {
+      return null;
+    }
+    try {
+      return QueuedOperation.parseFrom(operationBlob);
+    } catch (InvalidProtocolBufferException e) {
+      logger.warning(format("invalid queued operation: %s(%s)", name, DigestUtil.toString(digest)));
+      return null;
+    }
+  }
+
+  private void matchResettable(Platform platform, MatchListener listener)
+      throws IOException, InterruptedException {
+    QueueEntry queueEntry = backplane.dispatchOperation();
+
+    // FIXME platform match
+    if (listener.onEntry(queueEntry)) {
+      QueuedOperation queuedOperation = getQueuedOperation(
+          queueEntry.getExecuteEntry().getOperationName(),
+          queueEntry.getQueuedOperationDigest());
+      listener.onOperation(queuedOperation);
+    }
+  }
+
+
+  private void matchInterruptible(Platform platform, MatchListener listener)
+      throws IOException, InterruptedException {
+    matchResettable(platform, listener);
+    if (Thread.interrupted()) {
+      throw new InterruptedException();
+    }
+  }
+
   @Override
   public void match(MatchListener listener) throws InterruptedException {
-    // instance is a horrible place for this method's implementation for shard
     RetryingMatchListener dedupMatchListener = new RetryingMatchListener() {
-      boolean matched = false;
+      String operationName = null;
 
       @Override
       public boolean getMatched() {
-        return matched;
+        return operationName != null;
       }
 
       @Override
@@ -179,14 +240,14 @@ class ShardWorkerContext implements WorkerContext {
       }
 
       @Override
-      public boolean onOperationName(String operationName) {
-        if (activeOperations.contains(operationName)) {
-          logger.severe("WorkerContext::match: WARNING matched duplicate operation " + operationName);
+      public boolean onEntry(QueueEntry queueEntry) {
+        String operationName = queueEntry.getExecuteEntry().getOperationName();
+        if (activeOperations.putIfAbsent(operationName, queueEntry) != null) {
+          logger.warning("matched duplicate operation " + operationName);
           return false;
         }
-        matched = true;
-        activeOperations.add(operationName);
-        boolean success = listener.onOperationName(operationName);
+        this.operationName = operationName;
+        boolean success = listener.onEntry(queueEntry);
         if (!success) {
           requeue(operationName);
         }
@@ -194,23 +255,27 @@ class ShardWorkerContext implements WorkerContext {
       }
 
       @Override
-      public boolean onOperation(Operation operation) throws InterruptedException {
+      public boolean onOperation(QueuedOperation queuedOperation) throws InterruptedException {
         // could not fetch
-        if (operation.getDone()) {
+        if (queuedOperation == null) {
           listener.onOperation(null);
-          requeue(operation);
+          requeue(operationName);
           return false;
         }
 
-        boolean success = listener.onOperation(operation);
+        boolean success = listener.onOperation(queuedOperation);
         if (!success) {
-          requeue(operation);
+          requeue(operationName);
         }
         return success;
       }
     };
     while (!dedupMatchListener.getMatched()) {
-      instance.match(platform, dedupMatchListener);
+      try {
+        matchInterruptible(platform, dedupMatchListener);
+      } catch (IOException e) {
+        throw Status.fromThrowable(e).asRuntimeException();
+      }
     }
   }
 
@@ -224,7 +289,7 @@ class ShardWorkerContext implements WorkerContext {
       try {
         return operation.getMetadata().unpack(QueuedOperationMetadata.class).getExecuteOperationMetadata();
       } catch(InvalidProtocolBufferException e) {
-        logger.log(SEVERE, "error unpacking queued operation metadata from " + operation.getName(), e);
+        logger.log(SEVERE, "invalid operation metadata: " + operation.getName(), e);
         return null;
       }
     }
@@ -233,7 +298,7 @@ class ShardWorkerContext implements WorkerContext {
       try {
         return operation.getMetadata().unpack(ExecuteOperationMetadata.class);
       } catch(InvalidProtocolBufferException e) {
-        logger.log(SEVERE, "error unpacking execute operation metadata from " + operation.getName(), e);
+        logger.log(SEVERE, "invalid operation metadata: " + operation.getName(), e);
         return null;
       }
     }
@@ -242,9 +307,9 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   private void requeue(String operationName) {
-    deactivate(operationName);
+    QueueEntry queueEntry = activeOperations.remove(operationName);
     try {
-      operationPoller.poll(operationName, Stage.QUEUED, 0);
+      operationPoller.poll(queueEntry, Stage.QUEUED, 0);
     } catch (IOException e) {
       // ignore, at least dispatcher will pick us up in 30s
       logger.log(SEVERE, "Failure while trying to fast requeue " + operationName, e);
@@ -498,7 +563,8 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
-  public void putActionResult(ActionKey actionKey, ActionResult actionResult) throws IOException, InterruptedException {
+  public void putActionResult(ActionKey actionKey, ActionResult actionResult)
+      throws IOException, InterruptedException {
     createBackplaneRetrier().execute(() -> {
       instance.putActionResult(actionKey, actionResult);
       return null;

@@ -49,7 +49,7 @@ public class InputFetcher implements Runnable {
     final Thread fetcherThread = Thread.currentThread();
     Poller poller = workerContext.createPoller(
         "InputFetcher",
-        operationName,
+        operationContext.queueEntry,
         QUEUED,
         () -> fetcherThread.interrupt(),
         Deadline.after(60, SECONDS));

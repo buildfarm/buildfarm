@@ -24,6 +24,7 @@ import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.stub.Chunker;
 import build.buildfarm.v1test.CompletedOperationMetadata;
+import build.buildfarm.v1test.ExecutingOperationMetadata;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -89,7 +90,7 @@ public class ReportResultStage extends PipelineStage {
 
     Poller poller = workerContext.createPoller(
         "ReportResultStage",
-        operationContext.operation.getName(),
+        operationContext.queueEntry,
         ExecuteOperationMetadata.Stage.EXECUTING,
         this::cancelTick,
         Deadline.after(60, SECONDS));
@@ -109,16 +110,28 @@ public class ReportResultStage extends PipelineStage {
       return null;
     }
 
+    ExecuteOperationMetadata metadata;
+    try {
+      metadata = operationContext.operation
+          .getMetadata()
+          .unpack(ExecutingOperationMetadata.class)
+          .getExecuteOperationMetadata();
+    } catch (InvalidProtocolBufferException e) {
+      poller.stop();
+      logger.log(SEVERE, "invalid execute operation metadata", e);
+      return null;
+    }
+
     ActionResult result = resultBuilder.build();
     if (!operationContext.action.getDoNotCache() && resultBuilder.getExitCode() == 0) {
       try {
-        workerContext.putActionResult(DigestUtil.asActionKey(operationContext.metadata.getActionDigest()), result);
+        workerContext.putActionResult(DigestUtil.asActionKey(metadata.getActionDigest()), result);
       } catch (IOException e) {
         poller.stop();
         return null;
       } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
         poller.stop();
+        Thread.currentThread().interrupt();
         return null;
       }
     }
@@ -127,24 +140,22 @@ public class ReportResultStage extends PipelineStage {
 
     long completedAt = System.currentTimeMillis();
 
-    CompletedOperationMetadata metadata = CompletedOperationMetadata.newBuilder()
+    CompletedOperationMetadata completedMetadata = CompletedOperationMetadata.newBuilder()
         .setCompletedAt(completedAt)
         .setExecutedOn(workerContext.getName())
         .setMatchedIn(operationContext.matchedIn)
         .setFetchedIn(operationContext.fetchedIn)
         .setExecutedIn(operationContext.executedIn)
         .setReportedIn(reportedIn)
-        .setExecuteOperationMetadata(operationContext.metadata.toBuilder()
+        .setExecuteOperationMetadata(metadata.toBuilder()
             .setStage(ExecuteOperationMetadata.Stage.COMPLETED)
             .build())
-        .setRequestMetadata(operationContext.requestMetadata)
-        .setExecutionPolicy(operationContext.executionPolicy)
-        .setResultsCachePolicy(operationContext.resultsCachePolicy)
+        .setRequestMetadata(operationContext.queueEntry.getExecuteEntry().getRequestMetadata())
         .build();
 
     Operation operation = operationContext.operation.toBuilder()
         .setDone(true)
-        .setMetadata(Any.pack(metadata))
+        .setMetadata(Any.pack(completedMetadata))
         .setResponse(Any.pack(executeResponse.toBuilder()
             .setResult(result)
             .setStatus(status)
@@ -163,7 +174,7 @@ public class ReportResultStage extends PipelineStage {
     }
 
     return operationContext.toBuilder()
-        .setMetadata(metadata.getExecuteOperationMetadata())
+        .setOperation(operation)
         .build();
   }
 

@@ -18,9 +18,20 @@ import static build.buildfarm.worker.CASFileCache.getInterruptiblyOrIOException;
 import static com.google.common.collect.Maps.uniqueIndex;
 import static com.google.common.util.concurrent.Futures.allAsList;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
+import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.logging.Level.SEVERE;
 
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.DirectoryNode;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
+import build.bazel.remote.execution.v2.FileNode;
+import build.bazel.remote.execution.v2.Platform;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
@@ -33,8 +44,11 @@ import build.buildfarm.instance.stub.Retrier;
 import build.buildfarm.instance.stub.Retrier.Backoff;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.CASInsertionPolicy;
+import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.InstanceEndpoint;
+import build.buildfarm.v1test.QueueEntry;
+import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.WorkerConfig;
 import build.buildfarm.worker.CASFileCache;
 import build.buildfarm.worker.ExecuteActionStage;
@@ -57,16 +71,6 @@ import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.devtools.common.options.OptionsParser;
-import build.bazel.remote.execution.v2.Action;
-import build.bazel.remote.execution.v2.ActionResult;
-import build.bazel.remote.execution.v2.Command;
-import build.bazel.remote.execution.v2.Digest;
-import build.bazel.remote.execution.v2.Directory;
-import build.bazel.remote.execution.v2.DirectoryNode;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
-import build.bazel.remote.execution.v2.FileNode;
-import build.bazel.remote.execution.v2.Platform;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.Duration;
@@ -78,13 +82,13 @@ import io.grpc.ManagedChannel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import java.io.File;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.file.Files;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -430,15 +434,18 @@ public class Worker {
       }
 
       @Override
-      public Poller createPoller(String name, String operationName, Stage stage) {
-        return createPoller(name, operationName, stage, () -> {}, Deadline.after(10, DAYS));
+      public Poller createPoller(String name, QueueEntry queueEntry, Stage stage) {
+        return createPoller(name, queueEntry, stage, () -> {}, Deadline.after(10, DAYS));
       }
 
       @Override
-      public Poller createPoller(String name, String operationName, Stage stage, Runnable onFailure, Deadline deadline) {
-        Poller poller = new Poller(config.getOperationPollPeriod(), () -> {
+      public Poller createPoller(String name, QueueEntry queueEntry, Stage stage, Runnable onFailure, Deadline deadline) {
+        Poller poller = new Poller(
+            config.getOperationPollPeriod(),
+            () -> {
+              String operationName = queueEntry.getExecuteEntry().getOperationName();
               boolean success = operationQueueInstance.pollOperation(operationName, stage);
-              logInfo(name + ": poller: Completed Poll for " + operationName + ": " + (success ? "OK" : "Failed"));
+              logger.info(format("%s: poller: Completed Poll for %s: %s", name, operationName, success ? "OK" : "Failed"));
               if (!success) {
                 onFailure.run();
               }
@@ -459,6 +466,7 @@ public class Worker {
       public void match(MatchListener listener) throws InterruptedException {
         RetryingMatchListener dedupMatchListener = new RetryingMatchListener() {
           boolean matched = false;
+          QueueEntry queueEntry = null;
 
           @Override
           public boolean getMatched() {
@@ -476,21 +484,32 @@ public class Worker {
           }
 
           @Override
-          public boolean onOperationName(String operationName) {
+          public boolean onEntry(QueueEntry queueEntry) {
+            this.queueEntry = queueEntry;
             return true;
           }
 
           @Override
-          public boolean onOperation(Operation operation) throws InterruptedException {
-            if (activeOperations.contains(operation.getName())) {
-              logger.severe("WorkerContext::match: WARNING matched duplicate operation " + operation.getName());
+          public boolean onOperation(QueuedOperation queuedOperation) throws InterruptedException {
+            ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
+            String operationName = executeEntry.getOperationName();
+            if (activeOperations.contains(operationName)) {
+              logger.severe("WorkerContext::match: WARNING matched duplicate operation " + operationName);
               return false;
             }
             matched = true;
-            activeOperations.add(operation.getName());
-            boolean success = listener.onOperation(operation);
+            activeOperations.add(operationName);
+            boolean success = listener.onOperation(queuedOperation);
             if (!success) {
-              requeue(operation);
+              requeue(Operation.newBuilder()
+                  .setName(operationName)
+                  .setMetadata(Any.pack(ExecuteOperationMetadata.newBuilder()
+                      .setActionDigest(executeEntry.getActionDigest())
+                      .setStdoutStreamName(executeEntry.getStdoutStreamName())
+                      .setStderrStreamName(executeEntry.getStderrStreamName())
+                      .setStage(Stage.QUEUED)
+                      .build()))
+                  .build());
             }
             return success;
           }

@@ -15,21 +15,31 @@
 package build.buildfarm.worker;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance.MatchListener;
-import build.buildfarm.v1test.QueuedOperationMetadata;
+import build.buildfarm.v1test.ExecuteEntry;
+import build.buildfarm.v1test.QueueEntry;
+import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.WorkerConfig;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
@@ -43,11 +53,16 @@ public class MatchStageTest {
   static class PipelineSink extends PipelineStage {
     private static final Logger logger = Logger.getLogger(PipelineSink.class.getName());
 
+    private final List<OperationContext> operationContexts = Lists.newArrayList();
     private final Predicate<OperationContext> onPutShouldClose;
 
     PipelineSink(Predicate<OperationContext> onPutShouldClose) {
       super("Sink", null, null, null);
       this.onPutShouldClose = onPutShouldClose;
+    }
+
+    public List<OperationContext> getOperationContexts() {
+      return operationContexts;
     }
 
     @Override
@@ -57,6 +72,7 @@ public class MatchStageTest {
 
     @Override
     public void put(OperationContext operationContext) {
+      operationContexts.add(operationContext);
       if (onPutShouldClose.test(operationContext)) {
         close();
       }
@@ -70,8 +86,12 @@ public class MatchStageTest {
 
   @Test
   public void fetchFailureReentry() throws ConfigurationException {
-    List<Operation> queue = new ArrayList<>();
+    Map<String, QueuedOperation> queuedOperations = Maps.newHashMap();
+    List<QueueEntry> queue = Lists.newArrayList();
 
+    Poller poller = mock(Poller.class);
+
+    AtomicInteger requeueCount = new AtomicInteger();
     WorkerContext workerContext = new StubWorkerContext() {
       @Override
       public DigestUtil getDigestUtil() {
@@ -79,37 +99,46 @@ public class MatchStageTest {
       }
 
       @Override
-      public void match(MatchListener listener) throws InterruptedException {
-        listener.onOperation(queue.remove(0));
+      public Poller createPoller(String name, QueueEntry queueEntry, Stage stage) {
+        return poller;
       }
 
       @Override
-      public void requeue(Operation operation) {
-        assertThat(operation.getName()).isEqualTo("bad");
+      public void match(MatchListener listener) throws InterruptedException {
+        QueueEntry queueEntry = queue.remove(0);
+        listener.onEntry(queueEntry);
+        listener.onOperation(queuedOperations.get(queueEntry.getExecuteEntry().getOperationName()));
       }
     };
 
-    queue.add(Operation.newBuilder()
-        .setName("bad")
-        // inspire InvalidProtocolBufferException from operation metadata unpack
-        .build());
+    QueueEntry badEntry = QueueEntry.newBuilder()
+        .setExecuteEntry(ExecuteEntry.newBuilder()
+            .setOperationName("bad"))
+        .build();
+    // inspire empty argument list in Command resulting in null
+    queuedOperations.put("bad", QueuedOperation.getDefaultInstance());
+    queue.add(badEntry);
 
-    queue.add(Operation.newBuilder()
-        .setName("good")
-        .setMetadata(Any.pack(QueuedOperationMetadata.newBuilder()
-            .setAction(Action.getDefaultInstance())
-            .setCommand(Command.newBuilder()
-                .addArguments("/bin/true")
-                .build())
-            .setExecuteOperationMetadata(ExecuteOperationMetadata.newBuilder()
-                .setActionDigest(Digest.newBuilder().setHash("action").build())
-                .build())
-            .build()))
+    QueueEntry goodEntry = QueueEntry.newBuilder()
+        .setExecuteEntry(ExecuteEntry.newBuilder()
+            .setOperationName("good"))
+        .build();
+    queuedOperations.put("good", QueuedOperation.newBuilder()
+        .setAction(Action.getDefaultInstance())
+        .setCommand(Command.newBuilder()
+            .addArguments("/bin/true")
+            .build())
         .build());
+    queue.add(goodEntry);
 
-    final PipelineStage output = new PipelineSink((operationContext) -> operationContext.operation.getName().equals("good"));
+    PipelineSink output = new PipelineSink(
+        (operationContext) -> operationContext.operation.getName().equals("good"));
 
     PipelineStage matchStage = new MatchStage(workerContext, output, null);
     matchStage.run();
+    verify(poller, times(2)).stop();
+    assertThat(output.getOperationContexts().size()).isEqualTo(1);
+    OperationContext operationContext = output.getOperationContexts().get(0);
+    assertThat(operationContext.operation.getName()).isEqualTo("good");
   }
 }

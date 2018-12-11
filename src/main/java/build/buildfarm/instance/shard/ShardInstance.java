@@ -18,9 +18,18 @@ import static build.buildfarm.instance.shard.Util.SHARD_IS_RETRIABLE;
 import static build.buildfarm.instance.shard.Util.correctMissingBlob;
 import static com.google.common.base.Predicates.or;
 import static com.google.common.base.Predicates.notNull;
+import static com.google.common.util.concurrent.Futures.addCallback;
+import static com.google.common.util.concurrent.Futures.allAsList;
+import static com.google.common.util.concurrent.Futures.catching;
+import static com.google.common.util.concurrent.Futures.catchingAsync;
+import static com.google.common.util.concurrent.Futures.immediateFuture;
+import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
+import static com.google.common.util.concurrent.Futures.transform;
+import static com.google.common.util.concurrent.Futures.transformAsync;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
+import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.logging.Level.SEVERE;
 import static java.util.logging.Level.WARNING;
@@ -56,8 +65,11 @@ import build.buildfarm.instance.stub.Retrier.Backoff;
 import build.buildfarm.instance.stub.RetryException;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.CompletedOperationMetadata;
+import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.OperationIteratorToken;
 import build.buildfarm.v1test.ShardInstanceConfig;
+import build.buildfarm.v1test.QueueEntry;
+import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ProfiledQueuedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
@@ -72,7 +84,6 @@ import com.google.common.collect.Sets;
 import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.FluentFuture;
 import com.google.common.util.concurrent.FutureCallback;
-import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -212,12 +223,12 @@ public class ShardInstance extends AbstractServerInstance {
     if (runDispatchedMonitor) {
       dispatchedMonitor = new Thread(new DispatchedMonitor(
           backplane,
-          (operationName, statusBuilder) -> {
+          (queueEntry, statusBuilder) -> {
             try {
-              return requeueOperation(operationName, statusBuilder);
+              return requeueOperation(queueEntry, statusBuilder);
             } catch (IOException e) {
               statusBuilder.mergeFrom(StatusProto.fromThrowable(e));
-              logger.log(SEVERE, "error requeueing " + operationName, e);
+              logger.log(SEVERE, "error requeueing " + queueEntry.getExecuteEntry().getOperationName(), e);
               return false;
             } catch (InterruptedException e) {
               Thread.currentThread().interrupt();
@@ -226,7 +237,14 @@ public class ShardInstance extends AbstractServerInstance {
           },
           (operationName, status) -> {
             try {
-              errorOperation(operationName, status);
+              Operation operation = getOperation(operationName);
+              if (operation == null) {
+                operation = Operation.newBuilder()
+                  .setName(operationName)
+                  .setMetadata(Any.pack(ExecuteOperationMetadata.getDefaultInstance()))
+                  .build();
+              }
+              errorOperation(operation, status);
             } catch (InterruptedException e) {
               Thread.currentThread().interrupt();
             }
@@ -241,47 +259,22 @@ public class ShardInstance extends AbstractServerInstance {
 
         void iterate() throws IOException, InterruptedException {
           ensureCanQueue(stopwatch); // wait for transition to canQueue state
-          stopwatch.stop();
           long canQueueUSecs = stopwatch.elapsed(MICROSECONDS);
-          String operationName = backplane.deprequeueOperation();
-          if (operationName == null) {
+          ExecuteEntry executeEntry = backplane.deprequeueOperation();
+          if (executeEntry == null) {
             logger.severe("OperationQueuer: Got null from deprequeue...");
             return;
           }
 
-          try {
-            Operation operation = backplane.getOperation(operationName);
-            long operationFetchUSecs = stopwatch.elapsed(MICROSECONDS) - canQueueUSecs;
-            if (operation == null) {
-              backplane.deleteOperation(operationName);
-              long operationDeleteUSecs = stopwatch.elapsed(MICROSECONDS) - operationFetchUSecs - canQueueUSecs;
-              logger.severe(
-                  String.format(
-                      "OperationQueuer: Operation missing: %dus in canQueue, %dus in opfetch, %dus in delete",
-                      canQueueUSecs,
-                      operationFetchUSecs,
-                      operationDeleteUSecs));
-            } else if (isUnknown(operation)) {
-              queue(operation);
-              long operationTransformDispatchUSecs = stopwatch.elapsed(MICROSECONDS) - operationFetchUSecs - canQueueUSecs;
-              logger.info(
-                  String.format(
-                      "OperationQueuer: Dispatched To Transform: %dus in canQueue, %dus in opfetch, %dus in transform dispatch",
-                      canQueueUSecs,
-                      operationFetchUSecs,
-                      operationTransformDispatchUSecs));
-            }
-          } catch (IOException e) {
-            long failUSecs = stopwatch.elapsed(MICROSECONDS) - canQueueUSecs;
-            backplane.prequeueOperation(operationName);
-            long prequeueUSecs = stopwatch.elapsed(MICROSECONDS) - failUSecs - canQueueUSecs;
-            logger.severe(
-                String.format(
-                    "OperationQueuer: Failed: %dus in canQueue, %dus before failure, %dus reprequeing",
-                    canQueueUSecs,
-                    failUSecs,
-                    prequeueUSecs));
-          }
+          long operationFetchUSecs = stopwatch.elapsed(MICROSECONDS) - canQueueUSecs;
+          queue(executeEntry);
+          long operationTransformDispatchUSecs = stopwatch.elapsed(MICROSECONDS) - operationFetchUSecs - canQueueUSecs;
+          logger.info(
+              format(
+                  "OperationQueuer: Dispatched To Transform: %dus in canQueue, %dus in opfetch, %dus in transform dispatch",
+                  canQueueUSecs,
+                  operationFetchUSecs,
+                  operationTransformDispatchUSecs));
         }
 
         @Override
@@ -415,7 +408,7 @@ public class ShardInstance extends AbstractServerInstance {
   public ListenableFuture<Iterable<Digest>> findMissingBlobs(Iterable<Digest> blobDigests, ExecutorService service) {
     Iterable<Digest> nonEmptyDigests = Iterables.filter(blobDigests, (digest) -> digest.getSizeBytes() > 0);
     if (Iterables.isEmpty(nonEmptyDigests)) {
-      return Futures.immediateFuture(ImmutableList.of());
+      return immediateFuture(ImmutableList.of());
     }
 
     Deque<String> workers;
@@ -428,7 +421,7 @@ public class ShardInstance extends AbstractServerInstance {
     }
 
     if (workers.isEmpty()) {
-      return Futures.immediateFuture(nonEmptyDigests);
+      return immediateFuture(nonEmptyDigests);
     }
 
     return findMissingBlobsOnWorker(nonEmptyDigests, workers, service);
@@ -437,16 +430,16 @@ public class ShardInstance extends AbstractServerInstance {
   private ListenableFuture<Iterable<Digest>> findMissingBlobsOnWorker(Iterable<Digest> blobDigests, Deque<String> workers, ExecutorService service) {
     String worker = workers.removeFirst();
     // FIXME use FluentFuture
-    ListenableFuture<Iterable<Digest>> findMissingBlobsFuture = Futures.transformAsync(
+    ListenableFuture<Iterable<Digest>> findMissingBlobsFuture = transformAsync(
         workerStub(worker).findMissingBlobs(blobDigests, service),
         (missingDigests) -> {
           if (Iterables.isEmpty(missingDigests) || workers.isEmpty()) {
-            return Futures.immediateFuture(missingDigests);
+            return immediateFuture(missingDigests);
           }
           return findMissingBlobsOnWorker(missingDigests, workers, service);
         },
         service);
-    return Futures.catchingAsync(
+    return catchingAsync(
         findMissingBlobsFuture,
         Throwable.class,
         (e) -> {
@@ -464,7 +457,7 @@ public class ShardInstance extends AbstractServerInstance {
           }
 
           if (workers.isEmpty()) {
-            return Futures.immediateFuture(blobDigests);
+            return immediateFuture(blobDigests);
           } else {
             return findMissingBlobsOnWorker(blobDigests, workers, service);
           }
@@ -536,7 +529,7 @@ public class ShardInstance extends AbstractServerInstance {
     final ListenableFuture<List<String>> populatedWorkerListFuture;
     if (emptyWorkerList) {
       try {
-        populatedWorkerListFuture = Futures.transform(
+        populatedWorkerListFuture = transform(
             // should be sending this the blob location set and worker set we used
             correctMissingBlob(backplane, workerSet, locationSet, this::workerStub, blobDigest, newDirectExecutorService()),
             (foundOnWorkers) -> {
@@ -548,7 +541,7 @@ public class ShardInstance extends AbstractServerInstance {
         return;
       }
     } else {
-      populatedWorkerListFuture = Futures.immediateFuture(workersList);
+      populatedWorkerListFuture = immediateFuture(workersList);
     }
 
     StreamObserver<ByteString> chunkObserver = new StreamObserver<ByteString>() {
@@ -567,7 +560,7 @@ public class ShardInstance extends AbstractServerInstance {
           workersList.clear();
           final ListenableFuture<List<String>> workersListFuture;
           try {
-            workersListFuture = Futures.transform(
+            workersListFuture = transform(
                 correctMissingBlob(
                     backplane,
                     workerSet,
@@ -584,7 +577,7 @@ public class ShardInstance extends AbstractServerInstance {
             return;
           }
           final StreamObserver<ByteString> checkedChunkObserver = this;
-          Futures.addCallback(workersListFuture, new WorkersCallback(rand) {
+          addCallback(workersListFuture, new WorkersCallback(rand) {
             @Override
             public void onQueue(Deque<String> workers) {
               fetchBlobFromWorker(blobDigest, workers, offset, limit, checkedChunkObserver);
@@ -605,7 +598,7 @@ public class ShardInstance extends AbstractServerInstance {
         blobObserver.onCompleted();
       }
     };
-    Futures.addCallback(populatedWorkerListFuture, new WorkersCallback(rand) {
+    addCallback(populatedWorkerListFuture, new WorkersCallback(rand) {
       @Override
       public void onQueue(Deque<String> workers) {
         fetchBlobFromWorker(blobDigest, workers, offset, limit, chunkObserver);
@@ -749,7 +742,7 @@ public class ShardInstance extends AbstractServerInstance {
       }
     }
     Instance instance = workerStub(worker);
-    String resourceName = String.format(
+    String resourceName = format(
         "uploads/%s/blobs/%s",
         UUID.randomUUID(), DigestUtil.toString(blobDigest));
     return instance.getStreamOutput(resourceName, blobDigest.getSizeBytes());
@@ -759,7 +752,7 @@ public class ShardInstance extends AbstractServerInstance {
     ListenableFuture<Long> failedFuture;
 
     FailedChunkObserver(Throwable t) {
-      failedFuture = Futures.immediateFailedFuture(t);
+      failedFuture = immediateFailedFuture(t);
     }
 
     @Override
@@ -894,7 +887,7 @@ public class ShardInstance extends AbstractServerInstance {
                 + " was called on the cached tree entry for " + DigestUtil.toString(rootDigest)
                 + ", this is probably an error");
           }
-          return Futures.immediateFuture(directory);
+          return immediateFuture(directory);
         }
       };
     } else {
@@ -909,8 +902,10 @@ public class ShardInstance extends AbstractServerInstance {
       try {
         QueuedOperationMetadata metadata = operation.getMetadata()
             .unpack(QueuedOperationMetadata.class);
-        if (!metadata.getAction().equals(Action.getDefaultInstance())) {
-          return metadata.getAction();
+        QueuedOperation queuedOperation = getUnchecked(
+            expectQueuedOperation(metadata.getQueuedOperationDigest()));
+        if (!queuedOperation.getAction().equals(Action.getDefaultInstance())) {
+          return queuedOperation.getAction();
         }
       } catch (InvalidProtocolBufferException e) {
         return null;
@@ -938,7 +933,7 @@ public class ShardInstance extends AbstractServerInstance {
   @Override
   protected ListenableFuture<Command> expectCommand(Digest commandBlobDigest) {
     final Fetcher<Command> fetcher = () -> getUnchecked(super.expectCommand(commandBlobDigest));
-    return Futures.catching(
+    return catching(
         commandCache.get(commandBlobDigest, new Callable<Command>() {
           @Override
           public Command call() throws InterruptedException {
@@ -971,130 +966,159 @@ public class ShardInstance extends AbstractServerInstance {
     throw new UnsupportedOperationException();
   }
 
-  private ListenableFuture<QueuedOperationMetadata> buildQueuedOperationMetadata(
-      Action action, RequestMetadata requestMetadata, ListeningExecutorService service) {
-    QueuedOperationMetadata.Builder queuedBuilder = QueuedOperationMetadata.newBuilder()
-        .setAction(action)
-        .setExecuteOperationMetadata(ExecuteOperationMetadata.newBuilder()
-            .setActionDigest(digestUtil.compute(action))
-            .build())
-        .setRequestMetadata(requestMetadata);
-    return transformQueuedOperationMetadata(action, action.getCommandDigest(), action.getInputRootDigest(), queuedBuilder, service);
+  private ListenableFuture<QueuedOperation> buildQueuedOperation(
+      Action action, ExecutorService service) {
+    QueuedOperation.Builder queuedOperationBuilder = QueuedOperation.newBuilder()
+        .setAction(action);
+    return transformQueuedOperation(
+        action,
+        action.getCommandDigest(),
+        action.getInputRootDigest(),
+        queuedOperationBuilder,
+        service);
   }
 
-  private ListenableFuture<QueuedOperationMetadata> transformQueuedOperationMetadata(
+  private QueuedOperationMetadata buildQueuedOperationMetadata(
+      ExecuteOperationMetadata executeOperationMetadata,
+      QueuedOperation queuedOperation) {
+    return QueuedOperationMetadata.newBuilder()
+        .setExecuteOperationMetadata(executeOperationMetadata.toBuilder()
+            .setStage(Stage.QUEUED))
+        .setQueuedOperationDigest(getDigestUtil().compute(queuedOperation))
+        .build();
+  }
+
+  private ListenableFuture<QueuedOperation> transformQueuedOperation(
       Action action,
       Digest commandDigest,
       Digest inputRootDigest,
-      QueuedOperationMetadata.Builder queuedBuilder,
-      ListeningExecutorService service) {
-    return Futures.transform(
-        Futures.allAsList(
-            Futures.transform(insistCommand(commandDigest), queuedBuilder::setCommand, service),
-            Futures.transform(getTreeDirectories(inputRootDigest, service), queuedBuilder::addAllDirectories, service)),
-        (result) -> queuedBuilder.setAction(action).build(),
+      QueuedOperation.Builder queuedOperationBuilder,
+      ExecutorService service) {
+    return transform(
+        allAsList(
+            transform(
+                insistCommand(commandDigest),
+                queuedOperationBuilder::setCommand,
+                service),
+            transform(
+                getTreeDirectories(inputRootDigest, service),
+                queuedOperationBuilder::addAllDirectories,
+                service)),
+        (result) -> queuedOperationBuilder.setAction(action).build(),
         service);
   }
 
   protected Operation createOperation(ActionKey actionKey) { throw new UnsupportedOperationException(); }
 
-  private Operation createOperation(Message metadata) {
-    String name = createOperationName(UUID.randomUUID().toString());
+  private static final class QueuedOperationResult {
+    public final QueueEntry entry;
+    public final QueuedOperationMetadata metadata;
 
-    return Operation.newBuilder()
-        .setName(name)
-        .setMetadata(Any.pack(metadata))
-        .build();
+    QueuedOperationResult(
+        QueueEntry entry,
+        QueuedOperationMetadata metadata) {
+      this.entry = entry;
+      this.metadata = metadata;
+    }
   }
+
+  private ListenableFuture<QueuedOperationResult> uploadQueuedOperation(
+      QueuedOperation queuedOperation,
+      ExecuteEntry executeEntry,
+      ExecutorService service) {
+    ByteString queuedOperationBlob = queuedOperation.toByteString();
+    Digest queuedOperationDigest = getDigestUtil().compute(queuedOperationBlob);
+    QueuedOperationMetadata metadata = QueuedOperationMetadata.newBuilder()
+        .setExecuteOperationMetadata(ExecuteOperationMetadata.newBuilder()
+            .setActionDigest(executeEntry.getActionDigest())
+            .setStdoutStreamName(executeEntry.getStdoutStreamName())
+            .setStderrStreamName(executeEntry.getStderrStreamName())
+            .setStage(Stage.QUEUED))
+        .setQueuedOperationDigest(queuedOperationDigest)
+        .build();
+    QueueEntry entry = QueueEntry.newBuilder()
+        .setExecuteEntry(executeEntry)
+        .setQueuedOperationDigest(queuedOperationDigest)
+        .build();
+    try (CommittingOutputStream out = createBlobOutputStream(queuedOperationDigest)) {
+      queuedOperationBlob.writeTo(out);
+      return transform(
+          out.getCommittedFuture(),
+          (committedSize) -> new QueuedOperationResult(entry, metadata),
+          service);
+    } catch (Throwable t) {
+      return immediateFailedFuture(t);
+    }
+  }
+
+  private ListenableFuture<QueuedOperation> buildQueuedOperation(
+      Digest actionDigest,
+      ExecutorService service) {
+    ListenableFuture<Action> actionFuture = expectAction(actionDigest);
+    return transformAsync(
+        actionFuture,
+        (action) -> buildQueuedOperation(action, service),
+        service);
+  }
+
 
   private ListenableFuture<Boolean> validateAndRequeueOperation(
-      Operation operation, Action action, com.google.rpc.Status.Builder status) throws InterruptedException {
-    final QueuedOperationMetadata metadata;
-
-    boolean isQueuedOperationMetadata = operation.getMetadata().is(QueuedOperationMetadata.class);
-    if (isQueuedOperationMetadata) {
-      try {
-        metadata = operation.getMetadata().unpack(QueuedOperationMetadata.class);
-      } catch (InvalidProtocolBufferException e) {
-        return Futures.immediateFailedFuture(e);
-      }
-    } else {
-      RequestMetadata requestMetadata;
-      if (operation.getMetadata().is(ExecutingOperationMetadata.class)) {
-        try {
-          // we should record where it was previously executing...
-          requestMetadata = operation.getMetadata().unpack(ExecutingOperationMetadata.class).getRequestMetadata();
-        } catch (InvalidProtocolBufferException e) {
-          return Futures.immediateFailedFuture(e);
-        }
-      } else {
-        // losing our attributability
-        requestMetadata = RequestMetadata.getDefaultInstance();
-      }
-      try {
-        metadata = buildQueuedOperationMetadata(action, requestMetadata, newDirectExecutorService()).get();
-      } catch (ExecutionException e) {
-        return Futures.immediateFailedFuture(e.getCause());
-      }
-    }
-
-    SettableFuture<Boolean> requeuedFuture = SettableFuture.create();
+      QueueEntry queueEntry,
+      com.google.rpc.Status.Builder status) {
+    ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
+    ListenableFuture<QueuedOperation> queuedOperationFuture = catchingAsync(
+        expectQueuedOperation(queueEntry.getQueuedOperationDigest()),
+        Throwable.class,
+        (e) -> buildQueuedOperation(executeEntry.getActionDigest(), operationTransformService));
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
-    Futures.addCallback(
-      validateQueuedOperationMetadataAndInputs(metadata, preconditionFailure, operationTransformService),
-      new FutureCallback<QueuedOperationMetadata>() {
-        @Override
-        public void onSuccess(QueuedOperationMetadata metadata) {
-          try {
-            if (isQueuedOperationMetadata) {
-              backplane.requeueDispatchedOperation(operation);
-            } else {
-              Operation queuedOperation = operation.toBuilder()
-                  .setMetadata(Any.pack(metadata.toBuilder()
-                      .setExecuteOperationMetadata(metadata.getExecuteOperationMetadata().toBuilder()
-                          .setStage(Stage.QUEUED))
-                      .build()))
-                  .build();
-              ensureCanQueue(Stopwatch.createStarted());
-              backplane.putOperation(queuedOperation, Stage.QUEUED);
+    ListenableFuture<QueuedOperation> validatedFuture = transformAsync(
+        queuedOperationFuture,
+        (queuedOperation) -> validateQueuedOperationAndInputs(
+            queuedOperation,
+            preconditionFailure,
+            operationTransformService),
+        operationTransformService);
+    ListenableFuture<QueuedOperationResult> uploadedFuture = transformAsync(
+        validatedFuture,
+        (queuedOperation) -> uploadQueuedOperation(queuedOperation, executeEntry, operationTransformService));
+    String operationName = executeEntry.getOperationName();
+    SettableFuture<Boolean> requeuedFuture = SettableFuture.create();
+    addCallback(
+        uploadedFuture,
+        new FutureCallback<QueuedOperationResult>() {
+          @Override
+          public void onSuccess(QueuedOperationResult result) {
+            Operation queueOperation = Operation.newBuilder()
+                .setName(operationName)
+                .setMetadata(Any.pack(result.metadata))
+                .build();
+            try {
+              backplane.queue(result.entry, queueOperation);
+              requeuedFuture.set(true);
+            } catch (IOException e) {
+              onFailure(e);
             }
-            requeuedFuture.set(true);
-          } catch (IOException e) {
-            // we should probably be observing retriable backplane exceptions...
-            onFailure(e);
-          } catch (InterruptedException e) {
-            // ignore
           }
-        }
 
-        @Override
-        public void onFailure(Throwable t) {
-          if (preconditionFailure.getViolationsCount() > 0) {
-            status.addDetails(Any.pack(preconditionFailure.build()));
+          @Override
+          public void onFailure(Throwable t) {
+            if (preconditionFailure.getViolationsCount() > 0) {
+              status.addDetails(Any.pack(preconditionFailure.build()));
+            }
+            logger.log(SEVERE, "failed to requeue: " + operationName, t);
+            requeuedFuture.set(false);
           }
-          logger.log(SEVERE, "error transforming to requeue " + operation.getName(), t);
-          requeuedFuture.set(false);
-        }
-      },
-      operationTransformService);
+        },
+        operationTransformService);
     return requeuedFuture;
-  }
-
-  private boolean skipCacheLookup(Operation operation) {
-    if (!operation.getMetadata().is(QueuedOperationMetadata.class)) {
-      return false;
-    }
-    try {
-      return operation.getMetadata().unpack(QueuedOperationMetadata.class)
-          .getSkipCacheLookup();
-    } catch (InvalidProtocolBufferException e) {
-      return false;
-    }
   }
 
   // there's optimization to be had here - we can just use the prequeue to requeue this
   // just need to make it smart enough to see the construction already
-  private boolean requeueOperation(String operationName, com.google.rpc.Status.Builder statusBuilder) throws IOException, InterruptedException {
+  private boolean requeueOperation(QueueEntry queueEntry, com.google.rpc.Status.Builder statusBuilder)
+      throws IOException, InterruptedException {
+    ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
+    String operationName = executeEntry.getOperationName();
     Operation operation = getOperation(operationName);
     if (operation == null) {
       logger.info("Operation " + operationName + " no longer exists");
@@ -1106,25 +1130,14 @@ public class ShardInstance extends AbstractServerInstance {
       logger.info("Operation " + operation.getName() + " has already completed");
       return false;
     }
-    ExecuteOperationMetadata executeOperationMetadata = expectExecuteOperationMetadata(operation);
-    if (executeOperationMetadata == null) {
-      logger.info("Operation " + operation.getName() + " does not contain ExecuteOperationMetadata");
-      return false;
-    }
 
-    ActionKey actionKey = DigestUtil.asActionKey(executeOperationMetadata.getActionDigest());
+    ActionKey actionKey = DigestUtil.asActionKey(executeEntry.getActionDigest());
     ListenableFuture<Boolean> requeuedFuture;
     SettableFuture<Void> completeFuture = SettableFuture.create();
-    if (!skipCacheLookup(operation) && checkCache(actionKey, operation, executeOperationMetadata, completeFuture)) {
-      requeuedFuture = Futures.transform(completeFuture, (result) -> true);
+    if (!executeEntry.getSkipCacheLookup() && checkCache(actionKey, operation, completeFuture)) {
+      requeuedFuture = transform(completeFuture, (result) -> true);
     } else {
-      Action action = expectAction(operation);
-      if (action == null) {
-        logger.info("Action for " + operation.getName() + " no longer exists");
-        return false;
-      }
-
-      requeuedFuture = validateAndRequeueOperation(operation, action, statusBuilder);
+      requeuedFuture = validateAndRequeueOperation(queueEntry, statusBuilder);
     }
 
     try {
@@ -1153,25 +1166,41 @@ public class ShardInstance extends AbstractServerInstance {
         throw Status.UNAVAILABLE.withDescription("Too many jobs pending").asRuntimeException();
       }
 
-      QueuedOperationMetadata metadata = QueuedOperationMetadata.newBuilder()
-          .setExecuteOperationMetadata(ExecuteOperationMetadata.newBuilder().setActionDigest(actionDigest))
+      String operationName = createOperationName(UUID.randomUUID().toString());
+
+      String stdoutStreamName = operationName + "/streams/stdout";
+      String stderrStreamName = operationName + "/streams/stderr";
+      ExecuteEntry executeEntry = ExecuteEntry.newBuilder()
+          .setOperationName(operationName)
+          .setActionDigest(actionDigest)
           .setExecutionPolicy(executionPolicy)
           .setResultsCachePolicy(resultsCachePolicy)
           .setSkipCacheLookup(skipCacheLookup)
           .setRequestMetadata(requestMetadata)
+          .setStdoutStreamName(stdoutStreamName)
+          .setStderrStreamName(stderrStreamName)
           .build();
-      Operation operation = createOperation(metadata);
-      backplane.putOperation(operation, Stage.UNKNOWN);
+      ExecuteOperationMetadata metadata = ExecuteOperationMetadata.newBuilder()
+          .setActionDigest(actionDigest)
+          .setStdoutStreamName(stdoutStreamName)
+          .setStderrStreamName(stderrStreamName)
+          .build();
+      Operation operation = Operation.newBuilder()
+          .setName(operationName)
+          .setMetadata(Any.pack(metadata))
+          .build();
+      backplane.prequeue(executeEntry, operation);
       watchOperation(operation.getName(), watcher);
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }
   }
 
-  private void errorOperation(String operationName, Throwable t, com.google.rpc.Status.Builder status, SettableFuture<Void> errorFuture) {
-    status
-        .setCode(Status.fromThrowable(t).getCode().value())
-        .setMessage(t.getMessage());
+  private void errorOperation(Operation operation, Throwable t, com.google.rpc.Status.Builder status, SettableFuture<Void> errorFuture) {
+    status.setCode(Status.fromThrowable(t).getCode().value());
+    if (t.getMessage() != null) {
+      status.setMessage(t.getMessage());
+    }
     operationDeletionService.execute(new Runnable() {
       // we must make all efforts to delete this thing
       int attempt = 1;
@@ -1179,11 +1208,18 @@ public class ShardInstance extends AbstractServerInstance {
       @Override
       public void run() {
         try {
-          errorOperation(operationName, status.build());
+          errorOperation(operation, status.build());
           errorFuture.setException(t);
         } catch (StatusRuntimeException e) {
           if (attempt % 100 == 0) {
-            logger.severe(String.format("On attempt %d to cancel %s: %s", attempt, operationName, e.getLocalizedMessage()));
+            logger.log(
+                SEVERE,
+                format(
+                    "On attempt %d to cancel %s: %s",
+                    attempt,
+                    operation.getName(),
+                    e.getLocalizedMessage()),
+                e);
           }
           // hopefully as deferred execution...
           operationDeletionService.execute(this);
@@ -1195,10 +1231,12 @@ public class ShardInstance extends AbstractServerInstance {
     });
   }
 
-  private boolean checkCache(ActionKey actionKey, Operation operation, ExecuteOperationMetadata metadata, SettableFuture completeFuture) {
-    metadata = metadata.toBuilder()
-        .setStage(Stage.CACHE_CHECK)
-        .build();
+  private boolean checkCache(ActionKey actionKey, Operation operation, SettableFuture completeFuture) {
+    ExecuteOperationMetadata metadata =
+        ExecuteOperationMetadata.newBuilder()
+            .setActionDigest(actionKey.getDigest())
+            .setStage(Stage.CACHE_CHECK)
+            .build();
     try {
       backplane.putOperation(
           operation.toBuilder()
@@ -1228,37 +1266,33 @@ public class ShardInstance extends AbstractServerInstance {
       backplane.putOperation(completedOperation, metadata.getStage());
       completeFuture.set(null);
     } catch (IOException e) {
-      errorOperation(operation.getName(), e, com.google.rpc.Status.newBuilder(), completeFuture);
+      errorOperation(operation, e, com.google.rpc.Status.newBuilder(), completeFuture);
     }
     return true;
   }
 
   @VisibleForTesting
-  public ListenableFuture<Void> queue(Operation operation) throws InterruptedException {
-    final QueuedOperationMetadata prequeueMetadata;
-    try {
-      prequeueMetadata = operation.getMetadata()
-          .unpack(QueuedOperationMetadata.class);
-    } catch (InvalidProtocolBufferException e) {
-      try {
-        cancelOperation(operation.getName());
-      } catch (IllegalStateException cancelEx) {
-        logger.log(SEVERE, "interrupted while cancelling " + operation.getName(), cancelEx);
-      }
-      return Futures.immediateFailedFuture(e);
-    }
-
-    ExecuteOperationMetadata metadata = prequeueMetadata.getExecuteOperationMetadata();
-    ActionKey actionKey = DigestUtil.asActionKey(metadata.getActionDigest());
+  public ListenableFuture<Void> queue(ExecuteEntry executeEntry) throws InterruptedException {
+    ExecuteOperationMetadata metadata = ExecuteOperationMetadata.newBuilder()
+        .setActionDigest(executeEntry.getActionDigest())
+        .setStdoutStreamName(executeEntry.getStdoutStreamName())
+        .setStderrStreamName(executeEntry.getStderrStreamName())
+        .build();
+    Operation operation = Operation.newBuilder()
+        .setName(executeEntry.getOperationName())
+        .setMetadata(Any.pack(metadata))
+        .build();
+    Digest actionDigest = executeEntry.getActionDigest();
+    ActionKey actionKey = DigestUtil.asActionKey(actionDigest);
 
     // FIXME make this async and trigger the early return
     Stopwatch stopwatch = Stopwatch.createStarted();
     SettableFuture<Void> queueFuture = SettableFuture.create();
-    if (!prequeueMetadata.getSkipCacheLookup()
-        && checkCache(actionKey, operation, metadata, queueFuture)) {
+    if (!executeEntry.getSkipCacheLookup()
+        && checkCache(actionKey, operation, queueFuture)) {
       long checkCacheUSecs = stopwatch.elapsed(MICROSECONDS);
       logger.info(
-          String.format(
+          format(
               "ShardInstance(%s): checkCache(%s): %dus elapsed",
               getName(),
               operation.getName(),
@@ -1271,8 +1305,8 @@ public class ShardInstance extends AbstractServerInstance {
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
     Stopwatch transformStopwatch = Stopwatch.createStarted();
     long startTransformUSecs = stopwatch.elapsed(MICROSECONDS);
-    ListenableFuture<Action> actionFuture = Futures.catching(
-        expectAction(metadata.getActionDigest()),
+    ListenableFuture<Action> actionFuture = catching(
+        expectAction(actionDigest),
         StatusException.class,
         (e) -> {
           Status st = Status.fromThrowable(e);
@@ -1280,32 +1314,36 @@ public class ShardInstance extends AbstractServerInstance {
             preconditionFailure.addViolationsBuilder()
                 .setType(VIOLATION_TYPE_MISSING)
                 .setSubject(MISSING_INPUT)
-                .setDescription("Action " + DigestUtil.toString(metadata.getActionDigest()));
+                .setDescription("Action " + DigestUtil.toString(actionDigest));
             status.addDetails(Any.pack(preconditionFailure.build()));
             throw Status.FAILED_PRECONDITION.withDescription(e.getMessage()).asRuntimeException();
           }
           throw st.asRuntimeException();
         });
-    ListenableFuture<ProfiledQueuedOperationMetadata.Builder> queuedFuture = Futures.transformAsync(
+    QueuedOperation.Builder queuedOperationBuilder = QueuedOperation.newBuilder();
+    ListenableFuture<ProfiledQueuedOperationMetadata.Builder> queuedFuture = transformAsync(
         actionFuture,
-        (action) -> Futures.transform(
-            transformQueuedOperationMetadata(
+        (action) -> transform(
+            transformQueuedOperation(
                 action,
                 action.getCommandDigest(),
                 action.getInputRootDigest(),
-                prequeueMetadata.toBuilder(),
+                queuedOperationBuilder,
                 operationTransformService),
-            (queuedMetadata) -> ProfiledQueuedOperationMetadata.newBuilder()
-                .setQueuedMetadata(queuedMetadata)
+            (queuedOperation) -> ProfiledQueuedOperationMetadata.newBuilder()
+                .setQueuedOperation(queuedOperation)
+                .setQueuedOperationMetadata(buildQueuedOperationMetadata(
+                    metadata,
+                    queuedOperation))
                 .setTransformedIn(Durations.fromMicros(stopwatch.elapsed(MICROSECONDS) - startTransformUSecs)),
             operationTransformService),
         operationTransformService);
-    ListenableFuture<ProfiledQueuedOperationMetadata.Builder> validatedFuture = Futures.catching(
-        Futures.transform(
+    ListenableFuture<ProfiledQueuedOperationMetadata.Builder> validatedFuture = catching(
+        transform(
             queuedFuture,
             (profiledQueuedMetadata) -> {
               long startValidateUSecs = stopwatch.elapsed(MICROSECONDS);
-              validateQueuedOperationMetadata(profiledQueuedMetadata.getQueuedMetadata(), preconditionFailure);
+              validateQueuedOperation(profiledQueuedMetadata.getQueuedOperation(), preconditionFailure);
               return profiledQueuedMetadata
                   .setValidatedIn(Durations.fromMicros(stopwatch.elapsed(MICROSECONDS) - startValidateUSecs));
             },
@@ -1315,47 +1353,62 @@ public class ShardInstance extends AbstractServerInstance {
           status.addDetails(Any.pack(preconditionFailure.build()));
           throw Status.FAILED_PRECONDITION.withDescription(e.getMessage()).asRuntimeException();
         });
-    ListenableFuture<Operation> operationFuture = Futures.transform(
-        validatedFuture,
-        (profiledQueuedMetadata) -> operation.toBuilder()
-            .setMetadata(Any.pack(profiledQueuedMetadata.build()))
-            .build(),
-        operationTransformService);
+    ListenableFuture<ProfiledQueuedOperationMetadata> queuedOperationCommittedFuture = transformAsync(
+				validatedFuture,
+				(profiledQueuedMetadata) -> {
+					ByteString queuedOperationBlob = profiledQueuedMetadata.getQueuedOperation().toByteString();
+          Digest queuedOperationDigest = profiledQueuedMetadata
+              .getQueuedOperationMetadata()
+              .getQueuedOperationDigest();
+          long startUploadUSecs = stopwatch.elapsed(MICROSECONDS);
+					try (CommittingOutputStream out = createBlobOutputStream(queuedOperationDigest)) {
+						queuedOperationBlob.writeTo(out);
+						ListenableFuture<Long> committedFuture = out.getCommittedFuture();
+            return transform(
+                committedFuture,
+                (committedSize) -> profiledQueuedMetadata
+                    .setUploadedIn(Durations.fromMicros(stopwatch.elapsed(MICROSECONDS) - startUploadUSecs))
+                    .build(),
+                operationTransformService);
+					}
+				},
+				operationTransformService);
 
     // onQueue call?
-    Futures.addCallback(
-        operationFuture,
-        new FutureCallback<Operation>() {
+    addCallback(
+        queuedOperationCommittedFuture,
+        new FutureCallback<ProfiledQueuedOperationMetadata>() {
           @Override
-          public void onSuccess(Operation operation) {
-            // if we ever do contexts here, we will need to do the right thing and make it withCancellation
+          public void onSuccess(ProfiledQueuedOperationMetadata profiledQueuedMetadata) {
+            QueuedOperationMetadata queuedOperationMetadata =
+                profiledQueuedMetadata.getQueuedOperationMetadata();
+            Operation queueOperation = operation.toBuilder()
+                .setMetadata(Any.pack(queuedOperationMetadata))
+                .build();
+            QueueEntry queueEntry = QueueEntry.newBuilder()
+                .setExecuteEntry(executeEntry)
+                .setQueuedOperationDigest(queuedOperationMetadata.getQueuedOperationDigest())
+                .build();
             try {
-              ProfiledQueuedOperationMetadata profiledQueuedMetadata = operation.getMetadata().unpack(ProfiledQueuedOperationMetadata.class);
-              operation = operation.toBuilder()
-                  .setMetadata(
-                      Any.pack(
-                          profiledQueuedMetadata.getQueuedMetadata().toBuilder()
-                              .setExecuteOperationMetadata(metadata.toBuilder().setStage(Stage.QUEUED))
-                              .build()))
-                  .build();
               ensureCanQueue(stopwatch);
               long startQueueUSecs = stopwatch.elapsed(MICROSECONDS);
-              backplane.putOperation(operation, Stage.QUEUED);
+              backplane.queue(queueEntry, queueOperation);
               long elapsedUSecs = stopwatch.elapsed(MICROSECONDS);
               long queueUSecs = elapsedUSecs - startQueueUSecs;
               logger.info(
-                  String.format(
-                      "ShardInstance(%s): queue(%s): %d checkCache, %dus transform, %dus validate %dus queue, %dus elapsed",
+                  format(
+                      "ShardInstance(%s): queue(%s): %dus checkCache, %dus transform, %dus validate, %dus upload, %dus queue, %dus elapsed",
                       getName(),
-                      operation.getName(),
+                      queueOperation.getName(),
                       checkCacheUSecs,
                       Durations.toMicros(profiledQueuedMetadata.getTransformedIn()),
                       Durations.toMicros(profiledQueuedMetadata.getValidatedIn()),
+                      Durations.toMicros(profiledQueuedMetadata.getUploadedIn()),
                       queueUSecs,
                       elapsedUSecs));
               queueFuture.set(null);
             } catch (IOException e) {
-              onFailure(e.getCause());
+              onFailure(e.getCause() == null ? e : e.getCause());
             } catch (InterruptedException e) {
               // ignore
             }
@@ -1363,7 +1416,7 @@ public class ShardInstance extends AbstractServerInstance {
 
           @Override
           public void onFailure(Throwable t) {
-            errorOperation(operation.getName(), t, status, queueFuture);
+            errorOperation(operation, t, status, queueFuture);
           }
       }, operationTransformService);
     return queueFuture;

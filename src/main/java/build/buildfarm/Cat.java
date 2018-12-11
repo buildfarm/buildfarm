@@ -22,6 +22,7 @@ import build.buildfarm.instance.stub.Retrier;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
+import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
@@ -299,7 +300,7 @@ class Cat {
     System.out.println("CorrelatedInvocationsId: " + metadata.getCorrelatedInvocationsId());
   }
 
-  private static void printOperation(Operation operation) {
+  private static void printOperation(Instance instance, Operation operation) throws IOException, InterruptedException {
     System.out.println("Operation: " + operation.getName());
     System.out.println("Done: " + (operation.getDone() ? "true" : "false"));
     System.out.println("Metadata:");
@@ -307,9 +308,10 @@ class Cat {
       ExecuteOperationMetadata metadata;
       RequestMetadata requestMetadata;
       if (operation.getMetadata().is(QueuedOperationMetadata.class)) {
-        QueuedOperationMetadata queuedMetadata = operation.getMetadata().unpack(QueuedOperationMetadata.class);
-        metadata = queuedMetadata.getExecuteOperationMetadata();
-        requestMetadata = queuedMetadata.getRequestMetadata();
+        QueuedOperationMetadata queuedOperationMetadata =
+            operation.getMetadata().unpack(QueuedOperationMetadata.class);
+        metadata = queuedOperationMetadata.getExecuteOperationMetadata();
+        requestMetadata = queuedOperationMetadata.getRequestMetadata();
       } else if (operation.getMetadata().is(ExecutingOperationMetadata.class)) {
         ExecutingOperationMetadata executingMetadata = operation.getMetadata().unpack(ExecutingOperationMetadata.class);
         System.out.println("  Started At: " + new Date(executingMetadata.getStartedAt()));
@@ -381,7 +383,7 @@ class Cat {
     }
     for (int i = 4; i < args.length; i++) {
       if (type.equals("Operation")) {
-        printOperation(instance.getOperation(args[i]));
+        printOperation(instance, instance.getOperation(args[i]));
       } else {
         Digest blobDigest = DigestUtil.parseDigest(args[i]);
         if (type.equals("Missing")) {

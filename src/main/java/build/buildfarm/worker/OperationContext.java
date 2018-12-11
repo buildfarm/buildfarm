@@ -18,10 +18,7 @@ import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
-import build.bazel.remote.execution.v2.ExecutionPolicy;
-import build.bazel.remote.execution.v2.RequestMetadata;
-import build.bazel.remote.execution.v2.ResultsCachePolicy;
+import build.buildfarm.v1test.QueueEntry;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Duration;
 import java.nio.file.Path;
@@ -33,82 +30,64 @@ final class OperationContext {
   final Operation operation;
   final Path execDir;
   final Map<Digest, Directory> directoriesIndex;
-  final ExecuteOperationMetadata metadata;
   final Action action;
   final Command command;
   final Duration matchedIn;
   final Duration fetchedIn;
   final Duration executedIn;
-  final ExecutionPolicy executionPolicy;
-  final ResultsCachePolicy resultsCachePolicy;
-  final RequestMetadata requestMetadata;
+  final QueueEntry queueEntry;
 
   private OperationContext(
       Operation operation,
       Path execDir,
       Map<Digest, Directory> directoriesIndex,
-      ExecuteOperationMetadata metadata,
       Action action,
       Command command,
       Duration matchedIn,
       Duration fetchedIn,
       Duration executedIn,
-      ExecutionPolicy executionPolicy,
-      ResultsCachePolicy resultsCachePolicy,
-      RequestMetadata requestMetadata) {
+      QueueEntry queueEntry) {
     this.operation = operation;
     this.execDir = execDir;
     this.directoriesIndex = directoriesIndex;
-    this.metadata = metadata;
     this.action = action;
     this.command = command;
     this.matchedIn = matchedIn;
     this.fetchedIn = fetchedIn;
     this.executedIn = executedIn;
-    this.executionPolicy = executionPolicy;
-    this.resultsCachePolicy = resultsCachePolicy;
-    this.requestMetadata = requestMetadata;
+    this.queueEntry = queueEntry;
   }
 
   public static class Builder {
     private Operation operation;
     private Path execDir;
     private Map<Digest, Directory> directoriesIndex;
-    private ExecuteOperationMetadata metadata;
     private Action action;
     private Command command;
     private Duration matchedIn;
     private Duration fetchedIn;
     private Duration executedIn;
-    private ExecutionPolicy executionPolicy;
-    private ResultsCachePolicy resultsCachePolicy;
-    private RequestMetadata requestMetadata;
+    private QueueEntry queueEntry;
 
     private Builder(
         Operation operation,
         Path execDir,
         Map<Digest, Directory> directoriesIndex,
-        ExecuteOperationMetadata metadata,
         Action action,
         Command command,
         Duration matchedIn,
         Duration fetchedIn,
         Duration executedIn,
-        ExecutionPolicy executionPolicy,
-        ResultsCachePolicy resultsCachePolicy,
-        RequestMetadata requestMetadata) {
+        QueueEntry queueEntry) {
       this.operation = operation;
       this.execDir = execDir;
       this.directoriesIndex = directoriesIndex;
-      this.metadata = metadata;
       this.action = action;
       this.command = command;
       this.matchedIn = matchedIn;
       this.fetchedIn = fetchedIn;
       this.executedIn = executedIn;
-      this.executionPolicy = executionPolicy;
-      this.resultsCachePolicy = resultsCachePolicy;
-      this.requestMetadata = requestMetadata;
+      this.queueEntry = queueEntry;
     }
 
     public Builder setOperation(Operation operation) {
@@ -123,11 +102,6 @@ final class OperationContext {
 
     public Builder setDirectoriesIndex(Map<Digest, Directory> directoriesIndex) {
       this.directoriesIndex = directoriesIndex;
-      return this;
-    }
-
-    public Builder setMetadata(ExecuteOperationMetadata metadata) {
-      this.metadata = metadata;
       return this;
     }
 
@@ -156,18 +130,8 @@ final class OperationContext {
       return this;
     }
 
-    public Builder setExecutionPolicy(ExecutionPolicy executionPolicy) {
-      this.executionPolicy = executionPolicy;
-      return this;
-    }
-
-    public Builder setResultsCachePolicy(ResultsCachePolicy resultsCachePolicy) {
-      this.resultsCachePolicy = resultsCachePolicy;
-      return this;
-    }
-
-    public Builder setRequestMetadata(RequestMetadata requestMetadata) {
-      this.requestMetadata = requestMetadata;
+    public Builder setQueueEntry(QueueEntry queueEntry) {
+      this.queueEntry = queueEntry;
       return this;
     }
 
@@ -176,15 +140,12 @@ final class OperationContext {
         operation,
         execDir,
         directoriesIndex,
-        metadata,
         action,
         command,
         matchedIn,
         fetchedIn,
         executedIn,
-        executionPolicy,
-        resultsCachePolicy,
-        requestMetadata);
+        queueEntry);
     }
   }
 
@@ -193,15 +154,12 @@ final class OperationContext {
         /* operation=*/ null,
         /* execDir=*/ null,
         /* directoriesIndex=*/ null,
-        /* metadata=*/ null,
         /* action=*/ null,
         /* command=*/ null,
         /* matchedIn=*/ null,
         /* fetchedIn=*/ null,
         /* executedIn=*/ null,
-        /* executionPolicy=*/ null,
-        /* resultsCachePolicy=*/ null,
-        /* requestMetadata=*/ null);
+        /* queueEntry=*/ null);
   }
 
   public Builder toBuilder() {
@@ -209,14 +167,11 @@ final class OperationContext {
         operation,
         execDir,
         directoriesIndex,
-        metadata,
         action,
         command,
         matchedIn,
         fetchedIn,
         executedIn,
-        executionPolicy,
-        resultsCachePolicy,
-        requestMetadata);
+        queueEntry);
   }
 }

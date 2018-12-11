@@ -22,13 +22,17 @@ import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance.MatchListener;
-import build.buildfarm.v1test.QueuedOperationMetadata;
+import build.buildfarm.v1test.ExecuteEntry;
+import build.buildfarm.v1test.QueueEntry;
+import build.buildfarm.v1test.QueuedOperation;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.base.Stopwatch;
 import com.google.longrunning.Operation;
+import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.util.Durations;
@@ -56,6 +60,7 @@ public class MatchStage extends PipelineStage {
     private long waitDuration;
     private long operationNamedAtUSecs;
     private Poller poller = null;
+    private QueueEntry queueEntry = null;
 
     public MatchOperationListener(Stopwatch stopwatch) {
       this.stopwatch = stopwatch;
@@ -75,20 +80,21 @@ public class MatchStage extends PipelineStage {
     }
 
     @Override
-    public boolean onOperationName(String operationName) {
+    public boolean onEntry(QueueEntry queueEntry) {
       operationNamedAtUSecs = stopwatch.elapsed(MICROSECONDS);
       Preconditions.checkState(poller == null);
       poller = workerContext.createPoller(
           "MatchStage",
-          operationName,
-          ExecuteOperationMetadata.Stage.QUEUED);
+          queueEntry,
+          Stage.QUEUED);
+      this.queueEntry = queueEntry;
       return true;
     }
 
     @Override
-    public boolean onOperation(Operation operation) {
+    public boolean onOperation(QueuedOperation queuedOperation) {
       try {
-        return onOperationPolled(operation);
+        return onOperationPolled(queuedOperation);
       } finally {
         if (!Thread.currentThread().isInterrupted() && poller != null) {
           poller.stop();
@@ -97,19 +103,24 @@ public class MatchStage extends PipelineStage {
       }
     }
 
-    private boolean onOperationPolled(Operation operation) {
-      if (operation == null) {
+    private boolean onOperationPolled(QueuedOperation queuedOperation) {
+      if (queuedOperation == null) {
         output.release();
         return false;
       }
 
-      logStart(operation.getName());
+      String operationName = queueEntry.getExecuteEntry().getOperationName();
+      logStart(operationName);
 
       try {
         long matchingAtUSecs = stopwatch.elapsed(MICROSECONDS);
-        OperationContext context = match(operation, stopwatch, operationNamedAtUSecs);
+        OperationContext context = match(
+            queueEntry,
+            queuedOperation,
+            stopwatch,
+            operationNamedAtUSecs);
         long matchedInUSecs = stopwatch.elapsed(MICROSECONDS) - matchingAtUSecs;
-        logComplete(operation.getName(), matchedInUSecs, waitDuration, context != null);
+        logComplete(operationName, matchedInUSecs, waitDuration, context != null);
         if (context == null) {
           output.release();
         }
@@ -161,22 +172,11 @@ public class MatchStage extends PipelineStage {
   }
 
   private OperationContext match(
-      Operation operation,
+      QueueEntry queueEntry,
+      QueuedOperation queuedOperation,
       Stopwatch stopwatch,
       long matchStartAtUSecs) throws InterruptedException {
-    if (!operation.getMetadata().is(QueuedOperationMetadata.class)) {
-      return null;
-    }
-
-    QueuedOperationMetadata metadata;
-    try {
-      metadata = operation.getMetadata().unpack(QueuedOperationMetadata.class);
-    } catch (InvalidProtocolBufferException e) {
-      logger.log(SEVERE, "error unpacking queued operation metadata for " + operation.getName(), e);
-      return null;
-    }
-
-    Action action = metadata.getAction();
+    Action action = queuedOperation.getAction();
 
     if (action.hasTimeout() && workerContext.hasMaximumActionTimeout()) {
       Duration timeout = action.getTimeout();
@@ -187,20 +187,29 @@ public class MatchStage extends PipelineStage {
       }
     }
 
-    Command command = metadata.getCommand();
+    Command command = queuedOperation.getCommand();
     if (command.getArgumentsList().isEmpty()) {
       return null;
     }
 
+    ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
+    // this may be superfluous - we can probably just set the name and action digest
+    Operation operation = Operation.newBuilder()
+        .setName(executeEntry.getOperationName())
+        .setMetadata(Any.pack(ExecuteOperationMetadata.newBuilder()
+            .setActionDigest(executeEntry.getActionDigest())
+            .setStage(Stage.QUEUED)
+            .setStdoutStreamName(executeEntry.getStdoutStreamName())
+            .setStderrStreamName(executeEntry.getStderrStreamName())
+            .build()))
+        .build();
+
     OperationContext.Builder builder = OperationContext.newBuilder()
         .setOperation(operation)
-        .setDirectoriesIndex(createDirectoriesIndex(metadata.getDirectoriesList(), workerContext.getDigestUtil()))
-        .setMetadata(metadata.getExecuteOperationMetadata())
+        .setDirectoriesIndex(createDirectoriesIndex(queuedOperation.getDirectoriesList(), workerContext.getDigestUtil()))
         .setAction(action)
         .setCommand(command)
-        .setExecutionPolicy(metadata.getExecutionPolicy())
-        .setResultsCachePolicy(metadata.getResultsCachePolicy())
-        .setRequestMetadata(metadata.getRequestMetadata());
+        .setQueueEntry(queueEntry);
 
     Duration matchedIn = Durations.fromMicros(stopwatch.elapsed(MICROSECONDS) - matchStartAtUSecs);
     return builder

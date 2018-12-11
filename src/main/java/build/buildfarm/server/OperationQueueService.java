@@ -14,13 +14,25 @@
 
 package build.buildfarm.server;
 
+import static build.buildfarm.instance.Utils.putBlobFuture;
+import static com.google.common.util.concurrent.Futures.immediateFuture;
+import static com.google.common.util.concurrent.Futures.transformAsync;
+import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
+
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.instance.Instance.SimpleMatchListener;
+import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.common.function.InterruptingPredicate;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.PollOperationRequest;
+import build.buildfarm.v1test.QueueEntry;
+import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.TakeOperationRequest;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -29,6 +41,7 @@ import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
+import java.util.concurrent.ExecutionException;
 
 public class OperationQueueService extends OperationQueueGrpc.OperationQueueImplBase {
   private final Instances instances;
@@ -37,36 +50,72 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
     this.instances = instances;
   }
 
-  private InterruptingPredicate<Operation> createOnMatch(
-      Instance instance, StreamObserver<Operation> responseObserver) {
-    return (operation) -> {
-      // so this is interesting - the stdout injection belongs here, because
-      // we use this criteria to select the format for stream/blob differentiation
-      try {
-        ExecuteOperationMetadata metadata =
-            operation.getMetadata().unpack(ExecuteOperationMetadata.class);
-        metadata = metadata.toBuilder()
-            .setStdoutStreamName(operation.getName() + "/streams/stdout")
-            .setStderrStreamName(operation.getName() + "/streams/stderr")
-            .build();
-        Operation streamableOperation = operation.toBuilder()
-            .setMetadata(Any.pack(metadata))
-            .build();
+  private static <V> V getUnchecked(ListenableFuture<V> future) throws InterruptedException {
+    try {
+      return future.get();
+    } catch (ExecutionException e) {
+      return null;
+    }
+  }
 
-        responseObserver.onNext(streamableOperation);
+  private static class OperationQueueMatchListener implements MatchListener {
+    private final Instance instance;
+    private final InterruptingPredicate onMatch;
+    private QueueEntry queueEntry = null;
+
+    OperationQueueMatchListener(Instance instance, InterruptingPredicate onMatch) {
+      this.instance = instance;
+      this.onMatch = onMatch;
+    }
+
+    @Override
+    public void onWaitStart() {
+    }
+
+    @Override
+    public void onWaitEnd() {
+    }
+
+    @Override
+    public boolean onEntry(QueueEntry queueEntry) {
+      this.queueEntry = queueEntry;
+      return true;
+    }
+
+    @Override
+    public boolean onOperation(QueuedOperation queuedOperation) throws InterruptedException {
+      Digest queuedOperationDigest = queueEntry.getQueuedOperationDigest();
+      ListenableFuture<Digest> uploadFuture = transformAsync(
+          instance.findMissingBlobs(ImmutableList.of(queuedOperationDigest), newDirectExecutorService()),
+          (results) -> {
+            if (Iterables.isEmpty(results)) {
+              return immediateFuture(queuedOperationDigest);
+            }
+            return putBlobFuture(
+                instance,
+                queuedOperationDigest,
+                queuedOperation.toByteString());
+          });
+      getUnchecked(uploadFuture);
+      return onMatch.testInterruptibly(queueEntry);
+    }
+  }
+
+  private InterruptingPredicate<QueueEntry> createOnMatch(
+      Instance instance, StreamObserver<QueueEntry> responseObserver) {
+    return (queueEntry) -> {
+      try {
+        responseObserver.onNext(queueEntry);
         responseObserver.onCompleted();
         return true;
-      } catch(InvalidProtocolBufferException ex) {
-        responseObserver.onError(Status.INTERNAL.asException());
-        // should we update operation?
-      } catch(StatusRuntimeException ex) {
-        Status status = Status.fromThrowable(ex);
+      } catch(StatusRuntimeException e) {
+        Status status = Status.fromThrowable(e);
         if (status.getCode() != Status.Code.CANCELLED) {
-          responseObserver.onError(ex);
+          responseObserver.onError(e);
         }
       }
       try {
-        instance.putOperation(operation);
+        instance.putOperation(instance.getOperation(queueEntry.getExecuteEntry().getOperationName()));
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
       }
@@ -77,19 +126,21 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
   @Override
   public void take(
       TakeOperationRequest request,
-      StreamObserver<Operation> responseObserver) {
+      StreamObserver<QueueEntry> responseObserver) {
     Instance instance;
     try {
       instance = instances.get(request.getInstanceName());
-    } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
+    } catch (InstanceNotFoundException e) {
+      responseObserver.onError(BuildFarmInstances.toStatusException(e));
       return;
     }
 
     try {
       instance.match(
           request.getPlatform(),
-          new SimpleMatchListener(createOnMatch(instance, responseObserver)));
+          new OperationQueueMatchListener(
+              instance,
+              createOnMatch(instance, responseObserver)));
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }

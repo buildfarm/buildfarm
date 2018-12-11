@@ -73,7 +73,7 @@ class CASFileCacheTest {
       protected InputStream newExternalInput(Digest digest, long offset) {
         ByteString content = blobs.get(digest);
         if (content == null) {
-          return new BrokenInputStream(new IOException("NOT_FOUND"));
+          return new BrokenInputStream(new IOException("NOT_FOUND: " + DigestUtil.toString(digest)));
         }
         return content.substring((int) offset).newInput();
       }
@@ -183,7 +183,7 @@ class CASFileCacheTest {
               directoriesIndex,
               newDirectExecutorService()));
     } catch (IOException e) {
-      assertThat(e.getMessage()).isEqualTo("NOT_FOUND");
+      assertThat(e.getMessage()).isEqualTo("NOT_FOUND: " + DigestUtil.toString(fileDigest));
       exceptionHandled = true;
     }
     assertThat(exceptionHandled).isTrue();

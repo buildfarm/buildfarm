@@ -28,6 +28,7 @@ import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.v1test.ExecutionPolicy;
+import build.buildfarm.v1test.QueueEntry;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Duration;
 import io.grpc.Deadline;
@@ -38,8 +39,8 @@ import java.util.Map;
 
 public interface WorkerContext {
   String getName();
-  Poller createPoller(String name, String operationName, Stage stage);
-  Poller createPoller(String name, String operationName, Stage stage, Runnable onFailure, Deadline deadline);
+  Poller createPoller(String name, QueueEntry queueEntry, Stage stage);
+  Poller createPoller(String name, QueueEntry queueEntry, Stage stage, Runnable onFailure, Deadline deadline);
   void match(MatchListener listener) throws InterruptedException;
   void requeue(Operation operation) throws InterruptedException;
   void deactivate(String operationName);

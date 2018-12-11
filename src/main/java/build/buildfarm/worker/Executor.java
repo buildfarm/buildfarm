@@ -24,6 +24,7 @@ import static java.util.logging.Level.SEVERE;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.Platform.Property;
@@ -65,8 +66,16 @@ class Executor implements Runnable {
   }
 
   private long runInterruptible(Stopwatch stopwatch) throws InterruptedException {
-    ExecuteOperationMetadata executingMetadata = operationContext.metadata.toBuilder()
-        .setStage(ExecuteOperationMetadata.Stage.EXECUTING)
+    ExecuteOperationMetadata metadata;
+    try {
+      metadata = operationContext.operation
+          .getMetadata().unpack(ExecuteOperationMetadata.class);
+    } catch (InvalidProtocolBufferException e) {
+      logger.log(SEVERE, "invalid execute operation metadata", e);
+      return 0;
+    }
+    ExecuteOperationMetadata executingMetadata = metadata.toBuilder()
+        .setStage(Stage.EXECUTING)
         .build();
 
     long startedAt = System.currentTimeMillis();
@@ -76,9 +85,7 @@ class Executor implements Runnable {
             .setStartedAt(startedAt)
             .setExecutingOn(workerContext.getName())
             .setExecuteOperationMetadata(executingMetadata)
-            .setRequestMetadata(operationContext.requestMetadata)
-            .setExecutionPolicy(operationContext.executionPolicy)
-            .setResultsCachePolicy(operationContext.resultsCachePolicy)
+            .setRequestMetadata(operationContext.queueEntry.getExecuteEntry().getRequestMetadata())
             .build()))
         .build();
 
@@ -139,8 +146,8 @@ class Executor implements Runnable {
     final Thread executorThread = Thread.currentThread();
     Poller poller = workerContext.createPoller(
         "Executor",
-        operation.getName(),
-        ExecuteOperationMetadata.Stage.EXECUTING,
+        operationContext.queueEntry,
+        Stage.EXECUTING,
         () -> executorThread.interrupt(),
         pollDeadline);
 
@@ -156,8 +163,8 @@ class Executor implements Runnable {
           operationContext.execDir,
           operationContext.command,
           timeout,
-          operationContext.metadata.getStdoutStreamName(),
-          operationContext.metadata.getStderrStreamName(),
+          "", // executingMetadata.getStdoutStreamName(),
+          "", // executingMetadata.getStderrStreamName(),
           resultBuilder,
           policies.build());
     } catch (IOException e) {

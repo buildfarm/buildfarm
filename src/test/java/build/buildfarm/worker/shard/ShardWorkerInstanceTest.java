@@ -28,6 +28,8 @@ import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.instance.Instance.MatchListener;
+import build.buildfarm.v1test.ExecuteEntry;
+import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.ShardWorkerInstanceConfig;
 import build.buildfarm.worker.OutputStreamFactory;
 import com.google.longrunning.Operation;
@@ -84,11 +86,15 @@ public class ShardWorkerInstanceTest {
 
   @Test
   public void dispatchOperationIgnoresNull() throws IOException, InterruptedException {
+    QueueEntry queueEntry = QueueEntry.newBuilder()
+        .setExecuteEntry(ExecuteEntry.newBuilder()
+            .setOperationName("op"))
+        .build();
     when(backplane.dispatchOperation())
         .thenReturn(null)
-        .thenReturn("op");
+        .thenReturn(queueEntry);
     MatchListener listener = mock(MatchListener.class);
-    assertThat(instance.dispatchOperation(listener)).isEqualTo("op");
+    assertThat(instance.dispatchOperation(listener)).isEqualTo(queueEntry);
     verify(backplane, times(2)).dispatchOperation();
   }
 

@@ -14,7 +14,7 @@ option java_outer_classname = "OperationQueueProto";
 
 // The OperationQueue API is used internally to communicate with Workers
 service OperationQueue {
-  rpc Take(TakeOperationRequest) returns (google.longrunning.Operation) {
+  rpc Take(TakeOperationRequest) returns (QueueEntry) {
     option (google.api.http) = { get: "/v1test/{instance_name=**}/operation:take" };
   }
 
@@ -287,8 +287,8 @@ message ShardWorker {
   int64 expire_at = 2;
 }
 
-message ShardDispatchedOperation {
-  string name = 1;
+message DispatchedOperation {
+  QueueEntry queue_entry = 1;
 
   int64 requeue_at = 2;
 
@@ -296,65 +296,83 @@ message ShardDispatchedOperation {
 }
 
 message ProfiledQueuedOperationMetadata {
-  QueuedOperationMetadata queued_metadata = 1;
+  QueuedOperation queued_operation = 1;
 
-  google.protobuf.Duration transformed_in = 2;
+  QueuedOperationMetadata queued_operation_metadata = 2;
 
-  google.protobuf.Duration validated_in = 3;
+  google.protobuf.Duration transformed_in = 3;
+
+  google.protobuf.Duration validated_in = 4;
+
+  google.protobuf.Duration uploaded_in = 5;
 }
 
-message QueuedOperationMetadata {
-  build.bazel.remote.execution.v2.Action action = 1;
+message ExecuteEntry {
+  string operation_name = 1;
 
-  build.bazel.remote.execution.v2.Command command = 2;
+  build.bazel.remote.execution.v2.Digest action_digest = 2;
 
-  repeated build.bazel.remote.execution.v2.Directory directories = 3;
-
-  build.bazel.remote.execution.v2.ExecuteOperationMetadata execute_operation_metadata = 4;
-
-  bool skip_cache_lookup = 5;
-
-  build.bazel.remote.execution.v2.RequestMetadata request_metadata = 6;
-
-  build.bazel.remote.execution.v2.ExecutionPolicy execution_policy = 7;
-
-  build.bazel.remote.execution.v2.ResultsCachePolicy results_cache_policy = 8;
-}
-
-message ExecutingOperationMetadata {
-  int64 started_at = 1;
-
-  string executing_on = 2;
-
-  build.bazel.remote.execution.v2.ExecuteOperationMetadata execute_operation_metadata = 3;
+  bool skip_cache_lookup = 3;
 
   build.bazel.remote.execution.v2.RequestMetadata request_metadata = 4;
 
   build.bazel.remote.execution.v2.ExecutionPolicy execution_policy = 5;
 
   build.bazel.remote.execution.v2.ResultsCachePolicy results_cache_policy = 6;
+
+  string stdout_stream_name = 7;
+
+  string stderr_stream_name = 8;
+}
+
+message QueueEntry {
+  ExecuteEntry execute_entry = 1;
+
+  build.bazel.remote.execution.v2.Digest queued_operation_digest = 2;
+}
+
+message QueuedOperationMetadata {
+  build.bazel.remote.execution.v2.ExecuteOperationMetadata execute_operation_metadata = 1;
+
+  build.bazel.remote.execution.v2.Digest queued_operation_digest = 2;
+
+  build.bazel.remote.execution.v2.RequestMetadata request_metadata = 3;
+}
+
+message QueuedOperation {
+  build.bazel.remote.execution.v2.Action action = 1;
+
+  build.bazel.remote.execution.v2.Command command = 2;
+
+  repeated build.bazel.remote.execution.v2.Directory directories = 3;
+}
+
+message ExecutingOperationMetadata {
+  build.bazel.remote.execution.v2.ExecuteOperationMetadata execute_operation_metadata = 1;
+
+  build.bazel.remote.execution.v2.RequestMetadata request_metadata = 2;
+
+  int64 started_at = 3;
+
+  string executing_on = 4;
 }
 
 message CompletedOperationMetadata {
-  int64 completed_at = 1;
+  build.bazel.remote.execution.v2.ExecuteOperationMetadata execute_operation_metadata = 1;
 
-  string executed_on = 2;
+  build.bazel.remote.execution.v2.RequestMetadata request_metadata = 2;
 
-  google.protobuf.Duration matched_in = 7;
+  int64 completed_at = 3;
 
-  google.protobuf.Duration fetched_in = 3;
+  string executed_on = 4;
 
-  google.protobuf.Duration executed_in = 4;
+  google.protobuf.Duration matched_in = 5;
 
-  google.protobuf.Duration reported_in = 5;
+  google.protobuf.Duration fetched_in = 6;
 
-  build.bazel.remote.execution.v2.ExecuteOperationMetadata execute_operation_metadata = 6;
+  google.protobuf.Duration executed_in = 7;
 
-  build.bazel.remote.execution.v2.RequestMetadata request_metadata = 8;
-
-  build.bazel.remote.execution.v2.ExecutionPolicy execution_policy = 9;
-
-  build.bazel.remote.execution.v2.ResultsCachePolicy results_cache_policy = 10;
+  google.protobuf.Duration reported_in = 8;
 }
 
 message InstanceConfig {

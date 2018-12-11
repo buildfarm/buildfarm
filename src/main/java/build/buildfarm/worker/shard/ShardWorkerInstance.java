@@ -39,6 +39,7 @@ import build.buildfarm.instance.TokenizableIterator;
 import build.buildfarm.instance.TreeIterator.DirectoryEntry;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
+import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ShardWorkerInstanceConfig;
 import build.buildfarm.worker.OutputStreamFactory;
@@ -212,13 +213,13 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @VisibleForTesting
-  public String dispatchOperation(MatchListener listener) throws IOException, InterruptedException {
+  public QueueEntry dispatchOperation(MatchListener listener) throws IOException, InterruptedException {
     for (;;) {
       listener.onWaitStart();
       try {
-        String operationName = backplane.dispatchOperation();
-        if (operationName != null) {
-          return operationName;
+        QueueEntry queueEntry = backplane.dispatchOperation();
+        if (queueEntry != null) {
+          return queueEntry;
         }
       } catch (IOException e) {
         Status status = Status.fromThrowable(e);
@@ -230,37 +231,9 @@ public class ShardWorkerInstance extends AbstractServerInstance {
     }
   }
 
-  private void matchResettable(Platform platform, MatchListener listener) throws IOException, InterruptedException {
-    String operationName = dispatchOperation(listener);
-
-    // FIXME platform match
-    if (listener.onOperationName(operationName)) {
-      // onOperation must be called after this point, or we must throw
-      Operation operation = getOperation(operationName);
-      if (operation == null) {
-        operation = Operation.newBuilder()
-            .setName(operationName)
-            .setDone(true)
-            .build();
-      }
-      listener.onOperation(operation);
-    }
-  }
-
-  private void matchInterruptible(Platform platform, MatchListener listener) throws IOException, InterruptedException {
-    matchResettable(platform, listener);
-    if (Thread.interrupted()) {
-      throw new InterruptedException();
-    }
-  }
-
   @Override
   public void match(Platform platform, MatchListener listener) throws InterruptedException {
-    try {
-      matchInterruptible(platform, listener);
-    } catch (IOException e) {
-      throw Status.fromThrowable(e).asRuntimeException();
-    }
+    throw new UnsupportedOperationException();
   }
 
   @Override

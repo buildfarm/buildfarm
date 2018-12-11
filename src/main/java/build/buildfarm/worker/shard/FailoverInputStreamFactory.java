@@ -40,4 +40,4 @@ class FailoverInputStreamFactory implements InputStreamFactory {
       return delegate.newInput(blobDigest, offset);
     }
   }
-};
+}

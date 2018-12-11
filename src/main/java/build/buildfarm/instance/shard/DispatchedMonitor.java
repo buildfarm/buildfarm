@@ -14,8 +14,12 @@
 
 package build.buildfarm.instance.shard;
 
+import static java.lang.String.format;
+import static java.util.logging.Level.SEVERE;
+
 import build.buildfarm.common.ShardBackplane;
-import build.buildfarm.v1test.ShardDispatchedOperation;
+import build.buildfarm.v1test.DispatchedOperation;
+import build.buildfarm.v1test.QueueEntry;
 import com.google.rpc.Code;
 import com.google.rpc.Status;
 import java.util.concurrent.TimeUnit;
@@ -27,12 +31,12 @@ class DispatchedMonitor implements Runnable {
   private final static Logger logger = Logger.getLogger(DispatchedMonitor.class.getName());
 
   private final ShardBackplane backplane;
-  private final BiPredicate<String, Status.Builder> onRequeue;
+  private final BiPredicate<QueueEntry, Status.Builder> onRequeue;
   private final BiConsumer<String, Status> onCancel;
 
   DispatchedMonitor(
       ShardBackplane backplane,
-      BiPredicate<String, Status.Builder> onRequeue,
+      BiPredicate<QueueEntry, Status.Builder> onRequeue,
       BiConsumer<String, Status> onCancel) {
     this.backplane = backplane;
     this.onRequeue = onRequeue;
@@ -47,29 +51,31 @@ class DispatchedMonitor implements Runnable {
         long now = System.currentTimeMillis(); /* FIXME sync */
         boolean canQueueNow = backplane.canQueue();
         /* iterate over dispatched */
-        for (ShardDispatchedOperation o : backplane.getDispatchedOperations()) {
+        for (DispatchedOperation o : backplane.getDispatchedOperations()) {
           /* if now > dispatchedOperation.getExpiresAt() */
           if (now >= o.getRequeueAt()) {
-            logger.info("DispatchedMonitor: Testing " + o.getName() + " because " + now + " >= " + o.getRequeueAt());
+            QueueEntry queueEntry = o.getQueueEntry();
+            String operationName = queueEntry.getExecuteEntry().getOperationName();
+            logger.info(format("DispatchedMonitor: Testing %s because %d >= %d", operationName, now, o.getRequeueAt()));
             long startTime = System.nanoTime();
             Status.Builder statusBuilder = Status.newBuilder()
                 .setCode(Code.UNKNOWN.getNumber());
-            boolean shouldCancel = !canQueueNow || !onRequeue.test(o.getName(), statusBuilder);
+            boolean shouldCancel = !canQueueNow || !onRequeue.test(queueEntry, statusBuilder);
             if (Thread.interrupted()) {
               throw new InterruptedException();
             }
             long endTime = System.nanoTime();
             float ms = (endTime - startTime) / 1000000.0f;
-            logger.info(String.format("DispatchedMonitor::run: onRequeue(%s) %gms", o.getName(), ms));
+            logger.info(String.format("DispatchedMonitor::run: onRequeue(%s) %gms", operationName, ms));
             if (shouldCancel) {
-              backplane.completeOperation(o.getName());
-              logger.info("DispatchedMonitor: Cancel " + o.getName());
-              onCancel.accept(o.getName(), statusBuilder.build());
+              backplane.completeOperation(operationName);
+              logger.info(format("DispatchedMonitor: Cancel %s", operationName));
+              onCancel.accept(operationName, statusBuilder.build());
               if (Thread.interrupted()) {
                 throw new InterruptedException();
               }
             } else {
-              logger.info("DispatchedMonitor: Requeued " + o.getName());
+              logger.info(format("DispatchedMonitor: Requeued %s", operationName));
             }
           }
         }
@@ -78,7 +84,7 @@ class DispatchedMonitor implements Runnable {
         Thread.currentThread().interrupt();
         break;
       } catch (Exception e) {
-        e.printStackTrace();
+        logger.log(SEVERE, "error during dispatch evaluation", e);
       }
     }
     logger.info("DispatchedMonitor: Exiting");

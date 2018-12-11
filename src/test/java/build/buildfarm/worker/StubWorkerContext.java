@@ -22,6 +22,7 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.v1test.ExecutionPolicy;
+import build.buildfarm.v1test.QueueEntry;
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
@@ -38,8 +39,8 @@ import java.util.function.Predicate;
 
 class StubWorkerContext implements WorkerContext {
   @Override public String getName() { throw new UnsupportedOperationException(); }
-  @Override public Poller createPoller(String name, String operationName, Stage stage) { throw new UnsupportedOperationException(); }
-  @Override public Poller createPoller(String name, String operationName, Stage stage, Runnable onFailure, Deadline deadline) { throw new UnsupportedOperationException(); }
+  @Override public Poller createPoller(String name, QueueEntry queueEntry, Stage stage) { throw new UnsupportedOperationException(); }
+  @Override public Poller createPoller(String name, QueueEntry queueEntry, Stage stage, Runnable onFailure, Deadline deadline) { throw new UnsupportedOperationException(); }
   @Override public void match(MatchListener listener) throws InterruptedException { throw new UnsupportedOperationException(); }
   @Override public void requeue(Operation operation) { throw new UnsupportedOperationException(); }
   @Override public void deactivate(String operationName) { throw new UnsupportedOperationException(); }

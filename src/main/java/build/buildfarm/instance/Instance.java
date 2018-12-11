@@ -14,11 +14,6 @@
 
 package build.buildfarm.instance;
 
-import build.buildfarm.common.DigestUtil;
-import build.buildfarm.common.DigestUtil.ActionKey;
-import build.buildfarm.common.function.InterruptingPredicate;
-import com.google.common.collect.ImmutableList;
-import com.google.common.util.concurrent.ListenableFuture;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
@@ -28,6 +23,13 @@ import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ServerCapabilities;
+import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.function.InterruptingPredicate;
+import build.buildfarm.v1test.QueueEntry;
+import build.buildfarm.v1test.QueuedOperation;
+import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import io.grpc.stub.StreamObserver;
@@ -101,27 +103,11 @@ public interface Instance {
 
     void onWaitEnd();
 
-    // optional notification if distinct from operation fetch
     // returns false if this listener will not handle this match
-    boolean onOperationName(String operationName);
+    boolean onEntry(QueueEntry queueEntry);
 
     // returns false if this listener will not handle this match
-    boolean onOperation(Operation operation) throws InterruptedException;
-  }
-
-  public static class SimpleMatchListener implements MatchListener {
-    private final InterruptingPredicate<Operation> onMatch;
-
-    public SimpleMatchListener(InterruptingPredicate<Operation> onMatch) {
-      this.onMatch = onMatch;
-    }
-
-    @Override public void onWaitStart() { }
-    @Override public void onWaitEnd() { }
-    @Override public boolean onOperationName(String operationName) { return true; }
-    @Override public boolean onOperation(Operation operation) throws InterruptedException {
-      return onMatch.testInterruptibly(operation);
-    }
+    boolean onOperation(QueuedOperation operation) throws InterruptedException;
   }
 
   public static interface ChunkObserver extends StreamObserver<ByteString> {
