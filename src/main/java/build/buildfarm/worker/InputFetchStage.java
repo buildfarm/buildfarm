@@ -76,7 +76,7 @@ public class InputFetchStage extends PipelineStage {
 
   @Override
   public void release() {
-    removeAndNotify();
+    // do nothing. no state is maintained for claims
   }
 
   public void releaseInputFetcher(String operationName, long usecs, long stallUSecs, boolean success) {

@@ -76,7 +76,7 @@ public class ExecuteActionStage extends PipelineStage {
 
   @Override
   public void release() {
-    removeAndNotify();
+    // do nothing. no state is maintained for claims
   }
 
   public void releaseExecutor(String operationName, long usecs, long stallUSecs, int exitCode) {
