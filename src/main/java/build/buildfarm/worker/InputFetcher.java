@@ -15,11 +15,15 @@
 package build.buildfarm.worker;
 
 import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.QUEUED;
+import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.logging.Level.SEVERE;
 import static java.util.logging.Level.WARNING;
 
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.Command;
+import build.buildfarm.v1test.QueuedOperation;
 import com.google.common.base.Stopwatch;
 import com.google.protobuf.Duration;
 import com.google.protobuf.util.Durations;
@@ -44,8 +48,22 @@ public class InputFetcher implements Runnable {
     this.owner = owner;
   }
 
+  private boolean isQueuedOperationValid(QueuedOperation queuedOperation) {
+    Action action = queuedOperation.getAction();
+
+    if (action.hasTimeout() && workerContext.hasMaximumActionTimeout()) {
+      Duration timeout = action.getTimeout();
+      Duration maximum = workerContext.getMaximumActionTimeout();
+      if (timeout.getSeconds() > maximum.getSeconds() ||
+          (timeout.getSeconds() == maximum.getSeconds() && timeout.getNanos() > maximum.getNanos())) {
+        return false;
+      }
+    }
+
+    return !queuedOperation.getCommand().getArgumentsList().isEmpty();
+  }
+
   private long runInterruptibly(Stopwatch stopwatch) throws InterruptedException {
-    final String operationName = operationContext.operation.getName();
     final Thread fetcherThread = Thread.currentThread();
     Poller poller = workerContext.createPoller(
         "InputFetcher",
@@ -54,20 +72,30 @@ public class InputFetcher implements Runnable {
         () -> fetcherThread.interrupt(),
         Deadline.after(60, SECONDS));
 
-    workerContext.logInfo("InputFetcher: Fetching inputs: " + operationName);
+    String operationName = operationContext.queueEntry
+        .getExecuteEntry().getOperationName();
+    logger.info(format("fetching inputs: %s", operationName));
 
     long fetchStartAt = stopwatch.elapsed(MICROSECONDS);
 
+    QueuedOperation queuedOperation;
     Path execDir;
     try {
+      queuedOperation = workerContext.getQueuedOperation(operationContext.queueEntry);
+      if (queuedOperation == null
+          || !isQueuedOperationValid(queuedOperation)) {
+        logger.severe(format("invalid queued operation: %s", operationName));
+        owner.error().put(operationContext);
+        return 0;
+      }
+
       execDir = workerContext.createExecDir(
           operationName,
-          operationContext.directoriesIndex,
-          operationContext.action,
-          operationContext.command);
+          queuedOperation.getDirectoriesList(),
+          queuedOperation.getAction(),
+          queuedOperation.getCommand());
     } catch (IOException e) {
       logger.log(WARNING, "error creating exec dir for " + operationName, e);
-
       owner.error().put(operationContext);
       return 0;
     } finally {
@@ -81,6 +109,8 @@ public class InputFetcher implements Runnable {
     OperationContext executeOperationContext = operationContext.toBuilder()
         .setExecDir(execDir)
         .setFetchedIn(fetchedIn)
+        .setAction(queuedOperation.getAction())
+        .setCommand(queuedOperation.getCommand())
         .build();
     if (owner.output().claim()) {
       try {
@@ -100,7 +130,8 @@ public class InputFetcher implements Runnable {
   @Override
   public void run() {
     long stallUSecs = 0;
-    String operationName = operationContext.operation.getName();
+    String operationName = operationContext.queueEntry
+        .getExecuteEntry().getOperationName();
     Stopwatch stopwatch = Stopwatch.createStarted();
     try {
       stallUSecs = runInterruptibly(stopwatch);

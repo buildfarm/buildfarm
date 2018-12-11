@@ -19,6 +19,7 @@ import com.google.common.collect.Sets;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
 public class InputFetchStage extends PipelineStage {
@@ -38,7 +39,13 @@ public class InputFetchStage extends PipelineStage {
 
   @Override
   public OperationContext take() throws InterruptedException {
-    return queue.take();
+    while (!isClosed() && !output.isClosed()) {
+      OperationContext context = queue.poll(10, TimeUnit.MILLISECONDS);
+      if (context != null) {
+        return context;
+      }
+    }
+    throw new InterruptedException();
   }
 
   @Override
@@ -103,7 +110,9 @@ public class InputFetchStage extends PipelineStage {
       fetchers.add(fetcher);
       size = fetchers.size();
     }
-    logStart(operationContext.operation.getName(), getUsage(size));
+    logStart(
+        operationContext.queueEntry.getExecuteEntry().getOperationName(),
+        getUsage(size));
 
     fetcher.start();
   }

@@ -27,7 +27,6 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;
-import build.buildfarm.v1test.QueuedOperation;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.base.Stopwatch;
@@ -87,14 +86,8 @@ public class MatchStage extends PipelineStage {
           "MatchStage",
           queueEntry,
           Stage.QUEUED);
-      this.queueEntry = queueEntry;
-      return true;
-    }
-
-    @Override
-    public boolean onOperation(QueuedOperation queuedOperation) {
       try {
-        return onOperationPolled(queuedOperation);
+        return onOperationPolled(queueEntry);
       } finally {
         if (!Thread.currentThread().isInterrupted() && poller != null) {
           poller.stop();
@@ -103,8 +96,8 @@ public class MatchStage extends PipelineStage {
       }
     }
 
-    private boolean onOperationPolled(QueuedOperation queuedOperation) {
-      if (queuedOperation == null) {
+    private boolean onOperationPolled(QueueEntry queueEntry) {
+      if (queueEntry == null) {
         output.release();
         return false;
       }
@@ -116,22 +109,16 @@ public class MatchStage extends PipelineStage {
         long matchingAtUSecs = stopwatch.elapsed(MICROSECONDS);
         OperationContext context = match(
             queueEntry,
-            queuedOperation,
             stopwatch,
             operationNamedAtUSecs);
         long matchedInUSecs = stopwatch.elapsed(MICROSECONDS) - matchingAtUSecs;
-        logComplete(operationName, matchedInUSecs, waitDuration, context != null);
-        if (context == null) {
-          output.release();
-        }
+        logComplete(operationName, matchedInUSecs, waitDuration, true);
         if (poller != null) {
           poller.stop();
           poller = null;
         }
-        if (context != null) {
-          output.put(context);
-        }
-        return context != null;
+        output.put(context);
+        return true;
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         return false;
@@ -156,42 +143,10 @@ public class MatchStage extends PipelineStage {
     workerContext.match(listener);
   }
 
-  private static Map<Digest, Directory> createDirectoriesIndex(Iterable<Directory> directories, DigestUtil digestUtil) {
-    Set<Digest> directoryDigests = new HashSet<>();
-    ImmutableMap.Builder<Digest, Directory> directoriesIndex = new ImmutableMap.Builder<>();
-    for (Directory directory : directories) {
-      // double compute here...
-      Digest directoryDigest = digestUtil.compute(directory);
-      if (!directoryDigests.add(directoryDigest)) {
-        continue;
-      }
-      directoriesIndex.put(directoryDigest, directory);
-    }
-
-    return directoriesIndex.build();
-  }
-
   private OperationContext match(
       QueueEntry queueEntry,
-      QueuedOperation queuedOperation,
       Stopwatch stopwatch,
       long matchStartAtUSecs) throws InterruptedException {
-    Action action = queuedOperation.getAction();
-
-    if (action.hasTimeout() && workerContext.hasMaximumActionTimeout()) {
-      Duration timeout = action.getTimeout();
-      Duration maximum = workerContext.getMaximumActionTimeout();
-      if (timeout.getSeconds() > maximum.getSeconds() ||
-          (timeout.getSeconds() == maximum.getSeconds() && timeout.getNanos() > maximum.getNanos())) {
-        return null;
-      }
-    }
-
-    Command command = queuedOperation.getCommand();
-    if (command.getArgumentsList().isEmpty()) {
-      return null;
-    }
-
     ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
     // this may be superfluous - we can probably just set the name and action digest
     Operation operation = Operation.newBuilder()
@@ -206,9 +161,6 @@ public class MatchStage extends PipelineStage {
 
     OperationContext.Builder builder = OperationContext.newBuilder()
         .setOperation(operation)
-        .setDirectoriesIndex(createDirectoriesIndex(queuedOperation.getDirectoriesList(), workerContext.getDigestUtil()))
-        .setAction(action)
-        .setCommand(command)
         .setQueueEntry(queueEntry);
 
     Duration matchedIn = Durations.fromMicros(stopwatch.elapsed(MICROSECONDS) - matchStartAtUSecs);

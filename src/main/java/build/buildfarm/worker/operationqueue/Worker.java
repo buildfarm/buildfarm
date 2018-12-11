@@ -15,6 +15,7 @@
 package build.buildfarm.worker.operationqueue;
 
 import static build.buildfarm.worker.CASFileCache.getInterruptiblyOrIOException;
+import static build.buildfarm.instance.Utils.getBlob;
 import static com.google.common.collect.Maps.uniqueIndex;
 import static com.google.common.util.concurrent.Futures.allAsList;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
@@ -49,6 +50,7 @@ import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.InstanceEndpoint;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
+import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.WorkerConfig;
 import build.buildfarm.worker.CASFileCache;
 import build.buildfarm.worker.ExecuteActionStage;
@@ -68,11 +70,13 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.devtools.common.options.OptionsParser;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
+import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.TextFormat;
@@ -229,32 +233,6 @@ public class Worker {
   private void fetchInputs(
       Path execDir,
       Digest inputRoot,
-      OutputDirectory outputDirectory,
-      ImmutableList.Builder<Path> inputFiles,
-      ImmutableList.Builder<Digest> inputDirectories) throws IOException, InterruptedException {
-    ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
-    String pageToken = "";
-
-    do {
-      pageToken = casInstance.getTree(inputRoot, config.getTreePageSize(), pageToken, directories, /*acceptMissing=*/ false);
-    } while (!pageToken.isEmpty());
-
-    Set<Digest> directoryDigests = new HashSet<>();
-    ImmutableMap.Builder<Digest, Directory> directoriesIndex = new ImmutableMap.Builder<>();
-    for (Directory directory : directories.build()) {
-      Digest directoryDigest = casInstance.getDigestUtil().compute(directory);
-      if (!directoryDigests.add(directoryDigest)) {
-        continue;
-      }
-      directoriesIndex.put(directoryDigest, directory);
-    }
-
-    linkInputs(execDir, inputRoot, directoriesIndex.build(), outputDirectory, inputFiles, inputDirectories);
-  }
-
-  private void linkInputs(
-      Path execDir,
-      Digest inputRoot,
       Map<Digest, Directory> directoriesIndex,
       OutputDirectory outputDirectory,
       ImmutableList.Builder<Path> inputFiles,
@@ -280,7 +258,7 @@ public class Worker {
       Path dirPath = execDir.resolve(name);
       if (childOutputDirectory != null || !config.getLinkInputDirectories()) {
         Files.createDirectories(dirPath);
-        linkInputs(dirPath, digest, directoriesIndex, childOutputDirectory, inputFiles, inputDirectories);
+        fetchInputs(dirPath, digest, directoriesIndex, childOutputDirectory, inputFiles, inputDirectories);
       } else {
         inputDirectories.add(digest);
         linkDirectory(dirPath, digest, directoriesIndex);
@@ -484,13 +462,7 @@ public class Worker {
           }
 
           @Override
-          public boolean onEntry(QueueEntry queueEntry) {
-            this.queueEntry = queueEntry;
-            return true;
-          }
-
-          @Override
-          public boolean onOperation(QueuedOperation queuedOperation) throws InterruptedException {
+          public boolean onEntry(QueueEntry queueEntry) throws InterruptedException {
             ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
             String operationName = executeEntry.getOperationName();
             if (activeOperations.contains(operationName)) {
@@ -499,15 +471,17 @@ public class Worker {
             }
             matched = true;
             activeOperations.add(operationName);
-            boolean success = listener.onOperation(queuedOperation);
+            boolean success = listener.onEntry(queueEntry);
             if (!success) {
               requeue(Operation.newBuilder()
                   .setName(operationName)
-                  .setMetadata(Any.pack(ExecuteOperationMetadata.newBuilder()
-                      .setActionDigest(executeEntry.getActionDigest())
-                      .setStdoutStreamName(executeEntry.getStdoutStreamName())
-                      .setStderrStreamName(executeEntry.getStderrStreamName())
-                      .setStage(Stage.QUEUED)
+                  .setMetadata(Any.pack(QueuedOperationMetadata.newBuilder()
+                      .setExecuteOperationMetadata(ExecuteOperationMetadata.newBuilder()
+                          .setActionDigest(executeEntry.getActionDigest())
+                          .setStdoutStreamName(executeEntry.getStdoutStreamName())
+                          .setStderrStreamName(executeEntry.getStderrStreamName())
+                          .setStage(Stage.QUEUED))
+                      .setQueuedOperationDigest(queueEntry.getQueuedOperationDigest())
                       .build()))
                   .build());
             }
@@ -629,8 +603,49 @@ public class Worker {
             config.getStderrCasPolicy());
       }
 
+      private Map<Digest, Directory> createDirectoriesIndex(
+          Iterable<Directory> directories) {
+        Set<Digest> directoryDigests = Sets.newHashSet();
+        ImmutableMap.Builder<Digest, Directory> directoriesIndex = new ImmutableMap.Builder<>();
+        for (Directory directory : directories) {
+          // double compute here...
+          Digest directoryDigest = getDigestUtil().compute(directory);
+          if (!directoryDigests.add(directoryDigest)) {
+            continue;
+          }
+          directoriesIndex.put(directoryDigest, directory);
+        }
+
+        return directoriesIndex.build();
+      }
+
       @Override
-      public Path createExecDir(String operationName, Map<Digest, Directory> directoriesIndex, Action action, Command command) throws IOException, InterruptedException {
+      public QueuedOperation getQueuedOperation(QueueEntry queueEntry)
+          throws IOException, InterruptedException {
+        Digest queuedOperationDigest = queueEntry.getQueuedOperationDigest();
+        ByteString queuedOperationBlob = getBlob(casInstance, queuedOperationDigest);
+        if (queuedOperationBlob == null) {
+          return null;
+        }
+        try {
+          return QueuedOperation.parseFrom(queuedOperationBlob);
+        } catch (InvalidProtocolBufferException e) {
+          logger.warning(
+              format(
+                  "invalid queued operation: %s(%s)",
+                  queueEntry.getExecuteEntry().getOperationName(),
+                  DigestUtil.toString(queuedOperationDigest)));
+          return null;
+        }
+      }
+
+      @Override
+      public Path createExecDir(
+          String operationName,
+          Iterable<Directory> directories,
+          Action action,
+          Command command) throws IOException, InterruptedException {
+        Map<Digest, Directory> directoriesIndex = createDirectoriesIndex(directories);
         OutputDirectory outputDirectory = OutputDirectory.parse(
             command.getOutputFilesList(),
             command.getOutputDirectoriesList());
@@ -649,6 +664,7 @@ public class Worker {
           fetchInputs(
               execDir,
               action.getInputRootDigest(),
+              directoriesIndex,
               outputDirectory,
               inputFiles,
               inputDirectories);

@@ -25,7 +25,6 @@ import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.OperationQueueGrpc.OperationQueueBlockingStub;
 import build.buildfarm.v1test.PollOperationRequest;
 import build.buildfarm.v1test.QueueEntry;
-import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.TakeOperationRequest;
 import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamBlockingStub;
@@ -469,26 +468,6 @@ public class StubInstance implements Instance {
         .take(request);
     listener.onWaitEnd();
     listener.onEntry(queueEntry);
-    String operationName = queueEntry.getExecuteEntry().getOperationName();
-    ByteString queuedOperationBlob;
-    try {
-      queuedOperationBlob = Utils.getBlob(this, queueEntry.getQueuedOperationDigest());
-    } catch (IOException e) {
-      logger.log(SEVERE, "error getting queued operation: " + operationName, e);
-      queuedOperationBlob = null;
-    }
-    if (queuedOperationBlob == null) {
-      listener.onOperation(null);
-    } else {
-      try {
-        QueuedOperation queuedOperation =
-            QueuedOperation.parseFrom(queuedOperationBlob);
-        listener.onOperation(queuedOperation);
-      } catch (InvalidProtocolBufferException e) {
-        logger.log(SEVERE, "invalid queued operation: " + operationName, e);
-        listener.onOperation(null);
-      }
-    }
   }
 
   @Override

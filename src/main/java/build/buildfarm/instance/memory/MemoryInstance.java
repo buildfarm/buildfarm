@@ -19,8 +19,10 @@ import static com.google.common.collect.Multimaps.synchronizedSetMultimap;
 import static com.google.common.util.concurrent.Futures.addCallback;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+import static java.lang.String.format;
 import static java.util.Collections.synchronizedSortedMap;
 import static java.util.concurrent.Executors.newCachedThreadPool;
+import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
@@ -403,7 +405,7 @@ public class MemoryInstance extends AbstractServerInstance {
       } else if (isComplete(operation)) {
         operationStatus = "completed";
       }
-      logger.info(String.format("Operation %s was %s", operationName, operationStatus));
+      logger.info(format("Operation %s was %s", operationName, operationStatus));
     } else if (isExecuting(operation)) {
       Watchdog requeuer = requeuers.get(operationName);
       if (requeuer == null) {
@@ -472,6 +474,13 @@ public class MemoryInstance extends AbstractServerInstance {
         .build();
     ByteString queuedOperationBlob = queuedOperation.toByteString();
     Digest queuedOperationDigest = getDigestUtil().compute(queuedOperationBlob);
+    String operationName = operation.getName();
+    try {
+      putBlob(this, queuedOperationDigest, queuedOperationBlob);
+    } catch (StatusException|IOException e) {
+      logger.log(SEVERE, format("could not emplace queued operation: %s", operationName), e);
+      return false;
+    }
 
     ImmutableList.Builder<Worker> rejectedWorkers = new ImmutableList.Builder<>();
     boolean dispatched = false;
@@ -484,17 +493,15 @@ public class MemoryInstance extends AbstractServerInstance {
           QueueEntry queueEntry = QueueEntry.newBuilder()
               // FIXME find a way to get this properly populated...
               .setExecuteEntry(ExecuteEntry.newBuilder()
-                  .setOperationName(operation.getName())
+                  .setOperationName(operationName)
                   .setActionDigest(metadata.getActionDigest())
                   .setStdoutStreamName(metadata.getStdoutStreamName())
                   .setStderrStreamName(metadata.getStderrStreamName()))
               .setQueuedOperationDigest(queuedOperationDigest)
               .build();
-          if (worker.getListener().onEntry(queueEntry)) {
-            dispatched = worker.getListener().onOperation(queuedOperation);
-            if (dispatched) {
-              onDispatched(operation);
-            }
+          dispatched = worker.getListener().onEntry(queueEntry);
+          if (dispatched) {
+            onDispatched(operation);
           }
         }
       }
@@ -519,8 +526,9 @@ public class MemoryInstance extends AbstractServerInstance {
       Command command = getUnchecked(expectCommand(action.getCommandDigest()));
       Preconditions.checkState(command != null, "command not found");
 
+      String operationName = operation.getName();
       if (command == null) {
-        cancelOperation(operation.getName());
+        cancelOperation(operationName);
       } else if (satisfiesRequirements(platform, command)) {
         QueuedOperation queuedOperation = QueuedOperation.newBuilder()
             .setAction(action)
@@ -529,21 +537,26 @@ public class MemoryInstance extends AbstractServerInstance {
             .build();
         ByteString queuedOperationBlob = queuedOperation.toByteString();
         Digest queuedOperationDigest = getDigestUtil().compute(queuedOperationBlob);
+        // maybe do this elsewhere
+        try {
+          putBlob(this, queuedOperationDigest, queuedOperationBlob);
 
-        QueueEntry queueEntry = QueueEntry.newBuilder()
-            // FIXME find a way to get this properly populated...
-            .setExecuteEntry(ExecuteEntry.newBuilder()
-                .setOperationName(operation.getName())
-                .setActionDigest(metadata.getActionDigest())
-                .setStdoutStreamName(metadata.getStdoutStreamName())
-                .setStderrStreamName(metadata.getStderrStreamName()))
-            .setQueuedOperationDigest(queuedOperationDigest)
-            .build();
+          QueueEntry queueEntry = QueueEntry.newBuilder()
+              // FIXME find a way to get this properly populated...
+              .setExecuteEntry(ExecuteEntry.newBuilder()
+                  .setOperationName(operationName)
+                  .setActionDigest(metadata.getActionDigest())
+                  .setStdoutStreamName(metadata.getStdoutStreamName())
+                  .setStderrStreamName(metadata.getStderrStreamName()))
+              .setQueuedOperationDigest(queuedOperationDigest)
+              .build();
 
-        matched = true;
-        if (listener.onEntry(queueEntry)
-            && listener.onOperation(queuedOperation)) {
-          onDispatched(operation);
+          matched = true;
+          if (listener.onEntry(queueEntry)) {
+            onDispatched(operation);
+          }
+        } catch (StatusException|IOException e) {
+          logger.log(SEVERE, format("could not emplace queued operation: %s", operationName), e);
         }
       } else {
         rejectedOperations.add(operation);

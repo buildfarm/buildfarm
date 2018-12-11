@@ -77,26 +77,7 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
     }
 
     @Override
-    public boolean onEntry(QueueEntry queueEntry) {
-      this.queueEntry = queueEntry;
-      return true;
-    }
-
-    @Override
-    public boolean onOperation(QueuedOperation queuedOperation) throws InterruptedException {
-      Digest queuedOperationDigest = queueEntry.getQueuedOperationDigest();
-      ListenableFuture<Digest> uploadFuture = transformAsync(
-          instance.findMissingBlobs(ImmutableList.of(queuedOperationDigest), newDirectExecutorService()),
-          (results) -> {
-            if (Iterables.isEmpty(results)) {
-              return immediateFuture(queuedOperationDigest);
-            }
-            return putBlobFuture(
-                instance,
-                queuedOperationDigest,
-                queuedOperation.toByteString());
-          });
-      getUnchecked(uploadFuture);
+    public boolean onEntry(QueueEntry queueEntry) throws InterruptedException {
       return onMatch.testInterruptibly(queueEntry);
     }
   }
@@ -114,11 +95,7 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
           responseObserver.onError(e);
         }
       }
-      try {
-        instance.putOperation(instance.getOperation(queueEntry.getExecuteEntry().getOperationName()));
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      }
+      instance.putOperation(instance.getOperation(queueEntry.getExecuteEntry().getOperationName()));
       return false;
     };
   }

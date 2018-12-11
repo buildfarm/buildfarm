@@ -25,7 +25,6 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import build.buildfarm.common.DigestUtil;
-import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
@@ -34,6 +33,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
+import io.grpc.Deadline;
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -49,7 +49,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
-public class MatchStageTest {
+public class InputFetchStageTest {
   static class PipelineSink extends PipelineStage {
     private static final Logger logger = Logger.getLogger(PipelineSink.class.getName());
 
@@ -85,13 +85,17 @@ public class MatchStageTest {
   }
 
   @Test
-  public void fetchFailureReentry() throws ConfigurationException {
+  public void invalidQueuedOperationFails() throws InterruptedException {
     Map<String, QueuedOperation> queuedOperations = Maps.newHashMap();
     List<QueueEntry> queue = Lists.newArrayList();
 
     Poller poller = mock(Poller.class);
 
-    AtomicInteger requeueCount = new AtomicInteger();
+    QueueEntry badEntry = QueueEntry.newBuilder()
+        .setExecuteEntry(ExecuteEntry.newBuilder()
+            .setOperationName("bad"))
+        .build();
+
     WorkerContext workerContext = new StubWorkerContext() {
       @Override
       public DigestUtil getDigestUtil() {
@@ -99,46 +103,46 @@ public class MatchStageTest {
       }
 
       @Override
-      public Poller createPoller(String name, QueueEntry queueEntry, Stage stage) {
+      public Poller createPoller(
+          String name,
+          QueueEntry queueEntry,
+          Stage stage,
+          Runnable onFailure,
+          Deadline deadline) {
         return poller;
       }
 
       @Override
-      public void match(MatchListener listener) throws InterruptedException {
-        QueueEntry queueEntry = queue.remove(0);
-        listener.onEntry(queueEntry);
-        listener.onOperation(queuedOperations.get(queueEntry.getExecuteEntry().getOperationName()));
+      public int getInputFetchStageWidth() {
+        return 1;
+      }
+
+      @Override
+      public QueuedOperation getQueuedOperation(QueueEntry queueEntry) {
+        assertThat(queueEntry).isEqualTo(badEntry);
+        // inspire empty argument list in Command resulting in null
+        return QueuedOperation.getDefaultInstance();
       }
     };
 
-    QueueEntry badEntry = QueueEntry.newBuilder()
-        .setExecuteEntry(ExecuteEntry.newBuilder()
-            .setOperationName("bad"))
+    PipelineSink sinkOutput = new PipelineSink((operationContext) -> false);
+    PipelineSink error = new PipelineSink((operationContext) -> true) {
+      @Override
+      public void put(OperationContext operationContext) {
+        super.put(operationContext);
+        sinkOutput.close();
+      }
+    };
+    PipelineStage inputFetchStage = new InputFetchStage(workerContext, sinkOutput, error);
+    OperationContext badContext = OperationContext.newBuilder()
+        .setQueueEntry(badEntry)
         .build();
-    // inspire empty argument list in Command resulting in null
-    queuedOperations.put("bad", QueuedOperation.getDefaultInstance());
-    queue.add(badEntry);
-
-    QueueEntry goodEntry = QueueEntry.newBuilder()
-        .setExecuteEntry(ExecuteEntry.newBuilder()
-            .setOperationName("good"))
-        .build();
-    queuedOperations.put("good", QueuedOperation.newBuilder()
-        .setAction(Action.getDefaultInstance())
-        .setCommand(Command.newBuilder()
-            .addArguments("/bin/true")
-            .build())
-        .build());
-    queue.add(goodEntry);
-
-    PipelineSink output = new PipelineSink(
-        (operationContext) -> operationContext.operation.getName().equals("good"));
-
-    PipelineStage matchStage = new MatchStage(workerContext, output, null);
-    matchStage.run();
-    verify(poller, times(2)).stop();
-    assertThat(output.getOperationContexts().size()).isEqualTo(1);
-    OperationContext operationContext = output.getOperationContexts().get(0);
-    assertThat(operationContext.operation.getName()).isEqualTo("good");
+    inputFetchStage.put(badContext);
+    inputFetchStage.run();
+    assertThat(Thread.interrupted()).isTrue();
+    verify(poller, times(1)).stop();
+    assertThat(error.getOperationContexts().size()).isEqualTo(1);
+    OperationContext operationContext = error.getOperationContexts().get(0);
+    assertThat(operationContext).isEqualTo(badContext);
   }
 }

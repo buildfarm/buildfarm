@@ -104,10 +104,7 @@ public interface Instance {
     void onWaitEnd();
 
     // returns false if this listener will not handle this match
-    boolean onEntry(QueueEntry queueEntry);
-
-    // returns false if this listener will not handle this match
-    boolean onOperation(QueuedOperation operation) throws InterruptedException;
+    boolean onEntry(QueueEntry queueEntry) throws InterruptedException;
   }
 
   public static interface ChunkObserver extends StreamObserver<ByteString> {

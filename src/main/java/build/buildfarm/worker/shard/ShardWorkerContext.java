@@ -50,7 +50,9 @@ import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -183,37 +185,33 @@ class ShardWorkerContext implements WorkerContext {
     }
   }
 
-  private QueuedOperation getQueuedOperation(String name, Digest digest)
+  @Override
+  public QueuedOperation getQueuedOperation(QueueEntry queueEntry)
       throws IOException, InterruptedException {
-    ByteString operationBlob = getBlob(digest);
-    if (operationBlob == null) {
+    Digest queuedOperationDigest = queueEntry.getQueuedOperationDigest();
+    ByteString queuedOperationBlob = getBlob(queuedOperationDigest);
+    if (queuedOperationBlob == null) {
       return null;
     }
     try {
-      return QueuedOperation.parseFrom(operationBlob);
+      return QueuedOperation.parseFrom(queuedOperationBlob);
     } catch (InvalidProtocolBufferException e) {
-      logger.warning(format("invalid queued operation: %s(%s)", name, DigestUtil.toString(digest)));
+      logger.warning(
+          format(
+              "invalid queued operation: %s(%s)",
+              queueEntry.getExecuteEntry().getOperationName(),
+              DigestUtil.toString(queuedOperationDigest)));
       return null;
     }
   }
 
-  private void matchResettable(Platform platform, MatchListener listener)
-      throws IOException, InterruptedException {
-    QueueEntry queueEntry = backplane.dispatchOperation();
-
-    // FIXME platform match
-    if (listener.onEntry(queueEntry)) {
-      QueuedOperation queuedOperation = getQueuedOperation(
-          queueEntry.getExecuteEntry().getOperationName(),
-          queueEntry.getQueuedOperationDigest());
-      listener.onOperation(queuedOperation);
-    }
-  }
-
-
   private void matchInterruptible(Platform platform, MatchListener listener)
       throws IOException, InterruptedException {
-    matchResettable(platform, listener);
+    listener.onWaitStart();
+    QueueEntry queueEntry = backplane.dispatchOperation();
+    listener.onWaitEnd();
+    // FIXME platform match
+    listener.onEntry(queueEntry);
     if (Thread.interrupted()) {
       throw new InterruptedException();
     }
@@ -240,7 +238,7 @@ class ShardWorkerContext implements WorkerContext {
       }
 
       @Override
-      public boolean onEntry(QueueEntry queueEntry) {
+      public boolean onEntry(QueueEntry queueEntry) throws InterruptedException {
         String operationName = queueEntry.getExecuteEntry().getOperationName();
         if (activeOperations.putIfAbsent(operationName, queueEntry) != null) {
           logger.warning("matched duplicate operation " + operationName);
@@ -248,22 +246,6 @@ class ShardWorkerContext implements WorkerContext {
         }
         this.operationName = operationName;
         boolean success = listener.onEntry(queueEntry);
-        if (!success) {
-          requeue(operationName);
-        }
-        return success;
-      }
-
-      @Override
-      public boolean onOperation(QueuedOperation queuedOperation) throws InterruptedException {
-        // could not fetch
-        if (queuedOperation == null) {
-          listener.onOperation(null);
-          requeue(operationName);
-          return false;
-        }
-
-        boolean success = listener.onOperation(queuedOperation);
         if (!success) {
           requeue(operationName);
         }
@@ -551,9 +533,29 @@ class ShardWorkerContext implements WorkerContext {
     return success;
   }
 
+  private Map<Digest, Directory> createDirectoriesIndex(
+      Iterable<Directory> directories) {
+    Set<Digest> directoryDigests = Sets.newHashSet();
+    ImmutableMap.Builder<Digest, Directory> directoriesIndex = new ImmutableMap.Builder<>();
+    for (Directory directory : directories) {
+      // double compute here...
+      Digest directoryDigest = getDigestUtil().compute(directory);
+      if (!directoryDigests.add(directoryDigest)) {
+        continue;
+      }
+      directoriesIndex.put(directoryDigest, directory);
+    }
+
+    return directoriesIndex.build();
+  }
+
   @Override
-  public Path createExecDir(String operationName, Map<Digest, Directory> directoriesIndex, Action action, Command command) throws IOException, InterruptedException {
-    return execFileSystem.createExecDir(operationName, directoriesIndex, action, command);
+  public Path createExecDir(String operationName, Iterable<Directory> directories, Action action, Command command) throws IOException, InterruptedException {
+    return execFileSystem.createExecDir(
+        operationName,
+        createDirectoriesIndex(directories),
+        action,
+        command);
   }
 
   // might want to split for removeDirectory and decrement references to avoid removing for streamed output

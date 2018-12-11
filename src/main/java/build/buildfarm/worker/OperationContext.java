@@ -22,14 +22,12 @@ import build.buildfarm.v1test.QueueEntry;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Duration;
 import java.nio.file.Path;
-import java.util.Map;
 
 // FIXME MAKE THIS A PROTOBUF MESSAGE FOR EXECUTECONTEXT
 // hm, can we encode maps???
 final class OperationContext {
   final Operation operation;
   final Path execDir;
-  final Map<Digest, Directory> directoriesIndex;
   final Action action;
   final Command command;
   final Duration matchedIn;
@@ -40,7 +38,6 @@ final class OperationContext {
   private OperationContext(
       Operation operation,
       Path execDir,
-      Map<Digest, Directory> directoriesIndex,
       Action action,
       Command command,
       Duration matchedIn,
@@ -49,7 +46,6 @@ final class OperationContext {
       QueueEntry queueEntry) {
     this.operation = operation;
     this.execDir = execDir;
-    this.directoriesIndex = directoriesIndex;
     this.action = action;
     this.command = command;
     this.matchedIn = matchedIn;
@@ -61,7 +57,6 @@ final class OperationContext {
   public static class Builder {
     private Operation operation;
     private Path execDir;
-    private Map<Digest, Directory> directoriesIndex;
     private Action action;
     private Command command;
     private Duration matchedIn;
@@ -72,7 +67,6 @@ final class OperationContext {
     private Builder(
         Operation operation,
         Path execDir,
-        Map<Digest, Directory> directoriesIndex,
         Action action,
         Command command,
         Duration matchedIn,
@@ -81,7 +75,6 @@ final class OperationContext {
         QueueEntry queueEntry) {
       this.operation = operation;
       this.execDir = execDir;
-      this.directoriesIndex = directoriesIndex;
       this.action = action;
       this.command = command;
       this.matchedIn = matchedIn;
@@ -97,11 +90,6 @@ final class OperationContext {
 
     public Builder setExecDir(Path execDir) {
       this.execDir = execDir;
-      return this;
-    }
-
-    public Builder setDirectoriesIndex(Map<Digest, Directory> directoriesIndex) {
-      this.directoriesIndex = directoriesIndex;
       return this;
     }
 
@@ -139,7 +127,6 @@ final class OperationContext {
       return new OperationContext(
         operation,
         execDir,
-        directoriesIndex,
         action,
         command,
         matchedIn,
@@ -153,7 +140,6 @@ final class OperationContext {
     return new Builder(
         /* operation=*/ null,
         /* execDir=*/ null,
-        /* directoriesIndex=*/ null,
         /* action=*/ null,
         /* command=*/ null,
         /* matchedIn=*/ null,
@@ -166,7 +152,6 @@ final class OperationContext {
     return new Builder(
         operation,
         execDir,
-        directoriesIndex,
         action,
         command,
         matchedIn,
