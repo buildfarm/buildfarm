@@ -308,15 +308,6 @@ public class BuildFarmServerTest {
   }
   */
 
-  @Test(expected = StatusRuntimeException.class)
-  public void actionWithExcessiveTimeoutFailsValidation()
-      throws RetryException, InterruptedException, InvalidProtocolBufferException {
-    Digest actionDigestWithExcessiveTimeout = createAction(Action.newBuilder()
-        .setTimeout(Duration.newBuilder().setSeconds(9000)));
-
-    executeAction(actionDigestWithExcessiveTimeout);
-  }
-
   private Digest createSimpleAction() throws RetryException, InterruptedException {
     return createAction(Action.newBuilder());
   }

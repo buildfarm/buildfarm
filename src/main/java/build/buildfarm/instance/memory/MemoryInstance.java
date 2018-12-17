@@ -56,6 +56,7 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
+import com.google.protobuf.util.Durations;
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.grpc.Channel;
 import io.grpc.netty.NegotiationType;
@@ -334,8 +335,12 @@ public class MemoryInstance extends AbstractServerInstance {
       Duration timeout = action.getTimeout();
       Duration maximum = config.getMaximumActionTimeout();
       Preconditions.checkState(
-          timeout.getSeconds() < maximum.getSeconds() ||
-              (timeout.getSeconds() == maximum.getSeconds() && timeout.getNanos() < maximum.getNanos()));
+          timeout.getSeconds() < maximum.getSeconds()
+              || (timeout.getSeconds() == maximum.getSeconds() && timeout.getNanos() <= maximum.getNanos()),
+          String.format(
+              "action timeout %s exceeds the maximum timeout %s",
+              Durations.toString(timeout),
+              Durations.toString(maximum)));
     }
 
     super.validateAction(action);
