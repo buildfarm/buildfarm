@@ -20,22 +20,29 @@ import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.EXE
 import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.QUEUED;
 import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.UNKNOWN;
 import static build.buildfarm.instance.AbstractServerInstance.INVALID_DIGEST;
+import static build.buildfarm.cas.ContentAddressableStorages.casMapDecorator;
 import static com.google.common.collect.Multimaps.synchronizedSetMultimap;
 import static com.google.common.truth.Truth.assertThat;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static org.junit.Assert.fail;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyZeroInteractions;
 
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
+import build.bazel.remote.execution.v2.ExecutionPolicy;
+import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
@@ -44,26 +51,28 @@ import build.buildfarm.v1test.ActionCacheConfig;
 import build.buildfarm.v1test.DelegateCASConfig;
 import build.buildfarm.v1test.MemoryInstanceConfig;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Maps;
 import com.google.common.collect.MultimapBuilder;
 import com.google.common.collect.SetMultimap;
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.Durations;
+import com.google.rpc.Code;
+import com.google.rpc.Status;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
-import com.google.rpc.Code;
-import com.google.rpc.Status;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
@@ -79,6 +88,7 @@ public class MemoryInstanceTest {
       .setCommandDigest(simpleCommandDigest)
       .build();
   private final Digest simpleActionDigest = DIGEST_UTIL.compute(simpleAction);
+  private final Duration MAXIMUM_ACTION_TIMEOUT = Durations.fromSeconds(3600);
 
   private MemoryInstance instance;
 
@@ -86,12 +96,10 @@ public class MemoryInstanceTest {
   private SetMultimap<String, Predicate<Operation>> watchers;
   private ExecutorService watchersThreadPool;
 
-  @Mock
-  private ContentAddressableStorage storage;
+  private Map<Digest, ByteString> storage;
 
   @Before
   public void setUp() throws Exception {
-    MockitoAnnotations.initMocks(this);
     outstandingOperations = new MemoryInstance.OutstandingOperations();
     watchers = synchronizedSetMultimap(
         MultimapBuilder
@@ -107,17 +115,18 @@ public class MemoryInstanceTest {
         .setOperationPollTimeout(Durations.fromSeconds(10))
         .setOperationCompletedDelay(Durations.fromSeconds(10))
         .setDefaultActionTimeout(Durations.fromSeconds(600))
-        .setMaximumActionTimeout(Durations.fromSeconds(3600))
+        .setMaximumActionTimeout(MAXIMUM_ACTION_TIMEOUT)
         .setActionCacheConfig(ActionCacheConfig.newBuilder()
             .setDelegateCas(DelegateCASConfig.getDefaultInstance())
             .build())
         .build();
 
+    storage = Maps.newHashMap();
     instance = new MemoryInstance(
         "memory",
         DIGEST_UTIL,
         memoryInstanceConfig,
-        storage,
+        casMapDecorator(storage),
         watchers,
         watchersThreadPool,
         outstandingOperations);
@@ -207,8 +216,7 @@ public class MemoryInstanceTest {
   @Test
   public void actionCacheRetrievableByActionKey() throws InterruptedException {
     ActionResult result = ActionResult.getDefaultInstance();
-    when(storage.get(instance.getDigestUtil().compute(result)))
-        .thenReturn(new Blob(result.toByteString(), instance.getDigestUtil()));
+    storage.put(DIGEST_UTIL.compute(result), result.toByteString());
 
     Action action = Action.getDefaultInstance();
     instance.putActionResult(
@@ -396,8 +404,8 @@ public class MemoryInstanceTest {
   }
 
   private boolean putNovelOperation(Stage stage) throws InterruptedException {
-    when(storage.get(simpleActionDigest)).thenReturn(new Blob(simpleAction.toByteString(), simpleActionDigest));
-    when(storage.get(simpleCommandDigest)).thenReturn(new Blob(simpleCommand.toByteString(), simpleCommandDigest));
+    storage.put(simpleActionDigest, simpleAction.toByteString());
+    storage.put(simpleCommandDigest, simpleCommand.toByteString());
     return instance.putOperation(createOperation("does-not-exist", stage));
   }
 
@@ -424,5 +432,69 @@ public class MemoryInstanceTest {
   @Test
   public void novelPutCompletedOperationReturnsTrue() throws InterruptedException {
     assertThat(putNovelOperation(COMPLETED)).isTrue();
+  }
+
+  private Digest createAction(Action.Builder actionBuilder) {
+    Command command = Command.newBuilder()
+        .addArguments("echo")
+        .build();
+    ByteString commandBlob = command.toByteString();
+    Digest commandDigest = DIGEST_UTIL.compute(commandBlob);
+    storage.put(commandDigest, commandBlob);
+
+    Directory root = Directory.getDefaultInstance();
+    Digest rootDigest = DIGEST_UTIL.compute(root);
+    Action action = actionBuilder
+        .setCommandDigest(commandDigest)
+        .setInputRootDigest(rootDigest)
+        .build();
+    ByteString actionBlob = action.toByteString();
+    Digest actionDigest = DIGEST_UTIL.compute(actionBlob);
+    storage.put(actionDigest, actionBlob);
+    return actionDigest;
+  }
+
+  @Test
+  public void actionWithExcessiveTimeoutFailsValidation()
+      throws InterruptedException {
+    Duration timeout = Durations.fromSeconds(9000);
+    Digest actionDigestWithExcessiveTimeout = createAction(Action.newBuilder()
+        .setTimeout(timeout));
+
+    Predicate watcher = mock(Predicate.class);
+    IllegalStateException timeoutInvalid = null;
+    try {
+      instance.execute(
+          actionDigestWithExcessiveTimeout,
+          /* skipCacheLookup=*/ true,
+          ExecutionPolicy.getDefaultInstance(),
+          ResultsCachePolicy.getDefaultInstance(),
+          watcher);
+    } catch (IllegalStateException e) {
+      assertThat(e.getMessage()).isEqualTo(
+          String.format(
+              "action timeout %s exceeds the maximum timeout %s",
+              Durations.toString(timeout),
+              Durations.toString(MAXIMUM_ACTION_TIMEOUT)));
+      timeoutInvalid = e;
+    }
+    verifyZeroInteractions(watcher);
+  }
+
+  @Test
+  public void actionWithMaximumTimeoutIsValid()
+      throws InterruptedException {
+    Digest actionDigestWithExcessiveTimeout = createAction(Action.newBuilder()
+        .setTimeout(MAXIMUM_ACTION_TIMEOUT));
+
+    Predicate watcher = mock(Predicate.class);
+    when(watcher.test(any(Operation.class))).thenReturn(true);
+    instance.execute(
+        actionDigestWithExcessiveTimeout,
+        /* skipCacheLookup=*/ true,
+        ExecutionPolicy.getDefaultInstance(),
+        ResultsCachePolicy.getDefaultInstance(),
+        watcher);
+    verify(watcher, atLeast(1)).test(any(Operation.class));
   }
 }

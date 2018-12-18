@@ -14,13 +14,16 @@
 
 package build.buildfarm.cas;
 
+import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Retrier;
 import build.buildfarm.v1test.ContentAddressableStorageConfig;
 import build.buildfarm.v1test.GrpcCASConfig;
+import com.google.protobuf.ByteString;
 import io.grpc.Channel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
+import java.util.Map;
 
 public final class ContentAddressableStorages {
   private static Channel createChannel(String target) {
@@ -48,5 +51,37 @@ public final class ContentAddressableStorages {
       case MEMORY:
         return new MemoryCAS(config.getMemory().getMaxSizeBytes());
     }
+  }
+
+  /**
+   * decorates a map with a CAS interface, does not react
+   * to removals with expirations
+   */
+  public static ContentAddressableStorage casMapDecorator(Map<Digest, ByteString> map) {
+    return new ContentAddressableStorage() {
+      @Override
+      public boolean contains(Digest digest) {
+        return map.containsKey(digest);
+      }
+
+      @Override
+      public Blob get(Digest digest) {
+        ByteString data = map.get(digest);
+        if (data == null) {
+          return null;
+        }
+        return new Blob(map.get(digest), digest);
+      }
+
+      @Override
+      public void put(Blob blob) {
+        map.put(blob.getDigest(), blob.getData());
+      }
+
+      @Override
+      public void put(Blob blob, Runnable onExpiration) {
+        map.put(blob.getDigest(), blob.getData());
+      }
+    };
   }
 }
