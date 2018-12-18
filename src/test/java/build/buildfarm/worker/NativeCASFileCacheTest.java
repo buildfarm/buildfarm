@@ -16,12 +16,21 @@ package build.buildfarm.worker;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class NativeCASFileCacheTest extends CASFileCacheTest {
   public NativeCASFileCacheTest() throws IOException {
-    super(Files.createTempDirectory("native-cas-test"));
+    super(createTempDirectory());
+  }
+  
+  private static Path createTempDirectory() throws IOException {
+    if (Thread.interrupted()) {
+      throw new RuntimeException(new InterruptedException());
+    }
+    Path path = Files.createTempDirectory("native-cas-test");
+    return path;
   }
 }

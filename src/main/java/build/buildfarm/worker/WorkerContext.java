@@ -22,6 +22,7 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.Poller;
 import build.buildfarm.common.function.InterruptingConsumer;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Instance.MatchListener;
@@ -40,7 +41,7 @@ import java.nio.file.Path;
 public interface WorkerContext {
   String getName();
   Poller createPoller(String name, QueueEntry queueEntry, Stage stage);
-  Poller createPoller(String name, QueueEntry queueEntry, Stage stage, Runnable onFailure, Deadline deadline);
+  void resumePoller(Poller poller, String name, QueueEntry queueEntry, Stage stage, Runnable onFailure, Deadline deadline);
   void match(MatchListener listener) throws InterruptedException;
   void requeue(Operation operation) throws InterruptedException;
   void deactivate(String operationName);

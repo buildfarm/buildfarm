@@ -15,6 +15,7 @@
 package build.buildfarm.instance;
 
 import static com.google.common.util.concurrent.Futures.transform;
+import static com.google.common.util.concurrent.Futures.transformAsync;
 import static com.google.common.util.concurrent.Futures.allAsList;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
@@ -589,7 +590,9 @@ public abstract class AbstractServerInstance implements Instance {
     visited.add(directoryDigest);
   }
 
-  protected ListenableFuture<Iterable<Directory>> getTreeDirectories(Digest inputRoot, ExecutorService service) {
+  protected ListenableFuture<Iterable<Directory>> getTreeDirectories(
+      Digest inputRoot,
+      ExecutorService service) {
     return listeningDecorator(service).submit(() -> {
       ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
 
@@ -597,8 +600,9 @@ public abstract class AbstractServerInstance implements Instance {
       while (iterator.hasNext()) {
         DirectoryEntry entry = iterator.next();
         Directory directory = entry.getDirectory();
-        Preconditions.checkState(directory != null, MISSING_INPUT + " Directory [" + DigestUtil.toString(entry.getDigest()) + "]");
-        directories.add(directory);
+        if (directory != null) {
+          directories.add(directory);
+        }
       }
 
       return directories.build();
@@ -676,16 +680,23 @@ public abstract class AbstractServerInstance implements Instance {
       QueuedOperation queuedOperation,
       PreconditionFailure.Builder preconditionFailure,
       ExecutorService service) throws InterruptedException {
-    ImmutableSet.Builder<Digest> inputDigestsBuilder = ImmutableSet.builder();
     Action action = queuedOperation.getAction();
-    validateAction(
-        action,
-        queuedOperation.getCommand(),
-        queuedOperation.getDirectoriesList(),
-        inputDigestsBuilder,
-        preconditionFailure);
+    ListenableFuture<Iterable<Digest>> inputDigestsFuture = listeningDecorator(service).submit(() -> {
+      ImmutableSet.Builder<Digest> inputDigestsBuilder = ImmutableSet.builder();
+      validateAction(
+          action,
+          queuedOperation.getCommand(),
+          queuedOperation.getDirectoriesList(),
+          inputDigestsBuilder,
+          preconditionFailure);
+      return inputDigestsBuilder.build();
+    });
+    ListenableFuture<Void> validatedFuture = transformAsync(
+        inputDigestsFuture,
+        (inputDigests) -> validateInputs(inputDigests, preconditionFailure, service),
+        service);
     return transform(
-        validateInputs(inputDigestsBuilder.build(), preconditionFailure, service),
+        validatedFuture,
         (result) -> {
           checkViolations(action, preconditionFailure.getViolationsList());
           return queuedOperation;

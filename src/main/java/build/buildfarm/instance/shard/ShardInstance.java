@@ -30,6 +30,7 @@ import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorS
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static java.lang.String.format;
+import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.logging.Level.SEVERE;
 import static java.util.logging.Level.WARNING;
@@ -49,6 +50,7 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.Poller;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.cache.Cache;
 import build.buildfarm.common.cache.CacheBuilder;
@@ -92,22 +94,20 @@ import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
-import com.google.protobuf.util.Durations;
 import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.protobuf.Message;
-import com.google.protobuf.util.JsonFormat;
+import com.google.protobuf.util.Durations;
 import com.google.rpc.PreconditionFailure;
 import io.grpc.Channel;
 import io.grpc.Context;
-import io.grpc.Context.CancellableContext;
+import io.grpc.Deadline;
 import io.grpc.ManagedChannel;
 import io.grpc.Status;
-import io.grpc.protobuf.StatusProto;
 import io.grpc.Status.Code;
 import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
+import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
@@ -260,20 +260,33 @@ public class ShardInstance extends AbstractServerInstance {
         void iterate() throws IOException, InterruptedException {
           ensureCanQueue(stopwatch); // wait for transition to canQueue state
           long canQueueUSecs = stopwatch.elapsed(MICROSECONDS);
+          stopwatch.stop();
           ExecuteEntry executeEntry = backplane.deprequeueOperation();
+          stopwatch.start();
           if (executeEntry == null) {
             logger.severe("OperationQueuer: Got null from deprequeue...");
             return;
           }
-
-          long operationFetchUSecs = stopwatch.elapsed(MICROSECONDS) - canQueueUSecs;
-          queue(executeEntry);
-          long operationTransformDispatchUSecs = stopwatch.elapsed(MICROSECONDS) - operationFetchUSecs - canQueueUSecs;
+          // half the watcher expiry, need to expose this from backplane
+          Poller poller = new Poller(Durations.fromSeconds(5));
+          poller.resume(
+              () -> {
+                try {
+                  backplane.queueing(executeEntry.getOperationName());
+                } catch (IOException e) {
+                  logger.log(SEVERE, format("error polling %s for queuing", executeEntry.getOperationName()), e);
+                  // mostly ignore, we will be stopped at some point later
+                }
+                return true;
+              },
+              () -> {},
+              Deadline.after(10, DAYS));
+          queue(executeEntry, poller);
+          long operationTransformDispatchUSecs = stopwatch.elapsed(MICROSECONDS) - canQueueUSecs;
           logger.info(
               format(
-                  "OperationQueuer: Dispatched To Transform: %dus in canQueue, %dus in opfetch, %dus in transform dispatch",
+                  "OperationQueuer: Dispatched To Transform: %dus in canQueue, %dus in transform dispatch",
                   canQueueUSecs,
-                  operationFetchUSecs,
                   operationTransformDispatchUSecs));
         }
 
@@ -1066,21 +1079,51 @@ public class ShardInstance extends AbstractServerInstance {
       QueueEntry queueEntry,
       com.google.rpc.Status.Builder status) {
     ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
+    ListenableFuture<QueuedOperation> fetchQueuedOperationFuture =
+        expectQueuedOperation(queueEntry.getQueuedOperationDigest());
     ListenableFuture<QueuedOperation> queuedOperationFuture = catchingAsync(
-        expectQueuedOperation(queueEntry.getQueuedOperationDigest()),
+        fetchQueuedOperationFuture,
         Throwable.class,
         (e) -> buildQueuedOperation(executeEntry.getActionDigest(), operationTransformService));
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
     ListenableFuture<QueuedOperation> validatedFuture = transformAsync(
         queuedOperationFuture,
-        (queuedOperation) -> validateQueuedOperationAndInputs(
-            queuedOperation,
-            preconditionFailure,
+        (queuedOperation) -> catching(
+            validateQueuedOperationAndInputs(
+                queuedOperation,
+                preconditionFailure,
+                operationTransformService),
+            IllegalStateException.class,
+            (e) -> {
+              status.addDetails(Any.pack(preconditionFailure.build()));
+              throw Status.FAILED_PRECONDITION.withDescription(e.getMessage()).asRuntimeException();
+            },
             operationTransformService),
         operationTransformService);
+
+    // this little fork ensures that a successfully fetched QueuedOperation
+    // will not be reuploaded
     ListenableFuture<QueuedOperationResult> uploadedFuture = transformAsync(
         validatedFuture,
-        (queuedOperation) -> uploadQueuedOperation(queuedOperation, executeEntry, operationTransformService));
+        (queuedOperation) -> catchingAsync(
+            transform(
+                fetchQueuedOperationFuture,
+                (fechedQueuedOperation) -> {
+                  QueuedOperationMetadata metadata = QueuedOperationMetadata.newBuilder()
+                      .setExecuteOperationMetadata(ExecuteOperationMetadata.newBuilder()
+                          .setActionDigest(executeEntry.getActionDigest())
+                          .setStdoutStreamName(executeEntry.getStdoutStreamName())
+                          .setStderrStreamName(executeEntry.getStderrStreamName())
+                          .setStage(Stage.QUEUED))
+                      .setQueuedOperationDigest(queueEntry.getQueuedOperationDigest())
+                      .build();
+                  return new QueuedOperationResult(queueEntry, metadata);
+                },
+                operationTransformService),
+            Throwable.class,
+            (e) -> uploadQueuedOperation(queuedOperation, executeEntry, operationTransformService),
+            operationTransformService));
+
     String operationName = executeEntry.getOperationName();
     SettableFuture<Boolean> requeuedFuture = SettableFuture.create();
     addCallback(
@@ -1102,10 +1145,11 @@ public class ShardInstance extends AbstractServerInstance {
 
           @Override
           public void onFailure(Throwable t) {
-            if (preconditionFailure.getViolationsCount() > 0) {
-              status.addDetails(Any.pack(preconditionFailure.build()));
+            logger.log(SEVERE, format("failed to requeue: %s", operationName), t);
+            status.setCode(Status.fromThrowable(t).getCode().value());
+            if (t.getMessage() != null) {
+              status.setMessage(t.getMessage());
             }
-            logger.log(SEVERE, "failed to requeue: " + operationName, t);
             requeuedFuture.set(false);
           }
         },
@@ -1115,7 +1159,8 @@ public class ShardInstance extends AbstractServerInstance {
 
   // there's optimization to be had here - we can just use the prequeue to requeue this
   // just need to make it smart enough to see the construction already
-  private boolean requeueOperation(QueueEntry queueEntry, com.google.rpc.Status.Builder statusBuilder)
+  @VisibleForTesting
+  public boolean requeueOperation(QueueEntry queueEntry, com.google.rpc.Status.Builder statusBuilder)
       throws IOException, InterruptedException {
     ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
     String operationName = executeEntry.getOperationName();
@@ -1272,7 +1317,9 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @VisibleForTesting
-  public ListenableFuture<Void> queue(ExecuteEntry executeEntry) throws InterruptedException {
+  public ListenableFuture<Void> queue(
+      ExecuteEntry executeEntry,
+      Poller poller) throws InterruptedException {
     ExecuteOperationMetadata metadata = ExecuteOperationMetadata.newBuilder()
         .setActionDigest(executeEntry.getActionDigest())
         .setStdoutStreamName(executeEntry.getStdoutStreamName())
@@ -1290,6 +1337,8 @@ public class ShardInstance extends AbstractServerInstance {
     SettableFuture<Void> queueFuture = SettableFuture.create();
     if (!executeEntry.getSkipCacheLookup()
         && checkCache(actionKey, operation, queueFuture)) {
+      // a little out of order, should do this before delivering operation
+      poller.pause();
       long checkCacheUSecs = stopwatch.elapsed(MICROSECONDS);
       logger.info(
           format(
@@ -1303,7 +1352,6 @@ public class ShardInstance extends AbstractServerInstance {
 
     com.google.rpc.Status.Builder status = com.google.rpc.Status.newBuilder();
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
-    Stopwatch transformStopwatch = Stopwatch.createStarted();
     long startTransformUSecs = stopwatch.elapsed(MICROSECONDS);
     ListenableFuture<Action> actionFuture = catching(
         expectAction(actionDigest),
@@ -1323,20 +1371,23 @@ public class ShardInstance extends AbstractServerInstance {
     QueuedOperation.Builder queuedOperationBuilder = QueuedOperation.newBuilder();
     ListenableFuture<ProfiledQueuedOperationMetadata.Builder> queuedFuture = transformAsync(
         actionFuture,
-        (action) -> transform(
-            transformQueuedOperation(
-                action,
-                action.getCommandDigest(),
-                action.getInputRootDigest(),
-                queuedOperationBuilder,
-                operationTransformService),
-            (queuedOperation) -> ProfiledQueuedOperationMetadata.newBuilder()
-                .setQueuedOperation(queuedOperation)
-                .setQueuedOperationMetadata(buildQueuedOperationMetadata(
-                    metadata,
-                    queuedOperation))
-                .setTransformedIn(Durations.fromMicros(stopwatch.elapsed(MICROSECONDS) - startTransformUSecs)),
-            operationTransformService),
+        (action) -> {
+          Stopwatch transformStopwatch = Stopwatch.createStarted();
+          return transform(
+              transformQueuedOperation(
+                  action,
+                  action.getCommandDigest(),
+                  action.getInputRootDigest(),
+                  queuedOperationBuilder,
+                  operationTransformService),
+              (queuedOperation) -> ProfiledQueuedOperationMetadata.newBuilder()
+                  .setQueuedOperation(queuedOperation)
+                  .setQueuedOperationMetadata(buildQueuedOperationMetadata(
+                      metadata,
+                      queuedOperation))
+                  .setTransformedIn(Durations.fromMicros(transformStopwatch.elapsed(MICROSECONDS))),
+              operationTransformService);
+        },
         operationTransformService);
     ListenableFuture<ProfiledQueuedOperationMetadata.Builder> validatedFuture = catching(
         transform(
@@ -1392,6 +1443,7 @@ public class ShardInstance extends AbstractServerInstance {
             try {
               ensureCanQueue(stopwatch);
               long startQueueUSecs = stopwatch.elapsed(MICROSECONDS);
+              poller.pause();
               backplane.queue(queueEntry, queueOperation);
               long elapsedUSecs = stopwatch.elapsed(MICROSECONDS);
               long queueUSecs = elapsedUSecs - startQueueUSecs;
@@ -1416,6 +1468,7 @@ public class ShardInstance extends AbstractServerInstance {
 
           @Override
           public void onFailure(Throwable t) {
+            poller.pause();
             errorOperation(operation, t, status, queueFuture);
           }
       }, operationTransformService);

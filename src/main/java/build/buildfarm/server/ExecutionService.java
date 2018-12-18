@@ -44,10 +44,12 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
         return false;
       }
       try {
-        if (operation != null) {
-          responseObserver.onNext(operation);
+        if (operation == null) {
+          responseObserver.onError(Status.NOT_FOUND.asException());
+          return false;
         }
-        if (operation == null || operation.getDone()) {
+        responseObserver.onNext(operation);
+        if (operation.getDone()) {
           responseObserver.onCompleted();
           return false;
         }

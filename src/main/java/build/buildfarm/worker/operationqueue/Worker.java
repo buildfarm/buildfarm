@@ -37,6 +37,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
+import build.buildfarm.common.Poller;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.instance.stub.ByteStreamUploader;
@@ -59,7 +60,6 @@ import build.buildfarm.worker.MatchStage;
 import build.buildfarm.worker.OutputDirectory;
 import build.buildfarm.worker.Pipeline;
 import build.buildfarm.worker.PipelineStage;
-import build.buildfarm.worker.Poller;
 import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.ReportResultStage;
 import build.buildfarm.worker.RetryingMatchListener;
@@ -413,13 +413,20 @@ public class Worker {
 
       @Override
       public Poller createPoller(String name, QueueEntry queueEntry, Stage stage) {
-        return createPoller(name, queueEntry, stage, () -> {}, Deadline.after(10, DAYS));
+        Poller poller = new Poller(config.getOperationPollPeriod());
+        resumePoller(poller, name, queueEntry, stage, () -> {}, Deadline.after(10, DAYS));
+        return poller;
       }
 
       @Override
-      public Poller createPoller(String name, QueueEntry queueEntry, Stage stage, Runnable onFailure, Deadline deadline) {
-        Poller poller = new Poller(
-            config.getOperationPollPeriod(),
+      public void resumePoller(
+          Poller poller,
+          String name,
+          QueueEntry queueEntry,
+          Stage stage,
+          Runnable onFailure,
+          Deadline deadline) {
+        poller.resume(
             () -> {
               String operationName = queueEntry.getExecuteEntry().getOperationName();
               boolean success = operationQueueInstance.pollOperation(operationName, stage);
@@ -431,8 +438,6 @@ public class Worker {
             },
             onFailure,
             deadline);
-        new Thread(poller).start();
-        return poller;
       }
 
       @Override

@@ -22,6 +22,7 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.Poller;
 import build.buildfarm.instance.stub.Chunker;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
@@ -78,6 +79,21 @@ public class ReportResultStage extends PipelineStage {
 
   @Override
   protected OperationContext tick(OperationContext operationContext) throws InterruptedException {
+    workerContext.resumePoller(
+        operationContext.poller,
+        "ReportResultStage",
+        operationContext.queueEntry,
+        ExecuteOperationMetadata.Stage.EXECUTING,
+        this::cancelTick,
+        Deadline.after(60, SECONDS));
+    try {
+      return reportPolled(operationContext);
+    } finally {
+      operationContext.poller.pause();
+    }
+  }
+
+  private OperationContext reportPolled(OperationContext operationContext) throws InterruptedException {
     ExecuteResponse executeResponse;
     try {
       executeResponse = operationContext.operation
@@ -86,14 +102,8 @@ public class ReportResultStage extends PipelineStage {
       logger.log(SEVERE, "error unpacking execute response", e);
       return null;
     }
-    ActionResult.Builder resultBuilder = executeResponse.getResult().toBuilder();
 
-    Poller poller = workerContext.createPoller(
-        "ReportResultStage",
-        operationContext.queueEntry,
-        ExecuteOperationMetadata.Stage.EXECUTING,
-        this::cancelTick,
-        Deadline.after(60, SECONDS));
+    ActionResult.Builder resultBuilder = executeResponse.getResult().toBuilder();
 
     long reportStartAt = System.nanoTime();
 
@@ -106,7 +116,6 @@ public class ReportResultStage extends PipelineStage {
           operationContext.command.getOutputDirectoriesList());
     } catch (IOException e) {
       logger.log(SEVERE, "error uploading outputs", e);
-      poller.stop();
       return null;
     }
 
@@ -117,7 +126,6 @@ public class ReportResultStage extends PipelineStage {
           .unpack(ExecutingOperationMetadata.class)
           .getExecuteOperationMetadata();
     } catch (InvalidProtocolBufferException e) {
-      poller.stop();
       logger.log(SEVERE, "invalid execute operation metadata", e);
       return null;
     }
@@ -127,11 +135,7 @@ public class ReportResultStage extends PipelineStage {
       try {
         workerContext.putActionResult(DigestUtil.asActionKey(metadata.getActionDigest()), result);
       } catch (IOException e) {
-        poller.stop();
-        return null;
-      } catch (InterruptedException e) {
-        poller.stop();
-        Thread.currentThread().interrupt();
+        logger.log(SEVERE, "error reporting action result for " + operationContext.operation.getName(), e);
         return null;
       }
     }
@@ -162,14 +166,14 @@ public class ReportResultStage extends PipelineStage {
             .build()))
         .build();
 
-    poller.stop();
+    operationContext.poller.pause();
 
     try {
       if (!workerContext.putOperation(operation, operationContext.action)) {
         return null;
       }
     } catch (IOException e) {
-      logger.log(SEVERE, "error putting complete operation " + operation.getName(), e);
+      logger.log(SEVERE, "error reporting complete operation " + operation.getName(), e);
       return null;
     }
 

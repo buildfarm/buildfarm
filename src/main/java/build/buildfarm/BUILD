@@ -13,6 +13,8 @@ java_library(
     deps = [
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java_util",
+        "//3rdparty/jvm/io/grpc:grpc_context",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
         "@googleapis//:google_longrunning_operations_java_proto",

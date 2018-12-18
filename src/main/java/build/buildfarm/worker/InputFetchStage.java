@@ -45,6 +45,11 @@ public class InputFetchStage extends PipelineStage {
         return context;
       }
     }
+    synchronized (this) {
+      while (isClaimed()) {
+        wait();
+      }
+    }
     throw new InterruptedException();
   }
 

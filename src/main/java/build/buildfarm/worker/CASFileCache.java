@@ -1008,7 +1008,11 @@ public abstract class CASFileCache implements ContentAddressableStorage, OutputS
             newDirectExecutorService()));
   }
 
-  public ListenableFuture<Path> put(Digest digest, boolean isExecutable, Digest containingDirectory, ExecutorService service) {
+  public ListenableFuture<Path> put(
+      Digest digest,
+      boolean isExecutable,
+      Digest containingDirectory,
+      ExecutorService service) {
     Preconditions.checkState(digest.getSizeBytes() > 0, "file entries may not be empty");
 
     Path key = getKey(digest, isExecutable);
@@ -1039,6 +1043,7 @@ public abstract class CASFileCache implements ContentAddressableStorage, OutputS
           out.close();
         } catch (IOException e) {
           if (Thread.interrupted()) {
+            logger.log(SEVERE, "could not close stream", e);
             if (e.getCause() instanceof InterruptedException) {
               throw (InterruptedException) e.getCause();
             }

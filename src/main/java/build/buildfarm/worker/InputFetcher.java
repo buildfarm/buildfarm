@@ -23,6 +23,7 @@ import static java.util.logging.Level.WARNING;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
+import build.buildfarm.common.Poller;
 import build.buildfarm.v1test.QueuedOperation;
 import com.google.common.base.Stopwatch;
 import com.google.protobuf.Duration;
@@ -65,13 +66,21 @@ public class InputFetcher implements Runnable {
 
   private long runInterruptibly(Stopwatch stopwatch) throws InterruptedException {
     final Thread fetcherThread = Thread.currentThread();
-    Poller poller = workerContext.createPoller(
+    workerContext.resumePoller(
+        operationContext.poller,
         "InputFetcher",
         operationContext.queueEntry,
         QUEUED,
         () -> fetcherThread.interrupt(),
         Deadline.after(60, SECONDS));
+    try {
+      return fetchPolled(stopwatch);
+    } finally {
+      operationContext.poller.pause();
+    }
+  }
 
+  private long fetchPolled(Stopwatch stopwatch) throws InterruptedException {
     String operationName = operationContext.queueEntry
         .getExecuteEntry().getOperationName();
     logger.info(format("fetching inputs: %s", operationName));
@@ -98,8 +107,6 @@ public class InputFetcher implements Runnable {
       logger.log(WARNING, "error creating exec dir for " + operationName, e);
       owner.error().put(operationContext);
       return 0;
-    } finally {
-      poller.stop();
     }
     success = true;
 
@@ -112,7 +119,9 @@ public class InputFetcher implements Runnable {
         .setAction(queuedOperation.getAction())
         .setCommand(queuedOperation.getCommand())
         .build();
-    if (owner.output().claim()) {
+    boolean claimed = owner.output().claim();
+    operationContext.poller.pause();
+    if (claimed) {
       try {
         owner.output().put(executeOperationContext);
       } catch (InterruptedException e) {

@@ -28,6 +28,7 @@ import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.Platform.Property;
+import build.buildfarm.common.Poller;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.ExecutionPolicy;
 import com.google.common.base.Stopwatch;
@@ -110,18 +111,6 @@ class Executor implements Runnable {
       return 0;
     }
 
-    Platform platform = operationContext.command.getPlatform();
-    ImmutableList.Builder<ExecutionPolicy> policies = ImmutableList.builder();
-    ExecutionPolicy defaultPolicy = workerContext.getExecutionPolicy("");
-    if (defaultPolicy != null) {
-      policies.add(defaultPolicy);
-    }
-    for (Property property : platform.getPropertiesList()) {
-      if (property.getName().equals("execution-policy")) {
-        policies.add(workerContext.getExecutionPolicy(property.getValue()));
-      }
-    }
-
     Duration timeout;
     if (operationContext.action.hasTimeout()) {
       timeout = operationContext.action.getTimeout();
@@ -144,15 +133,39 @@ class Executor implements Runnable {
     }
 
     final Thread executorThread = Thread.currentThread();
-    Poller poller = workerContext.createPoller(
+    workerContext.resumePoller(
+        operationContext.poller,
         "Executor",
         operationContext.queueEntry,
         Stage.EXECUTING,
         () -> executorThread.interrupt(),
         pollDeadline);
 
+    try {
+      return executePolled(operation, timeout, stopwatch);
+    } finally {
+      operationContext.poller.pause();
+    }
+  }
+
+  private long executePolled(
+      Operation operation,
+      Duration timeout,
+      Stopwatch stopwatch) throws InterruptedException {
     /* execute command */
     workerContext.logInfo("Executor: Operation " + operation.getName() + " Executing command");
+
+    Platform platform = operationContext.command.getPlatform();
+    ImmutableList.Builder<ExecutionPolicy> policies = ImmutableList.builder();
+    ExecutionPolicy defaultPolicy = workerContext.getExecutionPolicy("");
+    if (defaultPolicy != null) {
+      policies.add(defaultPolicy);
+    }
+    for (Property property : platform.getPropertiesList()) {
+      if (property.getName().equals("execution-policy")) {
+        policies.add(workerContext.getExecutionPolicy(property.getValue()));
+      }
+    }
 
     long executeStartAt = System.nanoTime();
 
@@ -177,7 +190,7 @@ class Executor implements Runnable {
             "error destroying exec dir " + operationContext.execDir.toString(),
             destroyExecDirException);
       }
-      poller.stop();
+      operationContext.poller.pause();
       owner.error().put(operationContext);
       return 0;
     }
@@ -189,8 +202,6 @@ class Executor implements Runnable {
             "Executor::executeCommand(%s): Completed command: exit code %d",
             operation.getName(),
             resultBuilder.getExitCode()));
-
-    poller.stop();
 
     long executeUSecs = stopwatch.elapsed(MICROSECONDS);
     operation = operation.toBuilder()
@@ -205,7 +216,9 @@ class Executor implements Runnable {
           .setOperation(operation)
           .setExecutedIn(executedIn)
           .build();
-    if (owner.output().claim()) {
+    boolean claimed = owner.output().claim();
+    operationContext.poller.pause();
+    if (claimed) {
       try {
         owner.output().put(reportOperationContext);
       } catch (InterruptedException e) {

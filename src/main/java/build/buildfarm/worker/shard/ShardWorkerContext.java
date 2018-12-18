@@ -35,12 +35,12 @@ import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.InputStreamFactory;
+import build.buildfarm.common.Poller;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.instance.stub.Retrier;
 import build.buildfarm.instance.stub.Retrier.Backoff;
-import build.buildfarm.worker.Poller;
 import build.buildfarm.worker.RetryingMatchListener;
 import build.buildfarm.worker.WorkerContext;
 import build.buildfarm.v1test.ExecuteEntry;
@@ -138,14 +138,21 @@ class ShardWorkerContext implements WorkerContext {
 
   @Override
   public Poller createPoller(String name, QueueEntry queueEntry, Stage stage) {
-    return createPoller(name, queueEntry, stage, () -> {}, Deadline.after(10, DAYS));
+    Poller poller = new Poller(operationPollPeriod);
+    resumePoller(poller, name, queueEntry, stage, () -> {}, Deadline.after(10, DAYS));
+    return poller;
   }
 
   @Override
-  public Poller createPoller(String name, QueueEntry queueEntry, Stage stage, Runnable onFailure, Deadline deadline) {
+  public void resumePoller(
+      Poller poller,
+      String name,
+      QueueEntry queueEntry,
+      Stage stage,
+      Runnable onFailure,
+      Deadline deadline) {
     String operationName = queueEntry.getExecuteEntry().getOperationName();
-    Poller poller = new Poller(
-        operationPollPeriod,
+    poller.resume(
         () -> {
           boolean success = false;
           try {
@@ -165,8 +172,6 @@ class ShardWorkerContext implements WorkerContext {
           onFailure.run();
         },
         deadline);
-    new Thread(poller).start();
-    return poller;
   }
 
   @Override

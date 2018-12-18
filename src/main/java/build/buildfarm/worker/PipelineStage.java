@@ -53,7 +53,7 @@ public abstract class PipelineStage implements Runnable {
     try {
       runInterruptible();
     } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
+      // ignore
     } finally {
       close();
     }

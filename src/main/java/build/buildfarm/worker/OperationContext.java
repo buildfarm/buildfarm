@@ -18,6 +18,7 @@ import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
+import build.buildfarm.common.Poller;
 import build.buildfarm.v1test.QueueEntry;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Duration;
@@ -27,6 +28,7 @@ import java.nio.file.Path;
 // hm, can we encode maps???
 final class OperationContext {
   final Operation operation;
+  final Poller poller;
   final Path execDir;
   final Action action;
   final Command command;
@@ -37,6 +39,7 @@ final class OperationContext {
 
   private OperationContext(
       Operation operation,
+      Poller poller,
       Path execDir,
       Action action,
       Command command,
@@ -45,6 +48,7 @@ final class OperationContext {
       Duration executedIn,
       QueueEntry queueEntry) {
     this.operation = operation;
+    this.poller = poller;
     this.execDir = execDir;
     this.action = action;
     this.command = command;
@@ -56,6 +60,7 @@ final class OperationContext {
 
   public static class Builder {
     private Operation operation;
+    private Poller poller;
     private Path execDir;
     private Action action;
     private Command command;
@@ -66,6 +71,7 @@ final class OperationContext {
 
     private Builder(
         Operation operation,
+        Poller poller,
         Path execDir,
         Action action,
         Command command,
@@ -74,6 +80,7 @@ final class OperationContext {
         Duration executedIn,
         QueueEntry queueEntry) {
       this.operation = operation;
+      this.poller = poller;
       this.execDir = execDir;
       this.action = action;
       this.command = command;
@@ -85,6 +92,11 @@ final class OperationContext {
 
     public Builder setOperation(Operation operation) {
       this.operation = operation;
+      return this;
+    }
+
+    public Builder setPoller(Poller poller) {
+      this.poller = poller;
       return this;
     }
 
@@ -125,20 +137,22 @@ final class OperationContext {
 
     public OperationContext build() {
       return new OperationContext(
-        operation,
-        execDir,
-        action,
-        command,
-        matchedIn,
-        fetchedIn,
-        executedIn,
-        queueEntry);
+          operation,
+          poller,
+          execDir,
+          action,
+          command,
+          matchedIn,
+          fetchedIn,
+          executedIn,
+          queueEntry);
     }
   }
 
   public static Builder newBuilder() {
     return new Builder(
         /* operation=*/ null,
+        /* poller=*/ null,
         /* execDir=*/ null,
         /* action=*/ null,
         /* command=*/ null,
@@ -151,6 +165,7 @@ final class OperationContext {
   public Builder toBuilder() {
     return new Builder(
         operation,
+        poller,
         execDir,
         action,
         command,

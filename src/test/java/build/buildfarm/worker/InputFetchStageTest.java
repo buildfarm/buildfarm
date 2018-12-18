@@ -25,6 +25,7 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.Poller;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
@@ -103,13 +104,13 @@ public class InputFetchStageTest {
       }
 
       @Override
-      public Poller createPoller(
+      public void resumePoller(
+          Poller poller,
           String name,
           QueueEntry queueEntry,
           Stage stage,
           Runnable onFailure,
           Deadline deadline) {
-        return poller;
       }
 
       @Override
@@ -135,12 +136,12 @@ public class InputFetchStageTest {
     };
     PipelineStage inputFetchStage = new InputFetchStage(workerContext, sinkOutput, error);
     OperationContext badContext = OperationContext.newBuilder()
+        .setPoller(poller)
         .setQueueEntry(badEntry)
         .build();
     inputFetchStage.put(badContext);
     inputFetchStage.run();
-    assertThat(Thread.interrupted()).isTrue();
-    verify(poller, times(1)).stop();
+    verify(poller, times(1)).pause();
     assertThat(error.getOperationContexts().size()).isEqualTo(1);
     OperationContext operationContext = error.getOperationContexts().get(0);
     assertThat(operationContext).isEqualTo(badContext);

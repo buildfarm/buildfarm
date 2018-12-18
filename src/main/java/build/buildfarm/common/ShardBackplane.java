@@ -227,6 +227,13 @@ public interface ShardBackplane {
   QueueEntry dispatchOperation() throws IOException, InterruptedException;
 
   /**
+   * Updates the backplane to indicate that the operation is being
+   * queued and should not be considered immediately lost
+   */
+  @ThreadSafe
+  void queueing(String operationName) throws IOException;
+
+  /**
    * The state of operations is tracked in a series of lists representing the
    * order in which the work is to be processed (queued, dispatched, and
    * completed).
