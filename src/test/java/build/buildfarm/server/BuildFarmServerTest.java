@@ -62,6 +62,7 @@ import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.util.Durations;
 import com.google.rpc.Code;
 import io.grpc.ManagedChannel;
 import io.grpc.StatusRuntimeException;
@@ -90,24 +91,16 @@ public class BuildFarmServerTest {
         .setListOperationsMaxPageSize(16384)
         .setTreeDefaultPageSize(1024)
         .setTreeMaxPageSize(16384)
-        .setOperationPollTimeout(Duration.newBuilder()
-            .setSeconds(10)
-            .setNanos(0))
-        .setOperationCompletedDelay(Duration.newBuilder()
-            .setSeconds(10)
-            .setNanos(0))
+        .setOperationPollTimeout(Durations.fromSeconds(10))
+        .setOperationCompletedDelay(Durations.fromSeconds(10))
         .setCasConfig(ContentAddressableStorageConfig.newBuilder()
             .setMemory(MemoryCASConfig.newBuilder()
                 .setMaxSizeBytes(640 * 1024)))
         .setActionCacheConfig(ActionCacheConfig.newBuilder()
             .setDelegateCas(DelegateCASConfig.getDefaultInstance())
             .build())
-        .setDefaultActionTimeout(Duration.newBuilder()
-            .setSeconds(600)
-            .setNanos(0))
-        .setMaximumActionTimeout(Duration.newBuilder()
-            .setSeconds(3600)
-            .setNanos(0))
+        .setDefaultActionTimeout(Durations.fromSeconds(600))
+        .setMaximumActionTimeout(Durations.fromSeconds(3600))
         .build();
 
     BuildFarmServerConfig.Builder configBuilder =
