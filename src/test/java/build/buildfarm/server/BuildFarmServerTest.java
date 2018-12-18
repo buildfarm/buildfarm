@@ -221,7 +221,6 @@ public class BuildFarmServerTest {
     assertThat(listResponse.getOperationsList()).isEmpty();
   }
 
-  /*
   @Test
   public void canceledOperationHasCancelledState()
       throws RetryException, InterruptedException, InvalidProtocolBufferException {
@@ -306,7 +305,6 @@ public class BuildFarmServerTest {
             .build())
         .getCode()).isEqualTo(Code.UNAVAILABLE.getNumber());
   }
-  */
 
   @Test(expected = StatusRuntimeException.class)
   public void actionWithExcessiveTimeoutFailsValidation()
