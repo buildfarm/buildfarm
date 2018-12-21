@@ -108,6 +108,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
+import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
 
 public class Worker {
@@ -449,7 +450,6 @@ public class Worker {
       public void match(MatchListener listener) throws InterruptedException {
         RetryingMatchListener dedupMatchListener = new RetryingMatchListener() {
           boolean matched = false;
-          QueueEntry queueEntry = null;
 
           @Override
           public boolean getMatched() {
@@ -467,7 +467,11 @@ public class Worker {
           }
 
           @Override
-          public boolean onEntry(QueueEntry queueEntry) throws InterruptedException {
+          public boolean onEntry(@Nullable QueueEntry queueEntry) throws InterruptedException {
+            if (queueEntry == null) {
+              matched = true;
+              return listener.onEntry(null);
+            }
             ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
             String operationName = executeEntry.getOperationName();
             if (activeOperations.contains(operationName)) {

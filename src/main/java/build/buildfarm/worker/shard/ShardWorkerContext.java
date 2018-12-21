@@ -225,11 +225,11 @@ class ShardWorkerContext implements WorkerContext {
   @Override
   public void match(MatchListener listener) throws InterruptedException {
     RetryingMatchListener dedupMatchListener = new RetryingMatchListener() {
-      String operationName = null;
+      boolean matched = false;
 
       @Override
       public boolean getMatched() {
-        return operationName != null;
+        return matched;
       }
 
       @Override
@@ -244,12 +244,16 @@ class ShardWorkerContext implements WorkerContext {
 
       @Override
       public boolean onEntry(QueueEntry queueEntry) throws InterruptedException {
+        if (queueEntry == null) {
+          matched = true;
+          return listener.onEntry(null);
+        }
         String operationName = queueEntry.getExecuteEntry().getOperationName();
         if (activeOperations.putIfAbsent(operationName, queueEntry) != null) {
           logger.warning("matched duplicate operation " + operationName);
           return false;
         }
-        this.operationName = operationName;
+        matched = true;
         boolean success = listener.onEntry(queueEntry);
         if (!success) {
           requeue(operationName);

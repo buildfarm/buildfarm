@@ -46,6 +46,7 @@ import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.logging.Logger;
+import javax.annotation.Nullable;
 
 public class MatchStage extends PipelineStage {
   private static final Logger logger = Logger.getLogger(MatchStage.class.getName());
@@ -80,7 +81,12 @@ public class MatchStage extends PipelineStage {
     }
 
     @Override
-    public boolean onEntry(QueueEntry queueEntry) throws InterruptedException {
+    public boolean onEntry(@Nullable QueueEntry queueEntry) throws InterruptedException {
+      if (queueEntry == null) {
+        output.release();
+        return false;
+      }
+
       operationNamedAtUSecs = stopwatch.elapsed(MICROSECONDS);
       Preconditions.checkState(poller == null);
       Poller poller = workerContext.createPoller(
@@ -91,11 +97,6 @@ public class MatchStage extends PipelineStage {
     }
 
     private boolean onOperationPolled(QueueEntry queueEntry, Poller poller) throws InterruptedException {
-      if (queueEntry == null) {
-        output.release();
-        return false;
-      }
-
       String operationName = queueEntry.getExecuteEntry().getOperationName();
       logStart(operationName);
 

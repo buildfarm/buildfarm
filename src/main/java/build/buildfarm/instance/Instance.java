@@ -38,6 +38,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Predicate;
+import javax.annotation.Nullable;
 
 public interface Instance {
   String getName();
@@ -104,7 +105,7 @@ public interface Instance {
     void onWaitEnd();
 
     // returns false if this listener will not handle this match
-    boolean onEntry(QueueEntry queueEntry) throws InterruptedException;
+    boolean onEntry(@Nullable QueueEntry queueEntry) throws InterruptedException;
   }
 
   public static interface ChunkObserver extends StreamObserver<ByteString> {
