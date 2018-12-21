@@ -36,7 +36,7 @@ public final class ContentAddressableStorages {
     ByteStreamUploader byteStreamUploader
         = new ByteStreamUploader("", channel, null, 300, retrier, null);
 
-    return new GrpcCAS(config.getInstanceName(), channel, byteStreamUploader, retrier);
+    return new GrpcCAS(config.getInstanceName(), channel, byteStreamUploader);
   }
 
   public static ContentAddressableStorage create(ContentAddressableStorageConfig config) {

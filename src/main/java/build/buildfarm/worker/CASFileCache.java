@@ -892,12 +892,12 @@ public abstract class CASFileCache implements ContentAddressableStorage, OutputS
       ExecutorService service) {
     Path path = getDirectoryPath(digest);
 
-    Lock l = locks.acquire(path);
     ThreadFactory factory = new ThreadFactoryBuilder()
         .setNameFormat(String.format("directory-%s-lock-manager", path.getFileName()))
         .build();
     ListeningExecutorService lockService = listeningDecorator(Executors.newSingleThreadExecutor(factory));
 
+    Lock l = locks.acquire(path);
     ListenableFuture<Path> putFuture = transformAsync(
         lockService.submit(() -> {
           l.lockInterruptibly();
@@ -1036,7 +1036,7 @@ public abstract class CASFileCache implements ContentAddressableStorage, OutputS
         Downloader.copy((offset) -> newExternalInput(digest, offset), out);
       } catch (IOException e) {
         out.cancel();
-        logger.log(SEVERE, "error copying to entry from " + DigestUtil.toString(digest), e); // prevent burial by early end of stream during close
+        logger.log(SEVERE, "error downloading " + DigestUtil.toString(digest), e); // prevent burial by early end of stream during close
         throw e;
       } finally {
         try {

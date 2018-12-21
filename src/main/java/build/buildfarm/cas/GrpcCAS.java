@@ -50,14 +50,12 @@ class GrpcCAS implements ContentAddressableStorage {
   private final String instanceName;
   private final Channel channel;
   private final ByteStreamUploader uploader;
-  private final Retrier retrier;
   private final ConcurrentMap<Digest, List<Runnable>> digestsOnExpirations = new ConcurrentHashMap<>();
 
-  GrpcCAS(String instanceName, Channel channel, ByteStreamUploader uploader, Retrier retrier) {
+  GrpcCAS(String instanceName, Channel channel, ByteStreamUploader uploader) {
     this.instanceName = instanceName;
     this.channel = channel;
     this.uploader = uploader;
-    this.retrier = retrier;
   }
 
   private final Supplier<ContentAddressableStorageBlockingStub> contentAddressableStorageBlockingStub =
@@ -86,8 +84,7 @@ class GrpcCAS implements ContentAddressableStorage {
             .setReadOffset(offset)
             .build());
     return new ByteStringIteratorInputStream(
-        Iterators.transform(replies, (reply) -> reply.getData()),
-        retrier);
+        Iterators.transform(replies, (reply) -> reply.getData()));
   }
 
   private String getBlobName(Digest digest) {

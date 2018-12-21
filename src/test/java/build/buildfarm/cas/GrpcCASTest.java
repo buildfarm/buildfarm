@@ -87,8 +87,7 @@ public class GrpcCASTest {
     GrpcCAS cas = new GrpcCAS(
         instanceName,
         InProcessChannelBuilder.forName(fakeServerName).directExecutor().build(),
-        mock(ByteStreamUploader.class),
-        Retrier.NO_RETRIES);
+        mock(ByteStreamUploader.class));
     assertThat(cas.get(digest)).isNull();
     assertThat(readCalled.get()).isTrue();
   }

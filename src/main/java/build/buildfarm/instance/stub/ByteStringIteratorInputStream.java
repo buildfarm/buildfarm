@@ -24,14 +24,12 @@ import java.util.Iterator;
 
 public class ByteStringIteratorInputStream extends InputStream {
   private final Iterator<ByteString> iterator;
-  private final Retrier retrier;
   private InputStream input;
   private boolean closed;
 
   @VisibleForTesting
-  public ByteStringIteratorInputStream(Iterator<ByteString> iterator, Retrier retrier) {
+  public ByteStringIteratorInputStream(Iterator<ByteString> iterator) {
     this.iterator = iterator;
-    this.retrier = retrier;
     input = ByteString.EMPTY.newInput();
     closed = false;
   }

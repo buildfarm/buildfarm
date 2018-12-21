@@ -29,7 +29,6 @@ import build.buildfarm.instance.shard.ShardInstance.WorkersCallback;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Retrier;
 import build.buildfarm.instance.stub.Retrier.Backoff;
-import build.buildfarm.instance.stub.RetryException;
 import build.buildfarm.instance.stub.StubInstance;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -44,6 +43,7 @@ import io.grpc.Channel;
 import io.grpc.ManagedChannel;
 import io.grpc.Status;
 import io.grpc.Status.Code;
+import io.grpc.StatusRuntimeException;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import java.nio.file.NoSuchFileException;
@@ -124,7 +124,7 @@ class RemoteInputStreamFactory implements InputStreamFactory {
         throw new InterruptedException();
       }
       return input;
-    } catch (RetryException e) {
+    } catch (StatusRuntimeException e) {
       Status st = Status.fromThrowable(e);
       if (st.getCode().equals(Code.UNAVAILABLE)) {
         // for now, leave this up to schedulers

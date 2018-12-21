@@ -363,11 +363,11 @@ public class StubInstance implements Instance {
   @Override
   public InputStream newStreamInput(String name, long offset) throws IOException, InterruptedException {
     throwIfStopped();
-    Iterator<ReadResponse> replies = retrier.execute(() -> bsBlockingStub
+    Iterator<ReadResponse> replies = bsBlockingStub
         .get()
         .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
-        .read(ReadRequest.newBuilder().setReadOffset(offset).setResourceName(name).build()));
-    return new ByteStringIteratorInputStream(Iterators.transform(replies, (reply) -> reply.getData()), retrier);
+        .read(ReadRequest.newBuilder().setReadOffset(offset).setResourceName(name).build());
+    return new ByteStringIteratorInputStream(Iterators.transform(replies, (reply) -> reply.getData()));
   }
 
   @Override
