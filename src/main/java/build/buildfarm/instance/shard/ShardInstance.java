@@ -1101,7 +1101,12 @@ public class ShardInstance extends AbstractServerInstance {
       ExecutorService service) {
     return transformAsync(
         expectAction(actionDigest, service),
-        (action) -> buildQueuedOperation(action, service),
+        (action) -> {
+          if (action == null) {
+            return immediateFuture(QueuedOperation.getDefaultInstance());
+          }
+          return buildQueuedOperation(action, service);
+        },
         service);
   }
 
@@ -1112,15 +1117,17 @@ public class ShardInstance extends AbstractServerInstance {
     ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
     ListenableFuture<QueuedOperation> fetchQueuedOperationFuture =
         expect(queueEntry.getQueuedOperationDigest(), QueuedOperation.parser(), operationTransformService);
+    Digest actionDigest = executeEntry.getActionDigest();
     ListenableFuture<QueuedOperation> queuedOperationFuture = catchingAsync(
         fetchQueuedOperationFuture,
         Throwable.class,
-        (e) -> buildQueuedOperation(executeEntry.getActionDigest(), operationTransformService));
+        (e) -> buildQueuedOperation(actionDigest, operationTransformService));
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
     ListenableFuture<QueuedOperation> validatedFuture = transformAsync(
         queuedOperationFuture,
         (queuedOperation) -> catching(
             validateQueuedOperationAndInputs(
+                actionDigest,
                 queuedOperation,
                 preconditionFailure,
                 operationTransformService),

@@ -14,6 +14,7 @@
 
 package build.buildfarm.instance;
 
+import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.Futures.transformAsync;
 import static com.google.common.util.concurrent.Futures.allAsList;
@@ -684,15 +685,23 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   protected ListenableFuture<QueuedOperation> validateQueuedOperationAndInputs(
+      Digest actionDigest,
       QueuedOperation queuedOperation,
       PreconditionFailure.Builder preconditionFailure,
       ExecutorService service) throws InterruptedException {
+    if (!queuedOperation.hasAction()) {
+      preconditionFailure.addViolationsBuilder()
+          .setType(VIOLATION_TYPE_MISSING)
+          .setSubject(MISSING_INPUT)
+          .setDescription("Action " + DigestUtil.toString(actionDigest));
+      return immediateFailedFuture(new IllegalStateException(invalidActionMessage(() -> actionDigest)));
+    }
     Action action = queuedOperation.getAction();
     ListenableFuture<Iterable<Digest>> inputDigestsFuture = listeningDecorator(service).submit(() -> {
       ImmutableSet.Builder<Digest> inputDigestsBuilder = ImmutableSet.builder();
       validateAction(
           action,
-          queuedOperation.getCommand(),
+          queuedOperation.hasCommand() ? queuedOperation.getCommand() : null,
           queuedOperation.getDirectoriesList(),
           inputDigestsBuilder,
           preconditionFailure);
