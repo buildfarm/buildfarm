@@ -127,11 +127,19 @@ public class ShardInstanceTest {
     instance.stop();
   }
 
-  private Action createAction(boolean provideAction) throws Exception {
-    return createAction(provideAction, SIMPLE_COMMAND);
+  private Action createAction() throws Exception {
+    return createAction(/* provideAction=*/ true, /* provideCommand=*/ true, SIMPLE_COMMAND);
   }
 
-  private Action createAction(boolean provideAction, Command command) throws Exception {
+  private Action createAction(boolean provideAction) throws Exception {
+    return createAction(provideAction, /* provideCommand=*/ true, SIMPLE_COMMAND);
+  }
+
+  private Action createAction(boolean provideAction, boolean provideCommand) throws Exception {
+    return createAction(provideAction, provideCommand, SIMPLE_COMMAND);
+  }
+
+  private Action createAction(boolean provideAction, boolean provideCommand, Command command) throws Exception {
     Directory inputRoot = Directory.getDefaultInstance();
     ByteString inputRootBlob = inputRoot.toByteString();
     Digest inputRootDigest = DIGEST_UTIL.compute(inputRootBlob);
@@ -139,10 +147,10 @@ public class ShardInstanceTest {
 
     provideBlob(inputRootDigest, inputRootBlob);
 
-    return createAction(provideAction, inputRootDigest, command);
+    return createAction(provideAction, provideCommand, inputRootDigest, command);
   }
 
-  private Action createAction(boolean provideAction, Digest inputRootDigest, Command command) throws Exception {
+  private Action createAction(boolean provideAction, boolean provideCommand, Digest inputRootDigest, Command command) throws Exception {
     String workerName = "worker";
     when(mockInstanceLoader.load(eq(workerName))).thenReturn(mockWorkerInstance);
 
@@ -151,7 +159,10 @@ public class ShardInstanceTest {
 
     ByteString commandBlob = command.toByteString();
     Digest commandDigest = DIGEST_UTIL.compute(commandBlob);
-    provideBlob(commandDigest, commandBlob);
+    if (provideCommand) {
+      provideBlob(commandDigest, commandBlob);
+      when(mockBackplane.getBlobLocationSet(eq(commandDigest))).thenReturn(workers);
+    }
 
     doAnswer(new Answer<ListenableFuture<Iterable<Digest>>>() {
       @Override
@@ -160,7 +171,6 @@ public class ShardInstanceTest {
         return immediateFuture(Iterables.filter(digests, (digest) -> !blobDigests.contains(digest)));
       }
     }).when(mockWorkerInstance).findMissingBlobs(any(Iterable.class), any(ExecutorService.class));
-    when(mockBackplane.getBlobLocationSet(eq(commandDigest))).thenReturn(workers);
 
     Action action = Action.newBuilder()
         .setCommandDigest(commandDigest)
@@ -198,7 +208,7 @@ public class ShardInstanceTest {
     Digest actionDigest = DIGEST_UTIL.compute(action);
 
     ExecuteEntry executeEntry = ExecuteEntry.newBuilder()
-        .setOperationName("operation")
+        .setOperationName("missing-action-operation")
         .setActionDigest(actionDigest)
         .setSkipCacheLookup(true)
         .build();
@@ -224,7 +234,7 @@ public class ShardInstanceTest {
     ExecuteResponse executeResponse = ExecuteResponse.newBuilder()
         .setStatus(com.google.rpc.Status.newBuilder()
             .setCode(Code.FAILED_PRECONDITION.value())
-            .setMessage("FAILED_PRECONDITION: NOT_FOUND")
+            .setMessage("FAILED_PRECONDITION: Action " + DigestUtil.toString(actionDigest) + " is invalid")
             .addDetails(Any.pack(PreconditionFailure.newBuilder()
                 .addViolations(Violation.newBuilder()
                     .setType(VIOLATION_TYPE_MISSING)
@@ -246,8 +256,61 @@ public class ShardInstanceTest {
   }
 
   @Test
+  public void queueCommandMissingErrorsOperation() throws Exception {
+    Action action = createAction(true, false);
+    Digest actionDigest = DIGEST_UTIL.compute(action);
+
+    ExecuteEntry executeEntry = ExecuteEntry.newBuilder()
+        .setOperationName("missing-command-operation")
+        .setActionDigest(actionDigest)
+        .setSkipCacheLookup(true)
+        .build();
+
+    when(mockBackplane.canQueue()).thenReturn(true);
+
+    Poller poller = mock(Poller.class);
+
+    boolean unknownExceptionCaught = false;
+    try {
+      instance.queue(executeEntry, poller)
+          .get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
+    } catch (ExecutionException e) {
+      Status status = Status.fromThrowable(e);
+      if (status.getCode() == Code.FAILED_PRECONDITION) {
+        unknownExceptionCaught = true;
+      } else {
+        e.getCause().printStackTrace();
+      }
+    }
+    assertThat(unknownExceptionCaught).isTrue();
+
+    ExecuteResponse executeResponse = ExecuteResponse.newBuilder()
+        .setStatus(com.google.rpc.Status.newBuilder()
+            .setCode(Code.FAILED_PRECONDITION.value())
+            .setMessage("FAILED_PRECONDITION: Action " + DigestUtil.toString(actionDigest) + " is invalid")
+            .addDetails(Any.pack(PreconditionFailure.newBuilder()
+                .addViolations(Violation.newBuilder()
+                    .setType(VIOLATION_TYPE_MISSING)
+                    .setSubject(MISSING_INPUT)
+                    .setDescription("Command " + DigestUtil.toString(DIGEST_UTIL.compute(SIMPLE_COMMAND))))
+                .build())))
+        .build();
+    Operation erroredOperation = Operation.newBuilder()
+        .setName(executeEntry.getOperationName())
+        .setDone(true)
+        .setMetadata(Any.pack(ExecuteOperationMetadata.newBuilder()
+            .setActionDigest(actionDigest)
+            .setStage(COMPLETED)
+            .build()))
+        .setResponse(Any.pack(executeResponse))
+        .build();
+    verify(mockBackplane, times(1)).putOperation(eq(erroredOperation), eq(COMPLETED));
+    verify(poller, atLeast(1)).pause();
+  }
+
+  @Test
   public void queueOperationPutFailureCancelsOperation() throws Exception {
-    Action action = createAction(true);
+    Action action = createAction();
     Digest actionDigest = DIGEST_UTIL.compute(action);
     CommittingOutputStream mockCommittedOutputStream = mock(CommittingOutputStream.class);
     when(mockCommittedOutputStream.getCommittedFuture()).thenReturn(immediateFuture(actionDigest.getSizeBytes()));
@@ -367,7 +430,7 @@ public class ShardInstanceTest {
             .setName(operationName)
             .build());
 
-    Action action = createAction(true, missingDirectoryDigest, SIMPLE_COMMAND);
+    Action action = createAction(true, true, missingDirectoryDigest, SIMPLE_COMMAND);
     Digest actionDigest = DIGEST_UTIL.compute(action);
     QueueEntry queueEntry = QueueEntry.newBuilder()
         .setExecuteEntry(ExecuteEntry.newBuilder()
@@ -415,7 +478,7 @@ public class ShardInstanceTest {
             .setName(operationName)
             .build());
 
-    Action action = createAction(true, SIMPLE_COMMAND);
+    Action action = createAction();
     QueuedOperation queuedOperation = QueuedOperation.newBuilder()
         .setAction(action)
         .setCommand(SIMPLE_COMMAND)

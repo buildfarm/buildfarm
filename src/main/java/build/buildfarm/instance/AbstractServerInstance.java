@@ -66,6 +66,7 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.Message;
 import com.google.protobuf.Parser;
 import com.google.rpc.PreconditionFailure;
 import com.google.rpc.PreconditionFailure.Violation;
@@ -85,6 +86,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
+import javax.annotation.Nullable;
 
 public abstract class AbstractServerInstance implements Instance {
   private static final Logger logger = Logger.getLogger(AbstractServerInstance.class.getName());
@@ -652,8 +654,12 @@ public abstract class AbstractServerInstance implements Instance {
     }
   }
 
+  protected static String invalidActionMessage(Supplier<Digest> actionDigestSupplier) {
+    return String.format("Action %s is invalid", DigestUtil.toString(actionDigestSupplier.get()));
+  }
+
   private static void checkViolations(Supplier<Digest> actionDigestSupplier, List<Violation> violations) {
-    Preconditions.checkState(violations.isEmpty(), "Action " + DigestUtil.toString(actionDigestSupplier.get()) + " is invalid");
+    Preconditions.checkState(violations.isEmpty(), invalidActionMessage(actionDigestSupplier));
   }
 
   private void checkViolations(Action action, List<Violation> violations) {
@@ -661,11 +667,12 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   protected void validateAction(Action action, PreconditionFailure.Builder preconditionFailure) throws InterruptedException {
+    ExecutorService service = newDirectExecutorService();
     ImmutableSet.Builder<Digest> inputDigestsBuilder = ImmutableSet.builder();
     validateAction(
         action,
-        getUnchecked(expectCommand(action.getCommandDigest())),
-        getUnchecked(getTreeDirectories(action.getInputRootDigest(), newDirectExecutorService())),
+        getUnchecked(expect(action.getCommandDigest(), Command.parser(), service)),
+        getUnchecked(getTreeDirectories(action.getInputRootDigest(), service)),
         inputDigestsBuilder,
         preconditionFailure);
     try {
@@ -709,7 +716,7 @@ public abstract class AbstractServerInstance implements Instance {
     Action action = queuedOperation.getAction();
     validateAction(
         action,
-        queuedOperation.getCommand(),
+        queuedOperation.hasCommand() ? queuedOperation.getCommand() : null,
         queuedOperation.getDirectoriesList(),
         ImmutableSet.builder(),
         preconditionFailure);
@@ -718,7 +725,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   private void validateAction(
       Action action,
-      Command command,
+      @Nullable Command command,
       Iterable<Directory> directories,
       ImmutableSet.Builder<Digest> inputDigestsBuilder,
       PreconditionFailure.Builder preconditionFailure) {
@@ -746,28 +753,28 @@ public abstract class AbstractServerInstance implements Instance {
           .setType(VIOLATION_TYPE_MISSING)
           .setSubject(MISSING_INPUT)
           .setDescription("Command " + DigestUtil.toString(commandDigest));
-    }
+    } else {
+      // FIXME should input/output collisions (through directories) be another
+      // invalid action?
+      filesUniqueAndSortedPrecondition(
+          command.getOutputFilesList(), preconditionFailure);
+      filesUniqueAndSortedPrecondition(
+          command.getOutputDirectoriesList(), preconditionFailure);
 
-    // FIXME should input/output collisions (through directories) be another
-    // invalid action?
-    filesUniqueAndSortedPrecondition(
-        command.getOutputFilesList(), preconditionFailure);
-    filesUniqueAndSortedPrecondition(
-        command.getOutputDirectoriesList(), preconditionFailure);
+      AbstractServerInstance.validateOutputs(
+          inputFilesBuilder.build(),
+          inputDirectoriesBuilder.build(),
+          Sets.newHashSet(command.getOutputFilesList()),
+          Sets.newHashSet(command.getOutputDirectoriesList()));
 
-    AbstractServerInstance.validateOutputs(
-        inputFilesBuilder.build(),
-        inputDirectoriesBuilder.build(),
-        Sets.newHashSet(command.getOutputFilesList()),
-        Sets.newHashSet(command.getOutputDirectoriesList()));
-
-    environmentVariablesUniqueAndSortedPrecondition(
-        command.getEnvironmentVariablesList(), preconditionFailure);
-    if (command.getArgumentsList().isEmpty()) {
-      preconditionFailure.addViolationsBuilder()
-          .setType(VIOLATION_TYPE_INVALID)
-          .setSubject(INVALID_COMMAND)
-          .setDescription("argument list is empty");
+      environmentVariablesUniqueAndSortedPrecondition(
+          command.getEnvironmentVariablesList(), preconditionFailure);
+      if (command.getArgumentsList().isEmpty()) {
+        preconditionFailure.addViolationsBuilder()
+            .setType(VIOLATION_TYPE_INVALID)
+            .setSubject(INVALID_COMMAND)
+            .setDescription("argument list is empty");
+      }
     }
     checkViolations(() -> actionDigest, preconditionFailure.getViolationsList());
   }
@@ -1008,51 +1015,28 @@ public abstract class AbstractServerInstance implements Instance {
     return null;
   }
 
-  private <T> ListenableFuture<T> parseFuture(Digest digest, Parser<T> parser) {
+  protected <T> ListenableFuture<T> expect(Digest digest, Parser<T> parser, ExecutorService service) {
+    // FIXME find a way to make this a transform
     SettableFuture<T> future = SettableFuture.create();
-    Futures.addCallback(getBlobFuture(digest), new FutureCallback<ByteString>() {
-      @Override
-      public void onSuccess(ByteString blob) {
-        try {
-          future.set(parser.parseFrom(blob));
-        } catch (InvalidProtocolBufferException e) {
-          future.setException(e);
-        }
-      }
-
-      @Override
-      public void onFailure(Throwable t) {
-        future.setException(t);
-      }
-    });
-    return future;
-  }
-
-  protected ListenableFuture<Directory> expectDirectory(Digest directoryBlobDigest) {
-    return parseFuture(directoryBlobDigest, Directory.parser());
-  }
-
-  protected ListenableFuture<Command> expectCommand(Digest commandBlobDigest) {
-    return parseFuture(commandBlobDigest, Command.parser());
-  }
-
-  protected ListenableFuture<Action> expectAction(Digest actionBlobDigest) {
-    return parseFuture(actionBlobDigest, Action.parser());
-  }
-
-  protected ListenableFuture<QueuedOperation> expectQueuedOperation(Digest queuedOperationBlobDigest) {
-    return parseFuture(queuedOperationBlobDigest, QueuedOperation.parser());
-  }
-
-  protected ListenableFuture<Command> insistCommand(Digest commandBlobDigest) {
-    return transform(
-        expectCommand(commandBlobDigest),
-        (command) -> {
-          if (command != null) {
-            return command;
+    Futures.addCallback(
+        getBlobFuture(digest),
+        new FutureCallback<ByteString>() {
+          @Override
+          public void onSuccess(ByteString blob) {
+            try {
+              future.set(parser.parseFrom(blob));
+            } catch (InvalidProtocolBufferException e) {
+              future.setException(e);
+            }
           }
-          throw new IllegalStateException(MISSING_INPUT + " Command [" + DigestUtil.toString(commandBlobDigest) + "]");
-        });
+
+          @Override
+          public void onFailure(Throwable t) {
+            future.setException(t);
+          }
+        },
+        service);
+    return future;
   }
 
   protected static boolean isCancelled(Operation operation) {

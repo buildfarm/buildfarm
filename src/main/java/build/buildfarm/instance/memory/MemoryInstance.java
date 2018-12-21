@@ -19,6 +19,7 @@ import static com.google.common.collect.Multimaps.synchronizedSetMultimap;
 import static com.google.common.util.concurrent.Futures.addCallback;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static java.lang.String.format;
 import static java.util.Collections.synchronizedSortedMap;
 import static java.util.concurrent.Executors.newCachedThreadPool;
@@ -461,10 +462,10 @@ public class MemoryInstance extends AbstractServerInstance {
     ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
     Preconditions.checkState(metadata != null, "metadata not found");
 
-    Action action = getUnchecked(expectAction(metadata.getActionDigest()));
+    Action action = getUnchecked(expect(metadata.getActionDigest(), Action.parser(), newDirectExecutorService()));
     Preconditions.checkState(action != null, "action not found");
 
-    Command command = getUnchecked(expectCommand(action.getCommandDigest()));
+    Command command = getUnchecked(expect(action.getCommandDigest(), Command.parser(), newDirectExecutorService()));
     Preconditions.checkState(command != null, "command not found");
 
     QueuedOperation queuedOperation = QueuedOperation.newBuilder()
@@ -520,10 +521,10 @@ public class MemoryInstance extends AbstractServerInstance {
       ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
       Preconditions.checkState(metadata != null, "metadata not found");
 
-      Action action = getUnchecked(expectAction(metadata.getActionDigest()));
+      Action action = getUnchecked(expect(metadata.getActionDigest(), Action.parser(), newDirectExecutorService()));
       Preconditions.checkState(action != null, "action not found");
 
-      Command command = getUnchecked(expectCommand(action.getCommandDigest()));
+      Command command = getUnchecked(expect(action.getCommandDigest(), Command.parser(), newDirectExecutorService()));
       Preconditions.checkState(command != null, "command not found");
 
       String operationName = operation.getName();
@@ -643,7 +644,8 @@ public class MemoryInstance extends AbstractServerInstance {
   @Override
   protected TokenizableIterator<DirectoryEntry> createTreeIterator(
       Digest rootDigest, String pageToken) throws IOException, InterruptedException {
-    return new TreeIterator(this::expectDirectory, rootDigest, pageToken);
+    ExecutorService service = newDirectExecutorService();
+    return new TreeIterator((digest) -> expect(digest, Directory.parser(), service), rootDigest, pageToken);
   }
 
   @Override

@@ -151,6 +151,9 @@ public class ShardInstance extends AbstractServerInstance {
   private final Cache<Digest, Command> commandCache = CacheBuilder.newBuilder()
       .maximumSize(64 * 1024)
       .build();
+  private final Cache<Digest, Action> actionCache = CacheBuilder.newBuilder()
+      .maximumSize(64 * 1024)
+      .build();
   private final com.google.common.cache.RemovalListener<String, Instance> instanceRemovalListener = (removal) -> {
     Instance instance = removal.getValue();
     try {
@@ -727,6 +730,19 @@ public class ShardInstance extends AbstractServerInstance {
     }
     if (!known) {
       try {
+        actionCache.get(digest, new Callable<Action>() {
+          @Override
+          public Action call() throws IOException {
+            return Action.parseFrom(blob);
+          }
+        }).get();
+        known = true;
+      } catch (ExecutionException e) {
+        /* not an action */
+      }
+    }
+    if (!known) {
+      try {
         directoryCache.get(digest, new Callable<Directory>() {
           @Override
           public Directory call() throws IOException {
@@ -904,7 +920,7 @@ public class ShardInstance extends AbstractServerInstance {
         }
       };
     } else {
-      getDirectoryFunction = (directoryBlobDigest) -> expectDirectory(directoryBlobDigest);
+      getDirectoryFunction = (directoryBlobDigest) -> expectDirectory(directoryBlobDigest, newDirectExecutorService());
     }
     return new TreeIterator(getDirectoryFunction, rootDigest, pageToken);
   }
@@ -916,7 +932,7 @@ public class ShardInstance extends AbstractServerInstance {
         QueuedOperationMetadata metadata = operation.getMetadata()
             .unpack(QueuedOperationMetadata.class);
         QueuedOperation queuedOperation = getUnchecked(
-            expectQueuedOperation(metadata.getQueuedOperationDigest()));
+            expect(metadata.getQueuedOperationDigest(), QueuedOperation.parser(), newDirectExecutorService()));
         if (!queuedOperation.getAction().equals(Action.getDefaultInstance())) {
           return queuedOperation.getAction();
         }
@@ -931,9 +947,8 @@ public class ShardInstance extends AbstractServerInstance {
     T fetch() throws InterruptedException;
   }
 
-  @Override
-  protected ListenableFuture<Directory> expectDirectory(Digest directoryBlobDigest) {
-    final Fetcher<Directory> fetcher = () -> getUnchecked(super.expectDirectory(directoryBlobDigest));
+  private ListenableFuture<Directory> expectDirectory(Digest directoryBlobDigest, ExecutorService service) {
+    final Fetcher<Directory> fetcher = () -> getUnchecked(expect(directoryBlobDigest, Directory.parser(), service));
     // is there a better interface to use for the cache with these nice futures?
     return directoryCache.get(directoryBlobDigest, new Callable<Directory>() {
       @Override
@@ -943,13 +958,25 @@ public class ShardInstance extends AbstractServerInstance {
     });
   }
 
-  @Override
-  protected ListenableFuture<Command> expectCommand(Digest commandBlobDigest) {
-    final Fetcher<Command> fetcher = () -> getUnchecked(super.expectCommand(commandBlobDigest));
+  private ListenableFuture<Command> expectCommand(Digest commandBlobDigest, ExecutorService service) {
+    final Fetcher<Command> fetcher = () -> getUnchecked(expect(commandBlobDigest, Command.parser(), service));
     return catching(
         commandCache.get(commandBlobDigest, new Callable<Command>() {
           @Override
           public Command call() throws InterruptedException {
+            return fetcher.fetch();
+          }
+        }),
+        InvalidCacheLoadException.class,
+        (e) -> { return null; });
+  }
+
+  private ListenableFuture<Action> expectAction(Digest actionBlobDigest, ExecutorService service) {
+    final Fetcher<Action> fetcher = () -> getUnchecked(expect(actionBlobDigest, Action.parser(), service));
+    return catching(
+        actionCache.get(actionBlobDigest, new Callable<Action>() {
+          @Override
+          public Action call() throws InterruptedException {
             return fetcher.fetch();
           }
         }),
@@ -1010,8 +1037,13 @@ public class ShardInstance extends AbstractServerInstance {
     return transform(
         allAsList(
             transform(
-                insistCommand(commandDigest),
-                queuedOperationBuilder::setCommand,
+                expectCommand(commandDigest, service),
+                (command) -> {
+                  if (command != null) {
+                    queuedOperationBuilder.setCommand(command);
+                  }
+                  return queuedOperationBuilder;
+                },
                 service),
             transform(
                 getTreeDirectories(inputRootDigest, service),
@@ -1067,9 +1099,8 @@ public class ShardInstance extends AbstractServerInstance {
   private ListenableFuture<QueuedOperation> buildQueuedOperation(
       Digest actionDigest,
       ExecutorService service) {
-    ListenableFuture<Action> actionFuture = expectAction(actionDigest);
     return transformAsync(
-        actionFuture,
+        expectAction(actionDigest, service),
         (action) -> buildQueuedOperation(action, service),
         service);
   }
@@ -1080,7 +1111,7 @@ public class ShardInstance extends AbstractServerInstance {
       com.google.rpc.Status.Builder status) {
     ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
     ListenableFuture<QueuedOperation> fetchQueuedOperationFuture =
-        expectQueuedOperation(queueEntry.getQueuedOperationDigest());
+        expect(queueEntry.getQueuedOperationDigest(), QueuedOperation.parser(), operationTransformService);
     ListenableFuture<QueuedOperation> queuedOperationFuture = catchingAsync(
         fetchQueuedOperationFuture,
         Throwable.class,
@@ -1354,23 +1385,33 @@ public class ShardInstance extends AbstractServerInstance {
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
     long startTransformUSecs = stopwatch.elapsed(MICROSECONDS);
     ListenableFuture<Action> actionFuture = catching(
-        expectAction(actionDigest),
+        expectAction(actionDigest, operationTransformService),
         StatusException.class,
         (e) -> {
           Status st = Status.fromThrowable(e);
           if (st.getCode() == Code.NOT_FOUND) {
-            preconditionFailure.addViolationsBuilder()
-                .setType(VIOLATION_TYPE_MISSING)
-                .setSubject(MISSING_INPUT)
-                .setDescription("Action " + DigestUtil.toString(actionDigest));
-            status.addDetails(Any.pack(preconditionFailure.build()));
-            throw Status.FAILED_PRECONDITION.withDescription(e.getMessage()).asRuntimeException();
+            return null;
           }
           throw st.asRuntimeException();
-        });
+        },
+        operationTransformService);
     QueuedOperation.Builder queuedOperationBuilder = QueuedOperation.newBuilder();
     ListenableFuture<ProfiledQueuedOperationMetadata.Builder> queuedFuture = transformAsync(
-        actionFuture,
+        transform(
+            actionFuture,
+            (action) -> {
+              if (action != null) {
+                return action;
+              }
+              preconditionFailure.addViolationsBuilder()
+                  .setType(VIOLATION_TYPE_MISSING)
+                  .setSubject(MISSING_INPUT)
+                  .setDescription("Action " + DigestUtil.toString(actionDigest));
+              status.addDetails(Any.pack(preconditionFailure.build()));
+              throw Status.FAILED_PRECONDITION.withDescription(
+                  invalidActionMessage(() -> actionDigest)).asRuntimeException();
+            },
+            operationTransformService),
         (action) -> {
           Stopwatch transformStopwatch = Stopwatch.createStarted();
           return transform(
