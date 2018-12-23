@@ -6,9 +6,11 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 # Needed for "well-known protos" and @com_google_protobuf//:protoc.
 http_archive(
     name = "com_google_protobuf",
-    sha256 = "091d4263d9a55eccb6d3c8abde55c26eaaa933dea9ecabb185cdf3795f9b5ca2",
-    strip_prefix = "protobuf-3.5.1.1",
-    urls = ["https://github.com/google/protobuf/archive/v3.5.1.1.zip"],
+    patch_args = ["-p1"],
+    patches = ["//third_party/protobuf:4fcb36c.patch"],
+    sha256 = "d7a221b3d4fb4f05b7473795ccea9e05dab3b8721f6286a95fffbffc2d926f8b",
+    strip_prefix = "protobuf-3.6.1",
+    urls = ["https://github.com/google/protobuf/archive/v3.6.1.zip"],
 )
 
 # Needed for @grpc_java//compiler:grpc_java_plugin.
