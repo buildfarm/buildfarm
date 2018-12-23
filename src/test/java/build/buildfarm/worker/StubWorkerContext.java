@@ -39,6 +39,7 @@ class StubWorkerContext implements WorkerContext {
   @Override public Poller createPoller(String name, String operationName, Stage stage, Runnable onFailure) { throw new UnsupportedOperationException(); }
   @Override public void match(InterruptingConsumer<Operation> onMatch) throws InterruptedException { throw new UnsupportedOperationException(); }
   @Override public void requeue(Operation operation) { throw new UnsupportedOperationException(); }
+  @Override public void deactivate(Operation operation) { throw new UnsupportedOperationException(); }
   @Override public CASInsertionPolicy getFileCasPolicy() { throw new UnsupportedOperationException(); }
   @Override public CASInsertionPolicy getStdoutCasPolicy() { throw new UnsupportedOperationException(); }
   @Override public CASInsertionPolicy getStderrCasPolicy() { throw new UnsupportedOperationException(); }

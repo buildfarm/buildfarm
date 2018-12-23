@@ -156,4 +156,29 @@ public abstract class PipelineStage implements Runnable {
   abstract Logger getLogger();
   abstract OperationContext take() throws InterruptedException;
   abstract void put(OperationContext operationContext) throws InterruptedException;
+
+  public static class NullStage extends PipelineStage {
+    public NullStage() {
+      super("NullStage", null, null, null);
+    }
+
+    @Override
+    public Logger getLogger() { return null; }
+    @Override
+    public boolean claim() { return true; }
+    @Override
+    public void release() { }
+    @Override
+    public OperationContext take() { throw new UnsupportedOperationException(); }
+    @Override
+    public void put(OperationContext operation) throws InterruptedException { }
+    @Override
+    public void setInput(PipelineStage input) { }
+    @Override
+    public void run() { }
+    @Override
+    public void close() { }
+    @Override
+    public boolean isClosed() { return false; }
+  }
 }
