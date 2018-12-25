@@ -105,7 +105,7 @@ class GrpcCAS implements ContentAddressableStorage {
 
   private synchronized void addOnExpiration(Digest digest, Runnable onExpiration) {
     List<Runnable> onExpirations = digestsOnExpirations.get(digest);
-    if (onExpirations != null) {
+    if (onExpirations == null) {
       onExpirations = new ArrayList<>(1);
       digestsOnExpirations.put(digest, onExpirations);
     }
