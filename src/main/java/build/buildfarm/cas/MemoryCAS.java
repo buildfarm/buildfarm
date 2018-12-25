@@ -15,6 +15,7 @@
 package build.buildfarm.cas;
 
 import build.bazel.remote.execution.v2.Digest;
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -38,9 +39,15 @@ class MemoryCAS implements ContentAddressableStorage {
   }
 
   @Override
-  public synchronized boolean contains(Digest digest) {
+  public synchronized Iterable<Digest> findMissingBlobs(Iterable<Digest> digests) {
+    ImmutableList.Builder<Digest> missing = ImmutableList.builder();
     // incur access use of the digest
-    return get(digest) != null;
+    for (Digest digest : digests) {
+      if (digest.getSizeBytes() != 0 && get(digest) == null) {
+        missing.add(digest);
+      }
+    }
+    return missing.build();
   }
 
   @Override

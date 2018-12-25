@@ -55,9 +55,9 @@ public interface ContentAddressableStorage {
     }
   }
 
-  /** Indicates presence in the CAS for a digest. */
+  /** Indicates presence in the CAS for a sequence of digests. */
   @ThreadSafe
-  boolean contains(Digest digest);
+  Iterable<Digest> findMissingBlobs(Iterable<Digest> digests);
 
   /** Retrieve a value from the CAS. */
   @ThreadSafe
