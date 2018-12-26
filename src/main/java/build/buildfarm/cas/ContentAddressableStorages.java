@@ -14,12 +14,16 @@
 
 package build.buildfarm.cas;
 
+import static com.google.common.collect.Multimaps.synchronizedListMultimap;
+
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Retrier;
 import build.buildfarm.v1test.ContentAddressableStorageConfig;
 import build.buildfarm.v1test.GrpcCASConfig;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ListMultimap;
+import com.google.common.collect.MultimapBuilder;
 import com.google.protobuf.ByteString;
 import io.grpc.Channel;
 import io.grpc.netty.NegotiationType;
@@ -38,8 +42,13 @@ public final class ContentAddressableStorages {
     Channel channel = createChannel(config.getTarget());
     ByteStreamUploader byteStreamUploader
         = new ByteStreamUploader("", channel, null, 300, Retrier.NO_RETRIES, null);
+    ListMultimap<Digest, Runnable> onExpirations = synchronizedListMultimap(
+        MultimapBuilder
+            .hashKeys()
+            .arrayListValues()
+            .build());
 
-    return new GrpcCAS(config.getInstanceName(), channel, byteStreamUploader);
+    return new GrpcCAS(config.getInstanceName(), channel, byteStreamUploader, onExpirations);
   }
 
   public static ContentAddressableStorage create(ContentAddressableStorageConfig config) {

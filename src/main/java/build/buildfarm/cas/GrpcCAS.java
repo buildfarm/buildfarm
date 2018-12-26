@@ -23,10 +23,8 @@ import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.ByteStringIteratorInputStream;
 import build.buildfarm.instance.stub.Chunker;
 import build.buildfarm.instance.stub.RetryException;
-import build.buildfarm.v1test.GrpcCASConfig;
 import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamBlockingStub;
-import com.google.bytestream.ByteStreamGrpc.ByteStreamStub;
 import com.google.bytestream.ByteStreamProto.ReadRequest;
 import com.google.bytestream.ByteStreamProto.ReadResponse;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
@@ -34,28 +32,27 @@ import com.google.bytestream.ByteStreamProto.QueryWriteStatusResponse;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.Iterators;
+import com.google.common.collect.ListMultimap;
 import com.google.protobuf.ByteString;
 import io.grpc.Channel;
 import io.grpc.StatusRuntimeException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.ConcurrentHashMap;
 
 class GrpcCAS implements ContentAddressableStorage {
   private final String instanceName;
   private final Channel channel;
   private final ByteStreamUploader uploader;
-  private final ConcurrentMap<Digest, List<Runnable>> digestsOnExpirations = new ConcurrentHashMap<>();
+  private final ListMultimap<Digest, Runnable> onExpirations;
 
-  GrpcCAS(String instanceName, Channel channel, ByteStreamUploader uploader) {
+  GrpcCAS(String instanceName, Channel channel, ByteStreamUploader uploader, ListMultimap<Digest, Runnable> onExpirations) {
     this.instanceName = instanceName;
     this.channel = channel;
     this.uploader = uploader;
+    this.onExpirations = onExpirations;
   }
 
   private final Supplier<ContentAddressableStorageBlockingStub> casBlockingStub =
@@ -104,21 +101,13 @@ class GrpcCAS implements ContentAddressableStorage {
     return missingDigests;
   }
 
-  private synchronized void addOnExpiration(Digest digest, Runnable onExpiration) {
-    List<Runnable> onExpirations = digestsOnExpirations.get(digest);
-    if (onExpirations != null) {
-      onExpirations = new ArrayList<>(1);
-      digestsOnExpirations.put(digest, onExpirations);
-    }
-    onExpirations.add(onExpiration);
-  }
-
   private void expire(Digest digest) {
-    List<Runnable> onExpirations = digestsOnExpirations.remove(digest);
-    if (onExpirations != null) {
-      for (Runnable r : onExpirations) {
-        r.run();
-      }
+    List<Runnable> digestOnExpirations;
+    synchronized (onExpirations) {
+      digestOnExpirations = onExpirations.removeAll(digest);
+    }
+    for (Runnable r : digestOnExpirations) {
+      r.run();
     }
   }
 
@@ -155,6 +144,8 @@ class GrpcCAS implements ContentAddressableStorage {
   @Override
   public void put(Blob blob, Runnable onExpiration) throws InterruptedException {
     put(blob);
-    addOnExpiration(blob.getDigest(), onExpiration);
+    synchronized (onExpirations) {
+      onExpirations.put(blob.getDigest(), onExpiration);
+    }
   }
 }
