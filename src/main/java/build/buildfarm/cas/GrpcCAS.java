@@ -16,6 +16,7 @@ package build.buildfarm.cas;
 
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageBlockingStub;
+import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.stub.ByteStreamUploader;
@@ -54,7 +55,7 @@ class GrpcCAS implements ContentAddressableStorage {
     this.onExpirations = onExpirations;
   }
 
-  private final Supplier<ContentAddressableStorageBlockingStub> contentAddressableStorageBlockingStub =
+  private final Supplier<ContentAddressableStorageBlockingStub> casBlockingStub =
       Suppliers.memoize(
           new Supplier<ContentAddressableStorageBlockingStub>() {
             @Override
@@ -87,17 +88,17 @@ class GrpcCAS implements ContentAddressableStorage {
   }
 
   @Override
-  public boolean contains(Digest digest) {
-    QueryWriteStatusResponse response = bsBlockingStub.get()
-        .queryWriteStatus(QueryWriteStatusRequest.newBuilder()
-            .setResourceName(getBlobName(digest))
-            .build());
-    boolean contains = response.getComplete()
-        && response.getCommittedSize() == digest.getSizeBytes();
-    if (!contains) {
-      expire(digest);
+  public Iterable<Digest> findMissingBlobs(Iterable<Digest> digests) {
+    List<Digest> missingDigests = casBlockingStub.get()
+        .findMissingBlobs(FindMissingBlobsRequest.newBuilder()
+            .setInstanceName(instanceName)
+            .addAllBlobDigests(digests)
+            .build())
+        .getMissingBlobDigestsList();
+    for (Digest missingDigest : missingDigests) {
+      expire(missingDigest);
     }
-    return contains;
+    return missingDigests;
   }
 
   private void expire(Digest digest) {
