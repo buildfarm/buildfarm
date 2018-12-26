@@ -14,6 +14,10 @@
 
 package build.buildfarm.cas;
 
+import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc;
+import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageBlockingStub;
+import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
+import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.ByteStringIteratorInputStream;
@@ -30,9 +34,6 @@ import com.google.bytestream.ByteStreamProto.QueryWriteStatusResponse;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.Iterators;
-import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc;
-import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageBlockingStub;
-import build.bazel.remote.execution.v2.Digest;
 import com.google.protobuf.ByteString;
 import io.grpc.Channel;
 import io.grpc.StatusRuntimeException;
@@ -57,7 +58,7 @@ class GrpcCAS implements ContentAddressableStorage {
     this.uploader = uploader;
   }
 
-  private final Supplier<ContentAddressableStorageBlockingStub> contentAddressableStorageBlockingStub =
+  private final Supplier<ContentAddressableStorageBlockingStub> casBlockingStub =
       Suppliers.memoize(
           new Supplier<ContentAddressableStorageBlockingStub>() {
             @Override
@@ -90,17 +91,17 @@ class GrpcCAS implements ContentAddressableStorage {
   }
 
   @Override
-  public boolean contains(Digest digest) {
-    QueryWriteStatusResponse response = bsBlockingStub.get()
-        .queryWriteStatus(QueryWriteStatusRequest.newBuilder()
-            .setResourceName(getBlobName(digest))
-            .build());
-    boolean contains = response.getComplete()
-        && response.getCommittedSize() == digest.getSizeBytes();
-    if (!contains) {
-      expire(digest);
+  public Iterable<Digest> findMissingBlobs(Iterable<Digest> digests) {
+    List<Digest> missingDigests = casBlockingStub.get()
+        .findMissingBlobs(FindMissingBlobsRequest.newBuilder()
+            .setInstanceName(instanceName)
+            .addAllBlobDigests(digests)
+            .build())
+        .getMissingBlobDigestsList();
+    for (Digest missingDigest : missingDigests) {
+      expire(missingDigest);
     }
-    return contains;
+    return missingDigests;
   }
 
   private synchronized void addOnExpiration(Digest digest, Runnable onExpiration) {

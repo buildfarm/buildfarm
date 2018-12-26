@@ -19,6 +19,7 @@ import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Retrier;
 import build.buildfarm.v1test.ContentAddressableStorageConfig;
 import build.buildfarm.v1test.GrpcCASConfig;
+import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
 import io.grpc.Channel;
 import io.grpc.netty.NegotiationType;
@@ -60,8 +61,14 @@ public final class ContentAddressableStorages {
   public static ContentAddressableStorage casMapDecorator(Map<Digest, ByteString> map) {
     return new ContentAddressableStorage() {
       @Override
-      public boolean contains(Digest digest) {
-        return map.containsKey(digest);
+      public Iterable<Digest> findMissingBlobs(Iterable<Digest> digests) {
+        ImmutableList.Builder<Digest> missing = ImmutableList.builder();
+        for (Digest digest : digests) {
+          if (digest.getSizeBytes() != 0 && !map.containsKey(digest)) {
+            missing.add(digest);
+          }
+        }
+        return missing.build();
       }
 
       @Override
