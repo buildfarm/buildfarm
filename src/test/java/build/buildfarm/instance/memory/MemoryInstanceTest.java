@@ -497,4 +497,21 @@ public class MemoryInstanceTest {
         watcher);
     verify(watcher, atLeast(1)).test(any(Operation.class));
   }
+
+  @Test
+  public void pollFailsWithNullRequeuer() throws InterruptedException {
+    Operation operation = Operation.newBuilder()
+        .setName("test-operation")
+        .setMetadata(Any.pack(
+            ExecuteOperationMetadata.newBuilder()
+                .setStage(Stage.EXECUTING)
+                .build()))
+        .build();
+
+    outstandingOperations.put(operation.getName(), operation);
+
+    assertThat(instance.pollOperation(
+        operation.getName(),
+        Stage.EXECUTING)).isFalse();
+  }
 }

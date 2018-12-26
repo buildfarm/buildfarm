@@ -354,7 +354,11 @@ public class MemoryInstance extends AbstractServerInstance {
       return false;
     }
     // pet the requeue watchdog
-    requeuers.get(operationName).pet();
+    Watchdog requeuer = requeuers.get(operationName);
+    if (requeuer == null) {
+      return false;
+    }
+    requeuer.pet();
     return true;
   }
 
