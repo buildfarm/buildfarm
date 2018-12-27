@@ -39,6 +39,7 @@ public interface WorkerContext {
   Poller createPoller(String name, String operationName, Stage stage, Runnable onFailure);
   void match(InterruptingConsumer<Operation> onMatch) throws InterruptedException;
   void requeue(Operation operation) throws InterruptedException;
+  void deactivate(Operation operation);
   CASInsertionPolicy getFileCasPolicy();
   CASInsertionPolicy getStdoutCasPolicy();
   CASInsertionPolicy getStderrCasPolicy();
@@ -46,8 +47,6 @@ public interface WorkerContext {
   ExecutionPolicy getExecutionPolicy(String name);
   int getInlineContentLimit();
   int getExecuteStageWidth();
-  int getTreePageSize();
-  boolean getLinkInputDirectories();
   boolean hasDefaultActionTimeout();
   boolean hasMaximumActionTimeout();
   boolean getStreamStdout();
@@ -59,7 +58,6 @@ public interface WorkerContext {
   void createActionRoot(Path root, Action action, Command command) throws IOException, InterruptedException;
   void destroyActionRoot(Path root) throws IOException;
   Path getRoot();
-  void removeDirectory(Path path) throws IOException;
   boolean putOperation(Operation operation) throws InterruptedException;
   OutputStream getStreamOutput(String name);
   void putActionResult(ActionKey actionKey, ActionResult actionResult) throws InterruptedException;

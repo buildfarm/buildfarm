@@ -25,6 +25,7 @@ import static org.mockito.Mockito.verify;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Chunker;
+import build.buildfarm.worker.PipelineStage.NullStage;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.jimfs.Configuration;
@@ -75,7 +76,8 @@ public class ReportResultStageTest {
     when(mockWorkerContext.getUploader()).thenReturn(mockUploader);
     when(mockWorkerContext.getDigestUtil()).thenReturn(digestUtil);
     PipelineStage error = mock(PipelineStage.class);
-    reportResultStage = new ReportResultStage(mockWorkerContext, error);
+    reportResultStage = new ReportResultStage(
+        mockWorkerContext, new NullStage(), error);
     fileSystem = Jimfs.newFileSystem(config);
   }
 

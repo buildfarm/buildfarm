@@ -39,6 +39,7 @@ class StubWorkerContext implements WorkerContext {
   @Override public Poller createPoller(String name, String operationName, Stage stage, Runnable onFailure) { throw new UnsupportedOperationException(); }
   @Override public void match(InterruptingConsumer<Operation> onMatch) throws InterruptedException { throw new UnsupportedOperationException(); }
   @Override public void requeue(Operation operation) { throw new UnsupportedOperationException(); }
+  @Override public void deactivate(Operation operation) { throw new UnsupportedOperationException(); }
   @Override public CASInsertionPolicy getFileCasPolicy() { throw new UnsupportedOperationException(); }
   @Override public CASInsertionPolicy getStdoutCasPolicy() { throw new UnsupportedOperationException(); }
   @Override public CASInsertionPolicy getStderrCasPolicy() { throw new UnsupportedOperationException(); }
@@ -46,8 +47,6 @@ class StubWorkerContext implements WorkerContext {
   @Override public ExecutionPolicy getExecutionPolicy(String name) { throw new UnsupportedOperationException(); }
   @Override public int getInlineContentLimit() { throw new UnsupportedOperationException(); }
   @Override public int getExecuteStageWidth() { throw new UnsupportedOperationException(); }
-  @Override public int getTreePageSize() { throw new UnsupportedOperationException(); }
-  @Override public boolean getLinkInputDirectories() { throw new UnsupportedOperationException(); }
   @Override public boolean hasDefaultActionTimeout() { throw new UnsupportedOperationException(); }
   @Override public boolean hasMaximumActionTimeout() { throw new UnsupportedOperationException(); }
   @Override public boolean getStreamStdout() { throw new UnsupportedOperationException(); }
@@ -59,7 +58,6 @@ class StubWorkerContext implements WorkerContext {
   @Override public void createActionRoot(Path root, Action action, Command command) { throw new UnsupportedOperationException(); }
   @Override public void destroyActionRoot(Path root) { throw new UnsupportedOperationException(); }
   @Override public Path getRoot() { throw new UnsupportedOperationException(); }
-  @Override public void removeDirectory(Path path) { throw new UnsupportedOperationException(); }
   @Override public boolean putOperation(Operation operation) { throw new UnsupportedOperationException(); }
   @Override public OutputStream getStreamOutput(String name) { throw new UnsupportedOperationException(); }
   @Override public void putActionResult(ActionKey actionKey, ActionResult actionResult) { throw new UnsupportedOperationException(); }

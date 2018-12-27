@@ -51,14 +51,18 @@ public class MatchStage extends PipelineStage {
     long stallUSecs = stopwatch.elapsed(MICROSECONDS);
     logStart();
     workerContext.match((operation) -> {
-      logStart(operation.getName());
-      boolean fetched = fetch(operation);
-      long usecs = stopwatch.elapsed(MICROSECONDS);
-      if (!fetched) {
+      if (operation == null) {
         output.release();
-        workerContext.requeue(operation);
+      } else {
+        logStart(operation.getName());
+        boolean fetched = fetch(operation);
+        long usecs = stopwatch.elapsed(MICROSECONDS);
+        if (!fetched) {
+          output.release();
+          workerContext.requeue(operation);
+        }
+        logComplete(operation.getName(), usecs, stallUSecs, fetched);
       }
-      logComplete(operation.getName(), usecs, stallUSecs, fetched);
     });
   }
 

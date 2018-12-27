@@ -14,6 +14,8 @@
 
 package build.buildfarm.worker;
 
+import static java.util.logging.Level.SEVERE;
+
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.stub.Chunker;
 import build.buildfarm.v1test.CASInsertionPolicy;
@@ -59,33 +61,8 @@ public class ReportResultStage extends PipelineStage {
 
   private final BlockingQueue<OperationContext> queue;
 
-  public static class NullStage extends PipelineStage {
-    public NullStage(String name) {
-      super(name, null, null, null);
-    }
-
-    @Override
-    public Logger getLogger() { return null; }
-    @Override
-    public boolean claim() { return true; }
-    @Override
-    public void release() { }
-    @Override
-    public OperationContext take() { throw new UnsupportedOperationException(); }
-    @Override
-    public void put(OperationContext operation) { }
-    @Override
-    public void setInput(PipelineStage input) { }
-    @Override
-    public void run() { }
-    @Override
-    public void close() { }
-    @Override
-    public boolean isClosed() { return false; }
-  }
-
-  public ReportResultStage(WorkerContext workerContext, PipelineStage error) {
-    super("ReportResultStage", workerContext, new NullStage("Terminal"), error);
+  public ReportResultStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
+    super("ReportResultStage", workerContext, output, error);
     queue = new ArrayBlockingQueue<>(1);
   }
 
@@ -240,8 +217,9 @@ public class ReportResultStage extends PipelineStage {
   @Override
   protected void after(OperationContext operationContext) {
     try {
-      workerContext.removeDirectory(operationContext.execDir);
-    } catch (IOException ex) {
+      workerContext.destroyActionRoot(operationContext.execDir);
+    } catch (IOException e) {
+      logger.log(SEVERE, "error while destroying action root " + operationContext.execDir, e);
     }
   }
 }

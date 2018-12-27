@@ -38,6 +38,7 @@ import build.buildfarm.worker.OutputDirectory;
 import build.buildfarm.worker.Pipeline;
 import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.Poller;
+import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.ReportResultStage;
 import build.buildfarm.worker.WorkerContext;
 import com.google.common.base.Strings;
@@ -80,6 +81,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.Executors;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
@@ -100,6 +102,7 @@ public class Worker {
 
   private static final ListeningScheduledExecutorService retryScheduler =
       MoreExecutors.listeningDecorator(Executors.newScheduledThreadPool(1));
+  private final Set<String> activeOperations = new ConcurrentSkipListSet<>();
 
   private static Channel createChannel(String target) {
     NettyChannelBuilder builder =
@@ -311,7 +314,12 @@ public class Worker {
         operationQueueInstance.match(
             getPlatform(),
             (operation) -> {
-              onMatch.accept(operation);
+              if (activeOperations.contains(operation.getName())) {
+                onMatch.accept(null);
+              } else {
+                activeOperations.add(operation.getName());
+                onMatch.accept(operation);
+              }
               return true;
             });
       }
@@ -319,6 +327,7 @@ public class Worker {
       @Override
       public void requeue(Operation operation) throws InterruptedException {
         try {
+          deactivate(operation);
           ExecuteOperationMetadata metadata =
               operation.getMetadata().unpack(ExecuteOperationMetadata.class);
 
@@ -358,16 +367,6 @@ public class Worker {
       @Override
       public int getExecuteStageWidth() {
         return config.getExecuteStageWidth();
-      }
-
-      @Override
-      public int getTreePageSize() {
-        return config.getTreePageSize();
-      }
-
-      @Override
-      public boolean getLinkInputDirectories() {
-        return config.getLinkInputDirectories();
       }
 
       @Override
@@ -467,8 +466,8 @@ public class Worker {
       }
 
       @Override
-      public void removeDirectory(Path path) throws IOException {
-        CASFileCache.removeDirectory(path);
+      public void deactivate(Operation operation) {
+        activeOperations.remove(operation.getName());
       }
 
       @Override
@@ -488,11 +487,12 @@ public class Worker {
       }
     };
 
-    PipelineStage errorStage = new ReportResultStage.NullStage("ErrorStage"); /* ErrorStage(); */
-    PipelineStage reportResultStage = new ReportResultStage(workerContext, errorStage);
+    PipelineStage completeStage = new PutOperationStage(workerContext::deactivate);
+    PipelineStage errorStage = completeStage; /* new ErrorStage(); */
+    PipelineStage reportResultStage = new ReportResultStage(workerContext, completeStage, errorStage);
     PipelineStage executeActionStage = new ExecuteActionStage(workerContext, reportResultStage, errorStage);
     reportResultStage.setInput(executeActionStage);
-    PipelineStage inputFetchStage = new InputFetchStage(workerContext, executeActionStage, errorStage);
+    PipelineStage inputFetchStage = new InputFetchStage(workerContext, executeActionStage, new PutOperationStage(workerContext::requeue));
     executeActionStage.setInput(inputFetchStage);
     PipelineStage matchStage = new MatchStage(workerContext, inputFetchStage, errorStage);
     inputFetchStage.setInput(matchStage);

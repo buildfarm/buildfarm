@@ -199,14 +199,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public Iterable<Digest> findMissingBlobs(Iterable<Digest> digests) {
-    ImmutableList.Builder<Digest> missingBlobs = new ImmutableList.Builder<>();
-    for (Digest digest : digests) {
-      if (digest.getSizeBytes() == 0 || contentAddressableStorage.contains(digest)) {
-        continue;
-      }
-      missingBlobs.add(digest);
-    }
-    return missingBlobs.build();
+    return contentAddressableStorage.findMissingBlobs(digests);
   }
 
   protected abstract int getTreeDefaultPageSize();
