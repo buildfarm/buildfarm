@@ -19,6 +19,7 @@ java_test(
     test_class = "build.buildfarm.AllTests",
     deps = [
         ":test_runner",
+        "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "//3rdparty/jvm/com/google/truth",
         "//src/main/java/build/buildfarm:common",
@@ -70,6 +71,27 @@ java_test(
 )
 
 java_test(
+    name = "http-proxy-tests",
+    size = "small",
+    srcs = glob(["proxy/http/*.java"]),
+    test_class = "build.buildfarm.AllTests",
+    deps = [
+        ":test_runner",
+        "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java",
+        "//3rdparty/jvm/com/google/truth",
+        "//3rdparty/jvm/io/grpc:grpc_core",
+        "//3rdparty/jvm/io/grpc:grpc_stub",
+        "//3rdparty/jvm/org/mockito:mockito_core",
+        "//src/main/java/build/buildfarm:common",
+        "//src/main/java/build/buildfarm:http-proxy",
+        "@googleapis//:google_bytestream_bytestream_java_grpc",
+        "@googleapis//:google_bytestream_bytestream_java_proto",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+    ],
+)
+
+java_test(
     name = "server-tests",
     size = "small",
     srcs = glob(["server/*.java"]),
@@ -85,7 +107,7 @@ java_test(
         "//3rdparty/jvm/io/grpc:grpc_netty",
         "//3rdparty/jvm/io/grpc:grpc_protobuf",
         "//3rdparty/jvm/io/grpc:grpc_stub",
-        "//src/main/java/build/buildfarm",
+        "//src/main/java/build/buildfarm:server",
         "//src/main/java/build/buildfarm:common",
         "//src/main/java/build/buildfarm:stub-instance",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",

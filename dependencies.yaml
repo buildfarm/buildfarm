@@ -8,6 +8,11 @@ options:
   versionConflictPolicy: highest
 
 dependencies:
+  com.google.code.findbugs:
+    jsr305:
+      lang: java
+      version: "3.0.1"
+
   com.github.pcj:
     google-options:
       lang: java
@@ -17,6 +22,15 @@ dependencies:
     guava:
       lang: java
       version: "23.5-jre"
+
+  com.google.auth:
+    google-auth-library-credentials:
+      lang: java
+      version: "0.9.1"
+
+    google-auth-library-oauth2-http:
+      lang: java
+      version: "0.9.1"
 
   com.google.jimfs:
     jimfs:
@@ -32,23 +46,33 @@ dependencies:
       lang: java
       version: "3.5.0"
 
+  com.google.truth:
+    truth:
+      lang: java
+      version: "0.36"
+
   io.netty:
     netty:
       lang: java
       modules: [ "buffer", "codec", "codec-http", "codec-http2", "codec-socks", "common", "handler",
-        "handler-proxy", "resolver", "transport" ]
-      version: "4.1.17.Final"
+        "handler-proxy", "resolver", "transport", "transport-native-epoll", "transport-native-kqueue",
+        "transport-native-unix-common" ]
+      version: "4.1.31.Final"
 
-  #
   io.grpc:
     grpc-all:
       lang: java
       version: "1.8.0"
 
-  com.google.truth:
-    truth:
+    grpc:
       lang: java
-      version: "0.36"
+      modules: [ "auth", "core", "context", "netty", "stub", "protobuf" ]
+      version: "1.8.0"
+
+  junit:
+    junit:
+      lang: java
+      version: "4.12"
 
   org.mockito:
     mockito-core:

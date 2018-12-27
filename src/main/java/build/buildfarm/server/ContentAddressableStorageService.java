@@ -131,18 +131,23 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
     }
 
     String pageToken = request.getPageToken();
-    do {
-      ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
-      String nextPageToken = instance.getTree(
-          request.getRootDigest(), pageSize, pageToken, directories);
+    try {
+      do {
+        ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
+        String nextPageToken = instance.getTree(
+            request.getRootDigest(), pageSize, pageToken, directories);
 
-      responseObserver.onNext(GetTreeResponse.newBuilder()
-          .addAllDirectories(directories.build())
-          .setNextPageToken(nextPageToken)
-          .build());
-      pageToken = nextPageToken;
-    } while (!pageToken.isEmpty());
-    responseObserver.onCompleted();
+        responseObserver.onNext(GetTreeResponse.newBuilder()
+            .addAllDirectories(directories.build())
+            .setNextPageToken(nextPageToken)
+            .build());
+        pageToken = nextPageToken;
+      } while (!pageToken.isEmpty());
+      responseObserver.onCompleted();
+    } catch (IOException e) {
+      responseObserver.onError(Status.fromThrowable(e).asException());
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
   }
 }
-

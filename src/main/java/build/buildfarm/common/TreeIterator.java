@@ -12,38 +12,60 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.instance.memory;
+package build.buildfarm.common;
 
-import build.buildfarm.instance.Instance;
-import build.buildfarm.instance.TokenizableIterator;
 import build.buildfarm.v1test.TreeIteratorToken;
 import com.google.common.collect.Iterators;
 import com.google.common.io.BaseEncoding;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.MessageLite;
+import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Stack;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.function.Function;
 
-class TreeIterator implements TokenizableIterator<Directory> {
-  private final Instance instance;
+public class TreeIterator implements TokenizableIterator<Directory> {
+  private final GetBlobFunction getBlob;
   private Deque<Digest> path;
   private final ArrayDeque<Digest> parentPath;
   private final Stack<Iterator<Digest>> pointers;
 
-  public TreeIterator(Instance instance, Digest rootDigest, String pageToken) {
-    this.instance = instance;
+  @FunctionalInterface
+  public interface GetBlobFunction {
+    ListenableFuture<ByteString> apply(Digest digest);
+  }
+
+  private static <T> T getIOUnchecked(Future<T> future)
+      throws IOException, InterruptedException {
+    try {
+      return future.get();
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof IOException) {
+        throw (IOException) e.getCause();
+      }
+      throw new UncheckedExecutionException(e.getCause());
+    }
+  }
+
+  public TreeIterator(GetBlobFunction getBlob, Digest rootDigest, String pageToken)
+      throws IOException, InterruptedException {
+    this.getBlob = getBlob;
     parentPath = new ArrayDeque<Digest>();
     pointers = new Stack<Iterator<Digest>>();
 
     Iterator<Digest> iter = Iterators.singletonIterator(rootDigest);
 
-    Directory directory = expectDirectory(instance.getBlob(rootDigest));
+    Directory directory = expectDirectory(getIOUnchecked(getBlob.apply(rootDigest)));
 
     if (!pageToken.isEmpty()) {
       TreeIteratorToken token = parseToken(BaseEncoding.base64().decode(pageToken));
@@ -60,7 +82,7 @@ class TreeIterator implements TokenizableIterator<Directory> {
         }
         parentPath.addLast(digest);
         pointers.push(iter);
-        directory = expectDirectory(instance.getBlob(digest));
+        directory = expectDirectory(getIOUnchecked(getBlob.apply(digest)));
         if (directory == null) {
           // some directory data has disappeared, current iter
           // is correct and will be next directory fetched
@@ -108,14 +130,22 @@ class TreeIterator implements TokenizableIterator<Directory> {
      * (and simplify the interface) that they have been
      * removed. */
     Digest digest = iter.next();
-    Directory directory = expectDirectory(instance.getBlob(digest));
-    if (directory != null) {
-      /* the path to a new iter set is the path to its parent */
-      parentPath.addLast(digest);
-      path = parentPath.clone();
-      pointers.push(Iterators.transform(
-          directory.getDirectoriesList().iterator(),
-          directoryNode -> directoryNode.getDigest()));
+    Directory directory;
+    try {
+      directory = expectDirectory(getIOUnchecked(getBlob.apply(digest)));
+      if (directory != null) {
+        /* the path to a new iter set is the path to its parent */
+        parentPath.addLast(digest);
+        path = parentPath.clone();
+        pointers.push(Iterators.transform(
+            directory.getDirectoriesList().iterator(),
+            directoryNode -> directoryNode.getDigest()));
+      }
+    } catch (IOException e) {
+      directory = null;
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      return null;
     }
     advanceIterator();
     return directory;

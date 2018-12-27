@@ -34,7 +34,6 @@ java_library(
     srcs = [
         "instance/AbstractServerInstance.java",
         "instance/OperationsMap.java",
-        "instance/TokenizableIterator.java",
     ],
     deps = [
         ":ac",
@@ -81,7 +80,7 @@ java_library(
 )
 
 java_library(
-    name = "buildfarm",
+    name = "server",
     srcs = glob(["server/**/*.java"]),
     deps = [
         ":common",
@@ -114,7 +113,7 @@ java_binary(
     main_class = "build.buildfarm.server.BuildFarmServer",
     visibility = ["//visibility:public"],
     runtime_deps = [
-        ":buildfarm",
+        ":server",
     ],
 )
 
@@ -256,4 +255,44 @@ container_image(
         ":buildfarm-worker_deploy.jar",
     ],
     visibility = ["//visibility:public"],
+)
+
+java_binary(
+    name = "buildfarm-http-proxy",
+    main_class = "build.buildfarm.proxy.http.HttpProxy",
+    runtime_deps = [":http-proxy"],
+)
+
+java_library(
+    name = "http-proxy",
+    srcs = glob(["proxy/http/*.java"]),
+    deps = [
+        ":common",
+        "//3rdparty/jvm/com/github/pcj:google_options",
+        "//3rdparty/jvm/com/google/auth:google_auth_library_credentials",
+        "//3rdparty/jvm/com/google/auth:google_auth_library_oauth2_http",
+        "//3rdparty/jvm/com/google/code/findbugs:jsr305",
+        "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java",
+        "//3rdparty/jvm/io/grpc:grpc_auth",
+        "//3rdparty/jvm/io/grpc:grpc_core",
+        "//3rdparty/jvm/io/grpc:grpc_netty",
+        "//3rdparty/jvm/io/grpc:grpc_protobuf",
+        "//3rdparty/jvm/io/grpc:grpc_stub",
+        "//3rdparty/jvm/io/netty:netty_buffer",
+        "//3rdparty/jvm/io/netty:netty_codec",
+        "//3rdparty/jvm/io/netty:netty_codec_http",
+        "//3rdparty/jvm/io/netty:netty_common",
+        "//3rdparty/jvm/io/netty:netty_handler",
+        "//3rdparty/jvm/io/netty:netty_transport",
+        "//3rdparty/jvm/io/netty:netty_transport_native_epoll",
+        "//3rdparty/jvm/io/netty:netty_transport_native_kqueue",
+        "//3rdparty/jvm/io/netty:netty_transport_native_unix_common",
+        "@googleapis//:google_bytestream_bytestream_java_grpc",
+        "@googleapis//:google_bytestream_bytestream_java_proto",
+        "@googleapis//:google_rpc_code_java_proto",
+        "@googleapis//:google_rpc_status_java_proto",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+    ],
 )

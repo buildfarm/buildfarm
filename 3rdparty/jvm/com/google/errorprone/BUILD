@@ -1,9 +1,11 @@
 java_library(
     name = "error_prone_annotations",
-    visibility = [
-        "//visibility:public",
-    ],
     exports = [
-        "//external:jar/com/google/errorprone/error_prone_annotations",
+        "//external:jar/com/google/errorprone/error_prone_annotations"
     ],
+    visibility = [
+        "//3rdparty/jvm:__subpackages__"
+    ]
 )
+
+

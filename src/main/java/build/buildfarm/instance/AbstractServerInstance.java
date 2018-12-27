@@ -19,6 +19,7 @@ import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.TokenizableIterator;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -48,6 +49,7 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.rpc.Code;
 import io.grpc.Status;
+import java.io.IOException;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -204,12 +206,13 @@ public abstract class AbstractServerInstance implements Instance {
   protected abstract int getTreeMaxPageSize();
 
   protected abstract TokenizableIterator<Directory> createTreeIterator(
-      Digest rootDigest, String pageToken);
+      Digest rootDigest, String pageToken) throws IOException, InterruptedException;
 
   @Override
   public String getTree(
       Digest rootDigest, int pageSize, String pageToken,
-      ImmutableList.Builder<Directory> directories) {
+      ImmutableList.Builder<Directory> directories)
+      throws IOException, InterruptedException {
     if (pageSize == 0) {
       pageSize = getTreeDefaultPageSize();
     }

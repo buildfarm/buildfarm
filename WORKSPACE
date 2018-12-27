@@ -38,9 +38,9 @@ http_archive(
     build_file = "@build_buildfarm//:BUILD.remote_apis",
 )
 
-load("//3rdparty:workspace.bzl", "maven_dependencies", "declare_maven")
+load("//3rdparty:workspace.bzl", "maven_dependencies")
 
-maven_dependencies(declare_maven)
+maven_dependencies()
 
 git_repository(
     name = "io_bazel_rules_docker",

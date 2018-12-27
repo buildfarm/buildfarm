@@ -55,7 +55,8 @@ public interface Instance {
       Digest rootDigest,
       int pageSize,
       String pageToken,
-      ImmutableList.Builder<Directory> directories); 
+      ImmutableList.Builder<Directory> directories)
+      throws IOException, InterruptedException;
   OutputStream getStreamOutput(String name);
   InputStream newStreamInput(String name);
 

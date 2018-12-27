@@ -16,6 +16,7 @@ package build.buildfarm.instance.memory;
 
 import static com.google.common.collect.Multimaps.synchronizedSetMultimap;
 import static com.google.common.util.concurrent.Futures.addCallback;
+import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static java.util.Collections.synchronizedSortedMap;
 import static java.util.concurrent.Executors.newCachedThreadPool;
@@ -26,10 +27,11 @@ import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorages;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.TokenizableIterator;
+import build.buildfarm.common.TreeIterator;
 import build.buildfarm.common.function.InterruptingPredicate;
 import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.instance.OperationsMap;
-import build.buildfarm.instance.TokenizableIterator;
 import build.buildfarm.v1test.ActionCacheConfig;
 import build.buildfarm.v1test.GrpcACConfig;
 import build.buildfarm.v1test.MemoryInstanceConfig;
@@ -61,6 +63,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import io.grpc.Channel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
@@ -548,8 +551,8 @@ public class MemoryInstance extends AbstractServerInstance {
 
   @Override
   protected TokenizableIterator<Directory> createTreeIterator(
-      Digest rootDigest, String pageToken) {
-    return new TreeIterator(this, rootDigest, pageToken);
+      Digest rootDigest, String pageToken) throws IOException, InterruptedException {
+    return new TreeIterator((digest) -> immediateFuture(getBlob(digest)), rootDigest, pageToken);
   }
 
   @Override

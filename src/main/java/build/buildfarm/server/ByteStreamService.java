@@ -16,6 +16,9 @@ package build.buildfarm.server;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.UrlPath;
+import build.buildfarm.common.UrlPath.ResourceOperation;
+import build.buildfarm.common.UrlPath.InvalidResourceNameException;
 import build.buildfarm.instance.Instance;
 import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
@@ -56,7 +59,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
       String resourceName = request.getResourceName();
       Instance instance = instances.getFromBlob(resourceName);
 
-      Digest digest = UrlPath.parseBlobDigest(resourceName, instance.getDigestUtil());
+      Digest digest = UrlPath.parseBlobDigest(resourceName);
 
       ByteString blob = instance.getBlob(
           digest, request.getReadOffset(), request.getReadLimit());
@@ -80,14 +83,20 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
       }
 
       responseObserver.onCompleted();
-    } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
+    } catch (InstanceNotFoundException e) {
+      responseObserver.onError(BuildFarmInstances.toStatusException(e));
+    } catch (InvalidResourceNameException e) {
+      String description = e.getLocalizedMessage();
+      responseObserver.onError(Status.INVALID_ARGUMENT
+          .withDescription(description)
+          .asException());
     }
   }
 
   private void readOperationStream(
       ReadRequest request,
-      StreamObserver<ReadResponse> responseObserver) throws IOException {
+      StreamObserver<ReadResponse> responseObserver)
+      throws IOException, InvalidResourceNameException {
     String resourceName = request.getResourceName();
 
     Instance instance;
@@ -142,12 +151,14 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
     }
 
     try {
-      Optional<UrlPath.ResourceOperation> resourceOperation = Optional.empty();
+      Optional<ResourceOperation> resourceOperation = Optional.empty();
       try {
         resourceOperation = Optional.of(UrlPath.detectResourceOperation(resourceName));
-      } catch (IllegalArgumentException ex) {
-        String description = ex.getLocalizedMessage();
-        responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
+      } catch (InvalidResourceNameException e) {
+        String description = e.getLocalizedMessage();
+        responseObserver.onError(Status.INVALID_ARGUMENT
+            .withDescription(description)
+            .asException());
         return;
       }
       switch (resourceOperation.get()) {
@@ -162,8 +173,13 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
         responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
         break;
       }
-    } catch(IOException ex) {
-      responseObserver.onError(new StatusException(Status.fromThrowable(ex)));
+    } catch (IOException e) {
+      responseObserver.onError(new StatusException(Status.fromThrowable(e)));
+    } catch (InvalidResourceNameException e) {
+      String description = e.getLocalizedMessage();
+      responseObserver.onError(Status.INVALID_ARGUMENT
+          .withDescription(description)
+          .asException());
     }
   }
 
@@ -175,14 +191,20 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
       queryInstanceBlobWriteStatus(instance, resourceName, responseObserver);
     } catch (InstanceNotFoundException e) {
       responseObserver.onError(BuildFarmInstances.toStatusException(e));
+    } catch (InvalidResourceNameException e) {
+      String description = e.getLocalizedMessage();
+      responseObserver.onError(Status.INVALID_ARGUMENT
+          .withDescription(description)
+          .asException());
     }
   }
 
   private void queryInstanceBlobWriteStatus(
       Instance instance,
       String resourceName,
-      StreamObserver<QueryWriteStatusResponse> responseObserver) {
-    Digest digest = UrlPath.parseBlobDigest(resourceName, instance.getDigestUtil());
+      StreamObserver<QueryWriteStatusResponse> responseObserver)
+      throws InvalidResourceNameException {
+    Digest digest = UrlPath.parseBlobDigest(resourceName);
 
     if (Iterables.isEmpty(instance.findMissingBlobs(ImmutableList.of(digest)))) {
       responseObserver.onNext(
@@ -202,29 +224,26 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
       StreamObserver<QueryWriteStatusResponse> responseObserver) {
     String resourceName = request.getResourceName();
 
-    Optional<UrlPath.ResourceOperation> resourceOperation = Optional.empty();
     try {
-      resourceOperation = Optional.of(UrlPath.detectResourceOperation(resourceName));
-    } catch (IllegalArgumentException ex) {
-      String description = ex.getLocalizedMessage();
-      responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
-      return;
-    }
-
-    switch (resourceOperation.get()) {
-    case UploadBlob:
-      responseObserver.onError(new StatusException(Status.UNIMPLEMENTED));
-      break;
-    case OperationStream:
-      responseObserver.onError(new StatusException(Status.UNIMPLEMENTED));
-      break;
-    case Blob:
-      queryBlobWriteStatus(resourceName, responseObserver);
-      break;
-    default:
-      String description = "Invalid service";
-      responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
-      break;
+      ResourceOperation resourceOperation = UrlPath.detectResourceOperation(resourceName);
+      switch (resourceOperation) {
+      case UploadBlob:
+        responseObserver.onError(Status.UNIMPLEMENTED.asException());
+        break;
+      case OperationStream:
+        responseObserver.onError(Status.UNIMPLEMENTED.asException());
+        break;
+      case Blob:
+        queryBlobWriteStatus(resourceName, responseObserver);
+        break;
+      default:
+        throw new InvalidResourceNameException(resourceName, "Invalid resource type");
+      }
+    } catch (InvalidResourceNameException e) {
+      String description = e.getLocalizedMessage();
+      responseObserver.onError(Status.INVALID_ARGUMENT
+          .withDescription(description)
+          .asException());
     }
   }
 
@@ -247,6 +266,12 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
           Instance instance = instances.getFromUploadBlob(writeResourceName);
 
           writeInstanceBlob(request, responseObserver, instance);
+        } catch (InvalidResourceNameException e) {
+          String description = e.getLocalizedMessage();
+          responseObserver.onError(Status.INVALID_ARGUMENT
+              .withDescription(description)
+              .asException());
+          failed = true;
         } catch (InstanceNotFoundException ex) {
           responseObserver.onError(BuildFarmInstances.toStatusException(ex));
           failed = true;
@@ -256,9 +281,9 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
       private void writeInstanceBlob(
           WriteRequest request, StreamObserver<WriteResponse> responseObserver,
           Instance instance)
-          throws InterruptedException {
+          throws InvalidResourceNameException, InterruptedException {
         if (data == null) {
-          digest = UrlPath.parseUploadBlobDigest(writeResourceName, instance.getDigestUtil());
+          digest = UrlPath.parseUploadBlobDigest(writeResourceName);
           if (digest == null) {
             String description = "Could not parse digest of: " + writeResourceName;
             responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
@@ -317,6 +342,11 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
           }
         } catch (InstanceNotFoundException ex) {
           responseObserver.onError(BuildFarmInstances.toStatusException(ex));
+        } catch (InvalidResourceNameException e) {
+          String description = e.getLocalizedMessage();
+          responseObserver.onError(Status.INVALID_ARGUMENT
+              .withDescription(description)
+              .asException());
         }
       }
 
@@ -349,12 +379,14 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
           return;
         }
         
-        Optional<UrlPath.ResourceOperation> resourceOperation = Optional.empty();
+        Optional<ResourceOperation> resourceOperation = Optional.empty();
         try {
           resourceOperation = Optional.of(UrlPath.detectResourceOperation(writeResourceName));
-        } catch (IllegalArgumentException ex) {
-          String description = ex.getLocalizedMessage();
-          responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
+        } catch (InvalidResourceNameException e) {
+          String description = e.getLocalizedMessage();
+          responseObserver.onError(Status.INVALID_ARGUMENT
+              .withDescription(description)
+              .asException());
           failed = true;
         }
 
@@ -378,8 +410,8 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
             break;
           }
         } catch(InterruptedException ex) {
-          responseObserver.onError(new StatusException(Status.fromThrowable(ex)));
           failed = true;
+          Thread.currentThread().interrupt();
         } catch(IOException ex) {
           responseObserver.onError(new StatusException(Status.fromThrowable(ex)));
           failed = true;
