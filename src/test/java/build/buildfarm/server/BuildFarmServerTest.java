@@ -30,6 +30,7 @@ import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteRequest;
+import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecutionGrpc;
 import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
 import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
@@ -215,7 +216,7 @@ public class BuildFarmServerTest {
   }
 
   @Test
-  public void canceledOperationHasCancelledState()
+  public void cancelledOperationHasCancelledState()
       throws RetryException, InterruptedException, InvalidProtocolBufferException {
     Operation operation = executeAction(createSimpleAction());
 
@@ -240,8 +241,10 @@ public class BuildFarmServerTest {
     Operation cancelledOperation = operationsStub.getOperation(getRequest);
 
     assertThat(cancelledOperation.getDone()).isTrue();
-    assertThat(cancelledOperation.getResultCase()).isEqualTo(Operation.ResultCase.ERROR);
-    assertThat(cancelledOperation.getError().getCode()).isEqualTo(Code.CANCELLED.getNumber());
+    assertThat(cancelledOperation.getResultCase()).isEqualTo(Operation.ResultCase.RESPONSE);
+    ExecuteResponse executeResponse = cancelledOperation.getResponse()
+        .unpack(ExecuteResponse.class);
+    assertThat(executeResponse.getStatus().getCode()).isEqualTo(Code.CANCELLED.getNumber());
   }
 
   @Test

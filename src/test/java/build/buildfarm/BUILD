@@ -107,8 +107,8 @@ java_test(
         "//3rdparty/jvm/io/grpc:grpc_netty",
         "//3rdparty/jvm/io/grpc:grpc_protobuf",
         "//3rdparty/jvm/io/grpc:grpc_stub",
-        "//src/main/java/build/buildfarm:server",
         "//src/main/java/build/buildfarm:common",
+        "//src/main/java/build/buildfarm:server",
         "//src/main/java/build/buildfarm:stub-instance",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
@@ -141,7 +141,11 @@ java_test(
         ":test_runner",
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/truth",
+        "//src/main/java/build/buildfarm:common",
         "//src/main/java/build/buildfarm:server-instance",
+        "@googleapis//:google_longrunning_operations_java_grpc",
+        "@googleapis//:google_rpc_error_details_java_proto",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )
 
@@ -188,6 +192,7 @@ java_test(
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_longrunning_operations_java_grpc",
         "@googleapis//:google_rpc_code_java_proto",
+        "@googleapis//:google_rpc_error_details_java_proto",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )
