@@ -21,6 +21,13 @@ import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator
 import static java.util.Collections.synchronizedSortedMap;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.Platform;
 import build.buildfarm.ac.ActionCache;
 import build.buildfarm.ac.GrpcActionCache;
 import build.buildfarm.cas.ContentAddressableStorage;
@@ -29,6 +36,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator;
+import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.function.InterruptingPredicate;
 import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.instance.OperationsMap;
@@ -47,19 +55,14 @@ import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
-import build.bazel.remote.execution.v2.Action;
-import build.bazel.remote.execution.v2.ActionResult;
-import build.bazel.remote.execution.v2.Command;
-import build.bazel.remote.execution.v2.Digest;
-import build.bazel.remote.execution.v2.Directory;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
-import build.bazel.remote.execution.v2.Platform;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.util.Durations;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.rpc.PreconditionFailure;
+import com.google.rpc.PreconditionFailure.Violation;
 import io.grpc.Channel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
@@ -82,6 +85,9 @@ import java.util.logging.Logger;
 
 public class MemoryInstance extends AbstractServerInstance {
   private final static Logger logger = Logger.getLogger(MemoryInstance.class.getName());
+
+  public static final String TIMEOUT_OUT_OF_BOUNDS =
+      "A timeout specified is out of bounds with a configured range";
 
   private final MemoryInstanceConfig config;
   private final SetMultimap<String, Predicate<Operation>> watchers;
@@ -333,20 +339,22 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  protected void validateAction(Action action) {
+  protected void validateAction(
+      Action action,
+      PreconditionFailure.Builder preconditionFailure) {
     if (action.hasTimeout() && config.hasMaximumActionTimeout()) {
       Duration timeout = action.getTimeout();
       Duration maximum = config.getMaximumActionTimeout();
-      Preconditions.checkState(
-          timeout.getSeconds() < maximum.getSeconds()
-              || (timeout.getSeconds() == maximum.getSeconds() && timeout.getNanos() <= maximum.getNanos()),
-          String.format(
-              "action timeout %s exceeds the maximum timeout %s",
-              Durations.toString(timeout),
-              Durations.toString(maximum)));
+      if (timeout.getSeconds() > maximum.getSeconds() ||
+          (timeout.getSeconds() == maximum.getSeconds() && timeout.getNanos() > maximum.getNanos())) {
+        preconditionFailure.addViolationsBuilder()
+            .setType(VIOLATION_TYPE_INVALID)
+            .setSubject(TIMEOUT_OUT_OF_BOUNDS)
+            .setDescription(Durations.toString(timeout) + " > " + Durations.toString(maximum));
+      }
     }
 
-    super.validateAction(action);
+    super.validateAction(action, preconditionFailure);
   }
 
   @Override
@@ -550,9 +558,9 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  protected TokenizableIterator<Directory> createTreeIterator(
-      Digest rootDigest, String pageToken) throws IOException, InterruptedException {
-    return new TreeIterator((digest) -> immediateFuture(getBlob(digest)), rootDigest, pageToken);
+  protected TokenizableIterator<DirectoryEntry> createTreeIterator(
+      Digest rootDigest, String pageToken) {
+    return new TreeIterator(this::getBlob, rootDigest, pageToken);
   }
 
   @Override

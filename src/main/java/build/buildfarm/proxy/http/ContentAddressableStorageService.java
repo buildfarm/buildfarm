@@ -29,6 +29,7 @@ import build.bazel.remote.execution.v2.GetTreeRequest;
 import build.bazel.remote.execution.v2.GetTreeResponse;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator;
+import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
 import io.grpc.Metadata;
@@ -38,6 +39,7 @@ import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.StreamObserver;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
 
 public class ContentAddressableStorageService extends ContentAddressableStorageGrpc.ContentAddressableStorageImplBase {
@@ -126,20 +128,27 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
       pageSize = treeMaxPageSize;
     }
 
-    TokenizableIterator<Directory> iter =
+    TokenizableIterator<DirectoryEntry> iter =
         new TreeIterator(
             (digest) -> {
               ByteArrayOutputStream stream = new ByteArrayOutputStream((int) digest.getSizeBytes());
-              return transform(
-                  catching(
-                      simpleBlobStore.get(digest.getHash(), stream),
-                      Throwable.class,
-                      (e) -> false),
-                  (success) -> success ? ByteString.copyFrom(stream.toByteArray()) : null);
+              try {
+                return transform(
+                    catching(
+                        simpleBlobStore.get(digest.getHash(), stream),
+                        Throwable.class,
+                        (e) -> false),
+                    (success) -> success ? ByteString.copyFrom(stream.toByteArray()) : null).get();
+              } catch (ExecutionException e) {
+                return null; // should not happen due to catching
+              } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return null;
+              }
             }, rootDigest, pageToken);
 
     while (iter.hasNext() && pageSize != 0) {
-      Directory directory = iter.next();
+      Directory directory = iter.next().getDirectory();
       // If part of the tree is missing from the CAS, the server will return the
       // portion present and omit the rest.
       if (directory != null) {

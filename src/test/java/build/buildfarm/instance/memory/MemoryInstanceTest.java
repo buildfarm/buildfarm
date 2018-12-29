@@ -20,10 +20,15 @@ import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.EXE
 import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.QUEUED;
 import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.UNKNOWN;
 import static build.buildfarm.instance.AbstractServerInstance.INVALID_DIGEST;
+import static build.buildfarm.instance.AbstractServerInstance.MISSING_INPUT;
+import static build.buildfarm.instance.AbstractServerInstance.VIOLATION_TYPE_INVALID;
+import static build.buildfarm.instance.AbstractServerInstance.VIOLATION_TYPE_MISSING;
+import static build.buildfarm.instance.AbstractServerInstance.invalidActionMessage;
+import static build.buildfarm.instance.memory.MemoryInstance.TIMEOUT_OUT_OF_BOUNDS;
 import static build.buildfarm.cas.ContentAddressableStorages.casMapDecorator;
 import static com.google.common.collect.Multimaps.synchronizedSetMultimap;
+import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static com.google.common.truth.Truth.assertThat;
-import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static org.mockito.Mockito.any;
@@ -40,6 +45,7 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
+import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.buildfarm.cas.ContentAddressableStorage;
@@ -62,6 +68,8 @@ import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.Durations;
 import com.google.rpc.Code;
+import com.google.rpc.PreconditionFailure;
+import com.google.rpc.PreconditionFailure.Violation;
 import com.google.rpc.Status;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -72,6 +80,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.mockito.ArgumentCaptor;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 
@@ -93,7 +102,7 @@ public class MemoryInstanceTest {
 
   private OperationsMap outstandingOperations;
   private SetMultimap<String, Predicate<Operation>> watchers;
-  private ExecutorService watchersThreadPool;
+  private ExecutorService watcherService;
 
   private Map<Digest, ByteString> storage;
 
@@ -105,7 +114,7 @@ public class MemoryInstanceTest {
             .hashKeys()
             .hashSetValues(/* expectedValuesPerKey=*/ 1)
             .build());
-    watchersThreadPool = newFixedThreadPool(1);
+    watcherService = newDirectExecutorService();
     MemoryInstanceConfig memoryInstanceConfig = MemoryInstanceConfig.newBuilder()
         .setListOperationsDefaultPageSize(1024)
         .setListOperationsMaxPageSize(16384)
@@ -127,14 +136,14 @@ public class MemoryInstanceTest {
         memoryInstanceConfig,
         casMapDecorator(storage),
         watchers,
-        watchersThreadPool,
+        watcherService,
         outstandingOperations);
   }
 
   @After
   public void tearDown() throws Exception {
-    watchersThreadPool.shutdown();
-    watchersThreadPool.awaitTermination(Long.MAX_VALUE, NANOSECONDS);
+    watcherService.shutdown();
+    watcherService.awaitTermination(Long.MAX_VALUE, NANOSECONDS);
   }
 
   @Test
@@ -276,7 +285,7 @@ public class MemoryInstanceTest {
         return true;
       }
     };
-    Predicate<Operation> watcher = (Predicate<Operation>) mock(Predicate.class);
+    Predicate<Operation> watcher = mock(Predicate.class);
     when(watcher.test(eq(operation))).thenAnswer(initialAnswer);
     when(watcher.test(eq(doneOperation))).thenReturn(false);
 
@@ -308,60 +317,61 @@ public class MemoryInstanceTest {
 
   @Test
   public void requeueFailOnInvalid() throws InterruptedException, InvalidProtocolBufferException {
-    // These new operations are invalid as they're missing content.
-    Operation queuedOperation = createOperation("my-queued-operation", QUEUED);
+    // These new operations are invalid as they're missing actions.
+    Operation queuedOperation = createOperation("missing-action-queued-operation", QUEUED);
     outstandingOperations.put(queuedOperation.getName(), queuedOperation);
 
-    AtomicInteger code = new AtomicInteger(Code.OK.getNumber());
-    watchers.put(queuedOperation.getName(), new Predicate<Operation>() {
-      @Override
-      public boolean test(Operation operation) {
-        code.set(operation.getError().getCode());
-        return false;
-      }
-    });
+    Predicate<Operation> watcher = mock(Predicate.class);
+    watchers.put(queuedOperation.getName(), watcher);
+    when(watcher.test(any(Operation.class))).thenReturn(false);
 
     instance.requeueOperation(queuedOperation);
 
-    boolean done = false;
-    int waits = 0;
-    while (!done) {
-      assertThat(waits < 10).isTrue();
-      MICROSECONDS.sleep(10);
-      waits++;
-      synchronized (watchers) {
-        if (!watchers.containsKey(queuedOperation.getName())) {
-          done = true;
-        }
-      }
-    }
-    assertThat(code.get()).isEqualTo(Code.FAILED_PRECONDITION.getNumber());
+    ArgumentCaptor<Operation> operationCaptor = ArgumentCaptor.forClass(Operation.class);
+    verify(watcher, times(1)).test(operationCaptor.capture());
+    Operation operation = operationCaptor.getValue();
+    assertThat(operation.getName()).isEqualTo(queuedOperation.getName());
   }
 
   @Test
   public void requeueSucceedsOnQueued() throws InterruptedException, InvalidProtocolBufferException {
+    storage.put(simpleActionDigest, simpleAction.toByteString());
+    storage.put(simpleCommandDigest, simpleCommand.toByteString());
+
     Operation queuedOperation = createOperation("my-queued-operation", QUEUED);
     outstandingOperations.put(queuedOperation.getName(), queuedOperation);
+    Predicate<Operation> watcher = mock(Predicate.class);
+    when(watcher.test(any(Operation.class))).thenReturn(false);
+    watchers.put(queuedOperation.getName(), watcher);
 
-    instance.requeueOperation(queuedOperation);
+    verifyZeroInteractions(watcher);
   }
 
   @Test
   public void requeueFailureNotifiesWatchers() throws InterruptedException {
     ExecuteOperationMetadata metadata = ExecuteOperationMetadata.newBuilder()
+        .setActionDigest(simpleActionDigest)
         .setStage(QUEUED)
         .build();
-    Operation queuedOperation = createOperation("my-queued-operation", metadata);
+    Operation queuedOperation = createOperation("missing-action-operation", metadata);
     outstandingOperations.put(queuedOperation.getName(), queuedOperation);
+    ExecuteResponse executeResponse = ExecuteResponse.newBuilder()
+        .setStatus(com.google.rpc.Status.newBuilder()
+            .setCode(Code.FAILED_PRECONDITION.getNumber())
+            .setMessage(invalidActionMessage(simpleActionDigest))
+            .addDetails(Any.pack(PreconditionFailure.newBuilder()
+                .addViolations(Violation.newBuilder()
+                    .setType(VIOLATION_TYPE_MISSING)
+                    .setSubject(MISSING_INPUT)
+                    .setDescription("Action " + DigestUtil.toString(simpleActionDigest)))
+                .build())))
+        .build();
     Operation erroredOperation = queuedOperation.toBuilder()
         .setDone(true)
         .setMetadata(Any.pack(metadata.toBuilder()
             .setStage(COMPLETED)
             .build()))
-        .setError(Status.newBuilder()
-            .setCode(Code.FAILED_PRECONDITION.getNumber())
-            .setMessage(INVALID_DIGEST)
-            .build())
+        .setResponse(Any.pack(executeResponse))
         .build();
     Predicate<Operation> watcher = mock(Predicate.class);
     when(watcher.test(eq(queuedOperation))).thenReturn(true);
@@ -455,29 +465,33 @@ public class MemoryInstanceTest {
 
   @Test
   public void actionWithExcessiveTimeoutFailsValidation()
-      throws InterruptedException {
+      throws InterruptedException, InvalidProtocolBufferException {
     Duration timeout = Durations.fromSeconds(9000);
     Digest actionDigestWithExcessiveTimeout = createAction(Action.newBuilder()
         .setTimeout(timeout));
 
     Predicate watcher = mock(Predicate.class);
     IllegalStateException timeoutInvalid = null;
-    try {
-      instance.execute(
-          actionDigestWithExcessiveTimeout,
-          /* skipCacheLookup=*/ true,
-          ExecutionPolicy.getDefaultInstance(),
-          ResultsCachePolicy.getDefaultInstance(),
-          watcher);
-    } catch (IllegalStateException e) {
-      assertThat(e.getMessage()).isEqualTo(
-          String.format(
-              "action timeout %s exceeds the maximum timeout %s",
-              Durations.toString(timeout),
-              Durations.toString(MAXIMUM_ACTION_TIMEOUT)));
-      timeoutInvalid = e;
-    }
-    verifyZeroInteractions(watcher);
+    instance.execute(
+        actionDigestWithExcessiveTimeout,
+        /* skipCacheLookup=*/ true,
+        ExecutionPolicy.getDefaultInstance(),
+        ResultsCachePolicy.getDefaultInstance(),
+        watcher);
+    ArgumentCaptor<Operation> watchCaptor = ArgumentCaptor.forClass(Operation.class);
+    verify(watcher, times(1)).test(watchCaptor.capture());
+    Operation watchOperation = watchCaptor.getValue();
+    assertThat(watchOperation.getResponse().is(ExecuteResponse.class)).isTrue();
+    com.google.rpc.Status status = watchOperation.getResponse().unpack(ExecuteResponse.class).getStatus();
+    assertThat(status.getCode()).isEqualTo(Code.FAILED_PRECONDITION.getNumber());
+    assertThat(status.getDetailsCount()).isEqualTo(1);
+    assertThat(status.getDetails(0).is(PreconditionFailure.class)).isTrue();
+    PreconditionFailure preconditionFailure = status.getDetails(0).unpack(PreconditionFailure.class);
+    assertThat(preconditionFailure.getViolationsList()).contains(Violation.newBuilder()
+        .setType(VIOLATION_TYPE_INVALID)
+        .setSubject(TIMEOUT_OUT_OF_BOUNDS)
+        .setDescription(Durations.toString(timeout) + " > " + Durations.toString(MAXIMUM_ACTION_TIMEOUT))
+        .build());
   }
 
   @Test
