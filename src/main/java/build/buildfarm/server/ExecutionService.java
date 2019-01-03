@@ -14,9 +14,12 @@
 
 package build.buildfarm.server;
 
+import static java.lang.String.format;
+
 import build.bazel.remote.execution.v2.ExecuteRequest;
 import build.bazel.remote.execution.v2.ExecutionGrpc;
 import build.bazel.remote.execution.v2.WaitExecutionRequest;
+import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.instance.Instance;
 import com.google.common.base.Throwables;
@@ -32,10 +35,16 @@ import java.util.function.Predicate;
 import java.util.logging.Logger;
 
 public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
+  public static final Logger logger = Logger.getLogger(ExecutionService.class.getName());
+
   private final Instances instances;
 
   public ExecutionService(Instances instances) {
     this.instances = instances;
+  }
+
+  private void logExecute(String instanceName, ExecuteRequest request) {
+    logger.info(format("ExecutionSuccess: %s: %s", instanceName, DigestUtil.toString(request.getActionDigest())));
   }
 
   private Predicate<Operation> createWatcher(StreamObserver<Operation> responseObserver) {
@@ -102,6 +111,8 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
       responseObserver.onError(BuildFarmInstances.toStatusException(e));
       return;
     }
+
+    logExecute(instance.getName(), request);
 
     try {
       instance.execute(
