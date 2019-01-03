@@ -1035,9 +1035,7 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   private void completeOperation(Jedis jedis, String operationName) {
-    if (jedis.hdel(config.getDispatchedOperationsHashName(), operationName) != 1) {
-      logger.severe("RedisShardBackplane::completeOperation: WARNING " + operationName + " was not in dispatched list");
-    }
+    jedis.hdel(config.getDispatchedOperationsHashName(), operationName);
   }
 
   @Override
