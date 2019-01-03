@@ -1191,7 +1191,7 @@ public class ShardInstance extends AbstractServerInstance {
     if (executeEntry.getSkipCacheLookup()) {
       cachedResultFuture = immediateFuture(false);
     } else {
-      cachedResultFuture = checkCache(actionKey, operation);
+      cachedResultFuture = checkCacheFuture(actionKey, operation);
     }
     return transformAsync(
         cachedResultFuture,
@@ -1278,54 +1278,65 @@ public class ShardInstance extends AbstractServerInstance {
     });
   }
 
-  // FIXME make this async
-  private ListenableFuture<Boolean> checkCache(ActionKey actionKey, Operation operation) {
+  private boolean checkCache(ActionKey actionKey, Operation operation) throws IOException {
     ExecuteOperationMetadata metadata =
         ExecuteOperationMetadata.newBuilder()
             .setActionDigest(actionKey.getDigest())
             .setStage(Stage.CACHE_CHECK)
             .build();
-    try {
-      backplane.putOperation(
-          operation.toBuilder()
-              .setMetadata(Any.pack(metadata))
-              .build(),
-          metadata.getStage());
+    backplane.putOperation(
+        operation.toBuilder()
+            .setMetadata(Any.pack(metadata))
+            .build(),
+        metadata.getStage());
 
-      ActionResult actionResult = getActionResultFromBackplane(actionKey);
-      if (actionResult == null) {
-        return immediateFuture(false);
-      }
-
-      metadata = metadata.toBuilder()
-          .setStage(Stage.COMPLETED)
-          .build();
-      Operation completedOperation = operation.toBuilder()
-          .setDone(true)
-          .setResponse(Any.pack(ExecuteResponse.newBuilder()
-              .setResult(actionResult)
-              .setStatus(com.google.rpc.Status.newBuilder()
-                  .setCode(Code.OK.value())
-                  .build())
-              .setCachedResult(true)
-              .build()))
-          .setMetadata(Any.pack(metadata))
-          .build();
-      backplane.putOperation(completedOperation, metadata.getStage());
-    } catch (IOException e) {
-      logger.log(SEVERE, "error checking cache", e);
-      com.google.rpc.Status status = StatusProto.fromThrowable(e);
-      if (status == null) {
-        status = com.google.rpc.Status.newBuilder()
-            .setCode(Status.fromThrowable(e).getCode().value())
-            .setMessage(e.getMessage())
-            .build();
-      }
-      SettableFuture<Boolean> errorFuture = SettableFuture.create();
-      errorOperationFuture(operation, status, errorFuture);
-      return errorFuture;
+    ActionResult actionResult = getActionResultFromBackplane(actionKey);
+    if (actionResult == null) {
+      return false;
     }
-    return immediateFuture(true);
+
+    metadata = metadata.toBuilder()
+        .setStage(Stage.COMPLETED)
+        .build();
+    Operation completedOperation = operation.toBuilder()
+        .setDone(true)
+        .setResponse(Any.pack(ExecuteResponse.newBuilder()
+            .setResult(actionResult)
+            .setStatus(com.google.rpc.Status.newBuilder()
+                .setCode(Code.OK.value())
+                .build())
+            .setCachedResult(true)
+            .build()))
+        .setMetadata(Any.pack(metadata))
+        .build();
+    backplane.putOperation(completedOperation, metadata.getStage());
+    return true;
+  }
+
+  private ListenableFuture<Boolean> checkCacheFuture(ActionKey actionKey, Operation operation) {
+    ListenableFuture<Boolean> checkCacheFuture = operationTransformService.submit(new Callable<Boolean>() {
+      @Override
+      public Boolean call() throws IOException {
+        return checkCache(actionKey, operation);
+      }
+    });
+    return catchingAsync(
+        checkCacheFuture,
+        IOException.class,
+        (e) -> {
+          logger.log(SEVERE, "error checking cache", e);
+          com.google.rpc.Status status = StatusProto.fromThrowable(e);
+          if (status == null) {
+            status = com.google.rpc.Status.newBuilder()
+                .setCode(Status.fromThrowable(e).getCode().value())
+                .setMessage(e.getMessage())
+                .build();
+          }
+          SettableFuture<Boolean> errorFuture = SettableFuture.create();
+          errorOperationFuture(operation, status, errorFuture);
+          return errorFuture;
+        },
+        operationTransformService);
   }
 
   @VisibleForTesting
@@ -1350,7 +1361,7 @@ public class ShardInstance extends AbstractServerInstance {
     if (executeEntry.getSkipCacheLookup()) {
       cachedResultFuture = immediateFuture(false);
     } else {
-      cachedResultFuture = checkCache(actionKey, operation);
+      cachedResultFuture = checkCacheFuture(actionKey, operation);
     }
     addCallback(
         cachedResultFuture,
