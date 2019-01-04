@@ -372,6 +372,12 @@ public class ShardInstance extends AbstractServerInstance {
     // FIXME inline content
     Iterable<OutputFile> outputFiles = actionResult.getOutputFilesList();
     Iterable<Digest> outputDigests = Iterables.transform(outputFiles, (outputFile) -> outputFile.getDigest());
+    if (actionResult.hasStdoutDigest()) {
+      outputDigests = Iterables.concat(outputDigests, ImmutableList.of(actionResult.getStdoutDigest()));
+    }
+    if (actionResult.hasStderrDigest()) {
+      outputDigests = Iterables.concat(outputDigests, ImmutableList.of(actionResult.getStderrDigest()));
+    }
     try {
       if (Iterables.isEmpty(findMissingBlobs(outputDigests, newDirectExecutorService()).get())) {
         return actionResult;
