@@ -112,13 +112,13 @@ class Cat {
     if (!result.getStdoutRaw().isEmpty()) {
       indentOut(indentLevel, "Stdout: " + result.getStdoutRaw().toStringUtf8());
     }
-    if (!result.hasStdoutDigest()) {
+    if (result.hasStdoutDigest()) {
       indentOut(indentLevel, "Stdout Digest: " + DigestUtil.toString(result.getStdoutDigest()));
     }
     if (!result.getStderrRaw().isEmpty()) {
       indentOut(indentLevel, "Stderr: " + result.getStderrRaw().toStringUtf8());
     }
-    if (!result.hasStderrDigest()) {
+    if (result.hasStderrDigest()) {
       indentOut(indentLevel, "Stderr Digest: " + DigestUtil.toString(result.getStderrDigest()));
     }
   }
