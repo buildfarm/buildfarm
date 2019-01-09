@@ -329,7 +329,7 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   private void startSubscriptionThread() {
-    ListMultimap<String, TimedWatcher<Operation>> watchers = 
+    ListMultimap<String, TimedWatcher<Operation>> watchers =
         Multimaps.<String, TimedWatcher<Operation>>synchronizedListMultimap(
             MultimapBuilder.linkedHashKeys().arrayListValues().build());
     ExecutorService subscriberService = Executors.newFixedThreadPool(32);
@@ -873,92 +873,106 @@ public class RedisShardBackplane implements ShardBackplane {
     return builder.build();
   }
 
-  @Override
-  public ExecuteEntry deprequeueOperation() throws IOException, InterruptedException {
-    String executeEntryJson = withBackplaneException((jedis) -> {
-      List<String> result;
-      do {
-        result = jedis.brpop(1, config.getPreQueuedOperationsListName());
-        if (Thread.currentThread().isInterrupted()) {
-          return null;
-        }
-      } while (result == null || result.isEmpty());
-
-      if (result.size() == 2 && result.get(0).equals(config.getPreQueuedOperationsListName())) {
-        return result.get(1);
+  private ExecuteEntry deprequeueOperation(Jedis jedis) {
+    List<String> result;
+    do {
+      // time to switch to brpoplpush
+      result = jedis.brpop(1, config.getPreQueuedOperationsListName());
+      // right here is an operation loss risk
+      if (Thread.currentThread().isInterrupted()) {
+        return null;
       }
-      return null;
-    });
+    } while (result == null || result.isEmpty());
 
-    if (Thread.interrupted()) {
-      throw new InterruptedException();
-    }
-
-    if (executeEntryJson == null) {
+    if (result.size() != 2
+        || !result.get(0).equals(config.getPreQueuedOperationsListName())) {
       return null;
     }
 
     ExecuteEntry.Builder executeEntryBuilder = ExecuteEntry.newBuilder();
-    JsonFormat.parser().merge(executeEntryJson, executeEntryBuilder);
-    ExecuteEntry executeEntry = executeEntryBuilder.build();
+    String executeEntryJson = result.get(1);
+    try {
+      JsonFormat.parser().merge(executeEntryJson, executeEntryBuilder);
+      ExecuteEntry executeEntry = executeEntryBuilder.build();
+      String operationName = executeEntry.getOperationName();
 
-    // loss risk?
-    queueing(executeEntry.getOperationName());
-
-    return executeEntry;
+      String message = keepaliveMessage(operationName);
+      // publish so that watchers reset their timeout
+      keepalive(jedis, operationName, message);
+      return executeEntry;
+    } catch (InvalidProtocolBufferException e) {
+      return null;
+    }
   }
 
   @Override
-  public QueueEntry dispatchOperation() throws IOException, InterruptedException {
-    String queueEntryJson = withBackplaneException((jedis) -> {
-      List<String> result;
-      do {
-        /* maybe we should really have a dispatch queue per registered worker */
-        result = jedis.brpop(1, config.getQueuedOperationsListName());
-        if (Thread.currentThread().isInterrupted()) {
-          return null;
-        }
-      } while (result == null || result.isEmpty());
+  public ExecuteEntry deprequeueOperation() throws IOException, InterruptedException {
+    ExecuteEntry executeEntry = withBackplaneException(this::deprequeueOperation);
+    if (Thread.interrupted()) {
+      throw new InterruptedException();
+    }
+    return executeEntry;
+  }
 
-      if (result.size() == 2 && result.get(0).equals(config.getQueuedOperationsListName())) {
-        return result.get(1);
+  private QueueEntry dispatchOperation(Jedis jedis) {
+    List<String> result;
+    do {
+      // time to switch to brpoplpush
+      result = jedis.brpop(1, config.getQueuedOperationsListName());
+      // right here is an operation loss risk
+      if (Thread.currentThread().isInterrupted()) {
+        return null;
       }
-      return null;
-    });
+    } while (result == null || result.isEmpty());
 
-    if (queueEntryJson == null) {
-      if (Thread.interrupted()) {
-        throw new InterruptedException();
-      }
+    if (result.size() != 2
+        || !result.get(0).equals(config.getQueuedOperationsListName())) {
       return null;
     }
 
+    String queueEntryJson = result.get(1);
     QueueEntry.Builder queueEntryBuilder = QueueEntry.newBuilder();
-    JsonFormat.parser().merge(queueEntryJson, queueEntryBuilder);
+    try {
+      JsonFormat.parser().merge(queueEntryJson, queueEntryBuilder);
+    } catch (InvalidProtocolBufferException e) {
+      return null;
+    }
     QueueEntry queueEntry = queueEntryBuilder.build();
+
+    String operationName = queueEntry.getExecuteEntry().getOperationName();
+    try {
+      String message = keepaliveMessage(operationName);
+      keepalive(jedis, operationName, message);
+    } catch (InvalidProtocolBufferException e) {
+      // very unlikely, printer would have to fail
+      return null;
+    }
 
     long requeueAt = System.currentTimeMillis() + 30 * 1000;
     DispatchedOperation o = DispatchedOperation.newBuilder()
         .setQueueEntry(queueEntry)
         .setRequeueAt(requeueAt)
         .build();
-    String dispatchedOperationJson = JsonFormat.printer().print(o);
-    // right here is an operation loss risk
-    String operationName = queueEntry.getExecuteEntry().getOperationName();
-    String message = keepaliveMessage(operationName);
-    boolean dispatched = withBackplaneException((jedis) -> {
+    try {
+      String dispatchedOperationJson = JsonFormat.printer().print(o);
+
       /* if the operation is already in the dispatch list, fail the dispatch */
       boolean success = jedis.hsetnx(
           config.getDispatchedOperationsHashName(),
           operationName,
           dispatchedOperationJson) == 1;
-      if (success) {
-        keepalive(jedis, operationName, message);
-      }
-      return success;
-    });
-    if (!dispatched) {
+      return success ? queueEntry : null;
+    } catch (InvalidProtocolBufferException e) {
+      // very unlikely, printer would have to fail
       return null;
+    }
+  }
+
+  @Override
+  public QueueEntry dispatchOperation() throws IOException, InterruptedException {
+    QueueEntry queueEntry = withBackplaneException(this::dispatchOperation);
+    if (Thread.interrupted()) {
+      throw new InterruptedException();
     }
     return queueEntry;
   }
@@ -1002,7 +1016,7 @@ public class RedisShardBackplane implements ShardBackplane {
     });
   }
 
-  private String keepaliveMessage(String operationName) throws IOException {
+  private String keepaliveMessage(String operationName) throws InvalidProtocolBufferException {
     return operationPrinter.print(Operation.newBuilder()
         .setName(operationName)
         .build());
