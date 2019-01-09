@@ -14,6 +14,7 @@
 
 package build.buildfarm.instance.shard;
 
+import static java.lang.String.format;
 import static java.util.logging.Level.SEVERE;
 
 import com.google.common.collect.ImmutableList;
@@ -114,11 +115,11 @@ abstract class OperationSubscriber extends JedisPubSub {
     }
   }
 
-  public void terminateExpiredWatchers(String channel, Instant now) {
+  private void terminateExpiredWatchers(String channel, Instant now) {
     onOperation(channel, null, (watcher) -> {
       boolean expired = watcher.isExpiredAt(now);
       if (expired) {
-        System.out.println("Terminating expired watcher of " + channel + " because: " + now + " >= " + watcher.getExpiresAt());
+        logger.severe(format("Terminating expired watcher of %s because: %s >= %s", channel, now.toString(), watcher.getExpiresAt()));
       }
       return expired;
     }, now);
@@ -191,7 +192,7 @@ abstract class OperationSubscriber extends JedisPubSub {
 
           @Override
           public void onFailure(Throwable t) {
-            logger.log(SEVERE, "error while filtering watchers", t);
+            logger.log(SEVERE, "error while updating watchers of " + channel, t);
           }
         },
         executorService);

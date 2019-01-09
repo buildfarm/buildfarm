@@ -248,27 +248,27 @@ public class RedisShardBackplane implements ShardBackplane {
     if (expiringChannels.isEmpty()) {
       return;
     }
-    System.out.println(
-        String.format(
+    logger.info(
+        format(
             "Scan %d watches, %s, expiresAt: %s",
             expiringChannels.size(),
             now,
             expiresAt));
-    System.out.println("Scan dispatched");
+    logger.info("Scan dispatched");
     // scan dispatched pet watches
     scanDispatched(jedis, resetChannel);
 
     if (expiringChannels.isEmpty()) {
       return;
     }
-    System.out.println("Scan queue");
+    logger.info("Scan queue");
     // scan queue, pet watches
     scanQueue(jedis, resetChannel);
 
     if (expiringChannels.isEmpty()) {
       return;
     }
-    System.out.println("Scan prequeue");
+    logger.info("Scan prequeue");
     // scan prequeue, pet watches
     scanPrequeue(jedis, resetChannel);
     //
