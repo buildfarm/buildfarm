@@ -20,6 +20,8 @@ import static com.google.common.util.concurrent.Futures.allAsList;
 import static com.google.common.util.concurrent.Futures.catching;
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
+import static java.lang.String.format;
+import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest.Request;
@@ -45,8 +47,11 @@ import io.grpc.Status.Code;
 import io.grpc.StatusException;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
+import java.util.logging.Logger;
 
 public class ContentAddressableStorageService extends ContentAddressableStorageGrpc.ContentAddressableStorageImplBase {
+  private static final Logger logger = Logger.getLogger(ContentAddressableStorageService.class.getName());
+
   private final Instances instances;
 
   public ContentAddressableStorageService(Instances instances) {
@@ -79,6 +84,7 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
 
           @Override
           public void onFailure(Throwable t) {
+            logger.log(SEVERE, format("findMissingBlobs: %s: %d", request.getInstanceName(), request.getBlobDigestsCount()), t);
             responseObserver.onError(t);
           }
         });
