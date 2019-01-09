@@ -454,10 +454,10 @@ public class RedisShardBackplane implements ShardBackplane {
       // as a result of an error. The error is meant to indicate
       // that substantial resources were unavailable.
       // we must throw an IOException which indicates as much
-      // this looks simply to me like a good opportunity to use FAILED_PRECONDITION
+      // this looks simply to me like a good opportunity to use UNAVAILABLE
       // we are technically not at RESOURCE_EXHAUSTED, this is a
       // persistent state which can exist long past the error
-      throw new IOException(Status.FAILED_PRECONDITION.withCause(e).asRuntimeException());
+      throw new IOException(Status.UNAVAILABLE.withCause(e).asRuntimeException());
     } catch (JedisConnectionException e) {
       if ((e.getMessage() != null && e.getMessage().equals("Unexpected end of stream."))
           || e.getCause() instanceof ConnectException) {
@@ -1089,7 +1089,7 @@ public class RedisShardBackplane implements ShardBackplane {
 
   private Jedis getJedis() {
     if (!poolStarted) {
-      throw Status.FAILED_PRECONDITION.withDescription("pool is not started").asRuntimeException();
+      throw Status.UNAVAILABLE.withDescription("pool is not started").asRuntimeException();
     }
     return pool.getResource();
   }
