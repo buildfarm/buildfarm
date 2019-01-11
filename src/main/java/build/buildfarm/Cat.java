@@ -300,7 +300,7 @@ class Cat {
     System.out.println("CorrelatedInvocationsId: " + metadata.getCorrelatedInvocationsId());
   }
 
-  private static void printOperation(Instance instance, Operation operation) throws IOException, InterruptedException {
+  private static void printOperation(Operation operation) {
     System.out.println("Operation: " + operation.getName());
     System.out.println("Done: " + (operation.getDone() ? "true" : "false"));
     System.out.println("Metadata:");
@@ -364,6 +364,13 @@ class Cat {
     }
   }
 
+  private static void watchOperation(Instance instance, String operationName) {
+    instance.watchOperation(operationName, (operation) -> {
+      printOperation(operation);
+      return !operation.getDone();
+    });
+  }
+
   public static void main(String[] args) throws Exception {
     String host = args[0];
     String instanceName = args[1];
@@ -382,7 +389,9 @@ class Cat {
     }
     for (int i = 4; i < args.length; i++) {
       if (type.equals("Operation")) {
-        printOperation(instance, instance.getOperation(args[i]));
+        printOperation(instance.getOperation(args[i]));
+      } else if (type.equals("Watch")) {
+        watchOperation(instance, args[i]);
       } else {
         Digest blobDigest = DigestUtil.parseDigest(args[i]);
         if (type.equals("Missing")) {

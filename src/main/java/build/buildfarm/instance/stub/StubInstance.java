@@ -74,9 +74,15 @@ import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.rpc.Code;
+import com.google.watcher.v1.Change;
+import com.google.watcher.v1.ChangeBatch;
+import com.google.watcher.v1.Request;
+import com.google.watcher.v1.WatcherGrpc;
+import com.google.watcher.v1.WatcherGrpc.WatcherBlockingStub;
 import io.grpc.ManagedChannel;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
+import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
@@ -176,6 +182,15 @@ public class StubInstance implements Instance {
             @Override
             public OperationQueueBlockingStub get() {
               return OperationQueueGrpc.newBlockingStub(channel);
+            }
+          });
+
+  private final Supplier<WatcherBlockingStub> watcherBlockingStub =
+      Suppliers.memoize(
+          new Supplier<WatcherBlockingStub>() {
+            @Override
+            public WatcherBlockingStub get() {
+              return WatcherGrpc.newBlockingStub(channel);
             }
           });
 
@@ -553,7 +568,55 @@ public class StubInstance implements Instance {
   public boolean watchOperation(
       String operationName,
       Predicate<Operation> watcher) {
-    throw new UnsupportedOperationException();
+    Request request = Request.newBuilder()
+        .setTarget(operationName)
+        .build();
+    Iterator<ChangeBatch> replies = watcherBlockingStub.get().watch(request);
+    try {
+      while (replies.hasNext()) {
+        ChangeBatch changeBatch = replies.next();
+        for (Change change : changeBatch.getChangesList()) {
+          switch (change.getState()) {
+            case INITIAL_STATE_SKIPPED:
+              break;
+            case ERROR:
+              try {
+                throw StatusProto.toStatusRuntimeException(
+                    change.getData().unpack(com.google.rpc.Status.class));
+              } catch (InvalidProtocolBufferException e) {
+                throw new RuntimeException(e);
+              }
+            case DOES_NOT_EXIST:
+              throw Status.NOT_FOUND.asRuntimeException();
+            case EXISTS:
+              Operation o;
+              try {
+                o = change.getData().unpack(Operation.class);
+                boolean done = o.getDone();
+                boolean watched = watcher.test(o);
+                if (done == watched) {
+                  throw new RuntimeException("mismatched watched and " + (done ? "" : "not ") + "done");
+                }
+              } catch (InvalidProtocolBufferException e) {
+                throw new RuntimeException(e);
+              }
+              break;
+            default:
+              throw new RuntimeException(String.format("Illegal Change State: %s", change.getState()));
+          }
+        }
+      }
+    } finally {
+      try {
+        while (replies.hasNext()) {
+          replies.next();
+        }
+      } catch (StatusRuntimeException e) {
+        // ignore
+      }
+    }
+    // FIXME test to ensure that we got a result
+    return true;
   }
 
   @Override
