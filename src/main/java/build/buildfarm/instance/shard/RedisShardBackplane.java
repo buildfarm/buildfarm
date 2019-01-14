@@ -901,6 +901,7 @@ public class RedisShardBackplane implements ShardBackplane {
       keepalive(jedis, operationName, message);
       return executeEntry;
     } catch (InvalidProtocolBufferException e) {
+      logger.log(SEVERE, "error parsing execute entry", e);
       return null;
     }
   }
@@ -935,6 +936,7 @@ public class RedisShardBackplane implements ShardBackplane {
     try {
       JsonFormat.parser().merge(queueEntryJson, queueEntryBuilder);
     } catch (InvalidProtocolBufferException e) {
+      logger.log(SEVERE, "error parsing queue entry", e);
       return null;
     }
     QueueEntry queueEntry = queueEntryBuilder.build();
@@ -944,6 +946,7 @@ public class RedisShardBackplane implements ShardBackplane {
       String message = keepaliveMessage(operationName);
       keepalive(jedis, operationName, message);
     } catch (InvalidProtocolBufferException e) {
+      logger.log(SEVERE, "error printing keepalive message", e);
       // very unlikely, printer would have to fail
       return null;
     }
@@ -963,6 +966,7 @@ public class RedisShardBackplane implements ShardBackplane {
           dispatchedOperationJson) == 1;
       return success ? queueEntry : null;
     } catch (InvalidProtocolBufferException e) {
+      logger.log(SEVERE, "error printing dispatched operation", e);
       // very unlikely, printer would have to fail
       return null;
     }
@@ -988,7 +992,7 @@ public class RedisShardBackplane implements ShardBackplane {
     try {
       json = JsonFormat.printer().print(o);
     } catch (InvalidProtocolBufferException e) {
-      logger.log(SEVERE, "error printing operation " + operationName, e);
+      logger.log(SEVERE, "error printing dispatched operation " + operationName, e);
       return false;
     }
     return withBackplaneException((jedis) -> {
@@ -1071,7 +1075,7 @@ public class RedisShardBackplane implements ShardBackplane {
       json = JsonFormat.printer().print(o);
     } catch (InvalidProtocolBufferException e) {
       json = null;
-      logger.log(SEVERE, "error printing operation " + operationName, e);
+      logger.log(SEVERE, "error printing deleted operation " + operationName, e);
     }
 
     final String publishOperation = json;

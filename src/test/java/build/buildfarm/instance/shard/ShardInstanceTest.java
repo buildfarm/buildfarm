@@ -25,6 +25,7 @@ import static build.buildfarm.instance.AbstractServerInstance.VIOLATION_TYPE_MIS
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
+import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atLeast;
@@ -500,5 +501,18 @@ public class ShardInstanceTest {
         .setQueuedOperationDigest(queuedOperationDigest)
         .build();
     instance.requeueOperation(queueEntry).get();
+  }
+
+  @Test
+  public void blobsAreMissingWhenWorkersIsEmpty() throws Exception {
+    when(mockBackplane.getWorkers()).thenReturn(ImmutableSet.of());
+    Digest digest = Digest.newBuilder()
+        .setHash("hash")
+        .setSizeBytes(1)
+        .build();
+    Iterable<Digest> missingDigests = instance.findMissingBlobs(
+        ImmutableList.of(digest),
+        newDirectExecutorService()).get();
+    assertThat(missingDigests).containsExactly(digest);
   }
 }
