@@ -369,8 +369,8 @@ public class MemoryInstance extends AbstractServerInstance {
           (timeout.getSeconds() == maximum.getSeconds() && timeout.getNanos() > maximum.getNanos())) {
         preconditionFailure.addViolationsBuilder()
             .setType(VIOLATION_TYPE_INVALID)
-            .setSubject(TIMEOUT_OUT_OF_BOUNDS)
-            .setDescription(Durations.toString(timeout) + " > " + Durations.toString(maximum));
+            .setSubject(Durations.toString(timeout) + " > " + Durations.toString(maximum))
+            .setDescription(TIMEOUT_OUT_OF_BOUNDS);
       }
     }
 

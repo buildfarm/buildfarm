@@ -171,8 +171,8 @@ public class AbstractServerInstanceTest {
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
     Violation violation = preconditionFailure.getViolationsList().get(0);
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
-    assertThat(violation.getSubject()).isEqualTo(DUPLICATE_DIRENT);
-    assertThat(violation.getDescription()).isEqualTo("/: foo");
+    assertThat(violation.getSubject()).isEqualTo("/: foo");
+    assertThat(violation.getDescription()).isEqualTo(DUPLICATE_DIRENT);
   }
 
   @Test
@@ -200,8 +200,8 @@ public class AbstractServerInstanceTest {
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
     Violation violation = preconditionFailure.getViolationsList().get(0);
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
-    assertThat(violation.getSubject()).isEqualTo(DIRECTORY_NOT_SORTED);
-    assertThat(violation.getDescription()).isEqualTo("/: foo > bar");
+    assertThat(violation.getSubject()).isEqualTo("/: foo > bar");
+    assertThat(violation.getDescription()).isEqualTo(DIRECTORY_NOT_SORTED);
   }
 
   @Test
@@ -238,8 +238,8 @@ public class AbstractServerInstanceTest {
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
     Violation violation = preconditionFailure.getViolationsList().get(0);
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
-    assertThat(violation.getSubject()).isEqualTo(DUPLICATE_DIRENT);
-    assertThat(violation.getDescription()).isEqualTo("/: foo");
+    assertThat(violation.getSubject()).isEqualTo("/: foo");
+    assertThat(violation.getDescription()).isEqualTo(DUPLICATE_DIRENT);
   }
 
   @Test
@@ -275,8 +275,8 @@ public class AbstractServerInstanceTest {
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
     Violation violation = preconditionFailure.getViolationsList().get(0);
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
-    assertThat(violation.getSubject()).isEqualTo(DIRECTORY_NOT_SORTED);
-    assertThat(violation.getDescription()).isEqualTo("/: foo > bar");
+    assertThat(violation.getSubject()).isEqualTo("/: foo > bar");
+    assertThat(violation.getDescription()).isEqualTo(DIRECTORY_NOT_SORTED);
   }
 
   @Test
@@ -294,8 +294,8 @@ public class AbstractServerInstanceTest {
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
     Violation violation = preconditionFailure.getViolationsList().get(0);
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
-    assertThat(violation.getSubject()).isEqualTo(OUTPUT_DIRECTORY_IS_OUTPUT_ANCESTOR);
-    assertThat(violation.getDescription()).isEqualTo("foo");
+    assertThat(violation.getSubject()).isEqualTo("foo");
+    assertThat(violation.getDescription()).isEqualTo(OUTPUT_DIRECTORY_IS_OUTPUT_ANCESTOR);
   }
 
   @Test
@@ -313,8 +313,8 @@ public class AbstractServerInstanceTest {
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
     Violation violation = preconditionFailure.getViolationsList().get(0);
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
-    assertThat(violation.getSubject()).isEqualTo(OUTPUT_DIRECTORY_IS_OUTPUT_ANCESTOR);
-    assertThat(violation.getDescription()).isEqualTo("foo");
+    assertThat(violation.getSubject()).isEqualTo("foo");
+    assertThat(violation.getDescription()).isEqualTo(OUTPUT_DIRECTORY_IS_OUTPUT_ANCESTOR);
   }
 
   @Test
@@ -332,7 +332,7 @@ public class AbstractServerInstanceTest {
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
     Violation violation = preconditionFailure.getViolationsList().get(0);
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
-    assertThat(violation.getSubject()).isEqualTo(OUTPUT_FILE_IS_OUTPUT_ANCESTOR);
-    assertThat(violation.getDescription()).isEqualTo("foo");
+    assertThat(violation.getSubject()).isEqualTo("foo");
+    assertThat(violation.getDescription()).isEqualTo(OUTPUT_FILE_IS_OUTPUT_ANCESTOR);
   }
 }

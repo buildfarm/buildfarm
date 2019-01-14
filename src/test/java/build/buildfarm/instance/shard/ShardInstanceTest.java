@@ -18,6 +18,8 @@ import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.UNK
 import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.CACHE_CHECK;
 import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.QUEUED;
 import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.COMPLETED;
+import static build.buildfarm.instance.AbstractServerInstance.MISSING_ACTION;
+import static build.buildfarm.instance.AbstractServerInstance.MISSING_COMMAND;
 import static build.buildfarm.instance.AbstractServerInstance.MISSING_INPUT;
 import static build.buildfarm.instance.AbstractServerInstance.VIOLATION_TYPE_MISSING;
 import static com.google.common.truth.Truth.assertThat;
@@ -236,8 +238,8 @@ public class ShardInstanceTest {
             .addDetails(Any.pack(PreconditionFailure.newBuilder()
                 .addViolations(Violation.newBuilder()
                     .setType(VIOLATION_TYPE_MISSING)
-                    .setSubject(MISSING_INPUT)
-                    .setDescription("Action " + DigestUtil.toString(actionDigest)))
+                    .setSubject("blobs/" + DigestUtil.toString(actionDigest))
+                    .setDescription(MISSING_ACTION))
                 .build())))
         .build();
     Operation erroredOperation = Operation.newBuilder()
@@ -289,8 +291,8 @@ public class ShardInstanceTest {
             .addDetails(Any.pack(PreconditionFailure.newBuilder()
                 .addViolations(Violation.newBuilder()
                     .setType(VIOLATION_TYPE_MISSING)
-                    .setSubject(MISSING_INPUT)
-                    .setDescription("Command " + DigestUtil.toString(DIGEST_UTIL.compute(SIMPLE_COMMAND))))
+                    .setSubject("blobs/" + DigestUtil.toString(action.getCommandDigest()))
+                    .setDescription(MISSING_COMMAND))
                 .build())))
         .build();
     Operation erroredOperation = Operation.newBuilder()
@@ -451,8 +453,8 @@ public class ShardInstanceTest {
         .addDetails(Any.pack(PreconditionFailure.newBuilder()
             .addViolations(Violation.newBuilder()
                 .setType(VIOLATION_TYPE_MISSING)
-                .setSubject(MISSING_INPUT)
-                .setDescription("Directory " + DigestUtil.toString(missingDirectoryDigest)))
+                .setSubject("blobs/" + DigestUtil.toString(missingDirectoryDigest))
+                .setDescription("The directory `/` was not found in the CAS."))
             .build()))
         .build();
     assertThat(status).isEqualTo(expectedStatus);

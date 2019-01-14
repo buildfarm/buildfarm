@@ -1436,8 +1436,8 @@ public class ShardInstance extends AbstractServerInstance {
             PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
             preconditionFailure.addViolationsBuilder()
                 .setType(VIOLATION_TYPE_MISSING)
-                .setSubject(MISSING_INPUT)
-                .setDescription("Action " + DigestUtil.toString(actionDigest));
+                .setSubject("blobs/" + DigestUtil.toString(actionDigest))
+                .setDescription(MISSING_ACTION);
             checkPreconditionFailure(actionDigest, preconditionFailure.build());
           }
           throw st.asRuntimeException();

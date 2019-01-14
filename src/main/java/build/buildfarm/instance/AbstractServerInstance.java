@@ -132,6 +132,10 @@ public abstract class AbstractServerInstance implements Instance {
   public static final String MISSING_INPUT =
       "A requested input (or the `Action` or its `Command`) was not found in the CAS.";
 
+  public static final String MISSING_ACTION = "The action was not found in the CAS.";
+
+  public static final String MISSING_COMMAND = "The command was not found in the CAS.";
+
   public static final String INVALID_DIGEST = "A `Digest` in the input tree is invalid.";
 
   public static final String INVALID_ACTION = "The `Action` was invalid.";
@@ -408,14 +412,14 @@ public abstract class AbstractServerInstance implements Instance {
       if (direction == 0) {
         preconditionFailure.addViolationsBuilder()
             .setType(VIOLATION_TYPE_INVALID)
-            .setSubject(duplicateViolationMessage)
-            .setDescription(string);
+            .setSubject(string)
+            .setDescription(duplicateViolationMessage);
       }
       if (direction > 0) {
         preconditionFailure.addViolationsBuilder()
             .setType(VIOLATION_TYPE_INVALID)
-            .setSubject(unsortedViolationMessage)
-            .setDescription(lastString + " > " + string);
+            .setSubject(lastString + " > " + string)
+            .setDescription(unsortedViolationMessage);
       }
     }
   }
@@ -489,13 +493,13 @@ public abstract class AbstractServerInstance implements Instance {
       if (entryNames.contains(fileName)) {
         preconditionFailure.addViolationsBuilder()
             .setType(VIOLATION_TYPE_INVALID)
-            .setSubject(DUPLICATE_DIRENT)
-            .setDescription("/" + directoryPath + ": " + fileName);
+            .setSubject("/" + directoryPath + ": " + fileName)
+            .setDescription(DUPLICATE_DIRENT);
       } else if (lastFileName.compareTo(fileName) > 0) {
         preconditionFailure.addViolationsBuilder()
             .setType(VIOLATION_TYPE_INVALID)
-            .setSubject(DIRECTORY_NOT_SORTED)
-            .setDescription("/" + directoryPath + ": " + lastFileName + " > " + fileName);
+            .setSubject("/" + directoryPath + ": " + lastFileName + " > " + fileName)
+            .setDescription(DIRECTORY_NOT_SORTED);
       }
       /* FIXME serverside validity check? regex?
       Preconditions.checkState(
@@ -516,13 +520,13 @@ public abstract class AbstractServerInstance implements Instance {
       if (entryNames.contains(directoryName)) {
         preconditionFailure.addViolationsBuilder()
             .setType(VIOLATION_TYPE_INVALID)
-            .setSubject(DUPLICATE_DIRENT)
-            .setDescription("/" + directoryPath + ": " + directoryName);
+            .setSubject("/" + directoryPath + ": " + directoryName)
+            .setDescription(DUPLICATE_DIRENT);
       } else if (lastDirectoryName.compareTo(directoryName) > 0) {
         preconditionFailure.addViolationsBuilder()
             .setType(VIOLATION_TYPE_INVALID)
-            .setSubject(DIRECTORY_NOT_SORTED)
-            .setDescription("/" + directoryPath + ": " + lastDirectoryName + " > " + directoryName);
+            .setSubject("/" + directoryPath + ": " + lastDirectoryName + " > " + directoryName)
+            .setDescription(DIRECTORY_NOT_SORTED);
       }
       /* FIXME serverside validity check? regex?
       Preconditions.checkState(
@@ -586,8 +590,8 @@ public abstract class AbstractServerInstance implements Instance {
     if (directory == null) {
       preconditionFailure.addViolationsBuilder()
           .setType(VIOLATION_TYPE_MISSING)
-          .setSubject(MISSING_INPUT)
-          .setDescription("Directory " + DigestUtil.toString(directoryDigest));
+          .setSubject("blobs/" + DigestUtil.toString(directoryDigest))
+          .setDescription("The directory `/" + directoryPath + "` was not found in the CAS.");
     } else {
       validateActionInputDirectory(
           directoryPath,
@@ -650,8 +654,8 @@ public abstract class AbstractServerInstance implements Instance {
                   missingBlobDigests,
                   (digest) -> Violation.newBuilder()
                       .setType(VIOLATION_TYPE_MISSING)
-                      .setSubject(MISSING_INPUT)
-                      .setDescription(DigestUtil.toString(digest))
+                      .setSubject("blobs/" + DigestUtil.toString(digest))
+                      .setDescription(MISSING_INPUT)
                       .build()));
           return null;
         },
@@ -692,8 +696,8 @@ public abstract class AbstractServerInstance implements Instance {
     if (!queuedOperation.hasAction()) {
       preconditionFailure.addViolationsBuilder()
           .setType(VIOLATION_TYPE_MISSING)
-          .setSubject(MISSING_INPUT)
-          .setDescription("Action " + DigestUtil.toString(actionDigest));
+          .setSubject("blobs/" + DigestUtil.toString(actionDigest))
+          .setDescription(MISSING_ACTION);
       validatedFuture = Futures.<Void>immediateFuture(null);
     } else {
       ImmutableSet.Builder<Digest> inputDigestsBuilder = ImmutableSet.builder();
@@ -724,8 +728,8 @@ public abstract class AbstractServerInstance implements Instance {
 	  if (actionBlob == null) {
       preconditionFailure.addViolationsBuilder()
           .setType(VIOLATION_TYPE_MISSING)
-          .setSubject(MISSING_INPUT)
-          .setDescription("Action " + DigestUtil.toString(actionDigest));
+          .setSubject("blobs/" + DigestUtil.toString(actionDigest))
+          .setDescription(MISSING_ACTION);
     } else {
       try {
         action = Action.parseFrom(actionBlob);
@@ -814,8 +818,8 @@ public abstract class AbstractServerInstance implements Instance {
     if (command == null) {
       preconditionFailure.addViolationsBuilder()
           .setType(VIOLATION_TYPE_MISSING)
-          .setSubject(MISSING_INPUT)
-          .setDescription("Command " + DigestUtil.toString(action.getCommandDigest()));
+          .setSubject("blobs/" + DigestUtil.toString(action.getCommandDigest()))
+          .setDescription(MISSING_COMMAND);
     } else {
       // FIXME should input/output collisions (through directories) be another
       // invalid action?
@@ -885,8 +889,8 @@ public abstract class AbstractServerInstance implements Instance {
       if (inputFiles.contains(outputDir)) {
         preconditionFailure.addViolationsBuilder()
             .setType(VIOLATION_TYPE_INVALID)
-            .setSubject(OUTPUT_DIRECTORY_IS_INPUT_FILE)
-            .setDescription(outputDir);
+            .setSubject(outputDir)
+            .setDescription(OUTPUT_DIRECTORY_IS_INPUT_FILE);
       }
       String currentPath = outputDir;
       while (currentPath != "") {
@@ -904,15 +908,15 @@ public abstract class AbstractServerInstance implements Instance {
     for (String outputFileAncestor : outputFileAncestors) {
       preconditionFailure.addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
-          .setSubject(OUTPUT_FILE_IS_OUTPUT_ANCESTOR)
-          .setDescription(outputFileAncestor);
+          .setSubject(outputFileAncestor)
+          .setDescription(OUTPUT_FILE_IS_OUTPUT_ANCESTOR);
     }
     Set<String> outputDirectoryAncestors = Sets.intersection(outputDirectories, parentsOfOutputs);
     for (String outputDirectoryAncestor : outputDirectoryAncestors) {
       preconditionFailure.addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
-          .setSubject(OUTPUT_DIRECTORY_IS_OUTPUT_ANCESTOR)
-          .setDescription(outputDirectoryAncestor);
+          .setSubject(outputDirectoryAncestor)
+          .setDescription(OUTPUT_DIRECTORY_IS_OUTPUT_ANCESTOR);
     }
   }
 

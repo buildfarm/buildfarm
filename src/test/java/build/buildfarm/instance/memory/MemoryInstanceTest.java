@@ -20,7 +20,7 @@ import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.EXE
 import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.QUEUED;
 import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.UNKNOWN;
 import static build.buildfarm.instance.AbstractServerInstance.INVALID_DIGEST;
-import static build.buildfarm.instance.AbstractServerInstance.MISSING_INPUT;
+import static build.buildfarm.instance.AbstractServerInstance.MISSING_ACTION;
 import static build.buildfarm.instance.AbstractServerInstance.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.instance.AbstractServerInstance.VIOLATION_TYPE_MISSING;
 import static build.buildfarm.instance.AbstractServerInstance.invalidActionMessage;
@@ -364,8 +364,8 @@ public class MemoryInstanceTest {
             .addDetails(Any.pack(PreconditionFailure.newBuilder()
                 .addViolations(Violation.newBuilder()
                     .setType(VIOLATION_TYPE_MISSING)
-                    .setSubject(MISSING_INPUT)
-                    .setDescription("Action " + DigestUtil.toString(simpleActionDigest)))
+                    .setSubject("blobs/" + DigestUtil.toString(simpleActionDigest))
+                    .setDescription(MISSING_ACTION))
                 .build())))
         .build();
     Operation erroredOperation = queuedOperation.toBuilder()
@@ -492,8 +492,8 @@ public class MemoryInstanceTest {
     PreconditionFailure preconditionFailure = status.getDetails(0).unpack(PreconditionFailure.class);
     assertThat(preconditionFailure.getViolationsList()).contains(Violation.newBuilder()
         .setType(VIOLATION_TYPE_INVALID)
-        .setSubject(TIMEOUT_OUT_OF_BOUNDS)
-        .setDescription(Durations.toString(timeout) + " > " + Durations.toString(MAXIMUM_ACTION_TIMEOUT))
+        .setSubject(Durations.toString(timeout) + " > " + Durations.toString(MAXIMUM_ACTION_TIMEOUT))
+        .setDescription(TIMEOUT_OUT_OF_BOUNDS)
         .build());
   }
 
