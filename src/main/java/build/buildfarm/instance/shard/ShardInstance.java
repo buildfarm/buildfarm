@@ -920,6 +920,9 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   private ListenableFuture<Directory> expectDirectory(Digest directoryBlobDigest, ExecutorService service) {
+    if (directoryBlobDigest.getSizeBytes() == 0) {
+      return immediateFuture(Directory.getDefaultInstance());
+    }
     Supplier<ListenableFuture<Directory>> fetcher = () -> notFoundNull(expect(directoryBlobDigest, Directory.parser(), service));
     // is there a better interface to use for the cache with these nice futures?
     return directoryCache.get(directoryBlobDigest, new Callable<ListenableFuture<? extends Directory>>() {
