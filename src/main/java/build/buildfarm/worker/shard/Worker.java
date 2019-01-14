@@ -15,6 +15,7 @@
 package build.buildfarm.worker.shard;
 
 import static java.util.logging.Level.SEVERE;
+import static java.util.concurrent.Executors.newFixedThreadPool;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.cas.ContentAddressableStorage;
@@ -44,6 +45,7 @@ import build.buildfarm.v1test.ShardWorkerConfig;
 import build.buildfarm.v1test.ShardWorker;
 import com.google.common.base.Strings;
 import com.google.common.io.ByteStreams;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.devtools.common.options.OptionsParser;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
@@ -62,6 +64,7 @@ import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
@@ -231,15 +234,25 @@ public class Worker {
   }
 
   private ExecFileSystem createCFCExecFileSystem(InputStreamFactory remoteInputStreamFactory, Path casCacheDirectory) {
+    ExecutorService removeDirectoryService =
+        newFixedThreadPool(
+            /* nThreads=*/ 32,
+            new ThreadFactoryBuilder().setNameFormat("remove-directory-pool-%d").build());
+
     CASFileCache fileCache = new ShardCASFileCache(
         remoteInputStreamFactory,
         root.resolve(casCacheDirectory),
         config.getCasCacheMaxSizeBytes(),
         digestUtil,
+        removeDirectoryService,
         this::onStoragePut,
         this::onStorageExpire);
 
-    return new CFCExecFileSystem(root, fileCache, config.getLinkInputDirectories());
+    return new CFCExecFileSystem(
+        root,
+        fileCache,
+        config.getLinkInputDirectories(),
+        removeDirectoryService);
   }
 
   public void stop() throws InterruptedException {

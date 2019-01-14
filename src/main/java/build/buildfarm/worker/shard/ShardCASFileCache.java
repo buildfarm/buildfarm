@@ -7,6 +7,7 @@ import build.buildfarm.worker.CASFileCache;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
+import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 
 class ShardCASFileCache extends CASFileCache {
@@ -17,9 +18,10 @@ class ShardCASFileCache extends CASFileCache {
       Path root,
       long maxSizeInBytes,
       DigestUtil digestUtil,
+      ExecutorService expireService,
       Consumer<Digest> onPut,
       Consumer<Iterable<Digest>> onExpire) {
-    super(root, maxSizeInBytes, digestUtil, onPut, onExpire);
+    super(root, maxSizeInBytes, digestUtil, expireService, onPut, onExpire);
     this.inputStreamFactory = createInputStreamFactory(this, shardInputStreamFactory);
   }
 

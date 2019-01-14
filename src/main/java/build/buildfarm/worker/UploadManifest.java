@@ -14,26 +14,22 @@
 
 package build.buildfarm.worker;
 
+import static build.buildfarm.worker.Utils.readdir;
+import static build.buildfarm.worker.Utils.statIfFound;
+
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.stub.Chunker;
 import build.buildfarm.v1test.CASInsertionPolicy;
-import com.google.common.collect.Lists;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.Tree;
 import com.google.protobuf.ByteString;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
-import java.nio.file.LinkOption;
 import java.nio.file.Path;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -43,13 +39,6 @@ import java.util.function.Consumer;
 /** UploadManifest adds output metadata to a {@link ActionResult}. */
 /** FIXME move into worker implementation and implement 'fast add' with this for sharding */
 public class UploadManifest {
-  private static final String ERR_NO_SUCH_FILE_OR_DIR = " (No such file or directory)";
-
-  private static final LinkOption[] NO_LINK_OPTION = new LinkOption[0];
-  // This isn't generally safe; we rely on the file system APIs not modifying the array.
-  private static final LinkOption[] NOFOLLOW_LINKS_OPTION =
-      new LinkOption[] { LinkOption.NOFOLLOW_LINKS };
-
   private final DigestUtil digestUtil;
   private final ActionResult.Builder result;
   private final Path execRoot;
@@ -190,121 +179,6 @@ public class UploadManifest {
     }
 
     digestToChunkers.put(chunker.digest(), chunker);
-  }
-
-  private static LinkOption[] linkOpts(boolean followSymlinks) {
-    return followSymlinks ? NO_LINK_OPTION : NOFOLLOW_LINKS_OPTION;
-  }
-
-  /**
-   * Returns the status of a file.
-   */
-  private static FileStatus stat(final Path path, final boolean followSymlinks) throws IOException {
-    final BasicFileAttributes attributes;
-    try {
-      attributes =
-          Files.readAttributes(path, BasicFileAttributes.class, linkOpts(followSymlinks));
-    } catch (java.nio.file.FileSystemException e) {
-      throw new FileNotFoundException(path + ERR_NO_SUCH_FILE_OR_DIR);
-    }
-    FileStatus status = new FileStatus() {
-      @Override
-      public boolean isFile() {
-        return attributes.isRegularFile() || isSpecialFile();
-      }
-
-      @Override
-      public boolean isSpecialFile() {
-        return attributes.isOther();
-      }
-
-      @Override
-      public boolean isDirectory() {
-        return attributes.isDirectory();
-      }
-
-      @Override
-      public boolean isSymbolicLink() {
-        return attributes.isSymbolicLink();
-      }
-
-      @Override
-      public long getSize() throws IOException {
-        return attributes.size();
-      }
-
-      @Override
-      public long getLastModifiedTime() throws IOException {
-        return attributes.lastModifiedTime().toMillis();
-      }
-
-      @Override
-      public long getLastChangeTime() {
-        // This is the best we can do with Java NIO...
-        return attributes.lastModifiedTime().toMillis();
-      }
-
-      @Override
-      public Object fileKey() {
-        return attributes.fileKey();
-      }
-    };
-
-    return status;
-  }
-
-  /**
-   * Like stat(), but returns null on failures instead of throwing.
-   */
-  private static FileStatus statNullable(Path path, boolean followSymlinks) {
-    try {
-      return stat(path, followSymlinks);
-    } catch (IOException e) {
-      return null;
-    }
-  }
-
-  private FileStatus statIfFound(Path path, boolean followSymlinks) {
-    try {
-      return stat(path, followSymlinks);
-    } catch (FileNotFoundException e) {
-      return null;
-    } catch (IOException e) {
-      // If this codepath is ever hit, then this method should be rewritten to properly distinguish
-      // between not-found exceptions and others.
-      throw new IllegalStateException(e);
-    }
-  }
-
-  private static Dirent.Type direntTypeFromStat(FileStatus stat) {
-    if (stat == null) {
-      return Dirent.Type.UNKNOWN;
-    }
-    if (stat.isSpecialFile()) {
-      return Dirent.Type.UNKNOWN;
-    }
-    if (stat.isFile()) {
-      return Dirent.Type.FILE;
-    }
-    if (stat.isDirectory()) {
-      return Dirent.Type.DIRECTORY;
-    }
-    if (stat.isSymbolicLink()) {
-      return Dirent.Type.SYMLINK;
-    }
-    return Dirent.Type.UNKNOWN;
-  }
-
-  public static List<Dirent> readdir(Path path, boolean followSymlinks) throws IOException {
-    List<Dirent> dirents = new ArrayList<>();
-    try (DirectoryStream<Path> stream = Files.newDirectoryStream(path)) {
-      for (Path file : stream) {
-        FileStatus stat = statNullable(file, followSymlinks);
-        Dirent.Type type = direntTypeFromStat(statNullable(file, followSymlinks));
-        dirents.add(new Dirent(file.getFileName().toString(), type, stat));
-      }
-    }
-    return dirents;
   }
 
   private Directory computeDirectory(Path path, Tree.Builder tree)

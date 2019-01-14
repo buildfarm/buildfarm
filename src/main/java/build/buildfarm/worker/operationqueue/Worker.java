@@ -14,8 +14,9 @@
 
 package build.buildfarm.worker.operationqueue;
 
-import static build.buildfarm.worker.CASFileCache.getInterruptiblyOrIOException;
 import static build.buildfarm.instance.Utils.getBlob;
+import static build.buildfarm.worker.CASFileCache.getInterruptiblyOrIOException;
+import static build.buildfarm.worker.Utils.removeDirectory;
 import static com.google.common.collect.Maps.uniqueIndex;
 import static com.google.common.util.concurrent.Futures.allAsList;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
@@ -226,7 +227,8 @@ public class Worker {
         inputStreamFactory,
         root.resolve(casCacheDirectory),
         config.getCasCacheMaxSizeBytes(),
-        casInstance.getDigestUtil());
+        casInstance.getDigestUtil(),
+        newDirectExecutorService());
   }
 
   private void fetchInputs(
@@ -649,7 +651,7 @@ public class Worker {
 
         Path execDir = root.resolve(operationName);
         if (Files.exists(execDir)) {
-          fileCache.removeDirectoryAsync(execDir);
+          removeDirectory(execDir);
         }
         Files.createDirectories(execDir);
 
@@ -694,7 +696,7 @@ public class Worker {
         Iterable<Digest> inputDirectories = rootInputDirectories.remove(execDir);
 
         fileCache.decrementReferences(inputFiles, inputDirectories);
-        fileCache.removeDirectoryAsync(execDir);
+        removeDirectory(execDir);
       }
 
       @Override
@@ -745,7 +747,6 @@ public class Worker {
     if (Thread.interrupted()) {
       throw new InterruptedException();
     }
-    fileCache.stop();
   }
 
   private static WorkerConfig toWorkerConfig(Readable input, WorkerOptions options) throws IOException {

@@ -52,7 +52,7 @@ java_test(
 java_test(
     name = "worker-tests",
     size = "small",
-    srcs = glob(["worker/*.java"]),
+    srcs = glob(["worker/*.java"], exclude=["worker/UnixUtilsTest.java"]),
     test_class = "build.buildfarm.AllTests",
     deps = [
         ":test_runner",

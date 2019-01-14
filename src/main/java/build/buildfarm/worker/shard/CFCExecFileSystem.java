@@ -15,7 +15,8 @@
 package build.buildfarm.worker.shard;
 
 import static build.buildfarm.worker.CASFileCache.getInterruptiblyOrIOException;
-import static build.buildfarm.worker.UploadManifest.readdir;
+import static build.buildfarm.worker.Utils.readdir;
+import static build.buildfarm.worker.Utils.removeDirectory;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Iterables.concat;
 import static com.google.common.util.concurrent.Futures.allAsList;
@@ -42,6 +43,7 @@ import build.buildfarm.worker.Dirent;
 import build.buildfarm.worker.OutputDirectory;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -63,11 +65,17 @@ class CFCExecFileSystem implements ExecFileSystem {
   private final Map<Path, Iterable<Path>> rootInputFiles = new ConcurrentHashMap<>();
   private final Map<Path, Iterable<Digest>> rootInputDirectories = new ConcurrentHashMap<>();
   private final ExecutorService fetchService = newCachedThreadPool();
+  private final ExecutorService removeDirectoryService;
 
-  CFCExecFileSystem(Path root, CASFileCache fileCache, boolean linkInputDirectories) {
+  CFCExecFileSystem(
+      Path root,
+      CASFileCache fileCache,
+      boolean linkInputDirectories,
+      ExecutorService removeDirectoryService) {
     this.root = root;
     this.fileCache = fileCache;
     this.linkInputDirectories = linkInputDirectories;
+    this.removeDirectoryService = removeDirectoryService;
   }
 
   @Override
@@ -86,12 +94,12 @@ class CFCExecFileSystem implements ExecFileSystem {
       String name = dirent.getName();
       Path child = root.resolve(name);
       if (!child.equals(fileCache.getRoot())) {
-        removeDirectoryFutures.add(fileCache.removeDirectoryAsync(root.resolve(name)));
+        removeDirectoryFutures.add(removeDirectory(root.resolve(name), removeDirectoryService));
       }
     }
 
     ImmutableList.Builder<Digest> blobDigests = ImmutableList.builder();
-    fileCache.start(blobDigests::add);
+    fileCache.start(blobDigests::add, removeDirectoryService);
     onDigests.accept(blobDigests.build());
 
     getInterruptiblyOrIOException(allAsList(removeDirectoryFutures.build()));
@@ -110,7 +118,17 @@ class CFCExecFileSystem implements ExecFileSystem {
         Thread.currentThread().interrupt();
       }
     }
-    fileCache.stop();
+    removeDirectoryService.shutdown();
+    while (!removeDirectoryService.isTerminated()) {
+      try {
+        if (!removeDirectoryService.awaitTermination(1, MINUTES)) {
+          removeDirectoryService.shutdownNow();
+        }
+      } catch (InterruptedException e) {
+        removeDirectoryService.shutdownNow();
+        Thread.currentThread().interrupt();
+      }
+    }
   }
 
   @Override
@@ -233,7 +251,7 @@ class CFCExecFileSystem implements ExecFileSystem {
 
     Path execDir = root.resolve(operationName);
     if (Files.exists(execDir)) {
-      getInterruptiblyOrIOException(fileCache.removeDirectoryAsync(execDir));
+      removeDirectory(execDir);
     }
     Files.createDirectories(execDir);
 
@@ -273,16 +291,16 @@ class CFCExecFileSystem implements ExecFileSystem {
   }
 
   @Override
-  public void destroyExecDir(Path actionRoot) throws IOException, InterruptedException {
-    Iterable<Path> inputFiles = rootInputFiles.remove(actionRoot);
-    Iterable<Digest> inputDirectories = rootInputDirectories.remove(actionRoot);
+  public void destroyExecDir(Path execDir) throws IOException, InterruptedException {
+    Iterable<Path> inputFiles = rootInputFiles.remove(execDir);
+    Iterable<Digest> inputDirectories = rootInputDirectories.remove(execDir);
     if (inputFiles != null || inputDirectories != null) {
       fileCache.decrementReferences(
           inputFiles == null ? ImmutableList.<Path>of() : inputFiles,
           inputDirectories == null ? ImmutableList.<Digest>of() : inputDirectories);
     }
-    if (Files.exists(actionRoot)) {
-      getInterruptiblyOrIOException(fileCache.removeDirectoryAsync(actionRoot));
+    if (Files.exists(execDir)) {
+      removeDirectory(execDir);
     }
   }
 }

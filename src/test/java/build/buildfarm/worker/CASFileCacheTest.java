@@ -26,6 +26,9 @@ import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Iterables;
+import com.google.common.jimfs.Configuration;
+import com.google.common.jimfs.Jimfs;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
@@ -40,6 +43,8 @@ import java.util.HashMap;
 import java.util.Map;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.JUnit4;
 
 class CASFileCacheTest {
   private CASFileCache fileCache;
@@ -68,7 +73,7 @@ class CASFileCacheTest {
   public void setUp() {
     digestUtil = new DigestUtil(HashFunction.SHA256);
     blobs = new HashMap<Digest, ByteString>();
-    fileCache = new CASFileCache(root, /* maxSizeInBytes=*/ 1024, digestUtil) {
+    fileCache = new CASFileCache(root, /* maxSizeInBytes=*/ 1024, digestUtil, /* expireService=*/ newDirectExecutorService()) {
       @Override
       protected InputStream newExternalInput(Digest digest, long offset) {
         ByteString content = blobs.get(digest);
@@ -92,7 +97,7 @@ class CASFileCacheTest {
   @Test(expected = IllegalStateException.class)
   public void putEmptyFileThrowsIllegalStateException() throws IOException, InterruptedException {
     InputStreamFactory mockInputStreamFactory = mock(InputStreamFactory.class);
-    CASFileCache fileCache = new CASFileCache(root, /* maxSizeInBytes=*/ 1024, digestUtil) {
+    CASFileCache fileCache = new CASFileCache(root, /* maxSizeInBytes=*/ 1024, digestUtil, /* expireService=*/ newDirectExecutorService()) {
       @Override
       protected InputStream newExternalInput(Digest digest, long offset) throws IOException, InterruptedException {
         return mockInputStreamFactory.newInput(digest, offset);
@@ -262,17 +267,45 @@ class CASFileCacheTest {
     assertThat(!Files.exists(invalidExec)).isTrue();
   }
 
-  @Test
-  public void removeDirectoryDeletesTree() throws IOException {
-    Path tree = root.resolve("tree");
-    Files.createDirectory(tree);
-    Files.write(tree.resolve("file"), ImmutableList.of("Top level file"), StandardCharsets.UTF_8);
-    Path subdir = tree.resolve("subdir");
-    Files.createDirectory(subdir);
-    Files.write(subdir.resolve("file"), ImmutableList.of("A file in a subdirectory"), StandardCharsets.UTF_8);
-
-    CASFileCache.removeDirectory(tree);
-
-    assertThat(Files.exists(tree)).isFalse();
+  @RunWith(JUnit4.class)
+  public static class NativeCASFileCacheTest extends CASFileCacheTest {
+    public NativeCASFileCacheTest() throws IOException {
+      super(createTempDirectory());
+    }
+    
+    private static Path createTempDirectory() throws IOException {
+      if (Thread.interrupted()) {
+        throw new RuntimeException(new InterruptedException());
+      }
+      Path path = Files.createTempDirectory("native-cas-test");
+      return path;
+    }
   }
-};
+
+  @RunWith(JUnit4.class)
+  public static class OsXCASFileCacheTest extends CASFileCacheTest {
+    public OsXCASFileCacheTest() {
+      super(Iterables.getFirst(
+          Jimfs.newFileSystem(Configuration.osX()).getRootDirectories(),
+          null));
+    }
+  }
+
+  @RunWith(JUnit4.class)
+  public static class UnixCASFileCacheTest extends CASFileCacheTest {
+    public UnixCASFileCacheTest() {
+      super(Iterables.getFirst(
+          Jimfs.newFileSystem(Configuration.unix()).getRootDirectories(),
+          null));
+    }
+  }
+
+  @RunWith(JUnit4.class)
+  public static class WindowsCASFileCacheTest extends CASFileCacheTest {
+    public WindowsCASFileCacheTest() {
+      super(Iterables.getFirst(
+          Jimfs.newFileSystem(Configuration.windows()).getRootDirectories(),
+          null));
+    }
+  }
+}

@@ -7,6 +7,7 @@ import build.buildfarm.worker.CASFileCache;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
+import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 
 class InjectedCASFileCache extends CASFileCache {
@@ -16,8 +17,9 @@ class InjectedCASFileCache extends CASFileCache {
       InputStreamFactory inputStreamFactory,
       Path root,
       long maxSizeInBytes,
-      DigestUtil digestUtil) {
-    super(root, maxSizeInBytes, digestUtil);
+      DigestUtil digestUtil,
+      ExecutorService expireService) {
+    super(root, maxSizeInBytes, digestUtil, expireService);
     this.inputStreamFactory = inputStreamFactory;
   }
 
