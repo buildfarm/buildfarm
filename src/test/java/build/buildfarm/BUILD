@@ -250,6 +250,7 @@ java_test(
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java_util",
         "//3rdparty/jvm/com/google/truth",
+        "//3rdparty/jvm/io/grpc:grpc_core",
         "//3rdparty/jvm/org/mockito:mockito_core",
         "//src/main/java/build/buildfarm:cas",
         "//src/main/java/build/buildfarm:common",

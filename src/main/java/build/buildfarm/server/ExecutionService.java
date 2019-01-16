@@ -14,6 +14,8 @@
 
 package build.buildfarm.server;
 
+import static com.google.common.util.concurrent.Futures.addCallback;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.lang.String.format;
 
 import build.bazel.remote.execution.v2.ExecuteRequest;
@@ -25,13 +27,14 @@ import build.buildfarm.instance.Instance;
 import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import io.grpc.Context;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Predicate;
+import java.util.function.Consumer;
 import java.util.logging.Logger;
 
 public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
@@ -47,37 +50,31 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
     logger.info(format("ExecutionSuccess: %s: %s", instanceName, DigestUtil.toString(request.getActionDigest())));
   }
 
-  private Predicate<Operation> createWatcher(StreamObserver<Operation> responseObserver) {
+  private void withCancellation(StreamObserver<Operation> responseObserver, ListenableFuture<Void> future) {
+    addCallback(
+        future,
+        new FutureCallback<Void>() {
+          @Override
+          public void onSuccess(Void result) {
+            responseObserver.onCompleted();
+          }
+
+          @Override
+          public void onFailure(Throwable t) {
+            responseObserver.onError(Status.fromThrowable(t).asException());
+          }
+        });
+    Context.current().addListener(
+        (context) -> future.cancel(false),
+        directExecutor());
+  }
+
+  private Consumer<Operation> createWatcher(StreamObserver<Operation> responseObserver) {
     return (operation) -> {
-      if (Context.current().isCancelled()) {
-        return false;
+      if (operation == null) {
+        throw Status.NOT_FOUND.asRuntimeException();
       }
-      try {
-        if (operation == null) {
-          responseObserver.onError(Status.NOT_FOUND.asException());
-          return false;
-        }
-        responseObserver.onNext(operation);
-        if (operation.getDone()) {
-          responseObserver.onCompleted();
-          return false;
-        }
-      } catch (StatusRuntimeException e) {
-        // no further responses should be necessary
-        if (e.getStatus().getCode() != Status.Code.CANCELLED) {
-          responseObserver.onError(Status.fromThrowable(e).asException());
-        }
-        return false;
-      } catch (IllegalStateException e) {
-        // only indicator for this from ServerCallImpl layer
-        // no further responses should be necessary
-        if (!e.getMessage().equals("call is closed")) {
-          responseObserver.onError(Status.fromThrowable(e).asException());
-        }
-        return false;
-      }
-      // still watching
-      return true;
+      responseObserver.onNext(operation);
     };
   }
 
@@ -93,12 +90,11 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
       return;
     }
 
-    boolean watching = instance.watchOperation(
-        operationName,
-        createWatcher(responseObserver));
-    if (!watching) {
-      responseObserver.onCompleted();
-    }
+    withCancellation(
+        responseObserver,
+        instance.watchOperation(
+            operationName,
+            createWatcher(responseObserver)));
   }
 
   @Override
@@ -115,13 +111,15 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
     logExecute(instance.getName(), request);
 
     try {
-      instance.execute(
-          request.getActionDigest(),
-          request.getSkipCacheLookup(),
-          request.getExecutionPolicy(),
-          request.getResultsCachePolicy(),
-          TracingMetadataUtils.fromCurrentContext(),
-          createWatcher(responseObserver));
+      withCancellation(
+          responseObserver,
+          instance.execute(
+              request.getActionDigest(),
+              request.getSkipCacheLookup(),
+              request.getExecutionPolicy(),
+              request.getResultsCachePolicy(),
+              TracingMetadataUtils.fromCurrentContext(),
+              createWatcher(responseObserver)));
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }

@@ -15,6 +15,7 @@
 package build.buildfarm.instance.stub;
 
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.transform;
 import static java.util.logging.Level.SEVERE;
@@ -43,6 +44,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Utils;
+import build.buildfarm.instance.Watcher;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.OperationQueueGrpc.OperationQueueBlockingStub;
 import build.buildfarm.v1test.PollOperationRequest;
@@ -94,7 +96,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Predicate;
+import java.util.function.Consumer;
 import java.util.logging.Logger;
 
 public class StubInstance implements Instance {
@@ -509,13 +511,13 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public void execute(
+  public ListenableFuture<Void> execute(
       Digest actionDigest,
       boolean skipCacheLookup,
       ExecutionPolicy executionPolicy,
       ResultsCachePolicy resultsCachePolicy,
       RequestMetadata metadata,
-      Predicate<Operation> watcher) {
+      Consumer<Operation> watcher) {
     throw new UnsupportedOperationException();
   }
 
@@ -565,9 +567,9 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public boolean watchOperation(
+  public ListenableFuture<Void> watchOperation(
       String operationName,
-      Predicate<Operation> watcher) {
+      Consumer<Operation> watcher) {
     Request request = Request.newBuilder()
         .setTarget(operationName)
         .build();
@@ -584,25 +586,21 @@ public class StubInstance implements Instance {
                 throw StatusProto.toStatusRuntimeException(
                     change.getData().unpack(com.google.rpc.Status.class));
               } catch (InvalidProtocolBufferException e) {
-                throw new RuntimeException(e);
+                return immediateFailedFuture(e);
               }
             case DOES_NOT_EXIST:
-              throw Status.NOT_FOUND.asRuntimeException();
+              return immediateFailedFuture(Status.NOT_FOUND.asRuntimeException());
             case EXISTS:
               Operation o;
               try {
                 o = change.getData().unpack(Operation.class);
-                boolean done = o.getDone();
-                boolean watched = watcher.test(o);
-                if (done == watched) {
-                  throw new RuntimeException("mismatched watched and " + (done ? "" : "not ") + "done");
-                }
               } catch (InvalidProtocolBufferException e) {
-                throw new RuntimeException(e);
+                return immediateFailedFuture(e);
               }
+              watcher.accept(o);
               break;
             default:
-              throw new RuntimeException(String.format("Illegal Change State: %s", change.getState()));
+              return immediateFailedFuture(new RuntimeException(String.format("Illegal Change State: %s", change.getState())));
           }
         }
       }
@@ -615,8 +613,7 @@ public class StubInstance implements Instance {
         // ignore
       }
     }
-    // FIXME test to ensure that we got a result
-    return true;
+    return immediateFuture(null);
   }
 
   @Override

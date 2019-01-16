@@ -26,11 +26,12 @@ import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.ShardWorker;
 import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Predicate;
+import java.util.function.Consumer;
 
 public interface ShardBackplane {
 
@@ -260,7 +261,7 @@ public interface ShardBackplane {
    * Register a watcher for an operation
    */
   @ThreadSafe
-  boolean watchOperation(String operationName, Predicate<Operation> watcher) throws IOException;
+  ListenableFuture<Void> watchOperation(String operationName, Consumer<Operation> watcher) throws IOException;
 
   /**
    * Get all dispatched operations

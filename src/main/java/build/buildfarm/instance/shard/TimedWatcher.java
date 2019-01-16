@@ -1,5 +1,6 @@
 package build.buildfarm.instance.shard;
 
+import build.buildfarm.instance.Watcher;
 import java.time.Instant;
 
 abstract class TimedWatcher<T> implements Watcher<T> {

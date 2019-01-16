@@ -143,6 +143,9 @@ public abstract class CASFileCache implements ContentAddressableStorage, OutputS
       if (e.getCause() instanceof IOException) {
         throw (IOException) e.getCause();
       }
+      if (e.getCause() instanceof InterruptedException) {
+        throw (InterruptedException) e.getCause();
+      }
       throw new UncheckedExecutionException(e.getCause());
     }
   }

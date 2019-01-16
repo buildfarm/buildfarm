@@ -15,6 +15,7 @@
 package build.buildfarm.instance;
 
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
+import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.Futures.transformAsync;
 import static com.google.common.util.concurrent.Futures.allAsList;
@@ -87,7 +88,7 @@ import java.util.Stack;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeoutException;
-import java.util.function.Predicate;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
@@ -951,13 +952,13 @@ public abstract class AbstractServerInstance implements Instance {
 
   // this deserves a real async execute, but not now
   @Override
-  public void execute(
+  public ListenableFuture<Void> execute(
       Digest actionDigest,
       boolean skipCacheLookup,
       ExecutionPolicy executionPolicy,
       ResultsCachePolicy resultsCachePolicy,
       RequestMetadata requestMetadata,
-      Predicate<Operation> watcher) throws InterruptedException {
+      Consumer<Operation> observer) throws InterruptedException {
     Action action;
     try {
       action = validateActionDigest(actionDigest);
@@ -979,10 +980,12 @@ public abstract class AbstractServerInstance implements Instance {
               .setStatus(status)
               .build()))
           .build();
-      if (watcher.test(operation)) {
-        getLogger().severe("watcher did not respect completed operation for action " + DigestUtil.toString(actionDigest));
+      try {
+        observer.accept(operation);
+      } catch (Throwable t) {
+        return immediateFailedFuture(t);
       }
-      return;
+      return immediateFuture(null);
     }
 
     ActionKey actionKey = DigestUtil.asActionKey(actionDigest);
@@ -999,7 +1002,7 @@ public abstract class AbstractServerInstance implements Instance {
 
     putOperation(operation);
 
-    watchOperation(operation.getName(), watcher);
+    ListenableFuture<Void> watchFuture = watchOperation(operation.getName(), observer);
 
     ExecuteOperationMetadata metadata =
         expectExecuteOperationMetadata(operation);
@@ -1054,6 +1057,7 @@ public abstract class AbstractServerInstance implements Instance {
       updateOperationWatchers(operation); // updates watchers initially for queued stage
     }
     putOperation(operation);
+    return watchFuture;
   }
 
   protected static ExecuteOperationMetadata expectExecuteOperationMetadata(

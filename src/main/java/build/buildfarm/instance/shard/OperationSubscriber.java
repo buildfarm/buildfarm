@@ -15,8 +15,8 @@
 package build.buildfarm.instance.shard;
 
 import static java.lang.String.format;
-import static java.util.logging.Level.SEVERE;
 
+import build.buildfarm.instance.WatchFuture;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.ListMultimap;
@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
@@ -46,11 +47,24 @@ import redis.clients.jedis.Response;
 abstract class OperationSubscriber extends JedisPubSub {
   private static final Logger logger = Logger.getLogger(OperationSubscriber.class.getName());
 
-  private final ListMultimap<String, TimedWatcher<Operation>> watchers;
+  abstract static class TimedWatchFuture extends WatchFuture {
+    private final TimedWatcher<Operation> watcher;
+
+    TimedWatchFuture(TimedWatcher<Operation> watcher) {
+      super(watcher::observe);
+      this.watcher = watcher;
+    }
+
+    TimedWatcher<Operation> getWatcher() {
+      return watcher;
+    }
+  }
+
+  private final ListMultimap<String, TimedWatchFuture> watchers;
   private final ListeningExecutorService executorService;
 
   OperationSubscriber(
-      ListMultimap<String, TimedWatcher<Operation>> watchers,
+      ListMultimap<String, TimedWatchFuture> watchers,
       ExecutorService executorService) {
     this.watchers = watchers;
     this.executorService = MoreExecutors.listeningDecorator(executorService);
@@ -66,8 +80,8 @@ abstract class OperationSubscriber extends JedisPubSub {
     ImmutableList.Builder<String> builder = ImmutableList.builder();
     synchronized (watchers) {
       for (String channel : watchers.keySet()) {
-        for (TimedWatcher<Operation> watcher : watchers.get(channel)) {
-          if (watcher.isExpiredAt(now)) {
+        for (TimedWatchFuture watchFuture : watchers.get(channel)) {
+          if (watchFuture.getWatcher().isExpiredAt(now)) {
             builder.add(channel);
             break;
           }
@@ -94,23 +108,39 @@ abstract class OperationSubscriber extends JedisPubSub {
     super.unsubscribe(channels);
   }
 
-  public void watch(String channel, TimedWatcher<Operation> watcher) {
+  public ListenableFuture<Void> watch(String channel, TimedWatcher<Operation> watcher) {
+    TimedWatchFuture watchFuture = new TimedWatchFuture(watcher) {
+      @Override
+      public void unwatch() {
+        OperationSubscriber.this.unwatch(channel, this);
+      }
+    };
     boolean hasSubscribed;
     synchronized (watchers) {
       // use prefix
       hasSubscribed = watchers.containsKey(channel);
-      watchers.put(channel, watcher);
+      watchers.put(channel, watchFuture);
       if (!hasSubscribed) {
         subscribe(channel);
+      }
+    }
+    return watchFuture;
+  }
+
+  public void unwatch(String channel, TimedWatchFuture watchFuture) {
+    synchronized (watchers) {
+      if (watchers.remove(channel, watchFuture) &&
+          !watchers.containsKey(channel)) {
+        unsubscribe(channel);
       }
     }
   }
 
   public void resetWatchers(String channel, Instant expiresAt) {
-    List<TimedWatcher<Operation>> operationWatchers = watchers.get(channel);
+    List<TimedWatchFuture> operationWatchers = watchers.get(channel);
     synchronized (watchers) {
-      for (TimedWatcher<Operation> watcher : operationWatchers) {
-        watcher.reset(expiresAt);
+      for (TimedWatchFuture watchFuture : operationWatchers) {
+        watchFuture.getWatcher().reset(expiresAt);
       }
     }
   }
@@ -144,58 +174,25 @@ abstract class OperationSubscriber extends JedisPubSub {
       Operation operation,
       Predicate<TimedWatcher<Operation>> shouldObserve,
       Instant expiresAt) {
-    List<TimedWatcher<Operation>> operationWatchers = watchers.get(channel);
-    boolean complete = operation == null || operation.getDone();
+    List<TimedWatchFuture> operationWatchers = watchers.get(channel);
     boolean observe = operation == null || operation.hasMetadata();
-    ImmutableList.Builder<ListenableFuture<StillWatchingWatcher>> stillWatchingWatcherFutures =
-        new ImmutableList.Builder<>();
     synchronized (watchers) {
-      if (operationWatchers.isEmpty()) {
-        return;
-      }
-
-      for (TimedWatcher<Operation> watcher : operationWatchers) {
+      ImmutableList.Builder<Consumer<Operation>> observers = ImmutableList.builder();
+      for (TimedWatchFuture watchFuture : operationWatchers) {
+        TimedWatcher<Operation> watcher = watchFuture.getWatcher();
+        watcher.reset(expiresAt);
         if (shouldObserve.test(watcher)) {
-          ListenableFuture<StillWatchingWatcher> watcherFuture =
-              Futures.transform(
-                  executorService.submit(new Callable<Boolean>() {
-                    public Boolean call() {
-                      boolean stillWatching = (!observe || watcher.observe(operation)) && !complete;
-                      watcher.reset(expiresAt);
-                      return stillWatching;
-                    }
-                  }),
-                  (stillWatching) -> new StillWatchingWatcher(stillWatching, watcher),
-                  executorService);
-          stillWatchingWatcherFutures.add(watcherFuture);
+          observers.add(watchFuture::observe);
         }
       }
+      for (Consumer<Operation> observer : observers.build()) {
+        executorService.execute(() -> {
+          if (observe) {
+            observer.accept(operation);
+          }
+        });
+      }
     }
-
-    Futures.addCallback(
-        Futures.allAsList(stillWatchingWatcherFutures.build()),
-        new FutureCallback<List<StillWatchingWatcher>>() {
-          @Override
-          public void onSuccess(List<StillWatchingWatcher> stillWatchingWatchers) {
-            List<Watcher> unwatched = ImmutableList.copyOf(
-                Iterables.transform(
-                    Iterables.filter(stillWatchingWatchers, (s) -> !s.stillWatching),
-                    (s) -> s.watcher));
-            synchronized (watchers) {
-              // a little unoptimized for a list, perhaps we should save the index...
-              operationWatchers.removeAll(unwatched);
-              if (operationWatchers.isEmpty()) {
-                unsubscribe(channel);
-              }
-            }
-          }
-
-          @Override
-          public void onFailure(Throwable t) {
-            logger.log(SEVERE, "error while updating watchers of " + channel, t);
-          }
-        },
-        executorService);
   }
 
   @Override

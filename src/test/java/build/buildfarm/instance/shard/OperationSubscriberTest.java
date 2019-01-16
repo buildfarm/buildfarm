@@ -21,7 +21,9 @@ import static org.mockito.Mockito.mock;
 import static redis.clients.jedis.Protocol.Keyword.SUBSCRIBE;
 import static redis.clients.jedis.Protocol.Keyword.UNSUBSCRIBE;
 
+import build.buildfarm.instance.shard.OperationSubscriber.TimedWatchFuture;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimaps;
@@ -47,7 +49,7 @@ public class OperationSubscriberTest {
     }
 
     @Override
-    public boolean observe(Operation operation) {
+    public void observe(Operation operation) {
       throw new UnsupportedOperationException();
     }
   }
@@ -111,8 +113,8 @@ public class OperationSubscriberTest {
 
   @Test
   public void novelChannelWatcherSubscribes() throws InterruptedException {
-    ListMultimap<String, TimedWatcher<Operation>> watchers = 
-        Multimaps.<String, TimedWatcher<Operation>>synchronizedListMultimap(
+    ListMultimap<String, TimedWatchFuture> watchers = 
+        Multimaps.<String, TimedWatchFuture>synchronizedListMultimap(
             MultimapBuilder.linkedHashKeys().arrayListValues().build());
     ExecutorService subscriberService = newDirectExecutorService();
     OperationSubscriber operationSubscriber = new OperationSubscriber(watchers, subscriberService) {
@@ -133,7 +135,7 @@ public class OperationSubscriberTest {
     String novelChannel = "novel-channel";
     TimedWatcher<Operation> novelWatcher = new UnobservableWatcher();
     operationSubscriber.watch(novelChannel, novelWatcher);
-    assertThat(watchers.get(novelChannel)).isEqualTo(ImmutableList.of(novelWatcher));
+    assertThat(Iterables.getOnlyElement(watchers.get(novelChannel)).getWatcher()).isEqualTo(novelWatcher);
     String[] channels = new String[1];
     channels[0] = novelChannel;
     assertThat(testClient.getSubscriptions()).contains(novelChannel);
@@ -143,7 +145,7 @@ public class OperationSubscriberTest {
 
   @Test
   public void existingChannelWatcherSuppressesSubscription() {
-    ListMultimap<String, TimedWatcher<Operation>> watchers = 
+    ListMultimap<String, TimedWatchFuture> watchers = 
         MultimapBuilder.linkedHashKeys().arrayListValues().build();
     ExecutorService subscriberService = newDirectExecutorService();
     OperationSubscriber operationSubscriber = new OperationSubscriber(watchers, subscriberService) {
@@ -154,16 +156,21 @@ public class OperationSubscriberTest {
     };
     String existingChannel = "existing-channel";
     TimedWatcher<Operation> existingWatcher = new UnobservableWatcher();
-    watchers.put(existingChannel, existingWatcher);
+    watchers.put(existingChannel, new TimedWatchFuture(existingWatcher) {
+      @Override
+      public void unwatch() {
+        throw new UnsupportedOperationException();
+      }
+    });
     TimedWatcher<Operation> novelWatcher = new UnobservableWatcher();
     operationSubscriber.watch(existingChannel, novelWatcher);
-    assertThat(watchers.get(existingChannel)).containsExactly(existingWatcher, novelWatcher);
+    assertThat(watchers.get(existingChannel).size()).isEqualTo(2);
   }
 
   @Test
   public void nullMessageUnsubscribesWatcher() throws InterruptedException {
-    ListMultimap<String, TimedWatcher<Operation>> watchers = 
-        Multimaps.<String, TimedWatcher<Operation>>synchronizedListMultimap(
+    ListMultimap<String, TimedWatchFuture> watchers = 
+        Multimaps.<String, TimedWatchFuture>synchronizedListMultimap(
             MultimapBuilder.linkedHashKeys().arrayListValues().build());
     ExecutorService subscriberService = newDirectExecutorService();
     OperationSubscriber operationSubscriber = new OperationSubscriber(watchers, subscriberService) {
@@ -184,11 +191,10 @@ public class OperationSubscriberTest {
     String nullMessageChannel = "null-message-channel";
     TimedWatcher<Operation> nullMessageWatcher = new TimedWatcher<Operation>(Instant.now()) {
       @Override
-      public boolean observe(Operation operation) {
+      public void observe(Operation operation) {
         if (operation != null) {
           throw new UnsupportedOperationException();
         }
-        return true; // provide stillWatching which should be ignored
       }
     };
     operationSubscriber.watch(nullMessageChannel, nullMessageWatcher);

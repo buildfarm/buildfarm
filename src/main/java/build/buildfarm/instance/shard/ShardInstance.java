@@ -133,7 +133,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Predicate;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
@@ -1214,16 +1214,16 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @Override
-  public void execute(
+  public ListenableFuture<Void> execute(
       Digest actionDigest,
       boolean skipCacheLookup,
       ExecutionPolicy executionPolicy,
       ResultsCachePolicy resultsCachePolicy,
       RequestMetadata requestMetadata,
-      Predicate<Operation> watcher) {
+      Consumer<Operation> watcher) {
     try {
       if (!backplane.canPrequeue()) {
-        throw Status.UNAVAILABLE.withDescription("Too many jobs pending").asRuntimeException();
+        return immediateFailedFuture(Status.UNAVAILABLE.withDescription("Too many jobs pending").asException());
       }
 
       String operationName = createOperationName(UUID.randomUUID().toString());
@@ -1250,9 +1250,9 @@ public class ShardInstance extends AbstractServerInstance {
           .setMetadata(Any.pack(metadata))
           .build();
       backplane.prequeue(executeEntry, operation);
-      watchOperation(operation.getName(), watcher);
+      return watchOperation(operation.getName(), watcher);
     } catch (IOException e) {
-      throw Status.fromThrowable(e).asRuntimeException();
+      return immediateFailedFuture(e);
     }
   }
 
@@ -1668,17 +1668,17 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @Override
-  public boolean watchOperation(
+  public ListenableFuture<Void> watchOperation(
       String operationName,
-      Predicate<Operation> watcher) {
+      Consumer<Operation> watcher) {
     Operation operation = getOperation(operationName);
-    if (!watcher.test(stripOperation(operation))) {
-      // watcher processed completed state
-      return true;
+    try {
+      watcher.accept(stripOperation(operation));
+    } catch (Throwable t) {
+      return immediateFailedFuture(t);
     }
     if (operation == null || operation.getDone()) {
-      // watcher did not process completed state
-      return false;
+      return immediateFuture(null);
     }
 
     try {

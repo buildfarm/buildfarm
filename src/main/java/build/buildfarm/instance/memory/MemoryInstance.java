@@ -17,6 +17,7 @@ package build.buildfarm.instance.memory;
 import static build.buildfarm.instance.Utils.putBlob;
 import static com.google.common.collect.Multimaps.synchronizedSetMultimap;
 import static com.google.common.util.concurrent.Futures.addCallback;
+import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
@@ -46,6 +47,7 @@ import build.buildfarm.common.function.InterruptingPredicate;
 import build.buildfarm.common.Watchdog;
 import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.instance.OperationsMap;
+import build.buildfarm.instance.WatchFuture;
 import build.buildfarm.v1test.ActionCacheConfig;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.GrpcACConfig;
@@ -61,9 +63,8 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.MultimapBuilder;
 import com.google.common.collect.SetMultimap;
 import com.google.common.io.BaseEncoding;
-import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.AbstractFuture;
 import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -81,11 +82,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.function.Predicate;
+import java.util.function.Consumer;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -106,7 +107,7 @@ public class MemoryInstance extends AbstractServerInstance {
       "A timeout specified is out of bounds with a configured range";
 
   private final MemoryInstanceConfig config;
-  private final SetMultimap<String, Predicate<Operation>> watchers;
+  private final SetMultimap<String, WatchFuture> watchers;
   private final Map<String, ByteStringStreamSource> streams =
       new ConcurrentHashMap<String, ByteStringStreamSource>();
   private final List<Operation> queuedOperations = new ArrayList<Operation>();
@@ -116,7 +117,7 @@ public class MemoryInstance extends AbstractServerInstance {
   private final Map<String, Watchdog> operationTimeoutDelays =
       new ConcurrentHashMap(new HashMap<String, Watchdog>());
   private final OperationsMap outstandingOperations;
-  private final ListeningExecutorService watcherService;
+  private final Executor watcherExecutor;
 
   private static final class Worker {
     private final Platform platform;
@@ -177,7 +178,7 @@ public class MemoryInstance extends AbstractServerInstance {
                 .hashKeys()
                 .hashSetValues(/* expectedValuesPerKey=*/ 1)
                 .build()),
-        /* watcherService=*/ newCachedThreadPool(),
+        /* watcherExecutor=*/ newCachedThreadPool(),
         new OutstandingOperations());
   }
 
@@ -187,8 +188,8 @@ public class MemoryInstance extends AbstractServerInstance {
       DigestUtil digestUtil,
       MemoryInstanceConfig config,
       ContentAddressableStorage contentAddressableStorage,
-      SetMultimap<String, Predicate<Operation>> watchers,
-      ExecutorService watcherService,
+      SetMultimap<String, WatchFuture> watchers,
+      Executor watcherExecutor,
       OperationsMap outstandingOperations) {
     super(
         name,
@@ -201,7 +202,7 @@ public class MemoryInstance extends AbstractServerInstance {
     this.config = config;
     this.watchers = watchers;
     this.outstandingOperations = outstandingOperations;
-    this.watcherService = listeningDecorator(watcherService);
+    this.watcherExecutor = watcherExecutor;
   }
 
   private static ActionCache createActionCache(ActionCacheConfig config, ContentAddressableStorage cas, DigestUtil digestUtil) {
@@ -309,30 +310,10 @@ public class MemoryInstance extends AbstractServerInstance {
   protected void updateOperationWatchers(Operation operation) throws InterruptedException {
     super.updateOperationWatchers(operation);
 
-    Set<Predicate<Operation>> operationWatchers = watchers.get(operation.getName());
+    Set<WatchFuture> operationWatchers = watchers.get(operation.getName());
     synchronized (watchers) {
-      for (Predicate<Operation> watcher : operationWatchers) {
-        ListenableFuture<Boolean> stillWatchingFuture = watcherService.submit(new Callable<Boolean>() {
-          @Override
-          public Boolean call() {
-            return watcher.test(operation) && !operation.getDone();
-          }
-        });
-        addCallback(stillWatchingFuture, new FutureCallback<Boolean>() {
-          @Override
-          public void onSuccess(Boolean stillWatching) {
-            if (!stillWatching) {
-              synchronized (watchers) {
-                operationWatchers.remove(watcher);
-              }
-            }
-          }
-
-          @Override
-          public void onFailure(Throwable t) {
-            // ignore
-          }
-        }, watcherService);
+      for (WatchFuture watcher : operationWatchers) {
+        watcherExecutor.execute(() -> watcher.observe(operation));
       }
     }
   }
@@ -612,25 +593,35 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  public boolean watchOperation(
+  public ListenableFuture<Void> watchOperation(
       String operationName,
-      Predicate<Operation> watcher) {
+      Consumer<Operation> observer) {
     Operation operation = getOperation(operationName);
-    if (!watcher.test(operation)) {
-      // watcher processed completed state
-      return true;
+    try {
+      observer.accept(operation);
+    } catch (Throwable t) {
+      return immediateFailedFuture(t);
     }
     if (operation == null || operation.getDone()) {
-      // watcher did not process completed state
-      return false;
+      return immediateFuture(null);
     }
-    watchers.put(operationName, watcher);
+    WatchFuture watchFuture = new WatchFuture(observer) {
+      @Override
+      protected void unwatch() {
+        synchronized (watchers) {
+          watchers.remove(operationName, this);
+        }
+      }
+    };
+    synchronized (watchers) {
+      watchers.put(operationName, watchFuture);
+    }
     operation = getOperation(operationName);
-    if (operation == null || operation.getDone()) {
+    if (!watchFuture.isDone() && operation == null || operation.getDone()) {
       // guarantee at least once delivery
-      return !watcher.test(operation);
+      watchFuture.observe(operation);
     }
-    return true;
+    return watchFuture;
   }
 
   @Override

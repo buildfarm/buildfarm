@@ -28,6 +28,8 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.function.InterruptingRunnable;
+import build.buildfarm.instance.Watcher;
+import build.buildfarm.instance.shard.OperationSubscriber.TimedWatchFuture;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
@@ -46,6 +48,7 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.MultimapBuilder;
 import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -329,8 +332,8 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   private void startSubscriptionThread() {
-    ListMultimap<String, TimedWatcher<Operation>> watchers =
-        Multimaps.<String, TimedWatcher<Operation>>synchronizedListMultimap(
+    ListMultimap<String, TimedWatchFuture> watchers =
+        Multimaps.<String, TimedWatchFuture>synchronizedListMultimap(
             MultimapBuilder.linkedHashKeys().arrayListValues().build());
     ExecutorService subscriberService = Executors.newFixedThreadPool(32);
     operationSubscriber = new OperationSubscriber(watchers, subscriberService) {
@@ -399,18 +402,18 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   @Override
-  public boolean watchOperation(
+  public ListenableFuture<Void> watchOperation(
       String operationName,
-      Predicate<Operation> watcher) throws IOException {
-    operationSubscriber.watch(
+      Consumer<Operation> observer) throws IOException {
+    TimedWatcher<Operation> watcher = new TimedWatcher<Operation>(nextWatcherExpiresAt()) {
+      @Override
+      public void observe(Operation operation) {
+        observer.accept(operation);
+      }
+    };
+    return operationSubscriber.watch(
         operationChannel(operationName),
-        new TimedWatcher<Operation>(nextWatcherExpiresAt()) {
-          @Override
-          public boolean observe(Operation operation) {
-            return watcher.test(operation);
-          }
-        });
-    return true;
+        watcher);
   }
 
   @Override

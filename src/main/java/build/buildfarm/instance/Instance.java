@@ -25,7 +25,6 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
-import build.buildfarm.common.function.InterruptingPredicate;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import com.google.common.collect.ImmutableList;
@@ -37,7 +36,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.concurrent.ExecutorService;
-import java.util.function.Predicate;
+import java.util.function.Consumer;
 import javax.annotation.Nullable;
 
 public interface Instance {
@@ -65,13 +64,13 @@ public interface Instance {
   CommittingOutputStream getStreamOutput(String name, long expectedSize);
   InputStream newStreamInput(String name, long offset) throws IOException;
 
-  void execute(
+  ListenableFuture<Void> execute(
       Digest actionDigest,
       boolean skipCacheLookup,
       ExecutionPolicy executionPolicy,
       ResultsCachePolicy resultsCachePolicy,
       RequestMetadata requestMetadata,
-      Predicate<Operation> onOperation) throws InterruptedException;
+      Consumer<Operation> operationObserver) throws InterruptedException;
   void match(Platform platform, MatchListener listener) throws InterruptedException;
   boolean putOperation(Operation operation) throws InterruptedException;
   boolean putAndValidateOperation(Operation operation) throws InterruptedException;
@@ -86,14 +85,9 @@ public interface Instance {
   void cancelOperation(String name) throws InterruptedException;
   void deleteOperation(String name);
 
-  // returns true if the operation will be handled in all cases through the
-  // watcher.
-  // The watcher returns true to indicate it is still able to process updates,
-  // and returns false when it is complete and no longer wants updates
-  // The watcher must not be tested again after it has returned false.
-  boolean watchOperation(
+  ListenableFuture<Void> watchOperation(
       String operationName,
-      Predicate<Operation> watcher);
+      Consumer<Operation> watcher);
 
   ServerCapabilities getCapabilities();
 

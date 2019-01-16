@@ -63,7 +63,6 @@ import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
-import java.util.function.Predicate;
 import javax.naming.ConfigurationException;
 import java.util.logging.Logger;
 
@@ -205,13 +204,13 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  public void execute(
+  public ListenableFuture<Void> execute(
       Digest actionDigest, 
       boolean skipCacheLookup, 
       ExecutionPolicy executionPolicy, 
       ResultsCachePolicy resultsCachePolicy, 
       RequestMetadata requestMetadata,
-      Predicate<Operation> watcher) {
+      Consumer<Operation> watcher) {
     throw new UnsupportedOperationException();
   }
 
@@ -306,9 +305,9 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  public boolean watchOperation(
+  public ListenableFuture<Void> watchOperation(
       String operationName,
-      Predicate<Operation> watcher) {
+      Consumer<Operation> watcher) {
     throw new UnsupportedOperationException();
   }
 

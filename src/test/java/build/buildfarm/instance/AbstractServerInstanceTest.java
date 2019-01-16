@@ -38,12 +38,13 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import com.google.rpc.PreconditionFailure;
 import com.google.rpc.PreconditionFailure.Violation;
 import java.io.InputStream;
 import java.util.Stack;
-import java.util.function.Predicate;
+import java.util.function.Consumer;
 import java.util.logging.Logger;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -124,9 +125,9 @@ public class AbstractServerInstanceTest {
     }
 
     @Override
-    public boolean watchOperation(
+    public ListenableFuture<Void> watchOperation(
         String operationName,
-        Predicate<Operation> watcher) {
+        Consumer<Operation> watcher) {
       throw new UnsupportedOperationException();
     }
 

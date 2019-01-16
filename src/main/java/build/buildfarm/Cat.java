@@ -35,6 +35,7 @@ import com.google.protobuf.util.Durations;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.rpc.Code;
 import io.grpc.ManagedChannel;
+import io.grpc.Status;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import java.io.IOException;
@@ -364,11 +365,17 @@ class Cat {
     }
   }
 
-  private static void watchOperation(Instance instance, String operationName) {
-    instance.watchOperation(operationName, (operation) -> {
-      printOperation(operation);
-      return !operation.getDone();
-    });
+  private static void watchOperation(Instance instance, String operationName) throws InterruptedException {
+    try {
+      instance.watchOperation(operationName, (operation) -> {
+        if (operation == null) {
+          throw Status.NOT_FOUND.asRuntimeException();
+        }
+        printOperation(operation);
+      }).get();
+    } catch (ExecutionException e) {
+      e.getCause().printStackTrace();
+    }
   }
 
   public static void main(String[] args) throws Exception {

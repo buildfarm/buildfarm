@@ -54,6 +54,7 @@ java_library(
     srcs = [
         "instance/Instance.java",
         "instance/Utils.java",
+        "instance/Watcher.java",
     ],
     deps = [
         ":common",
@@ -73,6 +74,7 @@ java_library(
     srcs = [
         "instance/AbstractServerInstance.java",
         "instance/OperationsMap.java",
+        "instance/WatchFuture.java",
     ],
     deps = [
         ":ac",

@@ -20,10 +20,12 @@ import static build.buildfarm.worker.Utils.removeDirectory;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Iterables.concat;
 import static com.google.common.util.concurrent.Futures.allAsList;
+import static com.google.common.util.concurrent.Futures.catchingAsync;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.Futures.transformAsync;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.TimeUnit.MINUTES;
@@ -259,23 +261,23 @@ class CFCExecFileSystem implements ExecFileSystem {
     ImmutableList.Builder<Digest> inputDirectories = new ImmutableList.Builder<>();
 
     logger.info("ExecFileSystem::createExecDir(" + DigestUtil.toString(action.getInputRootDigest()) + ") calling fetchInputs");
-    boolean fetched = false;
-    try {
-      getInterruptiblyOrIOException(
-          allAsList(
-              fetchInputs(
-                  execDir,
-                  action.getInputRootDigest(),
-                  directoriesIndex,
-                  outputDirectory,
-                  inputFiles,
-                  inputDirectories)));
-      fetched = true;
-    } finally {
-      if (!fetched) {
-        fileCache.decrementReferences(inputFiles.build(), inputDirectories.build());
-      }
-    }
+		ListenableFuture<List<Void>> fetchedFuture = catchingAsync(
+				allAsList(
+						fetchInputs(
+								execDir,
+								action.getInputRootDigest(),
+								directoriesIndex,
+								outputDirectory,
+								inputFiles,
+								inputDirectories)),
+        Throwable.class,
+        (e) -> {
+          fileCache.decrementReferences(inputFiles.build(), inputDirectories.build());
+          removeDirectory(execDir);
+          return immediateFailedFuture(e);
+        },
+        directExecutor());
+    getInterruptiblyOrIOException(fetchedFuture);
 
     rootInputFiles.put(execDir, inputFiles.build());
     rootInputDirectories.put(execDir, inputDirectories.build());

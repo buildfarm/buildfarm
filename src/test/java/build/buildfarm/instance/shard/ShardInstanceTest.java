@@ -28,7 +28,7 @@ import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.matches;
@@ -253,7 +253,7 @@ public class ShardInstanceTest {
         .setResponse(Any.pack(executeResponse))
         .build();
     verify(mockBackplane, times(1)).putOperation(eq(erroredOperation), eq(COMPLETED));
-    verify(poller, atLeast(1)).pause();
+    verify(poller, atLeastOnce()).pause();
   }
 
   @Test
@@ -306,7 +306,7 @@ public class ShardInstanceTest {
         .setResponse(Any.pack(executeResponse))
         .build();
     verify(mockBackplane, times(1)).putOperation(eq(erroredOperation), eq(COMPLETED));
-    verify(poller, atLeast(1)).pause();
+    verify(poller, atLeastOnce()).pause();
   }
 
   @Test
@@ -368,7 +368,7 @@ public class ShardInstanceTest {
         .setResponse(Any.pack(executeResponse))
         .build();
     verify(mockBackplane, times(1)).putOperation(eq(erroredOperation), eq(COMPLETED));
-    verify(poller, atLeast(1)).pause();
+    verify(poller, atLeastOnce()).pause();
   }
 
   @Test
@@ -392,7 +392,7 @@ public class ShardInstanceTest {
     verify(mockBackplane, times(1)).putOperation(any(Operation.class), eq(CACHE_CHECK));
     verify(mockBackplane, never()).putOperation(any(Operation.class), eq(QUEUED));
     verify(mockBackplane, times(1)).putOperation(any(Operation.class), eq(COMPLETED));
-    verify(poller, atLeast(1)).pause();
+    verify(poller, atLeastOnce()).pause();
   }
 
   @Test

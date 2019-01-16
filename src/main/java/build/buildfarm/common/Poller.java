@@ -43,15 +43,21 @@ public class Poller {
     private Duration getWaitTime() {
       checkNotNull(periodDeadline);
       Deadline waitDeadline = expirationDeadline.minimum(periodDeadline);
-      return Durations.fromMicros(waitDeadline.timeRemaining(MICROSECONDS));
+      long waitMicros = waitDeadline.timeRemaining(MICROSECONDS);
+      if (waitMicros <= 0) {
+        return Duration.getDefaultInstance();
+      }
+      return Durations.fromMicros(waitMicros);
     }
 
     private void waitForNextDeadline() {
       try {
         Duration waitTime = getWaitTime();
-        wait(
-            waitTime.getSeconds() * 1000 + waitTime.getNanos() / 1000000,
-            waitTime.getNanos() % 1000000);
+        if (waitTime.getSeconds() != 0 || waitTime.getNanos() != 0) {
+            wait(
+                waitTime.getSeconds() * 1000 + waitTime.getNanos() / 1000000,
+                waitTime.getNanos() % 1000000);
+        }
       } catch (InterruptedException e) {
         running = false;
       }
