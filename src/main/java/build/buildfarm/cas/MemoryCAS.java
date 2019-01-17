@@ -14,12 +14,15 @@
 
 package build.buildfarm.cas;
 
-import build.buildfarm.common.DigestUtil;
 import build.bazel.remote.execution.v2.Digest;
+import build.buildfarm.common.DigestUtil;
+import com.google.common.collect.ImmutableList;
+import com.google.protobuf.ByteString;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.NoSuchFileException;
-import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -88,6 +91,32 @@ public class MemoryCAS implements ContentAddressableStorage {
       throw new NoSuchFileException(DigestUtil.toString(digest));
     }
     return blob.getData().substring((int) offset).newInput();
+  }
+
+  @Override
+  public OutputStream newOutput(Digest digest) throws IOException {
+    if (digest.getSizeBytes() == 0 || digest.getSizeBytes() > Integer.MAX_VALUE) {
+      return null;
+    }
+
+    return new ByteArrayOutputStream((int) digest.getSizeBytes()) {
+      boolean hasPut = false;
+
+      @Override
+      public void close() throws IOException {
+        if (count != digest.getSizeBytes()) {
+          throw new IOException(
+              String.format(
+                  "content size was %d, expected %d",
+                  count,
+                  digest.getSizeBytes()));
+        }
+        if (!hasPut) {
+          put(new Blob(ByteString.copyFrom(buf, 0, count), digest));
+          hasPut = true;
+        }
+      }
+    };
   }
 
   private long size() {

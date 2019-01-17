@@ -53,6 +53,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.google.common.io.ByteStreams;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -377,32 +378,42 @@ class ShardWorkerContext implements WorkerContext {
     return null;
   }
 
-  private void updateActionResultStdOutputs(
-      ActionResult.Builder resultBuilder,
-      ImmutableList.Builder<ByteString> contents) {
+  private void insertBlob(Digest digest, ByteString content) throws InterruptedException {
+    if (digest.getSizeBytes() > 0) {
+      Blob blob = new Blob(content, digest);
+      execFileSystem.getStorage().put(blob);
+    }
+  }
+
+  private void insertFile(Digest digest, Path file) throws IOException {
+    OutputStream out = execFileSystem.getStorage().newOutput(digest);
+    if (out != null) {
+      try (InputStream in = Files.newInputStream(file)) {
+        com.google.common.base.Preconditions.checkNotNull(in);
+        ByteStreams.copy(in, out);
+      } finally {
+        out.close();
+      }
+    }
+  }
+
+  private void updateActionResultStdOutputs(ActionResult.Builder resultBuilder) throws InterruptedException {
     ByteString stdoutRaw = resultBuilder.getStdoutRaw();
     if (stdoutRaw.size() > 0) {
       // reset to allow policy to determine inlining
       resultBuilder.setStdoutRaw(ByteString.EMPTY);
-      contents.add(stdoutRaw);
-      resultBuilder.setStdoutDigest(getDigestUtil().compute(stdoutRaw));
+      Digest stdoutDigest = getDigestUtil().compute(stdoutRaw);
+      insertBlob(stdoutDigest, stdoutRaw);
+      resultBuilder.setStdoutDigest(stdoutDigest);
     }
 
     ByteString stderrRaw = resultBuilder.getStderrRaw();
     if (stderrRaw.size() > 0) {
       // reset to allow policy to determine inlining
       resultBuilder.setStderrRaw(ByteString.EMPTY);
-      contents.add(stderrRaw);
-      resultBuilder.setStderrDigest(getDigestUtil().compute(stderrRaw));
-    }
-  }
-
-  private void putAllBlobs(Iterable<ByteString> blobs) throws InterruptedException {
-    for (ByteString content : blobs) {
-      if (content.size() > 0) {
-        Blob blob = new Blob(content, instance.getDigestUtil());
-        execFileSystem.getStorage().put(blob);
-      }
+      Digest stderrDigest = getDigestUtil().compute(stderrRaw);
+      insertBlob(stderrDigest, stderrRaw);
+      resultBuilder.setStderrDigest(stderrDigest);
     }
   }
 
@@ -413,7 +424,6 @@ class ShardWorkerContext implements WorkerContext {
       Iterable<String> outputFiles,
       Iterable<String> outputDirs)
       throws IOException, InterruptedException {
-    ImmutableList.Builder<ByteString> contents = new ImmutableList.Builder<>();
     for (String outputFile : outputFiles) {
       Path outputPath = actionRoot.resolve(outputFile);
       if (!Files.exists(outputPath)) {
@@ -421,27 +431,22 @@ class ShardWorkerContext implements WorkerContext {
         continue;
       }
 
-      // FIXME put the output into the fileCache
-      // FIXME this needs to be streamed to the server, not read to completion, but
-      // this is a constraint of not knowing the hash, however, if we put the entry
-      // into the cache, we can likely do so, stream the output up, and be done
-      //
       // will run into issues if we end up blocking on the cache insertion, might
       // want to decrement input references *before* this to ensure that we cannot
       // cause an internal deadlock
 
-      ByteString content;
-      try (InputStream inputStream = Files.newInputStream(outputPath)) {
-        content = ByteString.readFrom(inputStream);
+      Digest digest;
+      try {
+        digest = getDigestUtil().compute(outputPath);
       } catch (IOException e) {
         continue;
       }
 
       OutputFile.Builder outputFileBuilder = resultBuilder.addOutputFilesBuilder()
           .setPath(outputFile)
+          .setDigest(digest)
           .setIsExecutable(Files.isExecutable(outputPath));
-      contents.add(content);
-      outputFileBuilder.setDigest(getDigestUtil().compute(content));
+      insertFile(digest, outputPath);
     }
 
     for (String outputDir : outputDirs) {
@@ -459,22 +464,22 @@ class ShardWorkerContext implements WorkerContext {
 
         @Override
         public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-          ByteString content;
-          try (InputStream inputStream = Files.newInputStream(file)) {
-            content = ByteString.readFrom(inputStream);
+          Digest digest;
+          try {
+            digest = getDigestUtil().compute(file);
           } catch (IOException e) {
-            logger.log(SEVERE, "error reading " + file.toString(), e);
+            logger.log(SEVERE, format("error visiting file %s under output dir %s", outputDirPath.relativize(file), outputDirPath.toAbsolutePath()), e);
             return FileVisitResult.CONTINUE;
           }
 
           // should we cast to PosixFilePermissions and do gymnastics there for executable?
 
           // TODO symlink per revision proposal
-          contents.add(content);
           FileNode.Builder fileNodeBuilder = currentDirectory.addFilesBuilder()
               .setName(file.getFileName().toString())
-              .setDigest(getDigestUtil().compute(content))
+              .setDigest(digest)
               .setIsExecutable(Files.isExecutable(file));
+          insertFile(digest, file);
           return FileVisitResult.CONTINUE;
         }
 
@@ -503,20 +508,15 @@ class ShardWorkerContext implements WorkerContext {
       });
       Tree tree = treeBuilder.build();
       ByteString treeBlob = tree.toByteString();
-      contents.add(treeBlob);
       Digest treeDigest = getDigestUtil().compute(treeBlob);
+      insertBlob(treeDigest, treeBlob);
       resultBuilder.addOutputDirectoriesBuilder()
           .setPath(outputDir)
           .setTreeDigest(treeDigest);
     }
 
     /* put together our outputs and update the result */
-    updateActionResultStdOutputs(resultBuilder, contents);
-
-    List<ByteString> blobs = contents.build();
-    if (!blobs.isEmpty()) {
-      putAllBlobs(blobs);
-    }
+    updateActionResultStdOutputs(resultBuilder);
   }
 
   private void logComplete(String operationName) {

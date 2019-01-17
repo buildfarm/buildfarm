@@ -6,7 +6,7 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.InputStreamFactory;
-import build.buildfarm.worker.OutputStreamFactory;
+import build.buildfarm.common.OutputStreamFactory;
 import java.nio.file.Path;
 import java.io.IOException;
 import java.util.List;

@@ -28,8 +28,10 @@ import com.google.protobuf.ByteString;
 import io.grpc.Channel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Map;
 
 public final class ContentAddressableStorages {
@@ -77,6 +79,32 @@ public final class ContentAddressableStorages {
         InputStream in = map.get(digest).newInput();
         in.skip(offset);
         return in;
+      }
+
+      @Override
+      public OutputStream newOutput(Digest digest) throws IOException {
+        if (digest.getSizeBytes() == 0 || digest.getSizeBytes() > Integer.MAX_VALUE) {
+          return null;
+        }
+
+        return new ByteArrayOutputStream((int) digest.getSizeBytes()) {
+          boolean hasPut = false;
+
+          @Override
+          public void close() throws IOException {
+            if (count != digest.getSizeBytes()) {
+              throw new IOException(
+                  String.format(
+                      "content size was %d, expected %d",
+                      count,
+                      digest.getSizeBytes()));
+            }
+            if (!hasPut) {
+              map.put(digest, ByteString.copyFrom(buf, 0, count));
+              hasPut = true;
+            }
+          }
+        };
       }
 
       @Override

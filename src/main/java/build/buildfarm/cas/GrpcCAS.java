@@ -39,6 +39,7 @@ import io.grpc.Channel;
 import io.grpc.StatusRuntimeException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -83,6 +84,10 @@ class GrpcCAS implements ContentAddressableStorage {
             .build());
     return new ByteStringIteratorInputStream(
         Iterators.transform(replies, (reply) -> reply.getData()));
+  }
+
+  public OutputStream newStreamOutput(String name) {
+    throw new UnsupportedOperationException();
   }
 
   private String getBlobName(Digest digest) {
@@ -136,6 +141,11 @@ class GrpcCAS implements ContentAddressableStorage {
   @Override
   public InputStream newInput(Digest digest, long offset) {
     return newStreamInput(getBlobName(digest), offset);
+  }
+
+  @Override
+  public OutputStream newOutput(Digest digest) {
+    return newStreamOutput(getBlobName(digest));
   }
 
   @Override

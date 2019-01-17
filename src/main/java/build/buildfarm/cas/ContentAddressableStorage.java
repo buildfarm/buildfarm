@@ -16,12 +16,13 @@ package build.buildfarm.cas;
 
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.InputStreamFactory;
+import build.buildfarm.common.OutputStreamFactory;
 import build.buildfarm.common.ThreadSafety.ThreadSafe;
 import build.bazel.remote.execution.v2.Digest;
 import com.google.protobuf.ByteString;
 import java.io.InputStream;
 
-public interface ContentAddressableStorage extends InputStreamFactory {
+public interface ContentAddressableStorage extends InputStreamFactory, OutputStreamFactory {
   /**
    * Blob storage for the CAS. This class should be used at all times when interacting with
    * complete blobs in order to cut down on independent digest computation.
