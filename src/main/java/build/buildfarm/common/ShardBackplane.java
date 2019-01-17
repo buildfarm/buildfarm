@@ -64,7 +64,7 @@ public interface ShardBackplane {
    * Stop the backplane's operation
    */
   @ThreadSafe
-  void stop();
+  void stop() throws InterruptedException;
 
   /**
    * Adds a worker to the set of active workers.

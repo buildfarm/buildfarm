@@ -84,12 +84,14 @@ class RedisShardSubscription implements Runnable {
         throw e;
       }
     }
-    logger.warning("RedisShardSubscription: Unexpected subscribe return, reconnecting...");
   }
 
   private void mainLoop() throws IOException {
     boolean first = true;
     while (!isDone()) {
+      if (!first) {
+        logger.warning("unexpected subscribe return, reconnecting...");
+      }
       iterate(!first);
       first = false;
     }
@@ -97,6 +99,11 @@ class RedisShardSubscription implements Runnable {
 
   private boolean isDone() {
     return done;
+  }
+
+  public void stop() {
+    done = true;
+    subscriber.unsubscribe();
   }
 
   @Override

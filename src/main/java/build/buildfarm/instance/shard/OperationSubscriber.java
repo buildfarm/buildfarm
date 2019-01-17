@@ -18,31 +18,17 @@ import static java.lang.String.format;
 
 import build.buildfarm.instance.WatchFuture;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.ListMultimap;
-import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.ListeningExecutorService;
-import com.google.common.util.concurrent.MoreExecutors;
 import com.google.longrunning.Operation;
 import java.time.Instant;
-import java.util.AbstractMap;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executor;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
 import redis.clients.jedis.Client;
-import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPubSub;
-import redis.clients.jedis.Pipeline;
-import redis.clients.jedis.Response;
 
 abstract class OperationSubscriber extends JedisPubSub {
   private static final Logger logger = Logger.getLogger(OperationSubscriber.class.getName());
@@ -58,16 +44,20 @@ abstract class OperationSubscriber extends JedisPubSub {
     TimedWatcher<Operation> getWatcher() {
       return watcher;
     }
+
+    void complete() {
+      super.set(null);
+    }
   }
 
   private final ListMultimap<String, TimedWatchFuture> watchers;
-  private final ListeningExecutorService executorService;
+  private final Executor executor;
 
   OperationSubscriber(
       ListMultimap<String, TimedWatchFuture> watchers,
-      ExecutorService executorService) {
+      Executor executor) {
     this.watchers = watchers;
-    this.executorService = MoreExecutors.listeningDecorator(executorService);
+    this.executor = executor;
   }
 
   public List<String> watchedOperationChannels() {
@@ -106,6 +96,16 @@ abstract class OperationSubscriber extends JedisPubSub {
   @Override
   public synchronized void unsubscribe(String... channels) {
     super.unsubscribe(channels);
+  }
+
+  @Override
+  public synchronized void psubscribe(String... patterns) {
+    super.psubscribe(patterns);
+  }
+
+  @Override
+  public synchronized void punsubscribe(String... patterns) {
+    super.punsubscribe(patterns);
   }
 
   public ListenableFuture<Void> watch(String channel, TimedWatcher<Operation> watcher) {
@@ -186,7 +186,7 @@ abstract class OperationSubscriber extends JedisPubSub {
         }
       }
       for (Consumer<Operation> observer : observers.build()) {
-        executorService.execute(() -> {
+        executor.execute(() -> {
           if (observe) {
             observer.accept(operation);
           }
@@ -208,6 +208,17 @@ abstract class OperationSubscriber extends JedisPubSub {
 
   @Override
   public void onSubscribe(String channel, int subscribedChannels) {
+  }
+
+  @Override
+  public void onUnsubscribe(String channel, int subscribedChannels) {
+    List<TimedWatchFuture> operationWatchers;
+    synchronized (watchers) {
+      operationWatchers = watchers.removeAll(channel);
+    }
+    for (TimedWatchFuture watchFuture : operationWatchers) {
+      watchFuture.complete();
+    }
   }
 
   private String[] placeholderChannel() {

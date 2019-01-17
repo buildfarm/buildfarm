@@ -339,6 +339,7 @@ public class ShardInstance extends AbstractServerInstance {
 
   @Override
   public void stop() throws InterruptedException {
+    logger.fine(format("Instance %s is stopping", getName()));
     if (operationQueuer != null) {
       operationQueuer.stop();
     }
@@ -358,6 +359,7 @@ public class ShardInstance extends AbstractServerInstance {
     }
     operationTransformService.shutdownNow();
     workerStubs.invalidateAll();
+    logger.fine(format("Instance %s has been stopped", getName()));
   }
 
   private ActionResult getActionResultFromBackplane(ActionKey actionKey)

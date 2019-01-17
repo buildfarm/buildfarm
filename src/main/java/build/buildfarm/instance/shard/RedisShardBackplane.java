@@ -82,7 +82,6 @@ import javax.naming.ConfigurationException;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
-import redis.clients.jedis.JedisPubSub;
 import redis.clients.jedis.Pipeline;
 import redis.clients.jedis.Response;
 import redis.clients.jedis.ScanParams;
@@ -107,6 +106,7 @@ public class RedisShardBackplane implements ShardBackplane {
   private Thread failsafeOperationThread = null;
   private OperationSubscriber operationSubscriber = null;
   private RedisShardSubscription operationSubscription = null;
+  private ExecutorService subscriberService = null;
   private boolean poolStarted = false;
 
   private Set<String> workerSet = null;
@@ -335,7 +335,7 @@ public class RedisShardBackplane implements ShardBackplane {
     ListMultimap<String, TimedWatchFuture> watchers =
         Multimaps.<String, TimedWatchFuture>synchronizedListMultimap(
             MultimapBuilder.linkedHashKeys().arrayListValues().build());
-    ExecutorService subscriberService = Executors.newFixedThreadPool(32);
+    subscriberService = Executors.newFixedThreadPool(32);
     operationSubscriber = new OperationSubscriber(watchers, subscriberService) {
       @Override
       protected Instant nextExpiresAt() {
@@ -388,16 +388,26 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   @Override
-  public void stop() {
-    if (subscriptionThread != null) {
-      subscriptionThread.stop();
-      // subscriptionThread.join();
+  public void stop() throws InterruptedException {
+    if (failsafeOperationThread != null) {
       failsafeOperationThread.stop();
-      // failsafeOperationThread.join();
+      failsafeOperationThread.join();
+      logger.fine("failsafeOperationThread has been stopped");
+    }
+    if (operationSubscription != null) {
+      operationSubscription.stop();
+      subscriptionThread.join();
+      logger.fine("subscriptionThread has been stopped");
+    }
+    if (subscriberService != null) {
+      subscriberService.shutdown();
+      subscriberService.awaitTermination(10, TimeUnit.SECONDS);
+      logger.fine("subscriberService has been stopped");
     }
     if (pool != null) {
       poolStarted = false;
       pool.close();
+      logger.fine("pool has been closed");
     }
   }
 
