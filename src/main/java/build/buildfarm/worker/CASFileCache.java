@@ -29,6 +29,8 @@ import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorS
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 import static java.nio.file.StandardOpenOption.CREATE;
 import static java.nio.file.StandardOpenOption.TRUNCATE_EXISTING;
+import static java.util.concurrent.TimeUnit.MINUTES;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.Digest;
@@ -48,6 +50,7 @@ import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.protobuf.ByteString;
+import io.grpc.Deadline;
 import io.grpc.StatusRuntimeException;
 import java.io.File;
 import java.io.IOException;
@@ -74,7 +77,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
@@ -223,14 +225,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   private boolean entryExists(Entry e) {
-    long now = System.nanoTime();
-    if (now < e.ttl) {
+    if (!e.existsDeadline.isExpired()) {
       return true;
     }
 
     if (Files.exists(e.key)) {
-      // exists check is good for 10s
-      e.ttl = now + 10000000000l;
+      e.existsDeadline = Deadline.after(10, SECONDS);
       return true;
     }
     return false;
@@ -528,7 +528,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             try {
               if (storage.get(key) == null) {
                 long now = System.nanoTime();
-                Entry e = new Entry(key, size, null, now + 10000000000l);
+                Entry e = new Entry(key, size, null, Deadline.after(10, SECONDS));
                 fileKeysBuilder.put(attrs.fileKey(), e);
                 storage.put(e.key, e);
                 onPut.accept(fileEntryKey.getDigest());
@@ -578,7 +578,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     pool.shutdown();
     while (!pool.isTerminated()) {
       logger.info("Waiting for directory population to complete");
-      pool.awaitTermination(60, TimeUnit.SECONDS);
+      pool.awaitTermination(60, SECONDS);
     }
 
     for (Path path : invalidDirectories.build()) {
@@ -876,7 +876,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           });
           lockService.shutdown();
           try {
-            lockService.awaitTermination(10, TimeUnit.MINUTES);
+            lockService.awaitTermination(10, MINUTES);
           } catch (InterruptedException e) {
             // ignore
           } finally {
@@ -1076,7 +1076,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       out = future.get();
     } catch (ExecutionException e) {
       service.shutdownNow();
-      service.awaitTermination(10, TimeUnit.MINUTES);
+      service.awaitTermination(10, MINUTES);
 
       Throwable cause = e.getCause();
       while (cause != null) {
@@ -1091,7 +1091,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       throw new UncheckedExecutionException(e);
     } catch (InterruptedException e) {
       service.shutdownNow();
-      service.awaitTermination(10, TimeUnit.MINUTES);
+      service.awaitTermination(10, MINUTES);
       throw e;
     }
     if (out == DUPLICATE_OUTPUT_STREAM) {
@@ -1101,7 +1101,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       });
       service.shutdown();
       try {
-        service.awaitTermination(10, TimeUnit.MINUTES);
+        service.awaitTermination(10, MINUTES);
       } finally {
         if (!service.isTerminated()) {
           service.shutdownNow();
@@ -1139,7 +1139,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           });
           service.shutdown();
           try {
-            service.awaitTermination(10, TimeUnit.MINUTES);
+            service.awaitTermination(10, MINUTES);
           } catch (InterruptedException e) {
             service.shutdownNow();
 
@@ -1277,7 +1277,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         setPermissions(tmpPath, isExecutable);
         Files.move(tmpPath, key, REPLACE_EXISTING);
 
-        Entry e = new Entry(key, blobSizeInBytes, containingDirectory, System.nanoTime() + 10000000000l);
+        Entry e = new Entry(key, blobSizeInBytes, containingDirectory, Deadline.after(10, SECONDS));
 
         if (storage.put(key, e) != null) {
           throw new IllegalStateException("storage conflict with existing key for " + key);
@@ -1297,17 +1297,17 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     final long size;
     final Set<Digest> containingDirectories;
     int referenceCount;
-    long ttl;
+    Deadline existsDeadline;
 
     private Entry() {
       key = null;
       size = -1;
       containingDirectories = null;
       referenceCount = -1;
-      ttl = -1;
+      existsDeadline = null;
     }
 
-    public Entry(Path key, long size, Digest containingDirectory, long ttl) {
+    public Entry(Path key, long size, Digest containingDirectory, Deadline existsDeadline) {
       this.key = key;
       this.size = size;
       referenceCount = 1;
@@ -1315,7 +1315,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       if (containingDirectory != null) {
         containingDirectories.add(containingDirectory);
       }
-      this.ttl = ttl;
+      this.existsDeadline = existsDeadline;
     }
 
     public void unlink() {
