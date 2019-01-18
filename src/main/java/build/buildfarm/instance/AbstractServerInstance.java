@@ -726,7 +726,7 @@ public abstract class AbstractServerInstance implements Instance {
     if (actionDigest.getSizeBytes() != 0) {
       actionBlob = getBlob(actionDigest);
     }
-	  if (actionBlob == null) {
+    if (actionBlob == null) {
       preconditionFailure.addViolationsBuilder()
           .setType(VIOLATION_TYPE_MISSING)
           .setSubject("blobs/" + DigestUtil.toString(actionDigest))

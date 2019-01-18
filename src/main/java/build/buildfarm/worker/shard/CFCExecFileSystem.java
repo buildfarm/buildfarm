@@ -261,15 +261,15 @@ class CFCExecFileSystem implements ExecFileSystem {
     ImmutableList.Builder<Digest> inputDirectories = new ImmutableList.Builder<>();
 
     logger.info("ExecFileSystem::createExecDir(" + DigestUtil.toString(action.getInputRootDigest()) + ") calling fetchInputs");
-		ListenableFuture<List<Void>> fetchedFuture = catchingAsync(
-				allAsList(
-						fetchInputs(
-								execDir,
-								action.getInputRootDigest(),
-								directoriesIndex,
-								outputDirectory,
-								inputFiles,
-								inputDirectories)),
+    ListenableFuture<List<Void>> fetchedFuture = catchingAsync(
+        allAsList(
+            fetchInputs(
+                execDir,
+                action.getInputRootDigest(),
+                directoriesIndex,
+                outputDirectory,
+                inputFiles,
+                inputDirectories)),
         Throwable.class,
         (e) -> {
           fileCache.decrementReferences(inputFiles.build(), inputDirectories.build());

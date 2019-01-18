@@ -1481,25 +1481,25 @@ public class ShardInstance extends AbstractServerInstance {
         },
         operationTransformService);
     ListenableFuture<ProfiledQueuedOperationMetadata> queuedOperationCommittedFuture = transformAsync(
-				validatedFuture,
-				(profiledQueuedMetadata) -> {
-					ByteString queuedOperationBlob = profiledQueuedMetadata.getQueuedOperation().toByteString();
+        validatedFuture,
+        (profiledQueuedMetadata) -> {
+          ByteString queuedOperationBlob = profiledQueuedMetadata.getQueuedOperation().toByteString();
           Digest queuedOperationDigest = profiledQueuedMetadata
               .getQueuedOperationMetadata()
               .getQueuedOperationDigest();
           long startUploadUSecs = stopwatch.elapsed(MICROSECONDS);
-					try (CommittingOutputStream out = createBlobOutputStream(queuedOperationDigest)) {
-						queuedOperationBlob.writeTo(out);
-						ListenableFuture<Long> committedFuture = out.getCommittedFuture();
+          try (CommittingOutputStream out = createBlobOutputStream(queuedOperationDigest)) {
+            queuedOperationBlob.writeTo(out);
+            ListenableFuture<Long> committedFuture = out.getCommittedFuture();
             return transform(
                 committedFuture,
                 (committedSize) -> profiledQueuedMetadata
                     .setUploadedIn(Durations.fromMicros(stopwatch.elapsed(MICROSECONDS) - startUploadUSecs))
                     .build(),
                 operationTransformService);
-					}
-				},
-				operationTransformService);
+          }
+        },
+        operationTransformService);
 
     // onQueue call?
     addCallback(
