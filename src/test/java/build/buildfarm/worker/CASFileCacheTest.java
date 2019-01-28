@@ -17,40 +17,67 @@ package build.buildfarm.worker;
 import static build.buildfarm.worker.CASFileCache.getInterruptiblyOrIOException;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
+import static java.util.concurrent.Executors.newSingleThreadExecutor;
+import static java.util.concurrent.TimeUnit.MICROSECONDS;
+import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
-import build.buildfarm.common.DigestUtil;
-import build.buildfarm.common.DigestUtil.HashFunction;
-import build.buildfarm.common.InputStreamFactory;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Iterables;
-import com.google.common.jimfs.Configuration;
-import com.google.common.jimfs.Jimfs;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.FileNode;
+import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.DigestUtil.HashFunction;
+import build.buildfarm.common.InputStreamFactory;
+import build.buildfarm.worker.CASFileCache.Entry;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Maps;
+import com.google.common.jimfs.Configuration;
+import com.google.common.jimfs.Jimfs;
 import com.google.protobuf.ByteString;
+import io.grpc.Deadline;
 import java.io.InputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 
 class CASFileCacheTest {
+  private final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
+
   private CASFileCache fileCache;
-  private DigestUtil digestUtil;
   private Path root;
   private Map<Digest, ByteString> blobs;
+
+  @Mock
+  private Consumer<Digest> onPut;
+
+  @Mock
+  private Consumer<Iterable<Digest>> onExpire;
+
+  private ConcurrentMap<Path, Entry> storage;
 
   protected CASFileCacheTest(Path root) {
     this.root = root;
@@ -71,9 +98,18 @@ class CASFileCacheTest {
 
   @Before
   public void setUp() {
-    digestUtil = new DigestUtil(HashFunction.SHA256);
-    blobs = new HashMap<Digest, ByteString>();
-    fileCache = new CASFileCache(root, /* maxSizeInBytes=*/ 1024, digestUtil, /* expireService=*/ newDirectExecutorService()) {
+    MockitoAnnotations.initMocks(this);
+    blobs = Maps.newHashMap();
+    storage = Maps.newConcurrentMap();
+    fileCache = new CASFileCache(
+        root,
+        /* maxSizeInBytes=*/ 1024,
+        DIGEST_UTIL,
+        /* expireService=*/
+        newDirectExecutorService(),
+        storage,
+        onPut,
+        onExpire) {
       @Override
       protected InputStream newExternalInput(Digest digest, long offset) {
         ByteString content = blobs.get(digest);
@@ -88,7 +124,7 @@ class CASFileCacheTest {
   @Test
   public void putCreatesFile() throws IOException, InterruptedException {
     ByteString blob = ByteString.copyFromUtf8("Hello, World");
-    Digest blobDigest = digestUtil.compute(blob);
+    Digest blobDigest = DIGEST_UTIL.compute(blob);
     blobs.put(blobDigest, blob);
     Path path = fileCache.put(blobDigest, false);
     assertThat(Files.exists(path)).isTrue();
@@ -97,7 +133,7 @@ class CASFileCacheTest {
   @Test(expected = IllegalStateException.class)
   public void putEmptyFileThrowsIllegalStateException() throws IOException, InterruptedException {
     InputStreamFactory mockInputStreamFactory = mock(InputStreamFactory.class);
-    CASFileCache fileCache = new CASFileCache(root, /* maxSizeInBytes=*/ 1024, digestUtil, /* expireService=*/ newDirectExecutorService()) {
+    CASFileCache fileCache = new CASFileCache(root, /* maxSizeInBytes=*/ 1024, DIGEST_UTIL, /* expireService=*/ newDirectExecutorService()) {
       @Override
       protected InputStream newExternalInput(Digest digest, long offset) throws IOException, InterruptedException {
         return mockInputStreamFactory.newInput(digest, offset);
@@ -105,7 +141,7 @@ class CASFileCacheTest {
     };
 
     ByteString blob = ByteString.copyFromUtf8("");
-    Digest blobDigest = digestUtil.compute(blob);
+    Digest blobDigest = DIGEST_UTIL.compute(blob);
     // supply an empty input stream if called for test clarity
     when(mockInputStreamFactory.newInput(blobDigest, 0))
         .thenReturn(ByteString.EMPTY.newInput());
@@ -119,7 +155,7 @@ class CASFileCacheTest {
   @Test
   public void putCreatesExecutable() throws IOException, InterruptedException {
     ByteString blob = ByteString.copyFromUtf8("executable");
-    Digest blobDigest = digestUtil.compute(blob);
+    Digest blobDigest = DIGEST_UTIL.compute(blob);
     blobs.put(blobDigest, blob);
     Path path = fileCache.put(blobDigest, true);
     assertThat(Files.isExecutable(path)).isTrue();
@@ -199,7 +235,7 @@ class CASFileCacheTest {
   public void expireUnreferencedEntryRemovesBlobFile() throws IOException, InterruptedException {
     byte[] bigData = new byte[1000];
     ByteString bigBlob = ByteString.copyFrom(bigData);
-    Digest bigDigest = digestUtil.compute(bigBlob);
+    Digest bigDigest = DIGEST_UTIL.compute(bigBlob);
     blobs.put(bigDigest, bigBlob);
     Path bigPath = fileCache.put(bigDigest, false);
 
@@ -221,7 +257,7 @@ class CASFileCacheTest {
   @Test
   public void startLoadsExistingBlob() throws IOException, InterruptedException {
     ByteString blob = ByteString.copyFromUtf8("blob");
-    Digest blobDigest = digestUtil.compute(blob);
+    Digest blobDigest = DIGEST_UTIL.compute(blob);
     Path path = root.resolve(fileCache.getKey(blobDigest, false));
     Path execPath = root.resolve(fileCache.getKey(blobDigest, true));
     Files.write(path, blob.toByteArray());
@@ -242,7 +278,7 @@ class CASFileCacheTest {
     Path tooManyComponents = root.resolve("too_many_components_here");
     Path invalidDigest = root.resolve("digest_10");
     ByteString validBlob = ByteString.copyFromUtf8("valid");
-    Digest validDigest = digestUtil.compute(ByteString.copyFromUtf8("valid"));
+    Digest validDigest = DIGEST_UTIL.compute(ByteString.copyFromUtf8("valid"));
     Path invalidSize = root.resolve(validDigest.getHash() + "_ten");
     Path incorrectSize = fileCache.getKey(validDigest
         .toBuilder()
@@ -265,6 +301,87 @@ class CASFileCacheTest {
     assertThat(!Files.exists(invalidSize)).isTrue();
     assertThat(!Files.exists(incorrectSize)).isTrue();
     assertThat(!Files.exists(invalidExec)).isTrue();
+  }
+
+  @Test
+  public void newInputRemovesNonExistentEntry() throws IOException, InterruptedException {
+    Digest nonexistentDigest = Digest.newBuilder()
+        .setHash("file_does_not_exist")
+        .setSizeBytes(1)
+        .build();
+    Path nonexistentKey = fileCache.getKey(nonexistentDigest, false);
+    Entry entry = new Entry(nonexistentKey, 1, null, Deadline.after(10, SECONDS));
+    entry.before = entry;
+    entry.after = entry;
+    storage.put(nonexistentKey, entry);
+    NoSuchFileException noSuchFileException = null;
+    try (InputStream in = fileCache.newInput(nonexistentDigest, 0)) {
+      fail("should not get here");
+    } catch (NoSuchFileException e) {
+      noSuchFileException = e;
+    }
+
+    assertThat(noSuchFileException).isNotNull();
+    assertThat(storage.containsKey(nonexistentKey)).isFalse();
+  }
+
+  @Test
+  public void expireEntryWaitsForUnreferencedEntry() throws ExecutionException, IOException, InterruptedException {
+    byte[] bigData = new byte[1023];
+    Arrays.fill(bigData, (byte) 1);
+    ByteString bigContent = ByteString.copyFrom(bigData);
+    Digest bigDigest = DIGEST_UTIL.compute(bigContent);
+    blobs.put(bigDigest, bigContent);
+    Path bigPath = fileCache.put(bigDigest, /* isExecutable=*/ false);
+
+    AtomicReference<Boolean> started = new AtomicReference<>(false);
+    ExecutorService service = newSingleThreadExecutor();
+    Future<Void> putFuture = service.submit(new Callable<Void>() {
+      @Override
+      public Void call() throws IOException, InterruptedException {
+        started.set(true);
+        ByteString content = ByteString.copyFromUtf8("CAS Would Exceed Max Size");
+        Digest digest = DIGEST_UTIL.compute(content);
+        blobs.put(digest, content);
+        fileCache.put(digest, /* isExecutable=*/ false);
+        return null;
+      }
+    });
+    while (!started.get()) {
+      MICROSECONDS.sleep(1);
+    }
+    // minimal test to ensure that we're blocked
+    assertThat(putFuture.isDone()).isFalse();
+    fileCache.decrementReferences(ImmutableList.<Path>of(bigPath), ImmutableList.of());
+    putFuture.get();
+    service.shutdown();
+    service.awaitTermination(10, MICROSECONDS);
+  }
+
+  @Test
+  public void containsRecordsAccess() throws IOException, InterruptedException {
+    ByteString contentOne = ByteString.copyFromUtf8("one");
+    Digest digestOne = DIGEST_UTIL.compute(contentOne);
+    blobs.put(digestOne, contentOne);
+    ByteString contentTwo = ByteString.copyFromUtf8("two");
+    Digest digestTwo = DIGEST_UTIL.compute(contentTwo);
+    blobs.put(digestTwo, contentTwo);
+    ByteString contentThree = ByteString.copyFromUtf8("three");
+    Digest digestThree = DIGEST_UTIL.compute(contentThree);
+    blobs.put(digestThree, contentThree);
+
+    Path pathOne = fileCache.put(digestOne, /* isExecutable=*/ false);
+    Path pathTwo = fileCache.put(digestTwo, /* isExecutable=*/ false);
+    Path pathThree = fileCache.put(digestThree, /* isExecutable=*/ false);
+    fileCache.decrementReferences(ImmutableList.of(pathOne, pathTwo, pathThree), ImmutableList.of());
+    /* three -> two -> one */
+    assertThat(storage.get(pathOne).after).isEqualTo(storage.get(pathTwo));
+    assertThat(storage.get(pathTwo).after).isEqualTo(storage.get(pathThree));
+
+    /* one -> three -> two */
+    assertThat(fileCache.findMissingBlobs(ImmutableList.of(digestOne))).isEmpty();
+    assertThat(storage.get(pathTwo).after).isEqualTo(storage.get(pathThree));
+    assertThat(storage.get(pathThree).after).isEqualTo(storage.get(pathOne));
   }
 
   @RunWith(JUnit4.class)

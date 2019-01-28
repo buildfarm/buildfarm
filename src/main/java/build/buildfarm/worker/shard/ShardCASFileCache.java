@@ -4,6 +4,7 @@ import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.worker.CASFileCache;
+import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
@@ -21,7 +22,14 @@ class ShardCASFileCache extends CASFileCache {
       ExecutorService expireService,
       Consumer<Digest> onPut,
       Consumer<Iterable<Digest>> onExpire) {
-    super(root, maxSizeInBytes, digestUtil, expireService, onPut, onExpire);
+    super(
+        root,
+        maxSizeInBytes,
+        digestUtil,
+        expireService,
+        /* storage=*/ Maps.newConcurrentMap(),
+        onPut,
+        onExpire);
     this.inputStreamFactory = createInputStreamFactory(this, shardInputStreamFactory);
   }
 

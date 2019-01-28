@@ -60,7 +60,7 @@ public interface ContentAddressableStorage extends InputStreamFactory, OutputStr
 
   /** Indicates presence in the CAS for a sequence of digests. */
   @ThreadSafe
-  Iterable<Digest> findMissingBlobs(Iterable<Digest> digests);
+  Iterable<Digest> findMissingBlobs(Iterable<Digest> digests) throws InterruptedException;
 
   /** Retrieve a value from the CAS. */
   @ThreadSafe
