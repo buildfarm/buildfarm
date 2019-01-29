@@ -79,6 +79,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
@@ -897,21 +898,25 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         .setNameFormat(format("directory-%s-lock-manager", path.getFileName()))
         .build();
     ListeningExecutorService lockService = listeningDecorator(Executors.newSingleThreadExecutor(factory));
+    AtomicReference<Boolean> isLocked = new AtomicReference<>(false);
 
     Lock l = locks.acquire(path);
     ListenableFuture<Path> putFuture = transformAsync(
         lockService.submit(() -> {
           l.lockInterruptibly();
+					isLocked.set(true);
           return path;
         }),
         (lockedPath) -> putDirectorySynchronized(lockedPath, digest, directoriesIndex, service),
         service);
     putFuture.addListener(
         () -> {
-          lockService.execute(() -> {
-            locks.release(path);
-            l.unlock();
-          });
+					if (isLocked.get()) {
+						lockService.execute(() -> {
+							locks.release(path);
+							l.unlock();
+						});
+          }
           lockService.shutdown();
           try {
             lockService.awaitTermination(10, MINUTES);
@@ -1088,31 +1093,29 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         .setNameFormat(format("blob-%s-lock-manager", key.getFileName()))
         .build();
     ListeningExecutorService service = listeningDecorator(Executors.newSingleThreadExecutor(factory));
+    AtomicReference<Boolean> isLocked = new AtomicReference<>(false);
     Lock l = locks.acquire(key);
     ListenableFuture<CancellableOutputStream> future = service.submit(() -> {
       final CancellableOutputStream out;
-      boolean outIsSet = false;
       l.lockInterruptibly();
-      try {
-        out = putImplSynchronized(
+      isLocked.set(true);
+      return putImplSynchronized(
             key,
             blobSizeInBytes,
             isExecutable,
             containingDirectory,
             onInsert);
-        outIsSet = true;
-      } finally {
-        if (!outIsSet) {
-          locks.release(key);
-          l.unlock();
-        }
-      }
-      return out;
     });
     final CancellableOutputStream out;
     try {
       out = future.get();
     } catch (ExecutionException e) {
+      if (isLocked.get()) {
+        service.execute(() -> {
+          locks.release(key);
+          l.unlock();
+        });
+      }
       service.shutdownNow();
       service.awaitTermination(10, MINUTES);
 
@@ -1128,10 +1131,17 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       }
       throw new UncheckedExecutionException(e);
     } catch (InterruptedException e) {
+      if (isLocked.get()) {
+        service.execute(() -> {
+          locks.release(key);
+          l.unlock();
+        });
+      }
       service.shutdownNow();
       service.awaitTermination(10, MINUTES);
       throw e;
     }
+    // definitely have the lock at this point
     if (out == DUPLICATE_OUTPUT_STREAM) {
       service.execute(() -> {
         locks.release(key);
