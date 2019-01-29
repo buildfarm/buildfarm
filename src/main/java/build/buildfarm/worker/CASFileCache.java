@@ -762,9 +762,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         throw new RuntimeException("ERROR: Reference counts lru ordering has not been maintained correctly, attempting to expire referenced (or negatively counted) content");
       }
       Lock l = locks.acquire(e.key);
-      while (!l.tryLock()) {
-        wait();
-      }
+      l.lockInterruptibly();
       try {
         if (storage.remove(e.key) == e) {
           ImmutableList.Builder<ListenableFuture<Void>> directoryExpirationFutures = ImmutableList.builder();
