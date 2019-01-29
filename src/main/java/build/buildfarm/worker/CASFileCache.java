@@ -158,6 +158,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return digestUtil.build(hashComponent, parsedSizeComponent);
   }
 
+  /**
+   * Parses the given fileName and invokes the onKey method if successful
+   *
+   * if size > 0, consider the filename invalid if it does not match
+   */
   private static <T> T parseFileEntryKey(String fileName, long size, DigestUtil digestUtil, BiFunction<Digest, Boolean, T> onKey) {
     String[] components = fileName.split("_");
     if (components.length < 2 || components.length > 3) {
@@ -170,7 +175,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       String sizeComponent = components[1];
       int parsedSizeComponent = Integer.parseInt(sizeComponent);
 
-      if (parsedSizeComponent != size) {
+      if (size > 0 && parsedSizeComponent != size) {
         return null;
       }
 
@@ -188,6 +193,18 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
 
     return onKey.apply(digest, isExecutable);
+  }
+
+  private FileEntryKey parseFileEntryKey(String fileName) {
+    return parseFileEntryKey(fileName, /* size=*/ -1);
+  }
+
+  private FileEntryKey parseFileEntryKey(String fileName, long size) {
+    return parseFileEntryKey(
+        fileName,
+        size,
+        digestUtil,
+        (digest, isExecutable) -> new FileEntryKey(getKey(digest, isExecutable), isExecutable, digest));
   }
 
   private boolean contains(Digest digest, boolean isExecutable) throws IOException, InterruptedException {
@@ -421,15 +438,21 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   private static final class FileEntryKey {
     private final Path key;
+    private final boolean isExecutable;
     private final Digest digest;
 
-    FileEntryKey(Path key, Digest digest) {
+    FileEntryKey(Path key, boolean isExecutable, Digest digest) {
       this.key = key;
+      this.isExecutable = isExecutable;
       this.digest = digest;
     }
 
     Path getKey() {
       return key;
+    }
+
+    boolean getIsExecutable() {
+      return isExecutable;
     }
 
     Digest getDigest() {
@@ -512,11 +535,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         } else {
           FileEntryKey fileEntryKey = null;
           if (file.getParent().equals(root)) {
-            fileEntryKey = parseFileEntryKey(
-                file.getFileName().toString(),
-                size,
-                digestUtil,
-                (digest, isExecutable) -> new FileEntryKey(getKey(digest, isExecutable), digest));
+            String fileName = file.getFileName().toString();
+            fileEntryKey = parseFileEntryKey(fileName, size);
           }
           if (fileEntryKey != null) {
             Path key = fileEntryKey.getKey();
@@ -695,9 +715,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   /** must be called in synchronized context */
-  private ListenableFuture<Path> expireEntry(
-      long blobSizeInBytes,
-      ExecutorService service) throws IOException, InterruptedException {
+  private Entry waitForLastUnreferencedEntry(long blobSizeInBytes) throws InterruptedException {
     while (header.after == header) {
       int references = 0;
       int keys = 0;
@@ -731,18 +749,37 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           blobSizeInBytes, sizeInBytes, keys, references, min, minkey, max, maxkey));
       wait();
     }
-    Entry e = header.after;
-    if (e.referenceCount != 0) {
-      throw new RuntimeException("ERROR: Reference counts lru ordering has not been maintained correctly, attempting to expire referenced (or negatively counted) content");
+    return header.after;
+  }
+
+  /** must be called in synchronized context */
+  private ListenableFuture<Path> expireEntry(
+      long blobSizeInBytes,
+      ExecutorService service) throws IOException, InterruptedException {
+    for (;;) {
+      Entry e = waitForLastUnreferencedEntry(blobSizeInBytes);
+      if (e.referenceCount != 0) {
+        throw new RuntimeException("ERROR: Reference counts lru ordering has not been maintained correctly, attempting to expire referenced (or negatively counted) content");
+      }
+      Lock l = locks.acquire(e.key);
+      while (!l.tryLock()) {
+        wait();
+      }
+      try {
+        if (storage.remove(e.key) == e) {
+          ImmutableList.Builder<ListenableFuture<Void>> directoryExpirationFutures = ImmutableList.builder();
+          for (Digest containingDirectory : e.containingDirectories) {
+            directoryExpirationFutures.add(expireDirectory(containingDirectory, service));
+          }
+          e.unlink();
+          sizeInBytes -= e.size;
+          return transform(allAsList(directoryExpirationFutures.build()), (result) -> e.key, service);
+        }
+      } finally {
+        locks.release(e.key);
+        l.unlock();
+      }
     }
-    storage.remove(e.key);
-    ImmutableList.Builder<ListenableFuture<Void>> directoryExpirationFutures = ImmutableList.builder();
-    for (Digest containingDirectory : e.containingDirectories) {
-      directoryExpirationFutures.add(expireDirectory(containingDirectory, service));
-    }
-    e.unlink();
-    sizeInBytes -= e.size;
-    return transform(allAsList(directoryExpirationFutures.build()), (result) -> e.key, service);
   }
 
   /** must be called in synchronized context */
@@ -1182,7 +1219,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Digest containingDirectory,
       Runnable onInsert)
       throws IOException, InterruptedException {
-    ImmutableList.Builder<ListenableFuture<Path>> expiredKeysFutures = null;
+    final ListenableFuture<Set<Digest>> expiredDigestsFuture;
 
     synchronized (this) {
       Entry e = storage.get(key);
@@ -1204,34 +1241,37 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
       sizeInBytes += blobSizeInBytes;
 
+      ImmutableList.Builder<ListenableFuture<Digest>> expiredKeysFutures = ImmutableList.builder();
       while (sizeInBytes > maxSizeInBytes) {
-        if (expiredKeysFutures == null) {
-          expiredKeysFutures = new ImmutableList.Builder<ListenableFuture<Path>>();
-        }
-        expiredKeysFutures.add(expireEntry(blobSizeInBytes, expireService));
+        expiredKeysFutures.add(
+            transformAsync(
+                expireEntry(blobSizeInBytes, expireService),
+                (expiredKey) -> {
+                  try {
+                    Files.delete(expiredKey);
+                  } catch (NoSuchFileException eNoEnt) {
+                    logger.severe(format("CASFileCache::putImpl: expired key %s did not exist to delete", expiredKey.toString()));
+                  }
+                  String fileName = expiredKey.getFileName().toString();
+                  FileEntryKey fileEntryKey = parseFileEntryKey(fileName);
+                  if (fileEntryKey == null) {
+                    logger.severe(format("error parsing expired key %s", expiredKey));
+                  } else if (storage.containsKey(getKey(fileEntryKey.getDigest(), !fileEntryKey.getIsExecutable()))) {
+                    return immediateFuture(null);
+                  }
+                  return immediateFuture(fileEntryKey.getDigest());
+                },
+                expireService));
       }
+      expiredDigestsFuture = transform(
+          allAsList(expiredKeysFutures.build()),
+          (digests) -> ImmutableSet.copyOf(Iterables.filter(digests, (digest) -> digest != null)),
+          expireService);
     }
 
-    if (expiredKeysFutures != null) {
-      ListenableFuture<List<Path>> expiredKeys = allAsList(expiredKeysFutures.build());
-      ImmutableList.Builder<Digest> expiredDigests = new ImmutableList.Builder<>();
-      for (Path expiredKey : getInterruptiblyOrIOException(expiredKeys)) {
-        try {
-          Files.delete(expiredKey);
-        } catch (NoSuchFileException e) {
-          logger.severe("CASFileCache::putImpl: expired key " + expiredKey.toString() + " did not exist to delete");
-        }
-
-        try {
-          Digest digest = CASFileCache.keyToDigest(expiredKey, digestUtil);
-          if (!contains(digest)) {
-            expiredDigests.add(digest);
-          }
-        } catch (NumberFormatException e) {
-          logger.log(SEVERE, format("error parsing digest from expired key %s", expiredKey), e);
-        }
-      }
-      onExpire.accept(expiredDigests.build());
+    Set<Digest> expiredDigests = getInterruptiblyOrIOException(expiredDigestsFuture);
+    if (!expiredDigests.isEmpty()) {
+      onExpire.accept(expiredDigests);
     }
 
     Path tmpPath = key.resolveSibling(key.getFileName() + ".tmp");
