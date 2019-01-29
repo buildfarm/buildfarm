@@ -43,15 +43,20 @@ load("//3rdparty:workspace.bzl", "maven_dependencies")
 maven_dependencies()
 
 git_repository(
+    name = "bazel_skylib",
+    remote = "https://github.com/bazelbuild/bazel-skylib.git",
+    tag = "0.6.0",
+)
+
+git_repository(
     name = "io_bazel_rules_docker",
     remote = "https://github.com/bazelbuild/rules_docker.git",
-    tag = "v0.5.1",
+    tag = "v0.7.0",
 )
 
 load(
     "@io_bazel_rules_docker//container:container.bzl",
     "container_pull",
-    container_repositories = "repositories",
 )
 
 load(
