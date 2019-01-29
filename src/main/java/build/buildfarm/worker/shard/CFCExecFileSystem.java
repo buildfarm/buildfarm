@@ -298,8 +298,8 @@ class CFCExecFileSystem implements ExecFileSystem {
     Iterable<Digest> inputDirectories = rootInputDirectories.remove(execDir);
     if (inputFiles != null || inputDirectories != null) {
       fileCache.decrementReferences(
-          inputFiles == null ? ImmutableList.<Path>of() : inputFiles,
-          inputDirectories == null ? ImmutableList.<Digest>of() : inputDirectories);
+          inputFiles == null ? ImmutableList.of() : inputFiles,
+          inputDirectories == null ? ImmutableList.of() : inputDirectories);
     }
     if (Files.exists(execDir)) {
       removeDirectory(execDir);

@@ -262,7 +262,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         input.skip(offset);
         return input;
       } finally {
-        decrementReferences(ImmutableList.<Path>of(blobPath), ImmutableList.<Digest>of());
+        decrementReference(blobPath);
       }
     } catch (NoSuchFileException e) {
       remove(digest, isExecutable);
@@ -338,7 +338,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         }
       }
 
-      decrementReferences(ImmutableList.<Path>of(blobPath), ImmutableList.<Digest>of());
+      decrementReference(blobPath);
     } catch (IOException e) {
       /* unlikely, our stream comes from the blob */
       logger.log(SEVERE, "error putting " + DigestUtil.toString(blob.getDigest()), e);
@@ -362,7 +362,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       throw new IOException(e);
     }
     if (out == null) {
-      decrementReferences(ImmutableList.<Path>of(blobPath), ImmutableList.<Digest>of());
+      decrementReference(blobPath);
       return null;
     }
     return new OutputStream() {
@@ -370,7 +370,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       public void close() throws IOException {
         out.close();
 
-        decrementReferences(ImmutableList.<Path>of(blobPath), ImmutableList.<Digest>of());
+        decrementReference(blobPath);
       }
 
       @Override
@@ -596,6 +596,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   public Path getKey(Digest digest, boolean isExecutable) {
     return getPath(getFileName(digest, isExecutable));
+  }
+
+  private void decrementReference(Path inputFile) {
+    decrementReferences(ImmutableList.of(inputFile), ImmutableList.of());
   }
 
   public synchronized void decrementReferences(Iterable<Path> inputFiles, Iterable<Digest> inputDirectories) {
