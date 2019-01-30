@@ -235,11 +235,7 @@ class CFCExecFileSystem implements ExecFileSystem {
     return transformAsync(
         fileCache.putDirectory(digest, directoriesIndex, fetchService),
         (cachePath) -> {
-          try {
-            Files.createSymbolicLink(execPath, cachePath);
-          } catch (IOException e) {
-            return immediateFailedFuture(e);
-          }
+          Files.createSymbolicLink(execPath, cachePath);
           return immediateFuture(null);
         },
         fetchService);
