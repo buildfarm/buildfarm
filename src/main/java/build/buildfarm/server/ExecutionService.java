@@ -33,6 +33,7 @@ import io.grpc.Context;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
@@ -61,7 +62,9 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
 
           @Override
           public void onFailure(Throwable t) {
-            responseObserver.onError(Status.fromThrowable(t).asException());
+            if (!(t instanceof CancellationException)) {
+              responseObserver.onError(Status.fromThrowable(t).asException());
+            }
           }
         });
     Context.current().addListener(

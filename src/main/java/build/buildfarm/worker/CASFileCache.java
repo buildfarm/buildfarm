@@ -20,6 +20,7 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Iterables.concat;
 import static com.google.common.util.concurrent.Futures.allAsList;
 import static com.google.common.util.concurrent.Futures.catchingAsync;
+import com.google.common.util.concurrent.Futures;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.transform;
@@ -807,16 +808,18 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Path path,
       ImmutableList.Builder<Path> inputsBuilder,
       ExecutorService service) throws IOException, InterruptedException {
-    return putDirectoryFiles(files, path, /* containingDirectory=*/ null, inputsBuilder, service);
+    ImmutableList.Builder<ListenableFuture<Void>> putFutures = ImmutableList.builder();
+    putDirectoryFiles(files, path, /* containingDirectory=*/ null, inputsBuilder, putFutures, service);
+    return putFutures.build();
   }
 
-  private Iterable<ListenableFuture<Void>> putDirectoryFiles(
+  private void putDirectoryFiles(
       Iterable<FileNode> files,
       Path path,
       Digest containingDirectory,
       ImmutableList.Builder<Path> inputsBuilder,
+      ImmutableList.Builder<ListenableFuture<Void>> putFutures,
       ExecutorService service) throws IOException, InterruptedException {
-    ImmutableList.Builder<ListenableFuture<Void>> putFutures = ImmutableList.builder();
     for (FileNode fileNode : files) {
       Path filePath = path.resolve(fileNode.getName());
       ListenableFuture<Void> putFuture;
@@ -847,15 +850,15 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       }
       putFutures.add(putFuture);
     }
-    return putFutures.build();
   }
 
-  private Iterable<ListenableFuture<Void>> fetchDirectory(
+  private void fetchDirectory(
       Digest containingDirectory,
       Path path,
       Digest digest,
       Map<Digest, Directory> directoriesIndex,
       ImmutableList.Builder<Path> inputsBuilder,
+      ImmutableList.Builder<ListenableFuture<Void>> putFutures,
       ExecutorService service) throws IOException, InterruptedException {
     if (Files.exists(path)) {
       if (Files.isDirectory(path)) {
@@ -873,17 +876,17 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               DigestUtil.toString(digest)));
     }
     Files.createDirectory(path);
-    Iterable<ListenableFuture<Void>> putFutures = putDirectoryFiles(directory.getFilesList(), path, containingDirectory, inputsBuilder, service);
+    putDirectoryFiles(directory.getFilesList(), path, containingDirectory, inputsBuilder, putFutures, service);
     for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
-      putFutures = concat(putFutures, fetchDirectory(
+      fetchDirectory(
           containingDirectory,
           path.resolve(directoryNode.getName()),
           directoryNode.getDigest(),
           directoriesIndex,
           inputsBuilder,
-          service));
+          putFutures,
+          service);
     }
-    return putFutures;
   }
 
   public ListenableFuture<Path> putDirectory(
@@ -934,7 +937,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Path path,
       Digest digest,
       Map<Digest, Directory> directoriesIndex,
-      ExecutorService service) {
+      ExecutorService service) throws IOException, InterruptedException {
     ListenableFuture<Void> expireFuture;
     synchronized (this) {
       DirectoryEntry e = directoryStorage.get(digest);
@@ -957,10 +960,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         }
 
         if (!Files.isDirectory(path)) {
-          logger.error(
-              "CASFileCache::putDirectory({}) {} does not exist, purging the entry with fire and resorting to fetch",
-              DigestUtil.toString(digest),
-              path);
+          logger.severe(
+              format(
+                  "CASFileCache::putDirectory(%s) %s does not exist, purging the entry with fire and resorting to fetch",
+                  DigestUtil.toString(digest),
+                  path));
           e = null;
         }
 
@@ -975,34 +979,33 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       }
     }
 
-    ImmutableList.Builder<Path> inputsBuilder = new ImmutableList.Builder<>();
-
-    ListenableFuture<Void> fetchFuture = transform(
-        transformAsync(
-            expireFuture,
-            (result) -> catchingAsync(
-                allAsList(fetchDirectory(digest, path, digest, directoriesIndex, inputsBuilder, service)),
-                Throwable.class,
-                (e) -> {
-                  ImmutableList<Path> inputs = inputsBuilder.build();
-                  synchronized (this) {
-                    purgeDirectoryFromInputs(digest, inputs);
-                    decrementReferencesSynchronized(inputs, ImmutableList.<Digest>of());
-                  }
-                  try {
-                    removeDirectory(path);
-                  } catch (IOException removeException) {
-                    logger.log(SEVERE, "error during directory removal after fetch failure", removeException);
-                  }
-                  return immediateFailedFuture(e);
-                },
-                service),
+    ImmutableList.Builder<Path> inputsBuilder = ImmutableList.builder();
+    ImmutableList.Builder<ListenableFuture<Void>> putFutures = ImmutableList.builder();
+    fetchDirectory(digest, path, digest, directoriesIndex, inputsBuilder, putFutures, service);
+    ListenableFuture<List<Void>> fetchFuture = transformAsync(
+        expireFuture,
+        (results) -> catchingAsync(
+            allAsList(putFutures.build()),
+            Throwable.class,
+            (e) -> {
+              ImmutableList<Path> inputs = inputsBuilder.build();
+              synchronized (this) {
+                purgeDirectoryFromInputs(digest, inputs);
+                decrementReferencesSynchronized(inputs, ImmutableList.<Digest>of());
+              }
+              try {
+                removeDirectory(path);
+              } catch (IOException removeException) {
+                logger.log(SEVERE, format("error during directory removal of %s after fetch failure", path), removeException);
+              }
+              return immediateFailedFuture(e);
+            },
             service),
-        (results) -> null);
+        service);
 
     return transform(
         fetchFuture,
-        (result) -> {
+        (results) -> {
           DirectoryEntry e = new DirectoryEntry(directoriesIndex.get(digest), inputsBuilder.build());
           synchronized (this) {
             directoryStorage.put(digest, e);
