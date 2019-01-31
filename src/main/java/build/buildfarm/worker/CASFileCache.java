@@ -980,7 +980,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     ListenableFuture<Void> fetchFuture = transform(
         transformAsync(
             expireFuture,
-            (results) -> catchingAsync(
+            (result) -> catchingAsync(
                 allAsList(fetchDirectory(digest, path, digest, directoriesIndex, inputsBuilder, service)),
                 Throwable.class,
                 (e) -> {
