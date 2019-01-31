@@ -67,8 +67,6 @@ import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -91,7 +89,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private final long maxSizeInBytes;
   private final DigestUtil digestUtil;
   private final ConcurrentMap<Path, Entry> storage;
-  private final Map<Digest, DirectoryEntry> directoryStorage = new HashMap<>();
+  private final Map<Digest, DirectoryEntry> directoryStorage = Maps.newHashMap();
   private final LockMap locks = new LockMap();
   private final Consumer<Digest> onPut;
   private final Consumer<Iterable<Digest>> onExpire;
@@ -419,7 +417,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   private static final class LockMap {
-    private final Map<Path, Lock> mutexes = new HashMap<>();
+    private final Map<Path, Lock> mutexes = Maps.newHashMap();
 
     private synchronized Lock acquire(Path key) {
       Lock mutex = mutexes.get(key);
