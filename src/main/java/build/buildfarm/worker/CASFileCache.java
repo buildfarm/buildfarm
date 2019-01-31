@@ -319,7 +319,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       try {
         try (InputStream input = newInput(digest, 0)) {
           ByteString content = ByteString.readFrom(input);
-          return new Blob(content, digestUtil);
+          return new Blob(content, digest);
         }
       } catch (IOException e) {
         logger.log(SEVERE, "error getting " + DigestUtil.toString(digest), e);
