@@ -956,6 +956,14 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           inputsBuilder.add(input);
         }
 
+        if (!Files.isDirectory(path)) {
+          logger.error(
+              "CASFileCache::putDirectory({}) {} does not exist, purging the entry with fire and resorting to fetch",
+              DigestUtil.toString(digest),
+              path);
+          e = null;
+        }
+
         if (e != null) {
           return immediateFuture(path);
         }
