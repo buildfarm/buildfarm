@@ -794,7 +794,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private ListenableFuture<Void> expireDirectory(Digest digest, ExecutorService service) {
     DirectoryEntry e = directoryStorage.remove(digest);
     if (e == null) {
-      logger.severe("CASFileCache::expireDirectory(" + DigestUtil.toString(digest) + ") does not exist");
+      logger.severe(format("CASFileCache::expireDirectory(%s) does not exist", DigestUtil.toString(digest)));
       return immediateFuture(null);
     }
 
@@ -943,7 +943,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         for (Path input : e.inputs) {
           Entry fileEntry = storage.get(input);
           if (fileEntry == null) {
-            logger.severe("CASFileCache::putDirectory(" + DigestUtil.toString(digest) + ") exists, but input " + input + " does not, purging it with fire and resorting to fetch");
+            logger.severe(
+                format(
+                    "CASFileCache::putDirectory(%s) exists, but input %s does not, purging it with fire and resorting to fetch",
+                    DigestUtil.toString(digest),
+                    input));
             e = null;
             break;
           }
