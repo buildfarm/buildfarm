@@ -997,10 +997,12 @@ public class ShardInstance extends AbstractServerInstance {
 
   private QueuedOperationMetadata buildQueuedOperationMetadata(
       ExecuteOperationMetadata executeOperationMetadata,
+      RequestMetadata requestMetadata,
       QueuedOperation queuedOperation) {
     return QueuedOperationMetadata.newBuilder()
         .setExecuteOperationMetadata(executeOperationMetadata.toBuilder()
             .setStage(Stage.QUEUED))
+        .setRequestMetadata(requestMetadata)
         .setQueuedOperationDigest(getDigestUtil().compute(queuedOperation))
         .build();
   }
@@ -1464,6 +1466,7 @@ public class ShardInstance extends AbstractServerInstance {
                   .setQueuedOperation(queuedOperation)
                   .setQueuedOperationMetadata(buildQueuedOperationMetadata(
                       metadata,
+                      executeEntry.getRequestMetadata(),
                       queuedOperation))
                   .setTransformedIn(Durations.fromMicros(transformStopwatch.elapsed(MICROSECONDS))),
               operationTransformService);
