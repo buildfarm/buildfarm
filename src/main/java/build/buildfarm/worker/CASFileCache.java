@@ -822,18 +822,13 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       ExecutorService service) throws IOException, InterruptedException {
     for (FileNode fileNode : files) {
       Path filePath = path.resolve(fileNode.getName());
-      ListenableFuture<Void> putFuture;
+      final ListenableFuture<Void> putFuture;
       if (fileNode.getDigest().getSizeBytes() != 0) {
         putFuture = transformAsync(
             put(fileNode.getDigest(), fileNode.getIsExecutable(), containingDirectory, service),
             (fileCacheKey) -> {
-              try {
-                // FIXME this can die with 'too many links'... needs some cascading fallout
-                Files.createLink(filePath, fileCacheKey);
-              } catch (IOException e) {
-                return immediateFailedFuture(e);
-              }
-              checkNotNull(fileCacheKey);
+              // FIXME this can die with 'too many links'... needs some cascading fallout
+              Files.createLink(filePath, fileCacheKey);
               // we saw null entries in the built immutable list without synchronization
               synchronized (inputsBuilder) {
                 inputsBuilder.add(fileCacheKey);
