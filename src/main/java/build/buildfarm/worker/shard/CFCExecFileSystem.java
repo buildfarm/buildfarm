@@ -27,7 +27,7 @@ import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.Futures.transformAsync;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
-import static java.util.concurrent.Executors.newCachedThreadPool;
+import static java.util.concurrent.Executors.newWorkStealingPool;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.logging.Level.SEVERE;
 
@@ -66,7 +66,7 @@ class CFCExecFileSystem implements ExecFileSystem {
   private final boolean linkInputDirectories; // perform first-available non-output symlinking and retain directories in cache
   private final Map<Path, Iterable<Path>> rootInputFiles = new ConcurrentHashMap<>();
   private final Map<Path, Iterable<Digest>> rootInputDirectories = new ConcurrentHashMap<>();
-  private final ExecutorService fetchService = newCachedThreadPool();
+  private final ExecutorService fetchService = newWorkStealingPool(128);
   private final ExecutorService removeDirectoryService;
 
   CFCExecFileSystem(
