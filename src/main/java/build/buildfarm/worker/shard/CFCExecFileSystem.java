@@ -271,7 +271,7 @@ class CFCExecFileSystem implements ExecFileSystem {
       completed = true;
     } finally {
       if (!completed) {
-        fetchedFuture.cancel(true);
+        fetchedFuture.cancel(false);
         fileCache.decrementReferences(inputFiles.build(), inputDirectories.build());
         removeDirectory(execDir);
       }
