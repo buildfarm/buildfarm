@@ -133,6 +133,8 @@ class RemoteInputStreamFactory implements InputStreamFactory {
       } else if (Retrier.DEFAULT_IS_RETRIABLE.test(st)) {
         // why not, always
         workers.addLast(worker);
+      } else if (st.getCode() == Code.CANCELLED) {
+        throw new InterruptedException();
       } else {
         throw e;
       }
