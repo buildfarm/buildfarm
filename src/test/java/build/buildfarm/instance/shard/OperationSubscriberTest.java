@@ -57,7 +57,7 @@ public class OperationSubscriberTest {
   private static class TestClient extends Client {
     private final Set<String> subscriptions = Sets.newHashSet();
     private final BlockingQueue<List<Object>> replyQueue = new LinkedBlockingQueue<>();
-    private final List<List<Object>> pendingReplies = Lists.newArrayList();
+    private final BlockingQueue<List<Object>> pendingReplies = new LinkedBlockingQueue<>();
 
     Set<String> getSubscriptions() {
       return subscriptions;
@@ -106,8 +106,7 @@ public class OperationSubscriberTest {
 
     @Override
     public void flush() {
-      replyQueue.addAll(pendingReplies);
-      pendingReplies.clear();
+      pendingReplies.drainTo(replyQueue);
     }
   };
 
