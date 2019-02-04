@@ -644,7 +644,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             }
           }
         } else {
-          invalidDirectories.add(path);
+          synchronized (invalidDirectories) {
+            invalidDirectories.add(path);
+          }
         }
       });
     }
