@@ -23,8 +23,11 @@ import build.bazel.remote.execution.v2.UpdateActionResultRequest;
 import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.stub.StreamObserver;
+import java.util.logging.Logger;
 
 public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
+  private static final Logger logger = Logger.getLogger(ActionCacheService.class.getName());
+
   private final Instances instances;
 
   public ActionCacheService(Instances instances) {
@@ -50,6 +53,7 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
       return;
     }
 
+    logger.info("GetActionResult for ActionKey " + DigestUtil.toString(request.getActionDigest()));
     responseObserver.onNext(actionResult);
     responseObserver.onCompleted();
   }
