@@ -1132,6 +1132,7 @@ public class ShardInstance extends AbstractServerInstance {
                           .setStderrStreamName(executeEntry.getStderrStreamName())
                           .setStage(Stage.QUEUED))
                       .setQueuedOperationDigest(queueEntry.getQueuedOperationDigest())
+                      .setRequestMetadata(executeEntry.getRequestMetadata())
                       .build();
                   return new QueuedOperationResult(queueEntry, metadata);
                 },
