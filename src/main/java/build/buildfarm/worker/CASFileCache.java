@@ -17,10 +17,10 @@ package build.buildfarm.worker;
 import static build.buildfarm.worker.Utils.readdir;
 import static build.buildfarm.worker.Utils.removeDirectory;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterables.concat;
 import static com.google.common.util.concurrent.Futures.allAsList;
 import static com.google.common.util.concurrent.Futures.catchingAsync;
-import com.google.common.util.concurrent.Futures;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.transform;
@@ -33,6 +33,7 @@ import static java.nio.file.StandardOpenOption.CREATE;
 import static java.nio.file.StandardOpenOption.TRUNCATE_EXISTING;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static java.util.logging.Level.WARNING;
 import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.Digest;
@@ -42,13 +43,13 @@ import build.bazel.remote.execution.v2.FileNode;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -73,15 +74,16 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
 public abstract class CASFileCache implements ContentAddressableStorage {
@@ -96,6 +98,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private final Consumer<Digest> onPut;
   private final Consumer<Iterable<Digest>> onExpire;
   private final ExecutorService expireService;
+
+  private ListenableFuture<Path> lastPutDirectory = immediateFuture(null);
 
   private transient long sizeInBytes = 0;
   private transient Entry header = new SentinelEntry();
@@ -271,9 +275,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   private InputStream newInput(Digest digest, long offset, boolean isExecutable) throws IOException, InterruptedException {
+    logger.fine(format("private input stream for %s %d%s", DigestUtil.toString(digest), offset, isExecutable ? " executable" : ""));
     try {
-      Path blobPath = getInterruptiblyOrIOException(
-          put(digest, isExecutable, /* containingDirectory=*/ null, newDirectExecutorService()));
+      // head of line blocking here with download
+      Path blobPath = put(digest, isExecutable);
       try {
         InputStream input = Files.newInputStream(blobPath);
         input.skip(offset);
@@ -295,6 +300,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   @Override
   public InputStream newInput(Digest digest, long offset) throws IOException, InterruptedException {
+    logger.fine(format("getting input stream for %s", DigestUtil.toString(digest)));
     boolean isExecutable = false;
     do {
       Path key = getKey(digest, isExecutable);
@@ -335,32 +341,29 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   @Override
-  public void put(Blob blob) {
+  public void put(Blob blob) throws InterruptedException {
     Path blobPath = getKey(blob.getDigest(), false);
     try {
-      OutputStream out =
-          putImpl(
-              blobPath,
-              blob.getDigest().getSizeBytes(),
-              /* isExecutable=*/ false,
-              null,
-              () -> onPut.accept(blob.getDigest()));
+      logger.fine(format("put: %s", blobPath.getFileName()));
+      OutputStream out = putImpl(
+          blobPath,
+          blob.getDigest().getSizeBytes(),
+          /* isExecutable=*/ false,
+          null,
+          () -> onPut.accept(blob.getDigest()));
       try {
         if (out != null) {
-          blob.getData().writeTo(out);
+          try {
+            blob.getData().writeTo(out);
+          } finally {
+            out.close();
+          }
         }
       } finally {
-        if (out != null) {
-          out.close();
-        }
+        decrementReference(blobPath);
       }
-
-      decrementReference(blobPath);
     } catch (IOException e) {
-      /* unlikely, our stream comes from the blob */
       logger.log(SEVERE, "error putting " + DigestUtil.toString(blob.getDigest()), e);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
     }
   }
 
@@ -369,6 +372,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     Path blobPath = getKey(digest, false);
     final OutputStream out;
     try {
+      logger.fine(format("newOutput: %s", blobPath.getFileName()));
       out = putImpl(
           blobPath,
           digest.getSizeBytes(),
@@ -417,13 +421,66 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     throw new UnsupportedOperationException();
   }
 
+  private static final class SharedLock implements Lock {
+    private final AtomicBoolean locked = new AtomicBoolean(false);
+
+    @Override
+    public void lock() {
+      for (;;) {
+        try {
+          lockInterruptibly();
+          return;
+        } catch (InterruptedException e) {
+          // ignore
+        }
+      }
+    }
+
+    @Override
+    public void lockInterruptibly() throws InterruptedException {
+      // attempt to atomically synchronize
+      synchronized (locked) {
+        while (!locked.compareAndSet(/* expected=*/ false, /* update=*/ true)) {
+          locked.wait();
+        }
+      }
+    }
+
+    @Override
+    public Condition newCondition() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean tryLock() {
+      synchronized (locked) {
+        return locked.compareAndSet(false, true);
+      }
+    }
+
+    @Override
+    public boolean tryLock(long time, TimeUnit unit) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void unlock() {
+      if (!locked.compareAndSet(/* expected=*/ true, /* update=*/ false)) {
+        throw new IllegalMonitorStateException("the lock was not held");
+      }
+      synchronized (locked) {
+        locked.notify();
+      }
+    }
+  }
+
   private static final class LockMap {
     private final Map<Path, Lock> mutexes = Maps.newHashMap();
 
     private synchronized Lock acquire(Path key) {
       Lock mutex = mutexes.get(key);
       if (mutex == null) {
-        mutex = new ReentrantLock();
+        mutex = new SharedLock();
         mutexes.put(key, mutex);
       }
       return mutex;
@@ -592,9 +649,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       });
     }
     pool.shutdown();
+    // FIXME exhaustion timeout?
     while (!pool.isTerminated()) {
       logger.info("Waiting for directory population to complete");
-      pool.awaitTermination(60, SECONDS);
+      pool.awaitTermination(1, MINUTES);
     }
 
     for (Path path : invalidDirectories.build()) {
@@ -755,21 +813,30 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       long blobSizeInBytes,
       ExecutorService service) throws IOException, InterruptedException {
     for (;;) {
-      Entry e = waitForLastUnreferencedEntry(blobSizeInBytes);
-      if (e.referenceCount != 0) {
-        throw new RuntimeException("ERROR: Reference counts lru ordering has not been maintained correctly, attempting to expire referenced (or negatively counted) content");
+      Lock l = null;
+      Entry e = null;
+      while (e == null) {
+        e = waitForLastUnreferencedEntry(blobSizeInBytes);
+        if (e.referenceCount != 0) {
+          throw new IllegalStateException("ERROR: Reference counts lru ordering has not been maintained correctly, attempting to expire referenced (or negatively counted) content " + e.key.getFileName() + " with " + e.referenceCount + " references");
+        }
+        l = locks.acquire(e.key);
+        if (!l.tryLock()) {
+          logger.info(format("cannot acquire lock for %s, lock state is %s, moving it to the head of the unreferenced list", e.key.getFileName(), l));
+          e.recordAccess(header);
+          e = null;
+        }
       }
-      Lock l = locks.acquire(e.key);
-      l.lockInterruptibly();
       try {
-        if (storage.remove(e.key) == e) {
+        Path key = e.key;
+        if (storage.remove(key) == e) {
           ImmutableList.Builder<ListenableFuture<Void>> directoryExpirationFutures = ImmutableList.builder();
           for (Digest containingDirectory : e.containingDirectories) {
             directoryExpirationFutures.add(expireDirectory(containingDirectory, service));
           }
           e.unlink();
           sizeInBytes -= e.size;
-          return transform(allAsList(directoryExpirationFutures.build()), (result) -> e.key, service);
+          return transform(allAsList(directoryExpirationFutures.build()), (result) -> key, service);
         }
       } finally {
         l.unlock();
@@ -821,6 +888,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Path filePath = path.resolve(fileNode.getName());
       final ListenableFuture<Void> putFuture;
       if (fileNode.getDigest().getSizeBytes() != 0) {
+        Path key = getKey(fileNode.getDigest(), fileNode.getIsExecutable());
         putFuture = transformAsync(
             put(fileNode.getDigest(), fileNode.getIsExecutable(), containingDirectory, service),
             (fileCacheKey) -> {
@@ -886,39 +954,25 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Map<Digest, Directory> directoriesIndex,
       ExecutorService service) {
     Path path = getDirectoryPath(digest);
-
-    ThreadFactory factory = new ThreadFactoryBuilder()
-        .setNameFormat(format("directory-%s-lock-manager", path.getFileName()))
-        .build();
-    ListeningExecutorService lockService = listeningDecorator(Executors.newSingleThreadExecutor(factory));
-    AtomicReference<Boolean> isLocked = new AtomicReference<>(false);
-
+    AtomicReference<Lock> lockReference = new AtomicReference<Lock>(null);
     Lock l = locks.acquire(path);
-    ListenableFuture<Path> putFuture = transformAsync(
-        lockService.submit(() -> {
-          l.lockInterruptibly();
-          isLocked.set(true);
-          return path;
-        }),
-        (lockedPath) -> putDirectorySynchronized(lockedPath, digest, directoriesIndex, service),
-        service);
+    logger.fine(format("locking directory %s", path.getFileName()));
+    try {
+      l.lockInterruptibly();
+    } catch (InterruptedException e) {
+      return immediateFailedFuture(e);
+    }
+    logger.fine(format("locked directory %s", path.getFileName()));
+    ListenableFuture<Path> putFuture;
+    try {
+      putFuture = putDirectorySynchronized(path, digest, directoriesIndex, service);
+    } catch (IOException|InterruptedException e) {
+      putFuture = immediateFailedFuture(e);
+    }
     putFuture.addListener(
         () -> {
-          if (isLocked.get()) {
-            lockService.execute(() -> {
-              l.unlock();
-            });
-          }
-          lockService.shutdown();
-          try {
-            lockService.awaitTermination(10, MINUTES);
-          } catch (InterruptedException e) {
-            // ignore
-          } finally {
-            if (!lockService.isTerminated()) {
-              lockService.shutdownNow();
-            }
-          }
+          l.unlock();
+          logger.fine(format("directory %s has been unlocked", path.getFileName()));
         },
         service);
     return putFuture;
@@ -929,10 +983,13 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Digest digest,
       Map<Digest, Directory> directoriesIndex,
       ExecutorService service) throws IOException, InterruptedException {
+    logger.fine(format("directory %s has been locked", path.getFileName()));
     ListenableFuture<Void> expireFuture;
     synchronized (this) {
       DirectoryEntry e = directoryStorage.get(digest);
-      if (e != null) {
+      if (e == null) {
+        expireFuture = immediateFuture(null);
+      } else {
         ImmutableList.Builder<Path> inputsBuilder = new ImmutableList.Builder<>();
         for (Path input : e.inputs) {
           Entry fileEntry = storage.get(input);
@@ -950,53 +1007,48 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           inputsBuilder.add(input);
         }
 
-        if (!Files.isDirectory(path)) {
-          logger.severe(
-              format(
-                  "CASFileCache::putDirectory(%s) %s does not exist, purging the entry with fire and resorting to fetch",
-                  DigestUtil.toString(digest),
-                  path));
-          e = null;
-        }
-
         if (e != null) {
+          logger.fine(format("found existing entry for %s", path.getFileName()));
           return immediateFuture(path);
         }
 
         decrementReferencesSynchronized(inputsBuilder.build(), ImmutableList.<Digest>of());
         expireFuture = expireDirectory(digest, service);
-      } else {
-        expireFuture = immediateFuture(null);
+        logger.fine(format("expiring existing entry for %s", path.getFileName()));
       }
     }
 
     ImmutableList.Builder<Path> inputsBuilder = ImmutableList.builder();
-    ImmutableList.Builder<ListenableFuture<Void>> putFutures = ImmutableList.builder();
-    fetchDirectory(digest, path, digest, directoriesIndex, inputsBuilder, putFutures, service);
     ListenableFuture<List<Void>> fetchFuture = transformAsync(
         expireFuture,
-        (results) -> catchingAsync(
-            allAsList(putFutures.build()),
-            Throwable.class,
-            (e) -> {
-              ImmutableList<Path> inputs = inputsBuilder.build();
-              synchronized (this) {
-                purgeDirectoryFromInputs(digest, inputs);
-                decrementReferencesSynchronized(inputs, ImmutableList.<Digest>of());
-              }
-              try {
-                removeDirectory(path);
-              } catch (IOException removeException) {
-                logger.log(SEVERE, format("error during directory removal of %s after fetch failure", path), removeException);
-              }
-              return immediateFailedFuture(e);
-            },
-            service),
+        (results) -> {
+            logger.fine(format("expiry complete, fetching %s", path.getFileName()));
+            ImmutableList.Builder<ListenableFuture<Void>> putFutures = ImmutableList.builder();
+            fetchDirectory(digest, path, digest, directoriesIndex, inputsBuilder, putFutures, service);
+            return catchingAsync(
+                allAsList(putFutures.build()),
+                Throwable.class,
+                (e) -> {
+                  ImmutableList<Path> inputs = inputsBuilder.build();
+                  synchronized (this) {
+                    purgeDirectoryFromInputs(digest, inputs);
+                    decrementReferencesSynchronized(inputs, ImmutableList.<Digest>of());
+                  }
+                  try {
+                    removeDirectory(path);
+                  } catch (IOException removeException) {
+                    logger.log(SEVERE, "error during directory removal after fetch failure", removeException);
+                  }
+                  return immediateFailedFuture(e);
+                },
+                service);
+        },
         service);
 
     return transform(
         fetchFuture,
         (results) -> {
+          logger.fine(format("directory fetch complete, inserting %s", path.getFileName()));
           DirectoryEntry e = new DirectoryEntry(directoriesIndex.get(digest), inputsBuilder.build());
           synchronized (this) {
             directoryStorage.put(digest, e);
@@ -1008,50 +1060,57 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   @VisibleForTesting
   public Path put(Digest digest, boolean isExecutable) throws IOException, InterruptedException {
-    return getInterruptiblyOrIOException(
-        put(
-            digest,
-            isExecutable,
-            /* containingDirectory=*/ null,
-            newDirectExecutorService()));
+    checkState(digest.getSizeBytes() > 0, "file entries may not be empty");
+
+    Path key = getKey(digest, isExecutable);
+    CancellableOutputStream out = putImpl(
+        key,
+        digest.getSizeBytes(),
+        isExecutable,
+        /* containingDirectory=*/ null,
+        () -> onPut.accept(digest));
+    if (out != null) {
+      copyExternalInput(digest, out);
+    }
+    return key;
   }
 
+  // This can result in deadlock if called with a direct executor. I'm unsure how to guard
+  // against it, until we can get to using a current-download future
   public ListenableFuture<Path> put(
       Digest digest,
       boolean isExecutable,
       Digest containingDirectory,
-      ExecutorService service) {
-    Preconditions.checkState(digest.getSizeBytes() > 0, "file entries may not be empty");
+      Executor executor) {
+    checkState(digest.getSizeBytes() > 0, "file entries may not be empty");
 
     Path key = getKey(digest, isExecutable);
-    ListenableFuture<CancellableOutputStream> outFuture = putImplFuture(
-        key,
-        digest.getSizeBytes(),
-        isExecutable,
-        containingDirectory,
-        () -> onPut.accept(digest),
-        service);
     return transformAsync(
-        outFuture,
-        (out) -> {
+        immediateFuture(null),
+        (result) -> {
+          CancellableOutputStream out = putImpl(key, digest.getSizeBytes(), isExecutable, containingDirectory, () -> onPut.accept(digest));
           if (out != null) {
             copyExternalInput(digest, out);
           }
           return immediateFuture(key);
         },
-        service);
+        executor);
   }
 
   private void copyExternalInput(Digest digest, CancellableOutputStream out) throws IOException, InterruptedException {
     try {
+      logger.fine(format("downloading %s", DigestUtil.toString(digest)));
       Downloader.copy((offset) -> newExternalInput(digest, offset), out);
+      logger.fine(format("download of %s complete", DigestUtil.toString(digest)));
     } catch (IOException e) {
       out.cancel();
-      logger.log(SEVERE, format("error downloading %s", DigestUtil.toString(digest)), e); // prevent burial by early end of stream during close
+      logger.log(WARNING, format("error downloading %s", DigestUtil.toString(digest)), e); // prevent burial by early end of stream during close
       throw e;
     } finally {
       try {
+        logger.fine(format("closing output stream for %s", DigestUtil.toString(digest)));
         out.close();
+        logger.fine(format("output stream closed for %s", DigestUtil.toString(digest)));
       } catch (IOException e) {
         if (Thread.interrupted()) {
           logger.log(SEVERE, format("could not close stream for %s", DigestUtil.toString(digest)), e);
@@ -1059,6 +1118,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             throw (InterruptedException) e.getCause();
           }
           throw new InterruptedException();
+        } else {
+          logger.log(WARNING, format("failed output stream close for %s", DigestUtil.toString(digest)), e);
         }
         throw e;
       }
@@ -1086,45 +1147,18 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   };
 
-  private ListenableFuture<CancellableOutputStream> putImplFuture(
-      Path key,
-      long blobSizeInBytes,
-      boolean isExecutable,
-      Digest containingDirectory,
-      Runnable onInsert,
-      ExecutorService service) {
-    return listeningDecorator(service).submit(() -> putImpl(key, blobSizeInBytes, isExecutable, containingDirectory, onInsert));
-  }
-
   private CancellableOutputStream putImpl(
       Path key,
       long blobSizeInBytes,
       boolean isExecutable,
       Digest containingDirectory,
-      Runnable onInsert)
-      throws IOException, InterruptedException {
+      Runnable onInsert) throws IOException, InterruptedException {
     CancellableOutputStream out = null;
-    ThreadFactory factory = new ThreadFactoryBuilder()
-        .setNameFormat(format("blob-%s-lock-manager", key.getFileName()))
-        .build();
-    ListeningExecutorService lockService = listeningDecorator(Executors.newSingleThreadExecutor(factory));
     Lock l = locks.acquire(key);
-    ListenableFuture<Void> lockedFuture = lockService.submit(new Callable<Void>() {
-      @Override
-      public Void call() throws InterruptedException {
-        l.lockInterruptibly();
-        return null;
-      }
-    });
+    logger.fine(format("locking blob %s", key.getFileName()));
+    l.lockInterruptibly();
     try {
-      lockedFuture.get();
-    } catch (ExecutionException e) {
-      if (e.getCause() instanceof InterruptedException) {
-        throw (InterruptedException) e.getCause();
-      }
-      throw new UncheckedExecutionException(e.getCause());
-    }
-    try {
+      logger.fine(format("lock for blob %s received, getting output stream", key.getFileName()));
       out = putImplSynchronized(
           key,
           blobSizeInBytes,
@@ -1133,30 +1167,20 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           onInsert);
     } finally {
       if (out == null || out == DUPLICATE_OUTPUT_STREAM) {
-        lockService.execute(() -> {
-          l.unlock();
-        });
-        lockService.shutdown();
-        lockService.awaitTermination(10, MINUTES);
+        l.unlock();
+        logger.fine(format("blob %s has been unlocked for duplicate", key.getFileName()));
       }
     }
-    checkNotNull(out);
     if (out == DUPLICATE_OUTPUT_STREAM) {
       return null;
     }
-    return newLockedCancellableOutputStream(out, () -> {
-      lockService.execute(() -> {
-        l.unlock();
-      });
-      lockService.shutdown();
-      try {
-        lockService.awaitTermination(10, MINUTES);
-      } catch (InterruptedException e) {
-        lockService.shutdownNow();
-
-        Thread.currentThread().interrupt();
-      }
-    });
+    logger.fine(format("entry %s is missing, downloading and populating", key.getFileName()));
+    return newLockedCancellableOutputStream(
+        out,
+        () -> {
+          l.unlock();
+          logger.fine(format("blob %s has been unlocked for complete", key.getFileName()));
+        });
   }
 
   private CancellableOutputStream newLockedCancellableOutputStream(CancellableOutputStream out, Runnable onUnlock) {

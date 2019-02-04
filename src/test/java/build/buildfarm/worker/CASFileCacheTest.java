@@ -17,6 +17,7 @@ package build.buildfarm.worker;
 import static build.buildfarm.worker.CASFileCache.getInterruptiblyOrIOException;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
+import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -39,6 +40,8 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.jimfs.Configuration;
 import com.google.common.jimfs.Jimfs;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.protobuf.ByteString;
 import io.grpc.Deadline;
 import java.io.InputStream;
@@ -55,8 +58,10 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -70,6 +75,7 @@ class CASFileCacheTest {
   private CASFileCache fileCache;
   private Path root;
   private Map<Digest, ByteString> blobs;
+  private ExecutorService putService;
 
   @Mock
   private Consumer<Digest> onPut;
@@ -100,6 +106,7 @@ class CASFileCacheTest {
   public void setUp() {
     MockitoAnnotations.initMocks(this);
     blobs = Maps.newHashMap();
+    putService = newSingleThreadExecutor();
     storage = Maps.newConcurrentMap();
     fileCache = new CASFileCache(
         root,
@@ -119,6 +126,13 @@ class CASFileCacheTest {
         return content.substring((int) offset).newInput();
       }
     };
+  }
+
+  @After
+  public void tearDown() {
+    if (!shutdownAndAwaitTermination(putService, 1, SECONDS)) {
+      throw new RuntimeException("could not shut down put service");
+    }
   }
 
   @Test
@@ -186,7 +200,7 @@ class CASFileCacheTest {
         dirDigest, directory,
         subdirDigest, subDirectory);
     Path dirPath = getInterruptiblyOrIOException(
-        fileCache.putDirectory(dirDigest, directoriesIndex, newDirectExecutorService()));
+        fileCache.putDirectory(dirDigest, directoriesIndex, putService));
     assertThat(Files.isDirectory(dirPath)).isTrue();
     assertThat(Files.exists(dirPath.resolve("file"))).isTrue();
     assertThat(Files.isDirectory(dirPath.resolve("subdir"))).isTrue();
@@ -222,7 +236,7 @@ class CASFileCacheTest {
           fileCache.putDirectory(
               dirDigest,
               directoriesIndex,
-              newDirectExecutorService()));
+              putService));
     } catch (IOException e) {
       assertThat(e.getMessage()).isEqualTo("NOT_FOUND: " + DigestUtil.toString(fileDigest));
       exceptionHandled = true;
@@ -354,8 +368,9 @@ class CASFileCacheTest {
     assertThat(putFuture.isDone()).isFalse();
     fileCache.decrementReferences(ImmutableList.<Path>of(bigPath), ImmutableList.of());
     putFuture.get();
-    service.shutdown();
-    service.awaitTermination(10, MICROSECONDS);
+    if (!shutdownAndAwaitTermination(service, 10, MICROSECONDS)) {
+      throw new RuntimeException("could not shut down put service");
+    }
   }
 
   @Test
