@@ -53,15 +53,11 @@ message PollOperationRequest {
 message BuildFarmServerConfig {
   repeated InstanceConfig instances = 1;
 
-  string default_instance_name = 3; // must be present in instances list or empty
+  string default_instance_name = 2; // must be present in instances list or empty
 
-  int32 port = 2;
+  int32 port = 3;
 
-  string logging_host = 4;
-
-  string logging_project_id = 5;
-
-  string aws_namespace = 6;
+  string aws_namespace = 4;
 }
 
 message MemoryCASConfig {
