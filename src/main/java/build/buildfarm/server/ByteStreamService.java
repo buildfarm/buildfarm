@@ -20,13 +20,11 @@ import static java.lang.String.format;
 import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.Digest;
-import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.UrlPath;
 import build.buildfarm.common.UrlPath.ResourceOperation;
 import build.buildfarm.common.UrlPath.InvalidResourceNameException;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Instance.ChunkObserver;
-import build.bazel.remote.execution.v2.Digest;
 import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusResponse;
@@ -40,19 +38,13 @@ import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
-import io.grpc.StatusException;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
-import javax.annotation.Nullable;
 
 public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
   private static final Logger logger = Logger.getLogger(ByteStreamService.class.getName());
@@ -181,7 +173,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     } catch (IOException e) {
-      responseObserver.onError(new StatusException(Status.fromThrowable(e)));
+      responseObserver.onError(Status.fromThrowable(e).asException());
     } catch (InvalidResourceNameException e) {
       String description = e.getLocalizedMessage();
       responseObserver.onError(Status.INVALID_ARGUMENT
@@ -213,6 +205,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
       throws InvalidResourceNameException {
     Digest digest = UrlPath.parseBlobDigest(resourceName);
 
+    // FIXME this should become a callback
     Iterable<Digest> missingDigests;
     try {
       missingDigests = instance.findMissingBlobs(ImmutableList.of(digest), newDirectExecutorService()).get();

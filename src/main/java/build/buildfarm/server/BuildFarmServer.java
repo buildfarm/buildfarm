@@ -31,6 +31,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -45,7 +46,7 @@ public class BuildFarmServer {
 
   private final BuildFarmServerConfig config;
   private final Instances instances;
-  private Server server;
+  private final Server server;
   private boolean stopping = false;
 
   public BuildFarmServer(BuildFarmServerConfig config)
@@ -118,7 +119,6 @@ public class BuildFarmServer {
   private void blockUntilShutdown() throws InterruptedException {
     if (server != null) {
       server.awaitTermination();
-      server = null;
     }
   }
 

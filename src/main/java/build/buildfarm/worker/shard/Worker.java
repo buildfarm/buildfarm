@@ -16,6 +16,7 @@ package build.buildfarm.worker.shard;
 
 import static java.util.logging.Level.SEVERE;
 import static java.util.concurrent.Executors.newFixedThreadPool;
+import static java.util.concurrent.TimeUnit.SECONDS;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.cas.ContentAddressableStorage;
@@ -65,13 +66,14 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
 
 public class Worker {
   private static final java.util.logging.Logger nettyLogger = java.util.logging.Logger.getLogger("io.grpc.netty");
   private static final Logger logger = Logger.getLogger(Worker.class.getName());
+
+  private static final int shutdownWaitTimeInSeconds = 10;
 
   private final ShardWorkerConfig config;
   private final ShardWorkerInstance instance;
@@ -81,7 +83,6 @@ public class Worker {
   private final ExecFileSystem execFileSystem;
   private final Pipeline pipeline;
   private final ShardBackplane backplane;
-  private static final int shutdownWaitTimeInMillis = 10000;
 
   public Worker(ShardWorkerConfig config) throws ConfigurationException {
     this(ServerBuilder.forPort(config.getPort()), config);
@@ -256,11 +257,13 @@ public class Worker {
   }
 
   public void stop() throws InterruptedException {
+    boolean interrupted = Thread.interrupted();
     logger.info("Closing the pipeline");
     try {
       pipeline.close();
     } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
+      Thread.interrupted();
+      interrupted = true;
     }
     logger.info("Stopping exec filesystem");
     execFileSystem.stop();
@@ -269,15 +272,21 @@ public class Worker {
       server.shutdown();
 
       try {
-        server.awaitTermination(shutdownWaitTimeInMillis, TimeUnit.MILLISECONDS);
+        server.awaitTermination(shutdownWaitTimeInSeconds, SECONDS);
       } catch (InterruptedException e) {
+        interrupted = true;
         logger.log(SEVERE, "interrupted while waiting for server shutdown", e);
       } finally {
         server.shutdownNow();
       }
     }
-    backplane.stop();
-    if (Thread.interrupted()) {
+    try {
+      backplane.stop();
+    } catch (InterruptedException e) {
+      interrupted = true;
+    }
+    if (interrupted) {
+      Thread.currentThread().interrupt();
       throw new InterruptedException();
     }
   }
@@ -305,22 +314,7 @@ public class Worker {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
-    if (server != null) {
-      server.shutdown();
-
-      try {
-        server.awaitTermination(shutdownWaitTimeInMillis, TimeUnit.MILLISECONDS);
-      } catch (InterruptedException e) {
-        logger.log(SEVERE, "interrupted while waiting for server shutdown", e);
-      } finally {
-        server.shutdownNow();
-      }
-    }
-    execFileSystem.stop();
-    backplane.stop();
-    if (Thread.interrupted()) {
-      throw new InterruptedException();
-    }
+    stop();
   }
 
   private void removeWorker(String name) {
@@ -397,7 +391,7 @@ public class Worker {
         try {
           while (!server.isShutdown()) {
             registerIfExpired();
-            TimeUnit.SECONDS.sleep(1);
+            SECONDS.sleep(1);
           }
         } catch (InterruptedException e) {
           try {

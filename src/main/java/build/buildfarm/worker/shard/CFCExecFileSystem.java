@@ -27,6 +27,7 @@ import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.Futures.transformAsync;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
+import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
 import static java.util.concurrent.Executors.newWorkStealingPool;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.logging.Level.SEVERE;
@@ -109,27 +110,11 @@ class CFCExecFileSystem implements ExecFileSystem {
 
   @Override
   public void stop() {
-    fetchService.shutdown();
-    while (!fetchService.isTerminated()) {
-      try {
-        if (!fetchService.awaitTermination(1, MINUTES)) {
-          fetchService.shutdownNow();
-        }
-      } catch (InterruptedException e) {
-        fetchService.shutdownNow();
-        Thread.currentThread().interrupt();
-      }
+    if (!shutdownAndAwaitTermination(fetchService, 1, MINUTES)) {
+      logger.severe("could not terminate fetchService");
     }
-    removeDirectoryService.shutdown();
-    while (!removeDirectoryService.isTerminated()) {
-      try {
-        if (!removeDirectoryService.awaitTermination(1, MINUTES)) {
-          removeDirectoryService.shutdownNow();
-        }
-      } catch (InterruptedException e) {
-        removeDirectoryService.shutdownNow();
-        Thread.currentThread().interrupt();
-      }
+    if (!shutdownAndAwaitTermination(removeDirectoryService, 1, MINUTES)) {
+      logger.severe("could not terminate removeDirectoryService");
     }
   }
 
