@@ -67,6 +67,10 @@ abstract class OutputStreamChunkObserver implements ChunkObserver {
         chunk.writeTo(stream);
       }
     } catch (IOException e) {
+      if (e.getCause() instanceof InterruptedException) {
+        Thread.currentThread().interrupt();
+        return;
+      }
       throw Status.INTERNAL.withCause(e).asRuntimeException();
     }
     committedSize += chunk.size();

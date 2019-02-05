@@ -872,9 +872,6 @@ public class ShardInstance extends AbstractServerInstance {
         }
       }
     };
-    Context.current().addListener((context) -> {
-      chunkObserver.onError(Status.CANCELLED.asRuntimeException());
-    }, directExecutor());
     return chunkObserver;
   }
 

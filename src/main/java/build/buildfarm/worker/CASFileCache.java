@@ -387,11 +387,15 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       return null;
     }
     return new OutputStream() {
+      AtomicBoolean closed = new AtomicBoolean(false);
+
       @Override
       public void close() throws IOException {
-        out.close();
+        if (closed.compareAndSet(/* expected=*/ false, /* update=*/ true)) {
+          out.close();
 
-        decrementReference(blobPath);
+          decrementReference(blobPath);
+        }
       }
 
       @Override
@@ -1090,7 +1094,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return transformAsync(
         immediateFuture(null),
         (result) -> {
-          CancellableOutputStream out = putImpl(key, digest.getSizeBytes(), isExecutable, containingDirectory, () -> onPut.accept(digest));
+          CancellableOutputStream out = putImpl(
+              key,
+              digest.getSizeBytes(),
+              isExecutable,
+              containingDirectory,
+              () -> onPut.accept(digest));
           if (out != null) {
             copyExternalInput(digest, out);
           }

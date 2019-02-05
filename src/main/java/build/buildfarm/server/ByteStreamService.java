@@ -16,6 +16,7 @@ package build.buildfarm.server;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.lang.String.format;
 import static java.util.logging.Level.SEVERE;
 
@@ -37,6 +38,8 @@ import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.protobuf.ByteString;
+import io.grpc.Context;
+import io.grpc.Context.CancellationListener;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
@@ -355,6 +358,14 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
                 throw new InvalidResourceNameException(resourceName, "Missing resource name in request");
               }
               chunkObserver = getChunkObserver(resourceName);
+              // maybe remove it onCompleted...
+              Context.current().addListener(
+                  (context) -> {
+                    if (chunkObserver != null) {
+                      chunkObserver.onError(Status.CANCELLED.asRuntimeException());
+                    }
+                  },
+                  directExecutor());
               Futures.addCallback(chunkObserver.getCommittedFuture(), new FutureCallback<Long>() {
                 @Override
                 public void onFailure(Throwable t) {
@@ -377,7 +388,17 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
             }
             validateRequest(request);
 
+            CancellationListener writeInterruptListener = new CancellationListener() {
+              Thread writingThread = Thread.currentThread();
+
+              @Override
+              public void cancelled(Context context) {
+                writingThread.interrupt();
+              }
+            };
+            Context.current().addListener(writeInterruptListener, directExecutor());
             chunkObserver.onNext(request.getData());
+            Context.current().removeListener(writeInterruptListener);
           } catch (InstanceNotFoundException|InvalidResourceNameException e) {
             Throwable t = Status.INVALID_ARGUMENT.withDescription(e.getLocalizedMessage()).asException();
             if (chunkObserver != null) {
@@ -389,7 +410,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
           }
         }
 
-        if (request.getFinishWrite()) {
+        if (request.getFinishWrite() && !Thread.currentThread().isInterrupted()) {
           if (chunkObserver != null) {
             chunkObserver.onCompleted();
             chunkObserver = null;
