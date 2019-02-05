@@ -1,0 +1,21 @@
+# Setup IntelliJ for Bazel development using the IntelliJ Bazel Plugin.
+# Based on https://ij.bazel.build/docs/project-views.html
+
+directories:
+  .
+  -bazel-bazel-buildfarm
+  -bazel-bin
+  -bazel-genfiles
+  -bazel-out
+  -bazel-testlogs
+  -tmp
+
+targets:
+  //...
+
+workspace_type: java
+
+java_language_level: 8
+
+test_sources:
+  src/test/*
