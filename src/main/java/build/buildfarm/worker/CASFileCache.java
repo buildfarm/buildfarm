@@ -274,30 +274,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
-  private InputStream newInput(Digest digest, long offset, boolean isExecutable) throws IOException, InterruptedException {
-    logger.fine(format("private input stream for %s %d%s", DigestUtil.toString(digest), offset, isExecutable ? " executable" : ""));
-    try {
-      // head of line blocking here with download
-      Path blobPath = put(digest, isExecutable);
-      try {
-        InputStream input = Files.newInputStream(blobPath);
-        input.skip(offset);
-        return input;
-      } finally {
-        decrementReference(blobPath);
-      }
-    } catch (NoSuchFileException e) {
-      remove(digest, isExecutable);
-      throw e;
-    } catch (IOException e) {
-      if (!e.getMessage().equals("file not found")) {
-        logger.log(SEVERE, format("error creating input stream for %s at %d", getKey(digest, isExecutable), offset), e);
-      }
-      remove(digest, isExecutable);
-      throw e;
-    }
-  }
-
   @Override
   public InputStream newInput(Digest digest, long offset) throws IOException, InterruptedException {
     logger.fine(format("getting input stream for %s", DigestUtil.toString(digest)));
@@ -306,11 +282,23 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Path key = getKey(digest, isExecutable);
       Entry e = storage.get(key);
       if (e != null) {
-        InputStream input = newInput(digest, offset, isExecutable);
-        if (input != null) {
+        InputStream input = null;
+        try {
+          input = Files.newInputStream(key);
+        } catch (NoSuchFileException eNoEnt) {
           synchronized (this) {
-            e.recordAccess(header);
+            Entry removedEntry = storage.remove(key);
+            if (removedEntry == e) {
+              unlinkEntry(removedEntry);
+            }
           }
+          if (isExecutable) {
+            onExpire.accept(ImmutableList.of(digest));
+          }
+          continue;
+        }
+        synchronized (this) {
+          e.recordAccess(header);
         }
         return input;
       }
