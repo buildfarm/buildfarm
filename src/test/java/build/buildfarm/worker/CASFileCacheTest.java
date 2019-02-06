@@ -367,9 +367,12 @@ class CASFileCacheTest {
     // minimal test to ensure that we're blocked
     assertThat(putFuture.isDone()).isFalse();
     fileCache.decrementReferences(ImmutableList.<Path>of(bigPath), ImmutableList.of());
-    putFuture.get();
-    if (!shutdownAndAwaitTermination(service, 10, MICROSECONDS)) {
-      throw new RuntimeException("could not shut down put service");
+    try {
+      putFuture.get();
+    } finally {
+      if (!shutdownAndAwaitTermination(service, 1, SECONDS)) {
+        throw new RuntimeException("could not shut down put service");
+      }
     }
   }
 
