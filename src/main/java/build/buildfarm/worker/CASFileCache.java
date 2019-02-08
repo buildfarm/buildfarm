@@ -285,6 +285,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         InputStream input = null;
         try {
           input = Files.newInputStream(key);
+          input.skip(offset);
         } catch (NoSuchFileException eNoEnt) {
           synchronized (this) {
             Entry removedEntry = storage.remove(key);
