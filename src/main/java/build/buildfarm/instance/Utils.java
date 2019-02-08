@@ -34,7 +34,11 @@ public class Utils {
   private Utils() {}
 
   public static ByteString getBlob(Instance instance, Digest blobDigest) throws IOException, InterruptedException {
-    try (InputStream in = instance.newStreamInput(instance.getBlobName(blobDigest), 0)) {
+    return getBlob(instance, blobDigest, /* offset=*/ 0);
+  }
+
+  public static ByteString getBlob(Instance instance, Digest blobDigest, long offset) throws IOException, InterruptedException {
+    try (InputStream in = instance.newStreamInput(instance.getBlobName(blobDigest), offset)) {
       return ByteString.readFrom(in);
     } catch (StatusRuntimeException e) {
       if (e.getStatus().equals(Status.NOT_FOUND)) {

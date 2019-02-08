@@ -486,9 +486,12 @@ public class ShardInstance extends AbstractServerInstance {
       StreamObserver<ByteString> blobObserver) {
     String worker = workers.removeFirst();
     workerStub(worker).getBlob(blobDigest, offset, limit, new StreamObserver<ByteString>() {
+      long received = 0;
+
       @Override
       public void onNext(ByteString nextChunk) {
         blobObserver.onNext(nextChunk);
+        received += nextChunk.size();
       }
 
       @Override
@@ -514,7 +517,19 @@ public class ShardInstance extends AbstractServerInstance {
         if (workers.isEmpty()) {
           blobObserver.onError(Status.NOT_FOUND.asException());
         } else {
-          fetchBlobFromWorker(blobDigest, workers, offset, limit, blobObserver);
+          long nextLimit;
+          if (limit == 0) {
+            nextLimit = 0;
+          } else {
+            checkState(limit >= received);
+            nextLimit = limit - received;
+          }
+          if (nextLimit == 0 && limit != 0) {
+            // be gracious and terminate the blobObserver here
+            onCompleted();
+          } else {
+            fetchBlobFromWorker(blobDigest, workers, offset + received, nextLimit, blobObserver);
+          }
         }
       }
 
