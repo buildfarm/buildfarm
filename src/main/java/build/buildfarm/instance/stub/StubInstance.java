@@ -14,6 +14,7 @@
 
 package build.buildfarm.instance.stub;
 
+import static build.buildfarm.common.grpc.Retrier.NO_RETRIES;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
@@ -42,6 +43,8 @@ import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.bazel.remote.execution.v2.UpdateActionResultRequest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.grpc.ByteStreamHelper;
+import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Utils;
 import build.buildfarm.instance.Watcher;
@@ -62,6 +65,7 @@ import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
+import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.longrunning.CancelOperationRequest;
@@ -98,30 +102,51 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
+import javax.annotation.Nullable;
 
 public class StubInstance implements Instance {
   private static final Logger logger = Logger.getLogger(StubInstance.class.getName());
 
+  private static final long DEFAULT_DEADLINE_DAYS = 100 * 365;
+
   private final String name;
   private final DigestUtil digestUtil;
   private final ManagedChannel channel;
-  private final ByteStreamUploader uploader;
   private final long deadlineAfter;
   private final TimeUnit deadlineAfterUnits;
+  private final Retrier retrier;
+  private final @Nullable ListeningScheduledExecutorService retryService;
   private boolean isStopped = false;
+
+  public StubInstance(
+      String name,
+      DigestUtil digestUtil,
+      ManagedChannel channel) {
+    this(name, digestUtil, channel, DEFAULT_DEADLINE_DAYS, TimeUnit.DAYS);
+  }
+
+  public StubInstance(
+      String name,
+      DigestUtil digestUtil,
+      ManagedChannel channel,
+      long deadlineAfter, TimeUnit deadlineAfterUnits) {
+    this(name, digestUtil, channel, deadlineAfter, deadlineAfterUnits, NO_RETRIES, /* retryService=*/ null);
+  }
 
   public StubInstance(
       String name,
       DigestUtil digestUtil,
       ManagedChannel channel,
       long deadlineAfter, TimeUnit deadlineAfterUnits,
-      ByteStreamUploader uploader) {
+      Retrier retrier,
+      @Nullable ListeningScheduledExecutorService retryService) {
     this.name = name;
     this.digestUtil = digestUtil;
     this.channel = channel;
     this.deadlineAfter = deadlineAfter;
     this.deadlineAfterUnits = deadlineAfterUnits;
-    this.uploader = uploader;
+    this.retrier = retrier;
+    this.retryService = retryService;
   }
 
   private final Supplier<ActionCacheBlockingStub> actionCacheBlockingStub =
@@ -160,14 +185,10 @@ public class StubInstance implements Instance {
             }
           });
 
-  private final Supplier<ByteStreamStub> bsStub =
-      Suppliers.memoize(
-          new Supplier<ByteStreamStub>() {
-            @Override
-            public ByteStreamStub get() {
-              return ByteStreamGrpc.newStub(channel);
-            }
-          });
+  private ByteStreamStub newBSStub() {
+    return ByteStreamGrpc.newStub(channel)
+        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits);
+  }
 
   private final Supplier<OperationsBlockingStub> operationsBlockingStub =
       Suppliers.memoize(
@@ -311,8 +332,7 @@ public class StubInstance implements Instance {
       String resourceName = name;
       long writtenBytes = 0;
       SettableFuture<WriteResponse> writeResponseFuture = SettableFuture.create();
-      StreamObserver<WriteRequest> requestObserver = bsStub.get()
-          .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
+      StreamObserver<WriteRequest> requestObserver = newBSStub()
           .write(
               new StreamObserver<WriteResponse>() {
                 @Override
@@ -428,13 +448,15 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public InputStream newStreamInput(String name, long offset) throws IOException {
+  public InputStream newStreamInput(String name, long offset) {
     throwIfStopped();
-    Iterator<ReadResponse> replies = bsBlockingStub
-        .get()
-        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
-        .read(ReadRequest.newBuilder().setReadOffset(offset).setResourceName(name).build());
-    return new ByteStringIteratorInputStream(Iterators.transform(replies, (reply) -> reply.getData()));
+    return ByteStreamHelper.newInput(
+        name,
+        offset,
+        this::newBSStub,
+        retrier::newBackoff,
+        retrier::isRetriable,
+        retryService);
   }
 
   @Override
@@ -448,8 +470,7 @@ public class StubInstance implements Instance {
   @Override
   public void getBlob(Digest blobDigest, long offset, long limit, StreamObserver<ByteString> blobObserver) {
     throwIfStopped();
-    bsStub.get()
-        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
+    newBSStub()
         .read(
             ReadRequest.newBuilder()
                 .setResourceName(getBlobName(blobDigest))

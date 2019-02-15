@@ -22,6 +22,7 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyZeroInteractions;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionCacheGrpc.ActionCacheImplBase;
@@ -37,18 +38,24 @@ import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamImplBase;
+import com.google.bytestream.ByteStreamProto.ReadRequest;
+import com.google.bytestream.ByteStreamProto.ReadResponse;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
 import com.google.common.collect.ImmutableList;
+import com.google.common.io.ByteStreams;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Empty;
 import io.grpc.Server;
 import io.grpc.Status;
+import io.grpc.Status.Code;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.stub.StreamObserver;
 import io.grpc.util.MutableHandlerRegistry;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
@@ -84,6 +91,13 @@ public class StubInstanceTest {
     fakeServer.awaitTermination();
   }
 
+  private Instance newStubInstance(String instanceName) {
+    return new StubInstance(
+        instanceName,
+        DIGEST_UTIL,
+        InProcessChannelBuilder.forName(fakeServerName).directExecutor().build());
+  }
+
   @Test
   public void reflectsNameAndDigestUtil() {
     String test1Name = "test1";
@@ -92,9 +106,7 @@ public class StubInstanceTest {
     Instance test1Instance = new StubInstance(
         test1Name,
         test1DigestUtil,
-        /* channel=*/ null,
-        Long.MAX_VALUE, NANOSECONDS,
-        /* uploader=*/ null);
+        /* channel=*/ null);
     assertThat(test1Instance.getName()).isEqualTo(test1Name);
     assertThat(test1Instance.getDigestUtil().compute(test1Blob))
         .isEqualTo(test1DigestUtil.compute(test1Blob));
@@ -106,16 +118,14 @@ public class StubInstanceTest {
     Instance test2Instance = new StubInstance(
         test2Name,
         test2DigestUtil,
-        /* channel=*/ null,
-        Long.MAX_VALUE, NANOSECONDS,
-        /* uploader=*/ null);
+        /* channel=*/ null);
     assertThat(test2Instance.getName()).isEqualTo(test2Name);
     assertThat(test2Instance.getDigestUtil().compute(test2Blob))
         .isEqualTo(test2DigestUtil.compute(test2Blob));
   }
 
   @Test
-  public void getActionResultReturnsNullForNotFound() {
+  public void getActionResultReturnsNullForNotFound() throws InterruptedException {
     AtomicReference<GetActionResultRequest> reference = new AtomicReference<>();
     serviceRegistry.addService(
         new ActionCacheImplBase() {
@@ -125,17 +135,13 @@ public class StubInstanceTest {
             responseObserver.onError(Status.NOT_FOUND.asException());
           }
         });
-    Instance instance = new StubInstance(
-        "test",
-        DIGEST_UTIL,
-        InProcessChannelBuilder.forName(fakeServerName).directExecutor().build(),
-        Long.MAX_VALUE, NANOSECONDS,
-        /* uploader=*/ null);
+    Instance instance = newStubInstance("test");
     ActionKey actionKey = DIGEST_UTIL.computeActionKey(Action.getDefaultInstance());
     assertThat(instance.getActionResult(actionKey)).isNull();
     GetActionResultRequest request = reference.get();
     assertThat(request.getInstanceName()).isEqualTo(instance.getName());
     assertThat(request.getActionDigest()).isEqualTo(actionKey.getDigest());
+    instance.stop();
   }
 
   @Test
@@ -151,12 +157,7 @@ public class StubInstanceTest {
           }
         });
     String instanceName = "putActionResult-test";
-    Instance instance = new StubInstance(
-        instanceName,
-        DIGEST_UTIL,
-        InProcessChannelBuilder.forName(fakeServerName).directExecutor().build(),
-        Long.MAX_VALUE, NANOSECONDS,
-        /* uploader=*/ null);
+    Instance instance = newStubInstance(instanceName);
     ActionKey actionKey = DigestUtil.asActionKey(Digest.newBuilder()
         .setHash("action-digest")
         .setSizeBytes(1)
@@ -167,6 +168,7 @@ public class StubInstanceTest {
     assertThat(request.getInstanceName()).isEqualTo(instanceName);
     assertThat(request.getActionDigest()).isEqualTo(actionKey.getDigest());
     assertThat(request.getActionResult()).isEqualTo(actionResult);
+    instance.stop();
   }
 
   @Test
@@ -182,20 +184,15 @@ public class StubInstanceTest {
             responseObserver.onCompleted();
           }
         });
-    String instanceName = "findMissingBlobs-test";
-    Instance instance = new StubInstance(
-        instanceName,
-        DIGEST_UTIL,
-        InProcessChannelBuilder.forName(fakeServerName).directExecutor().build(),
-        Long.MAX_VALUE, NANOSECONDS,
-        /* uploader=*/ null);
+    Instance instance = newStubInstance("findMissingBlobs-test");
     Iterable<Digest> digests = ImmutableList.of(
         Digest.newBuilder().setHash("present").setSizeBytes(1).build());
     assertThat(instance.findMissingBlobs(digests, newDirectExecutorService()).get()).isEmpty();
+    instance.stop();
   }
 
   @Test
-  public void outputStreamWrites() throws IOException {
+  public void outputStreamWrites() throws IOException, InterruptedException {
     AtomicReference<ByteString> writtenContent = new AtomicReference<>();
     serviceRegistry.addService(
         new ByteStreamImplBase() {
@@ -233,23 +230,19 @@ public class StubInstanceTest {
             };
           }
         });
-    String instanceName = "outputStream-test";
-    Instance instance = new StubInstance(
-        instanceName,
-        DIGEST_UTIL,
-        InProcessChannelBuilder.forName(fakeServerName).directExecutor().build(),
-        Long.MAX_VALUE, NANOSECONDS,
-        /* uploader=*/ null);
+    Instance instance = newStubInstance("outputStream-test");
     String resourceName = "output-stream-test";
     ByteString content = ByteString.copyFromUtf8("test-content");
     try (OutputStream out = instance.getStreamOutput(resourceName, -1)) {
       out.write(content.toByteArray());
     }
     assertThat(writtenContent.get()).isEqualTo(content);
+    instance.stop();
   }
 
   @Test
-  public void completedWriteBeforeCloseThrowsOnNextInteraction() throws IOException {
+  public void completedWriteBeforeCloseThrowsOnNextInteraction()
+      throws IOException, InterruptedException {
     AtomicReference<ByteString> writtenContent = new AtomicReference<>();
     serviceRegistry.addService(
         new ByteStreamImplBase() {
@@ -280,13 +273,7 @@ public class StubInstanceTest {
             };
           }
         });
-    String instanceName = "early-completed-outputStream-test";
-    Instance instance = new StubInstance(
-        instanceName,
-        DIGEST_UTIL,
-        InProcessChannelBuilder.forName(fakeServerName).directExecutor().build(),
-        Long.MAX_VALUE, NANOSECONDS,
-        /* uploader=*/ null);
+    Instance instance = newStubInstance("early-completed-outputStream-test");
     String resourceName = "early-completed-output-stream-test";
     ByteString content = ByteString.copyFromUtf8("test-content");
     boolean writeThrewException = false;
@@ -300,5 +287,89 @@ public class StubInstanceTest {
       }
     }
     assertThat(writeThrewException).isTrue();
+    instance.stop();
+  }
+
+  @Test
+  public void inputStreamThrowsNonDeadlineExceededCausal()
+      throws IOException, InterruptedException {
+    serviceRegistry.addService(
+        new ByteStreamImplBase() {
+          @Override
+          public void read(
+              ReadRequest request,
+              StreamObserver<ReadResponse> responseObserver) {
+            responseObserver.onError(Status.UNAVAILABLE.asException());
+          }
+        });
+    OutputStream out = mock(OutputStream.class);
+    IOException ioException = null;
+    Instance instance = newStubInstance("input-stream-non-deadline-exceeded");
+    try (InputStream in = instance.newStreamInput("unavailable-blob-name", 0)) {
+      ByteStreams.copy(in, out);
+    } catch (IOException e) {
+      ioException = e;
+    }
+    assertThat(ioException).isNotNull();
+    Status status = Status.fromThrowable(ioException);
+    assertThat(status.getCode()).isEqualTo(Code.UNAVAILABLE);
+    verifyZeroInteractions(out);
+    instance.stop();
+  }
+
+  @Test
+  public void inputStreamRetriesOnDeadlineExceededWithProgress() throws IOException, InterruptedException {
+    ByteString content = ByteString.copyFromUtf8("1");
+    serviceRegistry.addService(
+        new ByteStreamImplBase() {
+          boolean first = true;
+
+          @Override
+          public void read(ReadRequest request, StreamObserver<ReadResponse> responseObserver) {
+            if (first && request.getReadOffset() == 0) {
+              first = false;
+              responseObserver.onNext(ReadResponse.newBuilder()
+                  .setData(content)
+                  .build());
+              responseObserver.onError(Status.DEADLINE_EXCEEDED.asException());
+            } else if (request.getReadOffset() == 1) {
+              responseObserver.onCompleted();
+            } else {
+              // all others fail with unimplemented
+              responseObserver.onError(Status.UNIMPLEMENTED.asException());
+            }
+          }
+        });
+    Instance instance = newStubInstance("input-stream-stalled");
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    try (InputStream in = instance.newStreamInput("delayed-blob-name", 0)) {
+      ByteStreams.copy(in, out);
+    }
+    assertThat(ByteString.copyFrom(out.toByteArray())).isEqualTo(content);
+    instance.stop();
+  }
+
+  @Test
+  public void inputStreamThrowsOnDeadlineExceededWithoutProgress() throws IOException, InterruptedException {
+    serviceRegistry.addService(
+        new ByteStreamImplBase() {
+          @Override
+          public void read(ReadRequest request, StreamObserver<ReadResponse> responseObserver) {
+            responseObserver.onError(Status.DEADLINE_EXCEEDED.asException());
+          }
+        });
+    OutputStream out = mock(OutputStream.class);
+    IOException ioException = null;
+    Instance instance = newStubInstance("input-stream-deadline-exceeded");
+    try (InputStream in = instance.newStreamInput("timeout-blob-name", 0)) {
+      ByteStreams.copy(in, out);
+    } catch (IOException e) {
+      ioException = e;
+    }
+    assertThat(ioException).isNotNull();
+    Status status = Status.fromThrowable(ioException);
+    assertThat(status.getCode()).isEqualTo(Code.DEADLINE_EXCEEDED);
+    verifyZeroInteractions(out);
+    instance.stop();
   }
 }

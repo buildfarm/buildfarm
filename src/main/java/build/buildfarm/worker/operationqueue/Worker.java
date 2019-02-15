@@ -39,12 +39,12 @@ import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.Poller;
+import build.buildfarm.common.grpc.Retrier;
+import build.buildfarm.common.grpc.Retrier.Backoff;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Chunker;
-import build.buildfarm.instance.stub.Retrier;
-import build.buildfarm.instance.stub.Retrier.Backoff;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.v1test.ExecuteEntry;
@@ -174,27 +174,24 @@ public class Worker {
     return new ByteStreamUploader("", channel, null, 300, createStubRetrier(), retryScheduler);
   }
 
-  private static Instance createInstance(
+  private static Instance newStubInstance(
       InstanceEndpoint instanceEndpoint,
       DigestUtil digestUtil) {
-    return createInstance(
+    return newStubInstance(
         instanceEndpoint.getInstanceName(),
         createChannel(instanceEndpoint.getTarget()),
-        null,
         digestUtil);
   }
 
-  private static Instance createInstance(
+  private static Instance newStubInstance(
       String name,
       ManagedChannel channel,
-      ByteStreamUploader uploader,
       DigestUtil digestUtil) {
     return new StubInstance(
         name,
         digestUtil,
         channel,
-        60 /* FIXME CONFIG */, TimeUnit.SECONDS,
-        uploader);
+        60 /* FIXME CONFIG */, TimeUnit.SECONDS);
   }
 
   public Worker(WorkerConfig config) throws ConfigurationException {
@@ -214,9 +211,9 @@ public class Worker {
     InstanceEndpoint casEndpoint = config.getContentAddressableStorage();
     ManagedChannel casChannel = createChannel(casEndpoint.getTarget());
     uploader = createStubUploader(casChannel);
-    casInstance = createInstance(casEndpoint.getInstanceName(), casChannel, uploader, digestUtil);
-    acInstance = createInstance(config.getActionCache(), digestUtil);
-    operationQueueInstance = createInstance(config.getOperationQueue(), digestUtil);
+    casInstance = newStubInstance(casEndpoint.getInstanceName(), casChannel, digestUtil);
+    acInstance = newStubInstance(config.getActionCache(), digestUtil);
+    operationQueueInstance = newStubInstance(config.getOperationQueue(), digestUtil);
     InputStreamFactory inputStreamFactory = new InputStreamFactory() {
       @Override
       public InputStream newInput(Digest digest, long offset) throws IOException, InterruptedException {

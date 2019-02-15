@@ -12,8 +12,6 @@ import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.OutputFile;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.instance.stub.ByteStreamUploader;
-import build.buildfarm.instance.stub.Retrier;
 import build.buildfarm.instance.stub.StubInstance;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
@@ -87,23 +85,19 @@ class Hist {
     printHistogramValue(executing, queued);
   }
 
-  public static void main(String[] args) throws java.io.IOException {
+  public static void main(String[] args) throws Exception {
     String instanceName = args[0];
     String host = args[1];
     DigestUtil digestUtil = DigestUtil.forHash(args[2]);
     ManagedChannel channel = createChannel(host);
-    Instance instance = new StubInstance(
-        instanceName,
-        digestUtil,
-        channel,
-        10, TimeUnit.SECONDS,
-        new ByteStreamUploader("", channel, null, 300, Retrier.NO_RETRIES, null));
+    Instance instance = new StubInstance(instanceName, digestUtil, channel);
     try {
       for(;;) {
         printHistogram(instance);
         Thread.sleep(500);
       }
     } catch (InterruptedException e) {
+      instance.stop();
     }
   }
 };

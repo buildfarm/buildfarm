@@ -14,18 +14,19 @@
 
 package build.buildfarm.cas;
 
+import static build.buildfarm.common.grpc.Retrier.NO_RETRIES;
+
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageBlockingStub;
 import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.grpc.ByteStreamHelper;
+import build.buildfarm.common.grpc.RetryException;
 import build.buildfarm.instance.stub.ByteStreamUploader;
-import build.buildfarm.instance.stub.ByteStringIteratorInputStream;
 import build.buildfarm.instance.stub.Chunker;
-import build.buildfarm.instance.stub.Retrier;
-import build.buildfarm.instance.stub.RetryException;
 import com.google.bytestream.ByteStreamGrpc;
-import com.google.bytestream.ByteStreamGrpc.ByteStreamBlockingStub;
+import com.google.bytestream.ByteStreamGrpc.ByteStreamStub;
 import com.google.bytestream.ByteStreamProto.ReadRequest;
 import com.google.bytestream.ByteStreamProto.ReadResponse;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
@@ -66,24 +67,23 @@ class GrpcCAS implements ContentAddressableStorage {
             }
           });
 
-  private final Supplier<ByteStreamBlockingStub> bsBlockingStub =
+  private final Supplier<ByteStreamStub> bsStub =
       Suppliers.memoize(
-          new Supplier<ByteStreamBlockingStub>() {
+          new Supplier<ByteStreamStub>() {
             @Override
-            public ByteStreamBlockingStub get() {
-              return ByteStreamGrpc.newBlockingStub(channel);
+            public ByteStreamStub get() {
+              return ByteStreamGrpc.newStub(channel);
             }
           });
 
   public InputStream newStreamInput(String name, long offset) {
-    Iterator<ReadResponse> replies = bsBlockingStub
-        .get()
-        .read(ReadRequest.newBuilder()
-            .setResourceName(name)
-            .setReadOffset(offset)
-            .build());
-    return new ByteStringIteratorInputStream(
-        Iterators.transform(replies, (reply) -> reply.getData()));
+    return ByteStreamHelper.newInput(
+        name,
+        offset,
+        bsStub,
+        NO_RETRIES::newBackoff,
+        NO_RETRIES::isRetriable,
+        /* retryService=*/ null);
   }
 
   public OutputStream newStreamOutput(String name) {

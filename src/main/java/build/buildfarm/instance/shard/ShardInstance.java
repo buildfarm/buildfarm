@@ -31,6 +31,9 @@ import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorS
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static java.lang.String.format;
+import static java.util.concurrent.Executors.newFixedThreadPool;
+import static java.util.concurrent.Executors.newSingleThreadExecutor;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.logging.Level.SEVERE;
@@ -59,12 +62,12 @@ import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.cache.Cache;
 import build.buildfarm.common.cache.CacheBuilder;
 import build.buildfarm.common.cache.CacheLoader.InvalidCacheLoadException;
+import build.buildfarm.common.grpc.Retrier;
+import build.buildfarm.common.grpc.Retrier.Backoff;
+import build.buildfarm.common.grpc.RetryException;
 import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.ByteStreamUploader;
-import build.buildfarm.instance.stub.Retrier;
-import build.buildfarm.instance.stub.Retrier.Backoff;
-import build.buildfarm.instance.stub.RetryException;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecuteEntry;
@@ -131,7 +134,6 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executor;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -165,9 +167,12 @@ public class ShardInstance extends AbstractServerInstance {
     }
   };
   private final Random rand = new Random();
-  private ExecutorService operationDeletionService = Executors.newSingleThreadExecutor();
+
+  private final ListeningExecutorService operationTransformService =
+      listeningDecorator(newFixedThreadPool(24));
+
+  private ExecutorService operationDeletionService = newSingleThreadExecutor();
   private Thread operationQueuer;
-  private ListeningExecutorService operationTransformService = listeningDecorator(Executors.newFixedThreadPool(24));
 
   public ShardInstance(String name, DigestUtil digestUtil, ShardInstanceConfig config, Runnable onStop)
       throws InterruptedException, ConfigurationException {
@@ -181,11 +186,7 @@ public class ShardInstance extends AbstractServerInstance {
         new CacheLoader<String, Instance>() {
           @Override
           public Instance load(String worker) {
-            ManagedChannel channel = createChannel(worker);
-            return new StubInstance(
-                "", digestUtil, channel,
-                60 /* FIXME CONFIG */, TimeUnit.SECONDS,
-                null);
+            return newStubInstance(worker, digestUtil);
           }
         });
   }
@@ -694,6 +695,29 @@ public class ShardInstance extends AbstractServerInstance {
       }
       return null;
     }
+  }
+
+  private static Instance newStubInstance(String worker, DigestUtil digestUtil) {
+    return new StubInstance(
+        "", digestUtil, createChannel(worker),
+        60 /* FIXME CONFIG */, TimeUnit.SECONDS,
+        newStubRetrier(),
+        newStubRetryService());
+  }
+
+  private static Retrier newStubRetrier() {
+    return new Retrier(
+      Backoff.exponential(
+          java.time.Duration.ofMillis(/*options.experimentalRemoteRetryStartDelayMillis=*/ 100),
+          java.time.Duration.ofMillis(/*options.experimentalRemoteRetryMaxDelayMillis=*/ 5000),
+          /*options.experimentalRemoteRetryMultiplier=*/ 2,
+          /*options.experimentalRemoteRetryJitter=*/ 0.1,
+          /*options.experimentalRemoteRetryMaxAttempts=*/ 5),
+      Retrier.DEFAULT_IS_RETRIABLE);
+  }
+
+  private static ListeningScheduledExecutorService newStubRetryService() {
+    return listeningDecorator(newSingleThreadScheduledExecutor());
   }
 
   private static ManagedChannel createChannel(String target) {

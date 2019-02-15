@@ -17,8 +17,8 @@ package build.buildfarm.cas;
 import static com.google.common.collect.Multimaps.synchronizedListMultimap;
 
 import build.bazel.remote.execution.v2.Digest;
+import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.instance.stub.ByteStreamUploader;
-import build.buildfarm.instance.stub.Retrier;
 import build.buildfarm.v1test.ContentAddressableStorageConfig;
 import build.buildfarm.v1test.GrpcCASConfig;
 import com.google.common.collect.ImmutableList;

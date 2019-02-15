@@ -18,17 +18,19 @@ import static build.buildfarm.instance.shard.Util.correctMissingBlob;
 import static com.google.common.util.concurrent.Futures.addCallback;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.transform;
+import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.ShardBackplane;
+import build.buildfarm.common.grpc.Retrier;
+import build.buildfarm.common.grpc.Retrier.Backoff;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.ShardInstance.WorkersCallback;
 import build.buildfarm.instance.stub.ByteStreamUploader;
-import build.buildfarm.instance.stub.Retrier;
-import build.buildfarm.instance.stub.Retrier.Backoff;
 import build.buildfarm.instance.stub.StubInstance;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -36,7 +38,6 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
-import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import io.grpc.Channel;
@@ -56,8 +57,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 class RemoteInputStreamFactory implements InputStreamFactory {
@@ -67,7 +66,7 @@ class RemoteInputStreamFactory implements InputStreamFactory {
   private final DigestUtil digestUtil;
   private final Map<String, StubInstance> workerStubs = Maps.newHashMap();
   private final ListeningScheduledExecutorService retryScheduler =
-      MoreExecutors.listeningDecorator(Executors.newScheduledThreadPool(1));
+      listeningDecorator(newSingleThreadScheduledExecutor());
 
   RemoteInputStreamFactory(String publicName, ShardBackplane backplane, Random rand, DigestUtil digestUtil) {
     this.publicName = publicName;
@@ -94,10 +93,6 @@ class RemoteInputStreamFactory implements InputStreamFactory {
         Retrier.DEFAULT_IS_RETRIABLE);
   }
 
-  private ByteStreamUploader createStubUploader(Channel channel) {
-    return new ByteStreamUploader("", channel, null, 300, createStubRetrier(), retryScheduler);
-  }
-
   private StubInstance workerStub(String worker) {
     StubInstance instance = workerStubs.get(worker);
     if (instance == null) {
@@ -105,7 +100,8 @@ class RemoteInputStreamFactory implements InputStreamFactory {
       instance = new StubInstance(
           "", digestUtil, channel,
           10 /* FIXME CONFIG */, TimeUnit.SECONDS,
-          createStubUploader(channel));
+          createStubRetrier(),
+          retryScheduler);
       workerStubs.put(worker, instance);
     }
     return instance;

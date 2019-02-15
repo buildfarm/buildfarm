@@ -15,7 +15,7 @@ java_library(
 java_test(
     name = "common-tests",
     size = "small",
-    srcs = glob(["common/*.java"]),
+    srcs = glob(["common/**/*.java"]),
     test_class = "build.buildfarm.AllTests",
     deps = [
         ":test_runner",
@@ -42,6 +42,7 @@ java_test(
         "//3rdparty/jvm/org/mockito:mockito_core",
         "//src/main/java/build/buildfarm:cas",
         "//src/main/java/build/buildfarm:common",
+        "//src/main/java/build/buildfarm:common-grpc",
         "//src/main/java/build/buildfarm:stub-instance",
         "@googleapis//:google_bytestream_bytestream_java_grpc",
         "@googleapis//:google_bytestream_bytestream_java_proto",
@@ -114,6 +115,7 @@ java_test(
         "//3rdparty/jvm/io/grpc:grpc_stub",
         "//3rdparty/jvm/org/mockito:mockito_core",
         "//src/main/java/build/buildfarm:common",
+        "//src/main/java/build/buildfarm:common-grpc",
         "//src/main/java/build/buildfarm:instance",
         "//src/main/java/build/buildfarm:server",
         "//src/main/java/build/buildfarm:server-instance",

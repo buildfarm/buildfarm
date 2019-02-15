@@ -23,8 +23,8 @@ import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.ShardBackplane;
+import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.instance.stub.Retrier;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.ImmutableList;

@@ -12,24 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.instance.stub;
+package build.buildfarm.common.io;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
-import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Iterator;
+import java.util.concurrent.BlockingQueue;
 
-public class ByteStringIteratorInputStream extends InputStream {
-  private final Iterator<ByteString> iterator;
+public class ByteStringQueueInputStream extends InputStream {
+  private final BlockingQueue<ByteString> queue;
   private InputStream input;
   private boolean closed;
+  private boolean completed = false;
+  private Throwable exception = null;
 
   @VisibleForTesting
-  public ByteStringIteratorInputStream(Iterator<ByteString> iterator) {
-    this.iterator = iterator;
+  public ByteStringQueueInputStream(BlockingQueue<ByteString> queue) {
+    this.queue = queue;
     input = ByteString.EMPTY.newInput();
     closed = false;
   }
@@ -73,6 +73,9 @@ public class ByteStringIteratorInputStream extends InputStream {
       int readLen = input.read(b, off, len);
       if (readLen == -1) {
         if (atInputEndOfFile) {
+          if (totalLen == 0 && exception != null) {
+            throw new IOException(exception);
+          }
           return totalLen == 0 ? -1 : totalLen;
         }
         atInputEndOfFile = true;
@@ -92,20 +95,35 @@ public class ByteStringIteratorInputStream extends InputStream {
   @Override
   public void close() {
     closed = true;
+    // offer to indicate cancellation?
+  }
+
+  public void setCompleted() {
+    completed = true;
+    queue.offer(ByteString.EMPTY);
+  }
+
+  public void setException(Throwable t) {
+    if (exception != null) {
+      throw new RuntimeException("attempt to set exception in stream after one is already set");
+    }
+    exception = t;
+    setCompleted();
+  }
+
+  private boolean hasNext() {
+    return !queue.isEmpty() || !completed;
   }
 
   private void advance() throws IOException {
     ByteString data = ByteString.EMPTY;
-    try {
-      while (iterator.hasNext() && data.isEmpty()) {
-        data = iterator.next();
-      }
-      input = data.newInput();
-    } catch (StatusRuntimeException e) {
-      if (Status.fromThrowable(e).getCode() == Status.Code.NOT_FOUND) {
+    while (hasNext() && data.isEmpty()) {
+      try {
+        data = queue.take();
+      } catch (InterruptedException e) {
         throw new IOException(e);
       }
-      throw e;
     }
+    input = data.newInput();
   }
 }

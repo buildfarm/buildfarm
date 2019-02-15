@@ -49,6 +49,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.google.common.io.ByteStreams;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
@@ -1100,7 +1101,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private void copyExternalInput(Digest digest, CancellableOutputStream out) throws IOException, InterruptedException {
     try {
       logger.fine(format("downloading %s", DigestUtil.toString(digest)));
-      Downloader.copy((offset) -> newExternalInput(digest, offset), out);
+      ByteStreams.copy(newExternalInput(digest, /* offset=*/ 0), out);
       logger.fine(format("download of %s complete", DigestUtil.toString(digest)));
     } catch (IOException e) {
       out.cancel();

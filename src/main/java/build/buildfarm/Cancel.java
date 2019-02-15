@@ -2,8 +2,6 @@ package build.buildfarm;
 
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.instance.stub.ByteStreamUploader;
-import build.buildfarm.instance.stub.Retrier;
 import build.buildfarm.instance.stub.StubInstance;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.NegotiationType;
@@ -23,14 +21,10 @@ class Cancel {
     String instanceName = args[1];
     DigestUtil digestUtil = DigestUtil.forHash(args[2]);
     ManagedChannel channel = createChannel(host);
-    Instance instance = new StubInstance(
-        instanceName,
-        digestUtil,
-        channel,
-        10, TimeUnit.SECONDS,
-        new ByteStreamUploader("", channel, null, 300, Retrier.NO_RETRIES, null));
+    Instance instance = new StubInstance(instanceName, digestUtil, channel);
     for( int i = 3; i < args.length; i++ ) {
       instance.cancelOperation(args[i]);
     }
+    instance.stop();
   }
 };

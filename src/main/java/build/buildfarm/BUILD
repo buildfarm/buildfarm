@@ -9,6 +9,7 @@ java_library(
     srcs = glob([
         "common/*.java",
         "common/function/*.java",
+        "common/io/*.java",
     ]),
     deps = [
         "//3rdparty/jvm/com/google/code/findbugs:jsr305",
@@ -41,10 +42,13 @@ java_library(
         ":common",
         "//3rdparty/jvm/com/google/code/findbugs:jsr305",
         "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "//3rdparty/jvm/io/grpc:grpc_context",
         "//3rdparty/jvm/io/grpc:grpc_core",
         "//3rdparty/jvm/io/grpc:grpc_protobuf",
         "//3rdparty/jvm/io/grpc:grpc_stub",
+        "@googleapis//:google_bytestream_bytestream_java_grpc",
+        "@googleapis//:google_bytestream_bytestream_java_proto",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )
@@ -130,6 +134,7 @@ java_library(
     deps = [
         ":common",
         ":common-cache",
+        ":common-grpc",
         ":instance",
         ":server-instance",
         ":stub-instance",
@@ -246,6 +251,7 @@ java_library(
     deps = [
         ":cas",
         ":common",
+        ":common-grpc",
         ":instance",
         ":memory-instance",
         ":server",
@@ -318,6 +324,7 @@ java_library(
     srcs = glob(["worker/operationqueue/*.java"]),
     deps = [
         ":common",
+        ":common-grpc",
         ":instance",
         ":stub-instance",
         ":worker",
@@ -339,6 +346,7 @@ java_library(
     srcs = glob(["cas/*.java"]),
     deps = [
         ":common",
+        ":common-grpc",
         ":stub-instance",
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
