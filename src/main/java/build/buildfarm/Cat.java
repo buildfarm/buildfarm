@@ -387,7 +387,7 @@ class Cat {
       System.out.println("Listing Operations");
       listOperations(instance);
     }
-    for (int i = 4; i < args.length; i+=2) {
+    for (int i = 4; i < args.length; i++) {
       if (type.equals("Operation")) {
         printOperation(instance.getOperation(args[i]));
       } else if (type.equals("Watch")) {
@@ -403,7 +403,7 @@ class Cat {
         } else if (type.equals("TreeLayout")) {
           printTreeLayout(instance, digestUtil, blobDigest);
         } else {
-          ByteString blob = getBlob(instance, blobDigest, Long.parseLong(args[i+1]));
+          ByteString blob = getBlob(instance, blobDigest);
           if (type.equals("Action")) {
             printAction(blob);
           } else if (type.equals("Command")) {
