@@ -59,6 +59,7 @@ import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
+import build.buildfarm.common.Watcher;
 import build.buildfarm.common.cache.Cache;
 import build.buildfarm.common.cache.CacheBuilder;
 import build.buildfarm.common.cache.CacheLoader.InvalidCacheLoadException;
@@ -135,7 +136,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
@@ -1261,7 +1261,7 @@ public class ShardInstance extends AbstractServerInstance {
       ExecutionPolicy executionPolicy,
       ResultsCachePolicy resultsCachePolicy,
       RequestMetadata requestMetadata,
-      Consumer<Operation> watcher) {
+      Watcher watcher) {
     try {
       if (!backplane.canPrequeue()) {
         return immediateFailedFuture(Status.UNAVAILABLE.withDescription("Too many jobs pending").asException());
@@ -1712,10 +1712,10 @@ public class ShardInstance extends AbstractServerInstance {
   @Override
   public ListenableFuture<Void> watchOperation(
       String operationName,
-      Consumer<Operation> watcher) {
+      Watcher watcher) {
     Operation operation = getOperation(operationName);
     try {
-      watcher.accept(stripOperation(operation));
+      watcher.observe(stripOperation(operation));
     } catch (Throwable t) {
       return immediateFailedFuture(t);
     }

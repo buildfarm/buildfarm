@@ -12,8 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.instance;
+package build.buildfarm.common;
 
-public interface Watcher<T> {
-  void observe(T t);
+import com.google.longrunning.Operation;
+
+@FunctionalInterface
+public interface Watcher {
+  void observe(Operation operation);
 }

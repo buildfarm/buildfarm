@@ -54,6 +54,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
+import build.buildfarm.common.Watcher;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -88,7 +89,6 @@ import java.util.Stack;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeoutException;
-import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
@@ -958,7 +958,7 @@ public abstract class AbstractServerInstance implements Instance {
       ExecutionPolicy executionPolicy,
       ResultsCachePolicy resultsCachePolicy,
       RequestMetadata requestMetadata,
-      Consumer<Operation> observer) throws InterruptedException {
+      Watcher watcher) throws InterruptedException {
     Action action;
     try {
       action = validateActionDigest(actionDigest);
@@ -981,7 +981,7 @@ public abstract class AbstractServerInstance implements Instance {
               .build()))
           .build();
       try {
-        observer.accept(operation);
+        watcher.observe(operation);
       } catch (Throwable t) {
         return immediateFailedFuture(t);
       }
@@ -1002,7 +1002,7 @@ public abstract class AbstractServerInstance implements Instance {
 
     putOperation(operation);
 
-    ListenableFuture<Void> watchFuture = watchOperation(operation.getName(), observer);
+    ListenableFuture<Void> watchFuture = watchOperation(operation.getName(), watcher);
 
     ExecuteOperationMetadata metadata =
         expectExecuteOperationMetadata(operation);

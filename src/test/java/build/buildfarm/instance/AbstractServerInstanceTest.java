@@ -32,6 +32,7 @@ import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
+import build.buildfarm.common.Watcher;
 import build.buildfarm.common.function.InterruptingPredicate;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -44,7 +45,6 @@ import com.google.rpc.PreconditionFailure;
 import com.google.rpc.PreconditionFailure.Violation;
 import java.io.InputStream;
 import java.util.Stack;
-import java.util.function.Consumer;
 import java.util.logging.Logger;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -127,7 +127,7 @@ public class AbstractServerInstanceTest {
     @Override
     public ListenableFuture<Void> watchOperation(
         String operationName,
-        Consumer<Operation> watcher) {
+        Watcher watcher) {
       throw new UnsupportedOperationException();
     }
 

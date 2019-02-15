@@ -20,6 +20,7 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.ThreadSafety.ThreadSafe;
+import build.buildfarm.common.Watcher;
 import build.buildfarm.common.function.InterruptingRunnable;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
@@ -31,7 +32,6 @@ import com.google.longrunning.Operation;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Consumer;
 
 public interface ShardBackplane {
 
@@ -261,7 +261,7 @@ public interface ShardBackplane {
    * Register a watcher for an operation
    */
   @ThreadSafe
-  ListenableFuture<Void> watchOperation(String operationName, Consumer<Operation> watcher) throws IOException;
+  ListenableFuture<Void> watchOperation(String operationName, Watcher watcher) throws IOException;
 
   /**
    * Get all dispatched operations

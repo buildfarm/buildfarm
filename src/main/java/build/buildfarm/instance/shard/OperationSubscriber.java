@@ -34,14 +34,14 @@ abstract class OperationSubscriber extends JedisPubSub {
   private static final Logger logger = Logger.getLogger(OperationSubscriber.class.getName());
 
   abstract static class TimedWatchFuture extends WatchFuture {
-    private final TimedWatcher<Operation> watcher;
+    private final TimedWatcher watcher;
 
-    TimedWatchFuture(TimedWatcher<Operation> watcher) {
+    TimedWatchFuture(TimedWatcher watcher) {
       super(watcher::observe);
       this.watcher = watcher;
     }
 
-    TimedWatcher<Operation> getWatcher() {
+    TimedWatcher getWatcher() {
       return watcher;
     }
 
@@ -108,7 +108,7 @@ abstract class OperationSubscriber extends JedisPubSub {
     super.punsubscribe(patterns);
   }
 
-  public ListenableFuture<Void> watch(String channel, TimedWatcher<Operation> watcher) {
+  public ListenableFuture<Void> watch(String channel, TimedWatcher watcher) {
     TimedWatchFuture watchFuture = new TimedWatchFuture(watcher) {
       @Override
       public void unwatch() {
@@ -161,9 +161,9 @@ abstract class OperationSubscriber extends JedisPubSub {
 
   private static class StillWatchingWatcher {
     public final boolean stillWatching;
-    public final TimedWatcher<Operation> watcher;
+    public final TimedWatcher watcher;
 
-    StillWatchingWatcher(boolean stillWatching, TimedWatcher<Operation> watcher) {
+    StillWatchingWatcher(boolean stillWatching, TimedWatcher watcher) {
       this.stillWatching = stillWatching;
       this.watcher = watcher;
     }
@@ -172,14 +172,14 @@ abstract class OperationSubscriber extends JedisPubSub {
   private void onOperation(
       String channel,
       Operation operation,
-      Predicate<TimedWatcher<Operation>> shouldObserve,
+      Predicate<TimedWatcher> shouldObserve,
       Instant expiresAt) {
     List<TimedWatchFuture> operationWatchers = watchers.get(channel);
     boolean observe = operation == null || operation.hasMetadata();
     synchronized (watchers) {
       ImmutableList.Builder<Consumer<Operation>> observers = ImmutableList.builder();
       for (TimedWatchFuture watchFuture : operationWatchers) {
-        TimedWatcher<Operation> watcher = watchFuture.getWatcher();
+        TimedWatcher watcher = watchFuture.getWatcher();
         watcher.reset(expiresAt);
         if (shouldObserve.test(watcher)) {
           observers.add(watchFuture::observe);

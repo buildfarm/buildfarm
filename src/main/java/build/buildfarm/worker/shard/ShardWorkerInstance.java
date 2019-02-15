@@ -37,6 +37,7 @@ import build.buildfarm.common.OutputStreamFactory;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
+import build.buildfarm.common.Watcher;
 import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
@@ -62,7 +63,6 @@ import java.io.OutputStream;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.util.concurrent.ExecutionException;
-import java.util.function.Consumer;
 import javax.naming.ConfigurationException;
 import java.util.logging.Logger;
 
@@ -210,7 +210,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
       ExecutionPolicy executionPolicy, 
       ResultsCachePolicy resultsCachePolicy, 
       RequestMetadata requestMetadata,
-      Consumer<Operation> watcher) {
+      Watcher watcher) {
     throw new UnsupportedOperationException();
   }
 
@@ -307,7 +307,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   @Override
   public ListenableFuture<Void> watchOperation(
       String operationName,
-      Consumer<Operation> watcher) {
+      Watcher watcher) {
     throw new UnsupportedOperationException();
   }
 

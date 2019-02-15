@@ -27,8 +27,8 @@ import build.bazel.remote.execution.v2.GetTreeResponse;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.ShardBackplane;
+import build.buildfarm.common.Watcher;
 import build.buildfarm.common.function.InterruptingRunnable;
-import build.buildfarm.instance.Watcher;
 import build.buildfarm.instance.shard.OperationSubscriber.TimedWatchFuture;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecuteEntry;
@@ -413,16 +413,16 @@ public class RedisShardBackplane implements ShardBackplane {
   @Override
   public ListenableFuture<Void> watchOperation(
       String operationName,
-      Consumer<Operation> observer) throws IOException {
-    TimedWatcher<Operation> watcher = new TimedWatcher<Operation>(nextWatcherExpiresAt()) {
+      Watcher watcher) throws IOException {
+    TimedWatcher timedWatcher = new TimedWatcher(nextWatcherExpiresAt()) {
       @Override
       public void observe(Operation operation) {
-        observer.accept(operation);
+        watcher.observe(operation);
       }
     };
     return operationSubscriber.watch(
         operationChannel(operationName),
-        watcher);
+        timedWatcher);
   }
 
   @Override

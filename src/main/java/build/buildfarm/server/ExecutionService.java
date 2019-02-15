@@ -22,6 +22,7 @@ import build.bazel.remote.execution.v2.ExecuteRequest;
 import build.bazel.remote.execution.v2.ExecutionGrpc;
 import build.bazel.remote.execution.v2.WaitExecutionRequest;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.Watcher;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.instance.Instance;
 import com.google.common.util.concurrent.FutureCallback;
@@ -31,7 +32,6 @@ import io.grpc.Context;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import java.util.concurrent.CancellationException;
-import java.util.function.Consumer;
 import java.util.logging.Logger;
 
 public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
@@ -68,7 +68,7 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
         directExecutor());
   }
 
-  private Consumer<Operation> createWatcher(StreamObserver<Operation> responseObserver) {
+  private Watcher createWatcher(StreamObserver<Operation> responseObserver) {
     return (operation) -> {
       if (operation == null) {
         throw Status.NOT_FOUND.asRuntimeException();

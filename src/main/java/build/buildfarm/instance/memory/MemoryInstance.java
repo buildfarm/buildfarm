@@ -45,6 +45,7 @@ import build.buildfarm.common.TreeIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.function.InterruptingPredicate;
 import build.buildfarm.common.Watchdog;
+import build.buildfarm.common.Watcher;
 import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.instance.OperationsMap;
 import build.buildfarm.instance.WatchFuture;
@@ -86,7 +87,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.function.Consumer;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -595,17 +595,17 @@ public class MemoryInstance extends AbstractServerInstance {
   @Override
   public ListenableFuture<Void> watchOperation(
       String operationName,
-      Consumer<Operation> observer) {
+      Watcher watcher) {
     Operation operation = getOperation(operationName);
     try {
-      observer.accept(operation);
+      watcher.observe(operation);
     } catch (Throwable t) {
       return immediateFailedFuture(t);
     }
     if (operation == null || operation.getDone()) {
       return immediateFuture(null);
     }
-    WatchFuture watchFuture = new WatchFuture(observer) {
+    WatchFuture watchFuture = new WatchFuture(watcher) {
       @Override
       protected void unwatch() {
         synchronized (watchers) {

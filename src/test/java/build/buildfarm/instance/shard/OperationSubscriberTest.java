@@ -43,7 +43,7 @@ import redis.clients.jedis.Client;
 
 @RunWith(JUnit4.class)
 public class OperationSubscriberTest {
-  private static class UnobservableWatcher extends TimedWatcher<Operation> {
+  private static class UnobservableWatcher extends TimedWatcher {
     UnobservableWatcher() {
       super(/* expiresAt=*/ Instant.now());
     }
@@ -132,7 +132,7 @@ public class OperationSubscriberTest {
     }
 
     String novelChannel = "novel-channel";
-    TimedWatcher<Operation> novelWatcher = new UnobservableWatcher();
+    TimedWatcher novelWatcher = new UnobservableWatcher();
     operationSubscriber.watch(novelChannel, novelWatcher);
     assertThat(Iterables.getOnlyElement(watchers.get(novelChannel)).getWatcher()).isEqualTo(novelWatcher);
     String[] channels = new String[1];
@@ -154,14 +154,14 @@ public class OperationSubscriberTest {
       }
     };
     String existingChannel = "existing-channel";
-    TimedWatcher<Operation> existingWatcher = new UnobservableWatcher();
+    TimedWatcher existingWatcher = new UnobservableWatcher();
     watchers.put(existingChannel, new TimedWatchFuture(existingWatcher) {
       @Override
       public void unwatch() {
         throw new UnsupportedOperationException();
       }
     });
-    TimedWatcher<Operation> novelWatcher = new UnobservableWatcher();
+    TimedWatcher novelWatcher = new UnobservableWatcher();
     operationSubscriber.watch(existingChannel, novelWatcher);
     assertThat(watchers.get(existingChannel).size()).isEqualTo(2);
   }
@@ -188,7 +188,7 @@ public class OperationSubscriberTest {
     }
 
     String nullMessageChannel = "null-message-channel";
-    TimedWatcher<Operation> nullMessageWatcher = new TimedWatcher<Operation>(Instant.now()) {
+    TimedWatcher nullMessageWatcher = new TimedWatcher(Instant.now()) {
       @Override
       public void observe(Operation operation) {
         if (operation != null) {

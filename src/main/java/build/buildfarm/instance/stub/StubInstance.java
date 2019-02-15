@@ -30,6 +30,9 @@ import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddr
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecutionGrpc;
+import build.bazel.remote.execution.v2.ExecutionGrpc.ExecutionStub;
+import build.bazel.remote.execution.v2.WaitExecutionRequest;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
 import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
@@ -43,11 +46,11 @@ import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.bazel.remote.execution.v2.UpdateActionResultRequest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.Watcher;
 import build.buildfarm.common.grpc.ByteStreamHelper;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Utils;
-import build.buildfarm.instance.Watcher;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.OperationQueueGrpc.OperationQueueBlockingStub;
 import build.buildfarm.v1test.PollOperationRequest;
@@ -80,22 +83,13 @@ import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.rpc.Code;
-import com.google.watcher.v1.Change;
-import com.google.watcher.v1.ChangeBatch;
-import com.google.watcher.v1.Request;
-import com.google.watcher.v1.WatcherGrpc;
-import com.google.watcher.v1.WatcherGrpc.WatcherBlockingStub;
 import io.grpc.ManagedChannel;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
-import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
-import java.util.Collections;
 import java.util.Iterator;
-import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -147,6 +141,11 @@ public class StubInstance implements Instance {
     this.deadlineAfterUnits = deadlineAfterUnits;
     this.retrier = retrier;
     this.retryService = retryService;
+  }
+
+  // no deadline for this
+  private ExecutionStub newEXStub() {
+    return ExecutionGrpc.newStub(channel);
   }
 
   private final Supplier<ActionCacheBlockingStub> actionCacheBlockingStub =
@@ -205,15 +204,6 @@ public class StubInstance implements Instance {
             @Override
             public OperationQueueBlockingStub get() {
               return OperationQueueGrpc.newBlockingStub(channel);
-            }
-          });
-
-  private final Supplier<WatcherBlockingStub> watcherBlockingStub =
-      Suppliers.memoize(
-          new Supplier<WatcherBlockingStub>() {
-            @Override
-            public WatcherBlockingStub get() {
-              return WatcherGrpc.newBlockingStub(channel);
             }
           });
 
@@ -538,7 +528,7 @@ public class StubInstance implements Instance {
       ExecutionPolicy executionPolicy,
       ResultsCachePolicy resultsCachePolicy,
       RequestMetadata metadata,
-      Consumer<Operation> watcher) {
+      Watcher watcher) {
     throw new UnsupportedOperationException();
   }
 
@@ -590,51 +580,30 @@ public class StubInstance implements Instance {
   @Override
   public ListenableFuture<Void> watchOperation(
       String operationName,
-      Consumer<Operation> watcher) {
-    Request request = Request.newBuilder()
-        .setTarget(operationName)
+      Watcher watcher) {
+    WaitExecutionRequest request = WaitExecutionRequest.newBuilder()
+        .setName(operationName)
         .build();
-    Iterator<ChangeBatch> replies = watcherBlockingStub.get().watch(request);
-    try {
-      while (replies.hasNext()) {
-        ChangeBatch changeBatch = replies.next();
-        for (Change change : changeBatch.getChangesList()) {
-          switch (change.getState()) {
-            case INITIAL_STATE_SKIPPED:
-              break;
-            case ERROR:
-              try {
-                throw StatusProto.toStatusRuntimeException(
-                    change.getData().unpack(com.google.rpc.Status.class));
-              } catch (InvalidProtocolBufferException e) {
-                return immediateFailedFuture(e);
-              }
-            case DOES_NOT_EXIST:
-              return immediateFailedFuture(Status.NOT_FOUND.asRuntimeException());
-            case EXISTS:
-              Operation o;
-              try {
-                o = change.getData().unpack(Operation.class);
-              } catch (InvalidProtocolBufferException e) {
-                return immediateFailedFuture(e);
-              }
-              watcher.accept(o);
-              break;
-            default:
-              return immediateFailedFuture(new RuntimeException(String.format("Illegal Change State: %s", change.getState())));
+    SettableFuture<Void> result = SettableFuture.create();
+    newEXStub().waitExecution(
+        request,
+        new StreamObserver<Operation>() {
+          @Override
+          public void onNext(Operation operation) {
+            watcher.observe(operation);
           }
-        }
-      }
-    } finally {
-      try {
-        while (replies.hasNext()) {
-          replies.next();
-        }
-      } catch (StatusRuntimeException e) {
-        // ignore
-      }
-    }
-    return immediateFuture(null);
+
+          @Override
+          public void onError(Throwable t) {
+            result.setException(t);
+          }
+
+          @Override
+          public void onCompleted() {
+            result.set(null);
+          }
+        });
+    return result;
   }
 
   @Override

@@ -25,6 +25,7 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.Watcher;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import com.google.common.collect.ImmutableList;
@@ -36,7 +37,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.concurrent.ExecutorService;
-import java.util.function.Consumer;
 import javax.annotation.Nullable;
 
 public interface Instance {
@@ -70,7 +70,7 @@ public interface Instance {
       ExecutionPolicy executionPolicy,
       ResultsCachePolicy resultsCachePolicy,
       RequestMetadata requestMetadata,
-      Consumer<Operation> operationObserver) throws InterruptedException;
+      Watcher operationObserver) throws InterruptedException;
   void match(Platform platform, MatchListener listener) throws InterruptedException;
   boolean putOperation(Operation operation) throws InterruptedException;
   boolean putAndValidateOperation(Operation operation) throws InterruptedException;
@@ -87,7 +87,7 @@ public interface Instance {
 
   ListenableFuture<Void> watchOperation(
       String operationName,
-      Consumer<Operation> watcher);
+      Watcher watcher);
 
   ServerCapabilities getCapabilities();
 

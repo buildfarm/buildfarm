@@ -38,11 +38,6 @@ java_proto_library(
 )
 
 java_proto_library(
-    name = "google_watch_v1_java_proto",
-    deps = [":google_watch_v1_proto"],
-)
-
-java_proto_library(
     name = "google_rpc_status_java_proto",
     deps = [":google_rpc_status_proto"],
 )
@@ -84,12 +79,6 @@ java_grpc_library(
     deps = [":google_longrunning_operations_java_proto"],
 )
 
-java_grpc_library(
-    name = "google_watch_v1_java_grpc",
-    srcs = [":google_watch_v1_proto"],
-    deps = [":google_watch_v1_java_proto"],
-)
-
 proto_library(
     name = "google_rpc_code_proto",
     srcs = ["google/rpc/code.proto"],
@@ -101,16 +90,6 @@ proto_library(
     deps = [
         "@com_google_protobuf//:any_proto",
         "@com_google_protobuf//:duration_proto",
-    ],
-)
-
-proto_library(
-    name = "google_watch_v1_proto",
-    srcs = ["google/watcher/v1/watch.proto"],
-    deps = [
-        ":google_api_annotations_proto",
-        "@com_google_protobuf//:any_proto",
-        "@com_google_protobuf//:empty_proto",
     ],
 )
 

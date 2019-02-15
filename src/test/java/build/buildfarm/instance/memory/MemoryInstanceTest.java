@@ -56,6 +56,7 @@ import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.Watcher;
 import build.buildfarm.instance.OperationsMap;
 import build.buildfarm.instance.WatchFuture;
 import build.buildfarm.v1test.ActionCacheConfig;
@@ -81,7 +82,6 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Consumer;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -243,8 +243,8 @@ public class MemoryInstanceTest {
 
   @Test
   public void missingOperationIsNotFound() throws InterruptedException {
-    Consumer<Operation> watcher = mock(Consumer.class);
-    doThrow(io.grpc.Status.NOT_FOUND.asRuntimeException()).when(watcher).accept(eq(null));
+    Watcher watcher = mock(Watcher.class);
+    doThrow(io.grpc.Status.NOT_FOUND.asRuntimeException()).when(watcher).observe(eq(null));
     boolean caughtNotFoundException = false;
     try {
       instance.watchOperation(
@@ -257,7 +257,7 @@ public class MemoryInstanceTest {
       }
     }
     assertThat(caughtNotFoundException).isTrue();
-    verify(watcher, times(1)).accept(eq(null));
+    verify(watcher, times(1)).observe(eq(null));
   }
 
   @Test
@@ -267,15 +267,15 @@ public class MemoryInstanceTest {
         .build();
     outstandingOperations.put(operation.getName(), operation);
 
-    Consumer<Operation> watcher = mock(Consumer.class);
+    Watcher watcher = mock(Watcher.class);
     instance.watchOperation(
         operation.getName(),
         watcher);
-    verify(watcher, times(1)).accept(eq(operation));
+    verify(watcher, times(1)).observe(eq(operation));
     WatchFuture watchFuture = Iterables.getOnlyElement(
         watchers.get(operation.getName()));
     watchFuture.observe(operation);
-    verify(watcher, times(2)).accept(eq(operation));
+    verify(watcher, times(2)).observe(eq(operation));
   }
 
   @Test
@@ -295,21 +295,21 @@ public class MemoryInstanceTest {
         return null;
       }
     };
-    Consumer<Operation> watcher = mock(Consumer.class);
-    doAnswer(initialAnswer).when(watcher).accept(eq(operation));
+    Watcher watcher = mock(Watcher.class);
+    doAnswer(initialAnswer).when(watcher).observe(eq(operation));
 
     // set for each verification
     outstandingOperations.put(operation.getName(), operation);
 
     instance.watchOperation(operation.getName(), watcher).get();
-    verify(watcher, times(1)).accept(eq(operation));
-    verify(watcher, times(1)).accept(eq(doneOperation));
+    verify(watcher, times(1)).observe(eq(operation));
+    verify(watcher, times(1)).observe(eq(doneOperation));
   }
 
   private class UnwatchFuture extends WatchFuture {
     private final String operationName;
 
-    UnwatchFuture(String operationName, Consumer<Operation> observer) {
+    UnwatchFuture(String operationName, Watcher observer) {
       super(observer);
       this.operationName = operationName;
     }
@@ -326,13 +326,13 @@ public class MemoryInstanceTest {
     Operation queuedOperation = createOperation("missing-action-queued-operation", QUEUED);
     outstandingOperations.put(queuedOperation.getName(), queuedOperation);
 
-    Consumer<Operation> watcher = mock(Consumer.class);
+    Watcher watcher = mock(Watcher.class);
     watchers.put(queuedOperation.getName(), new UnwatchFuture(queuedOperation.getName(), watcher));
 
     assertThat(instance.requeueOperation(queuedOperation)).isFalse();
 
     ArgumentCaptor<Operation> operationCaptor = ArgumentCaptor.forClass(Operation.class);
-    verify(watcher, times(1)).accept(operationCaptor.capture());
+    verify(watcher, times(1)).observe(operationCaptor.capture());
     Operation operation = operationCaptor.getValue();
     assertThat(operation.getName()).isEqualTo(queuedOperation.getName());
   }
@@ -344,7 +344,7 @@ public class MemoryInstanceTest {
 
     Operation queuedOperation = createOperation("my-queued-operation", QUEUED);
     outstandingOperations.put(queuedOperation.getName(), queuedOperation);
-    Consumer<Operation> watcher = mock(Consumer.class);
+    Watcher watcher = mock(Watcher.class);
     watchers.put(queuedOperation.getName(), new UnwatchFuture(queuedOperation.getName(), watcher));
 
     assertThat(instance.requeueOperation(queuedOperation)).isTrue();
@@ -377,12 +377,12 @@ public class MemoryInstanceTest {
             .build()))
         .setResponse(Any.pack(executeResponse))
         .build();
-    Consumer<Operation> watcher = mock(Consumer.class);
+    Watcher watcher = mock(Watcher.class);
     ListenableFuture<Void> watchFuture = instance.watchOperation(queuedOperation.getName(), watcher);
     assertThat(instance.requeueOperation(queuedOperation)).isFalse();
     watchFuture.get();
-    verify(watcher, times(1)).accept(eq(queuedOperation));
-    verify(watcher, times(1)).accept(eq(erroredOperation));
+    verify(watcher, times(1)).observe(eq(queuedOperation));
+    verify(watcher, times(1)).observe(eq(erroredOperation));
   }
 
   private Operation createOperation(String name, ExecuteOperationMetadata metadata) {
@@ -459,7 +459,7 @@ public class MemoryInstanceTest {
     Digest actionDigestWithExcessiveTimeout = createAction(Action.newBuilder()
         .setTimeout(timeout));
 
-    Consumer watcher = mock(Consumer.class);
+    Watcher watcher = mock(Watcher.class);
     IllegalStateException timeoutInvalid = null;
     instance.execute(
         actionDigestWithExcessiveTimeout,
@@ -469,7 +469,7 @@ public class MemoryInstanceTest {
         RequestMetadata.getDefaultInstance(),
         watcher);
     ArgumentCaptor<Operation> watchCaptor = ArgumentCaptor.forClass(Operation.class);
-    verify(watcher, times(1)).accept(watchCaptor.capture());
+    verify(watcher, times(1)).observe(watchCaptor.capture());
     Operation watchOperation = watchCaptor.getValue();
     assertThat(watchOperation.getResponse().is(ExecuteResponse.class)).isTrue();
     Status status = watchOperation.getResponse().unpack(ExecuteResponse.class).getStatus();
@@ -490,7 +490,7 @@ public class MemoryInstanceTest {
     Digest actionDigestWithExcessiveTimeout = createAction(Action.newBuilder()
         .setTimeout(MAXIMUM_ACTION_TIMEOUT));
 
-    Consumer watcher = mock(Consumer.class);
+    Watcher watcher = mock(Watcher.class);
     instance.execute(
         actionDigestWithExcessiveTimeout,
         /* skipCacheLookup=*/ true,
@@ -498,7 +498,7 @@ public class MemoryInstanceTest {
         ResultsCachePolicy.getDefaultInstance(),
         RequestMetadata.getDefaultInstance(),
         watcher);
-    verify(watcher, atLeastOnce()).accept(any(Operation.class));
+    verify(watcher, atLeastOnce()).observe(any(Operation.class));
   }
 
   @Test

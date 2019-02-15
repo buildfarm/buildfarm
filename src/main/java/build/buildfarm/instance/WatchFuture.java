@@ -14,20 +14,20 @@
 
 package build.buildfarm.instance;
 
+import build.buildfarm.common.Watcher;
 import com.google.common.util.concurrent.AbstractFuture;
 import com.google.longrunning.Operation;
-import java.util.function.Consumer;
 
 public abstract class WatchFuture extends AbstractFuture<Void> {
-  private final Consumer<Operation> observer;
+  private final Watcher watcher;
 
-  public WatchFuture(Consumer<Operation> observer) {
-    this.observer = observer;
+  public WatchFuture(Watcher watcher) {
+    this.watcher = watcher;
   }
 
   public void observe(Operation operation) {
     try {
-      observer.accept(operation);
+      watcher.observe(operation);
       if (operation == null || operation.getDone()) {
         set(null);
       }
