@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker.operationqueue;
 
+import static build.buildfarm.common.IOUtils.formatIOError;
 import static com.google.common.collect.Maps.uniqueIndex;
 
 import build.buildfarm.common.DigestUtil;
@@ -529,19 +530,34 @@ public class Worker {
                                               OptionsParser.HelpVerbosity.LONG));
   }
 
-  public static void main(String[] args) throws Exception {
+  /**
+   * returns success or failure
+   */
+  static boolean workerMain(String[] args) {
     OptionsParser parser = OptionsParser.newOptionsParser(WorkerOptions.class);
     parser.parseAndExitUponError(args);
     List<String> residue = parser.getResidue();
     if (residue.isEmpty()) {
       printUsage(parser);
-      throw new IllegalArgumentException("Missing CONFIG_PATH");
+      return false;
     }
     Path configPath = Paths.get(residue.get(0));
-    Worker worker;
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
-      worker = new Worker(toWorkerConfig(new InputStreamReader(configInputStream), parser.getOptions(WorkerOptions.class)));
+      Worker worker = new Worker(toWorkerConfig(new InputStreamReader(configInputStream), parser.getOptions(WorkerOptions.class)));
+      configInputStream.close();
+      worker.start();
+      return true;
+    } catch (IOException e) {
+      System.err.println("error: " + formatIOError(e));
+    } catch (ConfigurationException e) {
+      System.err.println("error: " + e.getMessage());
+    } catch (InterruptedException e) {
+      System.err.println("error: interrupted");
     }
-    worker.start();
+    return false;
+  }
+
+  public static void main(String[] args) {
+    System.exit(workerMain(args) ? 0 : 1);
   }
 }
