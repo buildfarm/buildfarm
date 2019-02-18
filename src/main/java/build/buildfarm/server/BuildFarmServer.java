@@ -14,6 +14,8 @@
 
 package build.buildfarm.server;
 
+import static build.buildfarm.common.IOUtils.formatIOError;
+
 import build.buildfarm.v1test.BuildFarmServerConfig;
 import com.google.common.io.ByteStreams;
 import com.google.devtools.common.options.OptionsParser;
@@ -103,36 +105,6 @@ public class BuildFarmServer {
                                               OptionsParser.HelpVerbosity.LONG));
   }
 
-  enum IOExceptionHelper {
-    AccessDeniedException("access denied"),
-    FileSystemException(""),
-    IOException(""),
-    NoSuchFileException("no such file");
-
-    private final String description;
-
-    IOExceptionHelper(String description) {
-      this.description = description;
-    }
-
-    String toString(IOException e) {
-      if (description.isEmpty()) {
-        return e.getMessage();
-      }
-      return String.format("%s: %s", e.getMessage(), description);
-    }
-  }
-
-  static String toIOError(IOException e) {
-    IOExceptionHelper category;
-    try {
-      category = IOExceptionHelper.valueOf(e.getClass().getSimpleName());
-    } catch (IllegalArgumentException eUnknown) {
-      category = IOExceptionHelper.valueOf("IOException");
-    }
-    return "error: " + category.toString(e);
-  }
-
   /**
    * returns success or failure
    */
@@ -163,7 +135,7 @@ public class BuildFarmServer {
       server.blockUntilShutdown();
       return true;
     } catch (IOException e) {
-      System.err.println(toIOError(e));
+      System.err.println("error: " + formatIOError(e));
     } catch (ConfigurationException e) {
       System.err.println("error: " + e.getMessage());
     } catch (InterruptedException e) {
