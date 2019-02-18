@@ -544,6 +544,7 @@ public class Worker {
     Path configPath = Paths.get(residue.get(0));
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
       Worker worker = new Worker(toWorkerConfig(new InputStreamReader(configInputStream), parser.getOptions(WorkerOptions.class)));
+      configInputStream.close();
       worker.start();
       return true;
     } catch (IOException e) {

@@ -131,6 +131,7 @@ public class BuildFarmServer {
               toBuildFarmServerConfig(
                   new InputStreamReader(configInputStream),
                   parser.getOptions(BuildFarmServerOptions.class)));
+      configInputStream.close();
       server.start();
       server.blockUntilShutdown();
       return true;
