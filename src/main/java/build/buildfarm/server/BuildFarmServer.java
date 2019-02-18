@@ -103,7 +103,40 @@ public class BuildFarmServer {
                                               OptionsParser.HelpVerbosity.LONG));
   }
 
-  public static void main(String[] args) throws Exception {
+  enum IOExceptionHelper {
+    AccessDeniedException("access denied"),
+    FileSystemException(""),
+    IOException(""),
+    NoSuchFileException("no such file");
+
+    private final String description;
+
+    IOExceptionHelper(String description) {
+      this.description = description;
+    }
+
+    String toString(IOException e) {
+      if (description.isEmpty()) {
+        return e.getMessage();
+      }
+      return String.format("%s: %s", e.getMessage(), description);
+    }
+  }
+
+  static String toIOError(IOException e) {
+    IOExceptionHelper category;
+    try {
+      category = IOExceptionHelper.valueOf(e.getClass().getSimpleName());
+    } catch (IllegalArgumentException eUnknown) {
+      category = IOExceptionHelper.valueOf("IOException");
+    }
+    return "error: " + category.toString(e);
+  }
+
+  /**
+   * returns success or failure
+   */
+  static boolean serverMain(String[] args) {
     // Only log severe log messages from Netty. Otherwise it logs warnings that look like this:
     //
     // 170714 08:16:28.552:WT 18 [io.grpc.netty.NettyServerHandler.onStreamError] Stream Error
@@ -116,14 +149,30 @@ public class BuildFarmServer {
     List<String> residue = parser.getResidue();
     if (residue.isEmpty()) {
       printUsage(parser);
-      throw new IllegalArgumentException("Missing CONFIG_PATH");
+      return false;
     }
+
     Path configPath = Paths.get(residue.get(0));
-    BuildFarmServer server;
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
-      server = new BuildFarmServer(toBuildFarmServerConfig(new InputStreamReader(configInputStream), parser.getOptions(BuildFarmServerOptions.class)));
+      BuildFarmServer server =
+          new BuildFarmServer(
+              toBuildFarmServerConfig(
+                  new InputStreamReader(configInputStream),
+                  parser.getOptions(BuildFarmServerOptions.class)));
+      server.start();
+      server.blockUntilShutdown();
+      return true;
+    } catch (IOException e) {
+      System.err.println(toIOError(e));
+    } catch (ConfigurationException e) {
+      System.err.println("error: " + e.getMessage());
+    } catch (InterruptedException e) {
+      System.err.println("error: interrupted");
     }
-    server.start();
-    server.blockUntilShutdown();
+    return false;
+  }
+
+  public static void main(String[] args) {
+    System.exit(serverMain(args) ? 0 : 1);
   }
 }
