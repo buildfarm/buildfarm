@@ -14,6 +14,8 @@
 
 package build.buildfarm.worker;
 
+import static java.util.logging.Level.WARNING;
+
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import java.io.File;
 import java.io.IOException;
@@ -57,7 +59,7 @@ public class InputFetchStage extends PipelineStage {
     try {
       workerContext.createActionRoot(operationContext.execDir, operationContext.action, operationContext.command);
     } catch (IOException e) {
-      e.printStackTrace();
+      logger.log(WARNING, "could not create action root", e);
       success = false;
     }
 
