@@ -56,6 +56,7 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
+import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -121,7 +122,8 @@ public class ShardInstanceTest {
         /* runDispatchedMonitor=*/ false,
         /* runOperationQueuer=*/ false,
         mockOnStop,
-        mockInstanceLoader);
+        CacheBuilder.newBuilder()
+            .build(mockInstanceLoader));
     instance.start();
   }
 

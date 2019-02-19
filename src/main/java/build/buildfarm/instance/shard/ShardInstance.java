@@ -33,7 +33,6 @@ import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator
 import static java.lang.String.format;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
-import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.logging.Level.SEVERE;
@@ -81,7 +80,6 @@ import build.buildfarm.v1test.ProfiledQueuedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Stopwatch;
-import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -147,7 +145,7 @@ public class ShardInstance extends AbstractServerInstance {
 
   private final Runnable onStop;
   private final ShardBackplane backplane;
-  private final LoadingCache<String, Instance> workerStubs;
+  private final com.google.common.cache.LoadingCache<String, Instance> workerStubs;
   private final Thread dispatchedMonitor;
   private final Cache<Digest, Directory> directoryCache = CacheBuilder.newBuilder()
       .maximumSize(64 * 1024)
@@ -158,14 +156,6 @@ public class ShardInstance extends AbstractServerInstance {
   private final Cache<Digest, Action> actionCache = CacheBuilder.newBuilder()
       .maximumSize(64 * 1024)
       .build();
-  private final com.google.common.cache.RemovalListener<String, Instance> instanceRemovalListener = (removal) -> {
-    Instance instance = removal.getValue();
-    try {
-      instance.stop();
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    }
-  };
   private final Random rand = new Random();
 
   private final ListeningExecutorService operationTransformService =
@@ -183,12 +173,7 @@ public class ShardInstance extends AbstractServerInstance {
         config.getRunDispatchedMonitor(),
         /* runOperationQueuer=*/ true,
         onStop,
-        new CacheLoader<String, Instance>() {
-          @Override
-          public Instance load(String worker) {
-            return newStubInstance(worker, digestUtil);
-          }
-        });
+        WorkerStubs.create(digestUtil));
   }
 
   private static ShardBackplane getBackplane(ShardInstanceConfig config)
@@ -215,15 +200,13 @@ public class ShardInstance extends AbstractServerInstance {
       boolean runDispatchedMonitor,
       boolean runOperationQueuer,
       Runnable onStop,
-      CacheLoader<String, Instance> instanceLoader)
+      com.google.common.cache.LoadingCache<String, Instance> workerStubs)
       throws InterruptedException {
     super(name, digestUtil, null, null, null, null, null);
     this.backplane = backplane;
+    this.workerStubs = workerStubs;
     this.onStop = onStop;
     backplane.setOnUnsubscribe(this::stop);
-    workerStubs = com.google.common.cache.CacheBuilder.newBuilder()
-        .removalListener(instanceRemovalListener)
-        .build(instanceLoader);
 
     if (runDispatchedMonitor) {
       dispatchedMonitor = new Thread(new DispatchedMonitor(
@@ -594,7 +577,7 @@ public class ShardInstance extends AbstractServerInstance {
                     backplane,
                     workerSet,
                     locationSet,
-                    (worker) -> workerStub(worker),
+                    ShardInstance.this::workerStub,
                     blobDigest,
                     newDirectExecutorService()),
                 (foundOnWorkers) -> {
@@ -697,42 +680,12 @@ public class ShardInstance extends AbstractServerInstance {
     }
   }
 
-  private static Instance newStubInstance(String worker, DigestUtil digestUtil) {
-    return new StubInstance(
-        "", digestUtil, createChannel(worker),
-        60 /* FIXME CONFIG */, TimeUnit.SECONDS,
-        newStubRetrier(),
-        newStubRetryService());
-  }
-
-  private static Retrier newStubRetrier() {
-    return new Retrier(
-      Backoff.exponential(
-          java.time.Duration.ofMillis(/*options.experimentalRemoteRetryStartDelayMillis=*/ 100),
-          java.time.Duration.ofMillis(/*options.experimentalRemoteRetryMaxDelayMillis=*/ 5000),
-          /*options.experimentalRemoteRetryMultiplier=*/ 2,
-          /*options.experimentalRemoteRetryJitter=*/ 0.1,
-          /*options.experimentalRemoteRetryMaxAttempts=*/ 5),
-      Retrier.DEFAULT_IS_RETRIABLE);
-  }
-
-  private static ListeningScheduledExecutorService newStubRetryService() {
-    return listeningDecorator(newSingleThreadScheduledExecutor());
-  }
-
-  private static ManagedChannel createChannel(String target) {
-    NettyChannelBuilder builder =
-        NettyChannelBuilder.forTarget(target)
-            .negotiationType(NegotiationType.PLAINTEXT);
-    return builder.build();
-  }
-
-  private synchronized Instance workerStub(String worker) {
+  private Instance workerStub(String worker) {
     try {
       return workerStubs.get(worker);
     } catch (ExecutionException e) {
       logger.log(SEVERE, "error getting worker stub for " + worker, e);
-      return null;
+      throw new IllegalStateException("stub instance creation must not fail");
     }
   }
 
@@ -1002,8 +955,8 @@ public class ShardInstance extends AbstractServerInstance {
       if (backplane.removeWorker(worker)) {
         logger.log(WARNING, format("Removed worker '%s' during(%s) due to exception", worker, context), t);
       }
-    } catch (IOException eIO) {
-      throw Status.fromThrowable(eIO).asRuntimeException();
+    } catch (IOException e) {
+      throw Status.fromThrowable(e).asRuntimeException();
     }
 
     workerStubs.invalidate(worker);

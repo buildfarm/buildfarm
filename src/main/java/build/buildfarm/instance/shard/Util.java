@@ -16,12 +16,15 @@ package build.buildfarm.instance.shard;
 
 import static com.google.common.util.concurrent.Futures.addCallback;
 import static com.google.common.util.concurrent.Futures.allAsList;
+import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
+import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.base.Predicates.notNull;
 import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.Digest;
+import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.instance.Instance;
@@ -38,8 +41,8 @@ import io.grpc.Status;
 import io.grpc.Status.Code;
 import java.io.IOException;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.concurrent.ExecutorService;
+import java.util.function.Function;
 import java.util.logging.Logger;
 
 public class Util {
@@ -80,7 +83,7 @@ public class Util {
                   found,
                   Sets.difference(Sets.intersection(originalLocationSet, workerSet), found));
             } catch (IOException e) {
-              logger.log(SEVERE, "error adjusting blob locations", e);
+              logger.log(SEVERE, "error adjusting blob location for " + DigestUtil.toString(digest), e);
             }
           }
 
@@ -101,13 +104,14 @@ public class Util {
             (e) -> {
               Status status = Status.fromThrowable(e);
               if (status.getCode() == Code.UNAVAILABLE) {
+                return immediateFuture(null);
               } else if (status.getCode() == Code.CANCELLED || Context.current().isCancelled()) {
                 // do nothing further if we're cancelled
-                throw status.asRuntimeException();
+                return immediateFailedFuture(e);
               } else if (SHARD_IS_RETRIABLE.test(status)) {
                 return checkMissingBlobOnInstance(digest, instance, service);
               }
-              throw Status.INTERNAL.withCause(e).asRuntimeException();
+              return immediateFailedFuture(status.asException());
             }, service);
   }
 

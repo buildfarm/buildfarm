@@ -21,90 +21,70 @@ import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
+import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.grpc.Retrier;
-import build.buildfarm.common.grpc.Retrier.Backoff;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.ShardInstance.WorkersCallback;
-import build.buildfarm.instance.stub.ByteStreamUploader;
-import build.buildfarm.instance.stub.StubInstance;
+import build.buildfarm.instance.shard.WorkerStubs;
+import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
-import io.grpc.Channel;
-import io.grpc.ManagedChannel;
 import io.grpc.Status;
 import io.grpc.Status.Code;
 import io.grpc.StatusRuntimeException;
-import io.grpc.netty.NegotiationType;
-import io.grpc.netty.NettyChannelBuilder;
 import java.nio.file.NoSuchFileException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
-import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
+import java.util.logging.Logger;
 
 class RemoteInputStreamFactory implements InputStreamFactory {
+  private static final Logger logger = Logger.getLogger(Worker.class.getName());
+
   private final String publicName;
   private final ShardBackplane backplane;
   private final Random rand;
   private final DigestUtil digestUtil;
-  private final Map<String, StubInstance> workerStubs = Maps.newHashMap();
-  private final ListeningScheduledExecutorService retryScheduler =
-      listeningDecorator(newSingleThreadScheduledExecutor());
+  private final LoadingCache<String, Instance> workerStubs;
 
   RemoteInputStreamFactory(String publicName, ShardBackplane backplane, Random rand, DigestUtil digestUtil) {
+    this(publicName, backplane, rand, digestUtil, WorkerStubs.create(digestUtil));
+  }
+
+  RemoteInputStreamFactory(
+      String publicName,
+      ShardBackplane backplane,
+      Random rand,
+      DigestUtil digestUtil,
+      LoadingCache<String, Instance> workerStubs) {
     this.publicName = publicName;
     this.backplane = backplane;
     this.rand = rand;
     this.digestUtil = digestUtil;
+    this.workerStubs = workerStubs;
   }
 
-  private static ManagedChannel createChannel(String target) {
-    NettyChannelBuilder builder =
-        NettyChannelBuilder.forTarget(target)
-            .negotiationType(NegotiationType.PLAINTEXT);
-    return builder.build();
-  }
-
-  private static Retrier createStubRetrier() {
-    return new Retrier(
-        Backoff.exponential(
-            java.time.Duration.ofMillis(/*options.experimentalRemoteRetryStartDelayMillis=*/ 100),
-            java.time.Duration.ofMillis(/*options.experimentalRemoteRetryMaxDelayMillis=*/ 5000),
-            /*options.experimentalRemoteRetryMultiplier=*/ 2,
-            /*options.experimentalRemoteRetryJitter=*/ 0.1,
-            /*options.experimentalRemoteRetryMaxAttempts=*/ 5),
-        Retrier.DEFAULT_IS_RETRIABLE);
-  }
-
-  private StubInstance workerStub(String worker) {
-    StubInstance instance = workerStubs.get(worker);
-    if (instance == null) {
-      ManagedChannel channel = createChannel(worker);
-      instance = new StubInstance(
-          "", digestUtil, channel,
-          10 /* FIXME CONFIG */, TimeUnit.SECONDS,
-          createStubRetrier(),
-          retryScheduler);
-      workerStubs.put(worker, instance);
+  private Instance workerStub(String worker) {
+    try {
+      return workerStubs.get(worker);
+    } catch (ExecutionException e) {
+      logger.log(SEVERE, "error getting worker stub for " + worker, e);
+      throw new IllegalStateException("stub instance creation must not fail");
     }
-    return instance;
   }
 
   private InputStream fetchBlobFromRemoteWorker(Digest blobDigest, Deque<String> workers, long offset) throws IOException, InterruptedException {
@@ -189,7 +169,7 @@ class RemoteInputStreamFactory implements InputStreamFactory {
               workersList.clear();
               try {
                 ListenableFuture<List<String>> checkedWorkerListFuture = transform(
-                    correctMissingBlob(backplane, remoteWorkers, locationSet, (worker) -> workerStub(worker), blobDigest, newDirectExecutorService()),
+                    correctMissingBlob(backplane, remoteWorkers, locationSet, RemoteInputStreamFactory.this::workerStub, blobDigest, newDirectExecutorService()),
                     (foundOnWorkers) -> {
                       Iterables.addAll(workersList, foundOnWorkers);
                       return workersList;
