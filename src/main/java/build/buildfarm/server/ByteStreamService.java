@@ -41,6 +41,7 @@ import com.google.protobuf.ByteString;
 import io.grpc.Context;
 import io.grpc.Context.CancellationListener;
 import io.grpc.Status;
+import io.grpc.Status.Code;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
@@ -276,7 +277,10 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
 
       @Override
       public void onFailure(Throwable t) {
-        logger.log(SEVERE, format("Failed writing blob %s", resourceName), t);
+        Status status = Status.fromThrowable(t);
+        if (status.getCode() != Code.CANCELLED) {
+          logger.log(SEVERE, format("Failed writing blob %s", resourceName), t);
+        }
       }
     });
     return chunkObserver;
@@ -369,8 +373,11 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
               Futures.addCallback(chunkObserver.getCommittedFuture(), new FutureCallback<Long>() {
                 @Override
                 public void onFailure(Throwable t) {
-                  logger.log(SEVERE, format("Error During upload of %s", resourceName), t);
-                  responseObserver.onError(t);
+                  Status status = Status.fromThrowable(t);
+                  if (status.getCode() != Code.CANCELLED) {
+                    logger.log(SEVERE, format("Error During upload of %s", resourceName), t);
+                    responseObserver.onError(t);
+                  }
                 }
 
                 @Override
