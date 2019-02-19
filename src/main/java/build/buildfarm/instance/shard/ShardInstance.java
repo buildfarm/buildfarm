@@ -1186,6 +1186,11 @@ public class ShardInstance extends AbstractServerInstance {
     }
     if (operation.getDone()) {
       logger.info("Operation " + operation.getName() + " has already completed");
+      try {
+        backplane.completeOperation(operationName);
+      } catch (IOException e) {
+        return immediateFailedFuture(e);
+      }
       return IMMEDIATE_VOID_FUTURE;
     }
 
