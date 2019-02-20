@@ -15,6 +15,7 @@
 package build.buildfarm.worker;
 
 import com.google.common.collect.Iterables;
+import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -28,7 +29,22 @@ public class ExecuteActionStage extends PipelineStage {
   private BlockingQueue<OperationContext> queue = new ArrayBlockingQueue<>(1);
 
   public ExecuteActionStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
-    super("ExecuteActionStage", workerContext, output, error);
+    super("ExecuteActionStage", workerContext, output, createDestroyExecDirStage(workerContext, error));
+  }
+
+  static PipelineStage createDestroyExecDirStage(WorkerContext workerContext, PipelineStage nextStage) {
+    return new PipelineStage.NullStage() {
+      @Override
+      public void put(OperationContext operationContext) throws InterruptedException {
+        try {
+          workerContext.destroyExecDir(operationContext.execDir);
+        } catch (IOException e) {
+          logger.error("error while destroying action root {}", operationContext.execDir, e);
+        } finally {
+          nextStage.put(operationContext);
+        }
+      }
+    };
   }
 
   @Override
