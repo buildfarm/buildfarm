@@ -1344,12 +1344,20 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         setPermissions(tmpPath, isExecutable);
         Files.move(tmpPath, key, REPLACE_EXISTING);
 
-        Entry e = new Entry(key, blobSizeInBytes, containingDirectory, Deadline.after(10, SECONDS));
+        Entry entry = new Entry(
+            key,
+            blobSizeInBytes,
+            containingDirectory,
+            Deadline.after(10, SECONDS));
 
-        if (storage.put(key, e) != null) {
+        if (storage.put(key, entry) != null) {
           throw new IllegalStateException("storage conflict with existing key for " + key);
         }
-        onInsert.run();
+        try {
+          onInsert.run();
+        } catch (RuntimeException e) {
+          throw new IOException(e);
+        }
       }
     };
   }
