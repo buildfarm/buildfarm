@@ -67,6 +67,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -438,7 +439,7 @@ class ShardWorkerContext implements WorkerContext {
       Digest digest;
       try {
         digest = getDigestUtil().compute(outputPath);
-      } catch (IOException e) {
+      } catch (NoSuchFileException e) {
         continue;
       }
 
@@ -467,7 +468,7 @@ class ShardWorkerContext implements WorkerContext {
           Digest digest;
           try {
             digest = getDigestUtil().compute(file);
-          } catch (IOException e) {
+          } catch (NoSuchFileException e) {
             logger.log(SEVERE, format("error visiting file %s under output dir %s", outputDirPath.relativize(file), outputDirPath.toAbsolutePath()), e);
             return FileVisitResult.CONTINUE;
           }
