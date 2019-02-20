@@ -7,7 +7,10 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 http_archive(
     name = "com_google_protobuf",
     patch_args = ["-p1"],
-    patches = ["//third_party/protobuf:4fcb36c.patch"],
+    patches = [
+        "//third_party/protobuf:4fcb36c.patch",
+        "//third_party/protobuf:d5f0dac.patch",
+    ],
     sha256 = "d7a221b3d4fb4f05b7473795ccea9e05dab3b8721f6286a95fffbffc2d926f8b",
     strip_prefix = "protobuf-3.6.1",
     urls = ["https://github.com/google/protobuf/archive/v3.6.1.zip"],
@@ -42,17 +45,21 @@ load("//3rdparty:workspace.bzl", "maven_dependencies")
 
 maven_dependencies()
 
-git_repository(
-    name = "io_bazel_rules_docker",
-    remote = "https://github.com/bazelbuild/rules_docker.git",
-    tag = "v0.5.1",
+http_archive(
+    name = "bazel_skylib",
+    sha256 = "eb5c57e4c12e68c0c20bc774bfbc60a568e800d025557bc4ea022c6479acc867",
+    strip_prefix = "bazel-skylib-0.6.0",
+    urls = ["https://github.com/bazelbuild/bazel-skylib/archive/0.6.0.tar.gz"],
 )
 
-load(
-    "@io_bazel_rules_docker//container:container.bzl",
-    "container_pull",
-    container_repositories = "repositories",
+http_archive(
+    name = "io_bazel_rules_docker",
+    sha256 = "aed1c249d4ec8f703edddf35cbe9dfaca0b5f5ea6e4cd9e83e99f3b0d1136c3d",
+    strip_prefix = "rules_docker-0.7.0",
+    urls = ["https://github.com/bazelbuild/rules_docker/archive/v0.7.0.tar.gz"],
 )
+
+load("@io_bazel_rules_docker//container:container.bzl", "container_pull")
 
 load(
     "@io_bazel_rules_docker//java:image.bzl",

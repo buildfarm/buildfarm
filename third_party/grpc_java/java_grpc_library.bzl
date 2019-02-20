@@ -15,16 +15,17 @@ def _gensource_impl(ctx):
       print(("in srcs attribute of {0}: Proto source with label {1} should be in "
              + "same package as consuming rule").format(ctx.label, s.label))
   # Use .jar since .srcjar makes protoc think output will be a directory
-  srcdotjar = ctx.new_file(ctx.label.name + "_src.jar")
+  srcdotjar = ctx.actions.declare_file(ctx.label.name + "_src.jar")
 
-  srcs = [f for dep in ctx.attr.srcs for f in dep.proto.direct_sources]
-  includes = [f for dep in ctx.attr.srcs for f in dep.proto.transitive_imports]
+  srcs = [f for dep in ctx.attr.srcs for f in dep[ProtoInfo].direct_sources]
+  includes = [f for dep in ctx.attr.srcs for f in dep[ProtoInfo].transitive_imports]
 
   flavor = ctx.attr.flavor
   if flavor == "normal":
     flavor = ""
-  ctx.action(
-      inputs = [ctx.executable._java_plugin] + srcs + includes,
+  ctx.actions.run(
+      inputs = srcs + includes,
+      tools = [ctx.executable._java_plugin],
       outputs = [srcdotjar],
       executable = ctx.executable._protoc,
       arguments = [
@@ -33,7 +34,7 @@ def _gensource_impl(ctx):
             .format(flavor, str(ctx.attr.enable_deprecated).lower(), srcdotjar.path)]
           + ["-I{0}={1}".format(_path_ignoring_repository(include), include.path) for include in includes]
           + [_path_ignoring_repository(src) for src in srcs])
-  ctx.action(
+  ctx.actions.run_shell(
       command = "cp $1 $2",
       inputs = [srcdotjar],
       outputs = [ctx.outputs.srcjar],
@@ -43,8 +44,8 @@ _gensource = rule(
     attrs = {
         "srcs": attr.label_list(
             mandatory = True,
-            non_empty = True,
-            providers = ["proto"],
+            allow_empty = False,
+            providers = [ProtoInfo],
         ),
         "flavor": attr.string(
             values = [
