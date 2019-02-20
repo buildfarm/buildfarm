@@ -1053,14 +1053,27 @@ public class ShardInstance extends AbstractServerInstance {
         .setExecuteEntry(executeEntry)
         .setQueuedOperationDigest(queuedOperationDigest)
         .build();
-    try (CommittingOutputStream out = createBlobOutputStream(queuedOperationDigest)) {
-      queuedOperationBlob.writeTo(out);
-      return transform(
-          out.getCommittedFuture(),
-          (committedSize) -> new QueuedOperationResult(entry, metadata),
-          service);
-    } catch (Throwable t) {
-      return immediateFailedFuture(t);
+    return transform(
+        writeBlobFuture(queuedOperationDigest, queuedOperationBlob),
+        (committedSize) -> new QueuedOperationResult(entry, metadata),
+        service);
+  }
+
+  private ListenableFuture<Long> writeBlobFuture(Digest digest, ByteString content) {
+    int attempts = 5;
+    for (;;) {
+      try (CommittingOutputStream out = createBlobOutputStream(digest)) {
+        content.writeTo(out);
+        return out.getCommittedFuture();
+      } catch (IOException e) {
+        return immediateFailedFuture(e);
+      } catch (Throwable t) {
+        Status status = Status.fromThrowable(t);
+        if (--attempts == 0 ||
+            !Retrier.DEFAULT_IS_RETRIABLE.test(status)) {
+          return immediateFailedFuture(t);
+        }
+      }
     }
   }
 
@@ -1486,16 +1499,12 @@ public class ShardInstance extends AbstractServerInstance {
               .getQueuedOperationMetadata()
               .getQueuedOperationDigest();
           long startUploadUSecs = stopwatch.elapsed(MICROSECONDS);
-          try (CommittingOutputStream out = createBlobOutputStream(queuedOperationDigest)) {
-            queuedOperationBlob.writeTo(out);
-            ListenableFuture<Long> committedFuture = out.getCommittedFuture();
-            return transform(
-                committedFuture,
-                (committedSize) -> profiledQueuedMetadata
-                    .setUploadedIn(Durations.fromMicros(stopwatch.elapsed(MICROSECONDS) - startUploadUSecs))
-                    .build(),
-                operationTransformService);
-          }
+          return transform(
+              writeBlobFuture(queuedOperationDigest, queuedOperationBlob),
+              (committedSize) -> profiledQueuedMetadata
+                  .setUploadedIn(Durations.fromMicros(stopwatch.elapsed(MICROSECONDS) - startUploadUSecs))
+                  .build(),
+              operationTransformService);
         },
         operationTransformService);
 
