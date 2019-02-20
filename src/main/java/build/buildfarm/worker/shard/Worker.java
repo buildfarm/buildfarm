@@ -479,5 +479,6 @@ public class Worker {
     }
     worker.start();
     worker.blockUntilShutdown();
+    System.exit(0); // bullet to the head in case anything is stuck
   }
 }
