@@ -26,7 +26,9 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.ShardBackplane;
+import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.RedisShardBackplane;
+import build.buildfarm.instance.shard.WorkerStubs;
 import build.buildfarm.server.InstanceNotFoundException;
 import build.buildfarm.server.Instances;
 import build.buildfarm.server.ContentAddressableStorageService;
@@ -45,6 +47,7 @@ import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ShardWorkerConfig;
 import build.buildfarm.v1test.ShardWorker;
 import com.google.common.base.Strings;
+import com.google.common.cache.LoadingCache;
 import com.google.common.io.ByteStreams;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.devtools.common.options.OptionsParser;
@@ -83,6 +86,7 @@ public class Worker {
   private final ExecFileSystem execFileSystem;
   private final Pipeline pipeline;
   private final ShardBackplane backplane;
+  private final LoadingCache<String, Instance> workerStubs;
 
   public Worker(ShardWorkerConfig config) throws ConfigurationException {
     this(ServerBuilder.forPort(config.getPort()), config);
@@ -140,12 +144,14 @@ public class Worker {
         break;
     }
 
+    workerStubs = WorkerStubs.create(digestUtil);
+
     InputStreamFactory remoteInputStreamFactory =
         new RemoteInputStreamFactory(
             config.getPublicName(),
             backplane,
             new Random(),
-            digestUtil);
+            workerStubs);
     execFileSystem = createExecFileSystem(remoteInputStreamFactory);
 
     instance = new ShardWorkerInstance(
@@ -285,6 +291,7 @@ public class Worker {
     } catch (InterruptedException e) {
       interrupted = true;
     }
+    workerStubs.invalidateAll();
     if (interrupted) {
       Thread.currentThread().interrupt();
       throw new InterruptedException();

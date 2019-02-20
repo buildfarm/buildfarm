@@ -30,7 +30,6 @@ import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.ShardInstance.WorkersCallback;
-import build.buildfarm.instance.shard.WorkerStubs;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -58,23 +57,16 @@ class RemoteInputStreamFactory implements InputStreamFactory {
   private final String publicName;
   private final ShardBackplane backplane;
   private final Random rand;
-  private final DigestUtil digestUtil;
   private final LoadingCache<String, Instance> workerStubs;
-
-  RemoteInputStreamFactory(String publicName, ShardBackplane backplane, Random rand, DigestUtil digestUtil) {
-    this(publicName, backplane, rand, digestUtil, WorkerStubs.create(digestUtil));
-  }
 
   RemoteInputStreamFactory(
       String publicName,
       ShardBackplane backplane,
       Random rand,
-      DigestUtil digestUtil,
       LoadingCache<String, Instance> workerStubs) {
     this.publicName = publicName;
     this.backplane = backplane;
     this.rand = rand;
-    this.digestUtil = digestUtil;
     this.workerStubs = workerStubs;
   }
 
