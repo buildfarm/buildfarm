@@ -91,6 +91,10 @@ public abstract class PipelineStage implements Runnable {
         long tickUSecs = stopwatch.elapsed(MICROSECONDS);
         valid = nextOperationContext != null && output.claim();
         stallUSecs = stopwatch.elapsed(MICROSECONDS) - tickUSecs;
+        // ensure that we clear interrupted if we were supposed to cancel tick
+        if (Thread.interrupted() && !tickCancelled()) {
+          throw new InterruptedException();
+        }
         tickThread = null;
       } catch (InterruptedException e) {
         boolean isTickCancelled = tickCancelled();
