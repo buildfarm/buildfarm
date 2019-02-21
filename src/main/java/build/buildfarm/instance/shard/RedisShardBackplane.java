@@ -395,7 +395,9 @@ public class RedisShardBackplane implements ShardBackplane {
     }
     if (operationSubscription != null) {
       operationSubscription.stop();
-      subscriptionThread.join();
+      if (subscriptionThread != null) {
+        subscriptionThread.join();
+      }
       logger.fine("subscriptionThread has been stopped");
     }
     if (subscriberService != null) {
