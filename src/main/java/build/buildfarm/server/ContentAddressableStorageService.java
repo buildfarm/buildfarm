@@ -78,15 +78,18 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
         new FutureCallback<FindMissingBlobsResponse.Builder>() {
           @Override
           public void onSuccess(FindMissingBlobsResponse.Builder builder) {
-            logger.info(format("FindMissingBlobs for %d blobs", request.getBlobDigestsList().size()));
+            logger.info(format("FindMissingBlobs(%s) for %d blobs", instance.getName(), request.getBlobDigestsList().size()));
             responseObserver.onNext(builder.build());
             responseObserver.onCompleted();
           }
 
           @Override
           public void onFailure(Throwable t) {
-            logger.log(SEVERE, format("findMissingBlobs: %s: %d", request.getInstanceName(), request.getBlobDigestsCount()), t);
-            responseObserver.onError(t);
+            Status status = Status.fromThrowable(t);
+            if (status.getCode() != Code.CANCELLED) {
+              logger.log(SEVERE, format("findMissingBlobs(%s): %s: %d", instance.getName(), request.getInstanceName(), request.getBlobDigestsCount()), t);
+              responseObserver.onError(t);
+            }
           }
         });
   }
