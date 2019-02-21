@@ -84,11 +84,6 @@ abstract class OperationSubscriber extends JedisPubSub {
   // synchronizing on these because the client has been observed to
   // cause protocol desynchronization for multiple concurrent calls
   @Override
-  public synchronized void subscribe(String... channels) {
-    super.subscribe(channels);
-  }
-
-  @Override
   public synchronized void unsubscribe() {
     super.unsubscribe();
   }
@@ -99,13 +94,28 @@ abstract class OperationSubscriber extends JedisPubSub {
   }
 
   @Override
+  public synchronized void subscribe(String... channels) {
+    super.subscribe(channels);
+  }
+
+  @Override
   public synchronized void psubscribe(String... patterns) {
     super.psubscribe(patterns);
   }
 
   @Override
+  public synchronized void punsubscribe() {
+    super.punsubscribe();
+  }
+
+  @Override
   public synchronized void punsubscribe(String... patterns) {
     super.punsubscribe(patterns);
+  }
+
+  @Override
+  public synchronized void ping() {
+    super.ping();
   }
 
   public ListenableFuture<Void> watch(String channel, TimedWatcher watcher) {

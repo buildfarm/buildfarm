@@ -89,7 +89,7 @@ import redis.clients.jedis.Transaction;
 import redis.clients.jedis.exceptions.JedisConnectionException;
 import redis.clients.jedis.exceptions.JedisDataException;
 import redis.clients.jedis.exceptions.JedisException;
-import redis.clients.util.Pool;
+import redis.clients.jedis.util.Pool;
 
 public class RedisShardBackplane implements ShardBackplane {
   private static final Logger logger = Logger.getLogger(RedisShardBackplane.class.getName());
@@ -632,7 +632,8 @@ public class RedisShardBackplane implements ShardBackplane {
             DigestUtil.asActionKey(DigestUtil.parseDigest(key.split(":")[1])),
             json));
       }
-      return scanResult.getStringCursor().equals(SCAN_POINTER_START) ? null : scanResult.getStringCursor();
+      String cursor = scanResult.getCursor();
+      return cursor.equals(SCAN_POINTER_START) ? null : cursor;
     });
     return new ActionCacheScanResult(
         token,
