@@ -14,6 +14,8 @@
 
 package build.buildfarm.worker;
 
+import static java.util.logging.Level.SEVERE;
+
 import com.google.common.collect.Iterables;
 import java.io.IOException;
 import java.util.HashSet;
@@ -39,7 +41,7 @@ public class ExecuteActionStage extends PipelineStage {
         try {
           workerContext.destroyExecDir(operationContext.execDir);
         } catch (IOException e) {
-          logger.error("error while destroying action root {}", operationContext.execDir, e);
+          logger.log(SEVERE, "error while destroying action root " + operationContext.execDir, e);
         } finally {
           nextStage.put(operationContext);
         }

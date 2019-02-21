@@ -628,7 +628,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         Directory directory = computeDirectory(path, fileKeys, inputsBuilder);
         Digest digest = directory == null ? null : digestUtil.compute(directory);
         if (digest != null && getDirectoryPath(digest).equals(path)) {
-          DirectoryEntry e = new DirectoryEntry(directory, inputsBuilder.build());
+          DirectoryEntry e = new DirectoryEntry(
+              directory,
+              inputsBuilder.build(),
+              Deadline.after(10, SECONDS));
           synchronized (this) {
             directoryStorage.put(digest, e);
             for (Path input : e.inputs) {
@@ -972,6 +975,42 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return putFuture;
   }
 
+  private boolean directoryExists(Path path, Directory directory, Map<Digest, Directory> directoriesIndex) {
+    if (!Files.exists(path)) {
+      logger.severe(format("directory path %s does not exist", path));
+      return false;
+    }
+    for (FileNode fileNode : directory.getFilesList()) {
+      Path filePath = path.resolve(fileNode.getName());
+      if (!Files.exists(filePath)) {
+        logger.severe(format("directory file entry %s does not exist", filePath));
+        return false;
+      }
+      // additional stat check to ensure that the cache entry exists for hard link inode match?
+    }
+    for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
+      if (!directoryExists(
+            path.resolve(directoryNode.getName()),
+            directoriesIndex.get(directoryNode.getDigest()),
+            directoriesIndex)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private boolean directoryEntryExists(Path path, DirectoryEntry dirEntry, Map<Digest, Directory> directoriesIndex) {
+    if (!dirEntry.existsDeadline.isExpired()) {
+      return true;
+    }
+
+    if (directoryExists(path, dirEntry.directory, directoriesIndex)) {
+      dirEntry.existsDeadline = Deadline.after(10, SECONDS);
+      return true;
+    }
+    return false;
+  }
+
   private ListenableFuture<Path> putDirectorySynchronized(
       Path path,
       Digest digest,
@@ -1003,7 +1042,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
         if (e != null) {
           logger.fine(format("found existing entry for %s", path.getFileName()));
-          return immediateFuture(path);
+          if (directoryExists(path, e.directory, directoriesIndex)) {
+            return immediateFuture(path);
+          }
+          logger.severe(format("directory %s does not exist in cache, purging it with fire and resorting to fetch", path.getFileName()));
         }
 
         decrementReferencesSynchronized(inputsBuilder.build(), ImmutableList.<Digest>of());
@@ -1043,7 +1085,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         fetchFuture,
         (results) -> {
           logger.fine(format("directory fetch complete, inserting %s", path.getFileName()));
-          DirectoryEntry e = new DirectoryEntry(directoriesIndex.get(digest), inputsBuilder.build());
+          DirectoryEntry e = new DirectoryEntry(
+              directoriesIndex.get(digest),
+              inputsBuilder.build(),
+              Deadline.after(10, SECONDS));
           synchronized (this) {
             directoryStorage.put(digest, e);
           }
@@ -1470,11 +1515,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private static class DirectoryEntry {
     public final Directory directory;
     public final Iterable<Path> inputs;
-    // FIXME we need to do a periodic sweep here to see that the filesystem has not degraded for each directory...
+    Deadline existsDeadline;
 
-    public DirectoryEntry(Directory directory, Iterable<Path> inputs) {
+    public DirectoryEntry(Directory directory, Iterable<Path> inputs, Deadline existsDeadline) {
       this.directory = directory;
       this.inputs = inputs;
+      this.existsDeadline = existsDeadline;
     }
   }
 
