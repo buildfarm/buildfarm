@@ -82,7 +82,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.logging.Logger;
@@ -950,7 +949,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Map<Digest, Directory> directoriesIndex,
       ExecutorService service) {
     Path path = getDirectoryPath(digest);
-    AtomicReference<Lock> lockReference = new AtomicReference<Lock>(null);
     Lock l = locks.acquire(path);
     logger.fine(format("locking directory %s", path.getFileName()));
     try {
