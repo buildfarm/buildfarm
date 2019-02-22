@@ -831,8 +831,8 @@ public class ShardInstance extends AbstractServerInstance {
           } else {
             smallBlob = null;
           }
-        } catch (IOException e) {
-          throw Status.INTERNAL.withCause(e).asRuntimeException();
+        } catch (Throwable t) {
+          throw Status.fromThrowable(t).asRuntimeException();
         }
       }
 
@@ -842,7 +842,7 @@ public class ShardInstance extends AbstractServerInstance {
           // need to cancel the request if size or digest doesn't match
           out.close();
         } catch (IOException e) {
-          throw Status.INTERNAL.withCause(e).asRuntimeException();
+          throw Status.fromThrowable(e).asRuntimeException();
         }
 
         try {

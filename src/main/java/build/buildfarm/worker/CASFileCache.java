@@ -104,6 +104,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private transient long sizeInBytes = 0;
   private transient Entry header = new SentinelEntry();
 
+  public static class DigestMismatchException extends IOException {
+    DigestMismatchException(String message) {
+      super(message);
+    }
+  }
+
   public CASFileCache(
       Path root,
       long maxSizeInBytes,
@@ -1243,8 +1249,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
       private void withSingleTermination(IORunnable runnable) throws IOException {
         if (!terminated) {
-          withTermination(runnable);
-          terminated = true;
+          try {
+            withTermination(runnable);
+          } finally {
+            terminated = true;
+          }
         }
       }
 
@@ -1381,7 +1390,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
         if (size != blobSizeInBytes) {
           Files.delete(tmpPath);
-          throw new IOException("blob digest size mismatch, expected " + blobSizeInBytes + ", was " + size);
+          throw new DigestMismatchException("blob digest size mismatch, expected " + blobSizeInBytes + ", was " + size);
         }
 
         setPermissions(tmpPath, isExecutable);

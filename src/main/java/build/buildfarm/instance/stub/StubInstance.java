@@ -352,9 +352,6 @@ public class StubInstance implements Instance {
         try {
           return writeResponseFuture.get().getCommittedSize();
         } catch (ExecutionException e) {
-          if (e.getCause() instanceof RuntimeException) {
-            throw (RuntimeException) e.getCause();
-          }
           if (e.getCause() instanceof IOException) {
             throw (IOException) e.getCause();
           }

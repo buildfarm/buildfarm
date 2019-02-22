@@ -15,6 +15,7 @@
 package build.buildfarm.worker.shard;
 
 import build.buildfarm.instance.Instance.ChunkObserver;
+import build.buildfarm.worker.CASFileCache.DigestMismatchException;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
@@ -81,6 +82,8 @@ abstract class OutputStreamChunkObserver implements ChunkObserver {
     if (stream != null) {
       try {
         stream.close();
+      } catch (DigestMismatchException e) {
+        throw Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asRuntimeException();
       } catch (IOException e) {
         throw Status.INTERNAL.withCause(e).asRuntimeException();
       }

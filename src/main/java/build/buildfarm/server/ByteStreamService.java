@@ -367,6 +367,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
                   (context) -> {
                     if (chunkObserver != null) {
                       chunkObserver.onError(Status.CANCELLED.asRuntimeException());
+                      chunkObserver = null;
                     }
                   },
                   directExecutor());
@@ -414,12 +415,27 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
             }
             responseObserver.onError(t);
             return;
+          } catch (RuntimeException e) {
+            // we will receive a CANCELLED status on the write when interrupted due to cancellation
+            // we must cache that and ignore the client
+            Status status = Status.fromThrowable(e);
+            if (status.getCode() != Code.CANCELLED) {
+              responseObserver.onError(status.asException());
+            }
+            return;
           }
         }
 
         if (request.getFinishWrite() && !Thread.currentThread().isInterrupted()) {
           if (chunkObserver != null) {
-            chunkObserver.onCompleted();
+            try {
+              chunkObserver.onCompleted();
+            } catch (RuntimeException e) {
+              Status status = Status.fromThrowable(e);
+              if (status.getCode() != Code.CANCELLED) {
+                responseObserver.onError(status.asException());
+              }
+            }
             chunkObserver = null;
           } else if (request.getData().size() == 0) {
             responseObserver.onNext(WriteResponse.newBuilder()
