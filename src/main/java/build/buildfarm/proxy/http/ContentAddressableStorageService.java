@@ -171,7 +171,7 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
       StreamObserver<GetTreeResponse> responseObserver) {
     int pageSize = request.getPageSize();
     if (pageSize < 0) {
-      responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
+      responseObserver.onError(Status.INVALID_ARGUMENT.asException());
       return;
     }
     ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();

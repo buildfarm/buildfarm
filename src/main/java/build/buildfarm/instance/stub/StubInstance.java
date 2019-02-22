@@ -333,7 +333,7 @@ public class StubInstance implements Instance {
                 @Override
                 public void onError(Throwable t) {
                   writeResponseFuture.setException(
-                      new StatusRuntimeException(Status.fromThrowable(t)));
+                      Status.fromThrowable(t).asRuntimeException());
                 }
 
                 @Override
