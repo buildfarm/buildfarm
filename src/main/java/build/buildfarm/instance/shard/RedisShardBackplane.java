@@ -282,7 +282,10 @@ public class RedisShardBackplane implements ShardBackplane {
       if (operation == null || !operation.getDone()) {
         jedis.publish(channel, "expire");
       } else {
-        operationSubscriber.onOperation(channel, operation, expiresAt);
+        operationSubscriber.onOperation(
+            channel,
+            onPublish.apply(operation),
+            expiresAt);
       }
     }
   }
@@ -312,7 +315,10 @@ public class RedisShardBackplane implements ShardBackplane {
         if (operation != null) {
           operation = onPublish.apply(operation);
         }
-        operationSubscriber.onOperation(operationChannel(operationName), operation, nextWatcherExpiresAt(now));
+        operationSubscriber.onOperation(
+            operationChannel(operationName),
+            operation,
+            nextWatcherExpiresAt(now));
         logger.info(
             format(
                 "operation %s done due to %s",
