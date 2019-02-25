@@ -189,6 +189,7 @@ public class Worker {
       DigestUtil digestUtil) {
     return new StubInstance(
         name,
+        "",
         digestUtil,
         channel,
         60 /* FIXME CONFIG */, TimeUnit.SECONDS);

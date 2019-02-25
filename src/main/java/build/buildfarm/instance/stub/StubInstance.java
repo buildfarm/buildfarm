@@ -19,6 +19,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.transform;
+import static java.lang.String.format;
 import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.ActionCacheGrpc;
@@ -110,25 +111,36 @@ public class StubInstance implements Instance {
   private final TimeUnit deadlineAfterUnits;
   private final Retrier retrier;
   private final @Nullable ListeningScheduledExecutorService retryService;
+  private final String identifier;
   private boolean isStopped = false;
 
   public StubInstance(
       String name,
       DigestUtil digestUtil,
       ManagedChannel channel) {
-    this(name, digestUtil, channel, DEFAULT_DEADLINE_DAYS, TimeUnit.DAYS);
+    this(name, "no-identifier", digestUtil, channel, DEFAULT_DEADLINE_DAYS, TimeUnit.DAYS);
   }
 
   public StubInstance(
       String name,
+      String identifier,
+      DigestUtil digestUtil,
+      ManagedChannel channel) {
+    this(name, identifier, digestUtil, channel, DEFAULT_DEADLINE_DAYS, TimeUnit.DAYS);
+  }
+
+  public StubInstance(
+      String name,
+      String identifier,
       DigestUtil digestUtil,
       ManagedChannel channel,
       long deadlineAfter, TimeUnit deadlineAfterUnits) {
-    this(name, digestUtil, channel, deadlineAfter, deadlineAfterUnits, NO_RETRIES, /* retryService=*/ null);
+    this(name, identifier, digestUtil, channel, deadlineAfter, deadlineAfterUnits, NO_RETRIES, /* retryService=*/ null);
   }
 
   public StubInstance(
       String name,
+      String identifier,
       DigestUtil digestUtil,
       ManagedChannel channel,
       long deadlineAfter, TimeUnit deadlineAfterUnits,
@@ -141,6 +153,7 @@ public class StubInstance implements Instance {
     this.deadlineAfterUnits = deadlineAfterUnits;
     this.retrier = retrier;
     this.retryService = retryService;
+    this.identifier = identifier;
   }
 
   // no deadline for this
@@ -372,6 +385,7 @@ public class StubInstance implements Instance {
             if (writtenBytes == 0) {
               builder.setResourceName(resourceName);
             }
+            logger.fine(format("writing to %s(%s): finish request", resourceName, identifier));
             requestObserver.onNext(builder.build());
           }
           requestObserver.onCompleted();
@@ -423,6 +437,9 @@ public class StubInstance implements Instance {
         WriteRequest request = createWriteRequest(
             ByteString.copyFrom(b, off, len),
             isFinishWrite(writtenBytes + len));
+        if (writtenBytes == 0) {
+          logger.fine(format("writing to %s(%s)", resourceName, identifier));
+        }
         requestObserver.onNext(request);
         writtenBytes += len;
       }
@@ -448,7 +465,7 @@ public class StubInstance implements Instance {
 
   @Override
   public String getBlobName(Digest blobDigest) {
-    return String.format(
+    return format(
         "%s/blobs/%s",
         getName(),
         DigestUtil.toString(blobDigest));

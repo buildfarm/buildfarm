@@ -160,7 +160,7 @@ class ShardWorkerContext implements WorkerContext {
           try {
             success = operationPoller.poll(queueEntry, stage, System.currentTimeMillis() + 30 * 1000);
           } catch (IOException e) {
-            logger.log(SEVERE, "error polling " + operationName, e);
+            logger.log(SEVERE, format("%s: poller: error while polling %s", name, operationName), e);
           }
 
           logger.info(format("%s: poller: Completed Poll for %s: %s", name, operationName, success ? "OK" : "Failed"));

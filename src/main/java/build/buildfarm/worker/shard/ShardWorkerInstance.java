@@ -180,7 +180,8 @@ public class ShardWorkerInstance extends AbstractServerInstance {
     };
   }
 
-  protected TokenizableIterator<DirectoryEntry> createTreeIterator(Digest rootDigest, String pageToken) {
+  protected TokenizableIterator<DirectoryEntry> createTreeIterator(
+      String reason, Digest rootDigest, String pageToken) {
     throw new UnsupportedOperationException();
   }
 

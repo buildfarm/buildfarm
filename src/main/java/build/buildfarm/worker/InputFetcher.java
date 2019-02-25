@@ -150,10 +150,11 @@ public class InputFetcher implements Runnable {
         owner.error().put(operationContext);
       } catch (InterruptedException errorEx) {
         logger.log(SEVERE, "interrupted while erroring " + operationName, errorEx);
+      } finally {
+        Thread.currentThread().interrupt();
       }
-      Thread.currentThread().interrupt();
     } catch (Exception e) {
-      logger.log(SEVERE, "error while fetching inputs for " + operationName, e);
+      logger.log(SEVERE, "error while fetching inputs: " + operationName, e);
       try {
         owner.error().put(operationContext);
       } catch (InterruptedException errorEx) {

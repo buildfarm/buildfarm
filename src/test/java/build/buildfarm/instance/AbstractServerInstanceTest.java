@@ -85,7 +85,7 @@ public class AbstractServerInstanceTest {
 
     @Override
     protected TokenizableIterator<DirectoryEntry> createTreeIterator(
-        Digest rootDigest, String pageToken) {
+        String reason, Digest rootDigest, String pageToken) {
       throw new UnsupportedOperationException();
     }
 

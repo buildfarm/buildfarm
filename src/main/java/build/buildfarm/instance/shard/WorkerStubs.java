@@ -53,7 +53,7 @@ public class WorkerStubs {
 
   private static Instance newStubInstance(String worker, DigestUtil digestUtil) {
     return new StubInstance(
-        "", digestUtil, createChannel(worker),
+        "", worker, digestUtil, createChannel(worker),
         60 /* FIXME CONFIG */, TimeUnit.SECONDS,
         newStubRetrier(),
         newStubRetryService());

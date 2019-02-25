@@ -17,6 +17,7 @@ package build.buildfarm.worker;
 import static com.google.common.collect.Iterables.filter;
 import static com.google.common.collect.Iterables.transform;
 import static build.buildfarm.v1test.ExecutionPolicy.PolicyCase.WRAPPER;
+import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.logging.Level.SEVERE;
@@ -94,7 +95,7 @@ class Executor implements Runnable {
     try {
       operationUpdateSuccess = workerContext.putOperation(operation, operationContext.action);
     } catch (IOException e) {
-      logger.log(SEVERE, "error putting operation " + operation.getName(), e);
+      logger.log(SEVERE, format("error putting operation %s as EXECUTING", operation.getName()), e);
     }
 
     if (!operationUpdateSuccess) {
@@ -172,6 +173,7 @@ class Executor implements Runnable {
     Code statusCode;
     try {
       statusCode = executeCommand(
+          operation.getName(),
           operationContext.execDir,
           operationContext.command,
           timeout,
@@ -180,15 +182,7 @@ class Executor implements Runnable {
           resultBuilder,
           policies.build());
     } catch (IOException e) {
-      logger.log(SEVERE, "error executing command for " + operation.getName(), e);
-      try {
-        workerContext.destroyExecDir(operationContext.execDir);
-      } catch (IOException destroyExecDirException) {
-        logger.log(
-            SEVERE,
-            "error destroying exec dir " + operationContext.execDir,
-            destroyExecDirException);
-      }
+      logger.log(SEVERE, "error executing operation " + operation.getName(), e);
       operationContext.poller.pause();
       owner.error().put(operationContext);
       return 0;
@@ -237,6 +231,7 @@ class Executor implements Runnable {
   public void run() {
     long stallUSecs = 0;
     Stopwatch stopwatch = Stopwatch.createStarted();
+    String operationName = operationContext.operation.getName();
     try {
       stallUSecs = runInterruptible(stopwatch);
     } catch (InterruptedException e) {
@@ -244,20 +239,23 @@ class Executor implements Runnable {
       try {
         owner.error().put(operationContext);
       } catch (InterruptedException errorEx) {
-        logger.log(SEVERE, "interrupted while erroring " + operationContext.operation.getName(), errorEx);
+        logger.log(SEVERE, "interrupted while erroring " + operationName, errorEx);
+      } finally {
+        Thread.currentThread().interrupt();
       }
-      Thread.currentThread().interrupt();
     } catch (Exception e) {
-      logger.log(SEVERE, "errored while executing " + operationContext.operation.getName(), e);
+      logger.log(SEVERE, "errored during execution of " + operationName, e);
       try {
         owner.error().put(operationContext);
       } catch (InterruptedException errorEx) {
-        logger.log(SEVERE, "interrupted while erroring " + operationContext.operation.getName(), errorEx);
+        logger.log(SEVERE, format("interrupted while erroring %s after error", operationName), errorEx);
+      } catch (Throwable t) {
+        logger.log(SEVERE, format("errored while erroring %s after error", operationName), t);
       }
       throw e;
     } finally {
       owner.releaseExecutor(
-          operationContext.operation.getName(),
+          operationName,
           stopwatch.elapsed(MICROSECONDS),
           stallUSecs,
           exitCode);
@@ -265,6 +263,7 @@ class Executor implements Runnable {
   }
 
   private Code executeCommand(
+      String operationName,
       Path execDir,
       Command command,
       Duration timeout,
@@ -311,7 +310,7 @@ class Executor implements Runnable {
       }
       process.getOutputStream().close();
     } catch(IOException e) {
-      logger.log(SEVERE, "could not start process for " + operationContext.operation.getName(), e);
+      logger.log(SEVERE, "error starting process for " + operationName, e);
       // again, should we do something else here??
       resultBuilder.setExitCode(INCOMPLETE_EXIT_CODE);
       return Code.INVALID_ARGUMENT;

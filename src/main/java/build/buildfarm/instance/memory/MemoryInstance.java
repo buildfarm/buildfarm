@@ -338,6 +338,7 @@ public class MemoryInstance extends AbstractServerInstance {
 
   @Override
   protected void validateAction(
+      String operationName,
       Action action,
       PreconditionFailure.Builder preconditionFailure)
       throws InterruptedException, StatusException {
@@ -353,7 +354,7 @@ public class MemoryInstance extends AbstractServerInstance {
       }
     }
 
-    super.validateAction(action, preconditionFailure);
+    super.validateAction(operationName, action, preconditionFailure);
   }
 
   @Override
@@ -644,7 +645,7 @@ public class MemoryInstance extends AbstractServerInstance {
 
   @Override
   protected TokenizableIterator<DirectoryEntry> createTreeIterator(
-      Digest rootDigest, String pageToken) {
+      String reason, Digest rootDigest, String pageToken) {
     ExecutorService service = newDirectExecutorService();
     return new TreeIterator((digest) -> expect(digest, Directory.parser(), service), rootDigest, pageToken);
   }

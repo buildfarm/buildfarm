@@ -362,7 +362,7 @@ public abstract class AbstractServerInstance implements Instance {
   protected abstract int getTreeMaxPageSize();
 
   protected abstract TokenizableIterator<DirectoryEntry> createTreeIterator(
-      Digest rootDigest, String pageToken);
+      String reason, Digest rootDigest, String pageToken);
 
   @Override
   public String getTree(
@@ -376,7 +376,7 @@ public abstract class AbstractServerInstance implements Instance {
     }
 
     TokenizableIterator<DirectoryEntry> iter =
-        createTreeIterator(rootDigest, pageToken);
+        createTreeIterator("getTree", rootDigest, pageToken);
 
     while (iter.hasNext() && pageSize != 0) {
       Directory directory = iter.next().getDirectory();
@@ -610,12 +610,13 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   protected ListenableFuture<Iterable<Directory>> getTreeDirectories(
+      String reason,
       Digest inputRoot,
       ExecutorService service) {
     return listeningDecorator(service).submit(() -> {
       ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
 
-      TokenizableIterator<DirectoryEntry> iterator = createTreeIterator(inputRoot, /* pageToken=*/ "");
+      TokenizableIterator<DirectoryEntry> iterator = createTreeIterator(reason, inputRoot, /* pageToken=*/ "");
       while (iterator.hasNext()) {
         DirectoryEntry entry = iterator.next();
         Directory directory = entry.getDirectory();
@@ -717,7 +718,7 @@ public abstract class AbstractServerInstance implements Instance {
     return queuedOperation;
   }
 
-  private Action validateActionDigest(Digest actionDigest)
+  private Action validateActionDigest(String operationName, Digest actionDigest)
       throws StatusException, InterruptedException {
     Action action = null;
     PreconditionFailure.Builder preconditionFailure =
@@ -741,7 +742,7 @@ public abstract class AbstractServerInstance implements Instance {
             .setDescription("Action " + DigestUtil.toString(actionDigest));
       }
       if (action != null) {
-        validateAction(action, preconditionFailure);
+        validateAction(operationName, action, preconditionFailure);
       }
     }
     checkPreconditionFailure(actionDigest, preconditionFailure.build());
@@ -749,6 +750,7 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   protected void validateAction(
+      String operationName,
       Action action,
       PreconditionFailure.Builder preconditionFailure)
       throws InterruptedException, StatusException {
@@ -757,7 +759,7 @@ public abstract class AbstractServerInstance implements Instance {
     validateAction(
         action,
         getUnchecked(expect(action.getCommandDigest(), Command.parser(), service)),
-        getUnchecked(getTreeDirectories(action.getInputRootDigest(), service)),
+        getUnchecked(getTreeDirectories(operationName, action.getInputRootDigest(), service)),
         inputDigestsBuilder,
         preconditionFailure);
     validateInputs(
@@ -961,7 +963,7 @@ public abstract class AbstractServerInstance implements Instance {
       Watcher watcher) throws InterruptedException {
     Action action;
     try {
-      action = validateActionDigest(actionDigest);
+      action = validateActionDigest("execute", actionDigest);
     } catch (StatusException e) {
       com.google.rpc.Status status = StatusProto.fromThrowable(e);
       if (status == null) {
@@ -1329,7 +1331,7 @@ public abstract class AbstractServerInstance implements Instance {
     }
     Digest actionDigest = metadata.getActionDigest();
     try {
-      validateActionDigest(actionDigest);
+      validateActionDigest(name, actionDigest);
     } catch (StatusException e) {
       com.google.rpc.Status status = StatusProto.fromThrowable(e);
       if (status == null) {
