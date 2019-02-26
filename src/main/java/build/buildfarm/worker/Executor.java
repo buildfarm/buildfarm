@@ -132,13 +132,12 @@ class Executor implements Runnable {
           MICROSECONDS);
     }
 
-    final Thread executorThread = Thread.currentThread();
     workerContext.resumePoller(
         operationContext.poller,
         "Executor",
         operationContext.queueEntry,
         Stage.EXECUTING,
-        () -> executorThread.interrupt(),
+        Thread.currentThread()::interrupt,
         pollDeadline);
 
     try {
@@ -329,27 +328,34 @@ class Executor implements Runnable {
     stderrReaderThread.start();
 
     Code statusCode = Code.OK;
-    if (timeout == null) {
-      exitCode = process.waitFor();
-    } else {
-      long timeoutNanos = timeout.getSeconds() * 1000000000L + timeout.getNanos();
-      long remainingNanoTime = timeoutNanos - (System.nanoTime() - startNanoTime);
-      if (process.waitFor(remainingNanoTime, TimeUnit.NANOSECONDS)) {
-        exitCode = process.exitValue();
+    try {
+      if (timeout == null) {
+        exitCode = process.waitFor();
       } else {
-        process.destroyForcibly();
-        process.waitFor(100, TimeUnit.MILLISECONDS); // fair trade, i think
-        statusCode = Code.DEADLINE_EXCEEDED;
+        long timeoutNanos = timeout.getSeconds() * 1000000000L + timeout.getNanos();
+        long remainingNanoTime = timeoutNanos - (System.nanoTime() - startNanoTime);
+        if (process.waitFor(remainingNanoTime, TimeUnit.NANOSECONDS)) {
+          exitCode = process.exitValue();
+        } else {
+          process.destroyForcibly();
+          process.waitFor(100, TimeUnit.MILLISECONDS); // fair trade, i think
+          statusCode = Code.DEADLINE_EXCEEDED;
+        }
       }
+    } catch (InterruptedException e) {
+      process.destroyForcibly();
+      process.waitFor(100, TimeUnit.MILLISECONDS);
+      throw e;
+    } finally {
+      if (!stdoutReader.isComplete()) {
+        stdoutReaderThread.interrupt();
+      }
+      stdoutReaderThread.join();
+      if (!stderrReader.isComplete()) {
+        stderrReaderThread.interrupt();
+      }
+      stderrReaderThread.join();
     }
-    if (!stdoutReader.isComplete()) {
-      stdoutReaderThread.interrupt();
-    }
-    stdoutReaderThread.join();
-    if (!stderrReader.isComplete()) {
-      stderrReaderThread.interrupt();
-    }
-    stderrReaderThread.join();
     resultBuilder
         .setExitCode(exitCode)
         .setStdoutRaw(stdoutReader.getData())
