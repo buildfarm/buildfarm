@@ -41,6 +41,9 @@ public class ByteStringQueueInputStream extends InputStream {
     }
     if (input.available() == 0) {
       advance();
+      if (input.available() == 0 && exception != null) {
+        throw new IOException(exception);
+      }
     }
     return input.available();
   }
