@@ -55,6 +55,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
@@ -226,6 +227,52 @@ class CFCExecFileSystem implements ExecFileSystem {
         fetchService);
   }
 
+  /**
+   * get a future value through any number of interrupts
+   *
+   * sets interrupt status if any interrupt occurred
+   */
+  private static <T> T getWithoutInterrupt(ListenableFuture<T> future) throws ExecutionException {
+    boolean wasInterrupted = false;
+    for (;;) {
+      try {
+        return future.get();
+      } catch (InterruptedException e) {
+        Thread.interrupted(); // clear the flag to permit continuation
+        wasInterrupted = true;
+      } finally {
+        if (wasInterrupted) {
+          Thread.currentThread().interrupt();
+        }
+      }
+    }
+  }
+
+  private static class ExecDirException extends IOException {
+    private final Path path;
+    private final List<Throwable> exceptions;
+
+    ExecDirException(Path path, List<Throwable> exceptions) {
+      super(String.format("%s: %d exceptions", path, exceptions.size()));
+      this.path = path;
+      this.exceptions = exceptions;
+    }
+
+    Path getPath() {
+      return path;
+    }
+
+    List<Throwable> getExceptions() {
+      return exceptions;
+    }
+  }
+
+  private static void checkExecErrors(Path path, List<Throwable> errors) throws ExecDirException {
+    if (!errors.isEmpty()) {
+      throw new ExecDirException(path, errors);
+    }
+  }
+
   @Override
   public Path createExecDir(String operationName, Map<Digest, Directory> directoriesIndex, Action action, Command command) throws IOException, InterruptedException {
     OutputDirectory outputDirectory = OutputDirectory.parse(
@@ -242,21 +289,40 @@ class CFCExecFileSystem implements ExecFileSystem {
     ImmutableList.Builder<Digest> inputDirectories = new ImmutableList.Builder<>();
 
     logger.info("ExecFileSystem::createExecDir(" + DigestUtil.toString(action.getInputRootDigest()) + ") calling fetchInputs");
-    ListenableFuture<List<Void>> fetchedFuture = allAsList(
+    Iterable<ListenableFuture<Void>> fetchedFutures =
         fetchInputs(
             execDir,
             action.getInputRootDigest(),
             directoriesIndex,
             outputDirectory,
             inputFiles,
-            inputDirectories));
-    boolean completed = false;
+            inputDirectories);
+    boolean success = false;
     try {
-      getInterruptiblyOrIOException(fetchedFuture);
-      completed = true;
+      boolean wasInterrupted = false;
+      ImmutableList.Builder<Throwable> exceptions = ImmutableList.builder();
+      for (ListenableFuture<Void> fetchedFuture : fetchedFutures) {
+        try {
+          getWithoutInterrupt(fetchedFuture);
+        } catch (ExecutionException e) {
+          // just to ensure that no other code can react to interrupt status
+          boolean isInterrupted = Thread.interrupted();
+          exceptions.add(e.getCause());
+          if (isInterrupted) {
+            Thread.currentThread().interrupt();
+          }
+        }
+        if (Thread.interrupted()) {
+          wasInterrupted = true;
+        }
+      }
+      checkExecErrors(execDir, exceptions.build());
+      if (wasInterrupted) {
+        throw new InterruptedException();
+      }
+      success = true;
     } finally {
-      if (!completed) {
-        fetchedFuture.cancel(true);
+      if (!success) {
         fileCache.decrementReferences(inputFiles.build(), inputDirectories.build());
         removeDirectory(execDir);
       }
