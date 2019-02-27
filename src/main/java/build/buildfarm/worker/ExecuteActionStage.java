@@ -35,7 +35,7 @@ public class ExecuteActionStage extends PipelineStage {
   }
 
   static PipelineStage createDestroyExecDirStage(WorkerContext workerContext, PipelineStage nextStage) {
-    return new PipelineStage.NullStage() {
+    return new PipelineStage.NullStage(workerContext, nextStage) {
       @Override
       public void put(OperationContext operationContext) throws InterruptedException {
         try {
@@ -43,7 +43,7 @@ public class ExecuteActionStage extends PipelineStage {
         } catch (IOException e) {
           logger.log(SEVERE, "error while destroying action root " + operationContext.execDir, e);
         } finally {
-          nextStage.put(operationContext);
+          output.put(operationContext);
         }
       }
     };

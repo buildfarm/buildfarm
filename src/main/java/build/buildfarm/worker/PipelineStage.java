@@ -197,7 +197,11 @@ public abstract class PipelineStage implements Runnable {
 
   public static class NullStage extends PipelineStage {
     public NullStage() {
-      super("NullStage", null, null, null);
+      this(/* workerContext=*/ null, /* output=*/ null);
+    }
+
+    public NullStage(WorkerContext workerContext, PipelineStage output) {
+      super("NullStage", workerContext, output, null);
     }
 
     @Override
