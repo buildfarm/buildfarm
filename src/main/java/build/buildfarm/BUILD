@@ -416,6 +416,26 @@ java_binary(
 )
 
 java_binary(
+    name = "bf-executor",
+    srcs = ["Executor.java"],
+    main_class = "build.buildfarm.Executor",
+    deps = [
+        ":common",
+        "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java",
+        "//3rdparty/jvm/io/grpc:grpc_context",
+        "//3rdparty/jvm/io/grpc:grpc_core",
+        "//3rdparty/jvm/io/grpc:grpc_netty",
+        "//3rdparty/jvm/io/grpc:grpc_protobuf",
+        "//3rdparty/jvm/io/grpc:grpc_stub",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+        "@googleapis//:google_rpc_code_java_proto",
+        "@googleapis//:google_rpc_status_java_proto",
+    ],
+)
+
+java_binary(
     name = "bf-cat",
     srcs = ["Cat.java"],
     main_class = "build.buildfarm.Cat",
