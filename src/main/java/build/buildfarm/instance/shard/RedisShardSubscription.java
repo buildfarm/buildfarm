@@ -41,7 +41,7 @@ class RedisShardSubscription implements Runnable {
   private final InterruptingRunnable onUnsubscribe;
   private final Consumer<Jedis> onReset;
   private final Supplier<List<String>> subscriptions;
-  private final Supplier<Jedis> jedisFactory;
+  private final IOSupplier<Jedis> jedisFactory;
   private final AtomicBoolean stopped = new AtomicBoolean(false);
 
   RedisShardSubscription(
@@ -49,7 +49,7 @@ class RedisShardSubscription implements Runnable {
       InterruptingRunnable onUnsubscribe,
       Consumer<Jedis> onReset,
       Supplier<List<String>> subscriptions,
-      Supplier<Jedis> jedisFactory) {
+      IOSupplier<Jedis> jedisFactory) {
     this.subscriber = subscriber;
     this.onUnsubscribe = onUnsubscribe;
     this.onReset = onReset;

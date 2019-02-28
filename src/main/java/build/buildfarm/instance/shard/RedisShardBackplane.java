@@ -1112,9 +1112,10 @@ public class RedisShardBackplane implements ShardBackplane {
     });
   }
 
-  private Jedis getJedis() {
+  private Jedis getJedis() throws IOException {
     if (!poolStarted) {
-      throw Status.UNAVAILABLE.withDescription("pool is not started").asRuntimeException();
+      throw new IOException(
+          Status.UNAVAILABLE.withDescription("pool is not started").asRuntimeException());
     }
     return pool.getResource();
   }
