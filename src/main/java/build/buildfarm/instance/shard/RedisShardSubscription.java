@@ -118,6 +118,7 @@ class RedisShardSubscription implements Runnable {
       try {
         onUnsubscribe.runInterruptibly();
       } catch (InterruptedException intEx) {
+        Thread.currentThread().interrupt();
       }
     } finally {
       stopped.set(true);
