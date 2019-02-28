@@ -23,6 +23,7 @@ import java.net.SocketTimeoutException;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPubSub;
@@ -31,12 +32,17 @@ import redis.clients.jedis.exceptions.JedisConnectionException;
 class RedisShardSubscription implements Runnable {
   private final static Logger logger = Logger.getLogger(RedisShardSubscription.class.getName());
 
+  @FunctionalInterface
+  interface IOSupplier<T> {
+    T get() throws IOException;
+  }
+
   private final JedisPubSub subscriber;
   private final InterruptingRunnable onUnsubscribe;
   private final Consumer<Jedis> onReset;
   private final Supplier<List<String>> subscriptions;
   private final Supplier<Jedis> jedisFactory;
-  private boolean done = false;
+  private final AtomicBoolean stopped = new AtomicBoolean(false);
 
   RedisShardSubscription(
       JedisPubSub subscriber,
@@ -88,7 +94,7 @@ class RedisShardSubscription implements Runnable {
 
   private void mainLoop() throws IOException {
     boolean first = true;
-    while (!isDone()) {
+    while (!stopped.get()) {
       if (!first) {
         logger.warning("unexpected subscribe return, reconnecting...");
       }
@@ -97,13 +103,10 @@ class RedisShardSubscription implements Runnable {
     }
   }
 
-  private boolean isDone() {
-    return done;
-  }
-
   public void stop() {
-    done = true;
-    subscriber.unsubscribe();
+    if (stopped.compareAndSet(false, true)) {
+      subscriber.unsubscribe();
+    }
   }
 
   @Override
@@ -116,6 +119,8 @@ class RedisShardSubscription implements Runnable {
         onUnsubscribe.runInterruptibly();
       } catch (InterruptedException intEx) {
       }
+    } finally {
+      stopped.set(true);
     }
   }
 }

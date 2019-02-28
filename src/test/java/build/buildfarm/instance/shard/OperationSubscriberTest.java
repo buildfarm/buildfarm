@@ -126,8 +126,7 @@ public class OperationSubscriberTest {
     TestClient testClient = new TestClient();
     Thread proceedThread = new Thread(() -> operationSubscriber.proceed(testClient));
     proceedThread.start();
-    // ensure that the client is subscribed
-    while (testClient.getSubscriptions().isEmpty()) {
+    while (!operationSubscriber.isSubscribed()) {
       MICROSECONDS.sleep(10);
     }
 
@@ -182,8 +181,7 @@ public class OperationSubscriberTest {
     TestClient testClient = new TestClient();
     Thread proceedThread = new Thread(() -> operationSubscriber.proceed(testClient));
     proceedThread.start();
-    // ensure that the client is subscribed
-    while (testClient.getSubscriptions().isEmpty()) {
+    while (!operationSubscriber.isSubscribed()) {
       MICROSECONDS.sleep(10);
     }
 

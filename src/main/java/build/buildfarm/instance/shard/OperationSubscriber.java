@@ -85,7 +85,9 @@ abstract class OperationSubscriber extends JedisPubSub {
   // cause protocol desynchronization for multiple concurrent calls
   @Override
   public synchronized void unsubscribe() {
-    super.unsubscribe();
+    if (isSubscribed()) {
+      super.unsubscribe();
+    }
   }
 
   @Override
