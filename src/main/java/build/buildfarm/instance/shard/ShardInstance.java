@@ -445,28 +445,61 @@ public class ShardInstance extends AbstractServerInstance {
       return immediateFuture(nonEmptyDigests);
     }
 
-    return findMissingBlobsOnWorker(nonEmptyDigests, workers, service);
+    return findMissingBlobsOnWorker(nonEmptyDigests, workers, ImmutableList.builder(), Iterables.size(nonEmptyDigests), service);
   }
 
-  private ListenableFuture<Iterable<Digest>> findMissingBlobsOnWorker(Iterable<Digest> blobDigests, Deque<String> workers, ExecutorService service) {
+  class FindMissingResponseEntry {
+    final String worker;
+    final long elapsedMicros;
+    final Throwable exception;
+    final int stillMissingAfter;
+
+    FindMissingResponseEntry(String worker, long elapsedMicros, Throwable exception, int stillMissingAfter) {
+      this.worker = worker;
+      this.elapsedMicros = elapsedMicros;
+      this.exception = exception;
+      this.stillMissingAfter = stillMissingAfter;
+    }
+  }
+
+  private ListenableFuture<Iterable<Digest>> findMissingBlobsOnWorker(
+      Iterable<Digest> blobDigests,
+      Deque<String> workers,
+      ImmutableList.Builder<FindMissingResponseEntry> responses,
+      int originalSize,
+      ExecutorService service) {
     String worker = workers.removeFirst();
     // FIXME use FluentFuture
+    Stopwatch stopwatch = Stopwatch.createStarted();
     ListenableFuture<Iterable<Digest>> findMissingBlobsFuture = transformAsync(
         workerStub(worker).findMissingBlobs(blobDigests, service),
         (missingDigests) -> {
+          responses.add(new FindMissingResponseEntry(worker, stopwatch.elapsed(MICROSECONDS), null, Iterables.size(missingDigests)));
           if (Iterables.isEmpty(missingDigests) || workers.isEmpty()) {
             return immediateFuture(missingDigests);
           }
-          return findMissingBlobsOnWorker(missingDigests, workers, service);
+          return findMissingBlobsOnWorker(missingDigests, workers, responses, originalSize, service);
         },
         service);
     return catchingAsync(
         findMissingBlobsFuture,
         Throwable.class,
-        (e) -> {
-          Status status = Status.fromThrowable(e);
+        (t) -> {
+          responses.add(new FindMissingResponseEntry(worker, stopwatch.elapsed(MICROSECONDS), t, Iterables.size(blobDigests)));
+          Status status = Status.fromThrowable(t);
           if (status.getCode() == Code.UNAVAILABLE || status.getCode() == Code.UNIMPLEMENTED) {
-            removeMalfunctioningWorker(worker, e, "findMissingBlobs(...)");
+            removeMalfunctioningWorker(worker, t, "findMissingBlobs(...)");
+          } else if (status.getCode() == Code.DEADLINE_EXCEEDED) {
+            for (FindMissingResponseEntry response : responses.build()) {
+              logger.error(
+                  "DEADLINE_EXCEEDED: findMissingBlobs({}): {} remaining of {} {}us{}",
+                  response.worker,
+                  response.stillMissingAfter,
+                  originalSize,
+                  response.elapsedMicros,
+                  response.exception != null ? ": " + t.toString() : "");
+            }
+            throw status.asRuntimeException();
           } else if (status.getCode() == Code.CANCELLED
               || Context.current().isCancelled()
               || !SHARD_IS_RETRIABLE.test(status)) {
@@ -480,7 +513,7 @@ public class ShardInstance extends AbstractServerInstance {
           if (workers.isEmpty()) {
             return immediateFuture(blobDigests);
           } else {
-            return findMissingBlobsOnWorker(blobDigests, workers, service);
+            return findMissingBlobsOnWorker(blobDigests, workers, responses, originalSize, service);
           }
         },
         service);
