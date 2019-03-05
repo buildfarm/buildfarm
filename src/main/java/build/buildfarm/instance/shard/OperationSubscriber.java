@@ -176,16 +176,6 @@ abstract class OperationSubscriber extends JedisPubSub {
     onOperation(channel, operation, (watcher) -> true, expiresAt);
   }
 
-  private static class StillWatchingWatcher {
-    public final boolean stillWatching;
-    public final TimedWatcher watcher;
-
-    StillWatchingWatcher(boolean stillWatching, TimedWatcher watcher) {
-      this.stillWatching = stillWatching;
-      this.watcher = watcher;
-    }
-  }
-
   private void onOperation(
       String channel,
       @Nullable Operation operation,
