@@ -87,6 +87,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
@@ -1115,7 +1116,7 @@ public abstract class AbstractServerInstance implements Instance {
     return null;
   }
 
-  protected <T> ListenableFuture<T> expect(Digest digest, Parser<T> parser, ExecutorService service) {
+  protected <T> ListenableFuture<T> expect(Digest digest, Parser<T> parser, Executor executor) {
     // FIXME find a way to make this a transform
     SettableFuture<T> future = SettableFuture.create();
     Futures.addCallback(
@@ -1135,7 +1136,7 @@ public abstract class AbstractServerInstance implements Instance {
             future.setException(t);
           }
         },
-        service);
+        executor);
     return future;
   }
 

@@ -907,7 +907,7 @@ public class ShardInstance extends AbstractServerInstance {
         QueuedOperationMetadata metadata = operation.getMetadata()
             .unpack(QueuedOperationMetadata.class);
         QueuedOperation queuedOperation = getUnchecked(
-            expect(metadata.getQueuedOperationDigest(), QueuedOperation.parser(), newDirectExecutorService()));
+            expect(metadata.getQueuedOperationDigest(), QueuedOperation.parser(), directExecutor()));
         if (queuedOperation.hasAction()) {
           return queuedOperation.getAction();
         }
@@ -933,11 +933,11 @@ public class ShardInstance extends AbstractServerInstance {
         directExecutor());
   }
 
-  private ListenableFuture<Directory> expectDirectory(String reason, Digest directoryBlobDigest, ExecutorService service) {
+  ListenableFuture<Directory> expectDirectory(String reason, Digest directoryBlobDigest, Executor executor) {
     if (directoryBlobDigest.getSizeBytes() == 0) {
       return immediateFuture(Directory.getDefaultInstance());
     }
-    Supplier<ListenableFuture<Directory>> fetcher = () -> notFoundNull(expect(directoryBlobDigest, Directory.parser(), service));
+    Supplier<ListenableFuture<Directory>> fetcher = () -> notFoundNull(expect(directoryBlobDigest, Directory.parser(), executor));
     // is there a better interface to use for the cache with these nice futures?
     return directoryCache.get(directoryBlobDigest, new Callable<ListenableFuture<? extends Directory>>() {
       @Override
@@ -952,8 +952,8 @@ public class ShardInstance extends AbstractServerInstance {
     });
   }
 
-  private ListenableFuture<Command> expectCommand(Digest commandBlobDigest, ExecutorService service) {
-    Supplier<ListenableFuture<Command>> fetcher = () -> notFoundNull(expect(commandBlobDigest, Command.parser(), service));
+  ListenableFuture<Command> expectCommand(Digest commandBlobDigest, Executor executor) {
+    Supplier<ListenableFuture<Command>> fetcher = () -> notFoundNull(expect(commandBlobDigest, Command.parser(), executor));
     return catching(
         commandCache.get(commandBlobDigest, new Callable<ListenableFuture<? extends Command>>() {
           @Override
@@ -965,8 +965,8 @@ public class ShardInstance extends AbstractServerInstance {
         (e) -> { return null; });
   }
 
-  private ListenableFuture<Action> expectAction(Digest actionBlobDigest, ExecutorService service) {
-    Supplier<ListenableFuture<Action>> fetcher = () -> notFoundNull(expect(actionBlobDigest, Action.parser(), service));
+  ListenableFuture<Action> expectAction(Digest actionBlobDigest, Executor executor) {
+    Supplier<ListenableFuture<Action>> fetcher = () -> notFoundNull(expect(actionBlobDigest, Action.parser(), executor));
     return catching(
         actionCache.get(actionBlobDigest, new Callable<ListenableFuture<? extends Action>>() {
           @Override
