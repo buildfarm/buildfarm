@@ -29,6 +29,7 @@ import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.AdditionalAnswers.answer;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
@@ -47,13 +48,17 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteResponse;
+import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.OutputFile;
+import build.bazel.remote.execution.v2.ResultsCachePolicy;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Poller;
 import build.buildfarm.common.ShardBackplane;
+import build.buildfarm.common.Watcher;
 import build.buildfarm.instance.Instance.CommittingOutputStream;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.ExecuteEntry;
@@ -77,6 +82,7 @@ import io.grpc.StatusRuntimeException;
 import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -86,6 +92,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatcher;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.invocation.InvocationOnMock;
@@ -247,6 +254,26 @@ public class ShardInstanceTest {
     Digest directoryDigest = DIGEST_UTIL.compute(directoryBlob);
     instance.updateCaches(directoryDigest, directoryBlob);
     assertThat(instance.expectDirectory("testing", directoryDigest, directExecutor()).get()).isEqualTo(directory);
+  }
+
+  @Test
+  public void executeCallsPrequeueWithAction() throws IOException {
+    when(mockBackplane.canPrequeue()).thenReturn(true);
+    Digest actionDigest = Digest.newBuilder()
+        .setHash("action")
+        .setSizeBytes(10)
+        .build();
+    instance.execute(
+        actionDigest,
+        /* skipCacheLookup=*/ false,
+        ExecutionPolicy.getDefaultInstance(),
+        ResultsCachePolicy.getDefaultInstance(),
+        RequestMetadata.getDefaultInstance(),
+        /* watcher=*/ null);
+    ArgumentCaptor<ExecuteEntry> executeEntryCaptor = ArgumentCaptor.forClass(ExecuteEntry.class);
+    verify(mockBackplane, times(1)).prequeue(executeEntryCaptor.capture(), any(Operation.class));
+    ExecuteEntry executeEntry = executeEntryCaptor.getValue();
+    assertThat(executeEntry.getActionDigest()).isEqualTo(actionDigest);
   }
 
   @Test
@@ -481,6 +508,14 @@ public class ShardInstanceTest {
   }
 
   @Test
+  public void missingActionResultReturnsNull() throws IOException {
+    ActionKey defaultActionKey = DIGEST_UTIL.computeActionKey(
+        Action.getDefaultInstance());
+    assertThat(instance.getActionResult(defaultActionKey)).isNull();
+    verify(mockBackplane, times(1)).getActionResult(defaultActionKey);
+  }
+
+  @Test
   public void actionResultsWithMissingOutputsAreInvalidated() throws IOException {
     ActionKey actionKey = DigestUtil.asActionKey(Digest.newBuilder()
         .setHash("test")
@@ -493,6 +528,12 @@ public class ShardInstanceTest {
                     Digest.newBuilder()
                         .setHash("dne")
                         .setSizeBytes(1)))
+        .setStdoutDigest(Digest.newBuilder()
+            .setHash("stdout")
+            .setSizeBytes(1))
+        .setStderrDigest(Digest.newBuilder()
+            .setHash("stderr")
+            .setSizeBytes(1))
         .build();
 
     when(mockBackplane.getActionResult(eq(actionKey))).thenReturn(actionResult);
@@ -599,5 +640,96 @@ public class ShardInstanceTest {
         ImmutableList.of(digest),
         newDirectExecutorService()).get();
     assertThat(missingDigests).containsExactly(digest);
+  }
+
+  @Test
+  public void blobsAreMissingWhenWorkersAreEmpty() throws Exception {
+    String workerName = "worker";
+    when(mockInstanceLoader.load(eq(workerName))).thenReturn(mockWorkerInstance);
+
+    ImmutableSet<String> workers = ImmutableSet.of(workerName);
+    when(mockBackplane.getWorkers()).thenReturn(workers);
+
+    Digest digest = Digest.newBuilder()
+        .setHash("hash")
+        .setSizeBytes(1)
+        .build();
+    List<Digest> queryDigests = ImmutableList.of(digest);
+    ArgumentMatcher<Iterable<Digest>> queryMatcher = (digests) -> Iterables.elementsEqual(digests, queryDigests);
+    when(mockWorkerInstance.findMissingBlobs(argThat(queryMatcher), any(ExecutorService.class)))
+        .thenReturn(immediateFuture(queryDigests));
+    Iterable<Digest> missingDigests = instance.findMissingBlobs(
+        queryDigests,
+        newDirectExecutorService()).get();
+    verify(mockWorkerInstance, times(1)).findMissingBlobs(argThat(queryMatcher), any(ExecutorService.class));
+    assertThat(missingDigests).containsExactly(digest);
+  }
+
+  @Test
+  public void watchOperationFutureIsDoneForCompleteOperation() throws IOException {
+    Watcher watcher = mock(Watcher.class);
+    Operation completedOperation = Operation.newBuilder()
+        .setName("completed-operation")
+        .setDone(true)
+        .setMetadata(Any.pack(ExecuteOperationMetadata.newBuilder()
+            .setStage(COMPLETED)
+            .build()))
+        .build();
+    when(mockBackplane.getOperation(completedOperation.getName()))
+        .thenReturn(completedOperation);
+    ListenableFuture<Void> future = instance.watchOperation(
+        completedOperation.getName(),
+        watcher);
+    assertThat(future.isDone()).isTrue();
+    verify(mockBackplane, times(1)).getOperation(completedOperation.getName());
+    ArgumentCaptor<Operation> operationCaptor = ArgumentCaptor.forClass(Operation.class);
+    verify(watcher, times(1)).observe(operationCaptor.capture());
+    Operation observedOperation = operationCaptor.getValue();
+    assertThat(observedOperation.getName()).isEqualTo(completedOperation.getName());
+    assertThat(observedOperation.getDone()).isTrue();
+  }
+
+  @Test
+  public void watchOperationFutureIsErrorForObserveException() throws IOException, InterruptedException {
+    RuntimeException observeException = new RuntimeException();
+    Watcher watcher = mock(Watcher.class);
+    doAnswer((invocation) -> {
+      throw observeException;
+    }).when(watcher).observe(any(Operation.class));
+    Operation errorObserveOperation = Operation.newBuilder()
+        .setName("error-observe-operation")
+        .setMetadata(Any.pack(ExecuteOperationMetadata.newBuilder()
+            .build()))
+        .build();
+    when(mockBackplane.getOperation(errorObserveOperation.getName()))
+        .thenReturn(errorObserveOperation);
+    ListenableFuture<Void> future = instance.watchOperation(
+        errorObserveOperation.getName(),
+        watcher);
+    boolean caughtException = false;
+    try {
+      future.get();
+    } catch (ExecutionException e) {
+      assertThat(e.getCause()).isEqualTo(observeException);
+      caughtException = true;
+    }
+    assertThat(caughtException).isTrue();
+  }
+
+  @Test
+  public void watchOperationCallsBackplaneForIncompleteOperation() throws IOException {
+    Watcher watcher = mock(Watcher.class);
+    Operation incompleteOperation = Operation.newBuilder()
+        .setName("incomplete-operation")
+        .setMetadata(Any.pack(ExecuteOperationMetadata.newBuilder()
+            .build()))
+        .build();
+    when(mockBackplane.getOperation(incompleteOperation.getName()))
+        .thenReturn(incompleteOperation);
+    instance.watchOperation(
+        incompleteOperation.getName(),
+        watcher);
+    verify(mockBackplane, times(1)).getOperation(incompleteOperation.getName());
+    verify(mockBackplane, times(1)).watchOperation(incompleteOperation.getName(), watcher);
   }
 }
