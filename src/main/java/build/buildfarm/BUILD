@@ -268,18 +268,6 @@ java_library(
     ],
 )
 
-container_image(
-    name = "buildfarm-shard-worker.container",
-    base = "@java_base//image",
-    cmd = [
-        "buildfarm-shard-worker_deploy.jar",
-        "/config/worker.config",
-    ],
-    files = [
-        ":buildfarm-shard-worker_deploy.jar",
-    ],
-)
-
 java_binary(
     name = "buildfarm-shard-worker",
     main_class = "build.buildfarm.worker.shard.Worker",
