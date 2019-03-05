@@ -1429,14 +1429,10 @@ public class ShardInstance extends AbstractServerInstance {
     } else {
       cachedResultFuture = checkCacheFuture(actionKey, operation);
     }
-    addCallback(
+    return transformAsync(
         cachedResultFuture,
-        new FutureCallback<Boolean>() {
-          @Override
-          public void onSuccess(Boolean cachedResult) {
-            if (!cachedResult) {
-              return;
-            }
+        (cachedResult) -> {
+          if (cachedResult) {
             poller.pause();
             long checkCacheUSecs = stopwatch.elapsed(MICROSECONDS);
             logger.info(
@@ -1445,18 +1441,6 @@ public class ShardInstance extends AbstractServerInstance {
                     getName(),
                     operation.getName(),
                     checkCacheUSecs));
-          }
-
-          @Override
-          public void onFailure(Throwable t) {
-            // ignore
-          }
-        },
-        operationTransformService);
-    return transformAsync(
-        cachedResultFuture,
-        (cachedResult) -> {
-          if (cachedResult) {
             return IMMEDIATE_VOID_FUTURE;
           }
           return transformAndQueue(executeEntry, poller, operation, stopwatch);
