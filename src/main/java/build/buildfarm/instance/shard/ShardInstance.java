@@ -1099,11 +1099,23 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   private ListenableFuture<Long> writeBlobFuture(Digest digest, ByteString content) {
+    checkState(digest.getSizeBytes() == content.size());
     int attempts = 5;
     for (;;) {
       try (CommittingOutputStream out = createBlobOutputStream(digest)) {
         content.writeTo(out);
-        return out.getCommittedFuture();
+        return transformAsync(
+            out.getCommittedFuture(),
+            (committedSize) -> {
+              if (committedSize != content.size()) {
+                throw new IOException(
+                    String.format(
+                        "committedSize %d did not match expected size for %s",
+                        committedSize,
+                        DigestUtil.toString(digest)));
+              }
+              return immediateFuture(committedSize);
+            });
       } catch (IOException e) {
         return immediateFailedFuture(e);
       } catch (Throwable t) {

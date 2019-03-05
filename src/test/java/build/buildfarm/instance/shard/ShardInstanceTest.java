@@ -28,6 +28,7 @@ import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.mockito.AdditionalAnswers.answer;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
@@ -358,14 +359,14 @@ public class ShardInstanceTest {
   public void queueOperationPutFailureCancelsOperation() throws Exception {
     Action action = createAction();
     Digest actionDigest = DIGEST_UTIL.compute(action);
-    CommittingOutputStream mockCommittedOutputStream = mock(CommittingOutputStream.class);
-    when(mockCommittedOutputStream.getCommittedFuture()).thenReturn(immediateFuture(actionDigest.getSizeBytes()));
 
     when(mockWorkerInstance.findMissingBlobs(any(Iterable.class), any(ExecutorService.class))).thenReturn(immediateFuture(ImmutableList.of()));
 
-    when(mockWorkerInstance.getStreamOutput(
-        matches("^uploads/[^/]+/blobs/.*$"),
-        any(Long.class))).thenReturn(mockCommittedOutputStream);
+    doAnswer(answer((resourceName, sizeBytes) -> new CommittingNullSink()))
+        .when(mockWorkerInstance)
+        .getStreamOutput(
+            matches("^uploads/[^/]+/blobs/.*$"),
+            any(Long.class));
 
     StatusRuntimeException queueException = Status.UNAVAILABLE.asRuntimeException();
     doAnswer((invocation) -> {
