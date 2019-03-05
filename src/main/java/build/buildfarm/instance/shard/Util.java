@@ -68,7 +68,7 @@ public class Util {
                   public ListenableFuture<String> apply(String worker) {
                     return transform(
                         checkMissingBlobOnInstance(digest, workerInstanceFactory.apply(worker), service),
-                        (missing) -> missing ? worker : null,
+                        (missing) -> (missing ? worker : null),
                         directExecutor());
                   }
                 })),
