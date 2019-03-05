@@ -442,6 +442,46 @@ public class ShardInstanceTest {
   }
 
   @Test
+  public void queueWithFailedCacheCheckContinues() throws Exception {
+    Action action = createAction();
+    ActionKey actionKey = DIGEST_UTIL.computeActionKey(action);
+    ExecuteEntry executeEntry = ExecuteEntry.newBuilder()
+        .setOperationName("operation-with-erroring-action-result")
+        .setActionDigest(actionKey.getDigest())
+        .build();
+
+    when(mockBackplane.canQueue()).thenReturn(true);
+
+    ActionResult actionResult = ActionResult.newBuilder()
+        .addOutputFiles(
+            OutputFile.newBuilder()
+                .setPath("output/path")
+                .setDigest(
+                    Digest.newBuilder()
+                        .setHash("find-missing-blobs-causes-resource-exhausted")
+                        .setSizeBytes(1)))
+        .build();
+
+    when(mockBackplane.getActionResult(eq(actionKey))).thenReturn(actionResult);
+    when(mockWorkerInstance.findMissingBlobs(any(Iterable.class), any(ExecutorService.class)))
+        .thenReturn(immediateFailedFuture(Status.RESOURCE_EXHAUSTED.asException()));
+
+    doAnswer(answer((resourceName, sizeBytes) -> new CommittingNullSink()))
+        .when(mockWorkerInstance)
+        .getStreamOutput(
+            matches("^uploads/[^/]+/blobs/.*$"),
+            any(Long.class));
+
+    Poller poller = mock(Poller.class);
+
+    instance.queue(executeEntry, poller).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
+
+    verify(mockBackplane, times(1)).queue(any(QueueEntry.class), any(Operation.class));
+    verify(mockBackplane, times(1)).putOperation(any(Operation.class), eq(CACHE_CHECK));
+    verify(poller, atLeastOnce()).pause();
+  }
+
+  @Test
   public void actionResultsWithMissingOutputsAreInvalidated() throws IOException {
     ActionKey actionKey = DigestUtil.asActionKey(Digest.newBuilder()
         .setHash("test")

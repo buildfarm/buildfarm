@@ -1397,19 +1397,10 @@ public class ShardInstance extends AbstractServerInstance {
     });
     return catchingAsync(
         checkCacheFuture,
-        IOException.class,
+        Throwable.class,
         (e) -> {
-          logger.log(SEVERE, "error checking cache", e);
-          com.google.rpc.Status status = StatusProto.fromThrowable(e);
-          if (status == null) {
-            status = com.google.rpc.Status.newBuilder()
-                .setCode(Status.fromThrowable(e).getCode().value())
-                .setMessage(e.getMessage())
-                .build();
-          }
-          SettableFuture<Boolean> errorFuture = SettableFuture.create();
-          errorOperationFuture(operation, status, errorFuture);
-          return errorFuture;
+          logger.log(SEVERE, "error checking cache for " + operation.getName(), e);
+          return immediateFuture(false);
         },
         operationTransformService);
   }
