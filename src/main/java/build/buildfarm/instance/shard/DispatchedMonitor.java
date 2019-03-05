@@ -14,7 +14,8 @@
 
 package build.buildfarm.instance.shard;
 
-import static com.google.common.util.concurrent.Futures.allAsList;
+import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
+import static com.google.common.util.concurrent.Futures.successfulAsList;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.lang.String.format;
 import static java.util.logging.Level.SEVERE;
@@ -24,9 +25,11 @@ import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.QueueEntry;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.rpc.Code;
 import com.google.rpc.Status;
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
@@ -37,12 +40,15 @@ class DispatchedMonitor implements Runnable {
 
   private final ShardBackplane backplane;
   private final Function<QueueEntry, ListenableFuture<Void>> requeuer;
+  private final int intervalSeconds;
 
   DispatchedMonitor(
       ShardBackplane backplane,
-      Function<QueueEntry, ListenableFuture<Void>> requeuer) {
+      Function<QueueEntry, ListenableFuture<Void>> requeuer,
+      int intervalSeconds) {
     this.backplane = backplane;
     this.requeuer = requeuer;
+    this.intervalSeconds = intervalSeconds;
   }
 
   private ListenableFuture<Void> requeueDispatchedOperation(DispatchedOperation o, long now) {
@@ -61,40 +67,69 @@ class DispatchedMonitor implements Runnable {
     return requeuedFuture;
   }
 
-  private void testDispatchedOperations(long now) throws IOException, InterruptedException {
-    ImmutableList.Builder<ListenableFuture<Void>> requeuedFutures = ImmutableList.builder();
+  private void testDispatchedOperations(
+      long now,
+      Iterable<DispatchedOperation> dispatchedOperations,
+      ImmutableList.Builder<ListenableFuture<Void>> requeuedFutures) {
     /* iterate over dispatched */
-    for (DispatchedOperation o : backplane.getDispatchedOperations()) {
+    for (DispatchedOperation o : dispatchedOperations) {
       /* if now > dispatchedOperation.getExpiresAt() */
       if (now >= o.getRequeueAt()) {
         requeuedFutures.add(requeueDispatchedOperation(o, now));
       }
     }
+  }
+
+  private ListenableFuture<List<Void>> submitAll() {
+    ImmutableList.Builder<ListenableFuture<Void>> requeuedFutures = ImmutableList.builder();
     try {
-      allAsList(requeuedFutures.build()).get();
+      long now = System.currentTimeMillis(); /* FIXME sync */
+      boolean canQueueNow = backplane.canQueue();
+      if (canQueueNow) {
+        testDispatchedOperations(now, backplane.getDispatchedOperations(), requeuedFutures);
+      }
+    } catch (Exception e) {
+      if (!backplane.isStopped()) {
+        logger.log(SEVERE, "error during dispatch evaluation", e);
+      }
+    }
+    return successfulAsList(requeuedFutures.build());
+  }
+
+  static <T> T getOnlyInterruptibly(ListenableFuture<T> future) throws InterruptedException {
+    try {
+      return future.get();
     } catch (ExecutionException e) {
-      logger.log(SEVERE, "error requeuing operations", e);
+      // unlikely, successfulAsList prevents this as the only return
+      Throwable cause = e.getCause();
+      logger.log(SEVERE, "unexpected exception", cause);
+      if (cause instanceof RuntimeException) {
+        throw (RuntimeException) cause;
+      }
+      throw new UncheckedExecutionException(cause);
+    }
+  }
+
+  void iterate() throws InterruptedException {
+    getOnlyInterruptibly(submitAll());
+  }
+
+  private void runInterruptibly() throws InterruptedException {
+    while (!backplane.isStopped()) {
+      TimeUnit.SECONDS.sleep(intervalSeconds);
+      iterate();
     }
   }
 
   @Override
   public synchronized void run() {
     logger.info("DispatchedMonitor: Running");
-    while (true) {
-      try {
-        long now = System.currentTimeMillis(); /* FIXME sync */
-        boolean canQueueNow = backplane.canQueue();
-        if (canQueueNow) {
-          testDispatchedOperations(now);
-        }
-        TimeUnit.SECONDS.sleep(1);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        break;
-      } catch (Exception e) {
-        logger.log(SEVERE, "error during dispatch evaluation", e);
-      }
+    try {
+      runInterruptibly();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    } finally {
+      logger.info("DispatchedMonitor: Exiting");
     }
-    logger.info("DispatchedMonitor: Exiting");
   }
 }

@@ -172,7 +172,8 @@ public class ShardInstance extends AbstractServerInstance {
         digestUtil,
         getBackplane(config),
         config.getRunDispatchedMonitor(),
-        /* runOperationQueuer=*/ true,
+        config.getDispatchedMonitorIntervalSeconds(),
+        config.getRunOperationQueuer(),
         onStop,
         WorkerStubs.create(digestUtil));
   }
@@ -199,6 +200,7 @@ public class ShardInstance extends AbstractServerInstance {
       DigestUtil digestUtil,
       ShardBackplane backplane,
       boolean runDispatchedMonitor,
+      int dispatchedMonitorIntervalSeconds,
       boolean runOperationQueuer,
       Runnable onStop,
       com.google.common.cache.LoadingCache<String, Instance> workerStubs)
@@ -212,7 +214,8 @@ public class ShardInstance extends AbstractServerInstance {
     if (runDispatchedMonitor) {
       dispatchedMonitor = new Thread(new DispatchedMonitor(
           backplane,
-          this::requeueOperation));
+          this::requeueOperation,
+          dispatchedMonitorIntervalSeconds));
     } else {
       dispatchedMonitor = null;
     }

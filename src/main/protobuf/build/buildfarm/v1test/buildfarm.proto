@@ -158,12 +158,12 @@ message RedisShardBackplaneConfig {
 message ShardInstanceConfig {
   bool run_dispatched_monitor = 1;
 
-  int64 max_completed_operations_count = 4;
+  int32 dispatched_monitor_interval_seconds = 2;
 
-  int32 action_cache_sweep_period = 5;
+  bool run_operation_queuer = 3;
 
   oneof backplane {
-    RedisShardBackplaneConfig redis_shard_backplane_config = 6;
+    RedisShardBackplaneConfig redis_shard_backplane_config = 4;
   }
 }
 

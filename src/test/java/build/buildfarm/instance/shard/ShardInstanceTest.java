@@ -120,6 +120,7 @@ public class ShardInstanceTest {
         DIGEST_UTIL,
         mockBackplane,
         /* runDispatchedMonitor=*/ false,
+        /* dispatchedMonitorIntervalSeconds=*/ 0,
         /* runOperationQueuer=*/ false,
         mockOnStop,
         CacheBuilder.newBuilder()
