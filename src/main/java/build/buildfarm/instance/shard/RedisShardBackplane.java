@@ -185,48 +185,141 @@ public class RedisShardBackplane implements ShardBackplane {
     return oldOnUnsubscribe;
   }
 
-  private void scanPrequeue(Jedis jedis, Consumer<String> onOperationName) {
-    int index = 0;
-    int nextIndex = index + 10000;
-    boolean done = false;
-    while (!done) {
-      List<String> executeEntries = jedis.lrange(config.getPreQueuedOperationsListName(), index, nextIndex - 1);
-      done = executeEntries.isEmpty();
-      for (String executeEntryJson : executeEntries) {
-        ExecuteEntry.Builder builder = ExecuteEntry.newBuilder();
-        try {
-          JsonFormat.parser().merge(executeEntryJson, builder);
-          onOperationName.accept(builder.build().getOperationName());
-        } catch (InvalidProtocolBufferException e) {
-          e.printStackTrace();
-          // ignore
-        }
+  private Instant getExpiresAt(Jedis jedis, String key, Instant now) {
+    String value = jedis.get(key);
+    if (value != null) {
+      try {
+        return Instant.ofEpochMilli(Long.parseLong(value));
+      } catch (NumberFormatException e) {
+        logger.severe(format("invalid expiration %s for %s", value, key));
       }
-      index = nextIndex;
-      nextIndex += 10000;
+    }
+
+    Instant expiresAt = now.plusMillis(config.getProcessingTimeoutMillis());
+    jedis.setex(
+        key,
+        /* expire=*/ (config.getProcessingTimeoutMillis() * 2) / 1000,
+        String.format("%d", expiresAt.toEpochMilli()));
+    return expiresAt;
+  }
+
+  abstract static class ListVisitor {
+    private static final int LIST_PAGE_SIZE = 10000;
+
+    protected abstract void visit(String entry);
+
+    // this can potentially operate over the same set of entries in multiple steps
+    public static void visit(Jedis jedis, String name, ListVisitor visitor) {
+      int index = 0;
+      int nextIndex = LIST_PAGE_SIZE;
+      List<String> entries;
+      do {
+        entries = jedis.lrange(name, index, nextIndex - 1);
+        for (String entry : entries) {
+          visitor.visit(entry);
+        }
+        index = nextIndex;
+        nextIndex += entries.size();
+      } while (entries.size() == LIST_PAGE_SIZE);
     }
   }
 
-  private void scanQueue(Jedis jedis, Consumer<String> onOperationName) {
-    int index = 0;
-    int nextIndex = index + 10000;
-    boolean done = false;
-    while (!done) {
-      List<String> queueEntries = jedis.lrange(config.getQueuedOperationsListName(), index, nextIndex - 1);
-      done = queueEntries.isEmpty();
-      for (String queueEntryJson : queueEntries) {
-        QueueEntry.Builder builder = QueueEntry.newBuilder();
-        try {
-          JsonFormat.parser().merge(queueEntryJson, builder);
-          onOperationName.accept(builder.build().getExecuteEntry().getOperationName());
-        } catch (InvalidProtocolBufferException e) {
-          e.printStackTrace();
-          // ignore
-        }
+  abstract static class QueueEntryListVisitor extends ListVisitor {
+    protected abstract void visit(QueueEntry queueEntry, String queueEntryJson);
+
+    @Override
+    protected void visit(String entry) {
+      QueueEntry.Builder queueEntry = QueueEntry.newBuilder();
+      try {
+        JsonFormat.parser().merge(entry, queueEntry);
+        visit(queueEntry.build(), entry);
+      } catch (InvalidProtocolBufferException e) {
+        logger.log(SEVERE, "invalid QueueEntry json: " + entry, e);
       }
-      index = nextIndex;
-      nextIndex += 10000;
     }
+  }
+
+  abstract static class ExecuteEntryListVisitor extends ListVisitor {
+    protected abstract void visit(ExecuteEntry executeEntry, String executeEntryJson);
+
+    @Override
+    protected void visit(String entry) {
+      ExecuteEntry.Builder executeEntry = ExecuteEntry.newBuilder();
+      try {
+        JsonFormat.parser().merge(entry, executeEntry);
+        visit(executeEntry.build(), entry);
+      } catch (InvalidProtocolBufferException e) {
+        logger.log(SEVERE, "invalid ExecuteEntry json: " + entry, e);
+      }
+    }
+  }
+
+  private void scanProcessing(Jedis jedis, Consumer<String> onOperationName, Instant now) {
+    ListVisitor.visit(
+        jedis,
+        config.getProcessingListName(),
+        new ExecuteEntryListVisitor() {
+          @Override
+          protected void visit(ExecuteEntry executeEntry, String executeEntryJson) {
+            String operationName = executeEntry.getOperationName();
+            String operationProcessingKey = processingKey(operationName);
+
+            Instant expiresAt = getExpiresAt(jedis, operationProcessingKey, now);
+            if (now.isBefore(expiresAt)) {
+              onOperationName.accept(operationName);
+            } else {
+              if (jedis.lrem(config.getProcessingListName(), -1, executeEntryJson) != 0) {
+                jedis.del(operationProcessingKey);
+              }
+            }
+          }
+        });
+  }
+
+  private void scanDispatching(Jedis jedis, Consumer<String> onOperationName, Instant now) {
+    ListVisitor.visit(
+        jedis,
+        config.getDispatchingListName(),
+        new QueueEntryListVisitor() {
+          @Override
+          protected void visit(QueueEntry queueEntry, String queueEntryJson) {
+            String operationName = queueEntry.getExecuteEntry().getOperationName();
+            String operationDispatchingKey = dispatchingKey(operationName);
+
+            Instant expiresAt = getExpiresAt(jedis, operationDispatchingKey, now);
+            if (now.isBefore(expiresAt)) {
+              onOperationName.accept(operationName);
+            } else {
+              if (jedis.lrem(config.getDispatchingListName(), -1, queueEntryJson) != 0) {
+                jedis.del(operationDispatchingKey);
+              }
+            }
+          }
+        });
+  }
+
+  private void scanPrequeue(Jedis jedis, Consumer<String> onOperationName) {
+    ListVisitor.visit(
+        jedis,
+        config.getPreQueuedOperationsListName(),
+        new ExecuteEntryListVisitor() {
+          @Override
+          protected void visit(ExecuteEntry executeEntry, String executeEntryJson) {
+            onOperationName.accept(executeEntry.getOperationName());
+          }
+        });
+  }
+
+  private void scanQueue(Jedis jedis, Consumer<String> onOperationName) {
+    ListVisitor.visit(
+        jedis,
+        config.getQueuedOperationsListName(),
+        new QueueEntryListVisitor() {
+          @Override
+          protected void visit(QueueEntry queueEntry, String queueEntryJson) {
+            onOperationName.accept(queueEntry.getExecuteEntry().getOperationName());
+          }
+        });
   }
 
   private void scanDispatched(Jedis jedis, Consumer<String> onOperationName) {
@@ -246,6 +339,15 @@ public class RedisShardBackplane implements ShardBackplane {
         operationSubscriber.resetWatchers(channel, expiresAt);
       }
     };
+
+    /**
+     * Run through the inflight lists first to ensure that they are always cleaned up
+     * instead of just when this scheduler has expiring watchers
+     */
+    // scan dispatching, create ttl key if missing, remove dead entries, pet live watches
+    scanDispatching(jedis, resetChannel, now);
+    // scan processing, create ttl key if missing, remove dead entries, pet live watches
+    scanProcessing(jedis, resetChannel, now);
 
     if (expiringChannels.isEmpty()) {
       return;
@@ -273,6 +375,11 @@ public class RedisShardBackplane implements ShardBackplane {
     logger.info("Scan prequeue");
     // scan prequeue, pet watches
     scanPrequeue(jedis, resetChannel);
+
+    if (expiringChannels.isEmpty()) {
+      return;
+    }
+
     //
     // filter watches on expiration
     // delete the operation?
@@ -900,23 +1007,18 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   private ExecuteEntry deprequeueOperation(Jedis jedis) {
-    List<String> result;
+    String executeEntryJson;
     do {
-      // time to switch to brpoplpush
-      result = jedis.brpop(1, config.getPreQueuedOperationsListName());
-      // right here is an operation loss risk
+      executeEntryJson = jedis.brpoplpush(
+          config.getPreQueuedOperationsListName(),
+          config.getProcessingListName(),
+          1000);
       if (Thread.currentThread().isInterrupted()) {
         return null;
       }
-    } while (result == null || result.isEmpty());
-
-    if (result.size() != 2
-        || !result.get(0).equals(config.getPreQueuedOperationsListName())) {
-      return null;
-    }
+    } while (executeEntryJson == null);
 
     ExecuteEntry.Builder executeEntryBuilder = ExecuteEntry.newBuilder();
-    String executeEntryJson = result.get(1);
     try {
       JsonFormat.parser().merge(executeEntryJson, executeEntryBuilder);
       ExecuteEntry executeEntry = executeEntryBuilder.build();
@@ -925,6 +1027,17 @@ public class RedisShardBackplane implements ShardBackplane {
       String message = keepaliveMessage(operationName);
       // publish so that watchers reset their timeout
       keepalive(jedis, operationName, message);
+
+      // destroy the processing entry and ttl
+      if (jedis.lrem(config.getProcessingListName(), -1, executeEntryJson) == 0) {
+        logger.severe(
+            format(
+                "could not remove %s from %s",
+                operationName,
+                config.getProcessingListName()));
+        return null;
+      }
+      jedis.del(processingKey(operationName)); // may or may not exist
       return executeEntry;
     } catch (InvalidProtocolBufferException e) {
       logger.log(SEVERE, "error parsing execute entry", e);
@@ -942,22 +1055,18 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   private QueueEntry dispatchOperation(Jedis jedis) {
-    List<String> result;
+    String queueEntryJson;
     do {
-      // time to switch to brpoplpush
-      result = jedis.brpop(1, config.getQueuedOperationsListName());
+      queueEntryJson = jedis.brpoplpush(
+          config.getQueuedOperationsListName(),
+          config.getDispatchingListName(),
+          1000);
       // right here is an operation loss risk
       if (Thread.currentThread().isInterrupted()) {
         return null;
       }
-    } while (result == null || result.isEmpty());
+    } while (queueEntryJson == null);
 
-    if (result.size() != 2
-        || !result.get(0).equals(config.getQueuedOperationsListName())) {
-      return null;
-    }
-
-    String queueEntryJson = result.get(1);
     QueueEntry.Builder queueEntryBuilder = QueueEntry.newBuilder();
     try {
       JsonFormat.parser().merge(queueEntryJson, queueEntryBuilder);
@@ -982,20 +1091,32 @@ public class RedisShardBackplane implements ShardBackplane {
         .setQueueEntry(queueEntry)
         .setRequeueAt(requeueAt)
         .build();
+    boolean success = false;
     try {
       String dispatchedOperationJson = JsonFormat.printer().print(o);
 
       /* if the operation is already in the dispatch list, fail the dispatch */
-      boolean success = jedis.hsetnx(
+      success = jedis.hsetnx(
           config.getDispatchedOperationsHashName(),
           operationName,
           dispatchedOperationJson) == 1;
-      return success ? queueEntry : null;
     } catch (InvalidProtocolBufferException e) {
       logger.log(SEVERE, "error printing dispatched operation", e);
       // very unlikely, printer would have to fail
-      return null;
     }
+
+    if (success) {
+      if (jedis.lrem(config.getDispatchingListName(), -1, queueEntryJson) == 0) {
+        logger.warning(
+            format(
+                "operation %s was missing in %s, may be orphaned",
+                operationName,
+                config.getDispatchingListName()));
+      }
+      jedis.del(dispatchingKey(operationName)); // may or may not exist
+      return queueEntry;
+    }
+    return null;
   }
 
   @Override
@@ -1143,6 +1264,14 @@ public class RedisShardBackplane implements ShardBackplane {
 
   private String operationChannel(String operationName) {
     return config.getOperationChannelPrefix() + ":" + operationName;
+  }
+
+  private String processingKey(String operationName) {
+    return config.getProcessingPrefix() + ":" + operationName;
+  }
+
+  private String dispatchingKey(String operationName) {
+    return config.getDispatchingPrefix() + ":" + operationName;
   }
 
   public static String parseOperationChannel(String channel) {

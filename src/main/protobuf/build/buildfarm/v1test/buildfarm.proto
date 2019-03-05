@@ -143,7 +143,13 @@ message RedisShardBackplaneConfig {
   string operation_prefix = 5;
   int32 operation_expire = 6;
   string pre_queued_operations_list_name = 18;
+  string processing_list_name = 19;
+  string processing_prefix = 20;
+  int32 processing_timeout_millis = 21;
   string queued_operations_list_name = 7;
+  string dispatching_list_name = 22;
+  string dispatching_prefix = 23;
+  int32 dispatching_timeout_millis = 24;
   string dispatched_operations_hash_name = 8;
   string operation_channel_prefix = 9;
   string cas_prefix = 10;
