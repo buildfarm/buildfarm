@@ -467,14 +467,14 @@ public class ShardInstance extends AbstractServerInstance {
           Status status = Status.fromThrowable(e);
           if (status.getCode() == Code.UNAVAILABLE || status.getCode() == Code.UNIMPLEMENTED) {
             removeMalfunctioningWorker(worker, e, "findMissingBlobs(...)");
-          } else if (status.getCode() == Code.CANCELLED || Context.current().isCancelled()) {
+          } else if (status.getCode() == Code.CANCELLED
+              || Context.current().isCancelled()
+              || !SHARD_IS_RETRIABLE.test(status)) {
             // do nothing further if we're cancelled
             throw status.asRuntimeException();
-          } else if (SHARD_IS_RETRIABLE.test(status)) {
+          } else {
             // why not, always
             workers.addLast(worker);
-          } else {
-            throw Status.INTERNAL.withCause(e).asRuntimeException();
           }
 
           if (workers.isEmpty()) {
