@@ -50,6 +50,8 @@ public class Util {
   public static final Predicate<Status> SHARD_IS_RETRIABLE =
       st -> st.getCode() != Code.CANCELLED && Retrier.DEFAULT_IS_RETRIABLE.test(st);
 
+  private Util() { }
+
   public static ListenableFuture<Set<String>> correctMissingBlob(
       ShardBackplane backplane,
       Set<String> workerSet,
