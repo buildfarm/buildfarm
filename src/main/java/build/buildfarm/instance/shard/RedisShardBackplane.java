@@ -419,6 +419,11 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   @Override
+  public boolean isStopped() {
+    return !poolStarted;
+  }
+
+  @Override
   public ListenableFuture<Void> watchOperation(
       String operationName,
       Watcher watcher) throws IOException {

@@ -67,6 +67,12 @@ public interface ShardBackplane {
   void stop() throws InterruptedException;
 
   /**
+   * Indicates whether the backplane has been stopped
+   */
+  @ThreadSafe
+  boolean isStopped();
+
+  /**
    * Adds a worker to the set of active workers.
    *
    * Returns true if the worker was newly added, and false if

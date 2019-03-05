@@ -337,7 +337,7 @@ public class Worker {
   }
 
   private void addBlobsLocation(List<Digest> digests, String name) {
-    for (;;) {
+    while (!backplane.isStopped()) {
       try {
         backplane.addBlobsLocation(digests, name);
         return;
@@ -348,10 +348,11 @@ public class Worker {
         }
       }
     }
+    throw Status.UNAVAILABLE.withDescription("backplane was stopped").asRuntimeException();
   }
 
   private void addWorker(ShardWorker worker) {
-    for (;;) {
+    while (!backplane.isStopped()) {
       try {
         backplane.addWorker(worker);
         return;
@@ -362,6 +363,7 @@ public class Worker {
         }
       }
     }
+    throw Status.UNAVAILABLE.withDescription("backplane was stopped").asRuntimeException();
   }
 
   private void startFailsafeRegistration() {

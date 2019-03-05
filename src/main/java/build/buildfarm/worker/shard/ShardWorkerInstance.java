@@ -217,7 +217,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
 
   @VisibleForTesting
   public QueueEntry dispatchOperation(MatchListener listener) throws IOException, InterruptedException {
-    for (;;) {
+    while (!backplane.isStopped()) {
       listener.onWaitStart();
       try {
         QueueEntry queueEntry = backplane.dispatchOperation();
@@ -232,6 +232,8 @@ public class ShardWorkerInstance extends AbstractServerInstance {
       }
       listener.onWaitEnd();
     }
+    throw new IOException(
+        Status.UNAVAILABLE.withDescription("backplane is stopped").asException());
   }
 
   @Override
@@ -283,7 +285,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
 
   @Override
   public Operation getOperation(String name) {
-    for (;;) {
+    while (!backplane.isStopped()) {
       try {
         return backplane.getOperation(name);
       } catch (IOException e) {
@@ -293,6 +295,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
         }
       }
     }
+    throw Status.UNAVAILABLE.withDescription("backplane is stopped").asRuntimeException();
   }
 
   @Override
