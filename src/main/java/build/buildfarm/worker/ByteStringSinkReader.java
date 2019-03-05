@@ -14,12 +14,17 @@
 
 package build.buildfarm.worker;
 
+import static java.util.logging.Level.SEVERE;
+
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.logging.Logger;
 
 public class ByteStringSinkReader implements Runnable {
+  private static final Logger logger = Logger.getLogger(ByteStringSinkReader.class.getName());
+
   private final InputStream input;
   private final OutputStream sink;
   private ByteString data;
@@ -44,6 +49,7 @@ public class ByteStringSinkReader implements Runnable {
         }
       }
     } catch(IOException e) {
+      logger.log(SEVERE, "error during sink read", e);
     } finally {
       try { input.close(); } catch(IOException e) { }
       try { sink.close(); } catch(IOException e) { }

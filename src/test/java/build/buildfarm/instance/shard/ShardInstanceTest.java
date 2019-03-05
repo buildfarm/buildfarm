@@ -374,7 +374,7 @@ public class ShardInstanceTest {
     }).when(mockBackplane).queue(any(QueueEntry.class), any(Operation.class));
 
     ExecuteEntry executeEntry = ExecuteEntry.newBuilder()
-        .setOperationName("queueOperationPutFailureCancelsOperation")
+        .setOperationName("queue-operation-put-failure-cancels-operation")
         .setActionDigest(actionDigest)
         .setSkipCacheLookup(true)
         .build();
@@ -401,8 +401,7 @@ public class ShardInstanceTest {
     verify(mockBackplane, times(1)).queue(any(QueueEntry.class), any(Operation.class));
     ExecuteResponse executeResponse = ExecuteResponse.newBuilder()
         .setStatus(com.google.rpc.Status.newBuilder()
-            .setCode(queueException.getStatus().getCode().value())
-            .setMessage(queueException.getMessage()))
+            .setCode(queueException.getStatus().getCode().value()))
         .build();
     Operation erroredOperation = Operation.newBuilder()
         .setName(executeEntry.getOperationName())
@@ -423,7 +422,7 @@ public class ShardInstanceTest {
         .setHash("test")
         .build());
     ExecuteEntry executeEntry = ExecuteEntry.newBuilder()
-        .setOperationName("operationWithCachedActionResult")
+        .setOperationName("operation-with-cached-action-result")
         .setActionDigest(actionKey.getDigest())
         .build();
 

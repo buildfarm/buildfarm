@@ -1219,7 +1219,7 @@ public class ShardInstance extends AbstractServerInstance {
             logger.log(SEVERE, "failed to requeue: " + operationName, t);
             com.google.rpc.Status status = StatusProto.fromThrowable(t);
             if (status == null) {
-              logger.log(SEVERE, "no rpc status from exception", t);
+              logger.log(SEVERE, "no rpc status from exception for " + operationName, t);
               status = com.google.rpc.Status.newBuilder()
                   .setCode(Status.fromThrowable(t).getCode().value())
                   .build();
@@ -1624,10 +1624,9 @@ public class ShardInstance extends AbstractServerInstance {
             poller.pause();
             com.google.rpc.Status status = StatusProto.fromThrowable(t);
             if (status == null) {
-              logger.log(SEVERE, "no rpc status from exception", t);
+              logger.log(SEVERE, "no rpc status from exception for " + operation.getName(), t);
               status = com.google.rpc.Status.newBuilder()
                   .setCode(Status.fromThrowable(t).getCode().value())
-                  .setMessage(t.getMessage())
                   .build();
             }
             logFailedStatus(actionDigest, status);
