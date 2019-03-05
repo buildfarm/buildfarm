@@ -336,14 +336,22 @@ class Executor implements Runnable {
         if (process.waitFor(remainingNanoTime, TimeUnit.NANOSECONDS)) {
           exitCode = process.exitValue();
         } else {
-          process.destroyForcibly();
-          process.waitFor(100, TimeUnit.MILLISECONDS); // fair trade, i think
+          logger.info("process timed out for {}", operationName);
+          process.destroy();
+          if (!process.waitFor(1, TimeUnit.SECONDS)) {
+            logger.info("process did not respond to termination for {}, killing it", operationName);
+            process.destroyForcibly();
+            process.waitFor(100, TimeUnit.MILLISECONDS); // fair trade, i think
+          }
           statusCode = Code.DEADLINE_EXCEEDED;
         }
       }
     } catch (InterruptedException e) {
-      process.destroyForcibly();
-      process.waitFor(100, TimeUnit.MILLISECONDS);
+      process.destroy();
+      if (!process.waitFor(1, TimeUnit.SECONDS)) {
+        process.destroyForcibly();
+        process.waitFor(100, TimeUnit.MILLISECONDS);
+      }
       throw e;
     } finally {
       if (!stdoutReader.isComplete()) {
