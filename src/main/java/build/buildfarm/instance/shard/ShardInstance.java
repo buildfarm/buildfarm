@@ -714,7 +714,6 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   void updateCaches(Digest digest, ByteString blob) throws InterruptedException {
-    boolean known = false;
     try {
       commandCache.get(digest, new Callable<ListenableFuture<? extends Command>>() {
         @Override
@@ -722,35 +721,30 @@ public class ShardInstance extends AbstractServerInstance {
           return immediateFuture(Command.parseFrom(blob));
         }
       }).get();
-      known = true;
     } catch (ExecutionException e) {
       /* not a command */
     }
-    if (!known) {
-      try {
-        actionCache.get(digest, new Callable<ListenableFuture<? extends Action>>() {
-          @Override
-          public ListenableFuture<Action> call() throws IOException {
-            return immediateFuture(Action.parseFrom(blob));
-          }
-        }).get();
-        known = true;
-      } catch (ExecutionException e) {
-        /* not an action */
-      }
+
+    try {
+      actionCache.get(digest, new Callable<ListenableFuture<? extends Action>>() {
+        @Override
+        public ListenableFuture<Action> call() throws IOException {
+          return immediateFuture(Action.parseFrom(blob));
+        }
+      }).get();
+    } catch (ExecutionException e) {
+      /* not an action */
     }
-    if (!known) {
-      try {
-        directoryCache.get(digest, new Callable<ListenableFuture<? extends Directory>>() {
-          @Override
-          public ListenableFuture<Directory> call() throws IOException {
-            return immediateFuture(Directory.parseFrom(blob));
-          }
-        }).get();
-        known = true;
-      } catch (ExecutionException e) {
-        /* not a directory */
-      }
+
+    try {
+      directoryCache.get(digest, new Callable<ListenableFuture<? extends Directory>>() {
+        @Override
+        public ListenableFuture<Directory> call() throws IOException {
+          return immediateFuture(Directory.parseFrom(blob));
+        }
+      }).get();
+    } catch (ExecutionException e) {
+      /* not a directory */
     }
   }
 

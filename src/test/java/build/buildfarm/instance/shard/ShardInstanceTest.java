@@ -25,6 +25,7 @@ import static build.buildfarm.instance.AbstractServerInstance.VIOLATION_TYPE_MIS
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.Mockito.any;
@@ -45,6 +46,7 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteResponse;
+import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.OutputFile;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
@@ -204,6 +206,46 @@ public class ShardInstanceTest {
     when(mockWorkerInstance.findMissingBlobs(eq(ImmutableList.of(actionDigest)), any(ExecutorService.class))).thenReturn(immediateFuture(ImmutableList.of()));
 
     return action;
+  }
+
+  @Test
+  public void updateCachesParsesCommandCorrectly() throws Exception {
+    Command command = Command.newBuilder()
+        .addAllArguments(ImmutableList.of("gcc", "foo.c", "-o", "foo.o"))
+        .addAllOutputFiles(ImmutableList.of("foo.o"))
+        .build();
+    ByteString commandBlob = command.toByteString();
+    Digest commandDigest = DIGEST_UTIL.compute(commandBlob);
+    instance.updateCaches(commandDigest, commandBlob);
+    assertThat(instance.expectCommand(commandDigest, directExecutor()).get()).isEqualTo(command);
+  }
+
+  @Test
+  public void updateCachesParsesActionCorrectly() throws Exception {
+    Action action = Action.newBuilder()
+        .setCommandDigest(Digest.newBuilder().setHash("command").setSizeBytes(10))
+        .setInputRootDigest(Digest.newBuilder().setHash("input-root").setSizeBytes(10))
+        .build();
+    ByteString actionBlob = action.toByteString();
+    Digest actionDigest = DIGEST_UTIL.compute(actionBlob);
+    instance.updateCaches(actionDigest, actionBlob);
+    assertThat(instance.expectAction(actionDigest, directExecutor()).get()).isEqualTo(action);
+  }
+
+  @Test
+  public void updateCachesParsesDirectoryCorrectly() throws Exception {
+    Directory directory = Directory.newBuilder()
+        .addFiles(FileNode.newBuilder()
+            .setName("foo")
+            .setDigest(Digest.newBuilder()
+                .setHash("foo")
+                .setSizeBytes(10)
+                .build()))
+        .build();
+    ByteString directoryBlob = directory.toByteString();
+    Digest directoryDigest = DIGEST_UTIL.compute(directoryBlob);
+    instance.updateCaches(directoryDigest, directoryBlob);
+    assertThat(instance.expectDirectory("testing", directoryDigest, directExecutor()).get()).isEqualTo(directory);
   }
 
   @Test
