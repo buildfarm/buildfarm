@@ -15,7 +15,7 @@ abstract class TimedWatcher implements Watcher {
   }
 
   boolean isExpiredAt(Instant now) {
-    return now.isAfter(expiresAt);
+    return !now.isBefore(expiresAt);
   }
 
   Instant getExpiresAt() {
