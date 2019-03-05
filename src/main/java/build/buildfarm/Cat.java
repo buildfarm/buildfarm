@@ -63,8 +63,10 @@ class Cat {
 
     System.out.println("Command Digest: Command " + DigestUtil.toString(action.getCommandDigest()));
     System.out.println("Input Root Digest: Directory " + DigestUtil.toString(action.getInputRootDigest()));
-    // FIXME timeout
     System.out.println("DoNotCache: " + (action.getDoNotCache() ? "true" : "false"));
+    if (action.hasTimeout()) {
+      System.out.println("Timeout: " + action.getTimeout().getSeconds() + action.getTimeout().getNanos() / 1e9 + "s");
+    }
   }
 
   private static void printCommand(ByteString commandBlob) {
