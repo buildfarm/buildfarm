@@ -926,9 +926,9 @@ public abstract class AbstractServerInstance implements Instance {
 
   protected void logFailedStatus(Digest actionDigest, com.google.rpc.Status status) {
     String message = String.format(
-        "%s: Code %d: %s\n",
+        "%s: %s: %s\n",
         DigestUtil.toString(actionDigest),
-        status.getCode(),
+        Code.forNumber(status.getCode()),
         status.getMessage());
     for (Any detail : status.getDetailsList()) {
       if (detail.is(PreconditionFailure.class)) {
