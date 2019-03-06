@@ -117,6 +117,7 @@ public class BuildFarmServerTest {
         .setMemoryInstanceConfig(memoryInstanceConfig);
 
     server = new BuildFarmServer(
+        "test",
         InProcessServerBuilder.forName(uniqueServerName).directExecutor(),
         configBuilder.build());
     server.start();

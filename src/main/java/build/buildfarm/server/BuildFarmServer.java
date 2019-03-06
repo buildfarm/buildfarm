@@ -31,6 +31,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -49,16 +50,16 @@ public class BuildFarmServer {
   private final Server server;
   private boolean stopping = false;
 
-  public BuildFarmServer(BuildFarmServerConfig config)
+  public BuildFarmServer(String session, BuildFarmServerConfig config)
       throws InterruptedException, ConfigurationException {
-    this(ServerBuilder.forPort(config.getPort()), config);
+    this(session, ServerBuilder.forPort(config.getPort()), config);
   }
 
-  public BuildFarmServer(ServerBuilder<?> serverBuilder, BuildFarmServerConfig config)
+  public BuildFarmServer(String session, ServerBuilder<?> serverBuilder, BuildFarmServerConfig config)
       throws InterruptedException, ConfigurationException {
     this.config = config;
     String defaultInstanceName = config.getDefaultInstanceName();
-    instances = new BuildFarmInstances(config.getInstancesList(), defaultInstanceName, this::stop);
+    instances = new BuildFarmInstances(session, config.getInstancesList(), defaultInstanceName, this::stop);
 
     ServerInterceptor headersInterceptor = new ServerHeadersInterceptor();
     server = serverBuilder
@@ -72,6 +73,8 @@ public class BuildFarmServer {
         .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
         .intercept(headersInterceptor)
         .build();
+
+    logger.info(String.format("%s initialized", session));
   }
 
   private static BuildFarmServerConfig toBuildFarmServerConfig(Readable input, BuildFarmServerOptions options) throws IOException {
@@ -144,9 +147,16 @@ public class BuildFarmServer {
       throw new IllegalArgumentException("Missing CONFIG_PATH");
     }
     Path configPath = Paths.get(residue.get(0));
+    BuildFarmServerOptions options = parser.getOptions(BuildFarmServerOptions.class);
+
+    String session = "buildfarm-server";
+    if (!options.publicName.isEmpty()) {
+      session += "-" + options.publicName;
+    }
+    session += "-" + UUID.randomUUID();
     BuildFarmServer server;
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
-      server = new BuildFarmServer(toBuildFarmServerConfig(new InputStreamReader(configInputStream), parser.getOptions(BuildFarmServerOptions.class)));
+      server = new BuildFarmServer(session, toBuildFarmServerConfig(new InputStreamReader(configInputStream), options));
     }
     server.start();
     server.blockUntilShutdown();

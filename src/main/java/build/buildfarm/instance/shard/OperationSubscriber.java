@@ -14,13 +14,18 @@
 
 package build.buildfarm.instance.shard;
 
+import static build.buildfarm.instance.shard.RedisShardBackplane.parseOperationChange;
 import static java.lang.String.format;
+import static java.util.logging.Level.FINE;
 
 import build.buildfarm.instance.WatchFuture;
+import build.buildfarm.v1test.OperationChange;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ListMultimap;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.Executor;
@@ -31,7 +36,7 @@ import javax.annotation.Nullable;
 import redis.clients.jedis.Client;
 import redis.clients.jedis.JedisPubSub;
 
-abstract class OperationSubscriber extends JedisPubSub {
+class OperationSubscriber extends JedisPubSub {
   private static final Logger logger = Logger.getLogger(OperationSubscriber.class.getName());
 
   abstract static class TimedWatchFuture extends WatchFuture {
@@ -125,6 +130,7 @@ abstract class OperationSubscriber extends JedisPubSub {
     TimedWatchFuture watchFuture = new TimedWatchFuture(watcher) {
       @Override
       public void unwatch() {
+        logger.fine("unwatching " + channel);
         OperationSubscriber.this.unwatch(channel, this);
       }
     };
@@ -158,14 +164,20 @@ abstract class OperationSubscriber extends JedisPubSub {
     }
   }
 
-  private void terminateExpiredWatchers(String channel, Instant now) {
+  private void terminateExpiredWatchers(String channel, Instant now, boolean force) {
     onOperation(
         channel,
         /* operation=*/ null,
         (watcher) -> {
-          boolean expired = watcher.isExpiredAt(now);
+          boolean expired = force || watcher.isExpiredAt(now);
           if (expired) {
-            logger.severe(format("Terminating expired watcher of %s because: %s >= %s", channel, now, watcher.getExpiresAt()));
+            logger.severe(
+                format(
+                    "Terminating expired watcher of %s because: %s >= %s%s",
+                    channel,
+                    now,
+                    watcher.getExpiresAt(),
+                    force ? " with force" : ""));
           }
           return expired;
         },
@@ -182,7 +194,8 @@ abstract class OperationSubscriber extends JedisPubSub {
       Predicate<TimedWatcher> shouldObserve,
       @Nullable Instant expiresAt) {
     List<TimedWatchFuture> operationWatchers = watchers.get(channel);
-    boolean observe = operation == null || operation.hasMetadata();
+    boolean observe = operation == null || operation.hasMetadata() || operation.getDone();
+    logger.fine(format("onOperation %s: %s", channel, operation));
     synchronized (watchers) {
       ImmutableList.Builder<Consumer<Operation>> observers = ImmutableList.builder();
       for (TimedWatchFuture watchFuture : operationWatchers) {
@@ -197,6 +210,7 @@ abstract class OperationSubscriber extends JedisPubSub {
       for (Consumer<Operation> observer : observers.build()) {
         executor.execute(() -> {
           if (observe) {
+            logger.fine("observing " + operation);
             observer.accept(operation);
           }
         });
@@ -206,12 +220,41 @@ abstract class OperationSubscriber extends JedisPubSub {
 
   @Override
   public void onMessage(String channel, String message) {
-    if (message != null && message.equals("expire")) {
-      terminateExpiredWatchers(channel, Instant.now());
-    } else {
-      Operation operation = message == null
-          ? null : RedisShardBackplane.parseOperationJson(message);
-      onOperation(channel, operation, nextExpiresAt());
+    try {
+      onOperationChange(channel, parseOperationChange(message));
+    } catch (InvalidProtocolBufferException e) {
+      logger.log(FINE, format("invalid operation change message for %s: %s", channel, message), e);
+    }
+  }
+
+  static Instant toInstant(Timestamp timestamp) {
+    return Instant.ofEpochSecond(timestamp.getSeconds(), timestamp.getNanos());
+  }
+
+  void resetOperation(String channel, OperationChange.Reset reset) {
+    onOperation(channel, reset.getOperation(), toInstant(reset.getExpiresAt()));
+  }
+
+  void onOperationChange(String channel, OperationChange operationChange) {
+    // FIXME indicate lag/clock skew for OOB timestamps
+    switch (operationChange.getTypeCase()) {
+      case TYPE_NOT_SET:
+        // FIXME present nice timestamp
+        logger.severe(
+            format(
+                "OperationChange oneof type is not set from %s at %s",
+                operationChange.getSource(),
+                operationChange.getEffectiveAt()));
+        break;
+      case RESET:
+        resetOperation(channel, operationChange.getReset());
+        break;
+      case EXPIRE:
+        terminateExpiredWatchers(
+            channel,
+            toInstant(operationChange.getEffectiveAt()),
+            operationChange.getExpire().getForce());
+        break;
     }
   }
 
@@ -243,6 +286,4 @@ abstract class OperationSubscriber extends JedisPubSub {
     }
     super.proceed(client, channels);
   }
-
-  protected abstract Instant nextExpiresAt();
 }

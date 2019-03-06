@@ -14,6 +14,8 @@
 
 package build.buildfarm.instance.shard;
 
+import static build.buildfarm.instance.shard.RedisShardBackplane.printOperationChange;
+import static build.buildfarm.instance.shard.RedisShardBackplane.toTimestamp;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
@@ -26,6 +28,7 @@ import static redis.clients.jedis.Protocol.Keyword.SUBSCRIBE;
 import static redis.clients.jedis.Protocol.Keyword.UNSUBSCRIBE;
 
 import build.buildfarm.instance.shard.OperationSubscriber.TimedWatchFuture;
+import build.buildfarm.v1test.OperationChange;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.ListMultimap;
@@ -34,12 +37,14 @@ import com.google.common.collect.Multimaps;
 import com.google.common.collect.MultimapBuilder;
 import com.google.common.collect.Sets;
 import com.google.longrunning.Operation;
+import com.google.protobuf.InvalidProtocolBufferException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Executor;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -115,25 +120,12 @@ public class OperationSubscriberTest {
     }
   };
 
-  class UnexpiringOperationSubscriber extends OperationSubscriber {
-    UnexpiringOperationSubscriber(
-        ListMultimap<String, TimedWatchFuture> watchers,
-        Executor executor) {
-      super(watchers, executor);
-    }
-
-    @Override
-    protected Instant nextExpiresAt() {
-      throw new UnsupportedOperationException();
-    }
-  }
-
   @Test
   public void novelChannelWatcherSubscribes() throws InterruptedException {
     ListMultimap<String, TimedWatchFuture> watchers =
         Multimaps.<String, TimedWatchFuture>synchronizedListMultimap(
             MultimapBuilder.linkedHashKeys().arrayListValues().build());
-    OperationSubscriber operationSubscriber = new UnexpiringOperationSubscriber(watchers, directExecutor());
+    OperationSubscriber operationSubscriber = new OperationSubscriber(watchers, directExecutor());
 
     TestClient testClient = new TestClient();
     Thread proceedThread = new Thread(() -> operationSubscriber.proceed(testClient));
@@ -157,7 +149,7 @@ public class OperationSubscriberTest {
   public void watchedOperationChannelsReflectsWatchers() {
     ListMultimap<String, TimedWatchFuture> watchers =
         MultimapBuilder.linkedHashKeys().arrayListValues().build();
-    OperationSubscriber operationSubscriber = new UnexpiringOperationSubscriber(watchers, /* executor=*/ null);
+    OperationSubscriber operationSubscriber = new OperationSubscriber(watchers, /* executor=*/ null);
     assertThat(operationSubscriber.watchedOperationChannels()).isEmpty();
     String addedChannel = "added-channel";
     watchers.put(addedChannel, null);
@@ -170,7 +162,7 @@ public class OperationSubscriberTest {
   public void expiredWatchedOperationChannelsReflectsWatchers() {
     ListMultimap<String, TimedWatchFuture> watchers =
         MultimapBuilder.linkedHashKeys().arrayListValues().build();
-    OperationSubscriber operationSubscriber = new UnexpiringOperationSubscriber(watchers, /* executor=*/ null);
+    OperationSubscriber operationSubscriber = new OperationSubscriber(watchers, /* executor=*/ null);
 
     TimedWatcher unexpiredWatcher = new UnobservableWatcher(Instant.MAX);
     TimedWatcher expiredWatcher = new UnobservableWatcher(Instant.EPOCH);
@@ -205,7 +197,7 @@ public class OperationSubscriberTest {
   public void existingChannelWatcherSuppressesSubscription() {
     ListMultimap<String, TimedWatchFuture> watchers =
         MultimapBuilder.linkedHashKeys().arrayListValues().build();
-    OperationSubscriber operationSubscriber = new UnexpiringOperationSubscriber(watchers, directExecutor());
+    OperationSubscriber operationSubscriber = new OperationSubscriber(watchers, directExecutor());
     String existingChannel = "existing-channel";
     TimedWatcher existingWatcher = new UnobservableWatcher();
     watchers.put(existingChannel, new LidlessTimedWatchFuture(existingWatcher));
@@ -215,16 +207,11 @@ public class OperationSubscriberTest {
   }
 
   @Test
-  public void nullMessageUnsubscribesWatcher() throws InterruptedException {
+  public void doneResetOperationIsObservedAndUnsubscribed() throws InterruptedException, InvalidProtocolBufferException {
     ListMultimap<String, TimedWatchFuture> watchers =
         Multimaps.<String, TimedWatchFuture>synchronizedListMultimap(
             MultimapBuilder.linkedHashKeys().arrayListValues().build());
-    OperationSubscriber operationSubscriber = new OperationSubscriber(watchers, directExecutor()) {
-      @Override
-      protected Instant nextExpiresAt() {
-        return Instant.now();
-      }
-    };
+    OperationSubscriber operationSubscriber = new OperationSubscriber(watchers, directExecutor());
 
     TestClient testClient = new TestClient();
     Thread proceedThread = new Thread(() -> operationSubscriber.proceed(testClient));
@@ -233,18 +220,28 @@ public class OperationSubscriberTest {
       MICROSECONDS.sleep(10);
     }
 
-    String nullMessageChannel = "null-message-channel";
-    TimedWatcher nullMessageWatcher = new TimedWatcher(Instant.now()) {
+    String doneMessageChannel = "done-message-channel";
+    AtomicBoolean observed = new AtomicBoolean(false);
+    TimedWatcher doneMessageWatcher = new TimedWatcher(Instant.now()) {
       @Override
       public void observe(Operation operation) {
-        if (operation != null) {
-          throw new UnsupportedOperationException();
+        if (operation.getDone()) {
+          observed.set(true);
         }
       }
     };
-    operationSubscriber.watch(nullMessageChannel, nullMessageWatcher);
-    operationSubscriber.onMessage(nullMessageChannel, /* message=*/ null);
-    assertThat(testClient.getSubscriptions()).doesNotContain(nullMessageChannel);
+    operationSubscriber.watch(doneMessageChannel, doneMessageWatcher);
+    operationSubscriber.onMessage(
+        doneMessageChannel,
+        printOperationChange(OperationChange.newBuilder()
+            .setReset(OperationChange.Reset.newBuilder()
+                .setOperation(Operation.newBuilder()
+                    .setDone(true)
+                    .build())
+                .build())
+            .build()));
+    assertThat(observed.get()).isTrue();
+    assertThat(testClient.getSubscriptions()).doesNotContain(doneMessageChannel);
     operationSubscriber.unsubscribe();
     proceedThread.join();
   }
@@ -261,19 +258,19 @@ public class OperationSubscriberTest {
     String resetChannel = "reset-channel";
     watchers.put(resetChannel, new LidlessTimedWatchFuture(resetWatcher));
 
-    OperationSubscriber operationSubscriber = new UnexpiringOperationSubscriber(watchers, /* executor=*/ null);
+    OperationSubscriber operationSubscriber = new OperationSubscriber(watchers, /* executor=*/ null);
     operationSubscriber.resetWatchers(resetChannel, Instant.MAX);
     assertThat(resetWatcher.isExpiredAt(now)).isFalse();
   }
 
   @Test
-  public void terminatesExpiredWatchersOnExpireMessage() {
+  public void terminatesExpiredWatchersOnExpireMessage() throws InvalidProtocolBufferException {
     ListMultimap<String, TimedWatchFuture> watchers =
         MultimapBuilder.linkedHashKeys().arrayListValues().build();
     TimedWatcher expiredWatcher = mock(TimedWatcher.class);
     when(expiredWatcher.isExpiredAt(any(Instant.class))).thenReturn(true);
 
-    OperationSubscriber operationSubscriber = new UnexpiringOperationSubscriber(watchers, directExecutor());
+    OperationSubscriber operationSubscriber = new OperationSubscriber(watchers, directExecutor());
 
     String expireChannel = "expire-channel";
     TimedWatchFuture watchFuture = new TimedWatchFuture(expiredWatcher) {
@@ -284,8 +281,35 @@ public class OperationSubscriberTest {
     };
     watchers.put(expireChannel, watchFuture);
 
-    operationSubscriber.onMessage(expireChannel, "expire");
+    operationSubscriber.onMessage(
+        expireChannel,
+        printOperationChange(OperationChange.newBuilder()
+            .setEffectiveAt(toTimestamp(Instant.now()))
+            .setExpire(OperationChange.Expire.newBuilder()
+                .setForce(false)
+                .build())
+            .build()));
     verify(expiredWatcher, times(1)).observe(null);
     assertThat(watchers.get(expireChannel)).isEmpty();
+  }
+
+  @Test
+  public void unsetTypeOperationChangeIsIgnored() {
+    ListMultimap<String, TimedWatchFuture> watchers =
+        MultimapBuilder.linkedHashKeys().arrayListValues().build();
+    OperationSubscriber operationSubscriber = new OperationSubscriber(watchers, directExecutor());
+
+    operationSubscriber.onOperationChange(
+        "unset-type-operation",
+        OperationChange.getDefaultInstance());
+  }
+
+  @Test
+  public void invalidOperationChangeIsIgnored() {
+    ListMultimap<String, TimedWatchFuture> watchers =
+        MultimapBuilder.linkedHashKeys().arrayListValues().build();
+    OperationSubscriber operationSubscriber = new OperationSubscriber(watchers, directExecutor());
+
+    operationSubscriber.onMessage("invalid-operation-change", "not-json!#?");
   }
 }

@@ -68,6 +68,7 @@ import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
@@ -88,8 +89,8 @@ public class Worker {
   private final ShardBackplane backplane;
   private final LoadingCache<String, Instance> workerStubs;
 
-  public Worker(ShardWorkerConfig config) throws ConfigurationException {
-    this(ServerBuilder.forPort(config.getPort()), config);
+  public Worker(String session, ShardWorkerConfig config) throws ConfigurationException {
+    this(session, ServerBuilder.forPort(config.getPort()), config);
   }
 
   private static Path getValidRoot(ShardWorkerConfig config) throws ConfigurationException {
@@ -128,8 +129,9 @@ public class Worker {
     return instance.stripQueuedOperation(operation);
   }
 
-  public Worker(ServerBuilder<?> serverBuilder, ShardWorkerConfig config) throws ConfigurationException {
+  public Worker(String session, ServerBuilder<?> serverBuilder, ShardWorkerConfig config) throws ConfigurationException {
     this.config = config;
+    String identifier = "buildfarm-worker-" + config.getPublicName() + "-" + session;
     root = getValidRoot(config);
 
     digestUtil = new DigestUtil(getValidHashFunction(config));
@@ -140,7 +142,13 @@ public class Worker {
       case BACKPLANE_NOT_SET:
         throw new IllegalArgumentException("Shard Backplane not set in config");
       case REDIS_SHARD_BACKPLANE_CONFIG:
-        backplane = new RedisShardBackplane(config.getRedisShardBackplaneConfig(), this::stripOperation, this::stripQueuedOperation, (o) -> false, (o) -> false);
+        backplane = new RedisShardBackplane(
+            config.getRedisShardBackplaneConfig(),
+            identifier,
+            this::stripOperation,
+            this::stripQueuedOperation,
+            (o) -> false,
+            (o) -> false);
         break;
     }
 
@@ -202,6 +210,8 @@ public class Worker {
     pipeline.add(inputFetchStage, 2);
     pipeline.add(executeActionStage, 3);
     pipeline.add(reportResultStage, 4);
+
+    logger.info(String.format("%s initialized", identifier));
   }
 
   private ExecFileSystem createFuseExecFileSystem(InputStreamFactory remoteInputStreamFactory) {
@@ -482,9 +492,10 @@ public class Worker {
       throw new IllegalArgumentException("Missing CONFIG_PATH");
     }
     Path configPath = Paths.get(residue.get(0));
+    String session = UUID.randomUUID().toString();
     Worker worker;
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
-      worker = new Worker(toShardWorkerConfig(new InputStreamReader(configInputStream), parser.getOptions(WorkerOptions.class)));
+      worker = new Worker(session, toShardWorkerConfig(new InputStreamReader(configInputStream), parser.getOptions(WorkerOptions.class)));
     }
     worker.start();
     worker.blockUntilShutdown();

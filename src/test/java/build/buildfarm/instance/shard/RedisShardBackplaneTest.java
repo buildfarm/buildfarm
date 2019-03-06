@@ -55,6 +55,7 @@ public class RedisShardBackplaneTest {
     when(mockJedisPool.getResource()).thenReturn(mock(Jedis.class));
     backplane = new RedisShardBackplane(
         RedisShardBackplaneConfig.getDefaultInstance(),
+        "end-of-stream-unavailable-test",
         (o) -> o,
         (o) -> o,
         (o) -> false,
@@ -75,6 +76,7 @@ public class RedisShardBackplaneTest {
     when(mockJedisPool.getResource()).thenReturn(mock(Jedis.class));
     backplane = new RedisShardBackplane(
         RedisShardBackplaneConfig.getDefaultInstance(),
+        "connection-reset-unavailable-test",
         (o) -> o,
         (o) -> o,
         (o) -> false,
@@ -96,6 +98,7 @@ public class RedisShardBackplaneTest {
     when(mockJedisPool.getResource()).thenReturn(mock(Jedis.class));
     backplane = new RedisShardBackplane(
         RedisShardBackplaneConfig.getDefaultInstance(),
+        "socket-timeout-exception-is-deadline-exceeded-test",
         (o) -> o,
         (o) -> o,
         (o) -> false,
@@ -123,6 +126,7 @@ public class RedisShardBackplaneTest {
     when(jedis.pipelined()).thenReturn(pipeline);
     backplane = new RedisShardBackplane(
         config,
+        "invalid-protobuf-worker-removed-test",
         (o) -> o,
         (o) -> o,
         (o) -> false,

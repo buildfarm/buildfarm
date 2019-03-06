@@ -167,12 +167,12 @@ public class ShardInstance extends AbstractServerInstance {
   private boolean stopping = false;
   private boolean stopped = true;
 
-  public ShardInstance(String name, DigestUtil digestUtil, ShardInstanceConfig config, Runnable onStop)
+  public ShardInstance(String name, String identifier, DigestUtil digestUtil, ShardInstanceConfig config, Runnable onStop)
       throws InterruptedException, ConfigurationException {
     this(
         name,
         digestUtil,
-        getBackplane(config),
+        getBackplane(config, identifier),
         config.getRunDispatchedMonitor(),
         config.getDispatchedMonitorIntervalSeconds(),
         config.getRunOperationQueuer(),
@@ -180,7 +180,7 @@ public class ShardInstance extends AbstractServerInstance {
         WorkerStubs.create(digestUtil));
   }
 
-  private static ShardBackplane getBackplane(ShardInstanceConfig config)
+  private static ShardBackplane getBackplane(ShardInstanceConfig config, String identifier)
       throws ConfigurationException {
     ShardInstanceConfig.BackplaneCase backplaneCase = config.getBackplaneCase();
     switch (backplaneCase) {
@@ -190,6 +190,7 @@ public class ShardInstance extends AbstractServerInstance {
       case REDIS_SHARD_BACKPLANE_CONFIG:
         return new RedisShardBackplane(
             config.getRedisShardBackplaneConfig(),
+            identifier,
             ShardInstance::stripOperation,
             ShardInstance::stripOperation,
             /* isPrequeued=*/ ShardInstance::isUnknown,
@@ -491,13 +492,14 @@ public class ShardInstance extends AbstractServerInstance {
             removeMalfunctioningWorker(worker, t, "findMissingBlobs(...)");
           } else if (status.getCode() == Code.DEADLINE_EXCEEDED) {
             for (FindMissingResponseEntry response : responses.build()) {
-              logger.error(
-                  "DEADLINE_EXCEEDED: findMissingBlobs({}): {} remaining of {} {}us{}",
-                  response.worker,
-                  response.stillMissingAfter,
-                  originalSize,
-                  response.elapsedMicros,
-                  response.exception != null ? ": " + t.toString() : "");
+              logger.severe(
+                  format(
+                      "DEADLINE_EXCEEDED: findMissingBlobs(%s): %d remaining of %d %dus%s",
+                      response.worker,
+                      response.stillMissingAfter,
+                      originalSize,
+                      response.elapsedMicros,
+                      response.exception != null ? ": " + t.toString() : ""));
             }
             throw status.asRuntimeException();
           } else if (status.getCode() == Code.CANCELLED

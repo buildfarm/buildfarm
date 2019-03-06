@@ -6,6 +6,7 @@ import "google/api/annotations.proto";
 import "build/bazel/remote/execution/v2/remote_execution.proto";
 import "google/longrunning/operations.proto";
 import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
 import "google/rpc/status.proto";
 
 option java_package = "build.buildfarm.v1test";
@@ -287,6 +288,28 @@ message ShardWorker {
   string endpoint = 1;
 
   int64 expire_at = 2;
+}
+
+message OperationChange {
+  message Reset {
+    google.protobuf.Timestamp expiresAt = 1;
+
+    google.longrunning.Operation operation = 2;
+  }
+
+  message Expire {
+    bool force = 1;
+  }
+
+  google.protobuf.Timestamp effectiveAt = 1;
+
+  string source = 2;
+
+  oneof type {
+    Reset reset = 3;
+
+    Expire expire = 4;
+  }
 }
 
 message DispatchedOperation {

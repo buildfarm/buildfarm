@@ -31,12 +31,13 @@ import build.buildfarm.common.Watcher;
 import build.buildfarm.common.function.InterruptingRunnable;
 import build.buildfarm.instance.shard.OperationSubscriber.TimedWatchFuture;
 import build.buildfarm.v1test.CompletedOperationMetadata;
+import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
+import build.buildfarm.v1test.OperationChange;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.RedisShardBackplaneConfig;
-import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ShardWorker;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -52,6 +53,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.JsonFormat;
 import com.google.rpc.PreconditionFailure;
 import io.grpc.Status;
@@ -93,7 +95,9 @@ import redis.clients.jedis.util.Pool;
 
 public class RedisShardBackplane implements ShardBackplane {
   private static final Logger logger = Logger.getLogger(RedisShardBackplane.class.getName());
+
   private final RedisShardBackplaneConfig config;
+  private final String source; // used in operation change publication
   private final Function<Operation, Operation> onPublish;
   private final Function<Operation, Operation> onComplete;
   private final Predicate<Operation> isPrequeued;
@@ -150,12 +154,14 @@ public class RedisShardBackplane implements ShardBackplane {
 
   public RedisShardBackplane(
       RedisShardBackplaneConfig config,
+      String source,
       Function<Operation, Operation> onPublish,
       Function<Operation, Operation> onComplete,
       Predicate<Operation> isPrequeued,
       Predicate<Operation> isDispatched) throws ConfigurationException {
     this(
         config,
+        source,
         onPublish,
         onComplete,
         isPrequeued,
@@ -165,12 +171,14 @@ public class RedisShardBackplane implements ShardBackplane {
 
   public RedisShardBackplane(
       RedisShardBackplaneConfig config,
+      String source,
       Function<Operation, Operation> onPublish,
       Function<Operation, Operation> onComplete,
       Predicate<Operation> isPrequeued,
       Predicate<Operation> isDispatched,
       JedisPool pool) {
     this.config = config;
+    this.source = source;
     this.onPublish = onPublish;
     this.onComplete = onComplete;
     this.isPrequeued = isPrequeued;
@@ -330,7 +338,7 @@ public class RedisShardBackplane implements ShardBackplane {
 
   private void updateWatchers(Jedis jedis) {
     Instant now = Instant.now();
-    Instant expiresAt = nextWatcherExpiresAt(now);
+    Instant expiresAt = nextExpiresAt(now);
     Set<String> expiringChannels = Sets.newHashSet(
         operationSubscriber.expiredWatchedOperationChannels(now));
     Consumer<String> resetChannel = (operationName) -> {
@@ -387,7 +395,7 @@ public class RedisShardBackplane implements ShardBackplane {
     for (String channel : expiringChannels) {
       Operation operation = parseOperationJson(getOperation(jedis, parseOperationChannel(channel)));
       if (operation == null || !operation.getDone()) {
-        jedis.publish(channel, "expire");
+        publishExpiration(jedis, channel, now, /* force=*/ false);
       } else {
         operationSubscriber.onOperation(
             channel,
@@ -395,6 +403,56 @@ public class RedisShardBackplane implements ShardBackplane {
             expiresAt);
       }
     }
+  }
+
+  static String printOperationChange(OperationChange operationChange) throws InvalidProtocolBufferException {
+    return operationPrinter.print(operationChange);
+  }
+
+  void publish(Jedis jedis, String channel, Instant effectiveAt, OperationChange.Builder operationChange) {
+    try {
+      String operationChangeJson = printOperationChange(
+          operationChange
+              .setEffectiveAt(toTimestamp(effectiveAt))
+              .setSource(source)
+              .build());
+      jedis.publish(channel, operationChangeJson);
+    } catch (InvalidProtocolBufferException e) {
+      logger.log(SEVERE, "error printing operation change", e);
+      // very unlikely, printer would have to fail
+    }
+  }
+
+  void publishReset(Jedis jedis, Operation operation) {
+    Instant effectiveAt = Instant.now();
+    Instant expiresAt = nextExpiresAt(effectiveAt);
+    publish(
+        jedis,
+        operationChannel(operation.getName()),
+        Instant.now(),
+        OperationChange.newBuilder()
+            .setReset(OperationChange.Reset.newBuilder()
+                .setExpiresAt(toTimestamp(expiresAt))
+                .setOperation(operation)
+                .build()));
+  }
+
+  static Timestamp toTimestamp(Instant instant) {
+    return Timestamp.newBuilder()
+        .setSeconds(instant.getEpochSecond())
+        .setNanos(instant.getNano())
+        .build();
+  }
+
+  void publishExpiration(Jedis jedis, String channel, Instant effectiveAt, boolean force) {
+    publish(
+        jedis,
+        channel,
+        effectiveAt,
+        OperationChange.newBuilder()
+            .setExpire(OperationChange.Expire.newBuilder()
+                .setForce(force)
+                .build()));
   }
 
   public void updateWatchedIfDone(Jedis jedis) {
@@ -425,7 +483,7 @@ public class RedisShardBackplane implements ShardBackplane {
         operationSubscriber.onOperation(
             operationChannel(operationName),
             operation,
-            nextWatcherExpiresAt(now));
+            nextExpiresAt(now));
         logger.info(
             format(
                 "operation %s done due to %s",
@@ -435,11 +493,7 @@ public class RedisShardBackplane implements ShardBackplane {
     }
   }
 
-  private Instant nextWatcherExpiresAt() {
-    return nextWatcherExpiresAt(Instant.now());
-  }
-
-  private Instant nextWatcherExpiresAt(Instant from) {
+  private Instant nextExpiresAt(Instant from) {
     return from.plusSeconds(10);
   }
 
@@ -448,12 +502,7 @@ public class RedisShardBackplane implements ShardBackplane {
         Multimaps.<String, TimedWatchFuture>synchronizedListMultimap(
             MultimapBuilder.linkedHashKeys().arrayListValues().build());
     subscriberService = Executors.newFixedThreadPool(32);
-    operationSubscriber = new OperationSubscriber(watchers, subscriberService) {
-      @Override
-      protected Instant nextExpiresAt() {
-        return nextWatcherExpiresAt();
-      }
-    };
+    operationSubscriber = new OperationSubscriber(watchers, subscriberService);
 
     operationSubscription = new RedisShardSubscription(
         operationSubscriber,
@@ -534,7 +583,7 @@ public class RedisShardBackplane implements ShardBackplane {
   public ListenableFuture<Void> watchOperation(
       String operationName,
       Watcher watcher) throws IOException {
-    TimedWatcher timedWatcher = new TimedWatcher(nextWatcherExpiresAt()) {
+    TimedWatcher timedWatcher = new TimedWatcher(nextExpiresAt(Instant.now())) {
       @Override
       public void observe(Operation operation) {
         watcher.observe(operation);
@@ -850,6 +899,13 @@ public class RedisShardBackplane implements ShardBackplane {
     return blobDigestsWorkers.build();
   }
 
+  public static OperationChange parseOperationChange(String operationChangeJson) throws InvalidProtocolBufferException {
+    OperationChange.Builder operationChangeBuilder = OperationChange.newBuilder();
+    // needs to be able to deserialize operations
+    getOperationParser().merge(operationChangeJson, operationChangeBuilder);
+    return operationChangeBuilder.build();
+  }
+
   public static Operation parseOperationJson(String operationJson) {
     if (operationJson == null) {
       return null;
@@ -912,9 +968,9 @@ public class RedisShardBackplane implements ShardBackplane {
       return false;
     }
 
-    String publishOperation;
+    Operation publishOperation;
     if (publish) {
-      publishOperation = operationPrinter.print(onPublish.apply(operation));
+      publishOperation = onPublish.apply(operation);
     } else {
       publishOperation = null;
     }
@@ -925,8 +981,8 @@ public class RedisShardBackplane implements ShardBackplane {
         completeOperation(jedis, name);
       }
       jedis.setex(operationKey(name), config.getOperationExpire(), json);
-      if (publish) {
-        jedis.publish(operationChannel(name), publishOperation);
+      if (publishOperation != null) {
+        publishReset(jedis, publishOperation);
       }
     });
     return true;
@@ -944,11 +1000,11 @@ public class RedisShardBackplane implements ShardBackplane {
     String operationName = operation.getName();
     String operationJson = operationPrinter.print(operation);
     String queueEntryJson = JsonFormat.printer().print(queueEntry);
-    String publishOperation = operationPrinter.print(onPublish.apply(operation));
+    Operation publishOperation = onPublish.apply(operation);
     withVoidBackplaneException((jedis) -> {
       jedis.setex(operationKey(operationName), config.getOperationExpire(), operationJson);
       queue(jedis, operation.getName(), queueEntryJson);
-      jedis.publish(operationChannel(operationName), publishOperation);
+      publishReset(jedis, publishOperation);
     });
   }
 
@@ -1024,9 +1080,9 @@ public class RedisShardBackplane implements ShardBackplane {
       ExecuteEntry executeEntry = executeEntryBuilder.build();
       String operationName = executeEntry.getOperationName();
 
-      String message = keepaliveMessage(operationName);
+      Operation operation = keepaliveOperation(operationName);
       // publish so that watchers reset their timeout
-      keepalive(jedis, operationName, message);
+      publishReset(jedis, operation);
 
       // destroy the processing entry and ttl
       if (jedis.lrem(config.getProcessingListName(), -1, executeEntryJson) == 0) {
@@ -1077,14 +1133,8 @@ public class RedisShardBackplane implements ShardBackplane {
     QueueEntry queueEntry = queueEntryBuilder.build();
 
     String operationName = queueEntry.getExecuteEntry().getOperationName();
-    try {
-      String message = keepaliveMessage(operationName);
-      keepalive(jedis, operationName, message);
-    } catch (InvalidProtocolBufferException e) {
-      logger.log(SEVERE, "error printing keepalive message", e);
-      // very unlikely, printer would have to fail
-      return null;
-    }
+    Operation operation = keepaliveOperation(operationName);
+    publishReset(jedis, operation);
 
     long requeueAt = System.currentTimeMillis() + 30 * 1000;
     DispatchedOperation o = DispatchedOperation.newBuilder()
@@ -1159,30 +1209,26 @@ public class RedisShardBackplane implements ShardBackplane {
     String operationName = operation.getName();
     String operationJson = operationPrinter.print(operation);
     String executeEntryJson = JsonFormat.printer().print(executeEntry);
-    String publishOperation = operationPrinter.print(onPublish.apply(operation));
+    Operation publishOperation = onPublish.apply(operation);
     withVoidBackplaneException((jedis) -> {
       jedis.setex(operationKey(operationName), config.getOperationExpire(), operationJson);
       jedis.lpush(config.getPreQueuedOperationsListName(), executeEntryJson);
-      jedis.publish(operationChannel(operationName), publishOperation);
+      publishReset(jedis, publishOperation);
     });
   }
 
-  private String keepaliveMessage(String operationName) throws InvalidProtocolBufferException {
-    return operationPrinter.print(Operation.newBuilder()
+  private Operation keepaliveOperation(String operationName) {
+    return Operation.newBuilder()
         .setName(operationName)
-        .build());
-  }
-
-  private void keepalive(Jedis jedis, String operationName, String message) {
-    jedis.publish(operationChannel(operationName), message);
+        .build();
   }
 
   @Override
   public void queueing(String operationName) throws IOException {
-    String message = keepaliveMessage(operationName);
+    Operation operation = keepaliveOperation(operationName);
     // publish so that watchers reset their timeout
     withVoidBackplaneException((jedis) -> {
-      keepalive(jedis, operationName, message);
+      publishReset(jedis, operation);
     });
   }
 
@@ -1190,12 +1236,10 @@ public class RedisShardBackplane implements ShardBackplane {
   public void requeueDispatchedOperation(QueueEntry queueEntry) throws IOException {
     String queueEntryJson = JsonFormat.printer().print(queueEntry);
     String operationName = queueEntry.getExecuteEntry().getOperationName();
-    String publishOperation = operationPrinter.print(Operation.newBuilder()
-        .setName(operationName)
-        .build());
+    Operation publishOperation = keepaliveOperation(operationName);
     withVoidBackplaneException((jedis) -> {
       queue(jedis, operationName, queueEntryJson);
-      jedis.publish(operationChannel(operationName), publishOperation);
+      publishReset(jedis, publishOperation);
     });
   }
 
@@ -1225,7 +1269,6 @@ public class RedisShardBackplane implements ShardBackplane {
       logger.log(SEVERE, "error printing deleted operation " + operationName, e);
     }
 
-    final String publishOperation = json;
     withVoidBackplaneException((jedis) -> {
       Transaction t = jedis.multi();
       t.hdel(config.getDispatchedOperationsHashName(), operationName);
@@ -1234,7 +1277,7 @@ public class RedisShardBackplane implements ShardBackplane {
       t.del(operationKey(operationName));
       t.exec();
 
-      jedis.publish(operationChannel(operationName), publishOperation);
+      publishReset(jedis, o);
     });
   }
 
