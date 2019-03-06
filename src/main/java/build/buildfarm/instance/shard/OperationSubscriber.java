@@ -27,6 +27,7 @@ import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
+import javax.annotation.Nullable;
 import redis.clients.jedis.Client;
 import redis.clients.jedis.JedisPubSub;
 
@@ -158,13 +159,17 @@ abstract class OperationSubscriber extends JedisPubSub {
   }
 
   private void terminateExpiredWatchers(String channel, Instant now) {
-    onOperation(channel, null, (watcher) -> {
-      boolean expired = watcher.isExpiredAt(now);
-      if (expired) {
-        logger.severe(format("Terminating expired watcher of %s because: %s >= %s", channel, now.toString(), watcher.getExpiresAt()));
-      }
-      return expired;
-    }, now);
+    onOperation(
+        channel,
+        /* operation=*/ null,
+        (watcher) -> {
+          boolean expired = watcher.isExpiredAt(now);
+          if (expired) {
+            logger.severe(format("Terminating expired watcher of %s because: %s >= %s", channel, now, watcher.getExpiresAt()));
+          }
+          return expired;
+        },
+        /* expiresAt=*/ null);
   }
 
   public void onOperation(String channel, Operation operation, Instant expiresAt) {
@@ -183,16 +188,18 @@ abstract class OperationSubscriber extends JedisPubSub {
 
   private void onOperation(
       String channel,
-      Operation operation,
+      @Nullable Operation operation,
       Predicate<TimedWatcher> shouldObserve,
-      Instant expiresAt) {
+      @Nullable Instant expiresAt) {
     List<TimedWatchFuture> operationWatchers = watchers.get(channel);
     boolean observe = operation == null || operation.hasMetadata();
     synchronized (watchers) {
       ImmutableList.Builder<Consumer<Operation>> observers = ImmutableList.builder();
       for (TimedWatchFuture watchFuture : operationWatchers) {
         TimedWatcher watcher = watchFuture.getWatcher();
-        watcher.reset(expiresAt);
+        if (expiresAt != null) {
+          watcher.reset(expiresAt);
+        }
         if (shouldObserve.test(watcher)) {
           observers.add(watchFuture::observe);
         }
