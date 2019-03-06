@@ -2,6 +2,7 @@ package build.buildfarm;
 
 import static build.buildfarm.instance.Utils.getBlob;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
+import static java.lang.String.format;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
@@ -22,16 +23,20 @@ import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
+import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.longrunning.Operation;
+import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.util.Durations;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.rpc.Code;
+import com.google.rpc.RetryInfo;
+import com.google.rpc.PreconditionFailure;
 import io.grpc.ManagedChannel;
 import io.grpc.Status;
 import io.grpc.netty.NegotiationType;
@@ -124,11 +129,18 @@ class Cat {
     }
   }
 
-  private static void printFindMissing(Instance instance, Digest digest) throws ExecutionException, InterruptedException {
-    Iterable<Digest> missingDigests = instance.findMissingBlobs(ImmutableList.of(digest), newDirectExecutorService()).get();
+  private static void printFindMissing(Instance instance, Iterable<Digest> digests) throws ExecutionException, InterruptedException {
+    Stopwatch stopwatch = Stopwatch.createStarted();
+    Iterable<Digest> missingDigests = instance.findMissingBlobs(digests, newDirectExecutorService()).get();
+    long elapsedMicros = stopwatch.elapsed(TimeUnit.MICROSECONDS);
 
+    boolean missing = false;
     for (Digest missingDigest : missingDigests) {
-      System.out.println("Missing: " + DigestUtil.toString(missingDigest));
+      System.out.println(format("Missing: %s Took %gms", DigestUtil.toString(missingDigest), elapsedMicros / 1000.0f));
+      missing = true;
+    }
+    if (!missing) {
+      System.out.println(format("Took %gms", elapsedMicros / 1000.0f));
     }
   }
 
@@ -301,6 +313,41 @@ class Cat {
     System.out.println("CorrelatedInvocationsId: " + metadata.getCorrelatedInvocationsId());
   }
 
+  private static void printStatus(com.google.rpc.Status status) throws InvalidProtocolBufferException {
+    System.out.println("    Code: " + Code.forNumber(status.getCode()));
+    if (!status.getMessage().isEmpty()) {
+      System.out.println("    Message: " + status.getMessage());
+    }
+    if (status.getDetailsCount() > 0) {
+      System.out.println("    Details:");
+      for (Any detail : status.getDetailsList()) {
+        if (detail.is(RetryInfo.class)) {
+          RetryInfo retryInfo = detail.unpack(RetryInfo.class);
+          System.out.println("      RetryDelay: " + (retryInfo.getRetryDelay().getSeconds() + retryInfo.getRetryDelay().getNanos() / 1000000000.0f));
+        } else if (detail.is(PreconditionFailure.class)) {
+          PreconditionFailure preconditionFailure = detail.unpack(PreconditionFailure.class);
+          System.out.println("      PreconditionFailure:");
+          for (PreconditionFailure.Violation violation : preconditionFailure.getViolationsList()) {
+            System.out.println("        Violation: " + violation.getType());
+            System.out.println("          Subject: " + violation.getSubject());
+            System.out.println("          Description: " + violation.getDescription());
+          }
+        } else {
+          System.out.println("      Unknown Detail: " + detail.getTypeUrl());
+        }
+      }
+    }
+  }
+
+  private static void printExecuteResponse(ExecuteResponse response) throws InvalidProtocolBufferException {
+    printStatus(response.getStatus());
+    if (Code.forNumber(response.getStatus().getCode()) == Code.OK) {
+      printActionResult(response.getResult(), 2);
+      System.out.println("    CachedResult: " + (response.getCachedResult() ? "true" : "false"));
+    }
+    // FIXME server_logs
+  }
+
   private static void printOperation(Operation operation) {
     System.out.println("Operation: " + operation.getName());
     System.out.println("Done: " + (operation.getDone() ? "true" : "false"));
@@ -346,11 +393,9 @@ class Cat {
     if (operation.getDone()) {
       switch(operation.getResultCase()) {
         case RESPONSE:
-          System.out.println("  Response (ActionResult):");
+          System.out.println("  Response:");
           try {
-            ExecuteResponse response = operation.getResponse().unpack(ExecuteResponse.class);
-            printActionResult(response.getResult(), 2);
-            System.out.println("    CachedResult: " + (response.getCachedResult() ? "true" : "false"));
+            printExecuteResponse(operation.getResponse().unpack(ExecuteResponse.class));
           } catch (InvalidProtocolBufferException e) {
             System.out.println("  UNKNOWN RESPONSE TYPE: " + operation.getResponse());
           }
@@ -383,39 +428,45 @@ class Cat {
     String instanceName = args[1];
     DigestUtil digestUtil = DigestUtil.forHash(args[2]);
     ManagedChannel channel = createChannel(host);
-    Instance instance = new StubInstance(instanceName, digestUtil, channel);
+    Instance instance = new StubInstance(instanceName, "bf-cat", digestUtil, channel, 10, TimeUnit.SECONDS);
     String type = args[3];
     if (type.equals("Operations") && args.length == 4) {
       System.out.println("Listing Operations");
       listOperations(instance);
     }
-    for (int i = 4; i < args.length; i++) {
-      if (type.equals("Operation")) {
-        printOperation(instance.getOperation(args[i]));
-      } else if (type.equals("Watch")) {
-        watchOperation(instance, args[i]);
-      } else {
-        Digest blobDigest = DigestUtil.parseDigest(args[i]);
-        if (type.equals("Missing")) {
-          printFindMissing(instance, blobDigest);
-        } else if (type.equals("ActionResult")) {
-          printActionResult(instance.getActionResult(DigestUtil.asActionKey(blobDigest)), 0);
-        } else if (type.equals("Tree")) {
-          printTree(instance, blobDigest);
-        } else if (type.equals("TreeLayout")) {
-          printTreeLayout(instance, digestUtil, blobDigest);
+    if (type.equals("Missing")) {
+      ImmutableList.Builder<Digest> digests = ImmutableList.builder();
+      for (int i = 4; i < args.length; i++) {
+        digests.add(DigestUtil.parseDigest(args[i]));
+      }
+      printFindMissing(instance, digests.build());
+    } else {
+      for (int i = 4; i < args.length; i++) {
+        if (type.equals("Operation")) {
+          printOperation(instance.getOperation(args[i]));
+        } else if (type.equals("Watch")) {
+          watchOperation(instance, args[i]);
         } else {
-          ByteString blob = getBlob(instance, blobDigest);
-          if (type.equals("Action")) {
-            printAction(blob);
-          } else if (type.equals("Command")) {
-            printCommand(blob);
-          } else if (type.equals("Directory")) {
-            printDirectory(blob);
-          } else if (type.equals("File")) {
-            blob.writeTo(System.out);
+          Digest blobDigest = DigestUtil.parseDigest(args[i]);
+          if (type.equals("ActionResult")) {
+            printActionResult(instance.getActionResult(DigestUtil.asActionKey(blobDigest)), 0);
+          } else if (type.equals("Tree")) {
+            printTree(instance, blobDigest);
+          } else if (type.equals("TreeLayout")) {
+            printTreeLayout(instance, digestUtil, blobDigest);
           } else {
-            System.err.println("Unknown type: " + type);
+            ByteString blob = getBlob(instance, blobDigest);
+            if (type.equals("Action")) {
+              printAction(blob);
+            } else if (type.equals("Command")) {
+              printCommand(blob);
+            } else if (type.equals("Directory")) {
+              printDirectory(blob);
+            } else if (type.equals("File")) {
+              blob.writeTo(System.out);
+            } else {
+              System.err.println("Unknown type: " + type);
+            }
           }
         }
       }
