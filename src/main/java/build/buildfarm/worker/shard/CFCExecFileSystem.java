@@ -195,7 +195,7 @@ class CFCExecFileSystem implements ExecFileSystem {
       OutputDirectory childOutputDirectory = outputDirectory != null
           ? outputDirectory.getChild(name) : null;
       Path dirPath = path.resolve(name);
-      if (childOutputDirectory != null || !linkInputDirectories) {
+      if (childOutputDirectory != null || !linkInputDirectories || name.equals("external")) {
         Files.createDirectories(dirPath);
         downloads = concat(downloads, fetchInputs(dirPath, digest, directoriesIndex, childOutputDirectory, inputFiles, inputDirectories));
       } else {
