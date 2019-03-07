@@ -348,44 +348,35 @@ public class RedisShardBackplane implements ShardBackplane {
       }
     };
 
-    /**
-     * Run through the inflight lists first to ensure that they are always cleaned up
-     * instead of just when this scheduler has expiring watchers
-     */
-    // scan dispatching, create ttl key if missing, remove dead entries, pet live watches
-    scanDispatching(jedis, resetChannel, now);
+    if (!expiringChannels.isEmpty()) {
+      logger.info(
+          format(
+              "Scan %d watches, %s, expiresAt: %s",
+              expiringChannels.size(),
+              now,
+              expiresAt));
+
+      logger.info("Scan prequeue");
+      // scan prequeue, pet watches
+      scanPrequeue(jedis, resetChannel);
+    }
+
     // scan processing, create ttl key if missing, remove dead entries, pet live watches
     scanProcessing(jedis, resetChannel, now);
 
-    if (expiringChannels.isEmpty()) {
-      return;
+    if (!expiringChannels.isEmpty()) {
+      logger.info("Scan queue");
+      // scan queue, pet watches
+      scanQueue(jedis, resetChannel);
     }
-    logger.info(
-        format(
-            "Scan %d watches, %s, expiresAt: %s",
-            expiringChannels.size(),
-            now,
-            expiresAt));
-    logger.info("Scan dispatched");
-    // scan dispatched pet watches
-    scanDispatched(jedis, resetChannel);
 
-    if (expiringChannels.isEmpty()) {
-      return;
-    }
-    logger.info("Scan queue");
-    // scan queue, pet watches
-    scanQueue(jedis, resetChannel);
+    // scan dispatching, create ttl key if missing, remove dead entries, pet live watches
+    scanDispatching(jedis, resetChannel, now);
 
-    if (expiringChannels.isEmpty()) {
-      return;
-    }
-    logger.info("Scan prequeue");
-    // scan prequeue, pet watches
-    scanPrequeue(jedis, resetChannel);
-
-    if (expiringChannels.isEmpty()) {
-      return;
+    if (!expiringChannels.isEmpty()) {
+      logger.info("Scan dispatched");
+      // scan dispatched pet watches
+      scanDispatched(jedis, resetChannel);
     }
 
     //
