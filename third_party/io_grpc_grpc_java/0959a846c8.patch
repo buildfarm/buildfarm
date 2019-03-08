@@ -1,0 +1,49 @@
+From 0959a846c8e472910a66c166f1c99e127097df18 Mon Sep 17 00:00:00 2001
+From: Rodrigo Queiro <overdrigzed@gmail.com>
+Date: Fri, 1 Mar 2019 05:30:48 +0100
+Subject: [PATCH] bazel: update to new ProtoInfo provider
+
+This is part of #5383. As Bazel 0.22.0 is the only supported version
+now, use this in the Kokoro build.
+---
+ buildscripts/kokoro/bazel.sh | 2 ++
+ java_grpc_library.bzl        | 6 +++---
+ 2 files changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/buildscripts/kokoro/bazel.sh b/buildscripts/kokoro/bazel.sh
+index 9d5c010c30..3e2d4f7fbb 100755
+--- a/buildscripts/kokoro/bazel.sh
++++ b/buildscripts/kokoro/bazel.sh
+@@ -2,6 +2,8 @@
+ 
+ set -exu -o pipefail
+ cat /VERSION
++
++use_bazel.sh 0.22.0
+ bazel version
+ 
+ cd github/grpc-java
+diff --git a/java_grpc_library.bzl b/java_grpc_library.bzl
+index ce1a2df1b8..56e50e6dde 100644
+--- a/java_grpc_library.bzl
++++ b/java_grpc_library.bzl
+@@ -14,8 +14,8 @@ def _java_rpc_library_impl(ctx):
+         print(("in srcs attribute of {0}: Proto source with label {1} should be in " +
+                "same package as consuming rule").format(ctx.label, ctx.attr.srcs[0].label))
+ 
+-    srcs = ctx.attr.srcs[0].proto.direct_sources
+-    includes = ctx.attr.srcs[0].proto.transitive_imports
++    srcs = ctx.attr.srcs[0][ProtoInfo].direct_sources
++    includes = ctx.attr.srcs[0][ProtoInfo].transitive_imports
+     flavor = ctx.attr.flavor
+     if flavor == "normal":
+         flavor = ""
+@@ -54,7 +54,7 @@ _java_rpc_library = rule(
+         "srcs": attr.label_list(
+             mandatory = True,
+             allow_empty = False,
+-            providers = ["proto"],
++            providers = [ProtoInfo],
+         ),
+         "deps": attr.label_list(
+             mandatory = True,

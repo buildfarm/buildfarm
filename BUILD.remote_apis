@@ -4,13 +4,13 @@ licenses(["notice"])
 
 exports_files(["LICENSE"])
 
-load("@//third_party/grpc_java:java_grpc_library.bzl", "java_grpc_library")
+load("@io_grpc_grpc_java//:java_grpc_library.bzl", "java_grpc_library")
 
 java_proto_library(
     name = "build_bazel_remote_execution_v2_remote_execution_java_proto",
     deps = [
         "//build/bazel/remote/execution/v2:remote_execution_proto",
-        "@googleapis//:google_longrunning_operations_proto"
+        "@googleapis//:google_longrunning_operations_proto",
     ],
 )
 

@@ -59,6 +59,7 @@ java_library(
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/io/opencensus:opencensus_api",
         "//3rdparty/jvm/io/opencensus:opencensus_contrib_grpc_metrics",
+        "//3rdparty/jvm/org/codehaus/mojo:animal_sniffer_annotations",
     ],
 )
 
@@ -106,7 +107,6 @@ java_library(
         "//3rdparty/jvm/com/google/api/grpc:proto_google_common_protos",
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
-        "//3rdparty/jvm/com/google/protobuf:protobuf_java_util",
     ],
 )
 

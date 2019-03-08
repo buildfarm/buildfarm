@@ -335,7 +335,7 @@ public class ByteStreamUploader {
           CallOptions.DEFAULT
               .withCallCredentials(callCredentials)
               .withDeadlineAfter(callTimeoutSecs, SECONDS);
-      call = channel.newCall(ByteStreamGrpc.METHOD_WRITE, callOptions);
+      call = channel.newCall(ByteStreamGrpc.getWriteMethod(), callOptions);
 
       ClientCall.Listener<WriteResponse> callListener =
           new ClientCall.Listener<WriteResponse>() {

@@ -1,0 +1,45 @@
+From 7e1d9e419ee0e5d3bb991387b7c8d647b6c5969e Mon Sep 17 00:00:00 2001
+From: David Ostrovsky <david@ostrovsky.org>
+Date: Sun, 3 Mar 2019 21:57:33 +0100
+Subject: [PATCH] Bazel: Add dependency to error_prone_annotations
+
+Recently dependency to error_prone_annotations was added to the code,
+but only Maven build tool chain was updated.
+
+Closes #5795.
+---
+ BUILD     |  1 +
+ WORKSPACE | 10 ++++++++++
+ 2 files changed, 11 insertions(+)
+
+diff --git a/BUILD b/BUILD
+index 0189fd9b51..0a279412a9 100644
+--- a/BUILD
++++ b/BUILD
+@@ -639,6 +639,7 @@ java_library(
+     visibility = ["//visibility:public"],
+     deps = [
+         "protobuf_java",
++        "//external:error_prone_annotations",
+         "//external:gson",
+         "//external:guava",
+     ],
+diff --git a/WORKSPACE b/WORKSPACE
+index 2678ed45b0..3687680024 100644
+--- a/WORKSPACE
++++ b/WORKSPACE
+@@ -65,3 +65,13 @@ bind(
+     name = "gson",
+     actual = "@gson_maven//jar",
+ )
++
++maven_jar(
++    name = "error_prone_annotations_maven",
++    artifact = "com.google.errorprone:error_prone_annotations:2.3.2",
++)
++
++bind(
++    name = "error_prone_annotations",
++    actual = "@com_google_errorprone_error_prone_annotations//jar",
++)
+
