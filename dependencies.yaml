@@ -21,7 +21,7 @@ dependencies:
   com.google.guava:
     guava:
       lang: java
-      version: "23.5-jre"
+      version: "27.0-jre"
 
   com.google.auth:
     google-auth-library-credentials:
@@ -40,11 +40,11 @@ dependencies:
   com.google.protobuf:
     protobuf-java:
       lang: java
-      version: "3.5.0"
+      version: "3.6.1"
 
     protobuf-java-util:
       lang: java
-      version: "3.5.0"
+      version: "3.6.1"
 
   com.google.truth:
     truth:
@@ -57,17 +57,17 @@ dependencies:
       modules: [ "buffer", "codec", "codec-http", "codec-http2", "codec-socks", "common", "handler",
         "handler-proxy", "resolver", "transport", "transport-native-epoll", "transport-native-kqueue",
         "transport-native-unix-common" ]
-      version: "4.1.31.Final"
+      version: "4.1.34.Final"
 
   io.grpc:
     grpc-all:
       lang: java
-      version: "1.12.0"
+      version: "1.19.0"
 
     grpc:
       lang: java
       modules: [ "auth", "core", "context", "netty", "stub", "protobuf" ]
-      version: "1.12.0"
+      version: "1.19.0"
 
   junit:
     junit:
@@ -77,4 +77,4 @@ dependencies:
   org.mockito:
     mockito-core:
       lang: java
-      version: "2.15.0"
+      version: "2.25.0"

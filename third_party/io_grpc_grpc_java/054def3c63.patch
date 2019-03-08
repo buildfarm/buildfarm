@@ -1,0 +1,46 @@
+From 054def3c63117b712983eaedb2daf101b0dfec82 Mon Sep 17 00:00:00 2001
+From: Rodrigo Queiro <rodrigoq@google.com>
+Date: Thu, 28 Feb 2019 12:08:11 +0100
+Subject: [PATCH] Use newer Bazel actions API
+
+Also pass in the binary correctly as a tool. This is required for #5383.
+
+I have tested the build with older Bazel versions and this doesn't
+appear to affect compatibility, ie grpc-java continues to be compatible
+with Bazel >=0.19.
+---
+ java_grpc_library.bzl | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/java_grpc_library.bzl b/java_grpc_library.bzl
+index 76264a0d25..ce1a2df1b8 100644
+--- a/java_grpc_library.bzl
++++ b/java_grpc_library.bzl
+@@ -26,9 +26,10 @@ def _java_rpc_library_impl(ctx):
+     args.add_all(includes, map_each = _create_include_path)
+     args.add_all(srcs, map_each = _path_ignoring_repository)
+ 
+-    ctx.action(
+-        inputs = depset([ctx.executable._java_plugin] + srcs, transitive = [includes]),
++    ctx.actions.run(
++        inputs = depset(srcs, transitive = [includes]),
+         outputs = [ctx.outputs.srcjar],
++        tools = [ctx.executable._java_plugin],
+         executable = ctx.executable._protoc,
+         arguments = [args],
+     )
+@@ -52,12 +53,12 @@ _java_rpc_library = rule(
+     attrs = {
+         "srcs": attr.label_list(
+             mandatory = True,
+-            non_empty = True,
++            allow_empty = False,
+             providers = ["proto"],
+         ),
+         "deps": attr.label_list(
+             mandatory = True,
+-            non_empty = True,
++            allow_empty = False,
+             providers = [JavaInfo],
+         ),
+         "flavor": attr.string(

@@ -16,6 +16,7 @@ package build.buildfarm.proxy.http;
 
 import static com.google.common.util.concurrent.Futures.catching;
 import static com.google.common.util.concurrent.Futures.transform;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest.Request;
@@ -137,8 +138,10 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
                     catching(
                         simpleBlobStore.get(digest.getHash(), stream),
                         Throwable.class,
-                        (e) -> false),
-                    (success) -> success ? ByteString.copyFrom(stream.toByteArray()) : null).get();
+                        (e) -> false,
+                        directExecutor()),
+                    (success) -> (success ? ByteString.copyFrom(stream.toByteArray()) : null),
+                    directExecutor()).get();
               } catch (ExecutionException e) {
                 return null; // should not happen due to catching
               } catch (InterruptedException e) {

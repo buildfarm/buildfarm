@@ -4,7 +4,7 @@ licenses(["notice"])
 
 exports_files(["LICENSE"])
 
-load("@//third_party/grpc_java:java_grpc_library.bzl", "java_grpc_library")
+load("@io_grpc_grpc_java//:java_grpc_library.bzl", "java_grpc_library")
 
 java_proto_library(
     name = "google_devtools_build_v1_build_status_java_proto",
@@ -35,11 +35,6 @@ java_proto_library(
 java_proto_library(
     name = "google_longrunning_operations_java_proto",
     deps = [":google_longrunning_operations_proto"],
-)
-
-java_proto_library(
-    name = "google_watch_v1_java_proto",
-    deps = [":google_watch_v1_proto"],
 )
 
 java_proto_library(
@@ -84,12 +79,6 @@ java_grpc_library(
     deps = [":google_longrunning_operations_java_proto"],
 )
 
-java_grpc_library(
-    name = "google_watch_v1_java_grpc",
-    srcs = [":google_watch_v1_proto"],
-    deps = [":google_watch_v1_java_proto"],
-)
-
 proto_library(
     name = "google_rpc_code_proto",
     srcs = ["google/rpc/code.proto"],
@@ -101,16 +90,6 @@ proto_library(
     deps = [
         "@com_google_protobuf//:any_proto",
         "@com_google_protobuf//:duration_proto",
-    ],
-)
-
-proto_library(
-    name = "google_watch_v1_proto",
-    srcs = ["google/watcher/v1/watch.proto"],
-    deps = [
-        ":google_api_annotations_proto",
-        "@com_google_protobuf//:any_proto",
-        "@com_google_protobuf//:empty_proto",
     ],
 )
 
