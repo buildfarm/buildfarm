@@ -129,12 +129,14 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executor;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
@@ -165,6 +167,7 @@ public class ShardInstance extends AbstractServerInstance {
       listeningDecorator(newFixedThreadPool(24));
   private final ScheduledExecutorService contextDeadlineScheduler = newSingleThreadScheduledExecutor();
   private final ExecutorService operationDeletionService = newSingleThreadExecutor();
+  private final BlockingQueue transformTokensQueue = new LinkedBlockingQueue(256);
   private Thread operationQueuer;
   private boolean stopping = false;
   private boolean stopped = true;
@@ -229,7 +232,7 @@ public class ShardInstance extends AbstractServerInstance {
       operationQueuer = new Thread(new Runnable() {
         Stopwatch stopwatch = Stopwatch.createUnstarted();
 
-        void iterate() throws IOException, InterruptedException {
+        ListenableFuture<Void> iterate() throws IOException, InterruptedException {
           ensureCanQueue(stopwatch); // wait for transition to canQueue state
           long canQueueUSecs = stopwatch.elapsed(MICROSECONDS);
           stopwatch.stop();
@@ -237,7 +240,7 @@ public class ShardInstance extends AbstractServerInstance {
           stopwatch.start();
           if (executeEntry == null) {
             logger.severe("OperationQueuer: Got null from deprequeue...");
-            return;
+            return immediateFuture(null);
           }
           // half the watcher expiry, need to expose this from backplane
           Poller poller = new Poller(Durations.fromSeconds(5));
@@ -258,8 +261,9 @@ public class ShardInstance extends AbstractServerInstance {
               Deadline.after(5, MINUTES));
           try {
             logger.info("queueing " + operationName);
+            ListenableFuture<Void> queueFuture = queue(executeEntry, poller);
             addCallback(
-                queue(executeEntry, poller),
+                queueFuture,
                 new FutureCallback<Void>() {
                   @Override
                   public void onSuccess(Void result) {
@@ -280,9 +284,11 @@ public class ShardInstance extends AbstractServerInstance {
                     operationName,
                     canQueueUSecs,
                     operationTransformDispatchUSecs));
+            return queueFuture;
           } catch (Throwable t) {
             poller.pause();
             logger.log(SEVERE, "error queueing " + operationName, t);
+            return immediateFuture(null);
           }
         }
 
@@ -291,10 +297,20 @@ public class ShardInstance extends AbstractServerInstance {
           logger.info("OperationQueuer: Running");
           try {
             for (;;) {
+              transformTokensQueue.put(new Object());
               stopwatch.start();
               try {
-                iterate();
+                iterate().addListener(
+                    () -> {
+                      try {
+                        transformTokensQueue.take();
+                      } catch (InterruptedException e) {
+                        logger.log(SEVERE, "interrupted while returning transform token", e);
+                      }
+                    },
+                    operationTransformService);
               } catch (IOException e) {
+                transformTokensQueue.take();
                 // problems interacting with backplane
               } finally {
                 stopwatch.reset();
@@ -361,7 +377,7 @@ public class ShardInstance extends AbstractServerInstance {
     backplane.stop();
     onStop.run();
     if (!contextDeadlineScheduler.awaitTermination(10, TimeUnit.SECONDS)) {
-      logger.error("Could not shut down operation deletion service, some operations may be zombies");
+      logger.severe("Could not shut down context deadline scheduler, some operations may be zombies");
     }
     if (!operationDeletionService.awaitTermination(10, TimeUnit.SECONDS)) {
       logger.severe("Could not shut down operation deletion service, some operations may be zombies");
