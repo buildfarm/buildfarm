@@ -15,7 +15,9 @@
 package build.buildfarm.cas;
 
 import static com.google.common.collect.Multimaps.synchronizedListMultimap;
+import static com.google.common.util.concurrent.Futures.immediateFuture;
 
+import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Retrier;
@@ -25,6 +27,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.MultimapBuilder;
 import com.google.protobuf.ByteString;
+import com.google.common.util.concurrent.ListenableFuture;
 import io.grpc.Channel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
@@ -78,6 +81,12 @@ public final class ContentAddressableStorages {
           }
         }
         return missing.build();
+      }
+
+      @Override
+      public ListenableFuture<Iterable<Response>> getAllFuture(
+          Iterable<Digest> digests) {
+        return immediateFuture(MemoryCAS.getAll(digests, map::get));
       }
 
       @Override

@@ -14,8 +14,14 @@
 
 package build.buildfarm.cas;
 
+import static com.google.common.util.concurrent.Futures.transform;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+
+import build.bazel.remote.execution.v2.BatchReadBlobsRequest;
+import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageBlockingStub;
+import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageFutureStub;
 import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
@@ -23,6 +29,7 @@ import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.ByteStringIteratorInputStream;
 import build.buildfarm.instance.stub.Chunker;
 import build.buildfarm.instance.stub.RetryException;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamBlockingStub;
 import com.google.bytestream.ByteStreamProto.ReadRequest;
@@ -61,6 +68,15 @@ class GrpcCAS implements ContentAddressableStorage {
             @Override
             public ContentAddressableStorageBlockingStub get() {
               return ContentAddressableStorageGrpc.newBlockingStub(channel);
+            }
+          });
+
+  private final Supplier<ContentAddressableStorageFutureStub> casFutureStub =
+      Suppliers.memoize(
+          new Supplier<ContentAddressableStorageFutureStub>() {
+            @Override
+            public ContentAddressableStorageFutureStub get() {
+              return ContentAddressableStorageGrpc.newFutureStub(channel);
             }
           });
 
@@ -109,6 +125,19 @@ class GrpcCAS implements ContentAddressableStorage {
     for (Runnable r : digestOnExpirations) {
       r.run();
     }
+  }
+
+  @Override
+  public ListenableFuture<Iterable<Response>> getAllFuture(Iterable<Digest> digests) {
+    // FIXME limit to 4MiB total response
+    return transform(
+        casFutureStub.get()
+            .batchReadBlobs(BatchReadBlobsRequest.newBuilder()
+                .setInstanceName(instanceName)
+                .addAllDigests(digests)
+                .build()),
+        (response) -> response.getResponsesList(),
+        directExecutor());
   }
 
   @Override

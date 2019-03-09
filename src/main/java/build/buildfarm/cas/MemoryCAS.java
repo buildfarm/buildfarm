@@ -14,16 +14,35 @@
 
 package build.buildfarm.cas;
 
+import static com.google.common.util.concurrent.Futures.immediateFuture;
+import static java.util.logging.Level.SEVERE;
+
+import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.Digest;
+import build.buildfarm.common.DigestUtil;
 import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.protobuf.ByteString;
+import com.google.rpc.Code;
+import com.google.rpc.Status;
+import io.grpc.protobuf.StatusProto;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.logging.Logger;
 
 class MemoryCAS implements ContentAddressableStorage {
   private static final Logger logger = Logger.getLogger(MemoryCAS.class.getName());
+
+  static final Status OK = Status.newBuilder()
+      .setCode(Code.OK.getNumber())
+      .build();
+
+  static final Status NOT_FOUND = Status.newBuilder()
+      .setCode(Code.NOT_FOUND.getNumber())
+      .build();
 
   private final long maxSizeInBytes;
   private final Map<Digest, Entry> storage;
@@ -48,6 +67,61 @@ class MemoryCAS implements ContentAddressableStorage {
       }
     }
     return missing.build();
+  }
+
+  @Override
+  public ListenableFuture<Iterable<Response>> getAllFuture(Iterable<Digest> digests) {
+    return immediateFuture(getAll(digests));
+  }
+
+  synchronized Iterable<Response> getAll(Iterable<Digest> digests) {
+    return getAll(digests, (digest) -> {
+      Blob blob = get(digest);
+      if (blob == null) {
+        return null;
+      }
+      return blob.getData();
+    });
+  }
+
+  public static Iterable<Response> getAll(
+      Iterable<Digest> digests,
+      Function<Digest, ByteString> blobGetter) {
+    ImmutableList.Builder<Response> responses =
+        ImmutableList.builder();
+    for (Digest digest : digests) {
+      responses.add(getResponse(digest, blobGetter));
+    }
+    return responses.build();
+  }
+
+  private static Status statusFromThrowable(Throwable t) {
+    Status status = StatusProto.fromThrowable(t);
+    if (status == null) {
+      status = Status.newBuilder()
+          .setCode(io.grpc.Status.fromThrowable(t).getCode().value())
+          .build();
+    }
+    return status;
+  }
+
+  public static Response getResponse(Digest digest, Function<Digest, ByteString> blobGetter) {
+    Response.Builder response = Response.newBuilder()
+        .setDigest(digest);
+    try {
+      ByteString blob = blobGetter.apply(digest);
+      if (blob == null) {
+        response.setStatus(NOT_FOUND);
+      } else {
+        response
+            .setData(blob)
+            .setStatus(OK);
+      }
+    } catch (Throwable t) {
+      logger.log(SEVERE, "error getting " + DigestUtil.toString(digest), t);
+      response.setStatus(statusFromThrowable(t));
+    }
+    return response.build();
   }
 
   @Override

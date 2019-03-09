@@ -14,9 +14,11 @@
 
 package build.buildfarm.cas;
 
+import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
+import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.ThreadSafety.ThreadSafe;
-import build.bazel.remote.execution.v2.Digest;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.protobuf.ByteString;
 
 public interface ContentAddressableStorage {
@@ -62,6 +64,9 @@ public interface ContentAddressableStorage {
   /** Retrieve a value from the CAS. */
   @ThreadSafe
   Blob get(Digest digest);
+
+  /** Retrieve a set of blobs from the CAS represented by a future. */
+  ListenableFuture<Iterable<Response>> getAllFuture(Iterable<Digest> digests);
 
   /** Insert a blob into the CAS. */
   @ThreadSafe

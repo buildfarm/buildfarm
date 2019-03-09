@@ -14,11 +14,17 @@
 
 package build.buildfarm.instance.stub;
 
+import static com.google.common.util.concurrent.Futures.transform;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+
 import build.bazel.remote.execution.v2.ActionCacheGrpc;
 import build.bazel.remote.execution.v2.ActionCacheGrpc.ActionCacheBlockingStub;
 import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.BatchReadBlobsRequest;
+import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageBlockingStub;
+import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageFutureStub;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
@@ -51,6 +57,7 @@ import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
@@ -96,7 +103,16 @@ public class StubInstance implements Instance {
             }
           });
 
-  private final Supplier<ContentAddressableStorageBlockingStub> contentAddressableStorageBlockingStub =
+  private final Supplier<ContentAddressableStorageFutureStub> casFutureStub =
+      Suppliers.memoize(
+          new Supplier<ContentAddressableStorageFutureStub>() {
+            @Override
+            public ContentAddressableStorageFutureStub get() {
+              return ContentAddressableStorageGrpc.newFutureStub(channel);
+            }
+          });
+
+  private final Supplier<ContentAddressableStorageBlockingStub> casBlockingStub =
       Suppliers.memoize(
           new Supplier<ContentAddressableStorageBlockingStub>() {
             @Override
@@ -159,8 +175,7 @@ public class StubInstance implements Instance {
 
   @Override
   public Iterable<Digest> findMissingBlobs(Iterable<Digest> digests) {
-    FindMissingBlobsResponse response = contentAddressableStorageBlockingStub
-        .get()
+    FindMissingBlobsResponse response = casBlockingStub.get()
         .findMissingBlobs(FindMissingBlobsRequest.newBuilder()
             .setInstanceName(getName())
             .addAllBlobDigests(digests)
@@ -293,6 +308,19 @@ public class StubInstance implements Instance {
   }
 
   @Override
+  public ListenableFuture<Iterable<Response>> getAllBlobsFuture(
+      Iterable<Digest> digests) {
+    return transform(
+        casFutureStub.get()
+            .batchReadBlobs(BatchReadBlobsRequest.newBuilder()
+                .setInstanceName(getName())
+                .addAllDigests(digests)
+                .build()),
+        (response) -> response.getResponsesList(),
+        directExecutor());
+  }
+
+  @Override
   public ByteString getBlob(Digest blobDigest) {
     if (blobDigest.getSizeBytes() == 0) {
       return ByteString.EMPTY;
@@ -327,8 +355,7 @@ public class StubInstance implements Instance {
       int pageSize,
       String pageToken,
       ImmutableList.Builder<Directory> directories) {
-    Iterator<GetTreeResponse> replies = contentAddressableStorageBlockingStub
-        .get()
+    Iterator<GetTreeResponse> replies = casBlockingStub.get()
         .getTree(GetTreeRequest.newBuilder()
             .setInstanceName(getName())
             .setRootDigest(rootDigest)

@@ -19,6 +19,7 @@ import static java.util.logging.Level.SEVERE;
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.ActionCacheUpdateCapabilities;
+import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.CacheCapabilities;
 import build.bazel.remote.execution.v2.CacheCapabilities.SymlinkAbsolutePathStrategy;
 import build.bazel.remote.execution.v2.Command;
@@ -47,6 +48,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -172,6 +174,11 @@ public abstract class AbstractServerInstance implements Instance {
         "%s/blobs/%s",
         getName(),
         DigestUtil.toString(blobDigest));
+  }
+
+  @Override
+  public ListenableFuture<Iterable<Response>> getAllBlobsFuture(Iterable<Digest> digests) {
+    return contentAddressableStorage.getAllFuture(digests);
   }
 
   @Override
