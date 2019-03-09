@@ -14,8 +14,14 @@
 
 package build.buildfarm.server;
 
+import static com.google.common.util.concurrent.Futures.addCallback;
+import static com.google.common.util.concurrent.Futures.transform;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+
 import build.buildfarm.instance.Instance;
 import com.google.common.collect.ImmutableList;
+import build.bazel.remote.execution.v2.BatchReadBlobsRequest;
+import build.bazel.remote.execution.v2.BatchReadBlobsResponse;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest.Request;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
@@ -27,6 +33,7 @@ import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
 import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
 import build.bazel.remote.execution.v2.GetTreeRequest;
 import build.bazel.remote.execution.v2.GetTreeResponse;
+import com.google.common.util.concurrent.FutureCallback;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.StatusException;
@@ -110,6 +117,46 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
         .addAllResponses(responses.build())
         .build());
     responseObserver.onCompleted();
+  }
+
+  void batchReadBlobs(
+      Instance instance,
+      BatchReadBlobsRequest batchRequest,
+      StreamObserver<BatchReadBlobsResponse> responseObserver) {
+    BatchReadBlobsResponse.Builder response =
+        BatchReadBlobsResponse.newBuilder();
+    addCallback(
+        transform(
+            instance.getAllBlobsFuture(batchRequest.getDigestsList()),
+            (responses) -> response.addAllResponses(responses).build(),
+            directExecutor()),
+        new FutureCallback<BatchReadBlobsResponse>() {
+          @Override
+          public void onSuccess(BatchReadBlobsResponse response) {
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+          }
+
+          @Override
+          public void onFailure(Throwable t) {
+            responseObserver.onError(Status.fromThrowable(t).asException());
+          }
+        },
+        directExecutor());
+  }
+
+  @Override
+  public void batchReadBlobs(
+      BatchReadBlobsRequest batchRequest,
+      StreamObserver<BatchReadBlobsResponse> responseObserver) {
+    try {
+      batchReadBlobs(
+          instances.get(batchRequest.getInstanceName()),
+          batchRequest,
+          responseObserver);
+    } catch (InstanceNotFoundException e) {
+      responseObserver.onError(BuildFarmInstances.toStatusException(e));
+    }
   }
 
   @Override

@@ -14,11 +14,8 @@
 
 package build.buildfarm.instance;
 
-import build.buildfarm.common.DigestUtil;
-import build.buildfarm.common.DigestUtil.ActionKey;
-import build.buildfarm.common.function.InterruptingPredicate;
-import com.google.common.collect.ImmutableList;
 import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
@@ -26,6 +23,11 @@ import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.ServerCapabilities;
+import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.function.InterruptingPredicate;
+import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
@@ -48,6 +50,7 @@ public interface Instance {
 
   String getBlobName(Digest blobDigest);
   ByteString getBlob(Digest blobDigest);
+  ListenableFuture<Iterable<Response>> getAllBlobsFuture(Iterable<Digest> digests);
   ByteString getBlob(Digest blobDigest, long offset, long limit);
   Digest putBlob(ByteString blob)
       throws IOException, IllegalArgumentException, InterruptedException;
