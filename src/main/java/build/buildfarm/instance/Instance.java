@@ -36,7 +36,7 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 
 public interface Instance {
@@ -50,7 +50,7 @@ public interface Instance {
   ActionResult getActionResult(ActionKey actionKey);
   void putActionResult(ActionKey actionKey, ActionResult actionResult) throws InterruptedException;
 
-  ListenableFuture<Iterable<Digest>> findMissingBlobs(Iterable<Digest> digests, ExecutorService service);
+  ListenableFuture<Iterable<Digest>> findMissingBlobs(Iterable<Digest> digests, Executor executor);
 
   String getBlobName(Digest blobDigest);
   void getBlob(Digest blobDigest, long offset, long limit, StreamObserver<ByteString> blobObserver);

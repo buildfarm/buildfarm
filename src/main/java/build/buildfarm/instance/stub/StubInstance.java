@@ -92,7 +92,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Iterator;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -278,7 +278,7 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public ListenableFuture<Iterable<Digest>> findMissingBlobs(Iterable<Digest> digests, ExecutorService service) {
+  public ListenableFuture<Iterable<Digest>> findMissingBlobs(Iterable<Digest> digests, Executor executor) {
     throwIfStopped();
     FindMissingBlobsRequest request = FindMissingBlobsRequest.newBuilder()
         .setInstanceName(getName())
@@ -292,7 +292,7 @@ public class StubInstance implements Instance {
             .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
             .findMissingBlobs(request),
         (response) -> response.getMissingBlobDigestsList(),
-        service);
+        executor);
   }
 
   /** expectedSize == -1 for unlimited */

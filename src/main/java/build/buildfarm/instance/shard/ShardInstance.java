@@ -14,6 +14,7 @@
 
 package build.buildfarm.instance.shard;
 
+import static io.grpc.Context.currentContextExecutor;
 import static build.buildfarm.instance.shard.Util.SHARD_IS_RETRIABLE;
 import static build.buildfarm.instance.shard.Util.correctMissingBlob;
 import static com.google.common.base.Predicates.or;
@@ -33,6 +34,7 @@ import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator
 import static java.lang.String.format;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.logging.Level.INFO;
@@ -91,7 +93,6 @@ import com.google.common.util.concurrent.FluentFuture;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListeningExecutorService;
-import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
@@ -134,6 +135,7 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
@@ -161,8 +163,8 @@ public class ShardInstance extends AbstractServerInstance {
 
   private final ListeningExecutorService operationTransformService =
       listeningDecorator(newFixedThreadPool(24));
-
-  private ExecutorService operationDeletionService = newSingleThreadExecutor();
+  private final ScheduledExecutorService contextDeadlineScheduler = newSingleThreadScheduledExecutor();
+  private final ExecutorService operationDeletionService = newSingleThreadExecutor();
   private Thread operationQueuer;
   private boolean stopping = false;
   private boolean stopped = true;
@@ -353,10 +355,14 @@ public class ShardInstance extends AbstractServerInstance {
     if (dispatchedMonitor != null) {
       dispatchedMonitor.stop();
     }
+    contextDeadlineScheduler.shutdown();
     operationDeletionService.shutdown();
     operationTransformService.shutdown();
     backplane.stop();
     onStop.run();
+    if (!contextDeadlineScheduler.awaitTermination(10, TimeUnit.SECONDS)) {
+      logger.error("Could not shut down operation deletion service, some operations may be zombies");
+    }
     if (!operationDeletionService.awaitTermination(10, TimeUnit.SECONDS)) {
       logger.severe("Could not shut down operation deletion service, some operations may be zombies");
     }
@@ -390,7 +396,7 @@ public class ShardInstance extends AbstractServerInstance {
       outputDigests = Iterables.concat(outputDigests, ImmutableList.of(actionResult.getStderrDigest()));
     }
     try {
-      if (Iterables.isEmpty(findMissingBlobs(outputDigests, newDirectExecutorService()).get())) {
+      if (Iterables.isEmpty(findMissingBlobs(outputDigests, directExecutor()).get())) {
         return actionResult;
       }
     } catch (ExecutionException e) {
@@ -427,7 +433,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @Override
-  public ListenableFuture<Iterable<Digest>> findMissingBlobs(Iterable<Digest> blobDigests, ExecutorService service) {
+  public ListenableFuture<Iterable<Digest>> findMissingBlobs(Iterable<Digest> blobDigests, Executor executor) {
     Iterable<Digest> nonEmptyDigests = Iterables.filter(blobDigests, (digest) -> digest.getSizeBytes() > 0);
     if (Iterables.isEmpty(nonEmptyDigests)) {
       return immediateFuture(ImmutableList.of());
@@ -446,7 +452,12 @@ public class ShardInstance extends AbstractServerInstance {
       return immediateFuture(nonEmptyDigests);
     }
 
-    return findMissingBlobsOnWorker(nonEmptyDigests, workers, ImmutableList.builder(), Iterables.size(nonEmptyDigests), service);
+    return findMissingBlobsOnWorker(
+        nonEmptyDigests,
+        workers,
+        ImmutableList.builder(),
+        Iterables.size(nonEmptyDigests),
+        executor);
   }
 
   class FindMissingResponseEntry {
@@ -468,20 +479,22 @@ public class ShardInstance extends AbstractServerInstance {
       Deque<String> workers,
       ImmutableList.Builder<FindMissingResponseEntry> responses,
       int originalSize,
-      ExecutorService service) {
+      Executor executor) {
+    Executor contextExecutor = currentContextExecutor(executor);
+
     String worker = workers.removeFirst();
     // FIXME use FluentFuture
     Stopwatch stopwatch = Stopwatch.createStarted();
     ListenableFuture<Iterable<Digest>> findMissingBlobsFuture = transformAsync(
-        workerStub(worker).findMissingBlobs(blobDigests, service),
+        workerStub(worker).findMissingBlobs(blobDigests, executor),
         (missingDigests) -> {
           responses.add(new FindMissingResponseEntry(worker, stopwatch.elapsed(MICROSECONDS), null, Iterables.size(missingDigests)));
           if (Iterables.isEmpty(missingDigests) || workers.isEmpty()) {
             return immediateFuture(missingDigests);
           }
-          return findMissingBlobsOnWorker(missingDigests, workers, responses, originalSize, service);
+          return findMissingBlobsOnWorker(missingDigests, workers, responses, originalSize, executor);
         },
-        service);
+        contextExecutor);
     return catchingAsync(
         findMissingBlobsFuture,
         Throwable.class,
@@ -515,10 +528,10 @@ public class ShardInstance extends AbstractServerInstance {
           if (workers.isEmpty()) {
             return immediateFuture(blobDigests);
           } else {
-            return findMissingBlobsOnWorker(blobDigests, workers, responses, originalSize, service);
+            return findMissingBlobsOnWorker(blobDigests, workers, responses, originalSize, executor);
           }
         },
-        service);
+        contextExecutor);
   }
 
   private void fetchBlobFromWorker(
@@ -1388,7 +1401,7 @@ public class ShardInstance extends AbstractServerInstance {
     });
   }
 
-  private boolean checkCache(ActionKey actionKey, Operation operation) throws IOException {
+  private boolean checkCache(ActionKey actionKey, Operation operation) throws Exception {
     ExecuteOperationMetadata metadata =
         ExecuteOperationMetadata.newBuilder()
             .setActionDigest(actionKey.getDigest())
@@ -1400,33 +1413,41 @@ public class ShardInstance extends AbstractServerInstance {
             .build(),
         metadata.getStage());
 
-    ActionResult actionResult = getActionResultFromBackplane(actionKey);
-    if (actionResult == null) {
-      return false;
-    }
+    Context.CancellableContext withDeadline = Context.current()
+        .withDeadlineAfter(60, TimeUnit.SECONDS, contextDeadlineScheduler);
+    try {
+      return withDeadline.call(() -> {
+        ActionResult actionResult = getActionResultFromBackplane(actionKey);
+        if (actionResult == null) {
+          return false;
+        }
 
-    metadata = metadata.toBuilder()
-        .setStage(Stage.COMPLETED)
-        .build();
-    Operation completedOperation = operation.toBuilder()
-        .setDone(true)
-        .setResponse(Any.pack(ExecuteResponse.newBuilder()
-            .setResult(actionResult)
-            .setStatus(com.google.rpc.Status.newBuilder()
-                .setCode(Code.OK.value())
-                .build())
-            .setCachedResult(true)
-            .build()))
-        .setMetadata(Any.pack(metadata))
-        .build();
-    backplane.putOperation(completedOperation, metadata.getStage());
-    return true;
+        ExecuteOperationMetadata completeMetadata = metadata.toBuilder()
+            .setStage(Stage.COMPLETED)
+            .build();
+        Operation completedOperation = operation.toBuilder()
+            .setDone(true)
+            .setResponse(Any.pack(ExecuteResponse.newBuilder()
+                .setResult(actionResult)
+                .setStatus(com.google.rpc.Status.newBuilder()
+                    .setCode(Code.OK.value())
+                    .build())
+                .setCachedResult(true)
+                .build()))
+            .setMetadata(Any.pack(completeMetadata))
+            .build();
+        backplane.putOperation(completedOperation, completeMetadata.getStage());
+        return true;
+      });
+    } finally {
+      withDeadline.cancel(null);
+    }
   }
 
   private ListenableFuture<Boolean> checkCacheFuture(ActionKey actionKey, Operation operation) {
     ListenableFuture<Boolean> checkCacheFuture = operationTransformService.submit(new Callable<Boolean>() {
       @Override
-      public Boolean call() throws IOException {
+      public Boolean call() throws Exception {
         return checkCache(actionKey, operation);
       }
     });

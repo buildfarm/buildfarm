@@ -354,9 +354,12 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public ListenableFuture<Iterable<Digest>> findMissingBlobs(Iterable<Digest> digests, ExecutorService service) {
-    ListeningExecutorService listeningService = listeningDecorator(service);
-    return listeningService.submit(() -> contentAddressableStorage.findMissingBlobs(digests));
+  public ListenableFuture<Iterable<Digest>> findMissingBlobs(Iterable<Digest> digests, Executor executor) {
+    try {
+      return immediateFuture(contentAddressableStorage.findMissingBlobs(digests));
+    } catch (InterruptedException e) {
+      return immediateFailedFuture(e);
+    }
   }
 
   protected abstract int getTreeDefaultPageSize();
@@ -648,9 +651,9 @@ public abstract class AbstractServerInstance implements Instance {
   private void validateInputs(
       Iterable<Digest> inputDigests,
       PreconditionFailure.Builder preconditionFailure,
-      ExecutorService service) throws StatusException, InterruptedException {
+      Executor executor) throws StatusException, InterruptedException {
     ListenableFuture<Void> result = transform(
-        findMissingBlobs(inputDigests, service),
+        findMissingBlobs(inputDigests, executor),
         (missingBlobDigests) -> {
           preconditionFailure.addAllViolations(
               Iterables.transform(
@@ -662,7 +665,7 @@ public abstract class AbstractServerInstance implements Instance {
                       .build()));
           return null;
         },
-        service);
+        executor);
     try {
       result.get();
     } catch (ExecutionException e) {
@@ -694,7 +697,7 @@ public abstract class AbstractServerInstance implements Instance {
       Digest actionDigest,
       QueuedOperation queuedOperation,
       PreconditionFailure.Builder preconditionFailure,
-      ExecutorService service) throws StatusException, InterruptedException {
+      Executor executor) throws StatusException, InterruptedException {
     final ListenableFuture<Void> validatedFuture;
     if (!queuedOperation.hasAction()) {
       preconditionFailure.addViolationsBuilder()
@@ -713,7 +716,7 @@ public abstract class AbstractServerInstance implements Instance {
       validateInputs(
           inputDigestsBuilder.build(),
           preconditionFailure,
-          service);
+          executor);
     }
     checkPreconditionFailure(actionDigest, preconditionFailure.build());
     return queuedOperation;
