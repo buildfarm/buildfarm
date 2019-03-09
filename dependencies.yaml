@@ -49,7 +49,7 @@ dependencies:
   com.google.truth:
     truth:
       lang: java
-      version: "0.36"
+      version: "0.43"
 
   io.netty:
     netty:
