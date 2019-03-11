@@ -16,15 +16,19 @@ package build.buildfarm.worker.operationqueue;
 
 import static build.buildfarm.common.IOUtils.formatIOError;
 import static com.google.common.collect.Maps.uniqueIndex;
+import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
+import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
+import static java.util.concurrent.TimeUnit.MINUTES;
 
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.function.InterruptingConsumer;
+import build.buildfarm.common.grpc.Retrier;
+import build.buildfarm.common.grpc.Retrier.Backoff;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.ByteStreamUploader;
-import build.buildfarm.instance.stub.Retrier;
-import build.buildfarm.instance.stub.Retrier.Backoff;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.v1test.ExecutionPolicy;
@@ -47,7 +51,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
-import com.google.common.util.concurrent.MoreExecutors;
 import com.google.devtools.common.options.OptionsParser;
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
@@ -83,7 +86,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
-import java.util.concurrent.Executors;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
@@ -102,7 +104,7 @@ public class Worker {
   private final Map<Path, Iterable<Digest>> rootInputDirectories = new ConcurrentHashMap<>();
 
   private static final ListeningScheduledExecutorService retryScheduler =
-      MoreExecutors.listeningDecorator(Executors.newScheduledThreadPool(1));
+      listeningDecorator(newSingleThreadScheduledExecutor());
   private final Set<String> activeOperations = new ConcurrentSkipListSet<>();
 
   private static Channel createChannel(String target) {
@@ -147,26 +149,29 @@ public class Worker {
         Retrier.DEFAULT_IS_RETRIABLE);
   }
 
-  private static ByteStreamUploader createStubUploader(Channel channel) {
-    return new ByteStreamUploader("", channel, null, 300, createStubRetrier(), retryScheduler);
+  private static ByteStreamUploader createStubUploader(Channel channel, Retrier retrier) {
+    return new ByteStreamUploader("", channel, null, 300, retrier, retryScheduler);
   }
 
   private static Instance createInstance(
       InstanceEndpoint instanceEndpoint,
-      DigestUtil digestUtil) {
+      DigestUtil digestUtil,
+      Retrier retrier) {
     return createInstance(
         instanceEndpoint.getInstanceName(),
+        digestUtil,
         createChannel(instanceEndpoint.getTarget()),
         null,
-        digestUtil);
+        retrier);
   }
 
   private static Instance createInstance(
       String name,
+      DigestUtil digestUtil,
       Channel channel,
       ByteStreamUploader uploader,
-      DigestUtil digestUtil) {
-    return new StubInstance(name, digestUtil, channel, uploader);
+      Retrier retrier) {
+    return new StubInstance(name, digestUtil, channel, uploader, retrier, retryScheduler);
   }
 
   public Worker(WorkerConfig config) throws ConfigurationException {
@@ -181,14 +186,15 @@ public class Worker {
     digestUtil = new DigestUtil(hashFunction);
     InstanceEndpoint casEndpoint = config.getContentAddressableStorage();
     Channel casChannel = createChannel(casEndpoint.getTarget());
-    uploader = createStubUploader(casChannel);
-    casInstance = createInstance(casEndpoint.getInstanceName(), casChannel, uploader, digestUtil);
-    acInstance = createInstance(config.getActionCache(), digestUtil);
-    operationQueueInstance = createInstance(config.getOperationQueue(), digestUtil);
+    Retrier retrier = createStubRetrier();
+    uploader = createStubUploader(casChannel, retrier);
+    casInstance = createInstance(casEndpoint.getInstanceName(), digestUtil, casChannel, uploader, retrier);
+    acInstance = createInstance(config.getActionCache(), digestUtil, retrier);
+    operationQueueInstance = createInstance(config.getOperationQueue(), digestUtil, retrier);
     InputStreamFactory inputStreamFactory = new InputStreamFactory() {
       @Override
-      public InputStream apply(Digest digest) {
-        return casInstance.newStreamInput(casInstance.getBlobName(digest));
+      public InputStream newInput(Digest digest, long offset) throws IOException {
+        return casInstance.newBlobInput(digest, offset);
       }
     };
     fileCache = new CASFileCache(
@@ -478,8 +484,8 @@ public class Worker {
 
       // doesn't belong in CAS or AC, must be in OQ
       @Override
-      public OutputStream getStreamOutput(String name) {
-        return operationQueueInstance.getStreamOutput(name);
+      public OutputStream getOperationStreamOutput(String name) throws IOException {
+        return operationQueueInstance.getOperationStreamWrite(name).getOutput();
       }
 
       @Override
@@ -508,6 +514,10 @@ public class Worker {
     pipeline.join(); // uninterruptable
     if (Thread.interrupted()) {
       throw new InterruptedException();
+    }
+    retryScheduler.shutdown();
+    if (!shutdownAndAwaitTermination(retryScheduler, 1, MINUTES)) {
+      logger.severe("unable to terminate retry scheduler");
     }
   }
 

@@ -59,6 +59,6 @@ public interface WorkerContext {
   void destroyActionRoot(Path root) throws IOException;
   Path getRoot();
   boolean putOperation(Operation operation) throws InterruptedException;
-  OutputStream getStreamOutput(String name);
+  OutputStream getOperationStreamOutput(String name) throws IOException;
   void putActionResult(ActionKey actionKey, ActionResult actionResult) throws InterruptedException;
 }

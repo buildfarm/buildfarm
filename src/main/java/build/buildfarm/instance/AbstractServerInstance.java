@@ -41,6 +41,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
+import build.buildfarm.common.Write;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -60,10 +61,13 @@ import io.grpc.Status;
 import java.io.IOException;
 import io.grpc.StatusException;
 import io.grpc.protobuf.StatusProto;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
+import java.util.UUID;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
@@ -177,6 +181,16 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
+  public InputStream newBlobInput(Digest digest, long offset) throws IOException {
+    return contentAddressableStorage.newInput(digest, offset);
+  }
+
+  @Override
+  public Write getBlobWrite(Digest digest, UUID uuid) {
+    return contentAddressableStorage.getWrite(digest, uuid);
+  }
+
+  @Override
   public ListenableFuture<Iterable<Response>> getAllBlobsFuture(Iterable<Digest> digests) {
     return contentAddressableStorage.getAllFuture(digests);
   }
@@ -225,6 +239,11 @@ public abstract class AbstractServerInstance implements Instance {
     Blob blob = new Blob(content, digestUtil);
     contentAddressableStorage.put(blob);
     return blob.getDigest();
+  }
+
+  @Override
+  public boolean containsBlob(Digest digest) {
+    return contentAddressableStorage.contains(digest);
   }
 
   @Override

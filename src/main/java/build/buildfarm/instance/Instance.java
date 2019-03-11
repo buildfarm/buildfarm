@@ -25,6 +25,7 @@ import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.Write;
 import build.buildfarm.common.function.InterruptingPredicate;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -33,6 +34,7 @@ import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.UUID;
 import java.util.function.Predicate;
 
 public interface Instance {
@@ -44,11 +46,14 @@ public interface Instance {
   void putActionResult(ActionKey actionKey, ActionResult actionResult) throws InterruptedException;
 
   Iterable<Digest> findMissingBlobs(Iterable<Digest> digests);
+  boolean containsBlob(Digest digest);
 
   Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs)
       throws IOException, IllegalArgumentException, InterruptedException;
 
   String getBlobName(Digest blobDigest);
+  InputStream newBlobInput(Digest digest, long offset) throws IOException;
+  Write getBlobWrite(Digest digest, UUID uuid);
   ByteString getBlob(Digest blobDigest);
   ListenableFuture<Iterable<Response>> getAllBlobsFuture(Iterable<Digest> digests);
   ByteString getBlob(Digest blobDigest, long offset, long limit);
@@ -60,8 +65,9 @@ public interface Instance {
       String pageToken,
       ImmutableList.Builder<Directory> directories)
       throws IOException, InterruptedException;
-  OutputStream getStreamOutput(String name);
-  InputStream newStreamInput(String name);
+
+  Write getOperationStreamWrite(String name);
+  InputStream newOperationStreamInput(String name, long offset) throws IOException;
 
   void execute(
       Digest actionDigest,

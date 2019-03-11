@@ -1,4 +1,4 @@
-// Copyright 2018 The Bazel Authors. All rights reserved.
+// Copyright 2019 The Bazel Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -11,14 +11,20 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-package build.buildfarm.server;
 
-class InstanceNotFoundException extends Exception {
-  private static final long serialVersionUID = 1;
+package build.buildfarm.common;
 
-  public final String instanceName;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.concurrent.Executor;
 
-  InstanceNotFoundException( String instanceName ) {
-    this.instanceName = instanceName;
-  }
+public interface Write {
+  long getCommittedSize();
+
+  boolean isComplete();
+
+  OutputStream getOutput() throws IOException;
+
+  /** add a callback to be invoked when blob has been completed */
+  void addListener(Runnable onCompleted, Executor executor);
 }

@@ -15,8 +15,9 @@
 package build.buildfarm.worker;
 
 import build.bazel.remote.execution.v2.Digest;
+import java.io.IOException;
 import java.io.InputStream;
-import java.util.function.Function;
 
-public interface InputStreamFactory extends Function<Digest, InputStream> {
+public interface InputStreamFactory {
+  InputStream newInput(Digest digest, long offset) throws IOException;
 }

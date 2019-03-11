@@ -14,15 +14,19 @@
 
 package build.buildfarm.cas;
 
+import static build.buildfarm.common.grpc.Retrier.NO_RETRIES;
 import static com.google.common.collect.Multimaps.synchronizedListMultimap;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.Digest;
+import build.buildfarm.common.Write;
 import build.buildfarm.instance.stub.ByteStreamUploader;
-import build.buildfarm.instance.stub.Retrier;
+import build.buildfarm.v1test.BlobWriteKey;
 import build.buildfarm.v1test.ContentAddressableStorageConfig;
 import build.buildfarm.v1test.GrpcCASConfig;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.MultimapBuilder;
@@ -31,7 +35,13 @@ import com.google.common.util.concurrent.ListenableFuture;
 import io.grpc.Channel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.NoSuchFileException;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 public final class ContentAddressableStorages {
   private static Channel createChannel(String target) {
@@ -44,7 +54,7 @@ public final class ContentAddressableStorages {
   private static ContentAddressableStorage createGrpcCAS(GrpcCASConfig config) {
     Channel channel = createChannel(config.getTarget());
     ByteStreamUploader byteStreamUploader
-        = new ByteStreamUploader("", channel, null, 300, Retrier.NO_RETRIES, null);
+        = new ByteStreamUploader("", channel, null, 300, NO_RETRIES, null);
     ListMultimap<Digest, Runnable> onExpirations = synchronizedListMultimap(
         MultimapBuilder
             .hashKeys()
@@ -72,6 +82,13 @@ public final class ContentAddressableStorages {
    */
   public static ContentAddressableStorage casMapDecorator(Map<Digest, ByteString> map) {
     return new ContentAddressableStorage() {
+      final Writes writes = new Writes(this);
+
+      @Override
+      public boolean contains(Digest digest) {
+        return map.containsKey(digest);
+      }
+
       @Override
       public Iterable<Digest> findMissingBlobs(Iterable<Digest> digests) {
         ImmutableList.Builder<Digest> missing = ImmutableList.builder();
@@ -81,6 +98,22 @@ public final class ContentAddressableStorages {
           }
         }
         return missing.build();
+      }
+
+      @Override
+      public Write getWrite(Digest digest, UUID uuid) {
+        return writes.get(digest, uuid);
+      }
+
+      @Override
+      public InputStream newInput(Digest digest, long offset) throws IOException {
+        ByteString data = map.get(digest);
+        if (data == null) {
+          throw new NoSuchFileException(digest.getHash());
+        }
+        InputStream in = data.newInput();
+        in.skip(offset);
+        return in;
       }
 
       @Override
@@ -95,17 +128,19 @@ public final class ContentAddressableStorages {
         if (data == null) {
           return null;
         }
-        return new Blob(map.get(digest), digest);
+        return new Blob(data, digest);
       }
 
       @Override
       public void put(Blob blob) {
         map.put(blob.getDigest(), blob.getData());
+
+        writes.getFuture(blob.getDigest()).set(blob.getData());
       }
 
       @Override
       public void put(Blob blob, Runnable onExpiration) {
-        map.put(blob.getDigest(), blob.getData());
+        put(blob);
       }
     };
   }

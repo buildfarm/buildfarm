@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.instance.stub;
+package build.buildfarm.common.grpc;
 
 import io.grpc.Status.Code;
 import io.grpc.StatusException;
@@ -25,7 +25,7 @@ public final class RetryException extends IOException {
 
   private final int attempts;
 
-  RetryException(Throwable cause, int retryAttempts) {
+  public RetryException(Throwable cause, int retryAttempts) {
     super(cause);
     this.attempts = retryAttempts + 1;
   }

@@ -12,31 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.instance.stub;
+package build.buildfarm.common.io;
 
 import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.collect.ImmutableList.of;
+import static com.google.common.collect.Queues.newLinkedBlockingQueue;
+import static com.google.protobuf.ByteString.copyFromUtf8;
+import static com.google.protobuf.ByteString.EMPTY;
 
-import build.buildfarm.instance.stub.ByteStringIteratorInputStream;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterators;
 import com.google.protobuf.ByteString;
-import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Iterator;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
-public class ByteStringIteratorInputStreamTest {
+public class ByteStringQueueInputStreamTest {
+  private ByteStringQueueInputStream newInput(Iterable<ByteString> elements) {
+    ByteStringQueueInputStream in = new ByteStringQueueInputStream(newLinkedBlockingQueue(elements));
+    in.setCompleted();
+    return in;
+  }
+
   @Test
   public void readSingleChunk() throws IOException {
-    ByteString hello = ByteString.copyFromUtf8("Hello, World");
-    InputStream in = new ByteStringIteratorInputStream(
-        Iterators.<ByteString>singletonIterator(hello));
+    ByteString hello = copyFromUtf8("Hello, World");
+    InputStream in = newInput(of(hello));
     byte[] data = new byte[hello.size()];
 
     assertThat(in.read(data)).isEqualTo(hello.size());
@@ -46,8 +49,7 @@ public class ByteStringIteratorInputStreamTest {
 
   @Test
   public void readEmpty() throws IOException {
-    InputStream in = new ByteStringIteratorInputStream(
-        ImmutableList.<ByteString>of().iterator());
+    InputStream in = newInput(of());
     assertThat(in.read()).isEqualTo(-1);
   }
 
@@ -55,18 +57,16 @@ public class ByteStringIteratorInputStreamTest {
   public void readSingleByte() throws IOException {
     byte[] single = new byte[1];
     single[0] = 42;
-    InputStream in = new ByteStringIteratorInputStream(
-        ImmutableList.<ByteString>of(ByteString.copyFrom(single)).iterator());
+    InputStream in = newInput(of(ByteString.copyFrom(single)));
     assertThat(in.read()).isEqualTo(42);
     assertThat(in.read()).isEqualTo(-1);
   }
 
   @Test
   public void readSpanningChunks() throws IOException {
-    ByteString hello = ByteString.copyFromUtf8("Hello, ");
-    ByteString world = ByteString.copyFromUtf8("World");
-    InputStream in = new ByteStringIteratorInputStream(
-        ImmutableList.<ByteString>of(hello, world).iterator());
+    ByteString hello = copyFromUtf8("Hello, ");
+    ByteString world = copyFromUtf8("World");
+    InputStream in = newInput(of(hello, world));
     ByteString helloWorld = hello.concat(world);
     byte[] data = new byte[helloWorld.size()];
 
@@ -77,10 +77,9 @@ public class ByteStringIteratorInputStreamTest {
 
   @Test
   public void readSpanningChunksWithEmptyChunk() throws IOException {
-    ByteString hello = ByteString.copyFromUtf8("Hello, ");
-    ByteString world = ByteString.copyFromUtf8("World");
-    InputStream in = new ByteStringIteratorInputStream(
-        ImmutableList.<ByteString>of(hello, ByteString.EMPTY, world).iterator());
+    ByteString hello = copyFromUtf8("Hello, ");
+    ByteString world = copyFromUtf8("World");
+    InputStream in = newInput(of(hello, EMPTY, world));
     ByteString helloWorld = hello.concat(world);
     byte[] data = new byte[helloWorld.size()];
 
@@ -112,9 +111,9 @@ public class ByteStringIteratorInputStreamTest {
     expected[4] = 42;
     expected[5] = 42;
 
-    InputStream in = new ByteStringIteratorInputStream(ImmutableList.<ByteString>of(
+    InputStream in = newInput(of(
         ByteString.copyFrom(data1),
-        ByteString.copyFrom(data2)).iterator());
+        ByteString.copyFrom(data2)));
     assertThat(in.read(buffer, 2, 2)).isEqualTo(2);
     assertThat(ByteString.copyFrom(buffer)).isEqualTo(ByteString.copyFrom(expected));
     assertThat(in.read()).isEqualTo(3);
@@ -122,22 +121,20 @@ public class ByteStringIteratorInputStreamTest {
   }
 
   @Test
-  public void iteratorAtBeginningHasAvailable() throws IOException {
-    InputStream in = new ByteStringIteratorInputStream(ImmutableList.<ByteString>of().iterator());
-    assertThat(in.available()).isEqualTo(0);
+  public void queueWithElementsHasAvailable() throws IOException {
+    InputStream in = newInput(of(copyFromUtf8("data")));
+    assertThat(in.available()).isNotEqualTo(0);
   }
 
   @Test
-  public void iteratorAtEndIsUnavailable() throws IOException {
-    InputStream in = new ByteStringIteratorInputStream(ImmutableList.<ByteString>of().iterator());
+  public void emptyQueueIsUnavailable() throws IOException {
+    InputStream in = newInput(of());
     assertThat(in.available()).isEqualTo(0);
   }
 
   @Test(expected = IOException.class)
   public void closedStreamAvailableThrowsIOException() throws IOException {
-    InputStream in = new ByteStringIteratorInputStream(
-        ImmutableList.<ByteString>of(
-            ByteString.copyFromUtf8("Hello, World")).iterator());
+    InputStream in = newInput(of(copyFromUtf8("Hello, World")));
     in.close();
 
     in.available();
@@ -145,9 +142,7 @@ public class ByteStringIteratorInputStreamTest {
 
   @Test(expected = IOException.class)
   public void closedStreamReadDefaultThrowsIOException() throws IOException {
-    InputStream in = new ByteStringIteratorInputStream(
-        ImmutableList.<ByteString>of(
-            ByteString.copyFromUtf8("Hello, World")).iterator());
+    InputStream in = newInput(of(copyFromUtf8("Hello, World")));
     in.close();
 
     in.read();
@@ -155,37 +150,24 @@ public class ByteStringIteratorInputStreamTest {
 
   @Test(expected = IOException.class)
   public void closedStreamReadThrowsIOException() throws IOException {
-    InputStream in = new ByteStringIteratorInputStream(
-        ImmutableList.<ByteString>of(
-            ByteString.copyFromUtf8("Hello, World")).iterator());
+    InputStream in = newInput(of(copyFromUtf8("Hello, World")));
     in.close();
 
     byte[] buffer = new byte[5];
     in.read(buffer, 0, 5);
   }
 
-  static class StatusIterator<E> implements Iterator<E> {
-    private final Status status;
-
-    StatusIterator(Status status) {
-      this.status = status;
-    }
-
-    @Override
-    public boolean hasNext() {
-      throw status.asRuntimeException();
-    }
-
-    @Override
-    public E next() {
-      throw status.asRuntimeException();
-    }
-  }
-
   @Test(expected = IOException.class)
-  public void readWithSRENotFoundThrowsIOException() throws IOException {
-    InputStream in = new ByteStringIteratorInputStream(
-        new StatusIterator(Status.NOT_FOUND));
+  public void readWithExceptionNotFoundThrowsIOExceptionAfterContent() throws IOException {
+    ByteStringQueueInputStream in = new ByteStringQueueInputStream(
+        newLinkedBlockingQueue(of(copyFromUtf8("Hello, World"))));
+    in.setException(new RuntimeException("failed"));
+    byte[] buffer = new byte[32]; // more than enough
+    try {
+      in.read(buffer);
+    } catch (IOException e) {
+      throw new RuntimeException("unexpected io exception", e);
+    }
 
     in.read();
   }

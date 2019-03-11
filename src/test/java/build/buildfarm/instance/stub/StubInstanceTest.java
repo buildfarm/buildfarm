@@ -14,6 +14,7 @@
 
 package build.buildfarm.instance.stub;
 
+import static build.buildfarm.common.grpc.Retrier.NO_RETRIES;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.Mockito.any;
@@ -31,21 +32,27 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.UpdateActionResultRequest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.grpc.ByteStreamServiceWriter;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamImplBase;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
+import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
+import com.google.bytestream.ByteStreamProto.QueryWriteStatusResponse;
 import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Empty;
 import io.grpc.Server;
+import io.grpc.Status;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.stub.StreamObserver;
 import io.grpc.util.MutableHandlerRegistry;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.After;
 import org.junit.Before;
@@ -85,7 +92,12 @@ public class StubInstanceTest {
     ByteString test1Blob = ByteString.copyFromUtf8(test1Name);
     DigestUtil test1DigestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
     Instance test1Instance = new StubInstance(
-        test1Name, test1DigestUtil, /* channel=*/ null, /* uploader=*/ null);
+        test1Name,
+        test1DigestUtil,
+        /* channel=*/ null,
+        /* uploader=*/ null,
+        NO_RETRIES,
+        /* retryScheduler=*/ null);
     assertThat(test1Instance.getName()).isEqualTo(test1Name);
     assertThat(test1Instance.getDigestUtil().compute(test1Blob))
         .isEqualTo(test1DigestUtil.compute(test1Blob));
@@ -95,7 +107,12 @@ public class StubInstanceTest {
     ByteString test2Blob = ByteString.copyFromUtf8(test2Name);
     DigestUtil test2DigestUtil = new DigestUtil(DigestUtil.HashFunction.MD5);
     Instance test2Instance = new StubInstance(
-        test2Name, test2DigestUtil, /* channel=*/ null, /* uploader=*/ null);
+        test2Name,
+        test2DigestUtil,
+        /* channel=*/ null,
+        /* uploader=*/ null,
+        NO_RETRIES,
+        /* retryScheduler=*/ null);
     assertThat(test2Instance.getName()).isEqualTo(test2Name);
     assertThat(test2Instance.getDigestUtil().compute(test2Blob))
         .isEqualTo(test2DigestUtil.compute(test2Blob));
@@ -104,7 +121,12 @@ public class StubInstanceTest {
   @Test
   public void getActionResultReturnsNull() {
     Instance instance = new StubInstance(
-        "test", DIGEST_UTIL, /* channel=*/ null, /* uploader=*/ null);
+        "test",
+        DIGEST_UTIL,
+        /* channel=*/ null,
+        /* uploader=*/ null,
+        NO_RETRIES,
+        /* retryScheduler=*/ null);
     assertThat(instance.getActionResult(DIGEST_UTIL.computeActionKey(Action.getDefaultInstance()))).isNull();
   }
 
@@ -125,7 +147,9 @@ public class StubInstanceTest {
         instanceName,
         DIGEST_UTIL,
         InProcessChannelBuilder.forName(fakeServerName).directExecutor().build(),
-        /* uploader=*/ null);
+        /* uploader=*/ null,
+        NO_RETRIES,
+        /* retryScheduler=*/ null);
     ActionKey actionKey = DigestUtil.asActionKey(Digest.newBuilder()
         .setHash("action-digest")
         .setSizeBytes(1)
@@ -155,7 +179,9 @@ public class StubInstanceTest {
         instanceName,
         DIGEST_UTIL,
         InProcessChannelBuilder.forName(fakeServerName).directExecutor().build(),
-        /* uploader=*/ null);
+        /* uploader=*/ null,
+        NO_RETRIES,
+        /* retryScheduler=*/ null);
     Iterable<Digest> digests = ImmutableList.of(
         Digest.newBuilder().setHash("present").setSizeBytes(1).build());
     assertThat(instance.findMissingBlobs(digests)).isEmpty();
@@ -169,7 +195,9 @@ public class StubInstanceTest {
         instanceName,
         DIGEST_UTIL,
         /* channel=*/ null,
-        uploader);
+        uploader,
+        NO_RETRIES,
+        /* retryScheduler=*/ null);
     ByteString first = ByteString.copyFromUtf8("first");
     ByteString last = ByteString.copyFromUtf8("last");
     ImmutableList<ByteString> blobs = ImmutableList.of(first, last);
@@ -181,73 +209,45 @@ public class StubInstanceTest {
   }
 
   @Test
-  public void outputStreamWrites() throws IOException {
-    AtomicReference<ByteString> writtenContent = new AtomicReference<>();
+  public void outputStreamWrites() throws Exception {
+    String resourceName = "output-stream-test";
+    SettableFuture<ByteString> finishedContent = SettableFuture.create();
     serviceRegistry.addService(
-        new ByteStreamImplBase() {
-          @Override
-          public StreamObserver<WriteRequest> write(StreamObserver<WriteResponse> responseObserver) {
-            return new StreamObserver<WriteRequest>() {
-              ByteString content = ByteString.EMPTY;
-              boolean finished = false;
-
-              @Override
-              public void onNext(WriteRequest request) {
-                checkState(!finished);
-                if (request.getData().size() != 0) {
-                  checkState(request.getWriteOffset() == content.size());
-                  content = content.concat(request.getData());
-                }
-                finished = request.getFinishWrite();
-                if (finished) {
-                  writtenContent.set(content);
-                  responseObserver.onNext(WriteResponse.newBuilder()
-                      .setCommittedSize(content.size())
-                      .build());
-                }
-              }
-
-              @Override
-              public void onError(Throwable t) {
-                t.printStackTrace();
-              }
-
-              @Override
-              public void onCompleted() {
-                responseObserver.onCompleted();
-              }
-            };
-          }
-        });
+        new ByteStreamServiceWriter(resourceName, finishedContent));
     String instanceName = "outputStream-test";
     Instance instance = new StubInstance(
         instanceName,
         DIGEST_UTIL,
         InProcessChannelBuilder.forName(fakeServerName).directExecutor().build(),
-        /* uploader=*/ null);
-    String resourceName = "output-stream-test";
+        /* uploader=*/ null,
+        NO_RETRIES,
+        /* retryScheduler=*/ null);
     ByteString content = ByteString.copyFromUtf8("test-content");
-    try (OutputStream out = instance.getStreamOutput(resourceName)) {
+    try (OutputStream out = instance.getOperationStreamWrite(resourceName).getOutput()) {
       out.write(content.toByteArray());
     }
-    assertThat(writtenContent.get()).isEqualTo(content);
+    assertThat(finishedContent.get(1, TimeUnit.SECONDS)).isEqualTo(content);
   }
 
   @Test
   public void completedWriteBeforeCloseThrowsOnNextInteraction() throws IOException {
+    String resourceName = "early-completed-output-stream-test";
     AtomicReference<ByteString> writtenContent = new AtomicReference<>();
     serviceRegistry.addService(
         new ByteStreamImplBase() {
+          boolean completed = false;
+          int writtenBytes = 0;
+
           @Override
           public StreamObserver<WriteRequest> write(StreamObserver<WriteResponse> responseObserver) {
             return new StreamObserver<WriteRequest>() {
-              boolean completed = false;
 
               @Override
               public void onNext(WriteRequest request) {
                 if (!completed) {
+                  writtenBytes = request.getData().size();
                   responseObserver.onNext(WriteResponse.newBuilder()
-                      .setCommittedSize(request.getData().size())
+                      .setCommittedSize(writtenBytes)
                       .build());
                   responseObserver.onCompleted();
                   completed = true;
@@ -264,22 +264,37 @@ public class StubInstanceTest {
               }
             };
           }
+
+          @Override
+          public void queryWriteStatus(
+              QueryWriteStatusRequest request,
+              StreamObserver<QueryWriteStatusResponse> responseObserver) {
+            if (request.getResourceName().equals(resourceName)) {
+              responseObserver.onNext(QueryWriteStatusResponse.newBuilder()
+                  .setCommittedSize(writtenBytes)
+                  .setComplete(completed)
+                  .build());
+              responseObserver.onCompleted();
+            } else {
+              responseObserver.onError(Status.NOT_FOUND.asException());
+            }
+          }
         });
     String instanceName = "early-completed-outputStream-test";
     Instance instance = new StubInstance(
         instanceName,
         DIGEST_UTIL,
         InProcessChannelBuilder.forName(fakeServerName).directExecutor().build(),
-        /* uploader=*/ null);
-    String resourceName = "early-completed-output-stream-test";
+        /* uploader=*/ null,
+        NO_RETRIES,
+        /* retryScheduler=*/ null);
     ByteString content = ByteString.copyFromUtf8("test-content");
     boolean writeThrewException = false;
-    try (OutputStream out = instance.getStreamOutput(resourceName)) {
+    try (OutputStream out = instance.getOperationStreamWrite(resourceName).getOutput()) {
       out.write(content.toByteArray());
       try {
         out.write(content.toByteArray()); // should throw
       } catch (Exception e) {
-        e.printStackTrace();
         writeThrewException = true;
       }
     }
