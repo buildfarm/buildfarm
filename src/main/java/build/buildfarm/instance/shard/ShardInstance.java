@@ -468,6 +468,7 @@ public class ShardInstance extends AbstractServerInstance {
     }
 
     return findMissingBlobsOnWorker(
+        UUID.randomUUID().toString(),
         nonEmptyDigests,
         workers,
         ImmutableList.builder(),
@@ -490,6 +491,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   private ListenableFuture<Iterable<Digest>> findMissingBlobsOnWorker(
+      String requestId,
       Iterable<Digest> blobDigests,
       Deque<String> workers,
       ImmutableList.Builder<FindMissingResponseEntry> responses,
@@ -506,7 +508,7 @@ public class ShardInstance extends AbstractServerInstance {
           if (Iterables.isEmpty(missingDigests) || workers.isEmpty()) {
             return immediateFuture(missingDigests);
           }
-          return findMissingBlobsOnWorker(missingDigests, workers, responses, originalSize, executor);
+          return findMissingBlobsOnWorker(requestId, missingDigests, workers, responses, originalSize, executor);
         },
         contextExecutor);
     return catchingAsync(
@@ -516,12 +518,14 @@ public class ShardInstance extends AbstractServerInstance {
           responses.add(new FindMissingResponseEntry(worker, stopwatch.elapsed(MICROSECONDS), t, Iterables.size(blobDigests)));
           Status status = Status.fromThrowable(t);
           if (status.getCode() == Code.UNAVAILABLE || status.getCode() == Code.UNIMPLEMENTED) {
-            removeMalfunctioningWorker(worker, t, "findMissingBlobs(...)");
+            removeMalfunctioningWorker(worker, t, "findMissingBlobs(" + requestId + ")");
           } else if (status.getCode() == Code.DEADLINE_EXCEEDED) {
             for (FindMissingResponseEntry response : responses.build()) {
-              logger.severe(
+              logger.log(
+                  response.exception == null ? WARNING : SEVERE,
                   format(
-                      "DEADLINE_EXCEEDED: findMissingBlobs(%s): %d remaining of %d %dus%s",
+                      "DEADLINE_EXCEEDED: findMissingBlobs(%s) %s: %d remaining of %d %dus%s",
+                      requestId,
                       response.worker,
                       response.stillMissingAfter,
                       originalSize,
@@ -542,7 +546,7 @@ public class ShardInstance extends AbstractServerInstance {
           if (workers.isEmpty()) {
             return immediateFuture(blobDigests);
           } else {
-            return findMissingBlobsOnWorker(blobDigests, workers, responses, originalSize, executor);
+            return findMissingBlobsOnWorker(requestId, blobDigests, workers, responses, originalSize, executor);
           }
         },
         contextExecutor);
