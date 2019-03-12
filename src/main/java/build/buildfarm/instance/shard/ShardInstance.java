@@ -14,7 +14,6 @@
 
 package build.buildfarm.instance.shard;
 
-import static io.grpc.Context.currentContextExecutor;
 import static build.buildfarm.instance.shard.Util.SHARD_IS_RETRIABLE;
 import static build.buildfarm.instance.shard.Util.correctMissingBlob;
 import static com.google.common.base.Predicates.or;
@@ -496,8 +495,7 @@ public class ShardInstance extends AbstractServerInstance {
       ImmutableList.Builder<FindMissingResponseEntry> responses,
       int originalSize,
       Executor executor) {
-    Executor contextExecutor = currentContextExecutor(executor);
-
+    Executor contextExecutor = Context.current().fixedContextExecutor(executor);
     String worker = workers.removeFirst();
     // FIXME use FluentFuture
     Stopwatch stopwatch = Stopwatch.createStarted();
