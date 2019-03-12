@@ -106,7 +106,7 @@ public class Util {
             (e) -> {
               Status status = Status.fromThrowable(e);
               if (status.getCode() == Code.UNAVAILABLE) {
-                return immediateFuture(null);
+                return immediateFuture(false);
               } else if (status.getCode() == Code.CANCELLED || Context.current().isCancelled()) {
                 // do nothing further if we're cancelled
                 return immediateFailedFuture(e);
@@ -114,7 +114,8 @@ public class Util {
                 return checkMissingBlobOnInstance(digest, instance, service);
               }
               return immediateFailedFuture(status.asException());
-            }, service);
+            },
+            service);
   }
 
 }
