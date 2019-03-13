@@ -14,6 +14,7 @@
 
 package build.buildfarm.cas;
 
+import static build.buildfarm.common.grpc.Retrier.NO_RETRIES;
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
@@ -25,17 +26,20 @@ import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddr
 import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.Write;
+import build.buildfarm.common.grpc.ByteStreamHelper;
+import build.buildfarm.common.grpc.RetryException;
+import build.buildfarm.common.grpc.StubWriteOutputStream;
 import build.buildfarm.instance.stub.ByteStreamUploader;
-import build.buildfarm.instance.stub.ByteStringIteratorInputStream;
 import build.buildfarm.instance.stub.Chunker;
-import build.buildfarm.instance.stub.RetryException;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamBlockingStub;
+import com.google.bytestream.ByteStreamGrpc.ByteStreamStub;
 import com.google.bytestream.ByteStreamProto.ReadRequest;
 import com.google.bytestream.ByteStreamProto.ReadResponse;
-import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
-import com.google.bytestream.ByteStreamProto.QueryWriteStatusResponse;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.Iterators;
@@ -48,6 +52,7 @@ import java.io.InputStream;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.UUID;
 
 class GrpcCAS implements ContentAddressableStorage {
   private final String instanceName;
@@ -89,11 +94,23 @@ class GrpcCAS implements ContentAddressableStorage {
             }
           });
 
-  public InputStream newStreamInput(String name) {
-    Iterator<ReadResponse> replies = bsBlockingStub
-        .get()
-        .read(ReadRequest.newBuilder().setResourceName(name).build());
-    return new ByteStringIteratorInputStream(Iterators.transform(replies, (reply) -> reply.getData()));
+  private final Supplier<ByteStreamStub> bsStub =
+      Suppliers.memoize(
+          new Supplier<ByteStreamStub>() {
+            @Override
+            public ByteStreamStub get() {
+              return ByteStreamGrpc.newStub(channel);
+            }
+          });
+
+  private InputStream newStreamInput(String resourceName, long offset) {
+    return ByteStreamHelper.newInput(
+        resourceName,
+        offset,
+        bsStub,
+        NO_RETRIES::newBackoff,
+        NO_RETRIES::isRetriable,
+        /* retryService=*/ null);
   }
 
   private String getBlobName(Digest digest) {
@@ -101,6 +118,12 @@ class GrpcCAS implements ContentAddressableStorage {
         "%sblobs/%s",
         instanceName.isEmpty() ? "" : (instanceName + "/"),
         DigestUtil.toString(digest));
+  }
+
+  @Override
+  public boolean contains(Digest digest) {
+    // QueryWriteStatusRequest?
+    return Iterables.isEmpty(findMissingBlobs(ImmutableList.of(digest)));
   }
 
   @Override
@@ -128,6 +151,11 @@ class GrpcCAS implements ContentAddressableStorage {
   }
 
   @Override
+  public InputStream newInput(Digest digest, long offset) {
+    return newStreamInput(getBlobName(digest), offset);
+  }
+
+  @Override
   public ListenableFuture<Iterable<Response>> getAllFuture(Iterable<Digest> digests) {
     // FIXME limit to 4MiB total response
     return transform(
@@ -142,7 +170,7 @@ class GrpcCAS implements ContentAddressableStorage {
 
   @Override
   public Blob get(Digest digest) {
-    try (InputStream in = newStreamInput(getBlobName(digest))) {
+    try (InputStream in = newStreamInput(getBlobName(digest), /* offset=*/ 0)) {
       ByteString content = ByteString.readFrom(in);
       if (content.size() != digest.getSizeBytes()) {
         throw new IOException(String.format(
@@ -155,6 +183,17 @@ class GrpcCAS implements ContentAddressableStorage {
       expire(digest);
       return null;
     }
+  }
+
+  @Override
+  public Write getWrite(Digest digest, UUID uuid) {
+    String resourceName = ByteStreamUploader.getResourceName(uuid, instanceName, digest);
+    return new StubWriteOutputStream(
+        bsBlockingStub,
+        bsStub,
+        resourceName,
+        digest.getSizeBytes(),
+        /* autoflush=*/ false);
   }
 
   @Override

@@ -34,6 +34,7 @@ import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
+import build.buildfarm.common.Write;
 import build.buildfarm.common.function.InterruptingPredicate;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -138,12 +139,12 @@ public class AbstractServerInstanceTest {
     }
 
     @Override
-    public InputStream newStreamInput(String name) {
+    public InputStream newOperationStreamInput(String name, long offset) {
       throw new UnsupportedOperationException();
     }
 
     @Override
-    public OutputStream getStreamOutput(String name) {
+    public Write getOperationStreamWrite(String name) {
       throw new UnsupportedOperationException();
     }
   }

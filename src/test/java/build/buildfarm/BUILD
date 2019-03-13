@@ -12,10 +12,26 @@ java_library(
     ],
 )
 
+java_library(
+    name = "test-common-grpc",
+    srcs = ["common/grpc/ByteStreamServiceWriter.java"],
+    deps = [
+        "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java",
+        "//3rdparty/jvm/io/grpc:grpc_core",
+        "//3rdparty/jvm/io/grpc:grpc_stub",
+        "//src/main/java/build/buildfarm:common-grpc",
+        "@googleapis//:google_bytestream_bytestream_java_grpc",
+        "@googleapis//:google_bytestream_bytestream_java_proto",
+    ],
+)
+
 java_test(
     name = "common-tests",
     size = "small",
-    srcs = glob(["common/*.java"]),
+    srcs = glob(
+        ["common/**/*.java"],
+        exclude=["common/grpc/ByteStreamServiceWriter.java"]),
     test_class = "build.buildfarm.AllTests",
     deps = [
         ":test_runner",
@@ -34,6 +50,7 @@ java_test(
     test_class = "build.buildfarm.AllTests",
     deps = [
         ":test_runner",
+        ":test-common-grpc",
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "//3rdparty/jvm/com/google/truth",
@@ -42,6 +59,7 @@ java_test(
         "//3rdparty/jvm/org/mockito:mockito_core",
         "//src/main/java/build/buildfarm:cas",
         "//src/main/java/build/buildfarm:common",
+        "//src/main/java/build/buildfarm:common-grpc",
         "//src/main/java/build/buildfarm:stub-instance",
         "@googleapis//:google_bytestream_bytestream_java_grpc",
         "@googleapis//:google_bytestream_bytestream_java_proto",
@@ -107,12 +125,17 @@ java_test(
         "//3rdparty/jvm/io/grpc:grpc_netty",
         "//3rdparty/jvm/io/grpc:grpc_protobuf",
         "//3rdparty/jvm/io/grpc:grpc_stub",
+        "//3rdparty/jvm/org/mockito:mockito_core",
         "//src/main/java/build/buildfarm:common",
+        "//src/main/java/build/buildfarm:common-grpc",
+        "//src/main/java/build/buildfarm:instance",
         "//src/main/java/build/buildfarm:server",
         "//src/main/java/build/buildfarm:stub-instance",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@com_google_protobuf//:protobuf_java",
+        "@googleapis//:google_bytestream_bytestream_java_grpc",
+        "@googleapis//:google_bytestream_bytestream_java_proto",
         "@googleapis//:google_longrunning_operations_java_grpc",
         "@googleapis//:google_rpc_code_java_proto",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
@@ -156,6 +179,7 @@ java_test(
     test_class = "build.buildfarm.AllTests",
     deps = [
         ":test_runner",
+        ":test-common-grpc",
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "//3rdparty/jvm/com/google/truth",
@@ -163,6 +187,7 @@ java_test(
         "//3rdparty/jvm/io/grpc:grpc_stub",
         "//3rdparty/jvm/org/mockito:mockito_core",
         "//src/main/java/build/buildfarm:common",
+        "//src/main/java/build/buildfarm:common-grpc",
         "//src/main/java/build/buildfarm:instance",
         "//src/main/java/build/buildfarm:stub-instance",
         "@googleapis//:google_bytestream_bytestream_java_grpc",

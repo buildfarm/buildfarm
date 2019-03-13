@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.instance.stub;
+package build.buildfarm.common.grpc;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -155,6 +155,18 @@ public class Retrier {
         }
       };
 
+  public static final Predicate<Status> REDIS_IS_RETRIABLE =
+      st -> {
+        switch (st.getCode()) {
+        case CANCELLED:
+          return !Thread.currentThread().isInterrupted();
+        case DEADLINE_EXCEEDED:
+          return true;
+        default:
+          return false;
+        }
+      };
+
   public static final Predicate<Status> RETRY_ALL = Predicates.alwaysTrue();
   public static final Predicate<Status> RETRY_NONE = Predicates.alwaysFalse();
   public static final Retrier NO_RETRIES = new Retrier(Backoff.NO_RETRIES, RETRY_NONE);
@@ -184,7 +196,7 @@ public class Retrier {
    *
    * @param c The callable to execute.
    */
-  public <T> T execute(Callable<T> c) throws InterruptedException, IOException {
+  public <T> T execute(Callable<T> c) throws IOException, InterruptedException {
     Backoff backoff = backoffSupplier.get();
     while (true) {
       try {

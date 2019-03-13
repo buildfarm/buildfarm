@@ -20,16 +20,24 @@ import static java.util.logging.Level.SEVERE;
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.Write;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.protobuf.ByteString;
 import com.google.rpc.Code;
 import com.google.rpc.Status;
 import io.grpc.protobuf.StatusProto;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.NoSuchFileException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.logging.Logger;
 
@@ -44,17 +52,23 @@ class MemoryCAS implements ContentAddressableStorage {
       .setCode(Code.NOT_FOUND.getNumber())
       .build();
 
+  private final Writes writes = new Writes(this);
   private final long maxSizeInBytes;
   private final Map<Digest, Entry> storage;
-  private transient long sizeInBytes;
-  private transient Entry header;
+  private final Entry header;
+  private long sizeInBytes;
 
   public MemoryCAS(long maxSizeInBytes) {
     this.maxSizeInBytes = maxSizeInBytes;
     sizeInBytes = 0;
     header = new SentinelEntry();
     header.before = header.after = header;
-    storage = new HashMap<>();
+    storage = Maps.newHashMap();
+  }
+
+  @Override
+  public synchronized boolean contains(Digest digest) {
+    return get(digest) != null;
   }
 
   @Override
@@ -62,11 +76,23 @@ class MemoryCAS implements ContentAddressableStorage {
     ImmutableList.Builder<Digest> missing = ImmutableList.builder();
     // incur access use of the digest
     for (Digest digest : digests) {
-      if (digest.getSizeBytes() != 0 && get(digest) == null) {
+      if (digest.getSizeBytes() != 0 && !contains(digest)) {
         missing.add(digest);
       }
     }
     return missing.build();
+  }
+
+  @Override
+  public InputStream newInput(Digest digest, long offset) throws IOException {
+    Entry e = storage.get(digest);
+    if (e == null) {
+      throw new NoSuchFileException(digest.getHash());
+    }
+    e.recordAccess(header);
+    InputStream in = e.value.getData().newInput();
+    in.skip(offset);
+    return in;
   }
 
   @Override
@@ -149,6 +175,11 @@ class MemoryCAS implements ContentAddressableStorage {
   }
 
   @Override
+  public Write getWrite(Digest digest, UUID uuid) {
+    return writes.get(digest, uuid);
+  }
+
+  @Override
   public void put(Blob blob) {
     put(blob, null);
   }
@@ -187,6 +218,8 @@ class MemoryCAS implements ContentAddressableStorage {
     createEntry(blob, onExpiration);
 
     storage.put(blob.getDigest(), header.before);
+
+    writes.getFuture(blob.getDigest()).set(blob.getData());
   }
 
   private void createEntry(Blob blob, Runnable onExpiration) {

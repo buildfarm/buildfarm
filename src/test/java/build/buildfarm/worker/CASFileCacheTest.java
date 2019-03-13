@@ -68,12 +68,14 @@ class CASFileCacheTest {
     fileCache = new CASFileCache(
         new InputStreamFactory() {
           @Override
-          public InputStream apply(Digest digest) {
+          public InputStream newInput(Digest digest, long offset) throws IOException {
             ByteString content = blobs.get(digest);
             if (content == null) {
               return new BrokenInputStream(new IOException("NOT_FOUND"));
             }
-            return content.newInput();
+            InputStream in = content.newInput();
+            in.skip(offset);
+            return in;
           }
         },
         root,
@@ -102,7 +104,7 @@ class CASFileCacheTest {
     ByteString blob = ByteString.copyFromUtf8("");
     Digest blobDigest = digestUtil.compute(blob);
     // supply an empty input stream if called for test clarity
-    when(mockInputStreamFactory.apply(blobDigest))
+    when(mockInputStreamFactory.newInput(blobDigest, /* offset=*/ 0))
         .thenReturn(ByteString.EMPTY.newInput());
     try {
       fileCache.put(blobDigest, false);

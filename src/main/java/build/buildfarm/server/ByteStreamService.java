@@ -14,127 +14,167 @@
 
 package build.buildfarm.server;
 
+import static build.buildfarm.common.UrlPath.detectResourceOperation;
+import static build.buildfarm.common.UrlPath.parseBlobDigest;
+import static build.buildfarm.common.UrlPath.parseUploadBlobDigest;
+import static build.buildfarm.common.UrlPath.parseUploadBlobUUID;
+import static build.buildfarm.common.grpc.Retrier.DEFAULT_IS_RETRIABLE;
+import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+import static io.grpc.Context.currentContextExecutor;
+import static io.grpc.Status.INVALID_ARGUMENT;
+import static io.grpc.Status.NOT_FOUND;
+import static io.grpc.Status.OUT_OF_RANGE;
+import static java.lang.String.format;
+import static java.util.logging.Level.SEVERE;
+
 import build.bazel.remote.execution.v2.Digest;
-import build.buildfarm.common.DigestUtil;
-import build.buildfarm.common.UrlPath;
-import build.buildfarm.common.UrlPath.ResourceOperation;
 import build.buildfarm.common.UrlPath.InvalidResourceNameException;
+import build.buildfarm.common.Write;
 import build.buildfarm.instance.Instance;
-import com.google.bytestream.ByteStreamGrpc;
+import com.google.bytestream.ByteStreamGrpc.ByteStreamImplBase;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusResponse;
 import com.google.bytestream.ByteStreamProto.ReadRequest;
 import com.google.bytestream.ByteStreamProto.ReadResponse;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
 import com.google.protobuf.ByteString;
+import io.grpc.Context;
+import io.grpc.Context.CancellableContext;
 import io.grpc.Status;
-import io.grpc.StatusException;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.nio.file.NoSuchFileException;
+import java.util.UUID;
+import java.util.logging.Logger;
 
-public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
-  private static final long DEFAULT_CHUNK_SIZE = 1024 * 16;
+class ByteStreamService extends ByteStreamImplBase {
+  private static final Logger logger = Logger.getLogger(ByteStreamService.class.getName());
 
-  private final Map<String, ByteString> active_write_requests;
+  private static int CHUNK_SIZE = 64 * 1024;
+
   private final Instances instances;
 
-  public ByteStreamService(Instances instances) {
-    active_write_requests = new HashMap<String, ByteString>();
+  ByteStreamService(Instances instances) {
     this.instances = instances;
   }
 
-  private void readBlob(
-      ReadRequest request,
-      StreamObserver<ReadResponse> responseObserver) {
-    try {
-      String resourceName = request.getResourceName();
-      Instance instance = instances.getFromBlob(resourceName);
-
-      Digest digest = UrlPath.parseBlobDigest(resourceName);
-
-      ByteString blob = instance.getBlob(
-          digest, request.getReadOffset(), request.getReadLimit());
-      if (blob == null) {
-        responseObserver.onError(new StatusException(Status.NOT_FOUND));
-        return;
-      }
-
-      while (!blob.isEmpty()) {
-        ByteString chunk;
-        if (blob.size() < DEFAULT_CHUNK_SIZE) {
-          chunk = blob;
-          blob = ByteString.EMPTY;
-        } else {
-          chunk = blob.substring(0, (int) DEFAULT_CHUNK_SIZE);
-          blob = blob.substring((int) DEFAULT_CHUNK_SIZE);
+  void readFrom(
+      InputStream in,
+      long limit,
+      StreamObserver<ReadResponse> responseObserver)
+      throws IOException {
+    byte buf[] = new byte[CHUNK_SIZE];
+    boolean unlimited = limit == 0;
+    long remaining = limit;
+    boolean complete = false;
+    while (!complete) {
+      int readBytes = in.read(buf);
+      if (readBytes == -1) {
+        if (!unlimited) {
+          responseObserver.onError(OUT_OF_RANGE.asException());
+          remaining = -1;
+        }
+        complete = true;
+      } else if (readBytes > 0) {
+        if (readBytes > remaining) {
+          logger.warning(format("read %d bytes, expected %d", readBytes, remaining));
+          readBytes = (int) remaining;
         }
         responseObserver.onNext(ReadResponse.newBuilder()
-            .setData(chunk)
+            .setData(ByteString.copyFrom(buf, 0, readBytes))
             .build());
+        remaining -= readBytes;
+        complete = remaining == 0;
       }
-
+    }
+    if (remaining == 0) {
       responseObserver.onCompleted();
-    } catch (InstanceNotFoundException e) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(e));
-    } catch (InvalidResourceNameException e) {
-      String description = e.getLocalizedMessage();
-      responseObserver.onError(Status.INVALID_ARGUMENT
-          .withDescription(description)
-          .asException());
     }
   }
 
-  private void readOperationStream(
-      ReadRequest request,
+  void readLimitedBlob(
+      Instance instance,
+      Digest digest,
+      long offset,
+      long limit,
+      StreamObserver<ReadResponse> responseObserver) {
+    try (InputStream in = instance.newBlobInput(digest, offset)) {
+      readFrom(in, limit, responseObserver);
+    } catch (NoSuchFileException e) {
+      responseObserver.onError(NOT_FOUND.asException());
+    } catch (IOException e) {
+      responseObserver.onError(Status.fromThrowable(e).asException());
+    }
+  }
+
+  void readBlob(
+      Instance instance,
+      Digest digest,
+      long offset,
+      long limit,
+      StreamObserver<ReadResponse> responseObserver) {
+    if (offset == digest.getSizeBytes()) {
+      responseObserver.onCompleted();
+    } else if (offset > digest.getSizeBytes()) {
+      responseObserver.onError(OUT_OF_RANGE.asException());
+    } else {
+      long available = digest.getSizeBytes() - offset;
+      if (limit == 0) {
+        limit = available;
+      } else {
+        limit = Math.min(available, limit);
+      }
+      readLimitedBlob(instance, digest, offset, limit, responseObserver);
+    }
+  }
+
+  void readOperationStream(
+      Instance instance,
+      String resourceName,
+      long offset,
+      long limit,
+      StreamObserver<ReadResponse> responseObserver) {
+    try (InputStream in = instance.newOperationStreamInput(resourceName, offset)) {
+      readFrom(in, limit, responseObserver);
+    } catch (NoSuchFileException e) {
+      responseObserver.onError(NOT_FOUND.asException());
+    } catch (IOException e) {
+      responseObserver.onError(Status.fromThrowable(e).asException());
+    }
+  }
+
+  void maybeInstanceRead(
+      String resourceName,
+      long offset,
+      long limit,
       StreamObserver<ReadResponse> responseObserver)
-      throws IOException, InvalidResourceNameException {
-    String resourceName = request.getResourceName();
-
-    Instance instance;
-    try {
-      instance = instances.getFromBlob(resourceName);
-    } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
-      return;
+      throws InstanceNotFoundException, InvalidResourceNameException {
+    switch (detectResourceOperation(resourceName)) {
+      case Blob:
+        readLimitedBlob(
+            instances.getFromBlob(resourceName),
+            parseBlobDigest(resourceName),
+            offset,
+            limit,
+            responseObserver);
+        break;
+      case OperationStream:
+        readOperationStream(
+            instances.getFromOperationStream(resourceName),
+            resourceName,
+            offset,
+            limit,
+            responseObserver);
+        break;
+      case UploadBlob:
+      default:
+        responseObserver.onError(INVALID_ARGUMENT.asException());
+        break;
     }
-
-    String operationStream = UrlPath.parseOperationStream(resourceName);
-
-    InputStream input = instance.newStreamInput(operationStream);
-    long readLimit = request.getReadLimit();
-    long readOffset = request.getReadOffset();
-    while (readOffset > 0) {
-      long n = input.skip(readOffset);
-      if (n == 0) {
-        responseObserver.onError(new StatusException(Status.OUT_OF_RANGE));
-        return;
-      }
-      readOffset -= n;
-    }
-    boolean unlimitedReadLimit = readLimit == 0;
-    byte[] buffer = new byte[(int) Math.min(readLimit, DEFAULT_CHUNK_SIZE)];
-    int len;
-    while ((unlimitedReadLimit || readLimit > 0) &&
-           (len = input.read(buffer, 0, (int) Math.min(buffer.length, readLimit))) >= 0) {
-      if (len == 0)
-        continue;
-      if (!unlimitedReadLimit) {
-        readLimit -= len;
-      }
-      responseObserver.onNext(ReadResponse.newBuilder()
-          .setData(ByteString.copyFrom(buffer, 0, len))
-          .build());
-    }
-    responseObserver.onCompleted();
   }
 
   @Override
@@ -142,79 +182,20 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
       ReadRequest request,
       StreamObserver<ReadResponse> responseObserver) {
     String resourceName = request.getResourceName();
-
-    long readLimit = request.getReadLimit();
-    long readOffset = request.getReadOffset();
-    if (readLimit < 0 || readOffset < 0) {
-      responseObserver.onError(new StatusException(Status.OUT_OF_RANGE));
-      return;
-    }
+    long offset = request.getReadOffset(), limit = request.getReadLimit();
+    logger.fine(
+        format(
+            "read resourceName=%s offset=%d limit=%d",
+            resourceName,
+            offset,
+            limit));
 
     try {
-      Optional<ResourceOperation> resourceOperation = Optional.empty();
-      try {
-        resourceOperation = Optional.of(UrlPath.detectResourceOperation(resourceName));
-      } catch (InvalidResourceNameException e) {
-        String description = e.getLocalizedMessage();
-        responseObserver.onError(Status.INVALID_ARGUMENT
-            .withDescription(description)
-            .asException());
-        return;
-      }
-      switch (resourceOperation.get()) {
-      case Blob:
-        readBlob(request, responseObserver);
-        break;
-      case OperationStream:
-        readOperationStream(request, responseObserver);
-        break;
-      default:
-        String description = "Invalid service";
-        responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
-        break;
-      }
-    } catch (IOException e) {
-      responseObserver.onError(new StatusException(Status.fromThrowable(e)));
-    } catch (InvalidResourceNameException e) {
-      String description = e.getLocalizedMessage();
-      responseObserver.onError(Status.INVALID_ARGUMENT
-          .withDescription(description)
-          .asException());
-    }
-  }
-
-  private void queryBlobWriteStatus(
-      String resourceName,
-      StreamObserver<QueryWriteStatusResponse> responseObserver) {
-    try {
-      Instance instance = instances.getFromBlob(resourceName);
-      queryInstanceBlobWriteStatus(instance, resourceName, responseObserver);
+      maybeInstanceRead(resourceName, offset, limit, responseObserver);
     } catch (InstanceNotFoundException e) {
       responseObserver.onError(BuildFarmInstances.toStatusException(e));
     } catch (InvalidResourceNameException e) {
-      String description = e.getLocalizedMessage();
-      responseObserver.onError(Status.INVALID_ARGUMENT
-          .withDescription(description)
-          .asException());
-    }
-  }
-
-  private void queryInstanceBlobWriteStatus(
-      Instance instance,
-      String resourceName,
-      StreamObserver<QueryWriteStatusResponse> responseObserver)
-      throws InvalidResourceNameException {
-    Digest digest = UrlPath.parseBlobDigest(resourceName);
-
-    if (Iterables.isEmpty(instance.findMissingBlobs(ImmutableList.of(digest)))) {
-      responseObserver.onNext(
-          QueryWriteStatusResponse.newBuilder()
-              .setCommittedSize(digest.getSizeBytes())
-              .setComplete(true)
-              .build());
-      responseObserver.onCompleted();
-    } else {
-      responseObserver.onError(Status.NOT_FOUND.asException());
+      responseObserver.onError(INVALID_ARGUMENT.withDescription(e.getMessage()).asException());
     }
   }
 
@@ -222,216 +203,210 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
   public void queryWriteStatus(
       QueryWriteStatusRequest request,
       StreamObserver<QueryWriteStatusResponse> responseObserver) {
-    String resourceName = request.getResourceName();
+    responseObserver.onError(Status.UNIMPLEMENTED.asException());
+  }
 
-    try {
-      ResourceOperation resourceOperation = UrlPath.detectResourceOperation(resourceName);
-      switch (resourceOperation) {
-      case UploadBlob:
-        responseObserver.onError(Status.UNIMPLEMENTED.asException());
-        break;
-      case OperationStream:
-        responseObserver.onError(Status.UNIMPLEMENTED.asException());
-        break;
+  long getBlobCommittedSize(Instance instance, Digest digest) {
+    return instance.containsBlob(digest) ? digest.getSizeBytes() : 0;
+  }
+
+  long getUploadBlobCommittedSize(Instance instance, Digest digest, UUID uuid) {
+    return instance.getBlobWrite(digest, uuid).getCommittedSize();
+  }
+
+  long getOperationStreamCommittedSize(Instance instance, String resourceName) {
+    return instance.getOperationStreamWrite(resourceName).getCommittedSize();
+  }
+
+  long getCommittedSize(String resourceName) throws InstanceNotFoundException, InvalidResourceNameException {
+    switch (detectResourceOperation(resourceName)) {
       case Blob:
-        queryBlobWriteStatus(resourceName, responseObserver);
-        break;
+        return getBlobCommittedSize(
+            instances.getFromBlob(resourceName),
+            parseBlobDigest(resourceName));
+      case UploadBlob:
+        return getUploadBlobCommittedSize(
+            instances.getFromUploadBlob(resourceName),
+            parseUploadBlobDigest(resourceName),
+            parseUploadBlobUUID(resourceName));
+      case OperationStream:
+        return getOperationStreamCommittedSize(
+            instances.getFromOperationStream(resourceName),
+            resourceName);
       default:
-        throw new InvalidResourceNameException(resourceName, "Invalid resource type");
-      }
-    } catch (InvalidResourceNameException e) {
-      String description = e.getLocalizedMessage();
-      responseObserver.onError(Status.INVALID_ARGUMENT
-          .withDescription(description)
-          .asException());
+        throw new IllegalArgumentException();
     }
   }
 
   @Override
   public StreamObserver<WriteRequest> write(
-      final StreamObserver<WriteResponse> responseObserver) {
+      StreamObserver<WriteResponse> responseObserver) {
+    CancellableContext withCancellation = Context.current().withCancellation();
     return new StreamObserver<WriteRequest>() {
-      long committed_size = 0;
-      ByteString data = null;
-      boolean finished = false;
-      boolean failed = false;
-      String writeResourceName = null;
-
-      Digest digest;
-
-      private void writeBlob(
-          WriteRequest request, StreamObserver<WriteResponse> responseObserver)
-          throws InterruptedException {
-        try {
-          Instance instance = instances.getFromUploadBlob(writeResourceName);
-
-          writeInstanceBlob(request, responseObserver, instance);
-        } catch (InvalidResourceNameException e) {
-          String description = e.getLocalizedMessage();
-          responseObserver.onError(Status.INVALID_ARGUMENT
-              .withDescription(description)
-              .asException());
-          failed = true;
-        } catch (InstanceNotFoundException ex) {
-          responseObserver.onError(BuildFarmInstances.toStatusException(ex));
-          failed = true;
-        }
-      }
-
-      private void writeInstanceBlob(
-          WriteRequest request, StreamObserver<WriteResponse> responseObserver,
-          Instance instance)
-          throws InvalidResourceNameException, InterruptedException {
-        if (data == null) {
-          digest = UrlPath.parseUploadBlobDigest(writeResourceName);
-          if (digest == null) {
-            String description = "Could not parse digest of: " + writeResourceName;
-            responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
-            failed = true;
-            return;
-          }
-          data = active_write_requests.get(writeResourceName);
-          if (data != null) {
-            committed_size = data.size();
-          }
-        }
-        if (request.getWriteOffset() != committed_size) {
-          String description = "Write offset invalid: " + request.getWriteOffset();
-          responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
-          failed = true;
-          return;
-        }
-        ByteString chunk = request.getData();
-        if (data == null) {
-          data = chunk;
-          committed_size = data.size();
-          active_write_requests.put(writeResourceName, data);
-        } else {
-          data = data.concat(chunk);
-          committed_size += chunk.size();
-        }
-        if (request.getFinishWrite()) {
-          active_write_requests.remove(writeResourceName);
-          Digest blobDigest = instance.getDigestUtil().compute(data);
-          if (!blobDigest.equals(digest)) {
-            String description = String.format("Digest mismatch %s <-> %s", DigestUtil.toString(blobDigest), DigestUtil.toString(digest));
-            responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
-            failed = true;
-          } else {
-            try {
-              instance.putBlob(data);
-            } catch (IOException ex) {
-              responseObserver.onError(new StatusException(Status.fromThrowable(ex)));
-              failed = true;
-            }
-          }
-        }
-      }
-
-      private void writeOperationStream(
-          WriteRequest request, StreamObserver<WriteResponse> responseObserver) throws IOException {
-        try {
-          Instance instance = instances.getFromOperationStream(writeResourceName);
-
-          String operationStream = UrlPath.parseOperationStream(writeResourceName);
-
-          OutputStream outputStream = instance.getStreamOutput(operationStream);
-          request.getData().writeTo(outputStream);
-          if (request.getFinishWrite()) {
-            outputStream.close();
-          }
-        } catch (InstanceNotFoundException ex) {
-          responseObserver.onError(BuildFarmInstances.toStatusException(ex));
-        } catch (InvalidResourceNameException e) {
-          String description = e.getLocalizedMessage();
-          responseObserver.onError(Status.INVALID_ARGUMENT
-              .withDescription(description)
-              .asException());
-        }
-      }
+      boolean initialized = false;
+      String name = null;
+      OutputStream out = null;
+      Instance instance = null;
 
       @Override
       public void onNext(WriteRequest request) {
-        if (finished) {
-          // FIXME does bytestream have a standard status for this invalid request?
-          responseObserver.onError(new StatusException(Status.OUT_OF_RANGE));
-          failed = true;
+        if (initialized) {
+          handleRequest(request);
         } else {
-          String resourceName = request.getResourceName();
-          if (resourceName.isEmpty()) {
-            if (writeResourceName == null) {
-              String description = "Missing resource name in request";
-              responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
-              failed = true;
-            } else {
-              resourceName = writeResourceName;
-            }
-          } else if (writeResourceName == null) {
-            writeResourceName = resourceName;
-          } else if (!writeResourceName.equals(resourceName)) {
-            String description = String.format("Previous resource name changed while handling request. %s -> %s", writeResourceName, resourceName);
-            responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT.withDescription(description)));
-            failed = true;
-          }
+          initialize(request);
         }
+      }
 
-        if (failed) {
-          return;
-        }
-        
-        Optional<ResourceOperation> resourceOperation = Optional.empty();
-        try {
-          resourceOperation = Optional.of(UrlPath.detectResourceOperation(writeResourceName));
-        } catch (InvalidResourceNameException e) {
-          String description = e.getLocalizedMessage();
-          responseObserver.onError(Status.INVALID_ARGUMENT
-              .withDescription(description)
-              .asException());
-          failed = true;
-        }
+      Write getBlobWrite(
+          Instance instance,
+          Digest digest,
+          UUID uuid) throws IOException {
+        return instance.getBlobWrite(digest, uuid);
+      }
 
-        if (failed) {
-          return;
-        }
+      Write getOperationStreamWrite(
+          Instance instance,
+          String resourceName) throws IOException {
+        return instance.getOperationStreamWrite(name);
+      }
 
-        try {
-          switch (resourceOperation.get()) {
+      Write getWrite(String resourceName) throws IOException, InstanceNotFoundException, InvalidResourceNameException {
+        switch (detectResourceOperation(resourceName)) {
           case UploadBlob:
-            writeBlob(request, responseObserver);
-            finished = request.getFinishWrite();
-            break;
+            return getBlobWrite(
+                instances.getFromUploadBlob(resourceName),
+                parseUploadBlobDigest(resourceName),
+                parseUploadBlobUUID(resourceName));
           case OperationStream:
-            writeOperationStream(request, responseObserver);
-            finished = request.getFinishWrite();
-            break;
+            return getOperationStreamWrite(
+                instances.getFromOperationStream(resourceName),
+                resourceName);
+          case Blob:
           default:
-            responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
-            failed = true;
-            break;
+            throw new IOException(INVALID_ARGUMENT
+                .withDescription("unknown resource operation for " + resourceName)
+                .asException());
+        }
+      }
+
+      void initialize(WriteRequest request) {
+        String resourceName = request.getResourceName();
+        if (resourceName.isEmpty()) {
+          responseObserver.onError(INVALID_ARGUMENT
+              .withDescription("resource_name is empty")
+              .asException());
+        } else {
+          name = resourceName;
+          try {
+            Write write = getWrite(resourceName);
+            logger.log(java.util.logging.Level.INFO, "Registering callback for " + resourceName);
+            write.addListener(
+                () -> {
+                  if (!Context.current().isCancelled()) {
+                    try {
+                      logger.log(java.util.logging.Level.INFO, "delivering committedSize for " + resourceName);
+                      responseObserver.onNext(WriteResponse.newBuilder()
+                          .setCommittedSize(write.getCommittedSize())
+                          .build());
+                    } catch (Throwable t) {
+                      logger.log(SEVERE, "error delivering committedSize to " + resourceName, t);
+                    }
+                  } else {
+                    logger.log(java.util.logging.Level.INFO, "skipped delivering committedSize to " + resourceName + " for cancelled context");
+                  }
+                },
+                withCancellation.fixedContextExecutor(directExecutor()));
+            out = write.getOutput();
+            initialized = true;
+            handleRequest(request);
+          } catch (InstanceNotFoundException e) {
+            responseObserver.onError(BuildFarmInstances.toStatusException(e));
+          } catch (IOException|InvalidResourceNameException e) {
+            responseObserver.onError(Status.fromThrowable(e).asException());
           }
-        } catch(InterruptedException ex) {
-          failed = true;
-          Thread.currentThread().interrupt();
-        } catch(IOException ex) {
-          responseObserver.onError(new StatusException(Status.fromThrowable(ex)));
-          failed = true;
+        }
+      }
+
+      void handleRequest(WriteRequest request) {
+        String resourceName = request.getResourceName();
+        if (resourceName.isEmpty()) {
+          resourceName = name;
+        }
+        handleWrite(
+            resourceName,
+            request.getWriteOffset(),
+            request.getData(),
+            request.getFinishWrite());
+      }
+
+      void handleWrite(
+          String resourceName,
+          long offset,
+          ByteString data,
+          boolean finishWrite) {
+        try {
+          long committedSize = getCommittedSize(name);
+          if (offset != 0 && offset != committedSize) {
+            responseObserver.onError(INVALID_ARGUMENT
+                .withDescription(format("offset %d does not match committed size %d", offset, committedSize))
+                .asException());
+          } else if (!resourceName.equals(name)) {
+            responseObserver.onError(INVALID_ARGUMENT
+                .withDescription(format("request resource_name %s does not match previous resource_name %s", resourceName, name))
+                .asException());
+          } else {
+            if (offset == 0 && offset != committedSize) {
+              // reset the write
+              try {
+                out.close();
+              } catch (IOException e) {
+                // ignore, cancelling
+              }
+              out = getWrite(resourceName).getOutput();
+              checkState(getCommittedSize(resourceName) == 0);
+            }
+            if (!data.isEmpty()) {
+              writeData(data);
+            }
+            if (finishWrite) {
+              logger.info("closing stream due to finishWrite for " + resourceName);
+              out.close();
+            }
+          }
+        } catch (InstanceNotFoundException e) {
+          responseObserver.onError(BuildFarmInstances.toStatusException(e));
+        } catch (IOException|InvalidResourceNameException e) {
+          responseObserver.onError(Status.fromThrowable(e).asException());
+        }
+      }
+
+      void writeData(ByteString data) {
+        try {
+          logger.log(java.util.logging.Level.INFO, "writing " + data.size() + " to " + name);
+          data.writeTo(out);
+        } catch (IOException e) {
+          responseObserver.onError(Status.fromThrowable(e).asException());
         }
       }
 
       @Override
       public void onError(Throwable t) {
-        // has the connection closed at this point?
-        failed = true;
+        if (initialized
+            && !DEFAULT_IS_RETRIABLE.apply(Status.fromThrowable(t))) {
+          try {
+            out.close();
+          } catch (IOException e) {
+            logger.log(SEVERE, "error closing output stream after error", e);
+          }
+        } else {
+          logger.log(java.util.logging.Level.INFO, "cancelling context for " + name, t);
+          withCancellation.cancel(t);
+        }
       }
 
       @Override
       public void onCompleted() {
-        if (failed)
-          return;
-
-        responseObserver.onNext(WriteResponse.newBuilder()
-            .setCommittedSize(committed_size)
-            .build());
+        logger.log(java.util.logging.Level.INFO, "calling completed for " + name);
         responseObserver.onCompleted();
       }
     };

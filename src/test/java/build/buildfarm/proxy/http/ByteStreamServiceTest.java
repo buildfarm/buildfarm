@@ -92,12 +92,12 @@ public class ByteStreamServiceTest {
     fakeServer.awaitTermination();
   }
 
-  private String createBlobUploadResourceName(String id, Digest digest) {
+  static String createBlobUploadResourceName(String id, Digest digest) {
     return createBlobUploadResourceName(
         /* instanceName=*/ "", id, digest);
   }
 
-  private String createBlobUploadResourceName(
+  static String createBlobUploadResourceName(
       String instanceName, String id, Digest digest) {
     return String.format(
         "%suploads/%s/blobs/%s",

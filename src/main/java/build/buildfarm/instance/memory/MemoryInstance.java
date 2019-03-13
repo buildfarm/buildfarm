@@ -37,6 +37,7 @@ import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
+import build.buildfarm.common.Write;
 import build.buildfarm.common.function.InterruptingPredicate;
 import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.instance.OperationsMap;
@@ -270,13 +271,22 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
+  public Write getOperationStreamWrite(String name) {
+    throw new UnsupportedOperationException(); // needs source->write conversion
+  }
+
+  /*
+  @Override
   public OutputStream getStreamOutput(String name) {
     return getSource(name).getOutputStream();
   }
+  */
 
   @Override
-  public InputStream newStreamInput(String name) {
-    return getSource(name).openStream();
+  public InputStream newOperationStreamInput(String name, long offset) throws IOException {
+    InputStream in = getSource(name).openStream();
+    in.skip(offset);
+    return in;
   }
 
   @Override
