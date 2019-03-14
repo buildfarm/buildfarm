@@ -1013,17 +1013,21 @@ public class ShardInstance extends AbstractServerInstance {
     }
     Supplier<ListenableFuture<Directory>> fetcher = () -> notFoundNull(expect(directoryBlobDigest, Directory.parser(), executor));
     // is there a better interface to use for the cache with these nice futures?
-    return directoryCache.get(directoryBlobDigest, new Callable<ListenableFuture<? extends Directory>>() {
-      @Override
-      public ListenableFuture<Directory> call() {
-        logger.info(
-            format(
-                "transformQueuedOperation(%s): fetching directory %s",
-                reason,
-                DigestUtil.toString(directoryBlobDigest)));
-        return fetcher.get();
-      }
-    });
+    return catching(
+      directoryCache.get(directoryBlobDigest, new Callable<ListenableFuture<? extends Directory>>() {
+        @Override
+        public ListenableFuture<Directory> call() {
+          logger.info(
+              format(
+                  "transformQueuedOperation(%s): fetching directory %s",
+                  reason,
+                  DigestUtil.toString(directoryBlobDigest)));
+          return fetcher.get();
+        }
+      }),
+      InvalidCacheLoadException.class,
+      (e) -> { return null; },
+      directExecutor());
   }
 
   ListenableFuture<Command> expectCommand(Digest commandBlobDigest, Executor executor) {

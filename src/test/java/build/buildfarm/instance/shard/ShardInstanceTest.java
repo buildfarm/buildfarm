@@ -46,6 +46,7 @@ import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
@@ -367,6 +368,76 @@ public class ShardInstanceTest {
                     .setType(VIOLATION_TYPE_MISSING)
                     .setSubject("blobs/" + DigestUtil.toString(action.getCommandDigest()))
                     .setDescription(MISSING_COMMAND))
+                .build())))
+        .build();
+    Operation erroredOperation = Operation.newBuilder()
+        .setName(executeEntry.getOperationName())
+        .setDone(true)
+        .setMetadata(Any.pack(ExecuteOperationMetadata.newBuilder()
+            .setActionDigest(actionDigest)
+            .setStage(COMPLETED)
+            .build()))
+        .setResponse(Any.pack(executeResponse))
+        .build();
+    verify(mockBackplane, times(1)).putOperation(eq(erroredOperation), eq(COMPLETED));
+    verify(poller, atLeastOnce()).pause();
+  }
+
+  @Test
+  public void queueDirectoryMissingErrorsOperation() throws Exception {
+    ByteString foo = ByteString.copyFromUtf8("foo");
+    Digest fooDigest = DIGEST_UTIL.compute(ByteString.copyFromUtf8("foo"));
+    // no need to provide foo, just want to make a non-default directory
+    Directory subdir = Directory.newBuilder()
+        .addFiles(FileNode.newBuilder()
+            .setName("foo")
+            .setDigest(fooDigest))
+        .build();
+    Digest subdirDigest = DIGEST_UTIL.compute(foo);
+    Directory inputRoot = Directory.newBuilder()
+        .addDirectories(DirectoryNode.newBuilder()
+            .setName("missing-subdir")
+            .setDigest(subdirDigest))
+        .build();
+    ByteString inputRootContent = inputRoot.toByteString();
+    Digest inputRootDigest = DIGEST_UTIL.compute(inputRootContent);
+    provideBlob(inputRootDigest, inputRootContent);
+    Action action = createAction(true, true, inputRootDigest, SIMPLE_COMMAND);
+    Digest actionDigest = DIGEST_UTIL.compute(action);
+
+    ExecuteEntry executeEntry = ExecuteEntry.newBuilder()
+        .setOperationName("missing-directory-operation")
+        .setActionDigest(actionDigest)
+        .setSkipCacheLookup(true)
+        .build();
+
+    when(mockBackplane.canQueue()).thenReturn(true);
+
+    Poller poller = mock(Poller.class);
+
+    boolean failedPreconditionExceptionCaught = false;
+    try {
+      instance.queue(executeEntry, poller)
+          .get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
+    } catch (ExecutionException e) {
+      com.google.rpc.Status status = StatusProto.fromThrowable(e);
+      if (status.getCode() == Code.FAILED_PRECONDITION.getNumber()) {
+        failedPreconditionExceptionCaught = true;
+      } else {
+        e.getCause().printStackTrace();
+      }
+    }
+    assertThat(failedPreconditionExceptionCaught).isTrue();
+
+    ExecuteResponse executeResponse = ExecuteResponse.newBuilder()
+        .setStatus(com.google.rpc.Status.newBuilder()
+            .setCode(Code.FAILED_PRECONDITION.getNumber())
+            .setMessage(ShardInstance.invalidActionMessage(actionDigest))
+            .addDetails(Any.pack(PreconditionFailure.newBuilder()
+                .addViolations(Violation.newBuilder()
+                    .setType(VIOLATION_TYPE_MISSING)
+                    .setSubject("blobs/" + DigestUtil.toString(subdirDigest))
+                    .setDescription("The directory `/missing-subdir` was not found in the CAS."))
                 .build())))
         .build();
     Operation erroredOperation = Operation.newBuilder()
