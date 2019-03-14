@@ -256,6 +256,9 @@ class CFCExecFileSystem implements ExecFileSystem {
       super(String.format("%s: %d exceptions", path, exceptions.size()));
       this.path = path;
       this.exceptions = exceptions;
+      for (Throwable exception : exceptions) {
+        addSuppressed(exception);
+      }
     }
 
     Path getPath() {

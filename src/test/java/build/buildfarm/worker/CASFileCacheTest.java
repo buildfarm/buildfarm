@@ -34,6 +34,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.worker.CASFileCache.Entry;
+import build.buildfarm.worker.CASFileCache.PutDirectoryException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -237,8 +238,7 @@ class CASFileCacheTest {
               dirDigest,
               directoriesIndex,
               putService));
-    } catch (IOException e) {
-      assertThat(e.getMessage()).isEqualTo("NOT_FOUND: " + DigestUtil.toString(fileDigest));
+    } catch (PutDirectoryException e) {
       exceptionHandled = true;
     }
     assertThat(exceptionHandled).isTrue();
