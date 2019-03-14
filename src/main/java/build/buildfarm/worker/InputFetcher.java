@@ -154,7 +154,7 @@ public class InputFetcher implements Runnable {
         Thread.currentThread().interrupt();
       }
     } catch (Exception e) {
-      logger.log(SEVERE, "error while fetching inputs: " + operationName, e);
+      logger.log(WARNING, "error while fetching inputs: " + operationName, e);
       try {
         owner.error().put(operationContext);
       } catch (InterruptedException errorEx) {
