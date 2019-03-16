@@ -170,7 +170,7 @@ public class Worker {
         config.getExecutionPoliciesList(),
         instance);
 
-    PipelineStage completeStage = new PutOperationStage(context::deactivate);
+    PipelineStage completeStage = new PutOperationStage((operation) -> context.deactivate(operation.getName()));
     PipelineStage errorStage = completeStage; /* new ErrorStage(); */
     PipelineStage reportResultStage = new ReportResultStage(context, completeStage, errorStage);
     PipelineStage executeActionStage = new ExecuteActionStage(context, reportResultStage, errorStage);

@@ -71,7 +71,6 @@ public class MatchStageTest {
   @Test
   public void fetchFailureReentry() throws ConfigurationException {
     List<Operation> queue = new ArrayList<>();
-    List<Boolean> results = new ArrayList<>();
 
     WorkerContext workerContext = new StubWorkerContext() {
       @Override
@@ -80,13 +79,13 @@ public class MatchStageTest {
       }
 
       @Override
-      public void requeue(Operation operation) {
-        assertThat(operation.getName()).isEqualTo("bad");
+      public void match(MatchListener listener) throws InterruptedException {
+        listener.onOperation(queue.remove(0));
       }
 
       @Override
-      public void match(MatchListener listener) {
-        listener.onOperation(queue.remove(0));
+      public void requeue(Operation operation) {
+        assertThat(operation.getName()).isEqualTo("bad");
       }
     };
 
@@ -94,7 +93,6 @@ public class MatchStageTest {
         .setName("bad")
         // inspire InvalidProtocolBufferException from operation metadata unpack
         .build());
-    results.add(false);
 
     queue.add(Operation.newBuilder()
         .setName("good")
@@ -108,7 +106,6 @@ public class MatchStageTest {
                 .build())
             .build()))
         .build());
-    results.add(true);
 
     final PipelineStage output = new PipelineSink((operationContext) -> operationContext.operation.getName().equals("good"));
 

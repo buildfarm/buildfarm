@@ -561,7 +561,12 @@ public abstract class AbstractServerInstance implements Instance {
       PreconditionFailure.Builder preconditionFailure) {
     pathDigests.push(directoryDigest);
 
-    Directory directory = directoriesIndex.get(directoryDigest);
+    final Directory directory;
+    if (directoryDigest.getSizeBytes() == 0) {
+      directory = Directory.getDefaultInstance();
+    } else {
+      directory = directoriesIndex.get(directoryDigest);
+    }
     if (directory == null) {
       preconditionFailure.addViolationsBuilder()
           .setType(VIOLATION_TYPE_MISSING)
@@ -809,12 +814,15 @@ public abstract class AbstractServerInstance implements Instance {
     try {
       actionBlob = getBlob(actionDigest);
     } catch (IOException e) {
-      preconditionFailure.addViolationsBuilder()
-          .setType(VIOLATION_TYPE_INVALID)
-          .setSubject(MISSING_INPUT)
-          .setDescription(DigestUtil.toString(actionDigest));
+      logger.log(SEVERE, "error retrieving action " + DigestUtil.toString(actionDigest), e);
     }
-    Preconditions.checkState(actionBlob != null, MISSING_INPUT);
+    if (actionBlob == null || actionBlob.isEmpty()) {
+      preconditionFailure.addViolationsBuilder()
+          .setType(VIOLATION_TYPE_MISSING)
+          .setSubject(MISSING_INPUT)
+          .setDescription("Action " + DigestUtil.toString(actionDigest));
+      throw new IllegalStateException(MISSING_INPUT);
+    }
 
     Action action;
     try {
@@ -823,7 +831,7 @@ public abstract class AbstractServerInstance implements Instance {
       preconditionFailure.addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
           .setSubject(INVALID_ACTION)
-          .setDescription(DigestUtil.toString(actionDigest));
+          .setDescription("Action " + DigestUtil.toString(actionDigest));
       throw new IllegalStateException(INVALID_ACTION);
     }
 
@@ -1176,23 +1184,41 @@ public abstract class AbstractServerInstance implements Instance {
         .build());
   }
 
+  @Override
+  public boolean putAndValidateOperation(Operation operation) throws InterruptedException {
+    if (isQueued(operation)) {
+      return requeueOperation(operation);
+    }
+    return putOperation(operation);
+  }
+
+  @VisibleForTesting
   public boolean requeueOperation(Operation operation) throws InterruptedException {
     String name = operation.getName();
-    if (!isQueued(operation)) {
-      throw new IllegalStateException(
-          String.format(
-              "Operation %s stage is not QUEUED",
-              name));
-    }
-
     ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
     if (metadata == null) {
-      throw new IllegalStateException(
-          String.format(
-              "Operation %s does not contain ExecuteOperationMetadata",
-              name));
+      // ensure that watchers are notified
+      String message = String.format(
+          "Operation %s does not contain ExecuteOperationMetadata",
+          name);
+      errorOperation(name, com.google.rpc.Status.newBuilder()
+          .setCode(com.google.rpc.Code.INTERNAL.getNumber())
+          .setMessage(message)
+          .build());
+      return false;
     }
 
+    if (metadata.getStage() != Stage.QUEUED) {
+      // ensure that watchers are notified
+      String message = String.format(
+          "Operation %s stage is not QUEUED",
+          name);
+      errorOperation(name, com.google.rpc.Status.newBuilder()
+          .setCode(com.google.rpc.Code.INTERNAL.getNumber())
+          .setMessage(message)
+          .build());
+      return false;
+    }
     Digest actionDigest = metadata.getActionDigest();
 
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
@@ -1235,7 +1261,7 @@ public abstract class AbstractServerInstance implements Instance {
     putOperation(operation.toBuilder()
         .setDone(true)
         .setMetadata(Any.pack(metadata.toBuilder()
-            .setStage(ExecuteOperationMetadata.Stage.COMPLETED)
+            .setStage(Stage.COMPLETED)
             .build()))
         .setResponse(Any.pack(ExecuteResponse.newBuilder()
             .setStatus(status)
@@ -1270,8 +1296,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public boolean pollOperation(String operationName, Stage stage) {
-    if (stage != Stage.QUEUED
-        && stage != Stage.EXECUTING) {
+    if (stage != Stage.QUEUED && stage != Stage.EXECUTING) {
       return false;
     }
     Operation operation = getOperation(operationName);

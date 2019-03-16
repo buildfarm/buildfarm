@@ -18,7 +18,6 @@ import static com.google.common.base.Preconditions.checkState;
 
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
-import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.OperationQueueGrpc.OperationQueueBlockingStub;
@@ -467,9 +466,6 @@ public class StubInstance implements Instance {
         .take(request);
     listener.onWaitEnd();
     listener.onOperation(operation);
-    if (Thread.interrupted()) {
-      throw new InterruptedException();
-    }
   }
 
   @Override
@@ -480,6 +476,11 @@ public class StubInstance implements Instance {
         .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
         .put(operation)
         .getCode() == Code.OK.getNumber();
+  }
+
+  @Override
+  public boolean putAndValidateOperation(Operation operation) {
+    throw new UnsupportedOperationException();
   }
 
   @Override

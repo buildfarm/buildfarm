@@ -16,6 +16,7 @@ package build.buildfarm.worker;
 
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.function.InterruptingConsumer;
 import build.buildfarm.worker.CASFileCache;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Instance.MatchListener;
@@ -39,9 +40,9 @@ class StubWorkerContext implements WorkerContext {
   @Override public String getName() { throw new UnsupportedOperationException(); }
   @Override public Poller createPoller(String name, String operationName, Stage stage) { throw new UnsupportedOperationException(); }
   @Override public Poller createPoller(String name, String operationName, Stage stage, Runnable onFailure, Deadline deadline) { throw new UnsupportedOperationException(); }
-  @Override public void match(MatchListener listener) { throw new UnsupportedOperationException(); }
+  @Override public void match(MatchListener listener) throws InterruptedException { throw new UnsupportedOperationException(); }
   @Override public void requeue(Operation operation) { throw new UnsupportedOperationException(); }
-  @Override public void deactivate(Operation operation) { throw new UnsupportedOperationException(); }
+  @Override public void deactivate(String operationName) { throw new UnsupportedOperationException(); }
   @Override public void logInfo(String msg) { }
   @Override public CASInsertionPolicy getFileCasPolicy() { throw new UnsupportedOperationException(); }
   @Override public CASInsertionPolicy getStdoutCasPolicy() { throw new UnsupportedOperationException(); }

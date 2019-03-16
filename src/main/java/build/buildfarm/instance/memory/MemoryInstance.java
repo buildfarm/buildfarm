@@ -458,7 +458,10 @@ public class MemoryInstance extends AbstractServerInstance {
 
   @Override
   protected boolean matchOperation(Operation operation) throws InterruptedException {
-    Command command = expectCommand(operation);
+    Action action = expectAction(operation);
+    Preconditions.checkState(action != null, "action not found");
+
+    Command command = getUnchecked(expectCommand(action.getCommandDigest()));
     Preconditions.checkState(command != null, "command not found");
 
     ImmutableList.Builder<Worker> rejectedWorkers = new ImmutableList.Builder<>();
@@ -499,7 +502,9 @@ public class MemoryInstance extends AbstractServerInstance {
         rejectedOperations.add(operation);
       }
     }
-    Iterables.addAll(queuedOperations, rejectedOperations.build());
+    for (Operation operation : rejectedOperations.build()) {
+      requeueOperation(operation);
+    }
     if (!matched) {
       synchronized(workers) {
         listener.onWaitStart();

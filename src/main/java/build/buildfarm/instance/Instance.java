@@ -16,6 +16,7 @@ package build.buildfarm.instance;
 
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.function.InterruptingPredicate;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import build.bazel.remote.execution.v2.ActionResult;
@@ -68,9 +69,10 @@ public interface Instance {
       ExecutionPolicy executionPolicy,
       ResultsCachePolicy resultsCachePolicy,
       RequestMetadata requestMetadata,
-      Predicate<Operation> watcher) throws InterruptedException;
+      Predicate<Operation> onOperation) throws InterruptedException;
   void match(Platform platform, MatchListener listener) throws InterruptedException;
   boolean putOperation(Operation operation) throws InterruptedException;
+  boolean putAndValidateOperation(Operation operation) throws InterruptedException;
   boolean pollOperation(String operationName, Stage stage);
   // returns nextPageToken suitable for list restart
   String listOperations(
@@ -104,21 +106,21 @@ public interface Instance {
     boolean onOperationName(String operationName);
 
     // returns false if this listener will not handle this match
-    boolean onOperation(Operation operation);
+    boolean onOperation(Operation operation) throws InterruptedException;
   }
 
   public static class SimpleMatchListener implements MatchListener {
-    private final Predicate<Operation> onMatch;
+    private final InterruptingPredicate<Operation> onMatch;
 
-    public SimpleMatchListener(Predicate<Operation> onMatch) {
+    public SimpleMatchListener(InterruptingPredicate<Operation> onMatch) {
       this.onMatch = onMatch;
     }
 
     @Override public void onWaitStart() { }
     @Override public void onWaitEnd() { }
     @Override public boolean onOperationName(String operationName) { return true; }
-    @Override public boolean onOperation(Operation operation) {
-      return onMatch.test(operation);
+    @Override public boolean onOperation(Operation operation) throws InterruptedException {
+      return onMatch.testInterruptibly(operation);
     }
   }
 

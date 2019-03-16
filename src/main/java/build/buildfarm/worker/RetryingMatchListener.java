@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.instance.memory;
+package build.buildfarm.worker;
 
-import com.google.protobuf.Duration;
+import build.buildfarm.instance.Instance.MatchListener;
 
-@FunctionalInterface
-interface InterruptingRunnable {
-  void run() throws InterruptedException;
+public interface RetryingMatchListener extends MatchListener {
+  boolean getMatched();
 }

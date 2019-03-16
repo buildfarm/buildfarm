@@ -22,6 +22,7 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.function.InterruptingConsumer;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.instance.stub.ByteStreamUploader;
@@ -41,7 +42,7 @@ public interface WorkerContext {
   Poller createPoller(String name, String operationName, Stage stage, Runnable onFailure, Deadline deadline);
   void match(MatchListener listener) throws InterruptedException;
   void requeue(Operation operation) throws InterruptedException;
-  void deactivate(Operation operation);
+  void deactivate(String operationName);
   void logInfo(String msg);
   CASInsertionPolicy getFileCasPolicy();
   CASInsertionPolicy getStdoutCasPolicy();

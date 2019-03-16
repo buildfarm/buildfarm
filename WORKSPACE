@@ -1,5 +1,8 @@
 workspace(name = "build_buildfarm")
 
+load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
 # Needed for "well-known protos" and @com_google_protobuf//:protoc.
 http_archive(
     name = "com_google_protobuf",
@@ -16,21 +19,21 @@ http_archive(
     urls = ["https://github.com/grpc/grpc-java/archive/v1.8.0.zip"],
 )
 
-new_http_archive(
+http_archive(
     name = "googleapis",
     sha256 = "7b6ea252f0b8fb5cd722f45feb83e115b689909bbb6a393a873b6cbad4ceae1d",
     url = "https://github.com/googleapis/googleapis/archive/143084a2624b6591ee1f9d23e7f5241856642f4d.zip",
     strip_prefix = "googleapis-143084a2624b6591ee1f9d23e7f5241856642f4d",
-    build_file = "BUILD.googleapis",
+    build_file = "@build_buildfarm//:BUILD.googleapis",
 )
 
 # The API that we implement.
-new_http_archive(
+http_archive(
     name = "remote_apis",
     sha256 = "865c6950a64b859cf211761330e5d13e6c4b54e22a454ae1195238594299de34",
     url = "https://github.com/bazelbuild/remote-apis/archive/fdeb922b595df28650d12fc2335c4426df2fc726.zip",
     strip_prefix = "remote-apis-fdeb922b595df28650d12fc2335c4426df2fc726",
-    build_file = "BUILD.remote_apis",
+    build_file = "@build_buildfarm//:BUILD.remote_apis",
 )
 
 load("//3rdparty:workspace.bzl", "maven_dependencies", "declare_maven")
@@ -40,7 +43,7 @@ maven_dependencies(declare_maven)
 git_repository(
     name = "io_bazel_rules_docker",
     remote = "https://github.com/bazelbuild/rules_docker.git",
-    tag = "v0.4.0",
+    tag = "v0.5.1",
 )
 
 load(

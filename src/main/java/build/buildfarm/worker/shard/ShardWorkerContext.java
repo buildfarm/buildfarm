@@ -38,6 +38,7 @@ import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.instance.stub.Retrier;
 import build.buildfarm.instance.stub.Retrier.Backoff;
 import build.buildfarm.worker.Poller;
+import build.buildfarm.worker.RetryingMatchListener;
 import build.buildfarm.worker.WorkerContext;
 import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.v1test.ExecutionPolicy;
@@ -159,7 +160,14 @@ class ShardWorkerContext implements WorkerContext {
   @Override
   public void match(MatchListener listener) throws InterruptedException {
     // instance is a horrible place for this method's implementation for shard
-    instance.match(platform, new MatchListener() {
+    RetryingMatchListener dedupMatchListener = new RetryingMatchListener() {
+      boolean matched = false;
+
+      @Override
+      public boolean getMatched() {
+        return matched;
+      }
+
       @Override
       public void onWaitStart() {
         listener.onWaitStart();
@@ -174,49 +182,35 @@ class ShardWorkerContext implements WorkerContext {
       public boolean onOperationName(String operationName) {
         if (activeOperations.contains(operationName)) {
           logger.severe("WorkerContext::match: WARNING matched duplicate operation " + operationName);
-          return listener.onOperation(null);
+          return false;
         }
+        matched = true;
         activeOperations.add(operationName);
         boolean success = listener.onOperationName(operationName);
         if (!success) {
-          try {
-            // fast path to requeue, implementation specific
-            operationPoller.poll(operationName, Stage.QUEUED, 0);
-          } catch (IOException e) {
-            logger.log(SEVERE, "Failure while trying to fast requeue " + operationName, e);
-          }
+          requeue(operationName);
         }
         return success;
       }
 
       @Override
-      public boolean onOperation(Operation operation) {
+      public boolean onOperation(Operation operation) throws InterruptedException {
         // could not fetch
         if (operation.getDone()) {
-          activeOperations.remove(operation.getName());
           listener.onOperation(null);
-          try {
-            operationPoller.poll(operation.getName(), Stage.QUEUED, 0);
-          } catch (IOException e) {
-            logger.log(SEVERE, "Failure while trying to fast requeue " + operation.getName(), e);
-          }
+          requeue(operation);
           return false;
         }
 
         boolean success = listener.onOperation(operation);
         if (!success) {
-          try {
-            requeue(operation);
-          } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return false;
-          }
+          requeue(operation);
         }
         return success;
       }
-    });
-    if (Thread.interrupted()) {
-      throw new InterruptedException();
+    };
+    while (!dedupMatchListener.getMatched()) {
+      instance.match(platform, dedupMatchListener);
     }
   }
 
@@ -247,20 +241,24 @@ class ShardWorkerContext implements WorkerContext {
     return null;
   }
 
-  @Override
-  public void requeue(Operation operation) throws InterruptedException {
-    deactivate(operation);
+  private void requeue(String operationName) {
+    deactivate(operationName);
     try {
-      operationPoller.poll(operation.getName(), Stage.QUEUED, 0);
+      operationPoller.poll(operationName, Stage.QUEUED, 0);
     } catch (IOException e) {
       // ignore, at least dispatcher will pick us up in 30s
-      logger.log(WARNING, "poll failed for " + operation.getName(), e);
+      logger.log(SEVERE, "Failure while trying to fast requeue " + operationName, e);
     }
   }
 
   @Override
-  public void deactivate(Operation operation) {
-    activeOperations.remove(operation.getName());
+  public void requeue(Operation operation) {
+    requeue(operation.getName());
+  }
+
+  @Override
+  public void deactivate(String operationName) {
+    activeOperations.remove(operationName);
   }
 
   @Override

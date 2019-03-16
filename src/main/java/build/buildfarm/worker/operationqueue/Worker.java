@@ -46,6 +46,7 @@ import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.Poller;
 import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.ReportResultStage;
+import build.buildfarm.worker.RetryingMatchListener;
 import build.buildfarm.worker.UploadManifest;
 import build.buildfarm.worker.WorkerContext;
 import com.google.common.annotations.VisibleForTesting;
@@ -456,7 +457,14 @@ public class Worker {
 
       @Override
       public void match(MatchListener listener) throws InterruptedException {
-        operationQueueInstance.match(config.getPlatform(), new MatchListener() {
+        RetryingMatchListener dedupMatchListener = new RetryingMatchListener() {
+          boolean matched = false;
+
+          @Override
+          public boolean getMatched() {
+            return matched;
+          }
+
           @Override
           public void onWaitStart() {
             listener.onWaitStart();
@@ -473,32 +481,29 @@ public class Worker {
           }
 
           @Override
-          public boolean onOperation(Operation operation) {
+          public boolean onOperation(Operation operation) throws InterruptedException {
             if (activeOperations.contains(operation.getName())) {
               logger.severe("WorkerContext::match: WARNING matched duplicate operation " + operation.getName());
-              return listener.onOperation(null);
+              return false;
             }
+            matched = true;
             activeOperations.add(operation.getName());
             boolean success = listener.onOperation(operation);
             if (!success) {
-              try {
-                requeue(operation);
-              } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-              }
+              requeue(operation);
             }
             return success;
           }
-        });
-        if (Thread.interrupted()) {
-          throw new InterruptedException();
+        };
+        while (!dedupMatchListener.getMatched()) {
+          operationQueueInstance.match(config.getPlatform(), dedupMatchListener);
         }
       }
 
       @Override
       public void requeue(Operation operation) throws InterruptedException {
         try {
-          deactivate(operation);
+          deactivate(operation.getName());
           ExecuteOperationMetadata metadata =
               operation.getMetadata().unpack(ExecuteOperationMetadata.class);
 
@@ -516,8 +521,8 @@ public class Worker {
       }
 
       @Override
-      public void deactivate(Operation operation) {
-        activeOperations.remove(operation.getName());
+      public void deactivate(String operationName) {
+        activeOperations.remove(operationName);
       }
 
       @Override
@@ -620,17 +625,34 @@ public class Worker {
         ImmutableList.Builder<Path> inputFiles = new ImmutableList.Builder<>();
         ImmutableList.Builder<Digest> inputDirectories = new ImmutableList.Builder<>();
 
-        fetchInputs(
-            execDir,
-            action.getInputRootDigest(),
-            outputDirectory,
-            inputFiles,
-            inputDirectories);
-
-        outputDirectory.stamp(execDir);
+        boolean fetched = false;
+        try {
+          fetchInputs(
+              execDir,
+              action.getInputRootDigest(),
+              outputDirectory,
+              inputFiles,
+              inputDirectories);
+          fetched = true;
+        } finally {
+          if (!fetched) {
+            fileCache.decrementReferences(inputFiles.build(), inputDirectories.build());
+          }
+        }
 
         rootInputFiles.put(execDir, inputFiles.build());
         rootInputDirectories.put(execDir, inputDirectories.build());
+
+        boolean stamped = false;
+        try {
+          outputDirectory.stamp(execDir);
+          stamped = true;
+        } finally {
+          if (!stamped) {
+            destroyExecDir(execDir);
+          }
+        }
+
         return execDir;
       }
 
@@ -665,7 +687,7 @@ public class Worker {
       }
     };
 
-    PipelineStage completeStage = new PutOperationStage(context::deactivate);
+    PipelineStage completeStage = new PutOperationStage((operation) -> context.deactivate(operation.getName()));
     PipelineStage errorStage = completeStage; /* new ErrorStage(); */
     PipelineStage reportResultStage = new ReportResultStage(context, completeStage, errorStage);
     PipelineStage executeActionStage = new ExecuteActionStage(context, reportResultStage, errorStage);
