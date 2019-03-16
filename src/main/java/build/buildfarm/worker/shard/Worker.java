@@ -14,13 +14,16 @@
 
 package build.buildfarm.worker.shard;
 
-import build.buildfarm.common.ContentAddressableStorage;
-import build.buildfarm.common.ContentAddressableStorage.Blob;
+import static java.util.logging.Level.SEVERE;
+
+import build.bazel.remote.execution.v2.Digest;
+import build.buildfarm.cas.ContentAddressableStorage;
+import build.buildfarm.cas.ContentAddressableStorage.Blob;
+import build.buildfarm.cas.MemoryCAS;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.ShardBackplane;
-import build.buildfarm.instance.memory.MemoryLRUContentAddressableStorage;
 import build.buildfarm.instance.shard.RedisShardBackplane;
 import build.buildfarm.server.InstanceNotFoundException;
 import build.buildfarm.server.Instances;
@@ -41,7 +44,6 @@ import build.buildfarm.v1test.ShardWorkerConfig;
 import com.google.common.base.Strings;
 import com.google.common.io.ByteStreams;
 import com.google.devtools.common.options.OptionsParser;
-import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
@@ -60,12 +62,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
 
 public class Worker {
-  private static final Logger nettyLogger = Logger.getLogger("io.grpc.netty");
+  private static final java.util.logging.Logger nettyLogger = java.util.logging.Logger.getLogger("io.grpc.netty");
+  private static final Logger logger = Logger.getLogger(Worker.class.getName());
 
   private final ShardWorkerConfig config;
   private final ShardWorkerInstance instance;
@@ -104,7 +106,7 @@ public class Worker {
 
   private static HashFunction getValidHashFunction(ShardWorkerConfig config) throws ConfigurationException {
     try {
-      return HashFunction.get(config.getHashFunction());
+      return HashFunction.get(config.getDigestFunction());
     } catch (IllegalArgumentException e) {
       throw new ConfigurationException("hash_function value unrecognized");
     }
@@ -164,6 +166,7 @@ public class Worker {
         config.getInlineContentLimit(),
         config.getExecuteStageWidth(),
         execFileSystem,
+        config.getExecutionPoliciesList(),
         instance);
 
     PipelineStage completeStage = new PutOperationStage(context::deactivate);
@@ -185,7 +188,7 @@ public class Worker {
   }
 
   private ExecFileSystem createFuseExecFileSystem(InputStreamFactory remoteInputStreamFactory) {
-    final ContentAddressableStorage storage = new MemoryLRUContentAddressableStorage(config.getCasMaxSizeBytes(), this::onStoragePut);
+    final ContentAddressableStorage storage = new MemoryCAS(config.getCasMaxSizeBytes(), this::onStoragePut);
     InputStreamFactory storageInputStreamFactory = (digest, offset) -> storage.get(digest).getData().substring((int) offset).newInput();
 
     InputStreamFactory localPopulatingInputStreamFactory = new InputStreamFactory() {
@@ -233,22 +236,22 @@ public class Worker {
   }
 
   public void stop() throws InterruptedException {
-    System.err.println("Closing the pipeline");
+    logger.info("Closing the pipeline");
     try {
       pipeline.close();
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
-    System.err.println("Stopping exec filesystem");
+    logger.info("Stopping exec filesystem");
     execFileSystem.stop();
     if (server != null) {
-      System.err.println("Shutting down the server");
+      logger.info("Shutting down the server");
       server.shutdown();
 
       try {
         server.awaitTermination(shutdownWaitTimeInMillis, TimeUnit.MILLISECONDS);
       } catch (InterruptedException e) {
-        e.printStackTrace();
+        logger.log(SEVERE, "interrupted while waiting for server shutdown", e);
       } finally {
         server.shutdownNow();
       }
@@ -288,7 +291,7 @@ public class Worker {
       try {
         server.awaitTermination(shutdownWaitTimeInMillis, TimeUnit.MILLISECONDS);
       } catch (InterruptedException e) {
-        e.printStackTrace();
+        logger.log(SEVERE, "interrupted while waiting for server shutdown", e);
       } finally {
         server.shutdownNow();
       }
@@ -308,7 +311,7 @@ public class Worker {
       if (status.getCode() != Code.UNAVAILABLE && status.getCode() != Code.DEADLINE_EXCEEDED) {
         throw status.asRuntimeException();
       }
-      System.out.println("backplane was unavailable or overloaded, deferring removeWorker");
+      logger.info("backplane was unavailable or overloaded, deferring removeWorker");
     }
   }
 
@@ -375,16 +378,16 @@ public class Worker {
       startFailsafeRegistration();
     } catch (Exception e) {
       stop();
-      e.printStackTrace();
+      logger.log(SEVERE, "error starting worker", e);
       return;
     }
     Runtime.getRuntime().addShutdownHook(new Thread() {
       @Override
       public void run() {
-        System.err.println("*** shutting down gRPC server since JVM is shutting down");
+        logger.severe("*** shutting down gRPC server since JVM is shutting down");
         try {
           Worker.this.stop();
-          System.err.println("*** server shut down");
+          logger.severe("*** server shut down");
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
         }
@@ -410,8 +413,8 @@ public class Worker {
   }
 
   private static void printUsage(OptionsParser parser) {
-    System.out.println("Usage: CONFIG_PATH");
-    System.out.println(parser.describeOptions(Collections.<String, String>emptyMap(),
+    logger.info("Usage: CONFIG_PATH");
+    logger.info(parser.describeOptions(Collections.<String, String>emptyMap(),
                                               OptionsParser.HelpVerbosity.LONG));
   }
 
@@ -421,7 +424,7 @@ public class Worker {
     // 170714 08:16:28.552:WT 18 [io.grpc.netty.NettyServerHandler.onStreamError] Stream Error
     // io.netty.handler.codec.http2.Http2Exception$StreamException: Received DATA frame for an
     // unknown stream 11369
-    nettyLogger.setLevel(Level.SEVERE);
+    nettyLogger.setLevel(SEVERE);
 
     OptionsParser parser = OptionsParser.newOptionsParser(WorkerOptions.class);
     parser.parseAndExitUponError(args);

@@ -1,8 +1,8 @@
 package build.buildfarm;
 
+import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.worker.CASFileCache;
 import build.buildfarm.common.DigestUtil;
-import com.google.devtools.remoteexecution.v1test.Digest;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;

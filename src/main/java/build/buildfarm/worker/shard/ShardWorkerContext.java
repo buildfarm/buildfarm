@@ -14,10 +14,23 @@
 
 package build.buildfarm.worker.shard;
 
-import static java.util.logging.Level.SEVERE;
+import static com.google.common.collect.Maps.uniqueIndex;
 import static java.util.concurrent.TimeUnit.DAYS;
+import static java.util.logging.Level.SEVERE;
+import static java.util.logging.Level.WARNING;
 
-import build.buildfarm.common.ContentAddressableStorage.Blob;
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
+import build.bazel.remote.execution.v2.FileNode;
+import build.bazel.remote.execution.v2.OutputFile;
+import build.bazel.remote.execution.v2.Platform;
+import build.bazel.remote.execution.v2.Tree;
+import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.instance.Instance;
@@ -27,18 +40,9 @@ import build.buildfarm.instance.stub.Retrier.Backoff;
 import build.buildfarm.worker.Poller;
 import build.buildfarm.worker.WorkerContext;
 import build.buildfarm.v1test.CASInsertionPolicy;
+import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import com.google.common.collect.ImmutableList;
-import com.google.devtools.remoteexecution.v1test.Action;
-import com.google.devtools.remoteexecution.v1test.ActionResult;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.Directory;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
-import com.google.devtools.remoteexecution.v1test.FileNode;
-import com.google.devtools.remoteexecution.v1test.OutputFile;
-import com.google.devtools.remoteexecution.v1test.Platform;
-import com.google.devtools.remoteexecution.v1test.Tree;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -71,9 +75,10 @@ class ShardWorkerContext implements WorkerContext {
   private final int inlineContentLimit;
   private final int executeStageWidth;
   private final ExecFileSystem execFileSystem;
+  private final Map<String, ExecutionPolicy> policies;
   private final Instance instance;
   private final Set<String> activeOperations = new ConcurrentSkipListSet<>();
-
+  
   ShardWorkerContext(
       String name,
       Platform platform,
@@ -82,6 +87,7 @@ class ShardWorkerContext implements WorkerContext {
       int inlineContentLimit,
       int executeStageWidth,
       ExecFileSystem execFileSystem,
+      Iterable<ExecutionPolicy> policies,
       Instance instance) {
     this.name = name;
     this.operationPollPeriod = operationPollPeriod;
@@ -89,6 +95,7 @@ class ShardWorkerContext implements WorkerContext {
     this.inlineContentLimit = inlineContentLimit;
     this.executeStageWidth = executeStageWidth;
     this.execFileSystem = execFileSystem;
+    this.policies = uniqueIndex(policies, (policy) -> policy.getName());
     this.instance = instance;
     this.platform = platform;
   }
@@ -220,7 +227,7 @@ class ShardWorkerContext implements WorkerContext {
       try {
         return operation.getMetadata().unpack(QueuedOperationMetadata.class).getExecuteOperationMetadata();
       } catch(InvalidProtocolBufferException e) {
-        logger.log(SEVERE, "invalid queued operation metadata", e);
+        logger.log(SEVERE, "error unpacking queued operation metadata from " + operation.getName(), e);
         return null;
       }
     }
@@ -229,7 +236,7 @@ class ShardWorkerContext implements WorkerContext {
       try {
         return operation.getMetadata().unpack(ExecuteOperationMetadata.class);
       } catch(InvalidProtocolBufferException e) {
-        logger.log(SEVERE, "invalid execute operation metadata", e);
+        logger.log(SEVERE, "error unpacking execute operation metadata from " + operation.getName(), e);
         return null;
       }
     }
@@ -244,7 +251,7 @@ class ShardWorkerContext implements WorkerContext {
       operationPoller.poll(operation.getName(), Stage.QUEUED, 0);
     } catch (IOException e) {
       // ignore, at least dispatcher will pick us up in 30s
-      logger.log(SEVERE, "error polling operation: " + operation.getName(), e);
+      logger.log(WARNING, "poll failed for " + operation.getName(), e);
     }
   }
 
@@ -313,63 +320,27 @@ class ShardWorkerContext implements WorkerContext {
     return null;
   }
 
-  private static int inlineOrDigest(
-      ByteString content,
-      CASInsertionPolicy policy,
-      ImmutableList.Builder<ByteString> contents,
-      int inlineContentBytes,
-      int inlineContentLimit,
-      Runnable setInline,
-      Consumer<ByteString> setDigest) {
-    boolean withinLimit = inlineContentBytes + content.size() <= inlineContentLimit;
-    if (withinLimit) {
-      setInline.run();
-      inlineContentBytes += content.size();
-    }
-    if (policy.equals(CASInsertionPolicy.ALWAYS_INSERT) ||
-        (!withinLimit && policy.equals(CASInsertionPolicy.INSERT_ABOVE_LIMIT))) {
-      contents.add(content);
-      setDigest.accept(content);
-    }
-    return inlineContentBytes;
-  }
-
-  private int updateActionResultStdOutputs(
+  private void updateActionResultStdOutputs(
       ActionResult.Builder resultBuilder,
-      ImmutableList.Builder<ByteString> contents,
-      int inlineContentBytes) {
+      ImmutableList.Builder<ByteString> contents) {
     ByteString stdoutRaw = resultBuilder.getStdoutRaw();
     if (stdoutRaw.size() > 0) {
       // reset to allow policy to determine inlining
       resultBuilder.setStdoutRaw(ByteString.EMPTY);
-      inlineContentBytes = inlineOrDigest(
-          stdoutRaw,
-          getStdoutCasPolicy(),
-          contents,
-          inlineContentBytes,
-          inlineContentLimit,
-          () -> resultBuilder.setStdoutRaw(stdoutRaw),
-          (content) -> resultBuilder.setStdoutDigest(getDigestUtil().compute(content)));
+      contents.add(stdoutRaw);
+      resultBuilder.setStdoutDigest(getDigestUtil().compute(stdoutRaw));
     }
 
     ByteString stderrRaw = resultBuilder.getStderrRaw();
     if (stderrRaw.size() > 0) {
       // reset to allow policy to determine inlining
       resultBuilder.setStderrRaw(ByteString.EMPTY);
-      inlineContentBytes = inlineOrDigest(
-          stderrRaw,
-          getStderrCasPolicy(),
-          contents,
-          inlineContentBytes,
-          inlineContentLimit,
-          () -> resultBuilder.setStderrRaw(stdoutRaw),
-          (content) -> resultBuilder.setStderrDigest(getDigestUtil().compute(content)));
+      contents.add(stderrRaw);
+      resultBuilder.setStderrDigest(getDigestUtil().compute(stderrRaw));
     }
-
-    return inlineContentBytes;
   }
 
-  private void putAllBlobs(Iterable<ByteString> blobs) {
+  private void putAllBlobs(Iterable<ByteString> blobs) throws InterruptedException {
     for (ByteString content : blobs) {
       if (content.size() > 0) {
         Blob blob = new Blob(content, instance.getDigestUtil());
@@ -385,7 +356,6 @@ class ShardWorkerContext implements WorkerContext {
       Iterable<String> outputFiles,
       Iterable<String> outputDirs)
       throws IOException, InterruptedException {
-    int inlineContentBytes = 0;
     ImmutableList.Builder<ByteString> contents = new ImmutableList.Builder<>();
     for (String outputFile : outputFiles) {
       Path outputPath = actionRoot.resolve(outputFile);
@@ -413,14 +383,8 @@ class ShardWorkerContext implements WorkerContext {
       OutputFile.Builder outputFileBuilder = resultBuilder.addOutputFilesBuilder()
           .setPath(outputFile)
           .setIsExecutable(Files.isExecutable(outputPath));
-      inlineContentBytes = inlineOrDigest(
-          content,
-          getFileCasPolicy(),
-          contents,
-          inlineContentBytes,
-          inlineContentLimit,
-          () -> outputFileBuilder.setContent(content),
-          (fileContent) -> outputFileBuilder.setDigest(getDigestUtil().compute(fileContent)));
+      contents.add(content);
+      outputFileBuilder.setDigest(getDigestUtil().compute(content));
     }
 
     for (String outputDir : outputDirs) {
@@ -442,7 +406,7 @@ class ShardWorkerContext implements WorkerContext {
           try (InputStream inputStream = Files.newInputStream(file)) {
             content = ByteString.readFrom(inputStream);
           } catch (IOException e) {
-            logger.log(SEVERE, "error loading content from " + file.toString(), e);
+            logger.log(SEVERE, "error reading " + file.toString(), e);
             return FileVisitResult.CONTINUE;
           }
 
@@ -490,7 +454,7 @@ class ShardWorkerContext implements WorkerContext {
     }
 
     /* put together our outputs and update the result */
-    updateActionResultStdOutputs(resultBuilder, contents, inlineContentBytes);
+    updateActionResultStdOutputs(resultBuilder, contents);
 
     List<ByteString> blobs = contents.build();
     if (!blobs.isEmpty()) {
@@ -503,6 +467,11 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
+  public ExecutionPolicy getExecutionPolicy(String name) {
+    return policies.get(name);
+  }
+
+  @Override
   public boolean putOperation(Operation operation, Action action) throws IOException, InterruptedException {
     boolean success = createBackplaneRetrier().execute(() -> instance.putOperation(operation));
     if (success && operation.getDone()) {
@@ -512,8 +481,8 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
-  public Path createExecDir(String operationName, Map<Digest, Directory> directoriesIndex, Action action) throws IOException, InterruptedException {
-    return execFileSystem.createExecDir(operationName, directoriesIndex, action);
+  public Path createExecDir(String operationName, Map<Digest, Directory> directoriesIndex, Action action, Command command) throws IOException, InterruptedException {
+    return execFileSystem.createExecDir(operationName, directoriesIndex, action, command);
   }
 
   // might want to split for removeDirectory and decrement references to avoid removing for streamed output

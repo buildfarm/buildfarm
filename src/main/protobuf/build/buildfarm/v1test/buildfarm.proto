@@ -3,7 +3,7 @@ syntax = "proto3";
 package build.buildfarm.v1test;
 
 import "google/api/annotations.proto";
-import "google/devtools/remoteexecution/v1test/remote_execution.proto";
+import "build/bazel/remote/execution/v2/remote_execution.proto";
 import "google/longrunning/operations.proto";
 import "google/protobuf/duration.proto";
 import "google/rpc/status.proto";
@@ -39,7 +39,7 @@ message TakeOperationRequest {
   // choose to execute the action on any worker satisfying the requirements, so
   // the client SHOULD ensure that running the action on any such worker will
   // have the same result.
-  google.devtools.remoteexecution.v1test.Platform platform = 5;
+  build.bazel.remote.execution.v2.Platform platform = 5;
 }
 
 message PollOperationRequest {
@@ -47,7 +47,7 @@ message PollOperationRequest {
   string operation_name = 2;
 
   // The current state of the worker
-  google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage stage = 3;
+  build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage stage = 3;
 }
 
 message BuildFarmServerConfig {
@@ -56,6 +56,50 @@ message BuildFarmServerConfig {
   string default_instance_name = 3; // must be present in instances list or empty
 
   int32 port = 2;
+
+  string logging_host = 4;
+
+  string logging_project_id = 5;
+
+  string aws_namespace = 6;
+}
+
+message MemoryCASConfig {
+  // limit for CAS total content size
+  int64 max_size_bytes = 1;
+}
+
+message GrpcCASConfig {
+  // CAS resources must contain instance names
+  string instance_name = 1;
+
+  // grpc endpoint supporting CAS/BS
+  string target = 2;
+}
+
+message ContentAddressableStorageConfig {
+  oneof type {
+    MemoryCASConfig memory = 1;
+    GrpcCASConfig grpc = 2;
+  }
+}
+
+message DelegateCASConfig {
+}
+
+message GrpcACConfig {
+  // AC requests can contain instance names
+  string instance_name = 1;
+
+  // grpc endpoint supporting AC
+  string target = 2;
+}
+
+message ActionCacheConfig {
+  oneof type {
+    DelegateCASConfig delegate_cas = 1;
+    GrpcACConfig grpc = 2;
+  }
 }
 
 message MemoryInstanceConfig {
@@ -78,19 +122,20 @@ message MemoryInstanceConfig {
   // considered lost on a worker and is requeued
   google.protobuf.Duration operation_completed_delay = 6;
 
-  // limit for CAS total content size
-  int64 cas_max_size_bytes = 7;
-
   // default timeout for actions
   // if a timeout is unspecified for an action, this value
   // is imposed on it, after which the operation will be
   // cancelled
-  google.protobuf.Duration default_action_timeout = 8;
+  google.protobuf.Duration default_action_timeout = 7;
 
   // maximum selectable timeout
   // a maximum threshold for an action's specified timeout,
   // beyond which an action will be rejected for execution
-  google.protobuf.Duration maximum_action_timeout = 9;
+  google.protobuf.Duration maximum_action_timeout = 8;
+
+  ContentAddressableStorageConfig cas_config = 9;
+
+  ActionCacheConfig action_cache_config = 10;
 }
 
 message RedisShardBackplaneConfig {
@@ -192,7 +237,7 @@ message ShardWorkerConfig {
   google.protobuf.Duration operation_poll_period = 13;
 
   // initial platform used to match operations
-  google.devtools.remoteexecution.v1test.Platform platform = 14;
+  build.bazel.remote.execution.v2.Platform platform = 14;
 
   // total size of the inline content for
   // action results
@@ -205,7 +250,7 @@ message ShardWorkerConfig {
   bool link_input_directories = 17;
 
   // selected hash function
-  InstanceConfig.HashFunction hash_function = 18;
+  build.bazel.remote.execution.v2.DigestFunction digest_function = 18;
 
   // default timeout for actions
   // if a timeout is unspecified for an action, this value
@@ -221,6 +266,16 @@ message ShardWorkerConfig {
   oneof backplane {
     RedisShardBackplaneConfig redis_shard_backplane_config = 21;
   }
+
+  string logging_host = 22;
+
+  string logging_project_id = 23;
+
+  string aws_namespace = 24;
+
+  // available execution policies, will be used to match
+  // with an action's platform for selection
+  repeated ExecutionPolicy execution_policies = 25;
 }
 
 message ShardDispatchedOperation {
@@ -240,17 +295,21 @@ message ProfiledQueuedOperationMetadata {
 }
 
 message QueuedOperationMetadata {
-  google.devtools.remoteexecution.v1test.Action action = 1;
+  build.bazel.remote.execution.v2.Action action = 1;
 
-  google.devtools.remoteexecution.v1test.Command command = 2;
+  build.bazel.remote.execution.v2.Command command = 2;
 
-  repeated google.devtools.remoteexecution.v1test.Directory directories = 3;
+  repeated build.bazel.remote.execution.v2.Directory directories = 3;
 
-  google.devtools.remoteexecution.v1test.ExecuteOperationMetadata execute_operation_metadata = 4;
+  build.bazel.remote.execution.v2.ExecuteOperationMetadata execute_operation_metadata = 4;
 
   bool skip_cache_lookup = 5;
 
-  google.devtools.remoteexecution.v1test.RequestMetadata request_metadata = 6;
+  build.bazel.remote.execution.v2.RequestMetadata request_metadata = 6;
+
+  build.bazel.remote.execution.v2.ExecutionPolicy execution_policy = 7;
+
+  build.bazel.remote.execution.v2.ResultsCachePolicy results_cache_policy = 8;
 }
 
 message ExecutingOperationMetadata {
@@ -258,9 +317,13 @@ message ExecutingOperationMetadata {
 
   string executing_on = 2;
 
-  google.devtools.remoteexecution.v1test.ExecuteOperationMetadata execute_operation_metadata = 3;
+  build.bazel.remote.execution.v2.ExecuteOperationMetadata execute_operation_metadata = 3;
 
-  google.devtools.remoteexecution.v1test.RequestMetadata request_metadata = 4;
+  build.bazel.remote.execution.v2.RequestMetadata request_metadata = 4;
+
+  build.bazel.remote.execution.v2.ExecutionPolicy execution_policy = 5;
+
+  build.bazel.remote.execution.v2.ResultsCachePolicy results_cache_policy = 6;
 }
 
 message CompletedOperationMetadata {
@@ -276,22 +339,19 @@ message CompletedOperationMetadata {
 
   google.protobuf.Duration reported_in = 5;
 
-  google.devtools.remoteexecution.v1test.ExecuteOperationMetadata execute_operation_metadata = 6;
+  build.bazel.remote.execution.v2.ExecuteOperationMetadata execute_operation_metadata = 6;
 
-  google.devtools.remoteexecution.v1test.RequestMetadata request_metadata = 8;
+  build.bazel.remote.execution.v2.RequestMetadata request_metadata = 8;
+
+  build.bazel.remote.execution.v2.ExecutionPolicy execution_policy = 9;
+
+  build.bazel.remote.execution.v2.ResultsCachePolicy results_cache_policy = 10;
 }
 
 message InstanceConfig {
   string name = 1;
 
-  enum HashFunction {
-    UNKNOWN = 0;
-    MD5 = 1;
-    SHA1 = 2;
-    SHA256 = 3;
-  }
-
-  HashFunction hash_function = 2;
+  build.bazel.remote.execution.v2.DigestFunction digest_function = 2;
 
   oneof type {
     MemoryInstanceConfig memory_instance_config = 3;
@@ -315,8 +375,22 @@ message InstanceEndpoint {
   string instance_name = 2;
 }
 
+message ExecutionWrapper {
+  string path = 1;
+}
+
+// selectable controls for executions
+// a universal policy can be specified with an empty name
+message ExecutionPolicy {
+  string name = 1;
+
+  oneof policy {
+    ExecutionWrapper wrapper = 2;
+  }
+}
+
 message WorkerConfig {
-  InstanceConfig.HashFunction hash_function = 1;
+  build.bazel.remote.execution.v2.DigestFunction digest_function = 1;
 
   // endpoint for all cas requests
   InstanceEndpoint content_addressable_storage = 2;
@@ -369,7 +443,7 @@ message WorkerConfig {
   google.protobuf.Duration operation_poll_period = 16;
 
   // initial platform used to match operations
-  google.devtools.remoteexecution.v1test.Platform platform = 17;
+  build.bazel.remote.execution.v2.Platform platform = 17;
 
   // execute width
   int32 execute_stage_width = 18;
@@ -387,10 +461,14 @@ message WorkerConfig {
   // a maximum threshold for an action's specified timeout,
   // beyond which an action will be rejected for execution
   google.protobuf.Duration maximum_action_timeout = 21;
+
+  // available execution policies, will be used to match
+  // with an action's platform for selection
+  repeated ExecutionPolicy execution_policies = 22;
 }
 
 message TreeIteratorToken {
-  repeated google.devtools.remoteexecution.v1test.Digest directories = 1;
+  repeated build.bazel.remote.execution.v2.Digest directories = 1;
 }
 
 message OperationIteratorToken {

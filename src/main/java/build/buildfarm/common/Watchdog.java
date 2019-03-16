@@ -14,17 +14,18 @@
 
 package build.buildfarm.common;
 
+import build.buildfarm.common.function.InterruptingRunnable;
 import com.google.protobuf.Duration;
 
 public class Watchdog implements Runnable {
-  private final Runnable runnable;
+  private final InterruptingRunnable runnable;
   private final Duration petTimeout;
   private long timeoutNanos;
   private boolean stopped;
   private boolean done;
   private long start;
 
-  public Watchdog(Duration petTimeout, Runnable runnable) {
+  public Watchdog(Duration petTimeout, InterruptingRunnable runnable) {
     this.runnable = runnable;
     this.petTimeout = petTimeout;
     stopped = false;
@@ -43,7 +44,7 @@ public class Watchdog implements Runnable {
           start = now;
         }
         if (!stopped) {
-          runnable.run();
+          runnable.runInterruptibly();
         }
         if (Thread.interrupted()) {
           throw new InterruptedException();

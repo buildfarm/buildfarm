@@ -14,8 +14,8 @@
 
 package build.buildfarm.worker.shard;
 
+import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.InputStreamFactory;
-import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.io.InputStream;

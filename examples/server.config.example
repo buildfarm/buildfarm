@@ -2,11 +2,11 @@
 instances {
   name: "default_memory_instance"
 
-  # the hash function for this instance, required
+  # the digest function for this instance, required
   # to match out of band between the client and server
   # since resource names must be determined on the client
   # for a valid upload
-  hash_function: SHA256
+  digest_function: SHA256
 
   # the implicit type specifier for this instance
   # a memory instance is volatile and has no persistent
@@ -37,8 +37,17 @@ instances {
       nanos: 0
     }
 
-    # limit for CAS total content size in bytes
-    cas_max_size_bytes: 1073741824 # 1024 * 1024 * 1024
+    cas_config: {
+      memory: {
+        # limit for CAS total content size in bytes
+        max_size_bytes: 1073741824 # 1024 * 1024 * 1024
+      }
+    }
+
+    action_cache_config: {
+      # retain a local map of actionKeys and retain actions in CAS
+      delegate_cas: {}
+    }
 
     # an imposed action-key-invariant timeout used in the unspecified timeout case
     default_action_timeout: {
@@ -59,8 +68,8 @@ instances {
 instances {
   name: "another_memory_instance"
 
-  # hash functions may be different between instances
-  hash_function: SHA1
+  # digest functions may be different between instances
+  digest_function: SHA1
 
   memory_instance_config: {
     list_operations_default_page_size: 1024
@@ -79,7 +88,25 @@ instances {
       nanos: 0
     }
 
-    cas_max_size_bytes: 655360 # 640k
+    cas_config: {
+      grpc: {
+        # instance name for CAS resources, default is empty
+        instance_name: "internal"
+
+        # target suitable for netty channel
+        target: "cas-host.cloud.org:5000"
+      }
+    }
+
+    action_cache_config: {
+      grpc: {
+        # instance name for AC requests, default is empty
+        instance_name: "lru-ac"
+
+        # target suitable for netty channel
+        target: "ac-host.cloud.org:5001"
+      }
+    }
 
     default_action_timeout: {
       seconds: 600

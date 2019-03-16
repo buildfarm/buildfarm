@@ -14,12 +14,18 @@
 
 package build.buildfarm.worker.shard;
 
+import static com.google.common.util.concurrent.Futures.allAsList;
 import static build.buildfarm.worker.CASFileCache.getOrIOException;
 import static build.buildfarm.worker.UploadManifest.readdir;
-import static com.google.common.util.concurrent.Futures.allAsList;
 import static java.util.logging.Level.SEVERE;
 
-import build.buildfarm.common.ContentAddressableStorage;
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.DirectoryNode;
+import build.bazel.remote.execution.v2.FileNode;
+import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.worker.CASFileCache;
@@ -27,11 +33,6 @@ import build.buildfarm.worker.Dirent;
 import build.buildfarm.worker.OutputDirectory;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
-import com.google.devtools.remoteexecution.v1test.Action;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.Directory;
-import com.google.devtools.remoteexecution.v1test.DirectoryNode;
-import com.google.devtools.remoteexecution.v1test.FileNode;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -44,7 +45,7 @@ import java.util.function.Consumer;
 import java.util.logging.Logger;
 
 class CFCExecFileSystem implements ExecFileSystem {
-  private static final Logger logger = Logger.getLogger(CFCExecFileSystem.class.getName());
+  private static final Logger logger = Logger.getLogger(Worker.class.getName());
 
   private final Path root;
   private final CASFileCache fileCache;
@@ -64,7 +65,7 @@ class CFCExecFileSystem implements ExecFileSystem {
     try {
       dirents = readdir(root, /* followSymlinks= */ false);
     } catch (IOException e) {
-      logger.log(SEVERE, "error reading " + root.toString(), e);
+      logger.log(SEVERE, "error reading directory " + root.toString(), e);
     }
 
     ImmutableList.Builder<ListenableFuture<Void>> removeDirectoryFutures = ImmutableList.builder();
@@ -150,10 +151,10 @@ class CFCExecFileSystem implements ExecFileSystem {
   }
 
   @Override
-  public Path createExecDir(String operationName, Map<Digest, Directory> directoriesIndex, Action action) throws IOException, InterruptedException {
+  public Path createExecDir(String operationName, Map<Digest, Directory> directoriesIndex, Action action, Command command) throws IOException, InterruptedException {
     OutputDirectory outputDirectory = OutputDirectory.parse(
-        action.getOutputFilesList(),
-        action.getOutputDirectoriesList());
+        command.getOutputFilesList(),
+        command.getOutputDirectoriesList());
 
     Path actionRoot = root.resolve(operationName);
     if (Files.exists(actionRoot)) {

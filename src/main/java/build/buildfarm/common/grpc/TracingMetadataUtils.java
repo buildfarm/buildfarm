@@ -13,8 +13,8 @@
 // limitations under the License.
 package build.buildfarm.common.grpc;
 
+import build.bazel.remote.execution.v2.RequestMetadata;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.devtools.remoteexecution.v1test.RequestMetadata;
 import io.grpc.ClientInterceptor;
 import io.grpc.Context;
 import io.grpc.Contexts;

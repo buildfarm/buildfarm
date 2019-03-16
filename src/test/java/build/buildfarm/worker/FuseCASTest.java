@@ -16,10 +16,10 @@ package build.buildfarm.worker;
 
 import static com.google.common.truth.Truth.assertThat;
 
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.FileNode;
 import build.buildfarm.common.InputStreamFactory;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.Directory;
-import com.google.devtools.remoteexecution.v1test.FileNode;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.io.InputStream;

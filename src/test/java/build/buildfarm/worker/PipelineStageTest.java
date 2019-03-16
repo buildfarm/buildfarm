@@ -18,12 +18,15 @@ import static com.google.common.truth.Truth.assertThat;
 
 import com.google.longrunning.Operation;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Logger;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class PipelineStageTest {
+  private static final Logger logger = Logger.getLogger(PipelineStageTest.class.getName());
+
   abstract static class AbstractPipelineStage extends PipelineStage {
     public AbstractPipelineStage(String name) {
       this(name, null, null, null);
@@ -31,6 +34,11 @@ public class PipelineStageTest {
 
     public AbstractPipelineStage(String name, WorkerContext workerContext, PipelineStage output, PipelineStage error) {
       super(name, workerContext, output, error);
+    }
+
+    @Override
+    public Logger getLogger() {
+      return logger;
     }
 
     @Override

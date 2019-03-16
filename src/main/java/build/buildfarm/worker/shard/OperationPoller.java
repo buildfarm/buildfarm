@@ -14,7 +14,7 @@
 
 package build.buildfarm.worker.shard;
 
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import java.io.IOException;
 
 @FunctionalInterface

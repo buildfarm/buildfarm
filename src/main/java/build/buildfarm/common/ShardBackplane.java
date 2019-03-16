@@ -14,15 +14,15 @@
 
 package build.buildfarm.common;
 
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.ThreadSafety.ThreadSafe;
 import build.buildfarm.common.function.InterruptingRunnable;
 import build.buildfarm.v1test.ShardDispatchedOperation;
 import com.google.common.collect.ImmutableList;
-import com.google.devtools.remoteexecution.v1test.ActionResult;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.Directory;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
 import com.google.longrunning.Operation;
 import java.io.IOException;
 import java.util.Map;

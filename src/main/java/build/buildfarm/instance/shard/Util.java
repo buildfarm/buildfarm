@@ -19,7 +19,9 @@ import static com.google.common.util.concurrent.Futures.allAsList;
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.base.Predicates.notNull;
+import static java.util.logging.Level.SEVERE;
 
+import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.Retrier;
@@ -31,7 +33,6 @@ import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.FluentFuture;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ListenableFuture;
-import com.google.devtools.remoteexecution.v1test.Digest;
 import io.grpc.Context;
 import io.grpc.Status;
 import io.grpc.Status.Code;
@@ -39,8 +40,10 @@ import java.io.IOException;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.concurrent.ExecutorService;
+import java.util.logging.Logger;
 
 public class Util {
+  private static final Logger logger = Logger.getLogger(Util.class.getName());
   public static final Predicate<Status> SHARD_IS_RETRIABLE =
       st -> st.getCode() != Code.CANCELLED && Retrier.DEFAULT_IS_RETRIABLE.test(st);
 
@@ -77,7 +80,7 @@ public class Util {
                   found,
                   Sets.difference(Sets.intersection(originalLocationSet, workerSet), found));
             } catch (IOException e) {
-              e.printStackTrace();
+              logger.log(SEVERE, "error adjusting blob locations", e);
             }
           }
 

@@ -14,11 +14,12 @@
 
 package build.buildfarm.worker.shard;
 
-import build.buildfarm.common.ContentAddressableStorage;
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.worker.FuseCAS;
-import com.google.devtools.remoteexecution.v1test.Action;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.Directory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -64,7 +65,7 @@ class FuseExecFileSystem implements ExecFileSystem {
   }
 
   @Override
-  public Path createExecDir(String operationName, Map<Digest, Directory> directoriesIndex, Action action) throws IOException, InterruptedException {
+  public Path createExecDir(String operationName, Map<Digest, Directory> directoriesIndex, Action action, Command command) throws IOException, InterruptedException {
     fuseCAS.createInputRoot(operationName, action.getInputRootDigest());
     return root.resolve(operationName);
   }

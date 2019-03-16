@@ -14,12 +14,14 @@
 
 package build.buildfarm.worker;
 
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.Directory;
-import com.google.devtools.remoteexecution.v1test.Action;
-import com.google.devtools.remoteexecution.v1test.Command;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
-import com.google.devtools.remoteexecution.v1test.RequestMetadata;
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecutionPolicy;
+import build.bazel.remote.execution.v2.RequestMetadata;
+import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Duration;
 import java.nio.file.Path;
@@ -37,6 +39,8 @@ final class OperationContext {
   final Duration matchedIn;
   final Duration fetchedIn;
   final Duration executedIn;
+  final ExecutionPolicy executionPolicy;
+  final ResultsCachePolicy resultsCachePolicy;
   final RequestMetadata requestMetadata;
 
   private OperationContext(
@@ -49,6 +53,8 @@ final class OperationContext {
       Duration matchedIn,
       Duration fetchedIn,
       Duration executedIn,
+      ExecutionPolicy executionPolicy,
+      ResultsCachePolicy resultsCachePolicy,
       RequestMetadata requestMetadata) {
     this.operation = operation;
     this.execDir = execDir;
@@ -59,6 +65,8 @@ final class OperationContext {
     this.matchedIn = matchedIn;
     this.fetchedIn = fetchedIn;
     this.executedIn = executedIn;
+    this.executionPolicy = executionPolicy;
+    this.resultsCachePolicy = resultsCachePolicy;
     this.requestMetadata = requestMetadata;
   }
 
@@ -72,6 +80,8 @@ final class OperationContext {
     private Duration matchedIn;
     private Duration fetchedIn;
     private Duration executedIn;
+    private ExecutionPolicy executionPolicy;
+    private ResultsCachePolicy resultsCachePolicy;
     private RequestMetadata requestMetadata;
 
     private Builder(
@@ -84,6 +94,8 @@ final class OperationContext {
         Duration matchedIn,
         Duration fetchedIn,
         Duration executedIn,
+        ExecutionPolicy executionPolicy,
+        ResultsCachePolicy resultsCachePolicy,
         RequestMetadata requestMetadata) {
       this.operation = operation;
       this.execDir = execDir;
@@ -94,6 +106,8 @@ final class OperationContext {
       this.matchedIn = matchedIn;
       this.fetchedIn = fetchedIn;
       this.executedIn = executedIn;
+      this.executionPolicy = executionPolicy;
+      this.resultsCachePolicy = resultsCachePolicy;
       this.requestMetadata = requestMetadata;
     }
 
@@ -142,6 +156,16 @@ final class OperationContext {
       return this;
     }
 
+    public Builder setExecutionPolicy(ExecutionPolicy executionPolicy) {
+      this.executionPolicy = executionPolicy;
+      return this;
+    }
+
+    public Builder setResultsCachePolicy(ResultsCachePolicy resultsCachePolicy) {
+      this.resultsCachePolicy = resultsCachePolicy;
+      return this;
+    }
+
     public Builder setRequestMetadata(RequestMetadata requestMetadata) {
       this.requestMetadata = requestMetadata;
       return this;
@@ -158,6 +182,8 @@ final class OperationContext {
         matchedIn,
         fetchedIn,
         executedIn,
+        executionPolicy,
+        resultsCachePolicy,
         requestMetadata);
     }
   }
@@ -173,6 +199,8 @@ final class OperationContext {
         /* matchedIn=*/ null,
         /* fetchedIn=*/ null,
         /* executedIn=*/ null,
+        /* executionPolicy=*/ null,
+        /* resultsCachePolicy=*/ null,
         /* requestMetadata=*/ null);
   }
 
@@ -187,6 +215,8 @@ final class OperationContext {
         matchedIn,
         fetchedIn,
         executedIn,
+        executionPolicy,
+        resultsCachePolicy,
         requestMetadata);
   }
 }

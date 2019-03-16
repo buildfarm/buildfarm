@@ -20,7 +20,7 @@ import static com.google.common.base.Preconditions.checkState;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.io.ByteStreams;
-import com.google.devtools.remoteexecution.v1test.Digest;
+import build.bazel.remote.execution.v2.Digest;
 import com.google.protobuf.ByteString;
 import java.io.EOFException;
 import java.io.IOException;

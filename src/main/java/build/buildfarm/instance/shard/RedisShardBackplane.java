@@ -15,7 +15,14 @@
 package build.buildfarm.instance.shard;
 
 import static redis.clients.jedis.ScanParams.SCAN_POINTER_START;
+import static java.util.logging.Level.SEVERE;
 
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
+import build.bazel.remote.execution.v2.GetTreeResponse;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.ShardBackplane;
@@ -32,12 +39,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
-import com.google.devtools.remoteexecution.v1test.ActionResult;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.Directory;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
-import com.google.devtools.remoteexecution.v1test.GetTreeResponse;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -61,6 +62,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.logging.Logger;
 import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
 import redis.clients.jedis.Jedis;
@@ -78,6 +80,7 @@ import redis.clients.jedis.exceptions.JedisException;
 import redis.clients.util.Pool;
 
 public class RedisShardBackplane implements ShardBackplane {
+  private static final Logger logger = Logger.getLogger(RedisShardBackplane.class.getName());
   private final RedisShardBackplaneConfig config;
   private final Function<Operation, Operation> onPublish;
   private final Function<Operation, Operation> onComplete;
@@ -178,7 +181,7 @@ public class RedisShardBackplane implements ShardBackplane {
       return;
     }
 
-    System.out.println("RedisShardBackplane::updateWatchedIfDone: Checking on open watches");
+    logger.info("RedisShardBackplane::updateWatchedIfDone: Checking on open watches");
 
     List<Map.Entry<String, Response<String>>> operations = new ArrayList(operationChannels.size());
     Pipeline p = jedis.pipelined();
@@ -206,23 +209,23 @@ public class RedisShardBackplane implements ShardBackplane {
       String operationName = entry.getKey();
       if (operation == null || operation.getDone()) {
         operationSubscriber.onOperation(operationChannel(operationName), operation);
-        System.out.println("RedisShardBackplane::updateWatchedIfDone: Operation " + operationName + " done due to " + (operation == null ? "null" : "completed"));
+        logger.info("RedisShardBackplane::updateWatchedIfDone: Operation " + operationName + " done due to " + (operation == null ? "null" : "completed"));
       } else if (!prequeued.contains(operationName) && isPrequeued.test(operation)) {
         if (previousPrequeued.contains(operationName)) {
           prequeueOperation(jedis, operationName);
-          System.out.println("RedisShardBackplane::updateWatchedIfDone: Operation " + operationName + " reprequeued...");
+          logger.info("RedisShardBackplane::updateWatchedIfDone: Operation " + operationName + " reprequeued...");
         } else {
           previousPrequeuedBuilder.add(operationName);
         }
       } else if (!dispatched.contains(operationName) && !queued.contains(operationName) && isDispatched.test(operation)) {
         if (previousDispatched.contains(operationName)) {
           dispatchOperation(jedis, operationName, /* requeueAt=*/ 0);
-          System.out.println("RedisShardBackplane::updateWatchedIfDone: Operation " + operationName + " redispatched...");
+          logger.info("RedisShardBackplane::updateWatchedIfDone: Operation " + operationName + " redispatched...");
         } else {
           previousDispatchedBuilder.add(operationName);
         }
       } else if (iRemainingIncomplete > 0) {
-        System.out.println("RedisShardBackplane::updateWatchedIfDone: Operation " + operationName);
+        logger.info("RedisShardBackplane::updateWatchedIfDone: Operation " + operationName);
         iRemainingIncomplete--;
       }
     }
@@ -261,7 +264,7 @@ public class RedisShardBackplane implements ShardBackplane {
           Thread.currentThread().interrupt();
           break;
         } catch (Exception e) {
-          e.printStackTrace();
+          logger.log(SEVERE, "error updating watched if done", e);
         }
       }
     });
@@ -585,7 +588,7 @@ public class RedisShardBackplane implements ShardBackplane {
       getOperationParser().merge(operationJson, operationBuilder);
       return operationBuilder.build();
     } catch (InvalidProtocolBufferException e) {
-      e.printStackTrace();
+      logger.log(SEVERE, "error parsing operation from " + operationJson, e);
       return null;
     }
   }
@@ -632,7 +635,7 @@ public class RedisShardBackplane implements ShardBackplane {
     try {
       json = operationPrinter.print(operation);
     } catch (InvalidProtocolBufferException e) {
-      e.printStackTrace();
+      logger.log(SEVERE, "error printing operation " + operation.getName(), e);
       return false;
     }
 
@@ -668,7 +671,7 @@ public class RedisShardBackplane implements ShardBackplane {
 
   private void queueOperation(Jedis jedis, String operationName) {
     if (jedis.hdel(config.getDispatchedOperationsHashName(), operationName) == 1) {
-      System.err.println("RedisShardBackplane::queueOperation: WARNING Removed dispatched operation");
+      logger.severe("RedisShardBackplane::queueOperation: WARNING Removed dispatched operation");
     }
     jedis.lpush(config.getQueuedOperationsListName(), operationName);
   }
@@ -708,8 +711,7 @@ public class RedisShardBackplane implements ShardBackplane {
         JsonFormat.parser().merge(entry.getValue(), dispatchedOperationBuilder);
         builder.add(dispatchedOperationBuilder.build());
       } catch (InvalidProtocolBufferException e) {
-        System.err.println("RedisShardBackplane::getDispatchedOperations: removing invalid operation " + entry.getKey());
-        e.printStackTrace();
+        logger.log(SEVERE, "RedisShardBackplane::getDispatchedOperations: removing invalid operation " + entry.getKey(), e);
         /* guess we don't want to spin on this */
         invalidOperationNames.add(entry.getKey());
         hasInvalid = true;
@@ -794,7 +796,7 @@ public class RedisShardBackplane implements ShardBackplane {
     try {
       json = JsonFormat.printer().print(o);
     } catch (InvalidProtocolBufferException e) {
-      e.printStackTrace();
+      logger.log(SEVERE, "error printing operation " + operationName, e);
       return false;
     }
     /* if the operation is already in the dispatch list, fail the dispatch */
@@ -811,7 +813,7 @@ public class RedisShardBackplane implements ShardBackplane {
     try {
       json = JsonFormat.printer().print(o);
     } catch (InvalidProtocolBufferException e) {
-      e.printStackTrace();
+      logger.log(SEVERE, "error printing operation " + operationName, e);
       return false;
     }
     return withBackplaneException((jedis) -> {
@@ -838,7 +840,7 @@ public class RedisShardBackplane implements ShardBackplane {
 
   private void completeOperation(Jedis jedis, String operationName) {
     if (jedis.hdel(config.getDispatchedOperationsHashName(), operationName) != 1) {
-      System.err.println("RedisShardBackplane::completeOperation: WARNING " + operationName + " was not in dispatched list");
+      logger.severe("RedisShardBackplane::completeOperation: WARNING " + operationName + " was not in dispatched list");
     }
   }
 
@@ -861,7 +863,7 @@ public class RedisShardBackplane implements ShardBackplane {
       json = JsonFormat.printer().print(o);
     } catch (InvalidProtocolBufferException e) {
       json = null;
-      e.printStackTrace();
+      logger.log(SEVERE, "error printing operation " + operationName, e);
     }
 
     final String publishOperation = json;
@@ -927,7 +929,7 @@ public class RedisShardBackplane implements ShardBackplane {
       JsonFormat.parser().merge(json, builder);
       return builder.build().getDirectoriesList();
     } catch (InvalidProtocolBufferException e) {
-      e.printStackTrace();
+      logger.log(SEVERE, "error parsing tree " + json, e);
       return null;
     }
   }

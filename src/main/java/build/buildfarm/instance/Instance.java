@@ -18,16 +18,17 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
-import com.google.devtools.remoteexecution.v1test.Action;
-import com.google.devtools.remoteexecution.v1test.ActionResult;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.Directory;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
-import com.google.devtools.remoteexecution.v1test.Platform;
-import com.google.devtools.remoteexecution.v1test.RequestMetadata;
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.ExecutionPolicy;
+import build.bazel.remote.execution.v2.ResultsCachePolicy;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
+import build.bazel.remote.execution.v2.Platform;
+import build.bazel.remote.execution.v2.RequestMetadata;
+import build.bazel.remote.execution.v2.ServerCapabilities;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
-import io.grpc.StatusException;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
@@ -44,7 +45,7 @@ public interface Instance {
   void stop() throws InterruptedException;
 
   ActionResult getActionResult(ActionKey actionKey);
-  void putActionResult(ActionKey actionKey, ActionResult actionResult);
+  void putActionResult(ActionKey actionKey, ActionResult actionResult) throws InterruptedException;
 
   ListenableFuture<Iterable<Digest>> findMissingBlobs(Iterable<Digest> digests, ExecutorService service);
 
@@ -61,7 +62,13 @@ public interface Instance {
   CommittingOutputStream getStreamOutput(String name, long expectedSize);
   InputStream newStreamInput(String name, long offset) throws IOException, InterruptedException;
 
-  ListenableFuture<Operation> execute(Action action, boolean skipCacheLookup, RequestMetadata requestMetadata);
+  void execute(
+      Digest actionDigest,
+      boolean skipCacheLookup,
+      ExecutionPolicy executionPolicy,
+      ResultsCachePolicy resultsCachePolicy,
+      RequestMetadata requestMetadata,
+      Predicate<Operation> watcher) throws InterruptedException;
   void match(Platform platform, MatchListener listener) throws InterruptedException;
   boolean putOperation(Operation operation) throws InterruptedException;
   boolean pollOperation(String operationName, Stage stage);
@@ -82,8 +89,9 @@ public interface Instance {
   // The watcher must not be tested again after it has returned false.
   boolean watchOperation(
       String operationName,
-      boolean watchInitialState,
       Predicate<Operation> watcher);
+
+  ServerCapabilities getCapabilities();
 
   interface MatchListener {
     // start/end pair called for each wait period

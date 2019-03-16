@@ -14,15 +14,20 @@
 
 package build.buildfarm.worker;
 
+import static java.util.concurrent.TimeUnit.MICROSECONDS;
+
+import com.google.common.base.Stopwatch;
+import java.util.logging.Logger;
+
 public abstract class PipelineStage implements Runnable {
-  private final String name;
+  protected final String name;
   protected final WorkerContext workerContext;
   protected final PipelineStage output;
   private final PipelineStage error;
 
-  private PipelineStage input;
-  protected boolean claimed;
-  private boolean closed;
+  private PipelineStage input = null;
+  protected boolean claimed = false;
+  private boolean closed = false;
   private Thread tickThread = null;
   private boolean tickCancelledFlag = false;
 
@@ -31,10 +36,6 @@ public abstract class PipelineStage implements Runnable {
     this.workerContext = workerContext;
     this.output = output;
     this.error = error;
-
-    input = null;
-    claimed = false;
-    closed = false;
   }
 
   public void setInput(PipelineStage input) {
@@ -75,18 +76,21 @@ public abstract class PipelineStage implements Runnable {
   }
 
   protected void iterate() throws InterruptedException {
-    long startTime, waitTime = 0;
-    OperationContext operationContext, nextOperationContext = null;
+    OperationContext operationContext;
+    OperationContext nextOperationContext = null;
+    long stallUSecs = 0;
+    Stopwatch stopwatch = Stopwatch.createUnstarted();
     try {
       operationContext = take();
-      startTime = System.nanoTime();
+      logStart(operationContext.operation.getName());
+      stopwatch.start();
       boolean valid = false;
+      tickThread = Thread.currentThread();
       try {
-        tickThread = Thread.currentThread();
         nextOperationContext = tick(operationContext);
-        long waitStartTime = System.nanoTime();
+        long tickUSecs = stopwatch.elapsed(MICROSECONDS);
         valid = nextOperationContext != null && output.claim();
-        waitTime = System.nanoTime() - waitStartTime;
+        stallUSecs = stopwatch.elapsed(MICROSECONDS) - tickUSecs;
         tickThread = null;
       } catch (InterruptedException e) {
         boolean isTickCancelled = tickCancelled();
@@ -107,15 +111,37 @@ public abstract class PipelineStage implements Runnable {
       release();
     }
     after(operationContext);
+    long usecs = stopwatch.elapsed(MICROSECONDS);
+    logComplete(operationContext.operation.getName(), usecs, stallUSecs, nextOperationContext != null);
+  }
 
-    long endTime = System.nanoTime();
-    workerContext.logInfo(String.format(
-        "%s::iterate(%s): %gms (%gms wait) %s",
-        name,
-        operationContext.operation.getName(),
-        (endTime - startTime) / 1000000.0f,
-        waitTime / 1000000.0f,
-        nextOperationContext == null ? "Failed" : "Success"));
+  private String logIterateId(String operationName) {
+    return String.format("%s::iterate(%s)", name, operationName);
+  }
+
+  protected void logStart() {
+    logStart("");
+  }
+
+  protected void logStart(String operationName) {
+    logStart(operationName, "Starting");
+  }
+
+  protected void logStart(String operationName, String message) {
+    getLogger().info(String.format("%s: %s", logIterateId(operationName), message));
+  }
+
+  protected void logComplete(String operationName, long usecs, long stallUSecs, boolean success) {
+    logComplete(operationName, usecs, stallUSecs, success ? "Success" : "Failed");
+  }
+
+  protected void logComplete(String operationName, long usecs, long stallUSecs, String status) {
+    getLogger().info(String.format(
+        "%s: %gms (%gms stalled) %s",
+        logIterateId(operationName),
+        usecs / 1000.0f,
+        stallUSecs / 1000.0f,
+        status));
   }
 
   protected OperationContext tick(OperationContext operationContext) throws InterruptedException {
@@ -161,6 +187,7 @@ public abstract class PipelineStage implements Runnable {
     return this.error;
   }
 
+  abstract Logger getLogger();
   abstract OperationContext take() throws InterruptedException;
   abstract void put(OperationContext operationContext) throws InterruptedException;
 
@@ -185,5 +212,7 @@ public abstract class PipelineStage implements Runnable {
     public void close() { }
     @Override
     public boolean isClosed() { return false; }
+    @Override
+    public Logger getLogger() { return null; }
   }
 }

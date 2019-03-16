@@ -16,14 +16,14 @@ package build.buildfarm.worker;
 
 import static com.google.common.truth.Truth.assertThat;
 
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.WorkerConfig;
-import com.google.devtools.remoteexecution.v1test.Action;
-import com.google.devtools.remoteexecution.v1test.Command;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import java.nio.file.FileSystems;
@@ -31,6 +31,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Predicate;
+import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
 import org.junit.Before;
 import org.junit.Test;
@@ -39,12 +40,19 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class MatchStageTest {
-  class PipelineSink extends PipelineStage {
-    Predicate<OperationContext> onPutShouldClose;
+  static class PipelineSink extends PipelineStage {
+    private static final Logger logger = Logger.getLogger(PipelineSink.class.getName());
+
+    private final Predicate<OperationContext> onPutShouldClose;
 
     PipelineSink(Predicate<OperationContext> onPutShouldClose) {
-      super("PipelineSink", null, null, null);
+      super("Sink", null, null, null);
       this.onPutShouldClose = onPutShouldClose;
+    }
+
+    @Override
+    public Logger getLogger() {
+      return logger;
     }
 
     @Override
@@ -72,13 +80,13 @@ public class MatchStageTest {
       }
 
       @Override
-      public void match(MatchListener listener) {
-        assertThat(listener.onOperation(queue.remove(0))).isEqualTo(results.remove(0));
+      public void requeue(Operation operation) {
+        assertThat(operation.getName()).isEqualTo("bad");
       }
 
       @Override
-      public void requeue(Operation operation) {
-        // ignore
+      public void match(MatchListener listener) {
+        listener.onOperation(queue.remove(0));
       }
     };
 

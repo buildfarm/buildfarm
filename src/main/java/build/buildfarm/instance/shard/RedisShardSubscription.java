@@ -84,7 +84,7 @@ class RedisShardSubscription implements Runnable {
         throw e;
       }
     }
-    System.err.println("RedisShardSubscription: Unexpected subscribe return, reconnecting...");
+    logger.warning("RedisShardSubscription: Unexpected subscribe return, reconnecting...");
   }
 
   private void mainLoop() throws IOException {

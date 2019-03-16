@@ -17,8 +17,8 @@ package build.buildfarm.common;
 import static com.google.common.truth.Truth.assertThat;
 
 import build.buildfarm.common.DigestUtil.HashFunction;
-import build.buildfarm.v1test.InstanceConfig;
-import com.google.devtools.remoteexecution.v1test.Digest;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.DigestFunction;
 import com.google.protobuf.ByteString;
 import org.junit.Rule;
 import org.junit.Test;
@@ -77,21 +77,21 @@ public class DigestUtilTest {
 
   @Test(expected = IllegalArgumentException.class)
   public void unrecognizedHashFunctionThrows() {
-    HashFunction.get(InstanceConfig.HashFunction.UNRECOGNIZED);
+    HashFunction.get(DigestFunction.UNRECOGNIZED);
   }
 
   @Test
   public void hashFunctionsMatchHashFunctions() {
-    assertThat(HashFunction.get(InstanceConfig.HashFunction.MD5)).isEqualTo(HashFunction.MD5);
-    assertThat(HashFunction.get(InstanceConfig.HashFunction.SHA1)).isEqualTo(HashFunction.SHA1);
-    assertThat(HashFunction.get(InstanceConfig.HashFunction.SHA256)).isEqualTo(HashFunction.SHA256);
+    assertThat(HashFunction.get(DigestFunction.MD5)).isEqualTo(HashFunction.MD5);
+    assertThat(HashFunction.get(DigestFunction.SHA1)).isEqualTo(HashFunction.SHA1);
+    assertThat(HashFunction.get(DigestFunction.SHA256)).isEqualTo(HashFunction.SHA256);
   }
 
   @Test
   public void forHashMatchesName() {
-    assertThat(DigestUtil.forHash("MD5").empty()).isEqualTo(new DigestUtil(HashFunction.get(InstanceConfig.HashFunction.MD5)).empty());
-    assertThat(DigestUtil.forHash("SHA1").empty()).isEqualTo(new DigestUtil(HashFunction.get(InstanceConfig.HashFunction.SHA1)).empty());
-    assertThat(DigestUtil.forHash("SHA256").empty()).isEqualTo(new DigestUtil(HashFunction.get(InstanceConfig.HashFunction.SHA256)).empty());
+    assertThat(DigestUtil.forHash("MD5").empty()).isEqualTo(new DigestUtil(HashFunction.get(DigestFunction.MD5)).empty());
+    assertThat(DigestUtil.forHash("SHA1").empty()).isEqualTo(new DigestUtil(HashFunction.get(DigestFunction.SHA1)).empty());
+    assertThat(DigestUtil.forHash("SHA256").empty()).isEqualTo(new DigestUtil(HashFunction.get(DigestFunction.SHA256)).empty());
   }
 
   @Test

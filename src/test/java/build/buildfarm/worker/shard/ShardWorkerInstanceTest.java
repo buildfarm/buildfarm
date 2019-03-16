@@ -22,7 +22,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import build.buildfarm.common.ContentAddressableStorage;
+import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;

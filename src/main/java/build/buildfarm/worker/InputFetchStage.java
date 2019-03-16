@@ -15,8 +15,9 @@
 package build.buildfarm.worker;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static java.util.logging.Level.SEVERE;
 
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import com.google.protobuf.Duration;
 import com.google.protobuf.util.Durations;
 import io.grpc.Deadline;
@@ -24,13 +25,20 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.logging.Logger;
 
 public class InputFetchStage extends PipelineStage {
-  private final BlockingQueue<OperationContext> queue;
+  private static final Logger logger = Logger.getLogger(InputFetchStage.class.getName());
+
+  private final BlockingQueue<OperationContext> queue = new ArrayBlockingQueue<>(1);
 
   public InputFetchStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
     super("InputFetchStage", workerContext, output, error);
-    queue = new ArrayBlockingQueue<>(1);
+  }
+
+  @Override
+  protected Logger getLogger() {
+    return logger;
   }
 
   @Override
@@ -45,9 +53,10 @@ public class InputFetchStage extends PipelineStage {
 
   @Override
   protected OperationContext tick(OperationContext operationContext) throws InterruptedException {
+    String operationName = operationContext.operation.getName();
     Poller poller = workerContext.createPoller(
         "InputFetchStage",
-        operationContext.operation.getName(),
+        operationName,
         ExecuteOperationMetadata.Stage.QUEUED,
         this::cancelTick,
         Deadline.after(60, SECONDS));
@@ -60,11 +69,12 @@ public class InputFetchStage extends PipelineStage {
     Path execDir;
     try {
       execDir = workerContext.createExecDir(
-          operationContext.operation.getName(),
+          operationName,
           operationContext.directoriesIndex,
-          operationContext.action);
+          operationContext.action,
+          operationContext.command);
     } catch (IOException e) {
-      e.printStackTrace();
+      logger.log(SEVERE, "error creating exec dir for " + operationName, e);
       return null;
     } finally {
       poller.stop();

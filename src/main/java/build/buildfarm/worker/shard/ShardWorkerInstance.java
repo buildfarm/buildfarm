@@ -16,9 +16,20 @@ package build.buildfarm.worker.shard;
 
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.Futures.allAsList;
+import static java.util.logging.Level.SEVERE;
 
-import build.buildfarm.common.ContentAddressableStorage;
-import build.buildfarm.common.ContentAddressableStorage.Blob;
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.Platform;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
+import build.bazel.remote.execution.v2.ExecutionPolicy;
+import build.bazel.remote.execution.v2.ResultsCachePolicy;
+import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.cas.ContentAddressableStorage;
+import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.InputStreamFactory;
@@ -35,14 +46,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.ListenableFuture;
-import com.google.devtools.remoteexecution.v1test.Action;
-import com.google.devtools.remoteexecution.v1test.ActionResult;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.Directory;
-import com.google.devtools.remoteexecution.v1test.Platform;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
-import com.google.devtools.remoteexecution.v1test.RequestMetadata;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -61,8 +64,11 @@ import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import javax.naming.ConfigurationException;
+import java.util.logging.Logger;
 
 public class ShardWorkerInstance extends AbstractServerInstance {
+  private static final Logger logger = Logger.getLogger(ShardWorkerInstance.class.getName());
+
   private final ShardWorkerInstanceConfig config;
   private final ShardBackplane backplane;
   private final InputStreamFactory inputStreamFactory;
@@ -139,7 +145,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
       try {
         backplane.removeBlobLocation(blobDigest, getName());
       } catch (IOException backplaneException) {
-        backplaneException.printStackTrace();
+        logger.log(SEVERE, "error removing blob location for " + DigestUtil.toString(blobDigest), backplaneException);
       }
     } catch (InterruptedException e) {
       blobObserver.onError(Status.CANCELLED.withCause(e).asException());
@@ -195,7 +201,13 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  public ListenableFuture<Operation> execute(Action action, boolean skipCacheLookup, RequestMetadata requestMetadata) {
+  public void execute(
+      Digest actionDigest, 
+      boolean skipCacheLookup, 
+      ExecutionPolicy executionPolicy, 
+      ResultsCachePolicy resultsCachePolicy, 
+      RequestMetadata requestMetadata,
+      Predicate<Operation> watcher) {
     throw new UnsupportedOperationException();
   }
 
@@ -320,7 +332,6 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   @Override
   public boolean watchOperation(
       String operationName,
-      boolean watchInitialState,
       Predicate<Operation> watcher) {
     throw new UnsupportedOperationException();
   }
@@ -331,21 +342,21 @@ public class ShardWorkerInstance extends AbstractServerInstance {
       try {
         return operation.getMetadata().unpack(QueuedOperationMetadata.class).getExecuteOperationMetadata();
       } catch(InvalidProtocolBufferException e) {
-        e.printStackTrace();
+        logger.log(SEVERE, "error unpacking queued operation metadata from " + operation.getName(), e);
         return null;
       }
     } else if (operation.getMetadata().is(ExecutingOperationMetadata.class)) {
       try {
         return operation.getMetadata().unpack(ExecutingOperationMetadata.class).getExecuteOperationMetadata();
       } catch(InvalidProtocolBufferException e) {
-        e.printStackTrace();
+        logger.log(SEVERE, "error unpacking executing operation metadata from " + operation.getName(), e);
         return null;
       }
     } else if (operation.getMetadata().is(CompletedOperationMetadata.class)) {
       try {
         return operation.getMetadata().unpack(CompletedOperationMetadata.class).getExecuteOperationMetadata();
       } catch(InvalidProtocolBufferException e) {
-        e.printStackTrace();
+        logger.log(SEVERE, "error unpacking completed operation metadata from " + operation.getName(), e);
         return null;
       }
     } else {
@@ -366,5 +377,10 @@ public class ShardWorkerInstance extends AbstractServerInstance {
         .build();
     }
     return operation;
+  }
+
+  @Override
+  protected Logger getLogger() {
+    return logger;
   }
 }

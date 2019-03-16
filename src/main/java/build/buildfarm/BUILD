@@ -11,7 +11,7 @@ java_library(
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
-        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
         "@googleapis//:google_longrunning_operations_java_proto",
     ],
 )
@@ -38,7 +38,7 @@ java_library(
         "//3rdparty/jvm/io/grpc:grpc_core",
         "//3rdparty/jvm/io/grpc:grpc_protobuf",
         "//3rdparty/jvm/io/grpc:grpc_stub",
-        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )
 
@@ -54,8 +54,8 @@ java_library(
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "//3rdparty/jvm/io/grpc:grpc_core",
         "//3rdparty/jvm/io/grpc:grpc_stub",
-        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
         "@googleapis//:google_longrunning_operations_java_proto",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )
 
@@ -64,11 +64,14 @@ java_library(
     srcs = [
         "instance/AbstractServerInstance.java",
         "instance/GetDirectoryFunction.java",
+        "instance/OperationsMap.java",
         "instance/TokenizableIterator.java",
         "instance/TreeIterator.java",
     ],
     deps = [
         "@googleapis//:google_rpc_error_details_java_proto",
+        ":ac",
+        ":cas",
         ":common",
         ":instance",
         "//3rdparty/jvm/com/google/code/findbugs:jsr305",
@@ -80,10 +83,10 @@ java_library(
         "//3rdparty/jvm/io/grpc:grpc_protobuf",
         "//3rdparty/jvm/io/grpc:grpc_stub",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
-        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
         "@googleapis//:google_longrunning_operations_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
         "@googleapis//:google_rpc_status_java_proto",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )
 
@@ -92,6 +95,8 @@ java_library(
     srcs = glob(["instance/memory/*.java"]),
     deps = [
         "@googleapis//:google_rpc_error_details_java_proto",
+        ":ac",
+        ":cas",
         ":common",
         ":instance",
         ":server-instance",
@@ -104,9 +109,10 @@ java_library(
         "//3rdparty/jvm/io/grpc:grpc_protobuf",
         "//3rdparty/jvm/io/grpc:grpc_stub",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
-        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
         "@googleapis//:google_longrunning_operations_java_proto",
+        "@googleapis//:google_rpc_code_java_proto",
         "@googleapis//:google_rpc_status_java_proto",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )
 
@@ -157,40 +163,42 @@ java_library(
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_bytestream_bytestream_java_grpc",
         "@googleapis//:google_bytestream_bytestream_java_proto",
-        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_grpc",
-        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
         "@googleapis//:google_longrunning_operations_java_grpc",
         "@googleapis//:google_rpc_code_java_proto",
         "@googleapis//:google_watch_v1_java_grpc",
         "@googleapis//:google_watch_v1_java_proto",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+        "@remote_apis//:build_bazel_semver_java_proto",
     ],
 )
 
 java_binary(
     name = "buildfarm-server",
     main_class = "build.buildfarm.server.BuildFarmServer",
+    visibility = ["//visibility:public"],
     runtime_deps = [
         ":buildfarm",
     ],
-    visibility = ["//visibility:public"],
 )
 
 container_image(
     name = "server.container",
     base = "@java_base//image",
+    cmd = [
+        "buildfarm-server_deploy.jar",
+        "/config/server.config",
+        "--port",
+        "8980",
+    ],
     # leverage the implicit target of the buildfarm-server to get a fat jar.
     # this is simply a workaround for the fact that we have so many dependencies,
     # so we'd want some wrappy script. This seemed more straightforward.
     # https://docs.bazel.build/versions/master/be/java.html#java_binary_implicit_outputs
     files = [
-        ":buildfarm-server_deploy.jar"
+        ":buildfarm-server_deploy.jar",
     ],
-    cmd = [
-        "buildfarm-server_deploy.jar",
-        "/config/server.config",
-        "--port",
-        "8098"
-    ],
+    visibility = ["//visibility:public"],
 )
 
 java_library(
@@ -212,11 +220,11 @@ java_library(
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_bytestream_bytestream_java_grpc",
         "@googleapis//:google_bytestream_bytestream_java_proto",
-        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_grpc",
-        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
         "@googleapis//:google_longrunning_operations_java_grpc",
         "@googleapis//:google_longrunning_operations_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )
 
@@ -225,6 +233,7 @@ java_library(
     srcs = glob(["worker/shard/*.java"]),
     deps = [
         ":buildfarm",
+        ":cas",
         ":common",
         ":instance",
         ":memory-instance",
@@ -269,6 +278,7 @@ java_library(
     name = "worker",
     srcs = glob(["worker/*.java"]),
     deps = [
+        ":cas",
         ":common",
         ":instance",
         ":stub-instance",
@@ -311,13 +321,43 @@ java_library(
     ],
 )
 
+java_library(
+    name = "cas",
+    srcs = glob(["cas/*.java"]),
+    deps = [
+        ":common",
+        ":stub-instance",
+        "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java",
+        "//3rdparty/jvm/io/grpc:grpc_core",
+        "//3rdparty/jvm/io/grpc:grpc_netty",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "@googleapis//:google_bytestream_bytestream_java_grpc",
+        "@googleapis//:google_bytestream_bytestream_java_proto",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+    ],
+)
+
+java_library(
+    name = "ac",
+    srcs = glob(["ac/*.java"]),
+    deps = [
+        ":common",
+        "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/io/grpc:grpc_core",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+    ],
+)
+
 java_binary(
     name = "buildfarm-operationqueue-worker",
     main_class = "build.buildfarm.worker.operationqueue.Worker",
+    visibility = ["//visibility:public"],
     runtime_deps = [
         ":operationqueue-worker",
     ],
-    visibility = ["//visibility:public"],
 )
 
 container_image(
@@ -364,7 +404,7 @@ java_binary(
     deps = [
         ":common",
         ":worker",
-        "@googleapis//:google_devtools_remoteexecution_v1test_remote_execution_java_proto",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )
 
@@ -423,4 +463,5 @@ java_binary(
         "//3rdparty/jvm/io/grpc:grpc_protobuf",
         "//3rdparty/jvm/io/grpc:grpc_stub",
     ],
+    visibility = ["//visibility:public"],
 )

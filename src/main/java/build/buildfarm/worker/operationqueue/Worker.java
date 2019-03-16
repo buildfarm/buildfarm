@@ -14,7 +14,9 @@
 
 package build.buildfarm.worker.operationqueue;
 
+import static com.google.common.collect.Maps.uniqueIndex;
 import static java.util.concurrent.TimeUnit.DAYS;
+import static java.util.logging.Level.SEVERE;
 
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
@@ -28,6 +30,7 @@ import build.buildfarm.instance.stub.Retrier;
 import build.buildfarm.instance.stub.Retrier.Backoff;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.CASInsertionPolicy;
+import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.InstanceEndpoint;
 import build.buildfarm.v1test.WorkerConfig;
 import build.buildfarm.worker.CASFileCache;
@@ -50,14 +53,16 @@ import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.devtools.common.options.OptionsParser;
-import com.google.devtools.remoteexecution.v1test.Action;
-import com.google.devtools.remoteexecution.v1test.ActionResult;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.Directory;
-import com.google.devtools.remoteexecution.v1test.DirectoryNode;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
-import com.google.devtools.remoteexecution.v1test.FileNode;
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.DirectoryNode;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
+import build.bazel.remote.execution.v2.FileNode;
+import build.bazel.remote.execution.v2.Platform;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.Duration;
@@ -94,7 +99,8 @@ import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
 
 public class Worker {
-  public static final Logger logger = Logger.getLogger(Worker.class.getName());
+  private static final Logger logger = Logger.getLogger(Worker.class.getName());
+
   private final Instance casInstance;
   private final Instance acInstance;
   private final Instance operationQueueInstance;
@@ -134,7 +140,7 @@ public class Worker {
 
   private static HashFunction getValidHashFunction(WorkerConfig config) throws ConfigurationException {
     try {
-      return HashFunction.get(config.getHashFunction());
+      return HashFunction.get(config.getDigestFunction());
     } catch (IllegalArgumentException e) {
       throw new ConfigurationException("hash_function value unrecognized");
     }
@@ -160,16 +166,16 @@ public class Worker {
       DigestUtil digestUtil) {
     return createInstance(
         instanceEndpoint.getInstanceName(),
-        digestUtil,
         createChannel(instanceEndpoint.getTarget()),
-        null);
+        null,
+        digestUtil);
   }
 
   private static Instance createInstance(
       String name,
-      DigestUtil digestUtil,
       ManagedChannel channel,
-      ByteStreamUploader uploader) {
+      ByteStreamUploader uploader,
+      DigestUtil digestUtil) {
     return new StubInstance(
         name,
         digestUtil,
@@ -196,7 +202,7 @@ public class Worker {
     InstanceEndpoint casEndpoint = config.getContentAddressableStorage();
     ManagedChannel casChannel = createChannel(casEndpoint.getTarget());
     uploader = createStubUploader(casChannel);
-    casInstance = createInstance(casEndpoint.getInstanceName(), digestUtil, casChannel, uploader);
+    casInstance = createInstance(casEndpoint.getInstanceName(), casChannel, uploader, digestUtil);
     acInstance = createInstance(config.getActionCache(), digestUtil);
     operationQueueInstance = createInstance(config.getOperationQueue(), digestUtil);
     InputStreamFactory inputStreamFactory = new InputStreamFactory() {
@@ -251,16 +257,7 @@ public class Worker {
       throw new IOException("Directory " + DigestUtil.toString(inputRoot) + " is not in input index");
     }
 
-    for (FileNode fileNode : directory.getFilesList()) {
-      Path execPath = execDir.resolve(fileNode.getName());
-      Path fileCacheKey = fileCache.put(fileNode.getDigest(), fileNode.getIsExecutable(), /* containingDirectory=*/ null);
-      if (fileCacheKey == null) {
-        throw new IOException("InputFetchStage: Failed to create cache entry for " + execPath);
-      }
-      inputFiles.add(fileCacheKey);
-      Files.createLink(execPath, fileCacheKey);
-    }
-
+    fileCache.putFiles(directory.getFilesList(), execDir, inputFiles);
     for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
       Digest digest = directoryNode.getDigest();
       String name = directoryNode.getName();
@@ -306,9 +303,8 @@ public class Worker {
     manifest.addFiles(
         Iterables.transform(outputFiles, (file) -> execRoot.resolve(file)),
         fileCasPolicy);
-    manifest.addFiles(
-        Iterables.transform(outputDirs, (dir) -> execRoot.resolve(dir)),
-        fileCasPolicy);
+    manifest.addDirectories(
+        Iterables.transform(outputDirs, (dir) -> execRoot.resolve(dir)));
 
     /* put together our outputs and update the result */
     if (result.getStdoutRaw().size() > 0) {
@@ -386,16 +382,30 @@ public class Worker {
         uploader);
   }
 
+  public Platform getPlatform() {
+    Platform.Builder platform = config.getPlatform().toBuilder();
+    for (ExecutionPolicy policy : config.getExecutionPoliciesList()) {
+      platform.addPropertiesBuilder()
+        .setName("execution-policy")
+        .setValue(policy.getName());
+    }
+    return platform.build();
+  }
+
   public void start() throws InterruptedException {
     try {
       Files.createDirectories(root);
       fileCache.start();
     } catch(IOException e) {
-      e.printStackTrace();
+      logger.log(SEVERE, "error starting file cache", e);
       return;
     }
 
     WorkerContext context = new WorkerContext() {
+      Map<String, ExecutionPolicy> policies = uniqueIndex(
+          config.getExecutionPoliciesList(),
+          (policy) -> policy.getName());
+
       @Override
       public String getName() {
         try {
@@ -452,7 +462,7 @@ public class Worker {
           @Override
           public boolean onOperation(Operation operation) {
             if (activeOperations.contains(operation.getName())) {
-              System.err.println("WorkerContext::match: WARNING matched duplicate operation " + operation.getName());
+              logger.severe("WorkerContext::match: WARNING matched duplicate operation " + operation.getName());
               return listener.onOperation(null);
             }
             activeOperations.add(operation.getName());
@@ -462,7 +472,6 @@ public class Worker {
                 requeue(operation);
               } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                return false;
               }
             }
             return success;
@@ -489,18 +498,13 @@ public class Worker {
               .build();
           operationQueueInstance.putOperation(operation);
         } catch (InvalidProtocolBufferException e) {
-          e.printStackTrace();
+          logger.log(SEVERE, "error unpacking execute operation metadata for " + operation.getName(), e);
         }
       }
 
       @Override
       public void deactivate(Operation operation) {
         activeOperations.remove(operation.getName());
-      }
-
-      @Override
-      public boolean putOperation(Operation operation, Action action) throws InterruptedException {
-        return operationQueueInstance.putOperation(operation);
       }
 
       @Override
@@ -584,10 +588,10 @@ public class Worker {
       }
 
       @Override
-      public Path createExecDir(String operationName, Map<Digest, Directory> directoriesIndex, Action action) throws IOException, InterruptedException {
+      public Path createExecDir(String operationName, Map<Digest, Directory> directoriesIndex, Action action, Command command) throws IOException, InterruptedException {
         OutputDirectory outputDirectory = OutputDirectory.parse(
-            action.getOutputFilesList(),
-            action.getOutputDirectoriesList());
+            command.getOutputFilesList(),
+            command.getOutputDirectoriesList());
 
         Path execDir = root.resolve(operationName);
         if (Files.exists(execDir)) {
@@ -621,6 +625,16 @@ public class Worker {
         fileCache.removeDirectoryAsync(execDir);
       }
 
+      @Override
+      public ExecutionPolicy getExecutionPolicy(String name) {
+        return policies.get(name);
+      }
+
+      @Override
+      public boolean putOperation(Operation operation, Action action) throws InterruptedException {
+        return operationQueueInstance.putOperation(operation);
+      }
+
       // doesn't belong in CAS or AC, must be in OQ
       @Override
       public OutputStream getStreamOutput(String name) {
@@ -628,7 +642,7 @@ public class Worker {
       }
 
       @Override
-      public void putActionResult(ActionKey actionKey, ActionResult actionResult) {
+      public void putActionResult(ActionKey actionKey, ActionResult actionResult) throws InterruptedException {
         acInstance.putActionResult(actionKey, actionResult);
       }
     };
@@ -671,8 +685,8 @@ public class Worker {
   }
 
   private static void printUsage(OptionsParser parser) {
-    System.out.println("Usage: CONFIG_PATH");
-    System.out.println(parser.describeOptions(Collections.<String, String>emptyMap(),
+    logger.info("Usage: CONFIG_PATH");
+    logger.info(parser.describeOptions(Collections.<String, String>emptyMap(),
                                               OptionsParser.HelpVerbosity.LONG));
   }
 

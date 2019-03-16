@@ -19,13 +19,14 @@ import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.worker.CASFileCache;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Instance.MatchListener;
-import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.v1test.CASInsertionPolicy;
-import com.google.devtools.remoteexecution.v1test.Action;
-import com.google.devtools.remoteexecution.v1test.ActionResult;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.Directory;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
+import build.buildfarm.v1test.ExecutionPolicy;
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Duration;
 import io.grpc.Deadline;
@@ -46,6 +47,7 @@ class StubWorkerContext implements WorkerContext {
   @Override public CASInsertionPolicy getStdoutCasPolicy() { throw new UnsupportedOperationException(); }
   @Override public CASInsertionPolicy getStderrCasPolicy() { throw new UnsupportedOperationException(); }
   @Override public DigestUtil getDigestUtil() { throw new UnsupportedOperationException(); }
+  @Override public ExecutionPolicy getExecutionPolicy(String name) { throw new UnsupportedOperationException(); }
   @Override public int getExecuteStageWidth() { throw new UnsupportedOperationException(); }
   @Override public int getTreePageSize() { throw new UnsupportedOperationException(); }
   @Override public boolean hasDefaultActionTimeout() { throw new UnsupportedOperationException(); }
@@ -54,7 +56,7 @@ class StubWorkerContext implements WorkerContext {
   @Override public boolean getStreamStderr() { throw new UnsupportedOperationException(); }
   @Override public Duration getDefaultActionTimeout() { throw new UnsupportedOperationException(); }
   @Override public Duration getMaximumActionTimeout() { throw new UnsupportedOperationException(); }
-  @Override public Path createExecDir(String operationName, Map<Digest, Directory> directoriesIndex, Action action) { throw new UnsupportedOperationException(); }
+  @Override public Path createExecDir(String operationName, Map<Digest, Directory> directoriesIndex, Action action, Command command) { throw new UnsupportedOperationException(); }
   @Override public void destroyExecDir(Path execDir) { throw new UnsupportedOperationException(); }
   @Override public void uploadOutputs(ActionResult.Builder resultBuilder, Path actionRoot, Iterable<String> outputFiles, Iterable<String> outputDirs) { throw new UnsupportedOperationException(); }
   @Override public boolean putOperation(Operation operation, Action action) { throw new UnsupportedOperationException(); }

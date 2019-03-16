@@ -39,27 +39,6 @@ import com.google.common.collect.Iterators;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
-import com.google.devtools.remoteexecution.v1test.Action;
-import com.google.devtools.remoteexecution.v1test.ActionCacheGrpc;
-import com.google.devtools.remoteexecution.v1test.ActionCacheGrpc.ActionCacheBlockingStub;
-import com.google.devtools.remoteexecution.v1test.ActionResult;
-import com.google.devtools.remoteexecution.v1test.ContentAddressableStorageGrpc;
-import com.google.devtools.remoteexecution.v1test.ContentAddressableStorageGrpc.ContentAddressableStorageBlockingStub;
-import com.google.devtools.remoteexecution.v1test.ContentAddressableStorageGrpc.ContentAddressableStorageFutureStub;
-import com.google.devtools.remoteexecution.v1test.ExecuteRequest;
-import com.google.devtools.remoteexecution.v1test.ExecutionGrpc;
-import com.google.devtools.remoteexecution.v1test.ExecutionGrpc.ExecutionFutureStub;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.Directory;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
-import com.google.devtools.remoteexecution.v1test.FindMissingBlobsRequest;
-import com.google.devtools.remoteexecution.v1test.FindMissingBlobsResponse;
-import com.google.devtools.remoteexecution.v1test.GetActionResultRequest;
-import com.google.devtools.remoteexecution.v1test.GetTreeRequest;
-import com.google.devtools.remoteexecution.v1test.GetTreeResponse;
-import com.google.devtools.remoteexecution.v1test.Platform;
-import com.google.devtools.remoteexecution.v1test.RequestMetadata;
-import com.google.devtools.remoteexecution.v1test.UpdateActionResultRequest;
 import com.google.longrunning.CancelOperationRequest;
 import com.google.longrunning.DeleteOperationRequest;
 import com.google.longrunning.GetOperationRequest;
@@ -67,6 +46,29 @@ import com.google.longrunning.ListOperationsRequest;
 import com.google.longrunning.ListOperationsResponse;
 import com.google.longrunning.OperationsGrpc;
 import com.google.longrunning.OperationsGrpc.OperationsBlockingStub;
+import build.bazel.remote.execution.v2.ActionCacheGrpc;
+import build.bazel.remote.execution.v2.ActionCacheGrpc.ActionCacheBlockingStub;
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc;
+import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageBlockingStub;
+import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageFutureStub;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecuteRequest;
+import build.bazel.remote.execution.v2.ExecutionGrpc;
+import build.bazel.remote.execution.v2.ExecutionGrpc.ExecutionFutureStub;
+import build.bazel.remote.execution.v2.ExecutionPolicy;
+import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
+import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
+import build.bazel.remote.execution.v2.GetActionResultRequest;
+import build.bazel.remote.execution.v2.GetTreeRequest;
+import build.bazel.remote.execution.v2.GetTreeResponse;
+import build.bazel.remote.execution.v2.Platform;
+import build.bazel.remote.execution.v2.RequestMetadata;
+import build.bazel.remote.execution.v2.ResultsCachePolicy;
+import build.bazel.remote.execution.v2.ServerCapabilities;
+import build.bazel.remote.execution.v2.UpdateActionResultRequest;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -85,10 +87,12 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Consumer;
 import java.util.function.Predicate;
+import java.util.logging.Logger;
 
 public class StubInstance implements Instance {
+  private static final Logger logger = Logger.getLogger(StubInstance.class.getName());
+
   private final String name;
   private final DigestUtil digestUtil;
   private final ManagedChannel channel;
@@ -289,7 +293,7 @@ public class StubInstance implements Instance {
                 @Override
                 public void onCompleted() {
                   if (!closed) {
-                    System.err.println("Server closed connection before output stream for " + resourceName + " at " + writtenBytes);
+                    logger.severe("Server closed connection before output stream for " + resourceName + " at " + writtenBytes);
                     // FIXME(werkt) better error, status
                     committedFuture.setException(
                         new RuntimeException("Server closed connection before output stream."));
@@ -418,7 +422,7 @@ public class StubInstance implements Instance {
       ImmutableList.Builder<Directory> directories,
       boolean acceptMissing) {
     throwIfStopped();
-    GetTreeResponse response = contentAddressableStorageBlockingStub
+    Iterator<GetTreeResponse> replies = contentAddressableStorageBlockingStub
         .get()
         .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
         .getTree(GetTreeRequest.newBuilder()
@@ -427,21 +431,25 @@ public class StubInstance implements Instance {
             .setPageSize(pageSize)
             .setPageToken(pageToken)
             .build());
-    directories.addAll(response.getDirectoriesList());
-    return response.getNextPageToken();
+    // new streaming interface doesn't really fit with what we're trying to do here...
+    String nextPageToken = "";
+    while (replies.hasNext()) {
+      GetTreeResponse response = replies.next();
+      directories.addAll(response.getDirectoriesList());
+      nextPageToken = response.getNextPageToken();
+    }
+    return nextPageToken;
   }
 
   @Override
-  public ListenableFuture<Operation> execute(Action action, boolean skipCacheLookup, RequestMetadata metadata) {
-    throwIfStopped();
-    return executionFutureStub
-        .get()
-        .withInterceptors(TracingMetadataUtils.attachMetadataInterceptor(metadata))
-        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
-        .execute(ExecuteRequest.newBuilder()
-            .setAction(action)
-            .setSkipCacheLookup(skipCacheLookup)
-            .build());
+  public void execute(
+      Digest actionDigest,
+      boolean skipCacheLookup,
+      ExecutionPolicy executionPolicy,
+      ResultsCachePolicy resultsCachePolicy,
+      RequestMetadata metadata,
+      Predicate<Operation> watcher) {
+    throw new UnsupportedOperationException();
   }
 
   @Override
@@ -491,7 +499,6 @@ public class StubInstance implements Instance {
   @Override
   public boolean watchOperation(
       String operationName,
-      boolean watchInitialState,
       Predicate<Operation> watcher) {
     throw new UnsupportedOperationException();
   }
@@ -542,5 +549,10 @@ public class StubInstance implements Instance {
         .cancelOperation(CancelOperationRequest.newBuilder()
         .setName(operationName)
         .build());
+  }
+
+  @Override
+  public ServerCapabilities getCapabilities() {
+    throw new UnsupportedOperationException();
   }
 }

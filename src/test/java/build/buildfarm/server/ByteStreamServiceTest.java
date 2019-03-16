@@ -9,6 +9,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Instance.ChunkObserver;
 import build.buildfarm.instance.stub.ByteStreamUploader;
@@ -18,7 +19,6 @@ import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamStub;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
-import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.protobuf.ByteString;
 import io.grpc.Channel;
 import io.grpc.Server;

@@ -62,12 +62,12 @@ public class BuildFarmServer {
     ServerInterceptor headersInterceptor = new ServerHeadersInterceptor();
     server = serverBuilder
         .addService(new ActionCacheService(instances))
+        .addService(new CapabilitiesService(instances))
         .addService(new ContentAddressableStorageService(instances))
         .addService(new ByteStreamService(instances))
         .addService(new ExecutionService(instances))
         .addService(new OperationQueueService(instances))
         .addService(new OperationsService(instances))
-        .addService(new WatcherService(instances))
         .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
         .intercept(headersInterceptor)
         .build();
@@ -88,9 +88,9 @@ public class BuildFarmServer {
     Runtime.getRuntime().addShutdownHook(new Thread() {
       @Override
       public void run() {
-        System.err.println("*** shutting down gRPC server since JVM is shutting down");
+        logger.info("*** shutting down gRPC server since JVM is shutting down");
         BuildFarmServer.this.stop();
-        System.err.println("*** server shut down");
+        logger.info("*** server shut down");
       }
     });
   }

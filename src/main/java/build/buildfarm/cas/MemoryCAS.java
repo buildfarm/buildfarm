@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.instance.memory;
+package build.buildfarm.cas;
 
 import build.buildfarm.common.DigestUtil;
-import build.buildfarm.common.ContentAddressableStorage;
-import com.google.devtools.remoteexecution.v1test.Digest;
+import build.bazel.remote.execution.v2.Digest;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.NoSuchFileException;
@@ -25,8 +24,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.logging.Logger;
 
-public class MemoryLRUContentAddressableStorage implements ContentAddressableStorage {
+public class MemoryCAS implements ContentAddressableStorage {
+  private static final Logger logger = Logger.getLogger(MemoryCAS.class.getName());
+
   private final long maxSizeInBytes;
   private Consumer<Digest> onPut;
 
@@ -35,11 +37,11 @@ public class MemoryLRUContentAddressableStorage implements ContentAddressableSto
   private final Entry header = new SentinelEntry();
   private transient long sizeInBytes = 0;
 
-  public MemoryLRUContentAddressableStorage(long maxSizeInBytes) {
+  public MemoryCAS(long maxSizeInBytes) {
     this(maxSizeInBytes, (digest) -> {});
   }
 
-  public MemoryLRUContentAddressableStorage(long maxSizeInBytes, Consumer<Digest> onPut) {
+  public MemoryCAS(long maxSizeInBytes, Consumer<Digest> onPut) {
     this.maxSizeInBytes = maxSizeInBytes;
     this.onPut = onPut;
   }
@@ -81,6 +83,16 @@ public class MemoryLRUContentAddressableStorage implements ContentAddressableSto
     return blob.getData().substring((int) offset).newInput();
   }
 
+  private long size() {
+    Entry e = header.before;
+    long count = 0;
+    while (e != header) {
+      count++;
+      e = e.before;
+    }
+    return count;
+  }
+
   @Override
   public void put(Blob blob) {
     put(blob, null);
@@ -107,6 +119,16 @@ public class MemoryLRUContentAddressableStorage implements ContentAddressableSto
       expireEntry(header.after);
     }
 
+    if (sizeInBytes > maxSizeInBytes) {
+      logger.warning(
+          String.format(
+              "Out of nodes to remove, sizeInBytes = %d, maxSizeInBytes = %d, storage = %d, list = %d",
+              sizeInBytes,
+              maxSizeInBytes,
+              storage.size(),
+              size()));
+    }
+
     createEntry(blob, onExpiration);
 
     storage.put(blob.getDigest(), header.before);
@@ -121,7 +143,7 @@ public class MemoryLRUContentAddressableStorage implements ContentAddressableSto
   }
 
   private void expireEntry(Entry e) {
-    System.out.println("MemoryLRUCAS: expiring " + DigestUtil.toString(e.key));
+    logger.info("MemoryLRUCAS: expiring " + DigestUtil.toString(e.key));
     storage.remove(e.key);
     e.expire();
     sizeInBytes -= e.value.size();

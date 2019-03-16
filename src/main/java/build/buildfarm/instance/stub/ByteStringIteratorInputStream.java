@@ -16,6 +16,8 @@ package build.buildfarm.instance.stub;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.ByteString;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Iterator;
@@ -58,6 +60,11 @@ public class ByteStringIteratorInputStream extends InputStream {
   }
 
   @Override
+  public int read(byte[] b) throws IOException {
+    return read(b, 0, b.length);
+  }
+
+  @Override
   public int read(byte[] b, int off, int len) throws IOException {
     if (closed) {
       throw new IOException("stream is closed");
@@ -90,17 +97,17 @@ public class ByteStringIteratorInputStream extends InputStream {
   }
 
   private void advance() throws IOException {
+    ByteString data = ByteString.EMPTY;
     try {
-      retrier.execute(() -> {
-        ByteString data = ByteString.EMPTY;
-        while (iterator.hasNext() && data.isEmpty()) {
-          data = iterator.next();
-        }
-        input = data.newInput();
-        return 0;
-      });
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
+      while (iterator.hasNext() && data.isEmpty()) {
+        data = iterator.next();
+      }
+      input = data.newInput();
+    } catch (StatusRuntimeException e) {
+      if (Status.fromThrowable(e).getCode() == Status.Code.NOT_FOUND) {
+        throw new IOException(e);
+      }
+      throw e;
     }
   }
 }

@@ -14,17 +14,20 @@
 
 package build.buildfarm.worker;
 
+import static java.util.concurrent.TimeUnit.MICROSECONDS;
+import static java.util.logging.Level.SEVERE;
+
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
-import com.google.devtools.remoteexecution.v1test.Action;
-import com.google.devtools.remoteexecution.v1test.Command;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.Directory;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
-import com.google.devtools.remoteexecution.v1test.Platform;
+import com.google.common.base.Stopwatch;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
@@ -38,41 +41,42 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.logging.Logger;
 
 public class MatchStage extends PipelineStage {
+  private static final Logger logger = Logger.getLogger(MatchStage.class.getName());
+
   public MatchStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
     super("MatchStage", workerContext, output, error);
   }
 
   class MatchOperationListener implements MatchListener {
+    private Stopwatch stopwatch;
     private long waitStart;
     private long waitDuration;
-    private long operationNamedAt;
+    private long operationNamedAtUSecs;
     private Poller poller = null;
 
-    public MatchOperationListener(long waitDuration) {
-      this.waitDuration = waitDuration;
-    }
-
-    public long getWaitDuration() {
-      return waitDuration;
+    public MatchOperationListener(Stopwatch stopwatch) {
+      this.stopwatch = stopwatch;
+      waitDuration = this.stopwatch.elapsed(MICROSECONDS);
     }
 
     @Override
     public void onWaitStart() {
-      waitStart = System.nanoTime();
+      waitStart = stopwatch.elapsed(MICROSECONDS);
     }
 
     @Override
     public void onWaitEnd() {
-      long now = System.nanoTime();
-      waitDuration += now - waitStart;
-      waitStart = now;
+      long elapsedUSecs = stopwatch.elapsed(MICROSECONDS);
+      waitDuration += elapsedUSecs - waitStart;
+      waitStart = elapsedUSecs;
     }
 
     @Override
     public boolean onOperationName(String operationName) {
-      operationNamedAt = System.nanoTime();
+      operationNamedAtUSecs = stopwatch.elapsed(MICROSECONDS);
       Preconditions.checkState(poller == null);
       poller = workerContext.createPoller(
           "MatchStage",
@@ -99,14 +103,14 @@ public class MatchStage extends PipelineStage {
         return false;
       }
 
-      workerContext.logInfo("MatchStage: Starting operation: " + operation.getName());
+      logStart(operation.getName());
 
       try {
-        OperationContext context = match(operation, operationNamedAt);
-        if (context != null) {
-          workerContext.logInfo("MatchStage: Done with operation: " + operation.getName());
-        } else {
-          workerContext.logInfo("MatchStage: Operation match failed: " + operation.getName());
+        long matchingAtUSecs = stopwatch.elapsed(MICROSECONDS);
+        OperationContext context = match(operation, operationNamedAtUSecs);
+        long matchedInUSecs = stopwatch.elapsed(MICROSECONDS) - matchingAtUSecs;
+        logComplete(operation.getName(), matchedInUSecs, waitDuration, context != null);
+        if (context == null) {
           output.release();
         }
         if (poller != null) {
@@ -125,23 +129,20 @@ public class MatchStage extends PipelineStage {
   }
 
   @Override
+  protected Logger getLogger() {
+    return logger;
+  }
+
+  @Override
   protected void iterate() throws InterruptedException {
-    long startTime = System.nanoTime();
+    Stopwatch stopwatch = Stopwatch.createStarted();
     if (!output.claim()) {
       return;
     }
-    long waitDuration = System.nanoTime() - startTime;
+    MatchOperationListener listener = new MatchOperationListener(stopwatch);
 
-    workerContext.logInfo("MatchStage: Matching");
-
-    MatchOperationListener listener = new MatchOperationListener(waitDuration);
-
+    logStart();
     workerContext.match(listener);
-    long endTime = System.nanoTime();
-    workerContext.logInfo(String.format(
-        "MatchStage::iterate(): %gms (%gms wait)",
-        (endTime - startTime) / 1000000.0f,
-        listener.getWaitDuration() / 1000000.0f));
   }
 
   private static Map<Digest, Directory> createDirectoriesIndex(Iterable<Directory> directories, DigestUtil digestUtil) {
@@ -168,7 +169,7 @@ public class MatchStage extends PipelineStage {
     try {
       metadata = operation.getMetadata().unpack(QueuedOperationMetadata.class);
     } catch (InvalidProtocolBufferException e) {
-      e.printStackTrace();
+      logger.log(SEVERE, "error unpacking queued operation metadata for " + operation.getName(), e);
       return null;
     }
 
@@ -194,6 +195,8 @@ public class MatchStage extends PipelineStage {
         .setMetadata(metadata.getExecuteOperationMetadata())
         .setAction(action)
         .setCommand(command)
+        .setExecutionPolicy(metadata.getExecutionPolicy())
+        .setResultsCachePolicy(metadata.getResultsCachePolicy())
         .setRequestMetadata(metadata.getRequestMetadata());
 
     Duration matchedIn = Durations.fromNanos(System.nanoTime() - matchStartAt);

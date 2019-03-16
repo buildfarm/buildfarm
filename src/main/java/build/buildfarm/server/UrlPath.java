@@ -16,7 +16,7 @@ package build.buildfarm.server;
 
 import build.buildfarm.common.DigestUtil;
 import com.google.common.collect.Iterables;
-import com.google.devtools.remoteexecution.v1test.Digest;
+import build.bazel.remote.execution.v2.Digest;
 import java.util.Arrays;
 
 public class UrlPath {
@@ -77,6 +77,9 @@ public class UrlPath {
   public static String fromOperationName(String operationName) {
     // {instance_name=**}/operations/{uuid}
     String[] components = operationName.split("/");
+    if (components.length < 2) {
+      return "";
+    }
     return String.join(
         "/", Iterables.limit(
             Arrays.asList(components),
@@ -110,12 +113,15 @@ public class UrlPath {
             components.length - 5));
   }
 
-  public static Digest parseBlobDigest(String resourceName, DigestUtil digestUtil)
-      throws NumberFormatException {
+  public static Digest parseBlobDigest(String resourceName, DigestUtil digestUtil) {
     String[] components = resourceName.split("/");
     String hash = components[components.length - 2];
-    long size = Long.parseLong(components[components.length - 1]);
-    return digestUtil.build(hash, size);
+    try {
+      long size = Long.parseLong(components[components.length - 1]);
+      return digestUtil.build(hash, size);
+    } catch (NumberFormatException e) {
+      return null;
+    }
   }
 
   public static Digest parseUploadBlobDigest(String resourceName)

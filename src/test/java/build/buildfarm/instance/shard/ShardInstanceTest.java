@@ -14,13 +14,15 @@
 
 package build.buildfarm.instance.shard;
 
+import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.UNKNOWN;
+import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.CACHE_CHECK;
+import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.QUEUED;
+import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.COMPLETED;
+import static build.buildfarm.instance.AbstractServerInstance.MISSING_INPUT;
+import static build.buildfarm.instance.AbstractServerInstance.VIOLATION_TYPE_MISSING;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
-import static com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage.UNKNOWN;
-import static com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage.CACHE_CHECK;
-import static com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage.QUEUED;
-import static com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage.COMPLETED;
 import static io.grpc.Status.Code.CANCELLED;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.Mockito.any;
@@ -33,6 +35,14 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecuteResponse;
+import build.bazel.remote.execution.v2.OutputFile;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.DigestUtil;
@@ -44,16 +54,11 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.Futures;
-import com.google.devtools.remoteexecution.v1test.Action;
-import com.google.devtools.remoteexecution.v1test.ActionResult;
-import com.google.devtools.remoteexecution.v1test.Command;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.Directory;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
-import com.google.devtools.remoteexecution.v1test.OutputFile;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
+import com.google.rpc.PreconditionFailure;
+import com.google.rpc.PreconditionFailure.Violation;
 import io.grpc.Status.Code;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -75,7 +80,7 @@ import org.mockito.stubbing.Answer;
 @RunWith(JUnit4.class)
 public class ShardInstanceTest {
   private static final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
-  private static final long QUEUE_TEST_TIMEOUT = 3;
+  private static final long QUEUE_TEST_TIMEOUT_SECONDS = 3;
 
   private ShardInstance instance;
 
@@ -110,7 +115,7 @@ public class ShardInstanceTest {
     instance.stop();
   }
 
-  private Action createAction() throws Exception {
+  private Action createAction(boolean provideAction) throws Exception {
     String workerName = "worker";
     when(mockInstanceLoader.load(eq(workerName))).thenReturn(mockWorkerInstance);
 
@@ -153,36 +158,29 @@ public class ShardInstanceTest {
       @Override
       public Void answer(InvocationOnMock invocation) {
         StreamObserver<ByteString> blobObserver = (StreamObserver) invocation.getArguments()[3];
-        blobObserver.onNext(action.toByteString());
-        blobObserver.onCompleted();
+        if (provideAction) {
+          blobObserver.onNext(action.toByteString());
+          blobObserver.onCompleted();
+        } else {
+          blobObserver.onError(Status.NOT_FOUND.asException());
+        }
         return null;
       }
     }).when(mockWorkerInstance).getBlob(eq(actionDigest), eq(0l), eq(0l), any(StreamObserver.class));
-    when(mockBackplane.getBlobLocationSet(eq(actionDigest))).thenReturn(workers);
+    when(mockBackplane.getBlobLocationSet(eq(actionDigest))).thenReturn(provideAction ? workers : ImmutableSet.of());
+    when(mockWorkerInstance.findMissingBlobs(eq(ImmutableList.of(actionDigest)), any(ExecutorService.class))).thenReturn(immediateFuture(ImmutableList.of()));
 
     return action;
   }
 
   @Test
-  public void sentinel() {
-  }
-
-  @Test
-  public void queueActionPutFailureErrorsOperation() throws Exception {
-    Action action = createAction();
+  public void queueActionMissingErrorsOperation() throws Exception {
+    Action action = createAction(false);
     Digest actionDigest = DIGEST_UTIL.compute(action);
-    CommittingOutputStream mockCommittedOutputStream = mock(CommittingOutputStream.class);
-    StatusRuntimeException commitException = Status.UNKNOWN.asRuntimeException();
-    when(mockCommittedOutputStream.getCommittedFuture()).thenReturn(immediateFailedFuture(commitException));
-
-    when(mockWorkerInstance.getStreamOutput(
-        matches("^uploads/.*/blobs/" + DigestUtil.toString(actionDigest) + "$"),
-        eq(actionDigest.getSizeBytes()))).thenReturn(mockCommittedOutputStream);
 
     Operation operation = Operation.newBuilder()
         .setName("operation")
         .setMetadata(Any.pack(QueuedOperationMetadata.newBuilder()
-            .setAction(action)
             .setExecuteOperationMetadata(ExecuteOperationMetadata.newBuilder()
                 .setActionDigest(actionDigest))
             .setSkipCacheLookup(true)
@@ -190,13 +188,14 @@ public class ShardInstanceTest {
         .build();
 
     when(mockBackplane.getOperation(eq(operation.getName()))).thenReturn(operation);
+    when(mockBackplane.canQueue()).thenReturn(true);
 
     boolean unknownExceptionCaught = false;
     try {
-      instance.queue(operation).get(QUEUE_TEST_TIMEOUT, SECONDS);
+      instance.queue(operation).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
     } catch (ExecutionException e) {
       Status status = Status.fromThrowable(e);
-      if (status.getCode() == Code.UNKNOWN) {
+      if (status.getCode() == Code.FAILED_PRECONDITION) {
         unknownExceptionCaught = true;
       } else {
         e.getCause().printStackTrace();
@@ -204,22 +203,31 @@ public class ShardInstanceTest {
     }
     assertThat(unknownExceptionCaught).isTrue();
 
+    ExecuteResponse executeResponse = ExecuteResponse.newBuilder()
+        .setStatus(com.google.rpc.Status.newBuilder()
+            .setCode(Code.FAILED_PRECONDITION.value())
+            .setMessage("FAILED_PRECONDITION: NOT_FOUND")
+            .addDetails(Any.pack(PreconditionFailure.newBuilder()
+                .addViolations(Violation.newBuilder()
+                    .setType(VIOLATION_TYPE_MISSING)
+                    .setSubject(MISSING_INPUT)
+                    .setDescription("Action " + DigestUtil.toString(actionDigest)))
+                .build())))
+        .build();
     Operation erroredOperation = operation.toBuilder()
         .setDone(true)
         .setMetadata(Any.pack(ExecuteOperationMetadata.newBuilder()
             .setActionDigest(actionDigest)
             .setStage(COMPLETED)
             .build()))
-        .setError(com.google.rpc.Status.newBuilder()
-            .setCode(commitException.getStatus().getCode().value())
-            .setMessage(commitException.getMessage()))
+        .setResponse(Any.pack(executeResponse))
         .build();
     verify(mockBackplane, times(1)).putOperation(eq(erroredOperation), eq(COMPLETED));
   }
 
   @Test
   public void queueOperationPutFailureCancelsOperation() throws Exception {
-    Action action = createAction();
+    Action action = createAction(true);
     Digest actionDigest = DIGEST_UTIL.compute(action);
     CommittingOutputStream mockCommittedOutputStream = mock(CommittingOutputStream.class);
     when(mockCommittedOutputStream.getCommittedFuture()).thenReturn(immediateFuture(actionDigest.getSizeBytes()));
@@ -227,7 +235,7 @@ public class ShardInstanceTest {
     when(mockWorkerInstance.findMissingBlobs(any(Iterable.class), any(ExecutorService.class))).thenReturn(immediateFuture(ImmutableList.of()));
 
     when(mockWorkerInstance.getStreamOutput(
-        matches("^uploads/.*/blobs/" + DigestUtil.toString(actionDigest) + "$"),
+        matches("^uploads/.* /blobs/" + DigestUtil.toString(actionDigest) + "$"),
         eq(actionDigest.getSizeBytes()))).thenReturn(mockCommittedOutputStream);
 
     StatusRuntimeException queueException = Status.UNAVAILABLE.asRuntimeException();
@@ -237,7 +245,6 @@ public class ShardInstanceTest {
     Operation operation = Operation.newBuilder()
         .setName("queueOperationPutFailureCancelsOperation")
         .setMetadata(Any.pack(QueuedOperationMetadata.newBuilder()
-            .setAction(action)
             .setExecuteOperationMetadata(ExecuteOperationMetadata.newBuilder()
                 .setActionDigest(actionDigest))
             .setSkipCacheLookup(true)
@@ -250,7 +257,7 @@ public class ShardInstanceTest {
     boolean unavailableExceptionCaught = false;
     try {
       // anything more would be unreasonable
-      instance.queue(operation).get(QUEUE_TEST_TIMEOUT, SECONDS);
+      instance.queue(operation).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
     } catch (ExecutionException e) {
       Status status = Status.fromThrowable(e);
       if (status.getCode() == Code.UNAVAILABLE) {
@@ -262,15 +269,18 @@ public class ShardInstanceTest {
     assertThat(unavailableExceptionCaught).isTrue();
 
     verify(mockBackplane, times(1)).putOperation(any(Operation.class), eq(QUEUED));
+    ExecuteResponse executeResponse = ExecuteResponse.newBuilder()
+        .setStatus(com.google.rpc.Status.newBuilder()
+            .setCode(queueException.getStatus().getCode().value())
+            .setMessage(queueException.getMessage()))
+        .build();
     Operation erroredOperation = operation.toBuilder()
         .setDone(true)
         .setMetadata(Any.pack(ExecuteOperationMetadata.newBuilder()
             .setActionDigest(actionDigest)
             .setStage(COMPLETED)
             .build()))
-        .setError(com.google.rpc.Status.newBuilder()
-            .setCode(queueException.getStatus().getCode().value())
-            .setMessage(queueException.getMessage()))
+        .setResponse(Any.pack(executeResponse))
         .build();
     verify(mockBackplane, times(1)).putOperation(eq(erroredOperation), eq(COMPLETED));
   }

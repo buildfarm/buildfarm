@@ -14,17 +14,19 @@
 
 package build.buildfarm.worker;
 
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.v1test.CASInsertionPolicy;
-import com.google.devtools.remoteexecution.v1test.Action;
-import com.google.devtools.remoteexecution.v1test.ActionResult;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.Directory;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
+import build.buildfarm.v1test.ExecutionPolicy;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Duration;
 import io.grpc.Deadline;
@@ -45,6 +47,7 @@ public interface WorkerContext {
   CASInsertionPolicy getStdoutCasPolicy();
   CASInsertionPolicy getStderrCasPolicy();
   DigestUtil getDigestUtil();
+  ExecutionPolicy getExecutionPolicy(String name);
   int getExecuteStageWidth();
   int getTreePageSize();
   boolean hasDefaultActionTimeout();
@@ -53,7 +56,7 @@ public interface WorkerContext {
   boolean getStreamStderr();
   Duration getDefaultActionTimeout();
   Duration getMaximumActionTimeout();
-  Path createExecDir(String operationName, Map<Digest, Directory> directoriesIndex, Action action) throws IOException, InterruptedException;
+  Path createExecDir(String operationName, Map<Digest, Directory> directoriesIndex, Action action, Command command) throws IOException, InterruptedException;
   void destroyExecDir(Path execDir) throws IOException, InterruptedException;
   void uploadOutputs(ActionResult.Builder resultBuilder, Path actionRoot, Iterable<String> outputFiles, Iterable<String> outputDirs) throws IOException, InterruptedException;
   boolean putOperation(Operation operation, Action Action) throws IOException, InterruptedException;

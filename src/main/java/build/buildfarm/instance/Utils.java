@@ -16,10 +16,10 @@ package build.buildfarm.instance;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.transform;
 
+import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.instance.Instance.ChunkObserver;
 import com.google.common.base.Function;
 import com.google.common.util.concurrent.ListenableFuture;
-import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.StatusException;

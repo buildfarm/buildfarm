@@ -15,15 +15,19 @@
 package build.buildfarm.worker;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.when;
 
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
+import build.buildfarm.common.InputStreamFactory;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.Directory;
-import com.google.devtools.remoteexecution.v1test.DirectoryNode;
-import com.google.devtools.remoteexecution.v1test.FileNode;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.DirectoryNode;
+import build.bazel.remote.execution.v2.FileNode;
 import com.google.protobuf.ByteString;
 import java.io.InputStream;
 import java.io.IOException;
@@ -45,13 +49,31 @@ class CASFileCacheTest {
     this.root = root;
   }
 
+  private static final class BrokenInputStream extends InputStream {
+    private final IOException exception;
+
+    public BrokenInputStream(IOException exception) {
+      this.exception = exception;
+    }
+
+    @Override
+    public int read() throws IOException {
+      throw exception;
+    }
+  }
+
   @Before
   public void setUp() {
     digestUtil = new DigestUtil(HashFunction.SHA256);
     blobs = new HashMap<Digest, ByteString>();
     fileCache = new CASFileCache(root, /* maxSizeInBytes=*/ 1024, digestUtil) {
+      @Override
       protected InputStream newExternalInput(Digest digest, long offset) {
-        return blobs.get(digest).substring((int) offset).newInput();
+        ByteString content = blobs.get(digest);
+        if (content == null) {
+          return new BrokenInputStream(new IOException("NOT_FOUND"));
+        }
+        return content.substring((int) offset).newInput();
       }
     };
   }
@@ -61,8 +83,30 @@ class CASFileCacheTest {
     ByteString blob = ByteString.copyFromUtf8("Hello, World");
     Digest blobDigest = digestUtil.compute(blob);
     blobs.put(blobDigest, blob);
-    Path path = fileCache.put(blobDigest, false, null);
+    Path path = fileCache.put(blobDigest, false);
     assertThat(Files.exists(path)).isTrue();
+  }
+
+  @Test(expected = IllegalStateException.class)
+  public void putEmptyFileThrowsIllegalStateException() throws IOException, InterruptedException {
+    InputStreamFactory mockInputStreamFactory = mock(InputStreamFactory.class);
+    CASFileCache fileCache = new CASFileCache(root, /* maxSizeInBytes=*/ 1024, digestUtil) {
+      @Override
+      protected InputStream newExternalInput(Digest digest, long offset) throws IOException, InterruptedException {
+        return mockInputStreamFactory.newInput(digest, offset);
+      }
+    };
+
+    ByteString blob = ByteString.copyFromUtf8("");
+    Digest blobDigest = digestUtil.compute(blob);
+    // supply an empty input stream if called for test clarity
+    when(mockInputStreamFactory.newInput(blobDigest, 0))
+        .thenReturn(ByteString.EMPTY.newInput());
+    try {
+      fileCache.put(blobDigest, false);
+    } finally {
+      verifyZeroInteractions(mockInputStreamFactory);
+    }
   }
 
   @Test
@@ -70,7 +114,7 @@ class CASFileCacheTest {
     ByteString blob = ByteString.copyFromUtf8("executable");
     Digest blobDigest = digestUtil.compute(blob);
     blobs.put(blobDigest, blob);
-    Path path = fileCache.put(blobDigest, true, null);
+    Path path = fileCache.put(blobDigest, true);
     assertThat(Files.isExecutable(path)).isTrue();
   }
 
@@ -105,12 +149,47 @@ class CASFileCacheTest {
   }
 
   @Test
+  public void putDirectoryIOExceptionRollsBack() throws IOException, InterruptedException {
+    ByteString file = ByteString.copyFromUtf8("Peanut Butter");
+    Digest fileDigest = Digest.newBuilder()
+        .setHash("file")
+        .setSizeBytes(file.size())
+        .build();
+    // omitting blobs.put to incur IOException
+    Directory subDirectory = Directory.newBuilder().build();
+    Digest subdirDigest = Digest.newBuilder().setHash("subdir").build();
+    Directory directory = Directory.newBuilder()
+        .addFiles(FileNode.newBuilder()
+            .setName("file")
+            .setDigest(fileDigest)
+            .build())
+        .addDirectories(DirectoryNode.newBuilder()
+            .setName("subdir")
+            .setDigest(subdirDigest)
+            .build())
+        .build();
+    Digest dirDigest = Digest.newBuilder().setHash("test").build();
+    Map<Digest, Directory> directoriesIndex = ImmutableMap.of(
+        dirDigest, directory,
+        subdirDigest, subDirectory);
+    boolean exceptionHandled = false;
+    try {
+      fileCache.putDirectory(dirDigest, directoriesIndex);
+    } catch (IOException e) {
+      assertThat(e.getMessage()).isEqualTo("NOT_FOUND");
+      exceptionHandled = true;
+    }
+    assertThat(exceptionHandled).isTrue();
+    assertThat(Files.exists(fileCache.getDirectoryPath(dirDigest))).isFalse();
+  }
+
+  @Test
   public void expireUnreferencedEntryRemovesBlobFile() throws IOException, InterruptedException {
     byte[] bigData = new byte[1000];
     ByteString bigBlob = ByteString.copyFrom(bigData);
     Digest bigDigest = digestUtil.compute(bigBlob);
     blobs.put(bigDigest, bigBlob);
-    Path bigPath = fileCache.put(bigDigest, false, null);
+    Path bigPath = fileCache.put(bigDigest, false);
 
     fileCache.decrementReferences(ImmutableList.<Path>of(bigPath), ImmutableList.of());
 
@@ -121,7 +200,7 @@ class CASFileCacheTest {
         .setSizeBytes(strawBlob.size())
         .build();
     blobs.put(strawDigest, strawBlob);
-    Path strawPath = fileCache.put(strawDigest, false, null);
+    Path strawPath = fileCache.put(strawDigest, false);
 
     assertThat(Files.exists(bigPath)).isFalse();
     assertThat(Files.exists(strawPath)).isTrue();
@@ -141,8 +220,8 @@ class CASFileCacheTest {
     // explicitly not providing blob via blobs, this would throw if fetched from factory
     //
     // FIXME https://github.com/google/truth/issues/285 assertThat(Path) is ambiguous
-    assertThat(fileCache.put(blobDigest, false, null).equals(path)).isTrue();
-    assertThat(fileCache.put(blobDigest, true, null).equals(execPath)).isTrue();
+    assertThat(fileCache.put(blobDigest, false).equals(path)).isTrue();
+    assertThat(fileCache.put(blobDigest, true).equals(execPath)).isTrue();
   }
 
   @Test

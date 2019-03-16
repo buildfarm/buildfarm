@@ -15,30 +15,50 @@
 package build.buildfarm.worker;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static java.util.logging.Level.SEVERE;
 
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.instance.stub.Chunker;
 import build.buildfarm.v1test.CompletedOperationMetadata;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-import com.google.devtools.remoteexecution.v1test.ActionResult;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
-import com.google.devtools.remoteexecution.v1test.ExecuteResponse;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.Durations;
+import com.google.rpc.Status;
+import com.google.rpc.Code;
 import io.grpc.Deadline;
 import io.grpc.StatusRuntimeException;
 import java.io.IOException;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.logging.Logger;
 
 public class ReportResultStage extends PipelineStage {
-  private final BlockingQueue<OperationContext> queue;
+  private static final Logger logger = Logger.getLogger(ReportResultStage.class.getName());
+
+  private final BlockingQueue<OperationContext> queue = new ArrayBlockingQueue<>(1);
 
   public ReportResultStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
     super("ReportResultStage", workerContext, output, error);
-    queue = new ArrayBlockingQueue<>(1);
+  }
+
+  @Override
+  protected Logger getLogger() {
+    return logger;
   }
 
   @Override
@@ -57,14 +77,15 @@ public class ReportResultStage extends PipelineStage {
 
   @Override
   protected OperationContext tick(OperationContext operationContext) throws InterruptedException {
-    ActionResult.Builder resultBuilder;
+    ExecuteResponse executeResponse;
     try {
-      resultBuilder = operationContext
-          .operation.getResponse().unpack(ExecuteResponse.class).getResult().toBuilder();
+      executeResponse = operationContext.operation
+          .getResponse().unpack(ExecuteResponse.class);
     } catch (InvalidProtocolBufferException e) {
-      e.printStackTrace();
+      logger.log(SEVERE, "error unpacking execute response", e);
       return null;
     }
+    ActionResult.Builder resultBuilder = executeResponse.getResult().toBuilder();
 
     Poller poller = workerContext.createPoller(
         "ReportResultStage",
@@ -75,17 +96,15 @@ public class ReportResultStage extends PipelineStage {
 
     long reportStartAt = System.nanoTime();
 
+    Status.Builder status = executeResponse.getStatus().toBuilder();
     try {
       workerContext.uploadOutputs(
           resultBuilder,
           operationContext.execDir,
-          operationContext.action.getOutputFilesList(),
-          operationContext.action.getOutputDirectoriesList());
+          operationContext.command.getOutputFilesList(),
+          operationContext.command.getOutputDirectoriesList());
     } catch (IOException e) {
-      poller.stop();
-      throw new IllegalStateException(e);
-    } catch (StatusRuntimeException e) {
-      e.printStackTrace();
+      logger.log(SEVERE, "error uploading outputs", e);
       poller.stop();
       return null;
     }
@@ -119,14 +138,16 @@ public class ReportResultStage extends PipelineStage {
             .setStage(ExecuteOperationMetadata.Stage.COMPLETED)
             .build())
         .setRequestMetadata(operationContext.requestMetadata)
+        .setExecutionPolicy(operationContext.executionPolicy)
+        .setResultsCachePolicy(operationContext.resultsCachePolicy)
         .build();
 
     Operation operation = operationContext.operation.toBuilder()
         .setDone(true)
         .setMetadata(Any.pack(metadata))
-        .setResponse(Any.pack(ExecuteResponse.newBuilder()
+        .setResponse(Any.pack(executeResponse.toBuilder()
             .setResult(result)
-            .setCachedResult(false)
+            .setStatus(status)
             .build()))
         .build();
 
@@ -137,7 +158,7 @@ public class ReportResultStage extends PipelineStage {
         return null;
       }
     } catch (IOException e) {
-      e.printStackTrace();
+      logger.log(SEVERE, "error putting complete operation " + operation.getName(), e);
       return null;
     }
 
@@ -153,7 +174,7 @@ public class ReportResultStage extends PipelineStage {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     } catch (IOException e) {
-      e.printStackTrace();
+      logger.log(SEVERE, "error destroying exec dir " + operationContext.execDir.toString(), e);
     }
   }
 }

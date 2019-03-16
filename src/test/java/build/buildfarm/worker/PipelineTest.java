@@ -14,15 +14,23 @@
 
 package build.buildfarm.worker;
 
+import java.util.logging.Logger;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class PipelineTest {
+  private static final Logger logger = Logger.getLogger(PipelineTest.class.getName());
+
   abstract static class AbstractPipelineStage extends PipelineStage {
     public AbstractPipelineStage(String name) {
       super(name, null, null, null);
+    }
+
+    @Override
+    public Logger getLogger() {
+      return logger;
     }
 
     @Override

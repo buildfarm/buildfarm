@@ -18,36 +18,43 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.fail;
 import static build.buildfarm.instance.AbstractServerInstance.VIOLATION_TYPE_INVALID;
 
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.ActionCacheGrpc;
+import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
+import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest.Request;
+import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
+import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse.Response;
+import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.DigestFunction;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
+import build.bazel.remote.execution.v2.ExecuteRequest;
+import build.bazel.remote.execution.v2.ExecuteResponse;
+import build.bazel.remote.execution.v2.ExecutionGrpc;
+import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
+import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
+import build.bazel.remote.execution.v2.GetActionResultRequest;
 import build.buildfarm.common.DigestUtil;
-import build.buildfarm.instance.stub.Chunker;
+import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.instance.stub.ByteStreamUploader;
+import build.buildfarm.instance.stub.Chunker;
 import build.buildfarm.instance.stub.Retrier;
 import build.buildfarm.instance.stub.RetryException;
 import build.buildfarm.server.BuildFarmServer;
+import build.buildfarm.v1test.ActionCacheConfig;
 import build.buildfarm.v1test.BuildFarmServerConfig;
-import build.buildfarm.v1test.InstanceConfig.HashFunction;
+import build.buildfarm.v1test.ContentAddressableStorageConfig;
+import build.buildfarm.v1test.DelegateCASConfig;
 import build.buildfarm.v1test.MemoryInstanceConfig;
+import build.buildfarm.v1test.MemoryCASConfig;
 import build.buildfarm.v1test.OperationQueueGrpc;
-import build.buildfarm.v1test.TakeOperationRequest;
 import build.buildfarm.v1test.PollOperationRequest;
+import build.buildfarm.v1test.TakeOperationRequest;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
-import com.google.devtools.remoteexecution.v1test.Action;
-import com.google.devtools.remoteexecution.v1test.ActionCacheGrpc;
-import com.google.devtools.remoteexecution.v1test.BatchUpdateBlobsRequest;
-import com.google.devtools.remoteexecution.v1test.BatchUpdateBlobsResponse;
-import com.google.devtools.remoteexecution.v1test.Command;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.Directory;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata.Stage;
-import com.google.devtools.remoteexecution.v1test.ExecuteRequest;
-import com.google.devtools.remoteexecution.v1test.ExecutionGrpc;
-import com.google.devtools.remoteexecution.v1test.FindMissingBlobsRequest;
-import com.google.devtools.remoteexecution.v1test.FindMissingBlobsResponse;
-import com.google.devtools.remoteexecution.v1test.GetActionResultRequest;
-import com.google.devtools.remoteexecution.v1test.UpdateBlobRequest;
-import com.google.devtools.remoteexecution.v1test.ContentAddressableStorageGrpc;
 import com.google.longrunning.CancelOperationRequest;
 import com.google.longrunning.GetOperationRequest;
 import com.google.longrunning.ListOperationsRequest;
@@ -66,6 +73,7 @@ import io.grpc.StatusRuntimeException;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import java.util.Collections;
+import java.util.function.Function;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -93,7 +101,12 @@ public class BuildFarmServerTest {
         .setOperationCompletedDelay(Duration.newBuilder()
             .setSeconds(10)
             .setNanos(0))
-        .setCasMaxSizeBytes(640 * 1024)
+        .setCasConfig(ContentAddressableStorageConfig.newBuilder()
+            .setMemory(MemoryCASConfig.newBuilder()
+                .setMaxSizeBytes(640 * 1024)))
+        .setActionCacheConfig(ActionCacheConfig.newBuilder()
+            .setDelegateCas(DelegateCASConfig.getDefaultInstance())
+            .build())
         .setDefaultActionTimeout(Duration.newBuilder()
             .setSeconds(600)
             .setNanos(0))
@@ -106,7 +119,7 @@ public class BuildFarmServerTest {
         BuildFarmServerConfig.newBuilder().setPort(0);
     configBuilder.addInstancesBuilder()
         .setName("memory")
-        .setHashFunction(HashFunction.SHA256)
+        .setDigestFunction(DigestFunction.SHA256)
         .setMemoryInstanceConfig(memoryInstanceConfig);
 
     server = new BuildFarmServer(
@@ -125,7 +138,7 @@ public class BuildFarmServerTest {
 
   @Test
   public void findMissingBlobs() {
-    DigestUtil digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
+    DigestUtil digestUtil = new DigestUtil(HashFunction.SHA256);
     ByteString content = ByteString.copyFromUtf8("Hello, World!");
     Iterable<Digest> digests =
         Collections.singleton(digestUtil.compute(content));
@@ -144,13 +157,13 @@ public class BuildFarmServerTest {
 
   @Test
   public void batchUpdateBlobs() {
-    DigestUtil digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
+    DigestUtil digestUtil = new DigestUtil(HashFunction.SHA256);
     ByteString content = ByteString.copyFromUtf8("Hello, World!");
     Digest digest = digestUtil.compute(content);
     BatchUpdateBlobsRequest request = BatchUpdateBlobsRequest.newBuilder()
         .setInstanceName("memory")
-        .addRequests(UpdateBlobRequest.newBuilder()
-            .setContentDigest(digest)
+        .addRequests(Request.newBuilder()
+            .setDigest(digest)
             .setData(content)
             .build())
         .build();
@@ -159,8 +172,8 @@ public class BuildFarmServerTest {
 
     BatchUpdateBlobsResponse response = stub.batchUpdateBlobs(request);
 
-    BatchUpdateBlobsResponse.Response expected = BatchUpdateBlobsResponse.Response.newBuilder()
-        .setBlobDigest(digest)
+    Response expected = Response.newBuilder()
+        .setDigest(digest)
         .setStatus(com.google.rpc.Status.newBuilder()
             .setCode(Code.OK.getNumber())
             .build())
@@ -235,8 +248,10 @@ public class BuildFarmServerTest {
     Operation cancelledOperation = getOperation(operation.getName());
 
     assertThat(cancelledOperation.getDone()).isTrue();
-    assertThat(cancelledOperation.getResultCase()).isEqualTo(Operation.ResultCase.ERROR);
-    assertThat(cancelledOperation.getError().getCode()).isEqualTo(Code.CANCELLED.getNumber());
+    assertThat(cancelledOperation.getResultCase()).isEqualTo(Operation.ResultCase.RESPONSE);
+    ExecuteResponse executeResponse = cancelledOperation.getResponse()
+        .unpack(ExecuteResponse.class);
+    assertThat(executeResponse.getStatus().getCode()).isEqualTo(Code.CANCELLED.getNumber());
   }
 
   @Test
@@ -261,7 +276,7 @@ public class BuildFarmServerTest {
       givenOperation.getMetadata().unpack(ExecuteOperationMetadata.class);
 
     executingMetadata = executingMetadata.toBuilder()
-        .setStage(ExecuteOperationMetadata.Stage.EXECUTING)
+        .setStage(Stage.EXECUTING)
         .build();
 
     Operation executingOperation = givenOperation.toBuilder()
@@ -274,7 +289,7 @@ public class BuildFarmServerTest {
     assertThat(operationQueueStub
         .poll(PollOperationRequest.newBuilder()
             .setOperationName(executingOperation.getName())
-            .setStage(ExecuteOperationMetadata.Stage.EXECUTING)
+            .setStage(Stage.EXECUTING)
             .build())
         .getCode()).isEqualTo(Code.OK.getNumber());
 
@@ -288,7 +303,7 @@ public class BuildFarmServerTest {
     // poll should fail
     assertThat(operationQueueStub
         .poll(PollOperationRequest.newBuilder()
-            .setStage(ExecuteOperationMetadata.Stage.EXECUTING)
+            .setStage(Stage.EXECUTING)
             .setOperationName(executingOperation.getName())
             .build())
         .getCode()).isEqualTo(Code.UNAVAILABLE.getNumber());
@@ -308,64 +323,69 @@ public class BuildFarmServerTest {
   @Test
   public void actionWithExcessiveTimeoutFailsValidation()
       throws RetryException, InterruptedException, InvalidProtocolBufferException {
-    Action actionWithExcessiveTimeout = createSimpleAction().toBuilder()
-        .setTimeout(Duration.newBuilder().setSeconds(9000))
-        .build();
+    Digest actionDigestWithExcessiveTimeout = createAction(Action.newBuilder()
+        .setTimeout(Duration.newBuilder().setSeconds(9000)));
 
-    Operation operation = executeAction(actionWithExcessiveTimeout);
-
-    Operation failedOperation = getOperation(operation.getName());
+    Operation failedOperation = executeAction(actionDigestWithExcessiveTimeout);
     assertThat(failedOperation.getDone()).isTrue();
     assertThat(
         failedOperation
             .getMetadata()
             .unpack(ExecuteOperationMetadata.class).getStage())
         .isEqualTo(Stage.COMPLETED);
-    assertThat(failedOperation.getError().getCode())
+    ExecuteResponse executeResponse = failedOperation.getResponse().unpack(ExecuteResponse.class);
+    com.google.rpc.Status status = executeResponse.getStatus();
+    assertThat(status.getCode())
         .isEqualTo(Code.FAILED_PRECONDITION.getNumber());
-    assertThat(failedOperation.getError().getDetailsCount()).isEqualTo(1);
-    PreconditionFailure preconditionFailure = failedOperation
-        .getError().getDetailsList().get(0).unpack(PreconditionFailure.class);
+    assertThat(status.getDetailsCount()).isEqualTo(1);
+    PreconditionFailure preconditionFailure = status
+        .getDetailsList().get(0).unpack(PreconditionFailure.class);
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
     Violation violation = preconditionFailure.getViolationsList().get(0);
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
   }
 
-  private Action createSimpleAction() throws RetryException, InterruptedException {
-    DigestUtil digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
+  private Digest createSimpleAction() throws RetryException, InterruptedException {
+    return createAction(Action.newBuilder());
+  }
+
+  private Digest createAction(Action.Builder actionBuilder) throws RetryException, InterruptedException {
+    DigestUtil digestUtil = new DigestUtil(HashFunction.SHA256);
     Command command = Command.newBuilder()
         .addArguments("echo")
         .build();
     Digest commandBlobDigest = digestUtil.compute(command);
     Directory root = Directory.getDefaultInstance();
     Digest rootBlobDigest = digestUtil.compute(root);
-    Action action = Action.newBuilder()
+    Action action = actionBuilder
         .setCommandDigest(commandBlobDigest)
         .setInputRootDigest(rootBlobDigest)
         .build();
+    Digest actionDigest = digestUtil.compute(action);
     ByteStreamUploader uploader = new ByteStreamUploader("memory", inProcessChannel, null, 60, Retrier.NO_RETRIES, null);
 
     uploader.uploadBlobs(ImmutableList.of(
+        new Chunker(action.toByteString(), actionDigest),
         new Chunker(command.toByteString(), commandBlobDigest)));
-    return action;
+    return actionDigest;
   }
 
-  private Operation executeAction(Action action) {
+  private Operation executeAction(Digest actionDigest) {
     ExecuteRequest executeRequest = ExecuteRequest.newBuilder()
         .setInstanceName("memory")
-        .setAction(action)
+        .setActionDigest(actionDigest)
         .setSkipCacheLookup(true)
         .build();
 
     ExecutionGrpc.ExecutionBlockingStub executeStub =
         ExecutionGrpc.newBlockingStub(inProcessChannel);
 
-    return executeStub.execute(executeRequest);
+    return executeStub.execute(executeRequest).next();
   }
 
   @Test
   public void actionNotCached() {
-    DigestUtil digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
+    DigestUtil digestUtil = new DigestUtil(HashFunction.SHA256);
     GetActionResultRequest request = GetActionResultRequest.newBuilder()
         .setInstanceName("memory")
         .setActionDigest(digestUtil.empty())

@@ -16,6 +16,7 @@ package build.buildfarm.server;
 
 import static com.google.common.base.Preconditions.checkState;
 
+import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Instance.ChunkObserver;
@@ -29,7 +30,6 @@ import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
-import com.google.devtools.remoteexecution.v1test.Digest;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.StatusException;

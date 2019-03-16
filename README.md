@@ -16,7 +16,7 @@ In general do not execute server binaries with bazel run, since bazel does not s
 
 All commandline options override corresponding config settings.
 
-### Bazel BuildFarmServer
+### Bazel BuildfarmServer
 
 Run via
 
@@ -25,12 +25,12 @@ Run via
 
 - **`configfile`** has to be in (undocumented) Protocol Buffer text format.
 
-  For an example, see the `examples` directory.
+  For an example, see the [examples](examples) directory.
   For format details see [here](https://stackoverflow.com/questions/18873924/what-does-the-protobuf-text-format-look-like). Protocol Buffer structure at [src/main/protobuf/build/buildfarm/v1test/buildfarm.proto](src/main/protobuf/build/buildfarm/v1test/buildfarm.proto)
 
 - **`PORT`** to expose service endpoints on
 
-### Bazel BuildFarmWorker
+### Bazel BuildfarmWorker
 
 Run via
 
@@ -39,7 +39,7 @@ Run via
 
 - **`configfile`** has to be in (undocumented) Protocol Buffer text format.
 
-  For an example, see the `examples` directory.
+  For an example, see the [examples](examples) directory.
   For format details see [here](https://stackoverflow.com/questions/18873924/what-does-the-protobuf-text-format-look-like). Protocol Buffer structure at [src/main/protobuf/build/buildfarm/v1test/buildfarm.proto](src/main/protobuf/build/buildfarm/v1test/buildfarm.proto)
 
 - **`ROOT`** base directory path for all work being performed.
@@ -48,16 +48,28 @@ Run via
 
 ### Bazel Itself
 
-To have bazel use the bazel buildfarm configured using the example configs provided in the `examples` directory, you could configure your
+To have bazel use the bazel buildfarm configured using the example configs provided in the [examples](examples) directory, you could configure your
 `.bazelrc` as follows:
 
 ```
 $ cat .bazelrc
-startup --host_jvm_args=-Dbazel.DigestFunction=SHA1
-build --spawn_strategy=remote --genrule_strategy=remote --strategy=Javac=remote --strategy=Closure=remote  --remote_executor=localhost:8980
+build --spawn_strategy=remote --genrule_strategy=remote --strategy=Javac=remote --strategy=Closure=remote --remote_executor=localhost:8980
 ```
 
 Then run your build as you would normally do.
+
+### Debugging
+
+Buildfarm uses [Java's Logging framework](https://docs.oracle.com/javase/10/core/java-logging-overview.htm) and outputs all routine behavior to the NICE [Level](https://docs.oracle.com/javase/8/docs/api/java/util/logging/Level.html).
+
+You can use typical Java logging configuration to filter these results and observe the flow of executions through your running services.
+An example `logging.properties` file has been provided at [examples/debug.logging.properties](examples/debug.logging.properties) for use as follows:
+
+    bazel-bin/src/main/java/build/buildfarm/buildfarm-server --jvm_flag=-Djava.util.logging.config.file=examples/debug.logging.properties ...
+
+and
+
+    bazel-bin/src/main/java/build/buildfarm/buildfarm-worker --jvm_flag=-Djava.util.logging.config.file=examples/debug.logging.properties ...
 
 ## Developer Information
 

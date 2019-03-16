@@ -124,7 +124,6 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
       responseObserver.onNext(Empty.getDefaultInstance());
       responseObserver.onCompleted();
     } catch (InterruptedException e) {
-      responseObserver.onError(Status.fromThrowable(e).asException());
       Thread.currentThread().interrupt();
     }
   }

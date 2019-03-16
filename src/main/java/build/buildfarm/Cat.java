@@ -2,6 +2,18 @@ package build.buildfarm;
 
 import static build.buildfarm.instance.Utils.getBlob;
 
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.DirectoryNode;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecuteResponse;
+import build.bazel.remote.execution.v2.FileNode;
+import build.bazel.remote.execution.v2.OutputFile;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.ByteStreamUploader;
@@ -12,18 +24,6 @@ import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
-import com.google.devtools.remoteexecution.v1test.Action;
-import com.google.devtools.remoteexecution.v1test.ActionResult;
-import com.google.devtools.remoteexecution.v1test.Command;
-import com.google.devtools.remoteexecution.v1test.Command.EnvironmentVariable;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.Directory;
-import com.google.devtools.remoteexecution.v1test.DirectoryNode;
-import com.google.devtools.remoteexecution.v1test.ExecuteOperationMetadata;
-import com.google.devtools.remoteexecution.v1test.ExecuteResponse;
-import com.google.devtools.remoteexecution.v1test.FileNode;
-import com.google.devtools.remoteexecution.v1test.OutputFile;
-import com.google.devtools.remoteexecution.v1test.RequestMetadata;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.util.Durations;
@@ -55,13 +55,6 @@ class Cat {
 
     System.out.println("Command Digest: Command " + DigestUtil.toString(action.getCommandDigest()));
     System.out.println("Input Root Digest: Directory " + DigestUtil.toString(action.getInputRootDigest()));
-    for (String outputFile : action.getOutputFilesList()) {
-      System.out.println("OutputFile: " + outputFile);
-    }
-    for (String outputDirectory : action.getOutputDirectoriesList()) {
-      System.out.println("OutputDirectory: " + outputDirectory);
-    }
-    // FIXME platform
     // FIXME timeout
     System.out.println("DoNotCache: " + (action.getDoNotCache() ? "true" : "false"));
   }
@@ -75,6 +68,13 @@ class Cat {
       return;
     }
 
+    for (String outputFile : command.getOutputFilesList()) {
+      System.out.println("OutputFile: " + outputFile);
+    }
+    for (String outputDirectory : command.getOutputDirectoriesList()) {
+      System.out.println("OutputDirectory: " + outputDirectory);
+    }
+    // FIXME platform
     System.out.println("Arguments: ('" + String.join("', '", command.getArgumentsList()) + "')");
     if (command.getEnvironmentVariablesList().isEmpty()) {
       System.out.println("Environment Variables:");
@@ -91,9 +91,6 @@ class Cat {
   private static void printActionResult(ActionResult result, int indentLevel) {
     for (OutputFile outputFile : result.getOutputFilesList()) {
       String attrs = "";
-      if (outputFile.getContent().size() == outputFile.getDigest().getSizeBytes()) {
-        attrs += "inline";
-      }
       if (outputFile.getIsExecutable()) {
         attrs += (attrs.length() == 0 ? "" : ",") + "executable";
       }

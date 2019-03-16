@@ -21,6 +21,17 @@ import static com.google.common.util.concurrent.Futures.catching;
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 
+import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
+import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest.Request;
+import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
+import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse.Response;
+import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
+import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
+import build.bazel.remote.execution.v2.GetTreeRequest;
+import build.bazel.remote.execution.v2.GetTreeResponse;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Instance.ChunkObserver;
 import com.google.common.base.Function;
@@ -28,17 +39,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ListenableFuture;
-import com.google.devtools.remoteexecution.v1test.BatchUpdateBlobsRequest;
-import com.google.devtools.remoteexecution.v1test.BatchUpdateBlobsResponse;
-import com.google.devtools.remoteexecution.v1test.BatchUpdateBlobsResponse.Response;
-import com.google.devtools.remoteexecution.v1test.ContentAddressableStorageGrpc;
-import com.google.devtools.remoteexecution.v1test.Digest;
-import com.google.devtools.remoteexecution.v1test.Directory;
-import com.google.devtools.remoteexecution.v1test.FindMissingBlobsRequest;
-import com.google.devtools.remoteexecution.v1test.FindMissingBlobsResponse;
-import com.google.devtools.remoteexecution.v1test.GetTreeRequest;
-import com.google.devtools.remoteexecution.v1test.GetTreeResponse;
-import com.google.devtools.remoteexecution.v1test.UpdateBlobRequest;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.Status.Code;
@@ -97,17 +97,17 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
           @Override
           public Response apply(Code code) {
             return Response.newBuilder()
-                .setBlobDigest(digest)
+                .setDigest(digest)
                 .setStatus(statusForCode(code))
                 .build();
           }
         });
   }
 
-  private static Iterable<ListenableFuture<Response>> putAllBlobs(Instance instance, Iterable<UpdateBlobRequest> requests) {
+  private static Iterable<ListenableFuture<Response>> putAllBlobs(Instance instance, Iterable<Request> requests) {
     ImmutableList.Builder<ListenableFuture<Response>> responses = new ImmutableList.Builder<>();
-    for (UpdateBlobRequest request : requests) {
-      Digest digest = request.getContentDigest();
+    for (Request request : requests) {
+      Digest digest = request.getDigest();
       responses.add(
           toResponseFuture(
               catching(
@@ -153,6 +153,26 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
     });
   }
 
+  private void getInstanceTree(
+      Instance instance,
+      Digest rootDigest,
+      String pageToken,
+      int pageSize,
+      StreamObserver<GetTreeResponse> responseObserver) throws IOException, InterruptedException {
+    do {
+      ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
+      String nextPageToken = instance.getTree(
+          rootDigest, pageSize, pageToken, directories, /* acceptMissing=*/ true);
+
+      responseObserver.onNext(GetTreeResponse.newBuilder()
+          .addAllDirectories(directories.build())
+          .setNextPageToken(nextPageToken)
+          .build());
+      pageToken = nextPageToken;
+    } while (!pageToken.isEmpty());
+    responseObserver.onCompleted();
+  }
+
   @Override
   public void getTree(
       GetTreeRequest request,
@@ -170,18 +190,18 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
       responseObserver.onError(Status.INVALID_ARGUMENT.asException());
       return;
     }
-    ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
-    try {
-      String nextPageToken = instance.getTree(
-          request.getRootDigest(), pageSize, request.getPageToken(), directories, /*acceptMissing=*/ true);
 
-      responseObserver.onNext(GetTreeResponse.newBuilder()
-          .addAllDirectories(directories.build())
-          .setNextPageToken(nextPageToken)
-          .build());
-      responseObserver.onCompleted();
-    } catch (InterruptedException|IOException e) {
+    try {
+      getInstanceTree(
+          instance,
+          request.getRootDigest(),
+          request.getPageToken(),
+          pageSize,
+          responseObserver);
+    } catch (IOException e) {
       responseObserver.onError(Status.fromThrowable(e).asException());
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
     }
   }
 }
