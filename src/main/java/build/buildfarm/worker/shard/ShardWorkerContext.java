@@ -348,11 +348,6 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
-  public int getTreePageSize() {
-    return 0;
-  }
-
-  @Override
   public boolean hasDefaultActionTimeout() {
     return false;
   }

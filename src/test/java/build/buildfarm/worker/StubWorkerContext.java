@@ -53,7 +53,6 @@ class StubWorkerContext implements WorkerContext {
   @Override public ExecutionPolicy getExecutionPolicy(String name) { throw new UnsupportedOperationException(); }
   @Override public int getInputFetchStageWidth() { throw new UnsupportedOperationException(); }
   @Override public int getExecuteStageWidth() { throw new UnsupportedOperationException(); }
-  @Override public int getTreePageSize() { throw new UnsupportedOperationException(); }
   @Override public boolean hasDefaultActionTimeout() { throw new UnsupportedOperationException(); }
   @Override public boolean hasMaximumActionTimeout() { throw new UnsupportedOperationException(); }
   @Override public boolean getStreamStdout() { throw new UnsupportedOperationException(); }

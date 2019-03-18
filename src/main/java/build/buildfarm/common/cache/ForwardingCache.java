@@ -50,7 +50,7 @@ public abstract class ForwardingCache<K, V> extends ForwardingObject implements 
 
   /** @since 11.0 */
   @Override
-  public ListenableFuture<V> get(K key, Callable<? extends V> valueLoader) {
+  public ListenableFuture<V> get(K key, Callable<ListenableFuture<? extends V>> valueLoader) {
     return delegate().get(key, valueLoader);
   }
 

@@ -130,3 +130,48 @@ java_library(
         ":netty_resolver",
     ],
 )
+
+java_library(
+    name = "netty_transport_native_epoll",
+    visibility = [
+        "//visibility:public",
+    ],
+    exports = [
+        "//external:jar/io/netty/netty_transport_native_epoll",
+    ],
+    runtime_deps = [
+        ":netty_buffer",
+        ":netty_common",
+        ":netty_transport",
+    ],
+)
+
+java_library(
+    name = "netty_transport_native_kqueue",
+    visibility = [
+        "//visibility:public",
+    ],
+    exports = [
+        "//external:jar/io/netty/netty_transport_native_kqueue",
+    ],
+    runtime_deps = [
+        ":netty_buffer",
+        ":netty_common",
+        ":netty_transport",
+        ":netty_transport_native_unix_common",
+    ],
+)
+
+java_library(
+    name = "netty_transport_native_unix_common",
+    visibility = [
+        "//visibility:public",
+    ],
+    exports = [
+        "//external:jar/io/netty/netty_transport_native_unix_common",
+    ],
+    runtime_deps = [
+        ":netty_common",
+        ":netty_transport",
+    ],
+)

@@ -137,7 +137,7 @@ class Cat {
     String pageToken = "";
 
     do {
-      pageToken = instance.getTree(rootDigest, 1024, pageToken, directories, false);
+      pageToken = instance.getTree(rootDigest, 1024, pageToken, directories);
     } while (!pageToken.isEmpty());
 
     return directories.build();
@@ -374,7 +374,6 @@ class Cat {
         digestUtil,
         channel,
         10, TimeUnit.SECONDS,
-        Retrier.NO_RETRIES,
         new ByteStreamUploader("", channel, null, 300, Retrier.NO_RETRIES, null));
     String type = args[3];
     if (type.equals("Operations") && args.length == 4) {

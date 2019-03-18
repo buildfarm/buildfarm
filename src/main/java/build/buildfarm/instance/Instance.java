@@ -61,10 +61,9 @@ public interface Instance {
       Digest rootDigest,
       int pageSize,
       String pageToken,
-      ImmutableList.Builder<Directory> directories,
-      boolean acceptMissing) throws IOException, InterruptedException;
+      ImmutableList.Builder<Directory> directories);
   CommittingOutputStream getStreamOutput(String name, long expectedSize);
-  InputStream newStreamInput(String name, long offset) throws IOException, InterruptedException;
+  InputStream newStreamInput(String name, long offset) throws IOException;
 
   void execute(
       Digest actionDigest,

@@ -32,7 +32,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Chunker;
 import build.buildfarm.v1test.CASInsertionPolicy;
-import build.buildfarm.v1test.WorkerConfig;
+import build.buildfarm.worker.PipelineStage.NullStage;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.jimfs.Configuration;
@@ -73,8 +73,6 @@ public class UploadOutputsTest {
 
     fileSystem = Jimfs.newFileSystem(config);
     root = Iterables.getFirst(fileSystem.getRootDirectories(), null);
-
-    fileSystem = Jimfs.newFileSystem(config);
 
     resultBuilder = ActionResult.newBuilder();
   }

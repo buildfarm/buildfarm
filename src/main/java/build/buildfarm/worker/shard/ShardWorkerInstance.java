@@ -34,9 +34,9 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.ShardBackplane;
+import build.buildfarm.common.TokenizableIterator;
+import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.instance.AbstractServerInstance;
-import build.buildfarm.instance.TokenizableIterator;
-import build.buildfarm.instance.TreeIterator.DirectoryEntry;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.QueueEntry;
@@ -154,10 +154,14 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  public ByteString getBlob(Digest blobDigest, long offset, long limit) throws IOException {
+  public ByteString getBlob(Digest blobDigest, long offset, long limit) {
     Blob blob = contentAddressableStorage.get(blobDigest);
     if (blob == null) {
-      backplane.removeBlobLocation(blobDigest, getName());
+      try {
+        backplane.removeBlobLocation(blobDigest, getName());
+      } catch (IOException e) {
+        logger.log(SEVERE, "error removing blob location for " + DigestUtil.toString(blobDigest), e);
+      }
       return null;
     }
     ByteString content = blob.getData();
@@ -186,8 +190,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
       Digest rootDigest,
       int pageSize,
       String pageToken,
-      ImmutableList.Builder<Directory> directories,
-      boolean acceptMissing) {
+      ImmutableList.Builder<Directory> directories) {
     throw new UnsupportedOperationException();
   }
 

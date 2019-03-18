@@ -23,7 +23,7 @@ public abstract class PipelineStage implements Runnable {
   protected final String name;
   protected final WorkerContext workerContext;
   protected final PipelineStage output;
-  private final PipelineStage error;
+  protected final PipelineStage error;
 
   private PipelineStage input = null;
   protected boolean claimed = false;
@@ -193,9 +193,11 @@ public abstract class PipelineStage implements Runnable {
 
   public static class NullStage extends PipelineStage {
     public NullStage() {
-      super(null, null, null, null);
+      super("NullStage", null, null, null);
     }
 
+    @Override
+    public Logger getLogger() { return null; }
     @Override
     public boolean claim() { return true; }
     @Override
@@ -212,7 +214,5 @@ public abstract class PipelineStage implements Runnable {
     public void close() { }
     @Override
     public boolean isClosed() { return false; }
-    @Override
-    public Logger getLogger() { return null; }
   }
 }

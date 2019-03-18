@@ -158,11 +158,11 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
       Digest rootDigest,
       String pageToken,
       int pageSize,
-      StreamObserver<GetTreeResponse> responseObserver) throws IOException, InterruptedException {
+      StreamObserver<GetTreeResponse> responseObserver) {
     do {
       ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
       String nextPageToken = instance.getTree(
-          rootDigest, pageSize, pageToken, directories, /* acceptMissing=*/ true);
+          rootDigest, pageSize, pageToken, directories);
 
       responseObserver.onNext(GetTreeResponse.newBuilder()
           .addAllDirectories(directories.build())
@@ -191,18 +191,11 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
       return;
     }
 
-    try {
-      getInstanceTree(
-          instance,
-          request.getRootDigest(),
-          request.getPageToken(),
-          pageSize,
-          responseObserver);
-    } catch (IOException e) {
-      responseObserver.onError(Status.fromThrowable(e).asException());
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    }
+    getInstanceTree(
+        instance,
+        request.getRootDigest(),
+        request.getPageToken(),
+        pageSize,
+        responseObserver);
   }
 }
-

@@ -23,7 +23,6 @@ import static build.buildfarm.instance.AbstractServerInstance.VIOLATION_TYPE_MIS
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
-import static io.grpc.Status.Code.CANCELLED;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atLeast;
@@ -63,10 +62,10 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
+import com.google.rpc.Code;
 import com.google.rpc.PreconditionFailure;
 import com.google.rpc.PreconditionFailure.Violation;
 import io.grpc.Status;
-import io.grpc.Status.Code;
 import io.grpc.StatusRuntimeException;
 import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.StreamObserver;
@@ -79,6 +78,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.invocation.InvocationOnMock;
@@ -143,8 +143,6 @@ public class ShardInstanceTest {
     Directory inputRoot = Directory.getDefaultInstance();
     ByteString inputRootBlob = inputRoot.toByteString();
     Digest inputRootDigest = DIGEST_UTIL.compute(inputRootBlob);
-    when(mockBackplane.getTree(eq(inputRootDigest))).thenReturn(ImmutableList.of(inputRoot));
-
     provideBlob(inputRootDigest, inputRootBlob);
 
     return createAction(provideAction, provideCommand, inputRootDigest, command);
@@ -217,24 +215,24 @@ public class ShardInstanceTest {
 
     Poller poller = mock(Poller.class);
 
-    boolean unknownExceptionCaught = false;
+    boolean failedPreconditionExceptionCaught = false;
     try {
       instance.queue(executeEntry, poller)
           .get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
     } catch (ExecutionException e) {
-      Status status = Status.fromThrowable(e);
-      if (status.getCode() == Code.FAILED_PRECONDITION) {
-        unknownExceptionCaught = true;
+      com.google.rpc.Status status = StatusProto.fromThrowable(e);
+      if (status.getCode() == Code.FAILED_PRECONDITION.getNumber()) {
+        failedPreconditionExceptionCaught = true;
       } else {
         e.getCause().printStackTrace();
       }
     }
-    assertThat(unknownExceptionCaught).isTrue();
+    assertThat(failedPreconditionExceptionCaught).isTrue();
 
     ExecuteResponse executeResponse = ExecuteResponse.newBuilder()
         .setStatus(com.google.rpc.Status.newBuilder()
-            .setCode(Code.FAILED_PRECONDITION.value())
-            .setMessage("FAILED_PRECONDITION: Action " + DigestUtil.toString(actionDigest) + " is invalid")
+            .setCode(Code.FAILED_PRECONDITION.getNumber())
+            .setMessage(ShardInstance.invalidActionMessage(actionDigest))
             .addDetails(Any.pack(PreconditionFailure.newBuilder()
                 .addViolations(Violation.newBuilder()
                     .setType(VIOLATION_TYPE_MISSING)
@@ -270,24 +268,24 @@ public class ShardInstanceTest {
 
     Poller poller = mock(Poller.class);
 
-    boolean unknownExceptionCaught = false;
+    boolean failedPreconditionExceptionCaught = false;
     try {
       instance.queue(executeEntry, poller)
           .get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
     } catch (ExecutionException e) {
-      Status status = Status.fromThrowable(e);
-      if (status.getCode() == Code.FAILED_PRECONDITION) {
-        unknownExceptionCaught = true;
+      com.google.rpc.Status status = StatusProto.fromThrowable(e);
+      if (status.getCode() == Code.FAILED_PRECONDITION.getNumber()) {
+        failedPreconditionExceptionCaught = true;
       } else {
         e.getCause().printStackTrace();
       }
     }
-    assertThat(unknownExceptionCaught).isTrue();
+    assertThat(failedPreconditionExceptionCaught).isTrue();
 
     ExecuteResponse executeResponse = ExecuteResponse.newBuilder()
         .setStatus(com.google.rpc.Status.newBuilder()
-            .setCode(Code.FAILED_PRECONDITION.value())
-            .setMessage("FAILED_PRECONDITION: Action " + DigestUtil.toString(actionDigest) + " is invalid")
+            .setCode(Code.FAILED_PRECONDITION.getNumber())
+            .setMessage(ShardInstance.invalidActionMessage(actionDigest))
             .addDetails(Any.pack(PreconditionFailure.newBuilder()
                 .addViolations(Violation.newBuilder()
                     .setType(VIOLATION_TYPE_MISSING)
@@ -342,8 +340,8 @@ public class ShardInstanceTest {
       instance.queue(executeEntry, poller)
           .get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
     } catch (ExecutionException e) {
-      Status status = Status.fromThrowable(e);
-      if (status.getCode() == Code.UNAVAILABLE) {
+      com.google.rpc.Status status = StatusProto.fromThrowable(e);
+      if (status.getCode() == Code.UNAVAILABLE.getNumber()) {
         unavailableExceptionCaught = true;
       } else {
         throw e;
@@ -424,10 +422,12 @@ public class ShardInstanceTest {
         .setSizeBytes(1)
         .build();
 
-    when(mockBackplane.getTree(eq(missingDirectoryDigest))).thenReturn(null);
     when(mockBackplane.getOperation(eq(operationName))).thenReturn(
         Operation.newBuilder()
             .setName(operationName)
+            .setMetadata(Any.pack(ExecuteOperationMetadata.newBuilder()
+                .setStage(QUEUED)
+                .build()))
             .build());
 
     Action action = createAction(true, true, missingDirectoryDigest, SIMPLE_COMMAND);
@@ -438,14 +438,16 @@ public class ShardInstanceTest {
             .setSkipCacheLookup(true)
             .setActionDigest(actionDigest))
         .build();
-    com.google.rpc.Status.Builder statusBuilder = com.google.rpc.Status.newBuilder();
-    assertThat(instance.requeueOperation(queueEntry, statusBuilder)).isFalse();
+    instance.requeueOperation(queueEntry).get();
+    ArgumentCaptor<Operation> operationCaptor = ArgumentCaptor.forClass(Operation.class);
+    verify(mockBackplane, times(1)).putOperation(operationCaptor.capture(), eq(COMPLETED));
+    Operation operation = operationCaptor.getValue();
+    assertThat(operation.getResponse().is(ExecuteResponse.class)).isTrue();
+    ExecuteResponse executeResponse = operation.getResponse().unpack(ExecuteResponse.class);
+    com.google.rpc.Status status = executeResponse.getStatus();
     com.google.rpc.Status expectedStatus = com.google.rpc.Status.newBuilder()
-        .setCode(Code.FAILED_PRECONDITION.value())
-        .setMessage(
-            String.format(
-                "FAILED_PRECONDITION: Action %s is invalid",
-                DigestUtil.toString(actionDigest)))
+        .setCode(Code.FAILED_PRECONDITION.getNumber())
+        .setMessage(ShardInstance.invalidActionMessage(actionDigest))
         .addDetails(Any.pack(PreconditionFailure.newBuilder()
             .addViolations(Violation.newBuilder()
                 .setType(VIOLATION_TYPE_MISSING)
@@ -453,7 +455,7 @@ public class ShardInstanceTest {
                 .setDescription("Directory " + DigestUtil.toString(missingDirectoryDigest)))
             .build()))
         .build();
-    assertThat(statusBuilder.build()).isEqualTo(expectedStatus);
+    assertThat(status).isEqualTo(expectedStatus);
   }
 
   private void provideBlob(Digest digest, ByteString content) {
@@ -495,9 +497,6 @@ public class ShardInstanceTest {
             .setActionDigest(actionDigest))
         .setQueuedOperationDigest(queuedOperationDigest)
         .build();
-    com.google.rpc.Status.Builder statusBuilder = com.google.rpc.Status.newBuilder();
-    boolean requeued = instance.requeueOperation(queueEntry, statusBuilder);
-    System.out.println(statusBuilder.build());
-    assertThat(requeued).isTrue();
+    instance.requeueOperation(queueEntry).get();
   }
 }

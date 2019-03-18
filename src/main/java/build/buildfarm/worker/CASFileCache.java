@@ -233,8 +233,17 @@ public abstract class CASFileCache implements ContentAddressableStorage, OutputS
     return false;
   }
 
-  @Override
-  public boolean contains(Digest digest) {
+  public Iterable<Digest> findMissingBlobs(Iterable<Digest> digests) {
+    ImmutableList.Builder<Digest> missingDigests = ImmutableList.builder();
+    for (Digest digest : digests) {
+      if (!contains(digest)) {
+        missingDigests.add(digest);
+      }
+    }
+    return missingDigests.build();
+  }
+
+  private boolean contains(Digest digest) {
     try {
       /* maybe swap the order here if we're higher in ratio on one side */
       return contains(digest, false) || contains(digest, true);

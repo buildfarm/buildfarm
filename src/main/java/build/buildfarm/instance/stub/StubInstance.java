@@ -15,8 +15,30 @@
 package build.buildfarm.instance.stub;
 
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.util.concurrent.Futures.immediateFuture;
+import static com.google.common.util.concurrent.Futures.transform;
 import static java.util.logging.Level.SEVERE;
 
+import build.bazel.remote.execution.v2.ActionCacheGrpc;
+import build.bazel.remote.execution.v2.ActionCacheGrpc.ActionCacheBlockingStub;
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc;
+import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageBlockingStub;
+import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageFutureStub;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecutionPolicy;
+import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
+import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
+import build.bazel.remote.execution.v2.GetActionResultRequest;
+import build.bazel.remote.execution.v2.GetTreeRequest;
+import build.bazel.remote.execution.v2.GetTreeResponse;
+import build.bazel.remote.execution.v2.Platform;
+import build.bazel.remote.execution.v2.RequestMetadata;
+import build.bazel.remote.execution.v2.ResultsCachePolicy;
+import build.bazel.remote.execution.v2.ServerCapabilities;
+import build.bazel.remote.execution.v2.UpdateActionResultRequest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.instance.Instance;
@@ -38,7 +60,6 @@ import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
-import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.longrunning.CancelOperationRequest;
@@ -48,29 +69,6 @@ import com.google.longrunning.ListOperationsRequest;
 import com.google.longrunning.ListOperationsResponse;
 import com.google.longrunning.OperationsGrpc;
 import com.google.longrunning.OperationsGrpc.OperationsBlockingStub;
-import build.bazel.remote.execution.v2.ActionCacheGrpc;
-import build.bazel.remote.execution.v2.ActionCacheGrpc.ActionCacheBlockingStub;
-import build.bazel.remote.execution.v2.ActionResult;
-import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc;
-import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageBlockingStub;
-import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageFutureStub;
-import build.bazel.remote.execution.v2.Digest;
-import build.bazel.remote.execution.v2.Directory;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
-import build.bazel.remote.execution.v2.ExecuteRequest;
-import build.bazel.remote.execution.v2.ExecutionGrpc;
-import build.bazel.remote.execution.v2.ExecutionGrpc.ExecutionFutureStub;
-import build.bazel.remote.execution.v2.ExecutionPolicy;
-import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
-import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
-import build.bazel.remote.execution.v2.GetActionResultRequest;
-import build.bazel.remote.execution.v2.GetTreeRequest;
-import build.bazel.remote.execution.v2.GetTreeResponse;
-import build.bazel.remote.execution.v2.Platform;
-import build.bazel.remote.execution.v2.RequestMetadata;
-import build.bazel.remote.execution.v2.ResultsCachePolicy;
-import build.bazel.remote.execution.v2.ServerCapabilities;
-import build.bazel.remote.execution.v2.UpdateActionResultRequest;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -86,6 +84,7 @@ import java.io.OutputStream;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -98,7 +97,6 @@ public class StubInstance implements Instance {
   private final String name;
   private final DigestUtil digestUtil;
   private final ManagedChannel channel;
-  private final Retrier retrier;
   private final ByteStreamUploader uploader;
   private final long deadlineAfter;
   private final TimeUnit deadlineAfterUnits;
@@ -109,14 +107,12 @@ public class StubInstance implements Instance {
       DigestUtil digestUtil,
       ManagedChannel channel,
       long deadlineAfter, TimeUnit deadlineAfterUnits,
-      Retrier retrier,
       ByteStreamUploader uploader) {
     this.name = name;
     this.digestUtil = digestUtil;
     this.channel = channel;
     this.deadlineAfter = deadlineAfter;
     this.deadlineAfterUnits = deadlineAfterUnits;
-    this.retrier = retrier;
     this.uploader = uploader;
   }
 
@@ -183,15 +179,6 @@ public class StubInstance implements Instance {
             }
           });
 
-  private final Supplier<ExecutionFutureStub> executionFutureStub =
-      Suppliers.memoize(
-          new Supplier<ExecutionFutureStub>() {
-            @Override
-            public ExecutionFutureStub get() {
-              return ExecutionGrpc.newFutureStub(channel);
-            }
-          });
-
   @Override
   public String getName() {
     return name;
@@ -239,29 +226,28 @@ public class StubInstance implements Instance {
   @Override
   public void putActionResult(ActionKey actionKey, ActionResult actionResult) {
     throwIfStopped();
+    // should we be checking the ActionResult return value?
     actionCacheBlockingStub.get()
         .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
         .updateActionResult(UpdateActionResultRequest.newBuilder()
-        .setInstanceName(getName())
-        .setActionDigest(actionKey.getDigest())
-        .setActionResult(actionResult)
-        .build());
+            .setInstanceName(getName())
+            .setActionDigest(actionKey.getDigest())
+            .setActionResult(actionResult)
+            .build());
   }
 
   @Override
   public ListenableFuture<Iterable<Digest>> findMissingBlobs(Iterable<Digest> digests, ExecutorService service) {
     throwIfStopped();
     FindMissingBlobsRequest request = FindMissingBlobsRequest.newBuilder()
-            .setInstanceName(getName())
-            .addAllBlobDigests(digests)
-            .build();
+        .setInstanceName(getName())
+        .addAllBlobDigests(digests)
+        .build();
     if (request.getSerializedSize() > 4 * 1024 * 1024) {
       throw new IllegalStateException("FINDMISSINGBLOBS IS TOO LARGE");
     }
-    // we could executor here, but it seems unnecessary
-    return Futures.transform(
-        contentAddressableStorageFutureStub
-            .get()
+    return transform(
+        contentAddressableStorageFutureStub.get()
             .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
             .findMissingBlobs(request),
         (response) -> response.getMissingBlobDigestsList(),
@@ -272,46 +258,102 @@ public class StubInstance implements Instance {
   @Override
   public CommittingOutputStream getStreamOutput(String name, long expectedSize) {
     throwIfStopped();
+    if (expectedSize == 0) {
+      return new CommittingOutputStream() {
+        @Override
+        public void close() {
+        }
+
+        void writeLengthFail(int len) throws IOException {
+          throw new IOException("write of " + len + " would exceed expectedSize by " + len);
+        }
+
+        @Override
+        public void write(int b) throws IOException {
+          writeLengthFail(1);
+        }
+
+        @Override
+        public void write(byte[] b) throws IOException {
+          writeLengthFail(b.length);
+        }
+
+        @Override
+        public void write(byte[] b, int off, int len) throws IOException {
+          writeLengthFail(len);
+        }
+
+        @Override
+        public ListenableFuture<Long> getCommittedFuture() {
+          return immediateFuture(0l);
+        }
+      };
+    }
     return new CommittingOutputStream() {
-      SettableFuture<Long> committedFuture = SettableFuture.create();
       boolean closed = false;
       String resourceName = name;
       long writtenBytes = 0;
+      SettableFuture<WriteResponse> writeResponseFuture = SettableFuture.create();
       StreamObserver<WriteRequest> requestObserver = bsStub.get()
           .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
           .write(
               new StreamObserver<WriteResponse>() {
                 @Override
-                public void onNext(WriteResponse reply) {
-                  checkState(reply.getCommittedSize() == writtenBytes);
-                  requestObserver.onCompleted();
-                  committedFuture.set(reply.getCommittedSize());
+                public void onNext(WriteResponse response) {
+                  writeResponseFuture.set(response);
                 }
 
                 @Override
                 public void onError(Throwable t) {
-                  committedFuture.setException(t);
+                  writeResponseFuture.setException(
+                      new StatusRuntimeException(Status.fromThrowable(t)));
                 }
 
                 @Override
                 public void onCompleted() {
-                  if (!closed) {
+                  if (!closed && !writeResponseFuture.isDone()) {
                     logger.severe("Server closed connection before output stream for " + resourceName + " at " + writtenBytes);
                     // FIXME(werkt) better error, status
-                    committedFuture.setException(
+                    writeResponseFuture.setException(
                         new RuntimeException("Server closed connection before output stream."));
                   }
                 }
               }
           );
 
+      private long checkWriteResponse() throws IOException {
+        try {
+          return writeResponseFuture.get().getCommittedSize();
+        } catch (ExecutionException e) {
+          if (e.getCause() instanceof RuntimeException) {
+            throw (RuntimeException) e.getCause();
+          }
+          if (e.getCause() instanceof IOException) {
+            throw (IOException) e.getCause();
+          }
+          throw new IOException(e.getCause());
+        } catch (InterruptedException e) {
+          throw new IOException(e);
+        }
+      }
+
       @Override
-      public void close() {
-        if (!closed) {
+      public void close() throws IOException {
+        boolean finish = !closed && !writeResponseFuture.isDone();
+        if (finish) {
           closed = true;
-          requestObserver.onNext(WriteRequest.newBuilder()
-              .setFinishWrite(true)
-              .build());
+          if (expectedSize < 0 || writtenBytes < expectedSize) {
+            WriteRequest.Builder builder = WriteRequest.newBuilder()
+                .setFinishWrite(true);
+            if (writtenBytes == 0) {
+              builder.setResourceName(resourceName);
+            }
+            requestObserver.onNext(builder.build());
+          }
+          requestObserver.onCompleted();
+        }
+        if (checkWriteResponse() != writtenBytes) {
+          throw new IOException("committed_size did not match bytes written");
         }
       }
 
@@ -347,21 +389,29 @@ public class StubInstance implements Instance {
         if (closed) {
           throw new IOException("stream is closed");
         }
-        closed = isFinishWrite(writtenBytes + len);
-        WriteRequest request = createWriteRequest(ByteString.copyFrom(b, off, len), closed);
+        if (writeResponseFuture.isDone()) {
+          long committedSize = checkWriteResponse();
+          throw new IOException("write response with committed_size " + committedSize + " received before write");
+        }
+        if (expectedSize >= 0 && writtenBytes + len > expectedSize) {
+          throw new IOException("write of " + len + " would exceed expectedSize by " + (writtenBytes + len - expectedSize));
+        }
+        WriteRequest request = createWriteRequest(
+            ByteString.copyFrom(b, off, len),
+            isFinishWrite(writtenBytes + len));
         requestObserver.onNext(request);
         writtenBytes += len;
       }
 
       @Override
       public ListenableFuture<Long> getCommittedFuture() {
-        return committedFuture;
+        return transform(writeResponseFuture, (writeResponse) -> writeResponse.getCommittedSize());
       }
     };
   }
 
   @Override
-  public InputStream newStreamInput(String name, long offset) throws IOException, InterruptedException {
+  public InputStream newStreamInput(String name, long offset) throws IOException {
     throwIfStopped();
     Iterator<ReadResponse> replies = bsBlockingStub
         .get()
@@ -422,8 +472,7 @@ public class StubInstance implements Instance {
       Digest rootDigest,
       int pageSize,
       String pageToken,
-      ImmutableList.Builder<Directory> directories,
-      boolean acceptMissing) {
+      ImmutableList.Builder<Directory> directories) {
     throwIfStopped();
     Iterator<GetTreeResponse> replies = contentAddressableStorageBlockingStub
         .get()

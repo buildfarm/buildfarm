@@ -95,7 +95,7 @@ public interface Cache<K, V> {
    * @throws ExecutionError if an error was thrown while loading the value
    * @since 11.0
    */
-  ListenableFuture<V> get(K key, Callable<? extends V> loader);
+  ListenableFuture<V> get(K key, Callable<ListenableFuture<? extends V>> loader);
 
   /**
    * Returns a map of the values associated with {@code keys} in this cache. The returned map will

@@ -15,10 +15,28 @@ dependencies:
       lang: java
       version: "1.0.0"
 
+  com.google.auth:
+    google-auth-library-credentials:
+      lang: java
+      version: "0.9.1"
+
+    google-auth-library-oauth2-http:
+      lang: java
+      version: "0.9.1"
+
+  com.google.code.findbugs:
+    jsr305:
+      lang: java
+      version: "3.0.1"
+
   com.google.errorprone:
     error_prone_core:
       lang: java
       version: "0.92"
+
+    error_prone_annotations:
+      lang: java
+      version: "2.2.0"
 
   com.google.guava:
     guava:
@@ -44,23 +62,33 @@ dependencies:
       lang: java
       version: "3.5.0"
 
-  io.netty:
-    netty:
-      lang: java
-      modules: [ "buffer", "codec", "codec-http", "codec-http2", "codec-socks", "common", "handler",
-        "handler-proxy", "resolver", "transport" ]
-      version: "4.1.22.Final"
-
-  #
-  io.grpc:
-    grpc-all:
-      lang: java
-      version: "1.8.0"
-
   com.google.truth:
     truth:
       lang: java
       version: "0.36"
+
+  io.netty:
+    netty:
+      lang: java
+      modules: [ "buffer", "codec", "codec-http", "codec-http2", "codec-socks", "common", "handler",
+        "handler-proxy", "resolver", "transport", "transport-native-epoll", "transport-native-kqueue",
+        "transport-native-unix-common" ]
+      version: "4.1.31.Final"
+
+  io.grpc:
+    grpc-all:
+      lang: java
+      version: "1.12.0"
+
+    grpc:
+      lang: java
+      modules: [ "auth", "core", "context", "netty", "stub", "protobuf" ]
+      version: "1.12.0"
+
+  junit:
+    junit:
+      lang: java
+      version: "4.12"
 
   org.mockito:
     mockito-core:
@@ -92,6 +120,10 @@ dependencies:
       version: "2.1.7"
 
     jffi:
+      lang: java
+      version: "1.2.16"
+
+    jffi:jar:native:
       lang: java
       version: "1.2.16"
 

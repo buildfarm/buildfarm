@@ -15,20 +15,26 @@
 package build.buildfarm.cas;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyZeroInteractions;
 
+import build.bazel.remote.execution.v2.Digest;
+import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.instance.stub.ByteStreamUploader;
-import build.buildfarm.instance.stub.Retrier;
+import build.buildfarm.instance.stub.RetryException;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamImplBase;
 import com.google.bytestream.ByteStreamProto.ReadRequest;
 import com.google.bytestream.ByteStreamProto.ReadResponse;
-import build.bazel.remote.execution.v2.Digest;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ListMultimap;
+import com.google.common.collect.MultimapBuilder;
 import com.google.protobuf.ByteString;
+import io.grpc.Channel;
 import io.grpc.Server;
 import io.grpc.Status;
 import io.grpc.inprocess.InProcessChannelBuilder;
@@ -51,6 +57,7 @@ public class GrpcCASTest {
   private final MutableHandlerRegistry serviceRegistry = new MutableHandlerRegistry();
   private final String fakeServerName = "fake server for " + getClass();
   private Server fakeServer;
+  private ListMultimap<Digest, Runnable> onExpirations;
 
   @Before
   public void setUp() throws IOException {
@@ -61,6 +68,9 @@ public class GrpcCASTest {
             .directExecutor()
             .build()
             .start();
+
+    onExpirations = MultimapBuilder
+        .hashKeys().arrayListValues().build();
   }
 
   @After
@@ -87,8 +97,58 @@ public class GrpcCASTest {
     GrpcCAS cas = new GrpcCAS(
         instanceName,
         InProcessChannelBuilder.forName(fakeServerName).directExecutor().build(),
-        mock(ByteStreamUploader.class));
+        mock(ByteStreamUploader.class),
+        onExpirations);
     assertThat(cas.get(digest)).isNull();
     assertThat(readCalled.get()).isTrue();
+  }
+
+  @Test
+  public void onExpirationCalledWhenNotFound() {
+    Digest digest = DIGEST_UTIL.compute(ByteString.copyFromUtf8("nonexistent"));
+    String instanceName = "test";
+    final AtomicReference<Boolean> readCalled = new AtomicReference<>(false);
+    serviceRegistry.addService(
+        new ByteStreamImplBase() {
+          @Override
+          public void read(ReadRequest request, StreamObserver<ReadResponse> responseObserver) {
+            assertThat(request.getResourceName()).isEqualTo(String.format("%s/blobs/%s", instanceName, DigestUtil.toString(digest)));
+            readCalled.compareAndSet(false, true);
+            responseObserver.onError(Status.NOT_FOUND.asException());
+          }
+        });
+
+    Runnable onExpiration = mock(Runnable.class);
+    onExpirations.put(digest, onExpiration);
+
+    GrpcCAS cas = new GrpcCAS(
+        instanceName,
+        InProcessChannelBuilder.forName(fakeServerName).directExecutor().build(),
+        mock(ByteStreamUploader.class),
+        onExpirations);
+    assertThat(cas.get(digest)).isNull();
+    assertThat(readCalled.get()).isTrue();
+    verify(onExpiration, times(1)).run();
+  }
+
+  @Test
+  public void putAddsExpiration() throws RetryException, InterruptedException {
+    ByteString uploadContent = ByteString.copyFromUtf8("uploaded");
+    Digest digest = DIGEST_UTIL.compute(uploadContent);
+    String instanceName = "test";
+    ListMultimap<Digest, Runnable> onExpirations = MultimapBuilder
+        .hashKeys().arrayListValues().build();
+    Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
+    ByteStreamUploader uploader = mock(ByteStreamUploader.class);
+    GrpcCAS cas = new GrpcCAS(
+        instanceName,
+        channel,
+        uploader,
+        onExpirations);
+    Runnable onExpiration = mock(Runnable.class);
+    cas.put(new Blob(uploadContent, digest), onExpiration);
+    verify(uploader, times(1)).uploadBlobs(any(Iterable.class));
+    assertThat(onExpirations.get(digest)).containsExactly(onExpiration);
+    verifyZeroInteractions(onExpiration);
   }
 }

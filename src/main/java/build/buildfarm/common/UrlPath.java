@@ -12,14 +12,39 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.server;
+package build.buildfarm.common;
 
-import build.buildfarm.common.DigestUtil;
 import com.google.common.collect.Iterables;
 import build.bazel.remote.execution.v2.Digest;
 import java.util.Arrays;
 
 public class UrlPath {
+  public static class InvalidResourceNameException extends Exception {
+    private final String resourceName;
+
+    public InvalidResourceNameException(String resourceName, String message) {
+      super(message);
+      this.resourceName = resourceName;
+    }
+
+    public InvalidResourceNameException(String resourceName, String message, Throwable cause) {
+      super(message, cause);
+      this.resourceName = resourceName;
+    }
+
+    public String getResourceName() {
+      return resourceName;
+    }
+
+    @Override
+    public String getMessage() {
+      return String.format(
+          "%s: %s",
+          resourceName,
+          super.getMessage());
+    }
+  }
+
   public enum ResourceOperation {
     Blob(3),
     UploadBlob(5),
@@ -31,11 +56,12 @@ public class UrlPath {
     }
   }
 
-  public static ResourceOperation detectResourceOperation(String resourceName) {
+  public static ResourceOperation detectResourceOperation(String resourceName)
+      throws InvalidResourceNameException {
     // TODO: Replace this with proper readonly parser should this become
     // a bottleneck
     String[] components = resourceName.split("/");
-    
+
     // Keep following checks ordered by descending minComponentLength
     if (components.length >= ResourceOperation.UploadBlob.minComponentLength && isUploadBlob(components)) {
       return ResourceOperation.UploadBlob;
@@ -45,9 +71,9 @@ public class UrlPath {
       return ResourceOperation.Blob;
     }
 
-    throw new IllegalArgumentException("Url path not recognized: " + resourceName);
+    throw new InvalidResourceNameException(resourceName, "Url path not recognized");
   }
-    
+
   private static boolean isBlob(String[] components) {
     // {instance_name=**}/blobs/{hash}/{size}
     return components[components.length - 3].equals("blobs");
@@ -113,30 +139,57 @@ public class UrlPath {
             components.length - 5));
   }
 
-  public static Digest parseBlobDigest(String resourceName, DigestUtil digestUtil) {
+  public static Digest parseBlobDigest(String resourceName)
+      throws InvalidResourceNameException {
     String[] components = resourceName.split("/");
-    String hash = components[components.length - 2];
-    try {
-      long size = Long.parseLong(components[components.length - 1]);
-      return digestUtil.build(hash, size);
-    } catch (NumberFormatException e) {
-      return null;
+    if (components.length < 2) {
+      throw new InvalidResourceNameException(resourceName, "invalid blob name");
     }
-  }
-
-  public static Digest parseUploadBlobDigest(String resourceName)
-      throws NumberFormatException {
-    String[] components = resourceName.split("/");
     String hash = components[components.length - 2];
-    long size = Long.parseLong(components[components.length - 1]);
+    long size;
+    try {
+      size = Long.parseLong(components[components.length - 1]);
+    } catch (NumberFormatException e) {
+      throw new InvalidResourceNameException(resourceName, e.getMessage(), e);
+    }
+    if (size <= 0) {
+      throw new InvalidResourceNameException(
+          resourceName,
+          String.format("upload size invalid: %d", size));
+    }
     return Digest.newBuilder()
         .setHash(hash)
         .setSizeBytes(size)
         .build();
   }
 
-  public static String parseOperationStream(String resourceName) {
+  public static Digest parseUploadBlobDigest(String resourceName)
+      throws InvalidResourceNameException {
     String[] components = resourceName.split("/");
+    String hash = components[components.length - 2];
+    long size;
+    try {
+      size = Long.parseLong(components[components.length - 1]);
+    } catch (NumberFormatException e) {
+      throw new InvalidResourceNameException(resourceName, e.getMessage(), e);
+    }
+    if (size <= 0) {
+      throw new InvalidResourceNameException(
+          resourceName,
+          String.format("upload size invalid: %d", size));
+    }
+    return Digest.newBuilder()
+        .setHash(hash)
+        .setSizeBytes(size)
+        .build();
+  }
+
+  public static String parseOperationStream(String resourceName)
+      throws InvalidResourceNameException {
+    String[] components = resourceName.split("/");
+    if (components.length <= 4) {
+      throw new InvalidResourceNameException(resourceName, "invalid operation stream name");
+    }
     return String.join("/", Arrays.asList(components).subList(components.length - 4, components.length));
   }
 }

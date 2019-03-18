@@ -105,7 +105,6 @@ class RemoteInputStreamFactory implements InputStreamFactory {
       instance = new StubInstance(
           "", digestUtil, channel,
           10 /* FIXME CONFIG */, TimeUnit.SECONDS,
-          createStubRetrier(),
           createStubUploader(channel));
       workerStubs.put(worker, instance);
     }

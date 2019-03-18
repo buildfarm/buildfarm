@@ -15,8 +15,11 @@
 package build.buildfarm.instance;
 
 import static com.google.common.truth.Truth.assertThat;
+import static build.buildfarm.instance.AbstractServerInstance.ACTION_INPUT_ROOT_DIRECTORY_PATH;
 import static build.buildfarm.instance.AbstractServerInstance.DIRECTORY_NOT_SORTED;
 import static build.buildfarm.instance.AbstractServerInstance.DUPLICATE_DIRENT;
+import static build.buildfarm.instance.AbstractServerInstance.OUTPUT_DIRECTORY_IS_OUTPUT_ANCESTOR;
+import static build.buildfarm.instance.AbstractServerInstance.OUTPUT_FILE_IS_OUTPUT_ANCESTOR;
 import static build.buildfarm.instance.AbstractServerInstance.VIOLATION_TYPE_INVALID;
 
 import build.bazel.remote.execution.v2.Digest;
@@ -25,9 +28,11 @@ import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.Platform;
 import build.buildfarm.common.DigestUtil;
-import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.DigestUtil.ActionKey;
-import build.buildfarm.instance.TreeIterator.DirectoryEntry;
+import build.buildfarm.common.DigestUtil.HashFunction;
+import build.buildfarm.common.TokenizableIterator;
+import build.buildfarm.common.TreeIterator.DirectoryEntry;
+import build.buildfarm.common.function.InterruptingPredicate;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -51,10 +56,6 @@ public class AbstractServerInstanceTest {
   private static final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
 
   class DummyServerInstance extends AbstractServerInstance {
-    protected Logger getLogger() {
-      return logger;
-    }
-
     DummyServerInstance() {
       super(
           /* name=*/ null,
@@ -64,6 +65,11 @@ public class AbstractServerInstanceTest {
           /* outstandingOperations=*/ null,
           /* completedOperations=*/ null,
           /* activeBlobWrites=*/ null);
+    }
+
+    @Override
+    protected Logger getLogger() {
+      return logger;
     }
 
     @Override
@@ -147,7 +153,7 @@ public class AbstractServerInstanceTest {
     PreconditionFailure.Builder preconditionFailure =
         PreconditionFailure.newBuilder();
     instance.validateActionInputDirectory(
-        /* directoryPath=*/ "",
+        ACTION_INPUT_ROOT_DIRECTORY_PATH,
         Directory.newBuilder()
             .addAllFiles(
                 ImmutableList.of(
@@ -176,7 +182,7 @@ public class AbstractServerInstanceTest {
     PreconditionFailure.Builder preconditionFailure =
         PreconditionFailure.newBuilder();
     instance.validateActionInputDirectory(
-        /* directoryPath=*/ "",
+        ACTION_INPUT_ROOT_DIRECTORY_PATH,
         Directory.newBuilder()
             .addAllFiles(
                 ImmutableList.of(
@@ -207,7 +213,7 @@ public class AbstractServerInstanceTest {
     PreconditionFailure.Builder preconditionFailure =
         PreconditionFailure.newBuilder();
     instance.validateActionInputDirectory(
-        /* directoryPath=*/ "",
+        ACTION_INPUT_ROOT_DIRECTORY_PATH,
         Directory.newBuilder()
             .addAllDirectories(
                 ImmutableList.of(
@@ -245,7 +251,7 @@ public class AbstractServerInstanceTest {
     PreconditionFailure.Builder preconditionFailure =
         PreconditionFailure.newBuilder();
     instance.validateActionInputDirectory(
-        /* directoryPath=*/ "",
+        ACTION_INPUT_ROOT_DIRECTORY_PATH,
         Directory.newBuilder()
             .addAllDirectories(
                 ImmutableList.of(
@@ -273,21 +279,60 @@ public class AbstractServerInstanceTest {
     assertThat(violation.getDescription()).isEqualTo("/: foo > bar");
   }
 
-  @Test(expected = IllegalStateException.class)
+  @Test
   public void nestedOutputDirectoriesAreInvalid() {
+    PreconditionFailure.Builder preconditionFailureBuilder =
+        PreconditionFailure.newBuilder();
     AbstractServerInstance.validateOutputs(
         ImmutableSet.<String>of(),
         ImmutableSet.<String>of(),
         ImmutableSet.<String>of(),
-        ImmutableSet.<String>of("foo", "foo/bar"));
+        ImmutableSet.<String>of("foo", "foo/bar"),
+        preconditionFailureBuilder);
+    PreconditionFailure preconditionFailure =
+        preconditionFailureBuilder.build();
+    assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
+    Violation violation = preconditionFailure.getViolationsList().get(0);
+    assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
+    assertThat(violation.getSubject()).isEqualTo(OUTPUT_DIRECTORY_IS_OUTPUT_ANCESTOR);
+    assertThat(violation.getDescription()).isEqualTo("foo");
   }
 
-  @Test(expected = IllegalStateException.class)
+  @Test
   public void outputDirectoriesContainingOutputFilesAreInvalid() {
+    PreconditionFailure.Builder preconditionFailureBuilder =
+        PreconditionFailure.newBuilder();
     AbstractServerInstance.validateOutputs(
         ImmutableSet.<String>of(),
         ImmutableSet.<String>of(),
         ImmutableSet.<String>of("foo/bar"),
-        ImmutableSet.<String>of("foo"));
+        ImmutableSet.<String>of("foo"),
+        preconditionFailureBuilder);
+    PreconditionFailure preconditionFailure =
+        preconditionFailureBuilder.build();
+    assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
+    Violation violation = preconditionFailure.getViolationsList().get(0);
+    assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
+    assertThat(violation.getSubject()).isEqualTo(OUTPUT_DIRECTORY_IS_OUTPUT_ANCESTOR);
+    assertThat(violation.getDescription()).isEqualTo("foo");
+  }
+
+  @Test
+  public void outputFilesAsOutputDirectoryAncestorsAreInvalid() {
+    PreconditionFailure.Builder preconditionFailureBuilder =
+        PreconditionFailure.newBuilder();
+    AbstractServerInstance.validateOutputs(
+        ImmutableSet.<String>of(),
+        ImmutableSet.<String>of(),
+        ImmutableSet.<String>of("foo"),
+        ImmutableSet.<String>of("foo/bar"),
+        preconditionFailureBuilder);
+    PreconditionFailure preconditionFailure =
+        preconditionFailureBuilder.build();
+    assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
+    Violation violation = preconditionFailure.getViolationsList().get(0);
+    assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
+    assertThat(violation.getSubject()).isEqualTo(OUTPUT_FILE_IS_OUTPUT_ANCESTOR);
+    assertThat(violation.getDescription()).isEqualTo("foo");
   }
 }

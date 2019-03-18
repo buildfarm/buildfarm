@@ -46,7 +46,7 @@ public abstract class AbstractCache<K, V> implements Cache<K, V> {
 
   /** @since 11.0 */
   @Override
-  public ListenableFuture<V> get(K key, Callable<? extends V> valueLoader) {
+  public ListenableFuture<V> get(K key, Callable<ListenableFuture<? extends V>> valueLoader) {
     throw new UnsupportedOperationException();
   }
 

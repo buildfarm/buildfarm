@@ -104,8 +104,8 @@ class Executor implements Runnable {
               operation.getName()));
       try {
         workerContext.destroyExecDir(operationContext.execDir);
-      } catch (IOException destroyExecDirException) {
-        logger.log(SEVERE, "error destroying exec dir " + operationContext.execDir.toString(), destroyExecDirException);
+      } catch (IOException e) {
+        logger.log(SEVERE, "error while destroying " + operationContext.execDir, e);
       }
       owner.error().put(operationContext);
       return 0;
@@ -187,7 +187,7 @@ class Executor implements Runnable {
       } catch (IOException destroyExecDirException) {
         logger.log(
             SEVERE,
-            "error destroying exec dir " + operationContext.execDir.toString(),
+            "error destroying exec dir " + operationContext.execDir,
             destroyExecDirException);
       }
       operationContext.poller.pause();

@@ -17,6 +17,7 @@ package build.buildfarm.instance.memory;
 import static build.buildfarm.instance.Utils.putBlob;
 import static com.google.common.collect.Multimaps.synchronizedSetMultimap;
 import static com.google.common.util.concurrent.Futures.addCallback;
+import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
@@ -38,13 +39,13 @@ import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorages;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.TokenizableIterator;
+import build.buildfarm.common.TreeIterator;
+import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.function.InterruptingPredicate;
 import build.buildfarm.common.Watchdog;
 import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.instance.OperationsMap;
-import build.buildfarm.instance.TokenizableIterator;
-import build.buildfarm.instance.TreeIterator;
-import build.buildfarm.instance.TreeIterator.DirectoryEntry;
 import build.buildfarm.v1test.ActionCacheConfig;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.GrpcACConfig;
@@ -63,22 +64,28 @@ import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
-import com.google.common.util.concurrent.MoreExecutors;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
-import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.Durations;
+import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.rpc.PreconditionFailure;
 import io.grpc.Channel;
+import io.grpc.Status;
+import io.grpc.Status.Code;
+import io.grpc.StatusException;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
-import io.grpc.StatusException;
-import java.io.InputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.function.Predicate;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -95,6 +102,9 @@ import java.util.logging.Logger;
 public class MemoryInstance extends AbstractServerInstance {
   private static final Logger logger = Logger.getLogger(MemoryInstance.class.getName());
 
+  public static final String TIMEOUT_OUT_OF_BOUNDS =
+      "A timeout specified is out of bounds with a configured range";
+
   private final MemoryInstanceConfig config;
   private final SetMultimap<String, Predicate<Operation>> watchers;
   private final Map<String, ByteStringStreamSource> streams =
@@ -107,9 +117,6 @@ public class MemoryInstance extends AbstractServerInstance {
       new ConcurrentHashMap(new HashMap<String, Watchdog>());
   private final OperationsMap outstandingOperations;
   private final ListeningExecutorService watcherService;
-
-  private static final String TIMEOUT_OUT_OF_BOUNDS =
-      "A timeout specified is out of bounds with a configured range";
 
   private static final class Worker {
     private final Platform platform;
@@ -353,7 +360,8 @@ public class MemoryInstance extends AbstractServerInstance {
   @Override
   protected void validateAction(
       Action action,
-      PreconditionFailure.Builder preconditionFailure) throws InterruptedException {
+      PreconditionFailure.Builder preconditionFailure)
+      throws InterruptedException, StatusException {
     if (action.hasTimeout() && config.hasMaximumActionTimeout()) {
       Duration timeout = action.getTimeout();
       Duration maximum = config.getMaximumActionTimeout();
@@ -377,7 +385,11 @@ public class MemoryInstance extends AbstractServerInstance {
       return false;
     }
     // pet the requeue watchdog
-    requeuers.get(operationName).pet();
+    Watchdog requeuer = requeuers.get(operationName);
+    if (requeuer == null) {
+      return false;
+    }
+    requeuer.pet();
     return true;
   }
 
@@ -643,7 +655,7 @@ public class MemoryInstance extends AbstractServerInstance {
 
   @Override
   protected TokenizableIterator<DirectoryEntry> createTreeIterator(
-      Digest rootDigest, String pageToken) throws IOException, InterruptedException {
+      Digest rootDigest, String pageToken) {
     ExecutorService service = newDirectExecutorService();
     return new TreeIterator((digest) -> expect(digest, Directory.parser(), service), rootDigest, pageToken);
   }

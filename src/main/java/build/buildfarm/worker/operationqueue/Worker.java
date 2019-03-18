@@ -98,7 +98,6 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -194,7 +193,6 @@ public class Worker {
         digestUtil,
         channel,
         60 /* FIXME CONFIG */, TimeUnit.SECONDS,
-        createStubRetrier(),
         uploader);
   }
 
@@ -523,11 +521,6 @@ public class Worker {
       }
 
       @Override
-      public void deactivate(String operationName) {
-        activeOperations.remove(operationName);
-      }
-
-      @Override
       public void logInfo(String msg) {
         logger.info(msg);
       }
@@ -555,11 +548,6 @@ public class Worker {
       @Override
       public int getExecuteStageWidth() {
         return config.getExecuteStageWidth();
-      }
-
-      @Override
-      public int getTreePageSize() {
-        return config.getTreePageSize();
       }
 
       @Override
@@ -712,6 +700,11 @@ public class Worker {
       @Override
       public ExecutionPolicy getExecutionPolicy(String name) {
         return policies.get(name);
+      }
+
+      @Override
+      public void deactivate(String operationName) {
+        activeOperations.remove(operationName);
       }
 
       @Override

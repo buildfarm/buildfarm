@@ -112,7 +112,7 @@ public class MatchStage extends PipelineStage {
       try {
         output.put(operationContext);
       } catch (InterruptedException e) {
-        error().put(operationContext);
+        error.put(operationContext);
         throw e;
       }
       return true;

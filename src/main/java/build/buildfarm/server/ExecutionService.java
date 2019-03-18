@@ -111,10 +111,6 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
           request.getResultsCachePolicy(),
           TracingMetadataUtils.fromCurrentContext(),
           createWatcher(responseObserver));
-    } catch (IllegalStateException e) {
-      responseObserver.onError(Status.FAILED_PRECONDITION
-          .withDescription(e.getMessage())
-          .asException());
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }

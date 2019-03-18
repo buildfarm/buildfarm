@@ -1,4 +1,4 @@
-// Copyright 2017 The Bazel Authors. All rights reserved.
+// Copyright 2018 The Bazel Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,10 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.instance;
+package build.buildfarm.proxy.http;
 
-import java.util.Iterator;
+import io.netty.handler.codec.http.HttpResponse;
+import java.io.IOException;
 
-public interface TokenizableIterator<E> extends Iterator<E> {
-  String toNextPageToken();
+/** An exception that propagates the http status. */
+final class HttpException extends IOException {
+  private final HttpResponse response;
+
+  HttpException(HttpResponse response, String message, Throwable cause) {
+    super(message, cause);
+    this.response = response;
+  }
+
+  public HttpResponse response() {
+    return response;
+  }
 }

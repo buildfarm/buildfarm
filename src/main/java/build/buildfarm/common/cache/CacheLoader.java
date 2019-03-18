@@ -70,7 +70,7 @@ public abstract class CacheLoader<K, V> {
    *     treated like any other {@code Exception} in all respects except that, when it is caught,
    *     the thread's interrupt status is set
    */
-  public abstract V load(K key) throws Exception;
+  public abstract ListenableFuture<? extends V> load(K key) throws Exception;
 
   /**
    * Computes or retrieves a replacement value corresponding to an already-cached {@code key}. This
@@ -94,10 +94,10 @@ public abstract class CacheLoader<K, V> {
    * @since 11.0
    */
   @GwtIncompatible // Futures
-  public ListenableFuture<V> reload(K key, V oldValue) throws Exception {
+  public ListenableFuture<? extends V> reload(K key, V oldValue) throws Exception {
     checkNotNull(key);
     checkNotNull(oldValue);
-    return Futures.immediateFuture(load(key));
+    return load(key);
   }
 
   /**
@@ -122,7 +122,7 @@ public abstract class CacheLoader<K, V> {
    *     the thread's interrupt status is set
    * @since 11.0
    */
-  public Map<K, V> loadAll(Iterable<? extends K> keys) throws Exception {
+  public Map<K, ListenableFuture<V>> loadAll(Iterable<? extends K> keys) throws Exception {
     // This will be caught by getAll(), causing it to fall back to multiple calls to
     // LoadingCache.get
     throw new UnsupportedLoadingOperationException();
@@ -135,7 +135,7 @@ public abstract class CacheLoader<K, V> {
    * @param function the function to be used for loading values; must never return {@code null}
    * @return a cache loader that loads values by passing each key to {@code function}
    */
-  public static <K, V> CacheLoader<K, V> from(Function<K, V> function) {
+  public static <K, V> CacheLoader<K, V> from(Function<K, ListenableFuture<V>> function) {
     return new FunctionToCacheLoader<>(function);
   }
 
@@ -148,20 +148,20 @@ public abstract class CacheLoader<K, V> {
    * @return a cache loader that loads values by calling {@link Supplier#get}, irrespective of the
    *     key
    */
-  public static <V> CacheLoader<Object, V> from(Supplier<V> supplier) {
+  public static <V> CacheLoader<Object, V> from(Supplier<ListenableFuture<V>> supplier) {
     return new SupplierToCacheLoader<V>(supplier);
   }
 
   private static final class FunctionToCacheLoader<K, V> extends CacheLoader<K, V>
       implements Serializable {
-    private final Function<K, V> computingFunction;
+    private final Function<K, ListenableFuture<V>> computingFunction;
 
-    public FunctionToCacheLoader(Function<K, V> computingFunction) {
+    public FunctionToCacheLoader(Function<K, ListenableFuture<V>> computingFunction) {
       this.computingFunction = checkNotNull(computingFunction);
     }
 
     @Override
-    public V load(K key) {
+    public ListenableFuture<? extends V> load(K key) {
       return computingFunction.apply(checkNotNull(key));
     }
 
@@ -184,7 +184,7 @@ public abstract class CacheLoader<K, V> {
     checkNotNull(executor);
     return new CacheLoader<K, V>() {
       @Override
-      public V load(K key) throws Exception {
+      public ListenableFuture<? extends V> load(K key) throws Exception {
         return loader.load(key);
       }
 
@@ -203,7 +203,7 @@ public abstract class CacheLoader<K, V> {
       }
 
       @Override
-      public Map<K, V> loadAll(Iterable<? extends K> keys) throws Exception {
+      public Map<K, ListenableFuture<V>> loadAll(Iterable<? extends K> keys) throws Exception {
         return loader.loadAll(keys);
       }
     };
@@ -211,14 +211,14 @@ public abstract class CacheLoader<K, V> {
 
   private static final class SupplierToCacheLoader<V> extends CacheLoader<Object, V>
       implements Serializable {
-    private final Supplier<V> computingSupplier;
+    private final Supplier<ListenableFuture<V>> computingSupplier;
 
-    public SupplierToCacheLoader(Supplier<V> computingSupplier) {
+    public SupplierToCacheLoader(Supplier<ListenableFuture<V>> computingSupplier) {
       this.computingSupplier = checkNotNull(computingSupplier);
     }
 
     @Override
-    public V load(Object key) {
+    public ListenableFuture<V> load(Object key) {
       checkNotNull(key);
       return computingSupplier.get();
     }

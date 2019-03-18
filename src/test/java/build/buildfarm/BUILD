@@ -19,6 +19,7 @@ java_test(
     test_class = "build.buildfarm.AllTests",
     deps = [
         ":test_runner",
+        "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "//3rdparty/jvm/com/google/truth",
         "//src/main/java/build/buildfarm:common",
@@ -33,6 +34,7 @@ java_test(
     test_class = "build.buildfarm.AllTests",
     deps = [
         ":test_runner",
+        "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "//3rdparty/jvm/com/google/truth",
         "//3rdparty/jvm/io/grpc:grpc_core",
@@ -74,15 +76,36 @@ java_test(
 )
 
 java_test(
+    name = "http-proxy-tests",
+    size = "small",
+    srcs = glob(["proxy/http/*.java"]),
+    test_class = "build.buildfarm.AllTests",
+    deps = [
+        ":test_runner",
+        "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java",
+        "//3rdparty/jvm/com/google/truth",
+        "//3rdparty/jvm/io/grpc:grpc_core",
+        "//3rdparty/jvm/io/grpc:grpc_stub",
+        "//3rdparty/jvm/org/mockito:mockito_core",
+        "//src/main/java/build/buildfarm:common",
+        "//src/main/java/build/buildfarm:http-proxy",
+        "@googleapis//:google_bytestream_bytestream_java_grpc",
+        "@googleapis//:google_bytestream_bytestream_java_proto",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+    ],
+)
+
+java_test(
     name = "server-tests",
     size = "small",
     srcs = glob(["server/*.java"]),
     test_class = "build.buildfarm.AllTests",
     deps = [
-        "@googleapis//:google_rpc_error_details_java_proto",
         ":test_runner",
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java_util",
         "//3rdparty/jvm/com/google/truth",
         "//3rdparty/jvm/io/grpc:grpc_context",
         "//3rdparty/jvm/io/grpc:grpc_core",
@@ -90,9 +113,9 @@ java_test(
         "//3rdparty/jvm/io/grpc:grpc_protobuf",
         "//3rdparty/jvm/io/grpc:grpc_stub",
         "//3rdparty/jvm/org/mockito:mockito_core",
-        "//src/main/java/build/buildfarm",
         "//src/main/java/build/buildfarm:common",
         "//src/main/java/build/buildfarm:instance",
+        "//src/main/java/build/buildfarm:server",
         "//src/main/java/build/buildfarm:server-instance",
         "//src/main/java/build/buildfarm:stub-instance",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
@@ -102,6 +125,7 @@ java_test(
         "@googleapis//:google_bytestream_bytestream_java_proto",
         "@googleapis//:google_longrunning_operations_java_grpc",
         "@googleapis//:google_rpc_code_java_proto",
+        "@googleapis//:google_rpc_error_details_java_proto",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
@@ -123,6 +147,7 @@ java_test(
         "//src/main/java/build/buildfarm:common",
         "//src/main/java/build/buildfarm:operationqueue-worker",
         "//src/main/java/build/buildfarm:stub-instance",
+        "//src/main/java/build/buildfarm:worker",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
     ],
 )
@@ -170,7 +195,6 @@ java_test(
     srcs = glob(["instance/shard/*.java"]),
     test_class = "build.buildfarm.AllTests",
     deps = [
-        "@googleapis//:google_rpc_error_details_java_proto",
         ":test_runner",
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
@@ -187,6 +211,7 @@ java_test(
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_longrunning_operations_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
+        "@googleapis//:google_rpc_error_details_java_proto",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )
@@ -202,7 +227,15 @@ java_test(
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "//3rdparty/jvm/com/google/truth",
         "//3rdparty/jvm/io/grpc:grpc_core",
+        "//3rdparty/jvm/io/grpc:grpc_stub",
+        "//3rdparty/jvm/org/mockito:mockito_core",
+        "//src/main/java/build/buildfarm:common",
+        "//src/main/java/build/buildfarm:instance",
         "//src/main/java/build/buildfarm:stub-instance",
+        "@googleapis//:google_bytestream_bytestream_java_grpc",
+        "@googleapis//:google_bytestream_bytestream_java_proto",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )
 
@@ -212,7 +245,6 @@ java_test(
     srcs = glob(["instance/memory/*.java"]),
     test_class = "build.buildfarm.AllTests",
     deps = [
-        "@googleapis//:google_rpc_error_details_java_proto",
         ":test_runner",
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
@@ -227,6 +259,7 @@ java_test(
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_longrunning_operations_java_grpc",
         "@googleapis//:google_rpc_code_java_proto",
+        "@googleapis//:google_rpc_error_details_java_proto",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )

@@ -19,6 +19,7 @@ import static com.google.common.base.Preconditions.checkState;
 import static build.buildfarm.common.cache.CacheBuilder.NULL_TICKER;
 import static build.buildfarm.common.cache.CacheBuilder.UNSET_INT;
 import static com.google.common.util.concurrent.Futures.transform;
+import static com.google.common.util.concurrent.Futures.transformAsync;
 import static com.google.common.util.concurrent.Futures.addCallback;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.Uninterruptibles.getUninterruptibly;
@@ -3560,10 +3561,17 @@ class LocalCache<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V> 
         stopwatch.start();
         V previousValue = oldValue.get();
         if (previousValue == null) {
-          V newValue = loader.load(key);
-          return set(newValue) ? futureValue : Futures.immediateFuture(newValue);
+          return transformAsync(
+              loader.load(key),
+              (newValue) -> {
+                if (LoadingValueReference.this.set(newValue)) {
+                  return futureValue;
+                }
+                return Futures.immediateFuture(newValue);
+              },
+              directExecutor());
         }
-        ListenableFuture<V> newValue = loader.reload(key, previousValue);
+        ListenableFuture<? extends V> newValue = loader.reload(key, previousValue);
         if (newValue == null) {
           return Futures.immediateFuture(null);
         }
@@ -4906,13 +4914,13 @@ class LocalCache<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V> 
     }
 
     @Override
-    public ListenableFuture<V> get(K key, final Callable<? extends V> valueLoader) {
+    public ListenableFuture<V> get(K key, final Callable<ListenableFuture<? extends V>> valueLoader) {
       checkNotNull(valueLoader);
       return localCache.get(
           key,
           new CacheLoader<Object, V>() {
             @Override
-            public V load(Object key) throws Exception {
+            public ListenableFuture<? extends V> load(Object key) throws Exception {
               return valueLoader.call();
             }
           });

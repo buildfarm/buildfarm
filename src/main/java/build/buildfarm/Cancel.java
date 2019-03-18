@@ -28,7 +28,6 @@ class Cancel {
         digestUtil,
         channel,
         10, TimeUnit.SECONDS,
-        Retrier.NO_RETRIES,
         new ByteStreamUploader("", channel, null, 300, Retrier.NO_RETRIES, null));
     for( int i = 3; i < args.length; i++ ) {
       instance.cancelOperation(args[i]);
