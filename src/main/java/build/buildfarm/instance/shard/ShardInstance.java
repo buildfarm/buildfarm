@@ -33,8 +33,8 @@ import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator
 import static java.lang.String.format;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
-import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
+import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.logging.Level.INFO;
 import static java.util.logging.Level.SEVERE;
 import static java.util.logging.Level.WARNING;
@@ -164,6 +164,8 @@ public class ShardInstance extends AbstractServerInstance {
 
   private ExecutorService operationDeletionService = newSingleThreadExecutor();
   private Thread operationQueuer;
+  private boolean stopping = false;
+  private boolean stopped = true;
 
   public ShardInstance(String name, DigestUtil digestUtil, ShardInstanceConfig config, Runnable onStop)
       throws InterruptedException, ConfigurationException {
@@ -242,13 +244,15 @@ public class ShardInstance extends AbstractServerInstance {
                 try {
                   backplane.queueing(executeEntry.getOperationName());
                 } catch (IOException e) {
-                  logger.log(SEVERE, format("error polling %s for queuing", executeEntry.getOperationName()), e);
+                  if (!stopping && !stopped) {
+                    logger.log(SEVERE, format("error polling %s for queuing", operationName), e);
+                  }
                   // mostly ignore, we will be stopped at some point later
                 }
-                return true;
+                return !stopping && !stopped;
               },
               () -> {},
-              Deadline.after(10, DAYS));
+              Deadline.after(5, MINUTES));
           try {
             logger.info("queueing " + operationName);
             addCallback(
@@ -297,8 +301,8 @@ public class ShardInstance extends AbstractServerInstance {
             // treat with exit
             operationQueuer = null;
             return;
-          } catch (Throwable t) {
-            logger.log(SEVERE, "error processing prequeue", t);
+          } catch (Exception t) {
+            logger.log(SEVERE, "OperationQueuer: fatal exception during iteration", t);
           } finally {
             logger.info("OperationQueuer: Exiting");
           }
@@ -306,7 +310,7 @@ public class ShardInstance extends AbstractServerInstance {
           try {
             stop();
           } catch (InterruptedException e) {
-            logger.log(SEVERE, "OperationQueuer: interrupted while stopping", e);
+            logger.log(SEVERE, "interrupted while stopping instance " + getName(), e);
           }
         }
       });
@@ -325,6 +329,7 @@ public class ShardInstance extends AbstractServerInstance {
 
   @Override
   public void start() {
+    stopped = false;
     backplane.start();
     if (dispatchedMonitor != null) {
       dispatchedMonitor.start();
@@ -336,6 +341,10 @@ public class ShardInstance extends AbstractServerInstance {
 
   @Override
   public void stop() throws InterruptedException {
+    if (stopped) {
+      return;
+    }
+    stopping = true;
     logger.fine(format("Instance %s is stopping", getName()));
     if (operationQueuer != null) {
       operationQueuer.stop();
@@ -357,6 +366,8 @@ public class ShardInstance extends AbstractServerInstance {
     operationTransformService.shutdownNow();
     workerStubs.invalidateAll();
     logger.fine(format("Instance %s has been stopped", getName()));
+    stopping = false;
+    stopped = true;
   }
 
   private ActionResult getActionResultFromBackplane(ActionKey actionKey)
