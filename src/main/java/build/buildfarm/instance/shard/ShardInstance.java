@@ -471,13 +471,16 @@ public class ShardInstance extends AbstractServerInstance {
       return immediateFuture(nonEmptyDigests);
     }
 
-    return findMissingBlobsOnWorker(
+    SettableFuture<Iterable<Digest>> missingDigestsFuture = SettableFuture.create();
+    findMissingBlobsOnWorker(
         UUID.randomUUID().toString(),
         nonEmptyDigests,
         workers,
         ImmutableList.builder(),
         Iterables.size(nonEmptyDigests),
-        executor);
+        Context.current().fixedContextExecutor(executor),
+        missingDigestsFuture);
+    return missingDigestsFuture;
   }
 
   class FindMissingResponseEntry {
@@ -494,66 +497,84 @@ public class ShardInstance extends AbstractServerInstance {
     }
   }
 
-  private ListenableFuture<Iterable<Digest>> findMissingBlobsOnWorker(
+  private void findMissingBlobsOnWorker(
       String requestId,
       Iterable<Digest> blobDigests,
       Deque<String> workers,
       ImmutableList.Builder<FindMissingResponseEntry> responses,
       int originalSize,
-      Executor executor) {
-    Executor contextExecutor = Context.current().fixedContextExecutor(executor);
+      Executor executor,
+      SettableFuture<Iterable<Digest>> missingDigestsFuture) {
     String worker = workers.removeFirst();
-    // FIXME use FluentFuture
+    ListenableFuture<Iterable<Digest>> workerMissingBlobsFuture =
+        workerStub(worker).findMissingBlobs(blobDigests, executor);
+
     Stopwatch stopwatch = Stopwatch.createStarted();
-    ListenableFuture<Iterable<Digest>> findMissingBlobsFuture = transformAsync(
-        workerStub(worker).findMissingBlobs(blobDigests, executor),
-        (missingDigests) -> {
-          responses.add(new FindMissingResponseEntry(worker, stopwatch.elapsed(MICROSECONDS), null, Iterables.size(missingDigests)));
-          if (Iterables.isEmpty(missingDigests) || workers.isEmpty()) {
-            return immediateFuture(missingDigests);
-          }
-          return findMissingBlobsOnWorker(requestId, missingDigests, workers, responses, originalSize, executor);
-        },
-        contextExecutor);
-    return catchingAsync(
-        findMissingBlobsFuture,
-        Throwable.class,
-        (t) -> {
-          responses.add(new FindMissingResponseEntry(worker, stopwatch.elapsed(MICROSECONDS), t, Iterables.size(blobDigests)));
-          Status status = Status.fromThrowable(t);
-          if (status.getCode() == Code.UNAVAILABLE || status.getCode() == Code.UNIMPLEMENTED) {
-            removeMalfunctioningWorker(worker, t, "findMissingBlobs(" + requestId + ")");
-          } else if (status.getCode() == Code.DEADLINE_EXCEEDED) {
-            for (FindMissingResponseEntry response : responses.build()) {
-              logger.log(
-                  response.exception == null ? WARNING : SEVERE,
-                  format(
-                      "DEADLINE_EXCEEDED: findMissingBlobs(%s) %s: %d remaining of %d %dus%s",
-                      requestId,
-                      response.worker,
-                      response.stillMissingAfter,
-                      originalSize,
-                      response.elapsedMicros,
-                      response.exception != null ? ": " + t.toString() : ""));
+    addCallback(
+        workerMissingBlobsFuture,
+        new FutureCallback<Iterable<Digest>>() {
+          @Override
+          public void onSuccess(Iterable<Digest> missingDigests) {
+            if (Iterables.isEmpty(missingDigests) || workers.isEmpty()) {
+              missingDigestsFuture.set(missingDigests);
+            } else {
+              responses.add(new FindMissingResponseEntry(worker, stopwatch.elapsed(MICROSECONDS), null, Iterables.size(missingDigests)));
+              findMissingBlobsOnWorker(
+                  requestId,
+                  missingDigests,
+                  workers,
+                  responses,
+                  originalSize,
+                  executor,
+                  missingDigestsFuture);
             }
-            throw status.asRuntimeException();
-          } else if (status.getCode() == Code.CANCELLED
-              || Context.current().isCancelled()
-              || !SHARD_IS_RETRIABLE.apply(status)) {
-            // do nothing further if we're cancelled
-            throw status.asRuntimeException();
-          } else {
-            // why not, always
-            workers.addLast(worker);
           }
 
-          if (workers.isEmpty()) {
-            return immediateFuture(blobDigests);
-          } else {
-            return findMissingBlobsOnWorker(requestId, blobDigests, workers, responses, originalSize, executor);
+          @Override
+          public void onFailure(Throwable t) {
+            responses.add(new FindMissingResponseEntry(worker, stopwatch.elapsed(MICROSECONDS), t, Iterables.size(blobDigests)));
+            Status status = Status.fromThrowable(t);
+            if (status.getCode() == Code.UNAVAILABLE || status.getCode() == Code.UNIMPLEMENTED) {
+              removeMalfunctioningWorker(worker, t, "findMissingBlobs(" + requestId + ")");
+            } else if (status.getCode() == Code.DEADLINE_EXCEEDED) {
+              for (FindMissingResponseEntry response : responses.build()) {
+                logger.log(
+                    response.exception == null ? WARNING : SEVERE,
+                    format(
+                        "DEADLINE_EXCEEDED: findMissingBlobs(%s) %s: %d remaining of %d %dus%s",
+                        requestId,
+                        response.worker,
+                        response.stillMissingAfter,
+                        originalSize,
+                        response.elapsedMicros,
+                        response.exception != null ? ": " + response.exception.toString() : ""));
+              }
+              missingDigestsFuture.setException(status.asException());
+            } else if (status.getCode() == Code.CANCELLED || Context.current().isCancelled() || !SHARD_IS_RETRIABLE.test(status)) {
+              // do nothing further if we're cancelled
+              missingDigestsFuture.setException(status.asException());
+            } else {
+              // why not, always
+              workers.addLast(worker);
+            }
+
+            if (!missingDigestsFuture.isDone()) {
+              if (workers.isEmpty()) {
+                missingDigestsFuture.set(blobDigests);
+              } else {
+                findMissingBlobsOnWorker(
+                    requestId,
+                    blobDigests,
+                    workers,
+                    responses,
+                    originalSize,
+                    executor,
+                    missingDigestsFuture);
+              }
+            }
           }
         },
-        contextExecutor);
+        executor);
   }
 
   private void fetchBlobFromWorker(

@@ -87,7 +87,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executor;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -186,7 +186,7 @@ public class ShardInstanceTest {
         Iterable<Digest> digests = (Iterable<Digest>) invocation.getArguments()[0];
         return immediateFuture(Iterables.filter(digests, (digest) -> !blobDigests.contains(digest)));
       }
-    }).when(mockWorkerInstance).findMissingBlobs(any(Iterable.class), any(ExecutorService.class));
+    }).when(mockWorkerInstance).findMissingBlobs(any(Iterable.class), any(Executor.class));
 
     Action action = Action.newBuilder()
         .setCommandDigest(commandDigest)
@@ -213,7 +213,7 @@ public class ShardInstanceTest {
       }
     }).when(mockWorkerInstance).getBlob(eq(actionDigest), eq(0l), eq(0l), any(StreamObserver.class));
     when(mockBackplane.getBlobLocationSet(eq(actionDigest))).thenReturn(provideAction ? workers : ImmutableSet.of());
-    when(mockWorkerInstance.findMissingBlobs(eq(ImmutableList.of(actionDigest)), any(ExecutorService.class))).thenReturn(immediateFuture(ImmutableList.of()));
+    when(mockWorkerInstance.findMissingBlobs(eq(ImmutableList.of(actionDigest)), any(Executor.class))).thenReturn(immediateFuture(ImmutableList.of()));
 
     return action;
   }
@@ -459,7 +459,7 @@ public class ShardInstanceTest {
     Action action = createAction();
     Digest actionDigest = DIGEST_UTIL.compute(action);
 
-    when(mockWorkerInstance.findMissingBlobs(any(Iterable.class), any(ExecutorService.class))).thenReturn(immediateFuture(ImmutableList.of()));
+    when(mockWorkerInstance.findMissingBlobs(any(Iterable.class), any(Executor.class))).thenReturn(immediateFuture(ImmutableList.of()));
 
     doAnswer(answer((digest, uuid) -> new NullWrite()))
         .when(mockWorkerInstance)
@@ -561,7 +561,7 @@ public class ShardInstanceTest {
         .build();
 
     when(mockBackplane.getActionResult(eq(actionKey))).thenReturn(actionResult);
-    when(mockWorkerInstance.findMissingBlobs(any(Iterable.class), any(ExecutorService.class)))
+    when(mockWorkerInstance.findMissingBlobs(any(Iterable.class), any(Executor.class)))
         .thenReturn(immediateFailedFuture(Status.RESOURCE_EXHAUSTED.asException()));
 
     doAnswer(answer((digest, uuid) -> new NullWrite()))
@@ -728,12 +728,12 @@ public class ShardInstanceTest {
         .build();
     List<Digest> queryDigests = ImmutableList.of(digest);
     ArgumentMatcher<Iterable<Digest>> queryMatcher = (digests) -> Iterables.elementsEqual(digests, queryDigests);
-    when(mockWorkerInstance.findMissingBlobs(argThat(queryMatcher), any(ExecutorService.class)))
+    when(mockWorkerInstance.findMissingBlobs(argThat(queryMatcher), any(Executor.class)))
         .thenReturn(immediateFuture(queryDigests));
     Iterable<Digest> missingDigests = instance.findMissingBlobs(
         queryDigests,
         newDirectExecutorService()).get();
-    verify(mockWorkerInstance, times(1)).findMissingBlobs(argThat(queryMatcher), any(ExecutorService.class));
+    verify(mockWorkerInstance, times(1)).findMissingBlobs(argThat(queryMatcher), any(Executor.class));
     assertThat(missingDigests).containsExactly(digest);
   }
 
