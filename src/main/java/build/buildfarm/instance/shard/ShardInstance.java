@@ -655,19 +655,14 @@ public class ShardInstance extends AbstractServerInstance {
     boolean emptyWorkerList = workersList.isEmpty();
     final ListenableFuture<List<String>> populatedWorkerListFuture;
     if (emptyWorkerList) {
-      try {
-        populatedWorkerListFuture = transform(
-            // should be sending this the blob location set and worker set we used
-            correctMissingBlob(backplane, workerSet, locationSet, this::workerStub, blobDigest, newDirectExecutorService()),
-            (foundOnWorkers) -> {
-              Iterables.addAll(workersList, foundOnWorkers);
-              return workersList;
-            },
-            directExecutor());
-      } catch (IOException e) {
-        blobObserver.onError(e);
-        return;
-      }
+      populatedWorkerListFuture = transform(
+          // should be sending this the blob location set and worker set we used
+          correctMissingBlob(backplane, workerSet, locationSet, this::workerStub, blobDigest, newDirectExecutorService()),
+          (foundOnWorkers) -> {
+            Iterables.addAll(workersList, foundOnWorkers);
+            return workersList;
+          },
+          directExecutor());
     } else {
       populatedWorkerListFuture = immediateFuture(workersList);
     }
@@ -687,24 +682,19 @@ public class ShardInstance extends AbstractServerInstance {
           triedCheck = true;
           workersList.clear();
           final ListenableFuture<List<String>> workersListFuture;
-          try {
-            workersListFuture = transform(
-                correctMissingBlob(
-                    backplane,
-                    workerSet,
-                    locationSet,
-                    ShardInstance.this::workerStub,
-                    blobDigest,
-                    newDirectExecutorService()),
-                (foundOnWorkers) -> {
-                  Iterables.addAll(workersList, foundOnWorkers);
-                  return workersList;
-                },
-                directExecutor());
-          } catch (IOException e) {
-            blobObserver.onError(e);
-            return;
-          }
+          workersListFuture = transform(
+              correctMissingBlob(
+                  backplane,
+                  workerSet,
+                  locationSet,
+                  ShardInstance.this::workerStub,
+                  blobDigest,
+                  newDirectExecutorService()),
+              (foundOnWorkers) -> {
+                Iterables.addAll(workersList, foundOnWorkers);
+                return workersList;
+              },
+              directExecutor());
           final StreamObserver<ByteString> checkedChunkObserver = this;
           addCallback(
               workersListFuture,

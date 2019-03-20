@@ -158,6 +158,8 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
         new WorkersCallback(rand) {
           boolean triedCheck = emptyWorkerList;
 
+          /*
+<<<<<<< HEAD:src/main/java/build/buildfarm/instance/shard/RemoteInputStreamFactory.java
           @Override
           public void onQueue(Deque<String> workers) {
             Set<String> locationSet = Sets.newHashSet(workers);
@@ -189,6 +191,52 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
                     complete = true;
                     onFailure(checkException);
                   }
+                }
+              } catch (InterruptedException e) {
+                complete = true;
+                onFailure(e);
+              }
+=======
+              workersList.clear();
+              ListenableFuture<List<String>> checkedWorkerListFuture = transform(
+                  correctMissingBlob(backplane, remoteWorkers, locationSet, RemoteInputStreamFactory.this::workerStub, blobDigest, newDirectExecutorService()),
+                  (foundOnWorkers) -> {
+                    Iterables.addAll(workersList, foundOnWorkers);
+                    return workersList;
+                  });
+              addCallback(checkedWorkerListFuture, this);
+              complete = true;
+>>>>>>> 59e82bad... Rework correctMissingBlob for unwrap and test:src/main/java/build/buildfarm/worker/shard/RemoteInputStreamFactory.java
+            }
+          }
+          */
+
+          @Override
+          public void onQueue(Deque<String> workers) {
+            Set<String> locationSet = Sets.newHashSet(workers);
+            boolean complete = false;
+            while (!complete && !workers.isEmpty()) {
+              try {
+                inputStreamFuture.set(fetchBlobFromRemoteWorker(blobDigest, workers, offset));
+                complete = true;
+              } catch (IOException e) {
+                if (workers.isEmpty()) {
+                  if (triedCheck) {
+                    onFailure(e);
+                    return;
+                  }
+                  triedCheck = true;
+    
+                  workersList.clear();
+                  ListenableFuture<List<String>> checkedWorkerListFuture = transform(
+                      correctMissingBlob(backplane, remoteWorkers, locationSet, RemoteInputStreamFactory.this::workerStub, blobDigest, newDirectExecutorService()),
+                      (foundOnWorkers) -> {
+                        Iterables.addAll(workersList, foundOnWorkers);
+                        return workersList;
+                      },
+                      directExecutor());
+                  addCallback(checkedWorkerListFuture, this, directExecutor());
+                  complete = true;
                 }
               } catch (InterruptedException e) {
                 complete = true;
