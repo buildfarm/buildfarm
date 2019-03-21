@@ -14,9 +14,10 @@
 
 package build.buildfarm.worker.shard;
 
-import static java.util.logging.Level.SEVERE;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static java.util.logging.Level.FINER;
+import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.cas.ContentAddressableStorage;
@@ -174,7 +175,7 @@ public class Worker {
 
     Instances instances = Instances.singular(instance);
     server = serverBuilder
-        .addService(new ContentAddressableStorageService(instances))
+        .addService(new ContentAddressableStorageService(instances, /* requestLogLevel=*/ FINER))
         .addService(new ByteStreamService(instances))
         .build();
 

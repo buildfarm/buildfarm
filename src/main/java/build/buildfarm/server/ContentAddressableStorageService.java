@@ -49,15 +49,18 @@ import io.grpc.Status.Code;
 import io.grpc.StatusException;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class ContentAddressableStorageService extends ContentAddressableStorageGrpc.ContentAddressableStorageImplBase {
   private static final Logger logger = Logger.getLogger(ContentAddressableStorageService.class.getName());
 
   private final Instances instances;
+  private final Level requestLogLevel;
 
-  public ContentAddressableStorageService(Instances instances) {
+  public ContentAddressableStorageService(Instances instances, Level requestLogLevel) {
     this.instances = instances;
+    this.requestLogLevel = requestLogLevel;
   }
 
   @Override
@@ -84,7 +87,7 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
             try {
               responseObserver.onNext(builder.build());
               responseObserver.onCompleted();
-              logger.info(format("FindMissingBlobs(%s) for %d blobs", instance.getName(), request.getBlobDigestsList().size()));
+              logger.log(requestLogLevel, format("FindMissingBlobs(%s) for %d blobs", instance.getName(), request.getBlobDigestsList().size()));
             } catch (Throwable t) {
               onFailure(t);
             }

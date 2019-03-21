@@ -15,6 +15,8 @@
 package build.buildfarm.server;
 
 import static build.buildfarm.common.IOUtils.formatIOError;
+import static java.util.logging.Level.FINE;
+import static java.util.logging.Level.SEVERE;
 
 import build.buildfarm.common.grpc.TracingMetadataUtils.ServerHeadersInterceptor;
 import build.buildfarm.v1test.BuildFarmServerConfig;
@@ -36,7 +38,6 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
 
@@ -67,7 +68,7 @@ public class BuildFarmServer {
     server = serverBuilder
         .addService(new ActionCacheService(instances))
         .addService(new CapabilitiesService(instances))
-        .addService(new ContentAddressableStorageService(instances))
+        .addService(new ContentAddressableStorageService(instances, /* requestLogLevel=*/ FINE))
         .addService(new ByteStreamService(instances))
         .addService(new ExecutionService(instances))
         .addService(new OperationQueueService(instances))
@@ -142,7 +143,7 @@ public class BuildFarmServer {
     // 170714 08:16:28.552:WT 18 [io.grpc.netty.NettyServerHandler.onStreamError] Stream Error
     // io.netty.handler.codec.http2.Http2Exception$StreamException: Received DATA frame for an
     // unknown stream 11369
-    nettyLogger.setLevel(Level.SEVERE);
+    nettyLogger.setLevel(SEVERE);
 
     OptionsParser parser = OptionsParser.newOptionsParser(BuildFarmServerOptions.class);
     parser.parseAndExitUponError(args);
