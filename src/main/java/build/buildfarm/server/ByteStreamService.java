@@ -157,7 +157,7 @@ class ByteStreamService extends ByteStreamImplBase {
       throws InstanceNotFoundException, InvalidResourceNameException {
     switch (detectResourceOperation(resourceName)) {
       case Blob:
-        readLimitedBlob(
+        readBlob(
             instances.getFromBlob(resourceName),
             parseBlobDigest(resourceName),
             offset,
