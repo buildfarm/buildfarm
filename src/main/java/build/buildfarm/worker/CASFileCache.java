@@ -284,7 +284,12 @@ public class CASFileCache {
       Digest digest,
       Map<Digest, Directory> directoriesIndex,
       ImmutableList.Builder<Path> inputsBuilder) throws IOException, InterruptedException {
-    Directory directory = directoriesIndex.get(digest);
+    Directory directory;
+    if (digest.getSizeBytes() == 0) {
+      directory = Directory.getDefaultInstance();
+    } else {
+      directory = directoriesIndex.get(digest);
+    }
     Files.createDirectory(path);
     putDirectoryFiles(directory.getFilesList(), path, containingDirectory, inputsBuilder);
     for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
@@ -328,6 +333,12 @@ public class CASFileCache {
       throw e;
     }
 
+    Directory directory;
+    if (digest.getSizeBytes() == 0) {
+      directory = Directory.getDefaultInstance();
+    } else {
+      directory = directoriesIndex.get(digest);
+    }
     DirectoryEntry e = new DirectoryEntry(directoriesIndex.get(digest), inputsBuilder.build());
 
     directoryStorage.put(digest, e);
