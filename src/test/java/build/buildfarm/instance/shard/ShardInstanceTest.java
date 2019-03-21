@@ -54,6 +54,7 @@ import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.bazel.remote.execution.v2.ToolDetails;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.DigestUtil;
@@ -560,9 +561,7 @@ public class ShardInstanceTest {
                         .setSizeBytes(1)))
         .build();
 
-    when(mockBackplane.getActionResult(eq(actionKey))).thenReturn(actionResult);
-    when(mockWorkerInstance.findMissingBlobs(any(Iterable.class), any(Executor.class)))
-        .thenReturn(immediateFailedFuture(Status.RESOURCE_EXHAUSTED.asException()));
+    when(mockBackplane.getActionResult(eq(actionKey))).thenThrow(new IOException(Status.UNAVAILABLE.asException()));
 
     doAnswer(answer((digest, uuid) -> new NullWrite()))
         .when(mockWorkerInstance)
@@ -588,7 +587,7 @@ public class ShardInstanceTest {
   }
 
   @Test
-  public void actionResultsWithMissingOutputsAreInvalidated() throws IOException {
+  public void duplicateExecutionsServedFromCacheAreForcedToSkipLookup() throws Exception {
     ActionKey actionKey = DigestUtil.asActionKey(Digest.newBuilder()
         .setHash("test")
         .build());
@@ -608,10 +607,57 @@ public class ShardInstanceTest {
             .setSizeBytes(1))
         .build();
 
-    when(mockBackplane.getActionResult(eq(actionKey))).thenReturn(actionResult);
+    when(mockBackplane.canQueue()).thenReturn(true);
+    when(mockBackplane.canPrequeue()).thenReturn(true);
+    when(mockBackplane.getActionResult(actionKey)).thenReturn(actionResult);
 
-    assertThat(instance.getActionResult(actionKey)).isNull();
-    verify(mockBackplane, times(1)).removeActionResult(eq(actionKey));
+    Digest actionDigest = actionKey.getDigest();
+    RequestMetadata requestMetadata = RequestMetadata.newBuilder()
+        .setToolDetails(ToolDetails.newBuilder()
+            .setToolName("buildfarm-test")
+            .setToolVersion("0.1"))
+        .setCorrelatedInvocationsId(UUID.randomUUID().toString())
+        .setToolInvocationId(UUID.randomUUID().toString())
+        .setActionId(actionDigest.getHash())
+        .build();
+
+    String operationName = "cache-served-operation";
+    ExecuteEntry cacheServedExecuteEntry = ExecuteEntry.newBuilder()
+        .setOperationName(operationName)
+        .setActionDigest(actionDigest)
+        .setRequestMetadata(requestMetadata)
+        .build();
+    Poller poller = mock(Poller.class);
+    instance.queue(cacheServedExecuteEntry, poller)
+        .get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
+
+    verify(poller, times(1)).pause();
+    verify(mockBackplane, never()).queue(any(QueueEntry.class), any(Operation.class));
+
+    ArgumentCaptor<Operation> cacheCheckOperationCaptor = ArgumentCaptor.forClass(Operation.class);
+    verify(mockBackplane, times(1)).putOperation(cacheCheckOperationCaptor.capture(), eq(CACHE_CHECK));
+    Operation cacheCheckOperation = cacheCheckOperationCaptor.getValue();
+    assertThat(cacheCheckOperation.getName()).isEqualTo(operationName);
+
+    ArgumentCaptor<Operation> completedOperationCaptor = ArgumentCaptor.forClass(Operation.class);
+    verify(mockBackplane, times(1)).putOperation(completedOperationCaptor.capture(), eq(COMPLETED));
+    Operation completedOperation = completedOperationCaptor.getValue();
+    assertThat(completedOperation.getName()).isEqualTo(operationName);
+    ExecuteResponse executeResponse = completedOperation.getResponse().unpack(ExecuteResponse.class);
+    assertThat(executeResponse.getResult()).isEqualTo(actionResult);
+    assertThat(executeResponse.getCachedResult()).isTrue();
+
+    ArgumentCaptor<ExecuteEntry> executeEntryCaptor = ArgumentCaptor.forClass(ExecuteEntry.class);
+    instance.execute(
+        actionDigest,
+        /* skipCacheLookup=*/ false,
+        ExecutionPolicy.getDefaultInstance(),
+        ResultsCachePolicy.getDefaultInstance(),
+        requestMetadata,
+        /* watcher=*/ null);
+    verify(mockBackplane, times(1)).prequeue(executeEntryCaptor.capture(), any(Operation.class));
+    ExecuteEntry executeEntry = executeEntryCaptor.getValue();
+    assertThat(executeEntry.getSkipCacheLookup()).isTrue();
   }
 
   @Test

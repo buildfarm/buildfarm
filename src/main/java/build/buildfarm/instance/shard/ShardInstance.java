@@ -149,8 +149,8 @@ public class ShardInstance extends AbstractServerInstance {
 
   private final Runnable onStop;
   private final ShardBackplane backplane;
-  private final com.google.common.cache.LoadingCache<String, Instance> workerStubs;
   private final RemoteInputStreamFactory remoteInputStreamFactory;
+  private final LoadingCache<String, Instance> workerStubs;
   private final Thread dispatchedMonitor;
   private final Cache<Digest, Directory> directoryCache = CacheBuilder.newBuilder()
       .maximumSize(64 * 1024)
@@ -161,6 +161,11 @@ public class ShardInstance extends AbstractServerInstance {
   private final Cache<Digest, Action> actionCache = CacheBuilder.newBuilder()
       .maximumSize(64 * 1024)
       .build();
+  private final com.google.common.cache.Cache<RequestMetadata, Boolean> recentCacheServedExecutions =
+      com.google.common.cache.CacheBuilder.newBuilder()
+          .maximumSize(64 * 1024)
+          .build();
+
   private final Random rand = new Random();
   private final Writes writes = new Writes(this::writeInstanceSupplier);
 
@@ -212,7 +217,7 @@ public class ShardInstance extends AbstractServerInstance {
       int dispatchedMonitorIntervalSeconds,
       boolean runOperationQueuer,
       Runnable onStop,
-      com.google.common.cache.LoadingCache<String, Instance> workerStubs)
+      LoadingCache<String, Instance> workerStubs)
       throws InterruptedException {
     super(name, digestUtil, null, null, null, null, null);
     this.backplane = backplane;
@@ -396,47 +401,10 @@ public class ShardInstance extends AbstractServerInstance {
     stopped = true;
   }
 
-  private ActionResult getActionResultFromBackplane(ActionKey actionKey)
-      throws IOException {
-    // logger.info("getActionResult: " + DigestUtil.toString(actionKey.getDigest()));
-    ActionResult actionResult = backplane.getActionResult(actionKey);
-    if (actionResult == null) {
-      return null;
-    }
-
-    // FIXME output dirs
-    // FIXME inline content
-    Iterable<OutputFile> outputFiles = actionResult.getOutputFilesList();
-    Iterable<Digest> outputDigests = Iterables.transform(outputFiles, (outputFile) -> outputFile.getDigest());
-    if (actionResult.hasStdoutDigest()) {
-      outputDigests = Iterables.concat(outputDigests, ImmutableList.of(actionResult.getStdoutDigest()));
-    }
-    if (actionResult.hasStderrDigest()) {
-      outputDigests = Iterables.concat(outputDigests, ImmutableList.of(actionResult.getStderrDigest()));
-    }
-    try {
-      if (Iterables.isEmpty(findMissingBlobs(outputDigests, directExecutor()).get())) {
-        return actionResult;
-      }
-    } catch (ExecutionException e) {
-      if (e.getCause() instanceof RuntimeException) {
-        throw (RuntimeException) e.getCause();
-      }
-      throw new UncheckedExecutionException(e.getCause());
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw Status.CANCELLED.asRuntimeException();
-    }
-
-    // some of our outputs are no longer in the CAS, remove the actionResult
-    backplane.removeActionResult(actionKey);
-    return null;
-  }
-
   @Override
   public ActionResult getActionResult(ActionKey actionKey) {
     try {
-      return getActionResultFromBackplane(actionKey);
+      return backplane.getActionResult(actionKey);
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }
@@ -1249,7 +1217,7 @@ public class ShardInstance extends AbstractServerInstance {
     if (executeEntry.getSkipCacheLookup()) {
       cachedResultFuture = immediateFuture(false);
     } else {
-      cachedResultFuture = checkCacheFuture(actionKey, operation);
+      cachedResultFuture = checkCacheFuture(actionKey, operation, executeEntry.getRequestMetadata());
     }
     return transformAsync(
         cachedResultFuture,
@@ -1272,10 +1240,18 @@ public class ShardInstance extends AbstractServerInstance {
       Watcher watcher) {
     try {
       if (!backplane.canPrequeue()) {
-        return immediateFailedFuture(Status.UNAVAILABLE.withDescription("Too many jobs pending").asException());
+        return immediateFailedFuture(
+            Status.UNAVAILABLE
+                .withDescription("Too many jobs pending")
+                .asException());
       }
 
       String operationName = createOperationName(UUID.randomUUID().toString());
+
+      if (recentCacheServedExecutions.getIfPresent(requestMetadata) != null) {
+        logger.fine(format("Operation %s will have skip_cache_lookup = true due to retry", operationName));
+        skipCacheLookup = true;
+      }
 
       String stdoutStreamName = operationName + "/streams/stdout";
       String stderrStreamName = operationName + "/streams/stderr";
@@ -1336,7 +1312,11 @@ public class ShardInstance extends AbstractServerInstance {
     });
   }
 
-  private boolean checkCache(ActionKey actionKey, Operation operation) throws Exception {
+  private boolean checkCache(
+      ActionKey actionKey,
+      Operation operation,
+      RequestMetadata requestMetadata)
+      throws Exception {
     ExecuteOperationMetadata metadata =
         ExecuteOperationMetadata.newBuilder()
             .setActionDigest(actionKey.getDigest())
@@ -1352,10 +1332,12 @@ public class ShardInstance extends AbstractServerInstance {
         .withDeadlineAfter(60, TimeUnit.SECONDS, contextDeadlineScheduler);
     try {
       return withDeadline.call(() -> {
-        ActionResult actionResult = getActionResultFromBackplane(actionKey);
+        ActionResult actionResult = backplane.getActionResult(actionKey);
         if (actionResult == null) {
           return false;
         }
+
+        recentCacheServedExecutions.put(requestMetadata, true);
 
         ExecuteOperationMetadata completeMetadata = metadata.toBuilder()
             .setStage(Stage.COMPLETED)
@@ -1379,11 +1361,11 @@ public class ShardInstance extends AbstractServerInstance {
     }
   }
 
-  private ListenableFuture<Boolean> checkCacheFuture(ActionKey actionKey, Operation operation) {
+  private ListenableFuture<Boolean> checkCacheFuture(ActionKey actionKey, Operation operation, RequestMetadata requestMetadata) {
     ListenableFuture<Boolean> checkCacheFuture = operationTransformService.submit(new Callable<Boolean>() {
       @Override
       public Boolean call() throws Exception {
-        return checkCache(actionKey, operation);
+        return checkCache(actionKey, operation, requestMetadata);
       }
     });
     return catchingAsync(
@@ -1418,7 +1400,7 @@ public class ShardInstance extends AbstractServerInstance {
     if (executeEntry.getSkipCacheLookup()) {
       cachedResultFuture = immediateFuture(false);
     } else {
-      cachedResultFuture = checkCacheFuture(actionKey, operation);
+      cachedResultFuture = checkCacheFuture(actionKey, operation, executeEntry.getRequestMetadata());
     }
     return transformAsync(
         cachedResultFuture,
