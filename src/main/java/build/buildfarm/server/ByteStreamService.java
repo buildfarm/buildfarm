@@ -369,8 +369,10 @@ class ByteStreamService extends ByteStreamImplBase {
                   }
                 },
                 withCancellation.fixedContextExecutor(directExecutor()));
-            initialized = true;
-            handleRequest(request);
+            if (!write.isComplete()) {
+              initialized = true;
+              handleRequest(request);
+            }
           } catch (InstanceNotFoundException e) {
             responseObserver.onError(BuildFarmInstances.toStatusException(e));
           } catch (IOException|InvalidResourceNameException e) {
