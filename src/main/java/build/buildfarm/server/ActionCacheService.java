@@ -14,6 +14,8 @@
 
 package build.buildfarm.server;
 
+import static java.lang.String.format;
+
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance;
 import build.bazel.remote.execution.v2.ActionCacheGrpc;
@@ -21,7 +23,8 @@ import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.GetActionResultRequest;
 import build.bazel.remote.execution.v2.UpdateActionResultRequest;
 import io.grpc.Status;
-import io.grpc.StatusException;
+import io.grpc.Status.Code;
+import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import java.util.logging.Logger;
 
@@ -46,16 +49,22 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
       return;
     }
 
-    ActionResult actionResult = instance.getActionResult(
-        DigestUtil.asActionKey(request.getActionDigest()));
-    if (actionResult == null) {
-      responseObserver.onError(Status.NOT_FOUND.asException());
-      return;
+    try {
+      ActionResult actionResult = instance.getActionResult(
+          DigestUtil.asActionKey(request.getActionDigest()));
+      if (actionResult == null) {
+        responseObserver.onError(Status.NOT_FOUND.asException());
+      } else {
+        logger.finer(format("GetActionResult for ActionKey %s", DigestUtil.toString(request.getActionDigest())));
+        responseObserver.onNext(actionResult);
+        responseObserver.onCompleted();
+      }
+    } catch (StatusRuntimeException e) {
+      Status status = Status.fromThrowable(e);
+      if (status.getCode() != Code.CANCELLED) {
+        responseObserver.onError(status.asException());
+      }
     }
-
-    logger.info("GetActionResult for ActionKey " + DigestUtil.toString(request.getActionDigest()));
-    responseObserver.onNext(actionResult);
-    responseObserver.onCompleted();
   }
 
   @Override
