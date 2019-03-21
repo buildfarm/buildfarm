@@ -26,6 +26,8 @@ import static io.grpc.Status.INVALID_ARGUMENT;
 import static io.grpc.Status.NOT_FOUND;
 import static io.grpc.Status.OUT_OF_RANGE;
 import static java.lang.String.format;
+import static java.util.logging.Level.FINE;
+import static java.util.logging.Level.FINER;
 import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.Digest;
@@ -183,7 +185,7 @@ class ByteStreamService extends ByteStreamImplBase {
       StreamObserver<ReadResponse> responseObserver) {
     String resourceName = request.getResourceName();
     long offset = request.getReadOffset(), limit = request.getReadLimit();
-    logger.fine(
+    logger.finest(
         format(
             "read resourceName=%s offset=%d limit=%d",
             resourceName,
@@ -299,20 +301,25 @@ class ByteStreamService extends ByteStreamImplBase {
           name = resourceName;
           try {
             write = getWrite(resourceName);
-            logger.log(java.util.logging.Level.INFO, "Registering callback for " + resourceName);
+            logger.finer(
+                format(
+                    "registering callback for %s: committed_size = %d, complete = %s",
+                    resourceName,
+                    write.getCommittedSize(),
+                    write.isComplete()));
             write.addListener(
                 () -> {
                   if (!Context.current().isCancelled()) {
                     try {
-                      logger.log(java.util.logging.Level.INFO, "delivering committedSize for " + resourceName);
+                      logger.finer(format("delivering committedSize for %s", resourceName));
                       responseObserver.onNext(WriteResponse.newBuilder()
                           .setCommittedSize(write.getCommittedSize())
                           .build());
                     } catch (Throwable t) {
-                      logger.log(SEVERE, "error delivering committedSize to " + resourceName, t);
+                      logger.log(SEVERE, format("error delivering committedSize to %s", resourceName), t);
                     }
                   } else {
-                    logger.log(java.util.logging.Level.INFO, "skipped delivering committedSize to " + resourceName + " for cancelled context");
+                    logger.finest(format("skipped delivering committedSize to %s for cancelled context", resourceName));
                   }
                 },
                 withCancellation.fixedContextExecutor(directExecutor()));
@@ -362,7 +369,7 @@ class ByteStreamService extends ByteStreamImplBase {
               writeData(data);
             }
             if (finishWrite) {
-              logger.info("closing stream due to finishWrite for " + resourceName);
+              logger.finest("closing stream due to finishWrite for " + resourceName);
               write.getOutput().close();
             }
           }
@@ -375,7 +382,7 @@ class ByteStreamService extends ByteStreamImplBase {
 
       void writeData(ByteString data) {
         try {
-          logger.log(java.util.logging.Level.INFO, "writing " + data.size() + " to " + name);
+          logger.finest(format("writing %d to %s", data.size(), name));
           data.writeTo(write.getOutput());
         } catch (IOException e) {
           responseObserver.onError(Status.fromThrowable(e).asException());
@@ -392,14 +399,14 @@ class ByteStreamService extends ByteStreamImplBase {
             logger.log(SEVERE, "error closing output stream after error", e);
           }
         } else {
-          logger.log(java.util.logging.Level.INFO, "cancelling context for " + name, t);
+          logger.log(FINER, "cancelling context for " + name, t);
           withCancellation.cancel(t);
         }
       }
 
       @Override
       public void onCompleted() {
-        logger.log(java.util.logging.Level.INFO, "calling completed for " + name);
+        logger.finer("calling completed for " + name);
         responseObserver.onCompleted();
       }
     };
