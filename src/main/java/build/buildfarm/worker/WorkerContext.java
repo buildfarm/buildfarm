@@ -16,6 +16,7 @@ package build.buildfarm.worker;
 
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.Write;
 import build.buildfarm.common.function.InterruptingConsumer;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.ByteStreamUploader;
@@ -30,7 +31,6 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.nio.file.Path;
 import java.util.function.Predicate;
 
@@ -59,6 +59,6 @@ public interface WorkerContext {
   void destroyActionRoot(Path root) throws IOException;
   Path getRoot();
   boolean putOperation(Operation operation) throws InterruptedException;
-  OutputStream getOperationStreamOutput(String name) throws IOException;
+  Write getOperationStreamWrite(String name) throws IOException;
   void putActionResult(ActionKey actionKey, ActionResult actionResult) throws InterruptedException;
 }
