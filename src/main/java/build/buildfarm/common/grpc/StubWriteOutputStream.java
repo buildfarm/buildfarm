@@ -195,6 +195,12 @@ public class StubWriteOutputStream extends OutputStream implements Write {
   }
 
   @Override
+  public void reset() {
+    offset = 0;
+    writtenBytes = 0;
+  }
+
+  @Override
   public void addListener(Runnable onCompleted, Executor executor) {
     writeFuture.addListener(onCompleted, executor);
   }

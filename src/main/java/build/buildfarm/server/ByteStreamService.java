@@ -245,7 +245,7 @@ class ByteStreamService extends ByteStreamImplBase {
     return new StreamObserver<WriteRequest>() {
       boolean initialized = false;
       String name = null;
-      OutputStream out = null;
+      Write write = null;
       Instance instance = null;
 
       @Override
@@ -298,7 +298,7 @@ class ByteStreamService extends ByteStreamImplBase {
         } else {
           name = resourceName;
           try {
-            Write write = getWrite(resourceName);
+            write = getWrite(resourceName);
             logger.log(java.util.logging.Level.INFO, "Registering callback for " + resourceName);
             write.addListener(
                 () -> {
@@ -316,7 +316,6 @@ class ByteStreamService extends ByteStreamImplBase {
                   }
                 },
                 withCancellation.fixedContextExecutor(directExecutor()));
-            out = write.getOutput();
             initialized = true;
             handleRequest(request);
           } catch (InstanceNotFoundException e) {
@@ -356,21 +355,15 @@ class ByteStreamService extends ByteStreamImplBase {
                 .asException());
           } else {
             if (offset == 0 && offset != committedSize) {
-              // reset the write
-              try {
-                out.close();
-              } catch (IOException e) {
-                // ignore, cancelling
-              }
-              out = getWrite(resourceName).getOutput();
-              checkState(getCommittedSize(resourceName) == 0);
+              write.reset();
             }
+
             if (!data.isEmpty()) {
               writeData(data);
             }
             if (finishWrite) {
               logger.info("closing stream due to finishWrite for " + resourceName);
-              out.close();
+              write.getOutput().close();
             }
           }
         } catch (InstanceNotFoundException e) {
@@ -383,7 +376,7 @@ class ByteStreamService extends ByteStreamImplBase {
       void writeData(ByteString data) {
         try {
           logger.log(java.util.logging.Level.INFO, "writing " + data.size() + " to " + name);
-          data.writeTo(out);
+          data.writeTo(write.getOutput());
         } catch (IOException e) {
           responseObserver.onError(Status.fromThrowable(e).asException());
         }
@@ -394,7 +387,7 @@ class ByteStreamService extends ByteStreamImplBase {
         if (initialized
             && !DEFAULT_IS_RETRIABLE.apply(Status.fromThrowable(t))) {
           try {
-            out.close();
+            write.getOutput().close();
           } catch (IOException e) {
             logger.log(SEVERE, "error closing output stream after error", e);
           }
