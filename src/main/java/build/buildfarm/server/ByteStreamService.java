@@ -72,7 +72,7 @@ class ByteStreamService extends ByteStreamImplBase {
     long remaining = limit;
     boolean complete = false;
     while (!complete) {
-      int readBytes = in.read(buf);
+      int readBytes = in.read(buf, 0, (int) Math.min(remaining, buf.length));
       if (readBytes == -1) {
         if (!unlimited) {
           responseObserver.onError(OUT_OF_RANGE.asException());
