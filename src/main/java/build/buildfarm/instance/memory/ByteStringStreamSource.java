@@ -15,12 +15,15 @@
 package build.buildfarm.instance.memory;
 
 import com.google.protobuf.ByteString;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.SettableFuture;
 import java.io.InputStream;
 import java.io.OutputStream;
 
 class ByteStringStreamSource {
   private final Runnable onClose;
   private final OutputStream outputStream;
+  private final SettableFuture<Void> closedFuture = SettableFuture.create();
 
   private final Object bufferSync;
   private ByteString buffer;
@@ -55,6 +58,7 @@ class ByteStringStreamSource {
         synchronized (bufferSync) {
           closed = true;
           bufferSync.notifyAll();
+          closedFuture.set(null);
         }
         onClose.run();
       }
@@ -69,6 +73,14 @@ class ByteStringStreamSource {
 
   public OutputStream getOutputStream() {
     return outputStream;
+  }
+
+  public long getCommittedSize() {
+    return buffer.size();
+  }
+
+  public ListenableFuture<Void> getClosedFuture() {
+    return closedFuture;
   }
 
   public InputStream openStream() {

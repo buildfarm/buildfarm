@@ -80,6 +80,7 @@ import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
@@ -272,15 +273,33 @@ public class MemoryInstance extends AbstractServerInstance {
 
   @Override
   public Write getOperationStreamWrite(String name) {
-    throw new UnsupportedOperationException(); // needs source->write conversion
-  }
+    return new Write() {
+      @Override
+      public long getCommittedSize() {
+        return getSource(name).getCommittedSize();
+      }
 
-  /*
-  @Override
-  public OutputStream getStreamOutput(String name) {
-    return getSource(name).getOutputStream();
+      @Override
+      public boolean isComplete() {
+        return getSource(name).isClosed();
+      }
+
+      @Override
+      public OutputStream getOutput() {
+        return getSource(name).getOutputStream();
+      }
+
+      @Override
+      public void reset() {
+        streams.remove(name);
+      }
+
+      @Override
+      public void addListener(Runnable onCompleted, Executor executor) {
+        getSource(name).getClosedFuture().addListener(onCompleted, executor);
+      }
+    };
   }
-  */
 
   @Override
   public InputStream newOperationStreamInput(String name, long offset) throws IOException {
