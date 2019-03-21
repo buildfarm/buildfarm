@@ -39,8 +39,9 @@ import org.junit.Before;
 import org.junit.Test;
 
 class CASFileCacheTest {
+  private final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
+
   private CASFileCache fileCache;
-  private DigestUtil digestUtil;
   private Path root;
   private Map<Digest, ByteString> blobs;
 
@@ -63,7 +64,6 @@ class CASFileCacheTest {
 
   @Before
   public void setUp() {
-    digestUtil = new DigestUtil(HashFunction.SHA256);
     blobs = new HashMap<Digest, ByteString>();
     fileCache = new CASFileCache(
         new InputStreamFactory() {
@@ -80,13 +80,13 @@ class CASFileCacheTest {
         },
         root,
         /* maxSizeInBytes=*/ 1024,
-        digestUtil);
+        DIGEST_UTIL);
   }
 
   @Test
   public void putCreatesFile() throws IOException, InterruptedException {
     ByteString blob = ByteString.copyFromUtf8("Hello, World");
-    Digest blobDigest = digestUtil.compute(blob);
+    Digest blobDigest = DIGEST_UTIL.compute(blob);
     blobs.put(blobDigest, blob);
     Path path = fileCache.put(blobDigest, false);
     assertThat(Files.exists(path)).isTrue();
@@ -99,10 +99,10 @@ class CASFileCacheTest {
         mockInputStreamFactory,
         root,
         /* maxSizeInBytes=*/ 1024,
-        digestUtil);
+        DIGEST_UTIL);
 
     ByteString blob = ByteString.copyFromUtf8("");
-    Digest blobDigest = digestUtil.compute(blob);
+    Digest blobDigest = DIGEST_UTIL.compute(blob);
     // supply an empty input stream if called for test clarity
     when(mockInputStreamFactory.newInput(blobDigest, /* offset=*/ 0))
         .thenReturn(ByteString.EMPTY.newInput());
@@ -116,7 +116,7 @@ class CASFileCacheTest {
   @Test
   public void putCreatesExecutable() throws IOException, InterruptedException {
     ByteString blob = ByteString.copyFromUtf8("executable");
-    Digest blobDigest = digestUtil.compute(blob);
+    Digest blobDigest = DIGEST_UTIL.compute(blob);
     blobs.put(blobDigest, blob);
     Path path = fileCache.put(blobDigest, true);
     assertThat(Files.isExecutable(path)).isTrue();
@@ -125,13 +125,10 @@ class CASFileCacheTest {
   @Test
   public void putDirectoryCreatesTree() throws IOException, InterruptedException {
     ByteString file = ByteString.copyFromUtf8("Peanut Butter");
-    Digest fileDigest = Digest.newBuilder()
-        .setHash("file")
-        .setSizeBytes(file.size())
-        .build();
+    Digest fileDigest = DIGEST_UTIL.compute(file);
     blobs.put(fileDigest, file);
-    Directory subDirectory = Directory.newBuilder().build();
-    Digest subdirDigest = Digest.newBuilder().setHash("subdir").build();
+    Directory subDirectory = Directory.getDefaultInstance();
+    Digest subdirDigest = DIGEST_UTIL.compute(subDirectory);
     Directory directory = Directory.newBuilder()
         .addFiles(FileNode.newBuilder()
             .setName("file")
@@ -142,7 +139,7 @@ class CASFileCacheTest {
             .setDigest(subdirDigest)
             .build())
         .build();
-    Digest dirDigest = Digest.newBuilder().setHash("test").build();
+    Digest dirDigest = DIGEST_UTIL.compute(directory);
     Map<Digest, Directory> directoriesIndex = ImmutableMap.of(
         dirDigest, directory,
         subdirDigest, subDirectory);
@@ -155,13 +152,10 @@ class CASFileCacheTest {
   @Test
   public void putDirectoryIOExceptionRollsBack() throws IOException, InterruptedException {
     ByteString file = ByteString.copyFromUtf8("Peanut Butter");
-    Digest fileDigest = Digest.newBuilder()
-        .setHash("file")
-        .setSizeBytes(file.size())
-        .build();
+    Digest fileDigest = DIGEST_UTIL.compute(file);
     // omitting blobs.put to incur IOException
-    Directory subDirectory = Directory.newBuilder().build();
-    Digest subdirDigest = Digest.newBuilder().setHash("subdir").build();
+    Directory subDirectory = Directory.getDefaultInstance();
+    Digest subdirDigest = DIGEST_UTIL.compute(subDirectory);
     Directory directory = Directory.newBuilder()
         .addFiles(FileNode.newBuilder()
             .setName("file")
@@ -172,7 +166,7 @@ class CASFileCacheTest {
             .setDigest(subdirDigest)
             .build())
         .build();
-    Digest dirDigest = Digest.newBuilder().setHash("test").build();
+    Digest dirDigest = DIGEST_UTIL.compute(directory);
     Map<Digest, Directory> directoriesIndex = ImmutableMap.of(
         dirDigest, directory,
         subdirDigest, subDirectory);
@@ -191,10 +185,7 @@ class CASFileCacheTest {
   public void expireUnreferencedEntryRemovesBlobFile() throws IOException, InterruptedException {
     byte[] bigData = new byte[1000];
     ByteString bigBlob = ByteString.copyFrom(bigData);
-    Digest bigDigest = Digest.newBuilder()
-        .setHash("big")
-        .setSizeBytes(bigBlob.size())
-        .build();
+    Digest bigDigest = DIGEST_UTIL.compute(bigBlob);
     blobs.put(bigDigest, bigBlob);
     Path bigPath = fileCache.put(bigDigest, false);
 
@@ -202,10 +193,7 @@ class CASFileCacheTest {
 
     byte[] strawData = new byte[30]; // take us beyond our 1024 limit
     ByteString strawBlob = ByteString.copyFrom(strawData);
-    Digest strawDigest = Digest.newBuilder()
-        .setHash("straw")
-        .setSizeBytes(strawBlob.size())
-        .build();
+    Digest strawDigest = DIGEST_UTIL.compute(strawBlob);
     blobs.put(strawDigest, strawBlob);
     Path strawPath = fileCache.put(strawDigest, false);
 
@@ -216,7 +204,7 @@ class CASFileCacheTest {
   @Test
   public void startLoadsExistingBlob() throws IOException, InterruptedException {
     ByteString blob = ByteString.copyFromUtf8("blob");
-    Digest blobDigest = digestUtil.compute(blob);
+    Digest blobDigest = DIGEST_UTIL.compute(blob);
     Path path = root.resolve(fileCache.getKey(blobDigest, false));
     Path execPath = root.resolve(fileCache.getKey(blobDigest, true));
     Files.write(path, blob.toByteArray());
@@ -237,7 +225,7 @@ class CASFileCacheTest {
     Path tooManyComponents = root.resolve("too_many_components_here");
     Path invalidDigest = root.resolve("digest_10");
     ByteString validBlob = ByteString.copyFromUtf8("valid");
-    Digest validDigest = digestUtil.compute(ByteString.copyFromUtf8("valid"));
+    Digest validDigest = DIGEST_UTIL.compute(ByteString.copyFromUtf8("valid"));
     Path invalidSize = root.resolve(validDigest.getHash() + "_ten");
     Path incorrectSize = fileCache.getKey(validDigest
         .toBuilder()

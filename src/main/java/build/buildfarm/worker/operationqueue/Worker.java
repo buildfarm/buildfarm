@@ -238,9 +238,14 @@ public class Worker {
       ImmutableList.Builder<Path> inputFiles,
       ImmutableList.Builder<Digest> inputDirectories)
       throws IOException, InterruptedException {
-    Directory directory = directoriesIndex.get(inputRoot);
-    if (directory == null) {
-      throw new IOException("Directory " + DigestUtil.toString(inputRoot) + " is not in input index");
+    Directory directory;
+    if (inputRoot.getSizeBytes() == 0) {
+      directory = Directory.getDefaultInstance();
+    } else {
+      directory = directoriesIndex.get(inputRoot);
+      if (directory == null) {
+        throw new IOException("Directory " + DigestUtil.toString(inputRoot) + " is not in input index");
+      }
     }
 
     fileCache.putFiles(directory.getFilesList(), execDir, inputFiles);
