@@ -4,7 +4,7 @@ import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
 import java.io.IOException;
 
-class DigestMismatchException extends IOException {
+public class DigestMismatchException extends IOException {
   private final Digest actual;
   private final Digest expected;
 

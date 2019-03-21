@@ -25,6 +25,8 @@ public interface Write {
 
   OutputStream getOutput() throws IOException;
 
+  void reset();
+
   /** add a callback to be invoked when blob has been completed */
   void addListener(Runnable onCompleted, Executor executor);
 }

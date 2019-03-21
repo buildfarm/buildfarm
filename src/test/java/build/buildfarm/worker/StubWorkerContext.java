@@ -16,6 +16,7 @@ package build.buildfarm.worker;
 
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.Write;
 import build.buildfarm.common.function.InterruptingConsumer;
 import build.buildfarm.worker.CASFileCache;
 import build.buildfarm.instance.Instance;
@@ -30,7 +31,6 @@ import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
-import java.io.OutputStream;
 import java.nio.file.Path;
 import java.util.function.Predicate;
 
@@ -59,6 +59,6 @@ class StubWorkerContext implements WorkerContext {
   @Override public void destroyActionRoot(Path root) { throw new UnsupportedOperationException(); }
   @Override public Path getRoot() { throw new UnsupportedOperationException(); }
   @Override public boolean putOperation(Operation operation) { throw new UnsupportedOperationException(); }
-  @Override public OutputStream getOperationStreamOutput(String name) { throw new UnsupportedOperationException(); }
+  @Override public Write getOperationStreamWrite(String name) { throw new UnsupportedOperationException(); }
   @Override public void putActionResult(ActionKey actionKey, ActionResult actionResult) { throw new UnsupportedOperationException(); }
 };

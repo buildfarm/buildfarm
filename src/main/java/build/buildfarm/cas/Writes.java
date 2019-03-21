@@ -66,6 +66,10 @@ class Writes {
     }
 
     @Override
+    public void reset() {
+    }
+
+    @Override
     public void addListener(Runnable onCompleted, Executor executor) {
       executor.execute(onCompleted);
     }

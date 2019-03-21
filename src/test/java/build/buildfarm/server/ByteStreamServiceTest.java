@@ -4,6 +4,7 @@ import static build.buildfarm.common.DigestUtil.HashFunction.SHA256;
 import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.AdditionalAnswers.answerVoid;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
@@ -43,6 +44,8 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 
 @RunWith(JUnit4.class)
 public class ByteStreamServiceTest {
@@ -88,8 +91,6 @@ public class ByteStreamServiceTest {
       public void close() {
         if (output.size() == digest.getSizeBytes()) {
           writtenFuture.set(output.toByteString());
-        } else {
-          output.reset();
         }
       }
 
@@ -115,10 +116,15 @@ public class ByteStreamServiceTest {
     };
 
     Write write = mock(Write.class);
+    doAnswer(new Answer<Void>() {
+      @Override
+      public Void answer(InvocationOnMock invocation) {
+        output.reset();
+        return null;
+      }
+    }).when(write).reset();
     when(write.getOutput()).thenReturn(out);
-    doAnswer((invocation) -> {
-      return (long) output.size();
-    }).when(write).getCommittedSize();
+    doAnswer(invocation -> (long) output.size()).when(write).getCommittedSize();
     doAnswer(answerVoid((Runnable listener, Executor executor) -> writtenFuture.addListener(listener, executor)))
         .when(write).addListener(any(Runnable.class), any(Executor.class));
 
@@ -130,22 +136,8 @@ public class ByteStreamServiceTest {
 
     Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
     ByteStreamStub service = ByteStreamGrpc.newStub(channel);
-    SettableFuture<WriteResponse> partialFuture = SettableFuture.create();
-    StreamObserver<WriteRequest> requestObserver = service.write(new StreamObserver<WriteResponse>() {
-      @Override
-      public void onNext(WriteResponse response) {
-        partialFuture.set(response);
-      }
-
-      @Override
-      public void onCompleted() {
-      }
-
-      @Override
-      public void onError(Throwable t) {
-        partialFuture.setException(t);
-      }
-    });
+    FutureWriteResponseObserver futureResponder = new FutureWriteResponseObserver();
+    StreamObserver<WriteRequest> requestObserver = service.write(futureResponder);
 
     ByteString shortContent = content.substring(0, 6);
     requestObserver.onNext(WriteRequest.newBuilder()
@@ -158,10 +150,14 @@ public class ByteStreamServiceTest {
         .setData(content)
         .setFinishWrite(true)
         .build());
-    requestObserver.onCompleted();
-    assertThat(partialFuture.get()).isEqualTo(WriteResponse.newBuilder()
+    assertThat(futureResponder.get()).isEqualTo(WriteResponse.newBuilder()
         .setCommittedSize(content.size())
         .build());
+    requestObserver.onCompleted();
+    verify(write, atLeastOnce()).getCommittedSize();
+    verify(write, atLeastOnce()).getOutput();
+    verify(write, times(1)).reset();
+    verify(write, times(1)).addListener(any(Runnable.class), any(Executor.class));
   }
 
   @Test
@@ -193,9 +189,7 @@ public class ByteStreamServiceTest {
 
     Write write = mock(Write.class);
     when(write.getOutput()).thenReturn(out);
-    doAnswer((invocation) -> {
-      return (long) output.size();
-    }).when(write).getCommittedSize();
+    doAnswer(invocation -> (long) output.size()).when(write).getCommittedSize();
     doAnswer(answerVoid((Runnable listener, Executor executor) -> writtenFuture.addListener(listener, executor)))
         .when(write).addListener(any(Runnable.class), any(Executor.class));
 
@@ -207,8 +201,6 @@ public class ByteStreamServiceTest {
 
     Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
     ByteStreamStub service = ByteStreamGrpc.newStub(channel);
-
-    SettableFuture<WriteResponse> partialFuture = SettableFuture.create();
 
     FutureWriteResponseObserver futureResponder = new FutureWriteResponseObserver();
     StreamObserver<WriteRequest> requestObserver = service.write(futureResponder);
@@ -229,9 +221,12 @@ public class ByteStreamServiceTest {
         .setData(content.substring(6))
         .setFinishWrite(true)
         .build());
-    requestObserver.onCompleted();
     assertThat(futureResponder.get()).isEqualTo(WriteResponse.newBuilder()
         .setCommittedSize(content.size())
         .build());
+    requestObserver.onCompleted();
+    verify(write, atLeastOnce()).getCommittedSize();
+    verify(write, atLeastOnce()).getOutput();
+    verify(write, times(2)).addListener(any(Runnable.class), any(Executor.class));
   }
 }

@@ -24,6 +24,7 @@ import static java.util.concurrent.TimeUnit.MINUTES;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
+import build.buildfarm.common.Write;
 import build.buildfarm.common.function.InterruptingConsumer;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.Retrier.Backoff;
@@ -71,11 +72,9 @@ import com.google.protobuf.TextFormat;
 import io.grpc.Channel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -489,8 +488,8 @@ public class Worker {
 
       // doesn't belong in CAS or AC, must be in OQ
       @Override
-      public OutputStream getOperationStreamOutput(String name) throws IOException {
-        return operationQueueInstance.getOperationStreamWrite(name).getOutput();
+      public Write getOperationStreamWrite(String name) {
+        return operationQueueInstance.getOperationStreamWrite(name);
       }
 
       @Override
