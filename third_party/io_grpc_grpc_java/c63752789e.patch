@@ -1,0 +1,38 @@
+From c63752789e61dd44120dbafcc59f6c12d72d652f Mon Sep 17 00:00:00 2001
+From: Eric Anderson <ejona@google.com>
+Date: Thu, 7 Mar 2019 16:22:54 -0800
+Subject: [PATCH] java_grpc_library.bzl: Pre-migrate for Bazel
+ incompatible_use_toolchain_providers_in_java_common
+
+This doesn't actually yet work with
+--incompatible_use_toolchain_providers_in_java_common, as Bazel 0.23 didn't
+include enough pieces. But this will work in 0.24 with the flag flipped. In
+both cases it will continue working if the flag is not specified.
+
+See https://github.com/grpc/grpc-java/issues/5383#issuecomment-470357965 and
+https://github.com/bazelbuild/bazel/issues/7186
+---
+ java_grpc_library.bzl | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/java_grpc_library.bzl b/java_grpc_library.bzl
+index 4601d4d78c..ff8abd422a 100644
+--- a/java_grpc_library.bzl
++++ b/java_grpc_library.bzl
+@@ -1,3 +1,5 @@
++load("@bazel_tools//tools/jdk:toolchain_utils.bzl", "find_java_runtime_toolchain", "find_java_toolchain")
++
+ # "repository" here is for Bazel builds that span multiple WORKSPACES.
+ def _path_ignoring_repository(f):
+     if len(f.owner.workspace_root) == 0:
+@@ -40,8 +42,8 @@ def _java_rpc_library_impl(ctx):
+ 
+     java_info = java_common.compile(
+         ctx,
+-        java_toolchain = ctx.attr._java_toolchain,
+-        host_javabase = ctx.attr._host_javabase,
++        java_toolchain = find_java_toolchain(ctx, ctx.attr._java_toolchain),
++        host_javabase = find_java_runtime_toolchain(ctx, ctx.attr._host_javabase),
+         source_jars = [srcjar],
+         output_source_jar = ctx.outputs.srcjar,
+         output = ctx.outputs.jar,
