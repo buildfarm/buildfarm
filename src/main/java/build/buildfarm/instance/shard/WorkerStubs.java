@@ -37,6 +37,7 @@ public class WorkerStubs {
 
   public static LoadingCache create(DigestUtil digestUtil) {
     return CacheBuilder.newBuilder()
+        .expireAfterAccess(10, TimeUnit.MINUTES)
         .removalListener(new RemovalListener<String, Instance>() {
           @Override
           public void onRemoval(RemovalNotification<String, Instance> notification) {
