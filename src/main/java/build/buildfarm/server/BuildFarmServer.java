@@ -15,6 +15,8 @@
 package build.buildfarm.server;
 
 import static build.buildfarm.common.IOUtils.formatIOError;
+import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.logging.Level.FINE;
 import static java.util.logging.Level.SEVERE;
 
@@ -48,7 +50,7 @@ public class BuildFarmServer {
   public static final Logger logger =
     Logger.getLogger(BuildFarmServer.class.getName());
 
-  private final BuildFarmServerConfig config;
+  private final ScheduledExecutorService keepaliveScheduler = newSingleThreadScheduledExecutor();
   private final Instances instances;
   private final Server server;
   private boolean stopping = false;
@@ -60,7 +62,6 @@ public class BuildFarmServer {
 
   public BuildFarmServer(String session, ServerBuilder<?> serverBuilder, BuildFarmServerConfig config)
       throws InterruptedException, ConfigurationException {
-    this.config = config;
     String defaultInstanceName = config.getDefaultInstanceName();
     instances = new BuildFarmInstances(session, config.getInstancesList(), defaultInstanceName, this::stop);
 
@@ -70,7 +71,11 @@ public class BuildFarmServer {
         .addService(new CapabilitiesService(instances))
         .addService(new ContentAddressableStorageService(instances, /* requestLogLevel=*/ FINE))
         .addService(new ByteStreamService(instances))
-        .addService(new ExecutionService(instances))
+        .addService(new ExecutionService(
+            instances,
+            config.getExecuteKeepaliveAfterSeconds(),
+            TimeUnit.SECONDS,
+            keepaliveScheduler))
         .addService(new OperationQueueService(instances))
         .addService(new OperationsService(instances))
         .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
@@ -119,6 +124,9 @@ public class BuildFarmServer {
       if (server != null) {
         server.shutdownNow();
       }
+    }
+    if (!shutdownAndAwaitTermination(keepaliveScheduler, 10, TimeUnit.SECONDS)) {
+      logger.warning("could not shut down keepalive scheduler");
     }
   }
 

@@ -59,6 +59,8 @@ message BuildFarmServerConfig {
   int32 port = 3;
 
   string aws_namespace = 4;
+
+  int32 execute_keepalive_after_seconds = 5;
 }
 
 message MemoryCASConfig {
