@@ -16,6 +16,7 @@ package build.buildfarm.worker;
 
 import static build.buildfarm.worker.CASFileCache.getInterruptiblyOrIOException;
 import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
@@ -33,6 +34,7 @@ import build.bazel.remote.execution.v2.FileNode;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
+import build.buildfarm.common.Write;
 import build.buildfarm.worker.CASFileCache.Entry;
 import build.buildfarm.worker.CASFileCache.PutDirectoryException;
 import com.google.common.collect.ImmutableList;
@@ -47,6 +49,7 @@ import com.google.protobuf.ByteString;
 import io.grpc.Deadline;
 import java.io.InputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
@@ -54,13 +57,14 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import org.junit.After;
 import org.junit.Before;
@@ -343,7 +347,7 @@ class CASFileCacheTest {
     blobs.put(bigDigest, bigContent);
     Path bigPath = fileCache.put(bigDigest, /* isExecutable=*/ false);
 
-    AtomicReference<Boolean> started = new AtomicReference<>(false);
+    AtomicBoolean started = new AtomicBoolean(false);
     ExecutorService service = newSingleThreadExecutor();
     Future<Void> putFuture = service.submit(new Callable<Void>() {
       @Override
@@ -395,6 +399,27 @@ class CASFileCacheTest {
     assertThat(fileCache.findMissingBlobs(ImmutableList.of(digestOne))).isEmpty();
     assertThat(storage.get(pathTwo).after).isEqualTo(storage.get(pathThree));
     assertThat(storage.get(pathThree).after).isEqualTo(storage.get(pathOne));
+  }
+
+  @Test
+  public void writeAddsEntry() throws IOException {
+    ByteString content = ByteString.copyFromUtf8("Hello, World");
+    Digest digest = DIGEST_UTIL.compute(content);
+
+    AtomicBoolean notified = new AtomicBoolean(false);
+    Write write = fileCache.getWrite(digest, UUID.randomUUID());
+    write.addListener(
+        () -> notified.set(true),
+        directExecutor());
+    try (OutputStream out = write.getOutput()) {
+      content.writeTo(out);
+    }
+    assertThat(notified.get()).isTrue();
+    Path key = fileCache.getKey(digest, false);
+    assertThat(storage.get(key)).isNotNull();
+    try (InputStream in = Files.newInputStream(key)) {
+      assertThat(ByteString.readFrom(in)).isEqualTo(content);
+    }
   }
 
   @RunWith(JUnit4.class)

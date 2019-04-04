@@ -410,7 +410,7 @@ public class StubInstance implements Instance {
   Write getWrite(String resourceName, long expectedSize, boolean autoflush) {
     return new StubWriteOutputStream(
         bsBlockingStub,
-        this::newBSStub,
+        Suppliers.memoize(() -> ByteStreamGrpc.newStub(channel)), // explicitly avoiding deadline due to client cancellation determination
         resourceName,
         expectedSize,
         autoflush);

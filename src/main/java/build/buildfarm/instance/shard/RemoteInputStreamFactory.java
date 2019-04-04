@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker.shard;
+package build.buildfarm.instance.shard;
 
 import static build.buildfarm.instance.shard.Util.correctMissingBlob;
 import static com.google.common.util.concurrent.Futures.addCallback;
@@ -51,16 +51,24 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Logger;
+import javax.annotation.Nullable;
 
-class RemoteInputStreamFactory implements InputStreamFactory {
-  private static final Logger logger = Logger.getLogger(Worker.class.getName());
+public class RemoteInputStreamFactory implements InputStreamFactory {
+  private static final Logger logger = Logger.getLogger(RemoteInputStreamFactory.class.getName());
 
-  private final String publicName;
+  private final @Nullable String publicName;
   private final ShardBackplane backplane;
   private final Random rand;
   private final LoadingCache<String, Instance> workerStubs;
 
   RemoteInputStreamFactory(
+      ShardBackplane backplane,
+      Random rand,
+      LoadingCache<String, Instance> workerStubs) {
+    this(/* publicName=*/ null, backplane, rand, workerStubs);
+  }
+
+  public RemoteInputStreamFactory(
       String publicName,
       ShardBackplane backplane,
       Random rand,
@@ -117,13 +125,17 @@ class RemoteInputStreamFactory implements InputStreamFactory {
     Set<String> locationSet;
     try {
       Set<String> workers = backplane.getWorkers();
-      remoteWorkers = Sets.difference(workers, ImmutableSet.<String>of(publicName));
+      if (publicName == null) {
+        remoteWorkers = workers;
+      } else {
+        remoteWorkers = Sets.difference(workers, ImmutableSet.<String>of(publicName));
+      }
       locationSet = Sets.newHashSet(Sets.intersection(backplane.getBlobLocationSet(blobDigest), workers));
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }
 
-    if (locationSet.remove(publicName)) {
+    if (publicName != null && locationSet.remove(publicName)) {
       backplane.removeBlobLocation(blobDigest, publicName);
     }
     List<String> workersList = new ArrayList<>(locationSet);

@@ -41,10 +41,14 @@ public class StubWriteOutputStream extends OutputStream implements Write {
                 .setComplete(false)
                 .build();
           }
-          return bsBlockingStub.get()
+          QueryWriteStatusResponse response = bsBlockingStub.get()
               .queryWriteStatus(QueryWriteStatusRequest.newBuilder()
                   .setResourceName(resourceName)
                   .build());
+          if (response.getComplete()) {
+            writeFuture.set(null);
+          }
+          return response;
         }
       });
   private boolean sentResourceName = false;
@@ -163,6 +167,7 @@ public class StubWriteOutputStream extends OutputStream implements Write {
       int copyLen = Math.min(buf.length - offset, len);
       System.arraycopy(b, off, buf, offset, copyLen);
       offset += copyLen;
+      off += copyLen;
       len -= copyLen;
       if (offset == buf.length || getCommittedSize() + offset == expectedSize) {
         flush();

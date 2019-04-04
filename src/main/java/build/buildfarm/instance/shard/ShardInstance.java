@@ -150,6 +150,7 @@ public class ShardInstance extends AbstractServerInstance {
   private final Runnable onStop;
   private final ShardBackplane backplane;
   private final com.google.common.cache.LoadingCache<String, Instance> workerStubs;
+  private final RemoteInputStreamFactory remoteInputStreamFactory;
   private final Thread dispatchedMonitor;
   private final Cache<Digest, Directory> directoryCache = CacheBuilder.newBuilder()
       .maximumSize(64 * 1024)
@@ -218,6 +219,8 @@ public class ShardInstance extends AbstractServerInstance {
     this.workerStubs = workerStubs;
     this.onStop = onStop;
     backplane.setOnUnsubscribe(this::stop);
+
+    remoteInputStreamFactory = new RemoteInputStreamFactory(backplane, rand, workerStubs);
 
     if (runDispatchedMonitor) {
       dispatchedMonitor = new Thread(new DispatchedMonitor(
@@ -808,6 +811,15 @@ public class ShardInstance extends AbstractServerInstance {
       }).get();
     } catch (ExecutionException e) {
       /* not a directory */
+    }
+  }
+
+  @Override
+  public InputStream newBlobInput(Digest digest, long offset) throws IOException {
+    try {
+      return remoteInputStreamFactory.newInput(digest, offset);
+    } catch (InterruptedException e) {
+      throw new IOException(e);
     }
   }
 
