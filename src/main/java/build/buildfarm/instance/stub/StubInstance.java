@@ -324,15 +324,24 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public InputStream newOperationStreamInput(String resourceName, long offset) {
-    return newInput(resourceName, offset);
+  public InputStream newOperationStreamInput(
+      String resourceName,
+      long offset,
+      long deadlineAfter,
+      TimeUnit deadlineAfterUnits) {
+    return newInput(resourceName, offset, deadlineAfter, deadlineAfterUnits);
   }
 
-  InputStream newInput(String resourceName, long offset) {
+  InputStream newInput(
+      String resourceName,
+      long offset,
+      long deadlineAfter,
+      TimeUnit deadlineAfterUnits) {
     return ByteStreamHelper.newInput(
         resourceName,
         offset,
-        this::newBSStub,
+        Suppliers.memoize(() -> ByteStreamGrpc.newStub(channel)
+            .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)),
         retrier::newBackoff,
         retrier::isRetriable,
         retryService);
@@ -347,9 +356,16 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public void getBlob(Digest blobDigest, long offset, long limit, StreamObserver<ByteString> blobObserver) {
+  public void getBlob(
+      Digest blobDigest,
+      long offset,
+      long limit,
+      long readDeadlineAfter,
+      TimeUnit readDeadlineAfterUnits,
+      StreamObserver<ByteString> blobObserver) {
     throwIfStopped();
     newBSStub()
+        .withDeadlineAfter(readDeadlineAfter, readDeadlineAfterUnits)
         .read(
             ReadRequest.newBuilder()
                 .setResourceName(getBlobName(blobDigest))
@@ -374,8 +390,12 @@ public class StubInstance implements Instance {
             });
   }
 
-  public InputStream newBlobInput(Digest digest, long offset) {
-    return newInput(getBlobName(digest), offset);
+  public InputStream newBlobInput(
+      Digest digest,
+      long offset,
+      long deadlineAfter,
+      TimeUnit deadlineAfterUnits) {
+    return newInput(getBlobName(digest), offset, deadlineAfter, deadlineAfterUnits);
   }
 
   @Override

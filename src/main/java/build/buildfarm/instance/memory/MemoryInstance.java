@@ -25,6 +25,7 @@ import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorS
 import static java.lang.String.format;
 import static java.util.Collections.synchronizedSortedMap;
 import static java.util.concurrent.Executors.newCachedThreadPool;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.Action;
@@ -92,23 +93,17 @@ import java.io.InputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
-import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Predicate;
 import java.util.logging.Logger;
 
 public class MemoryInstance extends AbstractServerInstance {
@@ -334,7 +329,7 @@ public class MemoryInstance extends AbstractServerInstance {
       }
 
       @Override
-      public OutputStream getOutput() {
+      public OutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits) {
         return getStreamSource(name).getOutput();
       }
 
@@ -351,7 +346,7 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  public InputStream newOperationStreamInput(String name, long offset) throws IOException {
+  public InputStream newOperationStreamInput(String name, long offset, long deadlineAfter, TimeUnit deadlineAfterUnits) throws IOException {
     InputStream in = getStreamSource(name).openStream();
     in.skip(offset);
     return in;
@@ -390,11 +385,6 @@ public class MemoryInstance extends AbstractServerInstance {
         .setDone(false)
         .setMetadata(Any.pack(metadata))
         .build();
-  }
-
-  @Override
-  protected void onQueue(Operation operation, Action action) throws IOException, InterruptedException, StatusException {
-    putBlob(this, digestUtil.compute(action), action.toByteString());
   }
 
   @Override
@@ -541,7 +531,7 @@ public class MemoryInstance extends AbstractServerInstance {
     Digest queuedOperationDigest = getDigestUtil().compute(queuedOperationBlob);
     String operationName = operation.getName();
     try {
-      putBlob(this, queuedOperationDigest, queuedOperationBlob);
+      putBlob(this, queuedOperationDigest, queuedOperationBlob, 60, SECONDS);
     } catch (StatusException|IOException e) {
       logger.log(SEVERE, format("could not emplace queued operation: %s", operationName), e);
       return false;
@@ -604,7 +594,7 @@ public class MemoryInstance extends AbstractServerInstance {
         Digest queuedOperationDigest = getDigestUtil().compute(queuedOperationBlob);
         // maybe do this elsewhere
         try {
-          putBlob(this, queuedOperationDigest, queuedOperationBlob);
+          putBlob(this, queuedOperationDigest, queuedOperationBlob, 60, SECONDS);
 
           QueueEntry queueEntry = QueueEntry.newBuilder()
               // FIXME find a way to get this properly populated...

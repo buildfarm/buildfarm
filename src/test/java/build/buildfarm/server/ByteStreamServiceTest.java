@@ -3,6 +3,7 @@ package build.buildfarm.server;
 import static build.buildfarm.common.DigestUtil.HashFunction.SHA256;
 import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.AdditionalAnswers.answerVoid;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
@@ -37,6 +38,7 @@ import java.io.OutputStream;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -66,7 +68,7 @@ public class ByteStreamServiceTest {
     // Use a mutable service registry for later registering the service impl for each test case.
     fakeServer =
         InProcessServerBuilder.forName(fakeServerName)
-            .addService(new ByteStreamService(instances))
+            .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, SECONDS))
             .directExecutor()
             .build()
             .start();
@@ -123,7 +125,7 @@ public class ByteStreamServiceTest {
         return null;
       }
     }).when(write).reset();
-    when(write.getOutput()).thenReturn(out);
+    when(write.getOutput(any(Long.class), any(TimeUnit.class))).thenReturn(out);
     doAnswer(invocation -> (long) output.size()).when(write).getCommittedSize();
     doAnswer(answerVoid((Runnable listener, Executor executor) -> writtenFuture.addListener(listener, executor)))
         .when(write).addListener(any(Runnable.class), any(Executor.class));
@@ -155,7 +157,7 @@ public class ByteStreamServiceTest {
         .build());
     requestObserver.onCompleted();
     verify(write, atLeastOnce()).getCommittedSize();
-    verify(write, atLeastOnce()).getOutput();
+    verify(write, atLeastOnce()).getOutput(any(Long.class), any(TimeUnit.class));
     verify(write, times(1)).reset();
     verify(write, times(1)).addListener(any(Runnable.class), any(Executor.class));
   }
@@ -188,7 +190,7 @@ public class ByteStreamServiceTest {
     };
 
     Write write = mock(Write.class);
-    when(write.getOutput()).thenReturn(out);
+    when(write.getOutput(any(Long.class), any(TimeUnit.class))).thenReturn(out);
     doAnswer(invocation -> (long) output.size()).when(write).getCommittedSize();
     doAnswer(answerVoid((Runnable listener, Executor executor) -> writtenFuture.addListener(listener, executor)))
         .when(write).addListener(any(Runnable.class), any(Executor.class));
@@ -226,7 +228,7 @@ public class ByteStreamServiceTest {
         .build());
     requestObserver.onCompleted();
     verify(write, atLeastOnce()).getCommittedSize();
-    verify(write, atLeastOnce()).getOutput();
+    verify(write, atLeastOnce()).getOutput(any(Long.class), any(TimeUnit.class));
     verify(write, times(2)).addListener(any(Runnable.class), any(Executor.class));
   }
 }

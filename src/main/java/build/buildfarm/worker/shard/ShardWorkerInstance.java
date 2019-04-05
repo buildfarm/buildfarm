@@ -64,6 +64,7 @@ import java.io.OutputStream;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
 
@@ -138,7 +139,13 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  public void getBlob(Digest blobDigest, long offset, long limit, StreamObserver<ByteString> blobObserver) {
+  public void getBlob(
+      Digest blobDigest,
+      long offset,
+      long limit,
+      long readDeadlineAfter,
+      TimeUnit readDeadlineAfterUnits,
+      StreamObserver<ByteString> blobObserver) {
     try (InputStream input = inputStreamFactory.newInput(blobDigest, offset)) {
       getBlob(input, blobDigest.getSizeBytes() - offset, limit, blobObserver);
     } catch (IOException e) {
@@ -173,7 +180,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  public InputStream newOperationStreamInput(String name, long offset) {
+  public InputStream newOperationStreamInput(String name, long offset, long deadlineAfter, TimeUnit deadlineAfterUnits) {
     throw new UnsupportedOperationException();
   }
 

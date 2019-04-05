@@ -49,6 +49,7 @@ import io.grpc.Status.Code;
 import io.grpc.StatusException;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -56,10 +57,18 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
   private static final Logger logger = Logger.getLogger(ContentAddressableStorageService.class.getName());
 
   private final Instances instances;
+  private final long writeDeadlineAfter;
+  private final TimeUnit writeDeadlineAfterUnits;
   private final Level requestLogLevel;
 
-  public ContentAddressableStorageService(Instances instances, Level requestLogLevel) {
+  public ContentAddressableStorageService(
+      Instances instances,
+      long writeDeadlineAfter,
+      TimeUnit writeDeadlineAfterUnits,
+      Level requestLogLevel) {
     this.instances = instances;
+    this.writeDeadlineAfter = writeDeadlineAfter;
+    this.writeDeadlineAfterUnits = writeDeadlineAfterUnits;
     this.requestLogLevel = requestLogLevel;
   }
 
@@ -126,7 +135,11 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
         directExecutor());
   }
 
-  private static Iterable<ListenableFuture<Response>> putAllBlobs(Instance instance, Iterable<Request> requests) {
+  private static Iterable<ListenableFuture<Response>> putAllBlobs(
+      Instance instance,
+      Iterable<Request> requests,
+      long writeDeadlineAfter,
+      TimeUnit writeDeadlineAfterUnits) {
     ImmutableList.Builder<ListenableFuture<Response>> responses = new ImmutableList.Builder<>();
     for (Request request : requests) {
       Digest digest = request.getDigest();
@@ -134,7 +147,7 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
           toResponseFuture(
               catching(
                   transform(
-                      putBlobFuture(instance, digest, request.getData()),
+                      putBlobFuture(instance, digest, request.getData(), writeDeadlineAfter, writeDeadlineAfterUnits),
                       (d) -> Code.OK,
                       directExecutor()),
                   Throwable.class,
@@ -161,7 +174,11 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
     ListenableFuture<BatchUpdateBlobsResponse> responseFuture = transform(
         allAsList(
             Iterables.transform(
-                putAllBlobs(instance, batchRequest.getRequestsList()),
+                putAllBlobs(
+                    instance,
+                    batchRequest.getRequestsList(),
+                    writeDeadlineAfter,
+                    writeDeadlineAfterUnits),
                 (future) -> transform(future, response::addResponses, directExecutor()))),
         (result) -> response.build(),
         directExecutor());

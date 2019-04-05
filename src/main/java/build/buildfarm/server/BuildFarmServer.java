@@ -69,8 +69,11 @@ public class BuildFarmServer {
     server = serverBuilder
         .addService(new ActionCacheService(instances))
         .addService(new CapabilitiesService(instances))
-        .addService(new ContentAddressableStorageService(instances, /* requestLogLevel=*/ FINE))
-        .addService(new ByteStreamService(instances))
+        .addService(new ContentAddressableStorageService(
+            instances,
+            /* deadlineAfter=*/ 1, TimeUnit.DAYS,
+            /* requestLogLevel=*/ FINE))
+        .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, TimeUnit.DAYS))
         .addService(new ExecutionService(
             instances,
             config.getExecuteKeepaliveAfterSeconds(),

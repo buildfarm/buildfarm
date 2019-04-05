@@ -59,7 +59,7 @@ class Writes {
     }
 
     @Override
-    public OutputStream getOutput() {
+    public OutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits) {
       return nullOutputStream();
     }
 

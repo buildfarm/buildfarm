@@ -15,6 +15,7 @@
 package build.buildfarm.worker.shard;
 
 import static java.util.concurrent.Executors.newFixedThreadPool;
+import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.FINER;
 import static java.util.logging.Level.SEVERE;
@@ -175,8 +176,11 @@ public class Worker {
 
     Instances instances = Instances.singular(instance);
     server = serverBuilder
-        .addService(new ContentAddressableStorageService(instances, /* requestLogLevel=*/ FINER))
-        .addService(new ByteStreamService(instances))
+        .addService(new ContentAddressableStorageService(
+            instances,
+            /* deadlineAfter=*/ 1, DAYS,
+            /* requestLogLevel=*/ FINER))
+        .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, DAYS))
         .build();
 
     WorkerContext context = new ShardWorkerContext(
@@ -194,7 +198,8 @@ public class Worker {
                 execFileSystem.getStorage(),
                 remoteInputStreamFactory)),
         config.getExecutionPoliciesList(),
-        instance);
+        instance,
+        /* deadlineAfter=*/ 1, /* deadlineAfterUnits=*/ DAYS);
 
     PipelineStage completeStage = new PutOperationStage((operation) -> context.deactivate(operation.getName()));
     PipelineStage errorStage = completeStage; /* new ErrorStage(); */
@@ -271,7 +276,8 @@ public class Worker {
         root,
         fileCache,
         config.getLinkInputDirectories(),
-        removeDirectoryService);
+        removeDirectoryService,
+        /* deadlineAfter=*/ 1, /* deadlineAfterUnits=*/ DAYS);
   }
 
   public void stop() throws InterruptedException {

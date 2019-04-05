@@ -43,6 +43,7 @@ import java.io.OutputStream;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 
 public interface Instance {
@@ -60,8 +61,18 @@ public interface Instance {
   boolean containsBlob(Digest digest);
 
   String getBlobName(Digest blobDigest);
-  void getBlob(Digest blobDigest, long offset, long limit, StreamObserver<ByteString> blobObserver);
-  InputStream newBlobInput(Digest digest, long offset) throws IOException;
+  void getBlob(
+      Digest blobDigest,
+      long offset,
+      long limit,
+      long deadlineAfter,
+      TimeUnit deadlineAfterUnits,
+      StreamObserver<ByteString> blobObserver);
+  InputStream newBlobInput(
+      Digest digest,
+      long offset,
+      long deadlineAfter,
+      TimeUnit deadlineAfterUnits) throws IOException;
   ListenableFuture<Iterable<Response>> getAllBlobsFuture(Iterable<Digest> digests);
   String getTree(
       Digest rootDigest,
@@ -75,7 +86,11 @@ public interface Instance {
       throws IOException, IllegalArgumentException, InterruptedException;
 
   Write getOperationStreamWrite(String name);
-  InputStream newOperationStreamInput(String name, long offset) throws IOException;
+  InputStream newOperationStreamInput(
+      String name,
+      long offset,
+      long deadlineAfter,
+      TimeUnit deadlineAfterUnits) throws IOException;
 
   ListenableFuture<Void> execute(
       Digest actionDigest,

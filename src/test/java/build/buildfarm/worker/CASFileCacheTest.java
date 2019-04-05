@@ -411,7 +411,7 @@ class CASFileCacheTest {
     write.addListener(
         () -> notified.set(true),
         directExecutor());
-    try (OutputStream out = write.getOutput()) {
+    try (OutputStream out = write.getOutput(1, SECONDS)) {
       content.writeTo(out);
     }
     assertThat(notified.get()).isTrue();

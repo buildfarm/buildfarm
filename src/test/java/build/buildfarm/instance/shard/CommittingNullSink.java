@@ -19,6 +19,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import java.io.OutputStream;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 
 class NullWrite extends OutputStream implements Write {
   private final SettableFuture<Long> committedFuture = SettableFuture.create();
@@ -58,7 +59,7 @@ class NullWrite extends OutputStream implements Write {
   }
 
   @Override
-  public OutputStream getOutput() {
+  public OutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits) {
     return this;
   }
 

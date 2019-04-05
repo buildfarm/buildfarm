@@ -11,8 +11,6 @@ import static java.util.logging.Level.FINE;
 import static java.util.logging.Level.FINER;
 import static java.util.logging.Level.SEVERE;
 
-import com.google.common.io.BaseEncoding;
-
 import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.common.UrlPath.InvalidResourceNameException;
 import build.buildfarm.common.Write;
@@ -25,12 +23,16 @@ import io.grpc.Context.CancellableContext;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
 class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private static final Logger logger = Logger.getLogger(WriteStreamObserver.class.getName());
 
   private final Instances instances;
+  private final long deadlineAfter;
+  private final TimeUnit deadlineAfterUnits;
   private final StreamObserver<WriteResponse> responseObserver;
   private final CancellableContext withCancellation;
 
@@ -39,8 +41,14 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private Write write = null;
   private Instance instance = null;
 
-  WriteStreamObserver(Instances instances, StreamObserver<WriteResponse> responseObserver) {
+  WriteStreamObserver(
+      Instances instances,
+      long deadlineAfter,
+      TimeUnit deadlineAfterUnits,
+      StreamObserver<WriteResponse> responseObserver) {
     this.instances = instances;
+    this.deadlineAfter = deadlineAfter;
+    this.deadlineAfterUnits = deadlineAfterUnits;
     this.responseObserver = responseObserver;
     withCancellation = Context.current().withCancellation();
   }
@@ -152,8 +160,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
 
       logger.finest(
           format(
-              "writing %d to %s at %d%s, snippet %s", data.size(), name, offset, finishWrite ? " with finish_write" : "",
-              BaseEncoding.base16().lowerCase().encode((data.size() > 32 ? data.substring(0, 32) : data).toByteArray())));
+              "writing %d to %s at %d%s", data.size(), name, offset, finishWrite ? " with finish_write" : ""));
       if (!data.isEmpty()) {
         writeData(data);
       }
@@ -166,7 +173,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private void close() {
     logger.finest("closing stream due to finishWrite for " + name);
     try {
-      write.getOutput().close();
+      getOutput().close();
     } catch (DigestMismatchException e) {
       responseObserver.onError(Status.INVALID_ARGUMENT
           .withDescription(e.getMessage())
@@ -179,10 +186,14 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
 
   private void writeData(ByteString data) {
     try {
-      data.writeTo(write.getOutput());
+      data.writeTo(getOutput());
     } catch (IOException e) {
       responseObserver.onError(Status.fromThrowable(e).asException());
     }
+  }
+
+  private OutputStream getOutput() throws IOException {
+    return write.getOutput(deadlineAfter, deadlineAfterUnits);
   }
 
   @Override
@@ -190,7 +201,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
     Status status = Status.fromThrowable(t);
     if (initialized && !DEFAULT_IS_RETRIABLE.apply(status)) {
       try {
-        write.getOutput().close();
+        getOutput().close();
       } catch (IOException e) {
         logger.log(SEVERE, "error closing output stream after error", e);
       }

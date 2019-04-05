@@ -223,7 +223,7 @@ public class Worker {
     InputStreamFactory inputStreamFactory = new InputStreamFactory() {
       @Override
       public InputStream newInput(Digest digest, long offset) throws IOException {
-        return casInstance.newBlobInput(digest, offset);
+        return casInstance.newBlobInput(digest, offset, 60, SECONDS);
       }
     };
     fileCache = new InjectedCASFileCache(

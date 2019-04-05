@@ -77,6 +77,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 
@@ -95,6 +96,8 @@ class ShardWorkerContext implements WorkerContext {
   private final InputStreamFactory inputStreamFactory;
   private final Map<String, ExecutionPolicy> policies;
   private final Instance instance;
+  private final long deadlineAfter;
+  private final TimeUnit deadlineAfterUnits;
   private final Map<String, QueueEntry> activeOperations = Maps.newConcurrentMap();
   
   ShardWorkerContext(
@@ -109,8 +112,11 @@ class ShardWorkerContext implements WorkerContext {
       ExecFileSystem execFileSystem,
       InputStreamFactory inputStreamFactory,
       Iterable<ExecutionPolicy> policies,
-      Instance instance) {
+      Instance instance,
+      long deadlineAfter,
+      TimeUnit deadlineAfterUnits) {
     this.name = name;
+    this.platform = platform;
     this.operationPollPeriod = operationPollPeriod;
     this.operationPoller = operationPoller;
     this.inlineContentLimit = inlineContentLimit;
@@ -121,7 +127,8 @@ class ShardWorkerContext implements WorkerContext {
     this.inputStreamFactory = inputStreamFactory;
     this.policies = uniqueIndex(policies, (policy) -> policy.getName());
     this.instance = instance;
-    this.platform = platform;
+    this.deadlineAfter = deadlineAfter;
+    this.deadlineAfterUnits = deadlineAfterUnits;
   }
 
   private static Retrier createBackplaneRetrier() {
@@ -389,13 +396,11 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   private void insertFile(Digest digest, Path file) throws IOException {
-    OutputStream out = execFileSystem.getStorage().getWrite(digest, UUID.randomUUID()).getOutput();
-    if (out != null) {
+    Write write = execFileSystem.getStorage().getWrite(digest, UUID.randomUUID());
+    try (OutputStream out = write.getOutput(deadlineAfter, deadlineAfterUnits)) {
       try (InputStream in = Files.newInputStream(file)) {
         com.google.common.base.Preconditions.checkNotNull(in);
         ByteStreams.copy(in, out);
-      } finally {
-        out.close();
       }
     }
   }

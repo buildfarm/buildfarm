@@ -1,5 +1,7 @@
 package build.buildfarm.common.grpc;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import build.buildfarm.common.Write;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamBlockingStub;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamStub;
@@ -17,6 +19,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 
 public class StubWriteOutputStream extends OutputStream implements Write {
   public static final long UNLIMITED_EXPECTED_SIZE = Long.MAX_VALUE;
@@ -55,6 +58,8 @@ public class StubWriteOutputStream extends OutputStream implements Write {
   private int offset = 0;
   private long writtenBytes = 0;
   private StreamObserver<WriteRequest> writeObserver = null;
+  private long deadlineAfter = 0;
+  private TimeUnit deadlineAfterUnits = null;
 
   static class WriteCompleteException extends IOException {
   }
@@ -133,23 +138,27 @@ public class StubWriteOutputStream extends OutputStream implements Write {
 
   private void initiateWrite() throws IOException {
     if (writeObserver == null) {
-      writeObserver = bsStub.get().write(new StreamObserver<WriteResponse>() {
-        @Override
-        public void onNext(WriteResponse response) {
-          writtenBytes += response.getCommittedSize() - getCommittedSize();
-          writeFuture.set(null);
-        }
+      checkNotNull(deadlineAfterUnits);
+      writeObserver = bsStub.get()
+          .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
+          .write(
+              new StreamObserver<WriteResponse>() {
+                @Override
+                public void onNext(WriteResponse response) {
+                  writtenBytes += response.getCommittedSize() - getCommittedSize();
+                  writeFuture.set(null);
+                }
 
-        @Override
-        public void onError(Throwable t) {
-          writeFuture.setException(t);
-        }
+                @Override
+                public void onError(Throwable t) {
+                  writeFuture.setException(t);
+                }
 
-        @Override
-        public void onCompleted() {
-          writeObserver = null;
-        }
-      });
+                @Override
+                public void onCompleted() {
+                  writeObserver = null;
+                }
+              });
     }
   }
 
@@ -205,7 +214,9 @@ public class StubWriteOutputStream extends OutputStream implements Write {
   }
 
   @Override
-  public OutputStream getOutput() {
+  public OutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits) {
+    this.deadlineAfter = deadlineAfter;
+    this.deadlineAfterUnits = deadlineAfterUnits;
     return this;
   }
 

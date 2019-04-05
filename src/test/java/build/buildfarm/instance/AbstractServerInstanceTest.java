@@ -46,6 +46,7 @@ import com.google.rpc.PreconditionFailure;
 import com.google.rpc.PreconditionFailure.Violation;
 import java.io.InputStream;
 import java.util.Stack;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -138,7 +139,7 @@ public class AbstractServerInstanceTest {
     }
 
     @Override
-    public InputStream newOperationStreamInput(String name, long offset) {
+    public InputStream newOperationStreamInput(String name, long offset, long deadlineAfter, TimeUnit deadlineAfterUnits) {
       throw new UnsupportedOperationException();
     }
 

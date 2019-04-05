@@ -58,6 +58,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 
@@ -71,16 +72,22 @@ class CFCExecFileSystem implements ExecFileSystem {
   private final Map<Path, Iterable<Digest>> rootInputDirectories = new ConcurrentHashMap<>();
   private final ExecutorService fetchService = newWorkStealingPool(128);
   private final ExecutorService removeDirectoryService;
+  private final long deadlineAfter;
+  private final TimeUnit deadlineAfterUnits;
 
   CFCExecFileSystem(
       Path root,
       CASFileCache fileCache,
       boolean linkInputDirectories,
-      ExecutorService removeDirectoryService) {
+      ExecutorService removeDirectoryService,
+      long deadlineAfter,
+      TimeUnit deadlineAfterUnits) {
     this.root = root;
     this.fileCache = fileCache;
     this.linkInputDirectories = linkInputDirectories;
     this.removeDirectoryService = removeDirectoryService;
+    this.deadlineAfter = deadlineAfter;
+    this.deadlineAfterUnits = deadlineAfterUnits;
   }
 
   @Override
@@ -132,7 +139,8 @@ class CFCExecFileSystem implements ExecFileSystem {
 
   @Override
   public OutputStream newOutput(Digest digest) throws IOException {
-    return fileCache.getWrite(digest, UUID.randomUUID()).getOutput();
+    return fileCache.getWrite(digest, UUID.randomUUID())
+        .getOutput(deadlineAfter, deadlineAfterUnits);
   }
 
   private ListenableFuture<Void> put(

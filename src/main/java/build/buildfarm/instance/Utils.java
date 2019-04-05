@@ -30,6 +30,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 /** Utility methods for the instance package. * */
 public class Utils {
@@ -37,11 +38,16 @@ public class Utils {
   private Utils() {}
 
   public static ByteString getBlob(Instance instance, Digest blobDigest) throws IOException, InterruptedException {
-    return getBlob(instance, blobDigest, /* offset=*/ 0);
+    return getBlob(instance, blobDigest, /* offset=*/ 0, 60, TimeUnit.SECONDS);
   }
 
-  public static ByteString getBlob(Instance instance, Digest blobDigest, long offset) throws IOException, InterruptedException {
-    try (InputStream in = instance.newBlobInput(blobDigest, offset)) {
+  public static ByteString getBlob(
+      Instance instance,
+      Digest blobDigest,
+      long offset,
+      long deadlineAfter,
+      TimeUnit deadlineAfterUnits) throws IOException, InterruptedException {
+    try (InputStream in = instance.newBlobInput(blobDigest, offset, deadlineAfter, deadlineAfterUnits)) {
       return ByteString.readFrom(in);
     } catch (StatusRuntimeException e) {
       if (e.getStatus().equals(Status.NOT_FOUND)) {
@@ -59,7 +65,12 @@ public class Utils {
             contentSize));
   }
 
-  public static ListenableFuture<Digest> putBlobFuture(Instance instance, Digest digest, ByteString data) {
+  public static ListenableFuture<Digest> putBlobFuture(
+      Instance instance,
+      Digest digest,
+      ByteString data,
+      long writeDeadlineAfter,
+      TimeUnit writeDeadlineAfterUnits) {
     if (digest.getSizeBytes() != data.size()) {
       return immediateFailedFuture(
           invalidDigestSize(digest.getSizeBytes(), data.size())
@@ -70,7 +81,7 @@ public class Utils {
     write.addListener(
         () -> future.set(digest),
         directExecutor());
-    try (OutputStream out = write.getOutput()) {
+    try (OutputStream out = write.getOutput(writeDeadlineAfter, writeDeadlineAfterUnits)) {
       data.writeTo(out);
     } catch (IOException e) {
       future.setException(e);
@@ -78,10 +89,20 @@ public class Utils {
     return future;
   }
 
-  public static Digest putBlob(Instance instance, Digest digest, ByteString blob)
+  public static Digest putBlob(
+      Instance instance,
+      Digest digest,
+      ByteString blob,
+      long writeDeadlineAfter,
+      TimeUnit writeDeadlineAfterUnits)
       throws IOException, InterruptedException, StatusException {
     try {
-      return putBlobFuture(instance, digest, blob).get();
+      return putBlobFuture(
+          instance,
+          digest,
+          blob,
+          writeDeadlineAfter,
+          writeDeadlineAfterUnits).get();
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
       if (cause instanceof IOException) {

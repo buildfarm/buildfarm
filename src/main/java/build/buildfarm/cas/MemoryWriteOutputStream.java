@@ -10,6 +10,7 @@ import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 class MemoryWriteOutputStream extends OutputStream implements Write {
@@ -91,7 +92,7 @@ class MemoryWriteOutputStream extends OutputStream implements Write {
   }
 
   @Override
-  public OutputStream getOutput() {
+  public OutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits) {
     return this;
   }
 

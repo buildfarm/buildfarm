@@ -36,7 +36,7 @@ import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.concurrent.TimeUnit.MINUTES;
-import static java.util.logging.Level.INFO;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.SEVERE;
 import static java.util.logging.Level.WARNING;
 
@@ -384,14 +384,14 @@ public class ShardInstance extends AbstractServerInstance {
     operationTransformService.shutdown();
     backplane.stop();
     onStop.run();
-    if (!contextDeadlineScheduler.awaitTermination(10, TimeUnit.SECONDS)) {
-      logger.severe("Could not shut down context deadline scheduler, some operations may be zombies");
+    if (!contextDeadlineScheduler.awaitTermination(10, SECONDS)) {
+      logger.severe("Could not shut down operation deletion service, some operations may be zombies");
     }
-    if (!operationDeletionService.awaitTermination(10, TimeUnit.SECONDS)) {
+    if (!operationDeletionService.awaitTermination(10, SECONDS)) {
       logger.severe("Could not shut down operation deletion service, some operations may be zombies");
     }
     operationDeletionService.shutdownNow();
-    if (!operationTransformService.awaitTermination(10, TimeUnit.SECONDS)) {
+    if (!operationTransformService.awaitTermination(10, SECONDS)) {
       logger.severe("Could not shut down operation transform service");
     }
     operationTransformService.shutdownNow();
@@ -550,65 +550,86 @@ public class ShardInstance extends AbstractServerInstance {
       Deque<String> workers,
       long offset,
       long limit,
+      long readDeadlineAfter,
+      TimeUnit readDeadlineAfterUnits,
       StreamObserver<ByteString> blobObserver) {
     String worker = workers.removeFirst();
-    workerStub(worker).getBlob(blobDigest, offset, limit, new StreamObserver<ByteString>() {
-      long received = 0;
+    workerStub(worker).getBlob(
+        blobDigest,
+        offset,
+        limit,
+        readDeadlineAfter,
+        readDeadlineAfterUnits,
+        new StreamObserver<ByteString>() {
+          long received = 0;
 
-      @Override
-      public void onNext(ByteString nextChunk) {
-        blobObserver.onNext(nextChunk);
-        received += nextChunk.size();
-      }
-
-      @Override
-      public void onError(Throwable t) {
-        Status status = Status.fromThrowable(t);
-        if (Context.current().isCancelled()) {
-          blobObserver.onError(t);
-          return;
-        }
-        if (status.getCode() == Code.UNAVAILABLE) {
-          removeMalfunctioningWorker(worker, t, "getBlob(" + DigestUtil.toString(blobDigest) + ")");
-        } else if (status.getCode() == Code.NOT_FOUND) {
-          logger.info(worker + " did not contain " + DigestUtil.toString(blobDigest));
-          // ignore this, the worker will update the backplane eventually
-        } else if (status.getCode() == Code.CANCELLED /* yes, gross */ || SHARD_IS_RETRIABLE.apply(status)) {
-          // why not, always
-          workers.addLast(worker);
-        } else {
-          blobObserver.onError(t);
-          return;
-        }
-
-        if (workers.isEmpty()) {
-          blobObserver.onError(Status.NOT_FOUND.asException());
-        } else {
-          long nextLimit;
-          if (limit == 0) {
-            nextLimit = 0;
-          } else {
-            checkState(limit >= received);
-            nextLimit = limit - received;
+          @Override
+          public void onNext(ByteString nextChunk) {
+            blobObserver.onNext(nextChunk);
+            received += nextChunk.size();
           }
-          if (nextLimit == 0 && limit != 0) {
-            // be gracious and terminate the blobObserver here
-            onCompleted();
-          } else {
-            fetchBlobFromWorker(blobDigest, workers, offset + received, nextLimit, blobObserver);
-          }
-        }
-      }
 
-      @Override
-      public void onCompleted() {
-        blobObserver.onCompleted();
-      }
-    });
+          @Override
+          public void onError(Throwable t) {
+            Status status = Status.fromThrowable(t);
+            if (Context.current().isCancelled()) {
+              blobObserver.onError(t);
+              return;
+            }
+            if (status.getCode() == Code.UNAVAILABLE) {
+              removeMalfunctioningWorker(worker, t, "getBlob(" + DigestUtil.toString(blobDigest) + ")");
+            } else if (status.getCode() == Code.NOT_FOUND) {
+              logger.info(worker + " did not contain " + DigestUtil.toString(blobDigest));
+              // ignore this, the worker will update the backplane eventually
+            } else if (status.getCode() == Code.CANCELLED /* yes, gross */ || SHARD_IS_RETRIABLE.apply(status)) {
+              // why not, always
+              workers.addLast(worker);
+            } else {
+              blobObserver.onError(t);
+              return;
+            }
+
+            if (workers.isEmpty()) {
+              blobObserver.onError(Status.NOT_FOUND.asException());
+            } else {
+              long nextLimit;
+              if (limit == 0) {
+                nextLimit = 0;
+              } else {
+                checkState(limit >= received);
+                nextLimit = limit - received;
+              }
+              if (nextLimit == 0 && limit != 0) {
+                // be gracious and terminate the blobObserver here
+                onCompleted();
+              } else {
+                fetchBlobFromWorker(
+                    blobDigest,
+                    workers,
+                    offset + received,
+                    nextLimit,
+                    readDeadlineAfter,
+                    readDeadlineAfterUnits,
+                    blobObserver);
+              }
+            }
+          }
+
+          @Override
+          public void onCompleted() {
+            blobObserver.onCompleted();
+          }
+        });
   }
 
   @Override
-  public void getBlob(Digest blobDigest, long offset, long limit, StreamObserver<ByteString> blobObserver) {
+  public void getBlob(
+      Digest blobDigest,
+      long offset,
+      long limit,
+      long readDeadlineAfter,
+      TimeUnit readDeadlineAfterUnits,
+      StreamObserver<ByteString> blobObserver) {
     List<String> workersList;
     Set<String> workerSet;
     Set<String> locationSet;
@@ -669,7 +690,14 @@ public class ShardInstance extends AbstractServerInstance {
               new WorkersCallback(rand) {
                 @Override
                 public void onQueue(Deque<String> workers) {
-                  fetchBlobFromWorker(blobDigest, workers, offset, limit, checkedChunkObserver);
+                  fetchBlobFromWorker(
+                      blobDigest,
+                      workers,
+                      offset,
+                      limit,
+                      readDeadlineAfter,
+                      readDeadlineAfterUnits,
+                      checkedChunkObserver);
                 }
 
                 @Override
@@ -693,7 +721,14 @@ public class ShardInstance extends AbstractServerInstance {
         new WorkersCallback(rand) {
           @Override
           public void onQueue(Deque<String> workers) {
-            fetchBlobFromWorker(blobDigest, workers, offset, limit, chunkObserver);
+            fetchBlobFromWorker(
+                blobDigest,
+                workers,
+                offset,
+                limit,
+                readDeadlineAfter,
+                readDeadlineAfterUnits,
+                chunkObserver);
           }
 
           @Override
@@ -794,9 +829,13 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @Override
-  public InputStream newBlobInput(Digest digest, long offset) throws IOException {
+  public InputStream newBlobInput(
+      Digest digest,
+      long offset,
+      long deadlineAfter,
+      TimeUnit deadlineAfterUnits) throws IOException {
     try {
-      return remoteInputStreamFactory.newInput(digest, offset);
+      return remoteInputStreamFactory.newInput(digest, offset, deadlineAfter, deadlineAfterUnits);
     } catch (InterruptedException e) {
       throw new IOException(e);
     }
@@ -968,7 +1007,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @Override
-  public InputStream newOperationStreamInput(String name, long offset) {
+  public InputStream newOperationStreamInput(String name, long offset, long deadlineAfter, TimeUnit deadlineAfterUnits) {
     throw new UnsupportedOperationException();
   }
 
@@ -1069,7 +1108,7 @@ public class ShardInstance extends AbstractServerInstance {
     write.addListener(
         () -> writtenFuture.set(digest.getSizeBytes()),
         directExecutor());
-    try (OutputStream out = write.getOutput()) {
+    try (OutputStream out = write.getOutput(60, SECONDS)) {
       content.writeTo(out);
     } catch (IOException e) {
       if (!writtenFuture.isDone()) {
@@ -1329,7 +1368,7 @@ public class ShardInstance extends AbstractServerInstance {
         metadata.getStage());
 
     Context.CancellableContext withDeadline = Context.current()
-        .withDeadlineAfter(60, TimeUnit.SECONDS, contextDeadlineScheduler);
+        .withDeadlineAfter(60, SECONDS, contextDeadlineScheduler);
     try {
       return withDeadline.call(() -> {
         ActionResult actionResult = backplane.getActionResult(actionKey);

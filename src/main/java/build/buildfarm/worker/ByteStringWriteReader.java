@@ -15,6 +15,7 @@
 package build.buildfarm.worker;
 
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+import static java.util.concurrent.TimeUnit.SECONDS;
 
 import build.buildfarm.common.Write;
 import com.google.protobuf.ByteString;
@@ -40,7 +41,7 @@ public class ByteStringWriteReader implements Runnable {
     byte[] buffer = new byte[1024 * 16];
     int len;
     write.addListener(this::complete, directExecutor());
-    try (OutputStream writeOut = write.getOutput()) {
+    try (OutputStream writeOut = write.getOutput(1, SECONDS)) {
       while (!isComplete() && (len = input.read(buffer)) != -1) {
         if (len != 0) {
           data.write(buffer, 0, len);

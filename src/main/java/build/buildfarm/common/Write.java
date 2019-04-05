@@ -17,13 +17,14 @@ package build.buildfarm.common;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 
 public interface Write {
   long getCommittedSize();
 
   boolean isComplete();
 
-  OutputStream getOutput() throws IOException;
+  OutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits) throws IOException;
 
   void reset();
 

@@ -18,7 +18,7 @@ import static build.buildfarm.common.grpc.Retrier.NO_RETRIES;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
-import static java.util.concurrent.TimeUnit.NANOSECONDS;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -253,7 +253,7 @@ public class StubInstanceTest {
     String resourceName = "output-stream-test";
     ByteString content = ByteString.copyFromUtf8("test-content");
     Write operationStreamWrite = instance.getOperationStreamWrite(resourceName);
-    try (OutputStream out = operationStreamWrite.getOutput()) {
+    try (OutputStream out = operationStreamWrite.getOutput(1, SECONDS)) {
       content.writeTo(out);
     }
     assertThat(writtenContent.get()).isEqualTo(content);
@@ -345,7 +345,7 @@ public class StubInstanceTest {
     ByteString content = ByteString.copyFromUtf8("test-content");
     boolean writeThrewException = false;
     Write operationStreamWrite = instance.getOperationStreamWrite(resourceName);
-    try (OutputStream out = operationStreamWrite.getOutput()) {
+    try (OutputStream out = operationStreamWrite.getOutput(1, SECONDS)) {
       content.writeTo(out);
       try {
         content.writeTo(out);
@@ -376,7 +376,7 @@ public class StubInstanceTest {
         .setHash("unavailable-blob-name")
         .setSizeBytes(1)
         .build();
-    try (InputStream in = instance.newBlobInput(unavailableDigest, 0)) {
+    try (InputStream in = instance.newBlobInput(unavailableDigest, 0, 1, SECONDS)) {
       ByteStreams.copy(in, out);
     } catch (IOException e) {
       ioException = e;
@@ -417,7 +417,7 @@ public class StubInstanceTest {
         .setHash("delayed-blob-name")
         .setSizeBytes(1)
         .build();
-    try (InputStream in = instance.newBlobInput(delayedDigest, 0)) {
+    try (InputStream in = instance.newBlobInput(delayedDigest, 0, 1, SECONDS)) {
       ByteStreams.copy(in, out);
     }
     assertThat(ByteString.copyFrom(out.toByteArray())).isEqualTo(content);
@@ -440,7 +440,7 @@ public class StubInstanceTest {
         .setHash("timeout-blob-name")
         .setSizeBytes(1)
         .build();
-    try (InputStream in = instance.newBlobInput(timeoutDigest, 0)) {
+    try (InputStream in = instance.newBlobInput(timeoutDigest, 0, 1, SECONDS)) {
       ByteStreams.copy(in, out);
     } catch (IOException e) {
       ioException = e;

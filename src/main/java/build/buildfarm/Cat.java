@@ -70,7 +70,7 @@ class Cat {
     System.out.println("Input Root Digest: Directory " + DigestUtil.toString(action.getInputRootDigest()));
     System.out.println("DoNotCache: " + (action.getDoNotCache() ? "true" : "false"));
     if (action.hasTimeout()) {
-      System.out.println("Timeout: " + action.getTimeout().getSeconds() + action.getTimeout().getNanos() / 1e9 + "s");
+      System.out.println("Timeout: " + (action.getTimeout().getSeconds() + action.getTimeout().getNanos() / 1e9) + "s");
     }
   }
 

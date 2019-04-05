@@ -16,6 +16,7 @@ package build.buildfarm.cas;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.truth.Truth.assertThat;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -179,11 +180,11 @@ public class GrpcCASTest {
         /* uploader=*/ null,
         onExpirations);
     Write initialWrite = cas.getWrite(digest, uuid);
-    try (OutputStream writeOut = initialWrite.getOutput()) {
+    try (OutputStream writeOut = initialWrite.getOutput(1, SECONDS)) {
       writeContent.substring(0, 4).writeTo(writeOut);
     }
     Write finalWrite = cas.getWrite(digest, uuid);
-    try (OutputStream writeOut = finalWrite.getOutput()) {
+    try (OutputStream writeOut = finalWrite.getOutput(1, SECONDS)) {
       writeContent.substring(4).writeTo(writeOut);
     }
     assertThat(content.get(1, TimeUnit.SECONDS)).isEqualTo(writeContent);

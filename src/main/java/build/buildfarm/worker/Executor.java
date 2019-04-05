@@ -83,7 +83,7 @@ class Executor implements Runnable {
       }
 
       @Override
-      public OutputStream getOutput() {
+      public OutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits) {
         return new OutputStream() {
           @Override
           public void close() {

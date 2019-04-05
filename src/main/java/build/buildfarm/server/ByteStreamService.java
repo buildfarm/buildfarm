@@ -46,6 +46,7 @@ import java.io.OutputStream;
 import java.nio.file.NoSuchFileException;
 import java.util.UUID;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
 public class ByteStreamService extends ByteStreamImplBase {
@@ -53,10 +54,17 @@ public class ByteStreamService extends ByteStreamImplBase {
 
   private static int CHUNK_SIZE = 64 * 1024;
 
+  private final long deadlineAfter;
+  private final TimeUnit deadlineAfterUnits;
   private final Instances instances;
 
-  public ByteStreamService(Instances instances) {
+  public ByteStreamService(
+      Instances instances,
+      long deadlineAfter,
+      TimeUnit deadlineAfterUnits) {
     this.instances = instances;
+    this.deadlineAfter = deadlineAfter;
+    this.deadlineAfterUnits = deadlineAfterUnits;
   }
 
   void readFrom(
@@ -99,7 +107,7 @@ public class ByteStreamService extends ByteStreamImplBase {
       long offset,
       long limit,
       StreamObserver<ReadResponse> responseObserver) {
-    try (InputStream in = instance.newBlobInput(digest, offset)) {
+    try (InputStream in = instance.newBlobInput(digest, offset, deadlineAfter, deadlineAfterUnits)) {
       readFrom(in, limit, responseObserver);
     } catch (NoSuchFileException e) {
       responseObserver.onError(NOT_FOUND.asException());
@@ -135,7 +143,7 @@ public class ByteStreamService extends ByteStreamImplBase {
       long offset,
       long limit,
       StreamObserver<ReadResponse> responseObserver) {
-    try (InputStream in = instance.newOperationStreamInput(resourceName, offset)) {
+    try (InputStream in = instance.newOperationStreamInput(resourceName, offset, deadlineAfter, deadlineAfterUnits)) {
       readFrom(in, limit, responseObserver);
     } catch (NoSuchFileException e) {
       responseObserver.onError(NOT_FOUND.asException());
@@ -243,7 +251,7 @@ public class ByteStreamService extends ByteStreamImplBase {
       }
 
       @Override
-      public OutputStream getOutput() throws IOException {
+      public OutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits) throws IOException {
         throw new IOException("cannot get output of blob write");
       }
 
@@ -295,6 +303,10 @@ public class ByteStreamService extends ByteStreamImplBase {
   @Override
   public StreamObserver<WriteRequest> write(
       StreamObserver<WriteResponse> responseObserver) {
-    return new WriteStreamObserver(instances, responseObserver);
+    return new WriteStreamObserver(
+        instances,
+        deadlineAfter,
+        deadlineAfterUnits,
+        responseObserver);
   }
 }

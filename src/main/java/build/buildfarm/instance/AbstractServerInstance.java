@@ -93,6 +93,7 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
 
@@ -224,7 +225,7 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public InputStream newBlobInput(Digest digest, long offset) throws IOException {
+  public InputStream newBlobInput(Digest digest, long offset, long deadlineAfter, TimeUnit deadlineAfterUnits) throws IOException {
     return contentAddressableStorage.newInput(digest, offset);
   }
 
@@ -277,7 +278,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   protected ListenableFuture<ByteString> getBlobFuture(Digest blobDigest, long offset, long limit) {
     SettableFuture<ByteString> future = SettableFuture.create();
-    getBlob(blobDigest, offset, limit, new StreamObserver<ByteString>() {
+    getBlob(blobDigest, offset, limit, 60, SECONDS, new StreamObserver<ByteString>() {
       ByteString content = ByteString.EMPTY;
 
       @Override
@@ -299,7 +300,13 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public void getBlob(Digest blobDigest, long offset, long limit, StreamObserver<ByteString> blobObserver) {
+  public void getBlob(
+      Digest blobDigest,
+      long offset,
+      long limit,
+      long readDeadlineAfter,
+      TimeUnit readDeadlineAfterUnits,
+      StreamObserver<ByteString> blobObserver) {
     try {
       ByteString blob = getBlob(blobDigest, offset, limit);
       if (blob == null) {
@@ -326,7 +333,7 @@ public abstract class AbstractServerInstance implements Instance {
     for (ByteString blob : blobs) {
       Digest digest = digestUtil.compute(blob);
       try {
-        blobDigestsBuilder.add(putBlob(this, digest, blob));
+        blobDigestsBuilder.add(putBlob(this, digest, blob, 1, SECONDS));
       } catch (StatusException e) {
         if (exception == null) {
           exception = new PutAllBlobsException();
@@ -398,10 +405,6 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   protected abstract Operation createOperation(ActionKey actionKey);
-
-  // called when an operation will be queued for execution
-  protected void onQueue(Operation operation, Action action) throws IOException, InterruptedException, StatusException {
-  }
 
   private static void stringsUniqueAndSortedPrecondition(
       Iterable<String> strings,
@@ -1036,16 +1039,6 @@ public abstract class AbstractServerInstance implements Instance {
               .setCachedResult(true)
               .build()));
     } else {
-      try {
-        onQueue(operation, action);
-      } catch (IOException|StatusException e) {
-        deleteOperation(operation.getName());
-        throw Status.fromThrowable(e).asRuntimeException();
-      } catch (InterruptedException e) {
-        deleteOperation(operation.getName());
-        Thread.currentThread().interrupt();
-        throw Status.fromThrowable(e).asRuntimeException();
-      }
       metadata = metadata.toBuilder()
           .setStage(Stage.QUEUED)
           .build();

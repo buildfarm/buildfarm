@@ -495,7 +495,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       }
 
       @Override
-      public OutputStream getOutput() throws IOException {
+      public OutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits) throws IOException {
         if (out == null) {
           out = newOutput(key.getDigest(), UUID.fromString(key.getIdentifier()));
           if (out == null) {
