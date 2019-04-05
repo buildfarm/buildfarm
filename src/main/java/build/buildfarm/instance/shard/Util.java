@@ -115,6 +115,7 @@ public class Util {
       Instance instance = workerInstanceFactory.apply(worker);
       checkMissingBlobOnInstance(
           digest,
+          worker,
           instance,
           new FutureCallback<Boolean>() {
             @Override
@@ -148,6 +149,7 @@ public class Util {
 
   static void checkMissingBlobOnInstance(
       Digest digest,
+      String worker,
       Instance instance,
       FutureCallback<Boolean> foundCallback,
       Executor executor) {
@@ -166,14 +168,15 @@ public class Util {
             Status status = Status.fromThrowable(t);
             if (status.getCode() == Code.UNAVAILABLE) {
               foundCallback.onSuccess(false);
-            } else if (
-                status.getCode() == Code.CANCELLED || Context.current().isCancelled()
+            } else if (status.getCode() == Code.CANCELLED || Context.current().isCancelled()
                 || status.getCode() == Code.DEADLINE_EXCEEDED
                 || !SHARD_IS_RETRIABLE.test(status)) {
+              logger.log(SEVERE, format("error checking for %s on %s", DigestUtil.toString(digest), worker), t);
               foundCallback.onFailure(t);
             } else {
               checkMissingBlobOnInstance(
                   digest,
+                  worker,
                   instance,
                   foundCallback,
                   executor);
