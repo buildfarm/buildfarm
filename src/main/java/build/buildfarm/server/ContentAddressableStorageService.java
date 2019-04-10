@@ -19,10 +19,13 @@ import static com.google.common.util.concurrent.Futures.addCallback;
 import static com.google.common.util.concurrent.Futures.allAsList;
 import static com.google.common.util.concurrent.Futures.catching;
 import static com.google.common.util.concurrent.Futures.transform;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static java.lang.String.format;
 import static java.util.logging.Level.SEVERE;
 
+import build.bazel.remote.execution.v2.BatchReadBlobsRequest;
+import build.bazel.remote.execution.v2.BatchReadBlobsResponse;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest.Request;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
@@ -35,7 +38,6 @@ import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
 import build.bazel.remote.execution.v2.GetTreeRequest;
 import build.bazel.remote.execution.v2.GetTreeResponse;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.instance.Instance.ChunkObserver;
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -74,7 +76,8 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
     addCallback(
         transform(
             instance.findMissingBlobs(request.getBlobDigestsList(), newDirectExecutorService()),
-            builder::addAllMissingBlobDigests),
+            builder::addAllMissingBlobDigests,
+            directExecutor()),
         new FutureCallback<FindMissingBlobsResponse.Builder>() {
           @Override
           public void onSuccess(FindMissingBlobsResponse.Builder builder) {
@@ -95,7 +98,8 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
               responseObserver.onError(t);
             }
           }
-        });
+        },
+        directExecutor());
   }
 
   private static com.google.rpc.Status statusForCode(Code code) {
@@ -115,7 +119,8 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
                 .setStatus(statusForCode(code))
                 .build();
           }
-        });
+        },
+        directExecutor());
   }
 
   private static Iterable<ListenableFuture<Response>> putAllBlobs(Instance instance, Iterable<Request> requests) {
@@ -125,9 +130,13 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
       responses.add(
           toResponseFuture(
               catching(
-                  transform(putBlobFuture(instance, digest, request.getData()), (d) -> Code.OK),
+                  transform(
+                      putBlobFuture(instance, digest, request.getData()),
+                      (d) -> Code.OK,
+                      directExecutor()),
                   Throwable.class,
-                  (e) -> Status.fromThrowable(e).getCode()),
+                  (e) -> Status.fromThrowable(e).getCode(),
+                  directExecutor()),
               digest));
     }
     return responses.build();
@@ -150,21 +159,25 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
         allAsList(
             Iterables.transform(
                 putAllBlobs(instance, batchRequest.getRequestsList()),
-                (future) -> transform(future, response::addResponses))),
-        (result) -> response.build());
+                (future) -> transform(future, response::addResponses, directExecutor()))),
+        (result) -> response.build(),
+        directExecutor());
 
-    addCallback(responseFuture, new FutureCallback<BatchUpdateBlobsResponse>() {
-      @Override
-      public void onSuccess(BatchUpdateBlobsResponse response) {
-        responseObserver.onNext(response);
-        responseObserver.onCompleted();
-      }
+    addCallback(
+        responseFuture,
+        new FutureCallback<BatchUpdateBlobsResponse>() {
+          @Override
+          public void onSuccess(BatchUpdateBlobsResponse response) {
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+          }
 
-      @Override
-      public void onFailure(Throwable t) {
-        responseObserver.onError(t);
-      }
-    });
+          @Override
+          public void onFailure(Throwable t) {
+            responseObserver.onError(t);
+          }
+        },
+        directExecutor());
   }
 
   private void getInstanceTree(
@@ -173,18 +186,64 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
       String pageToken,
       int pageSize,
       StreamObserver<GetTreeResponse> responseObserver) {
-    do {
-      ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
-      String nextPageToken = instance.getTree(
-          rootDigest, pageSize, pageToken, directories);
+    try {
+      do {
+        ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
+        String nextPageToken = instance.getTree(
+            rootDigest, pageSize, pageToken, directories);
 
-      responseObserver.onNext(GetTreeResponse.newBuilder()
-          .addAllDirectories(directories.build())
-          .setNextPageToken(nextPageToken)
-          .build());
-      pageToken = nextPageToken;
-    } while (!pageToken.isEmpty());
-    responseObserver.onCompleted();
+        responseObserver.onNext(GetTreeResponse.newBuilder()
+            .addAllDirectories(directories.build())
+            .setNextPageToken(nextPageToken)
+            .build());
+        pageToken = nextPageToken;
+      } while (!pageToken.isEmpty());
+      responseObserver.onCompleted();
+    } catch (IOException e) {
+      responseObserver.onError(Status.fromThrowable(e).asException());
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+  }
+
+  void batchReadBlobs(
+      Instance instance,
+      BatchReadBlobsRequest batchRequest,
+      StreamObserver<BatchReadBlobsResponse> responseObserver) {
+    BatchReadBlobsResponse.Builder response =
+        BatchReadBlobsResponse.newBuilder();
+    addCallback(
+        transform(
+            instance.getAllBlobsFuture(batchRequest.getDigestsList()),
+            (responses) -> response.addAllResponses(responses).build(),
+            directExecutor()),
+        new FutureCallback<BatchReadBlobsResponse>() {
+          @Override
+          public void onSuccess(BatchReadBlobsResponse response) {
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+          }
+
+          @Override
+          public void onFailure(Throwable t) {
+            responseObserver.onError(Status.fromThrowable(t).asException());
+          }
+        },
+        directExecutor());
+  }
+
+  @Override
+  public void batchReadBlobs(
+      BatchReadBlobsRequest batchRequest,
+      StreamObserver<BatchReadBlobsResponse> responseObserver) {
+    try {
+      batchReadBlobs(
+          instances.get(batchRequest.getInstanceName()),
+          batchRequest,
+          responseObserver);
+    } catch (InstanceNotFoundException e) {
+      responseObserver.onError(BuildFarmInstances.toStatusException(e));
+    }
   }
 
   @Override

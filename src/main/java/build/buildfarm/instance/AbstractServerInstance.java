@@ -14,6 +14,7 @@
 
 package build.buildfarm.instance;
 
+import static build.buildfarm.instance.Utils.putBlob;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.transform;
@@ -28,6 +29,8 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.ActionCacheUpdateCapabilities;
+import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
+import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
 import build.bazel.remote.execution.v2.CacheCapabilities;
 import build.bazel.remote.execution.v2.CacheCapabilities.SymlinkAbsolutePathStrategy;
 import build.bazel.remote.execution.v2.Command;
@@ -55,6 +58,7 @@ import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watcher;
+import build.buildfarm.common.Write;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -65,9 +69,7 @@ import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.SettableFuture;
-import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -81,16 +83,16 @@ import io.grpc.stub.StreamObserver;
 import io.grpc.StatusException;
 import io.grpc.protobuf.StatusProto;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.TimeoutException;
-import java.util.function.Supplier;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
 
@@ -221,11 +223,26 @@ public abstract class AbstractServerInstance implements Instance {
         DigestUtil.toString(blobDigest));
   }
 
-  public final ByteString getBlob(Digest blobDigest) throws InterruptedException {
+  @Override
+  public InputStream newBlobInput(Digest digest, long offset) throws IOException {
+    return contentAddressableStorage.newInput(digest, offset);
+  }
+
+  @Override
+  public Write getBlobWrite(Digest digest, UUID uuid) {
+    return contentAddressableStorage.getWrite(digest, uuid);
+  }
+
+  @Override
+  public ListenableFuture<Iterable<Response>> getAllBlobsFuture(Iterable<Digest> digests) {
+    return contentAddressableStorage.getAllFuture(digests);
+  }
+
+  ByteString getBlob(Digest blobDigest) throws InterruptedException {
     return getBlob(blobDigest, 0, 0);
   }
 
-  public ByteString getBlob(Digest blobDigest, long offset, long limit)
+  ByteString getBlob(Digest blobDigest, long offset, long limit)
       throws IndexOutOfBoundsException, InterruptedException {
     if (blobDigest.getSizeBytes() == 0) {
       if (offset == 0 && limit >= 0) {
@@ -296,61 +313,41 @@ public abstract class AbstractServerInstance implements Instance {
     }
   }
 
-  @Override
-  public ChunkObserver getWriteBlobObserver(Digest blobDigest) {
-    // what should the locking semantics be here??
-    activeBlobWrites.putIfAbsent(blobDigest, ByteString.EMPTY);
-    return new ChunkObserver() {
-      SettableFuture<Long> committedFuture = SettableFuture.create();
-
-      @Override
-      public long getCommittedSize() {
-        return activeBlobWrites.get(blobDigest).size();
-      }
-
-      @Override
-      public ListenableFuture<Long> getCommittedFuture() {
-        return committedFuture;
-      }
-
-      @Override
-      public void reset() {
-        activeBlobWrites.put(blobDigest, ByteString.EMPTY);
-      }
-
-      @Override
-      public void onNext(ByteString chunk) {
-        activeBlobWrites.put(blobDigest, activeBlobWrites.get(blobDigest).concat(chunk));
-      }
-
-      @Override
-      public void onError(Throwable t) {
-        activeBlobWrites.remove(blobDigest);
-        committedFuture.setException(t);
-      }
-
-      @Override
-      public void onCompleted() {
-        ByteString content = activeBlobWrites.get(blobDigest);
-        // yup, redundant, need to compute this inline
-        Preconditions.checkState(digestUtil.compute(content).equals(blobDigest));
-        try {
-          if (content.size() != 0) {
-            Blob blob = new Blob(content, digestUtil);
-            contentAddressableStorage.put(blob);
-          }
-          committedFuture.set((long) content.size());
-        } catch (Throwable t) {
-          committedFuture.setException(t);
-        }
-        activeBlobWrites.remove(blobDigest);
-      }
-    };
+  public boolean containsBlob(Digest digest) {
+    return contentAddressableStorage.contains(digest);
   }
 
   @Override
-  public ChunkObserver getWriteOperationStreamObserver(String operationStream) {
-    throw new UnsupportedOperationException();
+  public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs)
+      throws IOException, InterruptedException {
+    ImmutableList.Builder<Digest> blobDigestsBuilder =
+        new ImmutableList.Builder<Digest>();
+    PutAllBlobsException exception = null;
+    for (ByteString blob : blobs) {
+      Digest digest = digestUtil.compute(blob);
+      try {
+        blobDigestsBuilder.add(putBlob(this, digest, blob));
+      } catch (StatusException e) {
+        if (exception == null) {
+          exception = new PutAllBlobsException();
+        }
+        com.google.rpc.Status status = StatusProto.fromThrowable(e);
+        if (status == null) {
+          status = com.google.rpc.Status.newBuilder()
+              .setCode(Status.fromThrowable(e).getCode().value())
+              .build();
+        }
+        exception.addFailedResponse(
+            BatchUpdateBlobsResponse.Response.newBuilder()
+                .setDigest(digest)
+                .setStatus(status)
+                .build());
+      }
+    }
+    if (exception != null) {
+      throw exception;
+    }
+    return blobDigestsBuilder.build();
   }
 
   @Override
@@ -671,7 +668,7 @@ public abstract class AbstractServerInstance implements Instance {
     } catch (ExecutionException e) {
       com.google.rpc.Status status = StatusProto.fromThrowable(e);
       if (status == null) {
-        getLogger().log(SEVERE, "error during input validation", e);
+        getLogger().log(SEVERE, "no rpc status from exception", e.getCause());
         status = com.google.rpc.Status.newBuilder()
             .setCode(Status.fromThrowable(e).getCode().value())
             .build();

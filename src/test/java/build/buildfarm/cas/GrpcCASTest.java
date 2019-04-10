@@ -14,6 +14,7 @@
 
 package build.buildfarm.cas;
 
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
@@ -25,6 +26,8 @@ import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
+import build.buildfarm.common.Write;
+import build.buildfarm.common.grpc.ByteStreamServiceWriter;
 import build.buildfarm.common.grpc.RetryException;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamImplBase;
@@ -33,6 +36,7 @@ import com.google.bytestream.ByteStreamProto.ReadResponse;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.MultimapBuilder;
+import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
 import io.grpc.Channel;
 import io.grpc.Server;
@@ -42,6 +46,9 @@ import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.stub.StreamObserver;
 import io.grpc.util.MutableHandlerRegistry;
 import java.io.IOException;
+import java.io.OutputStream;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.After;
 import org.junit.Before;
@@ -150,5 +157,35 @@ public class GrpcCASTest {
     verify(uploader, times(1)).uploadBlobs(any(Iterable.class));
     assertThat(onExpirations.get(digest)).containsExactly(onExpiration);
     verifyZeroInteractions(onExpiration);
+  }
+
+  @Test
+  public void writeIsResumable() throws Exception {
+    UUID uuid = UUID.randomUUID();
+    ByteString writeContent = ByteString.copyFromUtf8("written");
+    Digest digest = DIGEST_UTIL.compute(writeContent);
+    String instanceName = "test";
+    String resourceName = ByteStreamUploader.getResourceName(uuid, instanceName, digest);
+
+    // better test might just put a full gRPC CAS behind an in-process and validate state
+    SettableFuture<ByteString> content = SettableFuture.create();
+    serviceRegistry.addService(
+        new ByteStreamServiceWriter(resourceName, content, (int) digest.getSizeBytes()));
+
+    Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
+    GrpcCAS cas = new GrpcCAS(
+        instanceName,
+        channel,
+        /* uploader=*/ null,
+        onExpirations);
+    Write initialWrite = cas.getWrite(digest, uuid);
+    try (OutputStream writeOut = initialWrite.getOutput()) {
+      writeContent.substring(0, 4).writeTo(writeOut);
+    }
+    Write finalWrite = cas.getWrite(digest, uuid);
+    try (OutputStream writeOut = finalWrite.getOutput()) {
+      writeContent.substring(4).writeTo(writeOut);
+    }
+    assertThat(content.get(1, TimeUnit.SECONDS)).isEqualTo(writeContent);
   }
 }

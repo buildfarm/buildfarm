@@ -19,6 +19,7 @@ import static build.buildfarm.worker.Utils.removeDirectory;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterables.concat;
+import static com.google.common.io.ByteStreams.nullOutputStream;
 import static com.google.common.util.concurrent.Futures.allAsList;
 import static com.google.common.util.concurrent.Futures.catchingAsync;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
@@ -26,10 +27,12 @@ import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.successfulAsList;
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.Futures.transformAsync;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static java.lang.String.format;
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
+import static java.nio.file.StandardOpenOption.APPEND;
 import static java.nio.file.StandardOpenOption.CREATE;
 import static java.nio.file.StandardOpenOption.TRUNCATE_EXISTING;
 import static java.util.concurrent.TimeUnit.MINUTES;
@@ -37,13 +40,21 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.WARNING;
 import static java.util.logging.Level.SEVERE;
 
+import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.FileNode;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.Write;
+import build.buildfarm.v1test.BlobWriteKey;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
+import com.google.common.cache.RemovalListener;
+import com.google.common.cache.RemovalNotification;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -54,12 +65,15 @@ import com.google.common.io.ByteStreams;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.protobuf.ByteString;
 import io.grpc.Deadline;
 import io.grpc.StatusRuntimeException;
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -74,8 +88,10 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -99,6 +115,29 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private final Consumer<Digest> onPut;
   private final Consumer<Iterable<Digest>> onExpire;
   private final ExecutorService expireService;
+  private final LoadingCache<BlobWriteKey, Write> writes = CacheBuilder.newBuilder()
+      .expireAfterWrite(10, TimeUnit.MINUTES)
+      .build(new CacheLoader<BlobWriteKey, Write>() {
+        @Override
+        public Write load(BlobWriteKey key) {
+          return newWrite(key);
+        }
+      });
+  private final LoadingCache<Digest, SettableFuture<Long>> writesInProgress = CacheBuilder.newBuilder()
+      .expireAfterWrite(10, TimeUnit.MINUTES)
+      .removalListener(new RemovalListener<Digest, SettableFuture<Long>>() {
+        @Override
+        public void onRemoval(RemovalNotification<Digest, SettableFuture<Long>> notification) {
+          // no effect if already done
+          notification.getValue().setException(new IOException("write cancelled"));
+        }
+      })
+      .build(new CacheLoader<Digest, SettableFuture<Long>>() {
+        @Override
+        public SettableFuture<Long> load(Digest digest) {
+          return SettableFuture.create();
+        }
+      });
 
   private ListenableFuture<Path> lastPutDirectory = immediateFuture(null);
 
@@ -219,7 +258,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         (digest, isExecutable) -> new FileEntryKey(getKey(digest, isExecutable), isExecutable, digest));
   }
 
-  private boolean contains(Digest digest, boolean isExecutable) throws IOException, InterruptedException {
+  private boolean contains(Digest digest, boolean isExecutable) {
     Path key = getKey(digest, isExecutable);
     Lock l = locks.acquire(key);
     if (l.tryLock()) {
@@ -232,7 +271,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           if (!entryExists(e)) {
             Entry removedEntry = storage.remove(key);
             if (removedEntry != null) {
-              unlinkEntry(removedEntry);
+              try {
+                unlinkEntry(removedEntry);
+              } catch (IOException unlinkEx) {
+                logger.log(SEVERE, "error unlinking non-existent entry " + key, unlinkEx);
+              }
             }
             return false;
           }
@@ -271,18 +314,19 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return missingDigests.build();
   }
 
-  private boolean contains(Digest digest) throws InterruptedException {
-    try {
-      /* maybe swap the order here if we're higher in ratio on one side */
-      return contains(digest, false) || contains(digest, true);
-    } catch (IOException e) {
-      logger.log(SEVERE, "error testing contains for " + DigestUtil.toString(digest), e);
-      return false;
-    }
+  @Override
+  public boolean contains(Digest digest) {
+    /* maybe swap the order here if we're higher in ratio on one side */
+    return contains(digest, false) || contains(digest, true);
   }
 
   @Override
-  public InputStream newInput(Digest digest, long offset) throws IOException, InterruptedException {
+  public ListenableFuture<Iterable<Response>> getAllFuture(Iterable<Digest> digests) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public InputStream newInput(Digest digest, long offset) throws IOException {
     logger.fine(format("getting input stream for %s", DigestUtil.toString(digest)));
     boolean isExecutable = false;
     do {
@@ -327,13 +371,19 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       } catch (IOException e) {
         logger.log(SEVERE, "error getting " + DigestUtil.toString(digest), e);
         retries--;
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        return null;
       }
     }
     logger.severe(format("CASFileCache::get(%s): exceeded IOException retry", DigestUtil.toString(digest)));
     return null;
+  }
+
+  boolean completeWrite(Digest digest) {
+    try {
+      return writesInProgress.get(digest).set(digest.getSizeBytes());
+    } catch (ExecutionException e) {
+      logger.log(SEVERE, "error getting write in progress future for " + DigestUtil.toString(digest), e);
+      return false;
+    }
   }
 
   @Override
@@ -343,10 +393,16 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       logger.fine(format("put: %s", blobPath.getFileName()));
       OutputStream out = putImpl(
           blobPath,
+          UUID.randomUUID(),
+          () -> completeWrite(blob.getDigest()),
           blob.getDigest().getSizeBytes(),
           /* isExecutable=*/ false,
           null,
-          () -> onPut.accept(blob.getDigest()));
+          () -> {
+            Digest digest = blob.getDigest();
+            onPut.accept(digest);
+            writesInProgress.invalidate(digest);
+          });
       try {
         if (out != null) {
           try {
@@ -364,17 +420,131 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   @Override
-  public OutputStream newOutput(Digest digest) throws IOException {
-    Path blobPath = getKey(digest, false);
-    final OutputStream out;
+  public Write getWrite(Digest digest, UUID uuid) {
     try {
-      logger.fine(format("newOutput: %s", blobPath.getFileName()));
+      return writes.get(BlobWriteKey.newBuilder()
+          .setDigest(digest)
+          .setIdentifier(uuid.toString())
+          .build());
+    } catch (ExecutionException e) {
+      logger.log(SEVERE, "error getting write for " + DigestUtil.toString(digest) + ":" + uuid, e);
+      throw new IllegalStateException("write create must not fail", e.getCause());
+    }
+  }
+
+  static class WriteOutputStream extends FilterOutputStream {
+    final WriteOutputStream out;
+
+    WriteOutputStream(OutputStream out) {
+      super(out);
+      this.out = null;
+    }
+
+    WriteOutputStream(WriteOutputStream out) {
+      super(out);
+      this.out = out;
+    }
+
+    public Path getPath() {
+      if (out == null) {
+        throw new UnsupportedOperationException();
+      }
+      return out.getPath();
+    }
+
+    public long getWritten() {
+      if (out == null) {
+        throw new UnsupportedOperationException();
+      }
+      return out.getWritten();
+    }
+  }
+
+  Write newWrite(BlobWriteKey key) {
+    return new Write() {
+      WriteOutputStream out = null;
+      boolean complete = false;
+
+      @Override
+      public long getCommittedSize() {
+        if (isComplete()) {
+          return key.getDigest().getSizeBytes();
+        }
+        if (out == null) {
+          Path blobKey = getKey(key.getDigest(), false);
+          try {
+            return Files.size(blobKey.resolveSibling(blobKey.getFileName() + "." + key.getIdentifier()));
+          } catch (IOException e) {
+            return 0;
+          }
+        }
+        return out.getWritten();
+      }
+
+      @Override
+      public boolean isComplete() {
+        return complete || (out == null && contains(key.getDigest()));
+      }
+
+      @Override
+      public OutputStream getOutput() throws IOException {
+        if (out == null) {
+          out = newOutput(key.getDigest(), UUID.fromString(key.getIdentifier()));
+          if (out == null) {
+            complete = true;
+          } else {
+            addListener(
+                () -> {
+                  // winner will already be renamed
+                  Path path = out.getPath();
+                  try {
+                    if (Files.exists(path)) {
+                      Files.delete(path);
+                    }
+                    out.close();
+                    out = null;
+                  } catch (IOException e) {
+                    logger.log(SEVERE, "error closing and deleting " + path, e);
+                  }
+                },
+                directExecutor());
+          }
+          out = new WriteOutputStream(nullOutputStream());
+        }
+        return out;
+      }
+
+      @Override
+      public void addListener(Runnable onCompleted, Executor executor) {
+        if (isComplete()) {
+          executor.execute(onCompleted);
+        } else {
+          try {
+            writesInProgress.get(key.getDigest()).addListener(onCompleted, executor);
+          } catch (ExecutionException e) {
+            throw new UncheckedExecutionException(e.getCause());
+          }
+        }
+      }
+    };
+  }
+
+  WriteOutputStream newOutput(Digest digest, UUID uuid) throws IOException {
+    Path blobPath = getKey(digest, false);
+    final WriteOutputStream out;
+    try {
+      logger.fine(format("getWrite: %s", blobPath.getFileName()));
       out = putImpl(
           blobPath,
+          uuid,
+          () -> completeWrite(digest),
           digest.getSizeBytes(),
           /* isExecutable=*/ false,
           null,
-          () -> onPut.accept(digest));
+          () -> {
+            onPut.accept(digest);
+            writesInProgress.invalidate(digest);
+          });
     } catch (InterruptedException e) {
       throw new IOException(e);
     }
@@ -382,7 +552,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       decrementReference(blobPath);
       return null;
     }
-    return new OutputStream() {
+    return new WriteOutputStream(out) {
       AtomicBoolean closed = new AtomicBoolean(false);
 
       @Override
@@ -392,26 +562,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
           decrementReference(blobPath);
         }
-      }
-
-      @Override
-      public void flush() throws IOException {
-        out.flush();
-      }
-
-      @Override
-      public void write(byte[] b) throws IOException {
-        out.write(b);
-      }
-
-      @Override
-      public void write(byte[] b, int off, int len) throws IOException {
-        out.write(b, off, len);
-      }
-
-      @Override
-      public void write(int b) throws IOException {
-        out.write(b);
       }
     };
   }
@@ -753,19 +903,24 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   /** must be called in synchronized context */
-  private void unlinkEntry(Entry e) throws IOException, InterruptedException {
-    if (e.referenceCount == 0) {
-      e.unlink();
+  private void unlinkEntry(Entry entry) throws IOException {
+    if (entry.referenceCount == 0) {
+      entry.unlink();
     } else {
-      logger.severe("removed referenced entry " + e.key);
+      logger.severe("removed referenced entry " + entry.key);
     }
     ImmutableList.Builder<ListenableFuture<Void>> directoryExpirationFutures = ImmutableList.builder();
-    for (Digest containingDirectory : e.containingDirectories) {
+    for (Digest containingDirectory : entry.containingDirectories) {
       directoryExpirationFutures.add(expireDirectory(containingDirectory, expireService));
     }
-    getInterruptiblyOrIOException(allAsList(directoryExpirationFutures.build()));
+    try {
+      getInterruptiblyOrIOException(allAsList(directoryExpirationFutures.build()));
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IOException(e);
+    }
     // still debating this one being in this method
-    sizeInBytes -= e.size;
+    sizeInBytes -= entry.size;
     // technically we should attempt to remove the file here,
     // but we're only called in contexts where it doesn't exist...
   }
@@ -1166,10 +1321,15 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     Path key = getKey(digest, isExecutable);
     CancellableOutputStream out = putImpl(
         key,
+        UUID.randomUUID(),
+        () -> completeWrite(digest),
         digest.getSizeBytes(),
         isExecutable,
         /* containingDirectory=*/ null,
-        () -> onPut.accept(digest));
+        () -> {
+          onPut.accept(digest);
+          writesInProgress.invalidate(digest);
+        });
     if (out != null) {
       copyExternalInput(digest, out);
     }
@@ -1191,10 +1351,15 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         (result) -> {
           CancellableOutputStream out = putImpl(
               key,
+              UUID.randomUUID(),
+              () -> completeWrite(digest),
               digest.getSizeBytes(),
               isExecutable,
               containingDirectory,
-              () -> onPut.accept(digest));
+              () -> {
+                onPut.accept(digest);
+                writesInProgress.invalidate(digest);
+              });
           if (out != null) {
             copyExternalInput(digest, out);
           }
@@ -1242,12 +1407,20 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     void run() throws IOException;
   }
 
-  private static abstract class CancellableOutputStream extends OutputStream {
+  private static abstract class CancellableOutputStream extends WriteOutputStream {
+    CancellableOutputStream(OutputStream out) {
+      super(out);
+    }
+
+    CancellableOutputStream(WriteOutputStream out) {
+      super(out);
+    }
+
     void cancel() throws IOException {
     }
   }
 
-  private static final CancellableOutputStream DUPLICATE_OUTPUT_STREAM = new CancellableOutputStream() {
+  private static final CancellableOutputStream DUPLICATE_OUTPUT_STREAM = new CancellableOutputStream(nullOutputStream()) {
     @Override
     public void write(int b) {
     }
@@ -1255,6 +1428,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   private CancellableOutputStream putImpl(
       Path key,
+      UUID writeId,
+      Supplier<Boolean> writeWinner,
       long blobSizeInBytes,
       boolean isExecutable,
       Digest containingDirectory,
@@ -1267,6 +1442,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       logger.fine(format("lock for blob %s received, getting output stream", key.getFileName()));
       out = putImplSynchronized(
           key,
+          writeId,
+          writeWinner,
           blobSizeInBytes,
           isExecutable,
           containingDirectory,
@@ -1289,18 +1466,20 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         });
   }
 
-  private CancellableOutputStream newLockedCancellableOutputStream(CancellableOutputStream out, Runnable onUnlock) {
-    return new CancellableOutputStream() {
+  private CancellableOutputStream newLockedCancellableOutputStream(
+      CancellableOutputStream cancellableOut,
+      Runnable onUnlock) {
+    return new CancellableOutputStream(cancellableOut) {
       boolean terminated = false;
 
       @Override
       public void cancel() throws IOException {
-        withSingleTermination(out::cancel);
+        withSingleTermination(cancellableOut::cancel);
       }
 
       @Override
       public void close() throws IOException {
-        withSingleTermination(out::close);
+        withSingleTermination(cancellableOut::close);
       }
 
       private void withSingleTermination(IORunnable runnable) throws IOException {
@@ -1320,32 +1499,14 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           onUnlock.run();
         }
       }
-
-      @Override
-      public void flush() throws IOException {
-        out.flush();
-      }
-
-      @Override
-      public void write(byte[] b) throws IOException {
-        out.write(b);
-      }
-
-      @Override
-      public void write(byte[] b, int off, int len) throws IOException {
-        out.write(b, off, len);
-      }
-
-      @Override
-      public void write(int b) throws IOException {
-        out.write(b);
-      }
     };
   }
 
   // must have key locked
   private CancellableOutputStream putImplSynchronized(
       Path key,
+      UUID writeId,
+      Supplier<Boolean> writeWinner,
       long blobSizeInBytes,
       boolean isExecutable,
       Digest containingDirectory,
@@ -1406,51 +1567,65 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       onExpire.accept(expiredDigests);
     }
 
-    Path tmpPath = key.resolveSibling(key.getFileName() + ".tmp");
-    return new CancellableOutputStream() {
-      OutputStream tmpFile = Files.newOutputStream(tmpPath, CREATE, TRUNCATE_EXISTING);
-      long size = 0;
+    Path writePath = key.resolveSibling(key.getFileName() + "." + writeId);
+    final long committedSize;
+    if (Files.exists(writePath)) {
+      committedSize = Files.size(writePath);
+    } else {
+      committedSize = 0;
+    }
+    OutputStream writeOut = Files.newOutputStream(writePath, CREATE, APPEND);
+    return new CancellableOutputStream(writeOut) {
+      long written = committedSize;
 
       @Override
-      public void flush() throws IOException {
-        tmpFile.flush();
+      public long getWritten() {
+        return written;
       }
 
       @Override
-      public void write(byte[] b) throws IOException {
-        tmpFile.write(b);
-        size += b.length;
-      }
-
-      @Override
-      public void write(byte[] b, int off, int len) throws IOException {
-        tmpFile.write(b, off, len);
-        size += len;
-      }
-
-      @Override
-      public void write(int b) throws IOException {
-        tmpFile.write(b);
-        size++;
+      public Path getPath() {
+        return writePath;
       }
 
       @Override
       public void cancel() throws IOException {
-        tmpFile.close();
-        Files.delete(tmpPath);
+        writeOut.close();
+        Files.delete(writePath);
+      }
+
+      @Override
+      public void write(int b) throws IOException {
+        writeOut.write(b);
+        written++;
+      }
+
+      @Override
+      public void write(byte[] b) throws IOException {
+        writeOut.write(b);
+        written += b.length;
+      }
+
+      @Override
+      public void write(byte[] b, int off, int len) throws IOException {
+        writeOut.write(b, off, len);
+        written += len;
       }
 
       @Override
       public void close() throws IOException {
-        tmpFile.close();
+        // has some trouble with multiple closes, fortunately we have something above to handle this
+        long size = getWritten();
+        writeOut.close();
 
         if (size != blobSizeInBytes) {
-          Files.delete(tmpPath);
+          Files.delete(writePath);
           throw new DigestMismatchException("blob digest size mismatch, expected " + blobSizeInBytes + ", was " + size);
         }
 
-        setPermissions(tmpPath, isExecutable);
-        Files.move(tmpPath, key, REPLACE_EXISTING);
+        setPermissions(writePath, isExecutable);
+        // maybe don't replace existing?
+        Files.move(writePath, key, REPLACE_EXISTING);
 
         Entry entry = new Entry(
             key,
@@ -1458,13 +1633,15 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             containingDirectory,
             Deadline.after(10, SECONDS));
 
-        if (storage.put(key, entry) != null) {
-          throw new IllegalStateException("storage conflict with existing key for " + key);
-        }
-        try {
-          onInsert.run();
-        } catch (RuntimeException e) {
-          throw new IOException(e);
+        if (writeWinner.get()) {
+          if (storage.put(key, entry) != null) {
+            throw new IllegalStateException("storage conflict with existing key for " + key);
+          }
+          try {
+            onInsert.run();
+          } catch (RuntimeException e) {
+            throw new IOException(e);
+          }
         }
       }
     };

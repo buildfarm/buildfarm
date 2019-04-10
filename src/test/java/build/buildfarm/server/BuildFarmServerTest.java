@@ -24,6 +24,8 @@ import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest.Request;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse.Response;
+import build.bazel.remote.execution.v2.BatchReadBlobsRequest;
+import build.bazel.remote.execution.v2.BatchReadBlobsResponse;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc;
 import build.bazel.remote.execution.v2.Digest;
@@ -54,8 +56,12 @@ import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.PollOperationRequest;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.TakeOperationRequest;
+import com.google.bytestream.ByteStreamGrpc;
+import com.google.bytestream.ByteStreamProto.WriteRequest;
+import com.google.bytestream.ByteStreamProto.WriteResponse;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+import com.google.common.util.concurrent.SettableFuture;
 import com.google.longrunning.CancelOperationRequest;
 import com.google.longrunning.GetOperationRequest;
 import com.google.longrunning.ListOperationsRequest;
@@ -70,11 +76,15 @@ import com.google.protobuf.util.Durations;
 import com.google.rpc.Code;
 import com.google.rpc.PreconditionFailure;
 import com.google.rpc.PreconditionFailure.Violation;
+import io.grpc.ManagedChannel;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
-import io.grpc.ManagedChannel;
-import io.grpc.StatusRuntimeException;
+import io.grpc.protobuf.StatusProto;
+import io.grpc.stub.StreamObserver;
 import java.util.Collections;
+import java.util.UUID;
 import java.util.function.Function;
 import org.junit.After;
 import org.junit.Before;
@@ -84,6 +94,8 @@ import org.junit.Test;
 
 @RunWith(JUnit4.class)
 public class BuildFarmServerTest {
+  private final static String INSTANCE_NAME = "memory";
+
   private BuildFarmServer server;
   private ManagedChannel inProcessChannel;
   private MemoryInstanceConfig memoryInstanceConfig;
@@ -112,7 +124,7 @@ public class BuildFarmServerTest {
     BuildFarmServerConfig.Builder configBuilder =
         BuildFarmServerConfig.newBuilder().setPort(0);
     configBuilder.addInstancesBuilder()
-        .setName("memory")
+        .setName(INSTANCE_NAME)
         .setDigestFunction(DigestFunction.SHA256)
         .setMemoryInstanceConfig(memoryInstanceConfig);
 
@@ -131,6 +143,24 @@ public class BuildFarmServerTest {
     server.stop();
   }
 
+  ByteString getBlob(Digest digest) {
+    ContentAddressableStorageGrpc.ContentAddressableStorageBlockingStub stub =
+        ContentAddressableStorageGrpc.newBlockingStub(inProcessChannel);
+    BatchReadBlobsResponse batchResponse = stub.batchReadBlobs(BatchReadBlobsRequest.newBuilder()
+        .setInstanceName(INSTANCE_NAME)
+        .addDigests(digest)
+        .build());
+    BatchReadBlobsResponse.Response response = batchResponse.getResponsesList().get(0);
+    com.google.rpc.Status status = response.getStatus();
+    if (Code.forNumber(status.getCode()) == Code.NOT_FOUND) {
+      return null;
+    }
+    if (Code.forNumber(status.getCode()) != Code.OK) {
+      throw StatusProto.toStatusRuntimeException(status);
+    }
+    return response.getData();
+  }
+
   @Test
   public void findMissingBlobs() {
     DigestUtil digestUtil = new DigestUtil(HashFunction.SHA256);
@@ -138,7 +168,7 @@ public class BuildFarmServerTest {
     Iterable<Digest> digests =
         Collections.singleton(digestUtil.compute(content));
     FindMissingBlobsRequest request = FindMissingBlobsRequest.newBuilder()
-        .setInstanceName("memory")
+        .setInstanceName(INSTANCE_NAME)
         .addAllBlobDigests(digests)
         .build();
     ContentAddressableStorageGrpc.ContentAddressableStorageBlockingStub stub =
@@ -156,7 +186,7 @@ public class BuildFarmServerTest {
     ByteString content = ByteString.copyFromUtf8("Hello, World!");
     Digest digest = digestUtil.compute(content);
     BatchUpdateBlobsRequest request = BatchUpdateBlobsRequest.newBuilder()
-        .setInstanceName("memory")
+        .setInstanceName(INSTANCE_NAME)
         .addRequests(Request.newBuilder()
             .setDigest(digest)
             .setData(content)
@@ -180,7 +210,7 @@ public class BuildFarmServerTest {
   @Test
   public void listOperations() {
     ListOperationsRequest request = ListOperationsRequest.newBuilder()
-        .setName("memory/operations")
+        .setName(INSTANCE_NAME + "/operations")
         .setPageSize(1024)
         .build();
 
@@ -198,7 +228,7 @@ public class BuildFarmServerTest {
 
     // should appear in outstanding list
     ListOperationsRequest listRequest = ListOperationsRequest.newBuilder()
-        .setName("memory/operations")
+        .setName(INSTANCE_NAME + "/operations")
         .setPageSize(1024)
         .build();
 
@@ -256,7 +286,7 @@ public class BuildFarmServerTest {
 
     // take our operation from the queue
     TakeOperationRequest takeRequest = TakeOperationRequest.newBuilder()
-        .setInstanceName("memory")
+        .setInstanceName(INSTANCE_NAME)
         .build();
 
     OperationQueueGrpc.OperationQueueBlockingStub operationQueueStub =
@@ -360,7 +390,7 @@ public class BuildFarmServerTest {
         .setInputRootDigest(rootBlobDigest)
         .build();
     Digest actionDigest = digestUtil.compute(action);
-    ByteStreamUploader uploader = new ByteStreamUploader("memory", inProcessChannel, null, 60, Retrier.NO_RETRIES, null);
+    ByteStreamUploader uploader = new ByteStreamUploader(INSTANCE_NAME, inProcessChannel, null, 60, Retrier.NO_RETRIES, null);
 
     uploader.uploadBlobs(ImmutableList.of(
         new Chunker(action.toByteString(), actionDigest),
@@ -370,7 +400,7 @@ public class BuildFarmServerTest {
 
   private Operation executeAction(Digest actionDigest) {
     ExecuteRequest executeRequest = ExecuteRequest.newBuilder()
-        .setInstanceName("memory")
+        .setInstanceName(INSTANCE_NAME)
         .setActionDigest(actionDigest)
         .setSkipCacheLookup(true)
         .build();
@@ -385,7 +415,7 @@ public class BuildFarmServerTest {
   public void actionNotCached() {
     DigestUtil digestUtil = new DigestUtil(HashFunction.SHA256);
     GetActionResultRequest request = GetActionResultRequest.newBuilder()
-        .setInstanceName("memory")
+        .setInstanceName(INSTANCE_NAME)
         .setActionDigest(digestUtil.empty())
         .build();
 
@@ -398,5 +428,44 @@ public class BuildFarmServerTest {
     } catch (StatusRuntimeException e) {
       assertThat(e.getStatus().getCode()).isEqualTo(io.grpc.Status.Code.NOT_FOUND);
     }
+  }
+
+  @Test
+  public void progressiveUploadCompletes() throws Exception {
+    DigestUtil digestUtil = new DigestUtil(HashFunction.SHA256);
+    ByteString content = ByteString.copyFromUtf8("Hello, World!");
+    Digest digest = digestUtil.compute(content);
+    UUID uuid = UUID.randomUUID();
+    String resourceName = ByteStreamUploader.getResourceName(uuid, INSTANCE_NAME, digest);
+
+    assertThat(getBlob(digest)).isNull();
+
+    SettableFuture<Void> partialFuture = SettableFuture.create();
+    FutureWriteResponseObserver futureResponder = new FutureWriteResponseObserver();
+    StreamObserver<WriteRequest> requestObserver =
+        ByteStreamGrpc.newStub(inProcessChannel).write(futureResponder);
+    ByteString shortContent = content.substring(0, 6);
+    requestObserver.onNext(WriteRequest.newBuilder()
+        .setWriteOffset(0)
+        .setResourceName(resourceName)
+        .setData(shortContent)
+        .build());
+    requestObserver.onError(Status.CANCELLED.asException());
+    assertThat(futureResponder.isDone()).isTrue(); // should be done
+
+    futureResponder = new FutureWriteResponseObserver();
+    requestObserver = ByteStreamGrpc.newStub(inProcessChannel).write(futureResponder);
+    requestObserver.onNext(WriteRequest.newBuilder()
+        .setWriteOffset(6)
+        .setResourceName(resourceName)
+        .setData(content.substring(6))
+        .setFinishWrite(true)
+        .build());
+    requestObserver.onCompleted();
+    assertThat(futureResponder.get()).isEqualTo(WriteResponse.newBuilder()
+        .setCommittedSize(content.size())
+        .build());
+
+    assertThat(getBlob(digest)).isEqualTo(content);
   }
 }

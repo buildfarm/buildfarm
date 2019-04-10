@@ -292,12 +292,12 @@ class Executor implements Runnable {
     OutputStream stdoutSink = null, stderrSink = null;
 
     if (stdoutStreamName != null && !stdoutStreamName.isEmpty() && workerContext.getStreamStdout()) {
-      stdoutSink = workerContext.getStreamOutput(stdoutStreamName);
+      stdoutSink = workerContext.getOperationStreamOutput(stdoutStreamName);
     } else {
       stdoutSink = nullOutputStream;
     }
     if (stderrStreamName != null && !stderrStreamName.isEmpty() && workerContext.getStreamStderr()) {
-      stderrSink = workerContext.getStreamOutput(stderrStreamName);
+      stderrSink = workerContext.getOperationStreamOutput(stderrStreamName);
     } else {
       stderrSink = nullOutputStream;
     }

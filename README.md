@@ -73,6 +73,11 @@ and
 
 ## Developer Information
 
+### Setting up intelliJ
+
+1. Follow the instructions in https://github.com/bazelbuild/intellij to install the bazel plugin for intelliJ
+1. Import the project using `ij.bazelproject`
+
 ### Third-party Dependencies
 
 Most third-party dependencies (e.g. protobuf, gRPC, ...) are managed automatically via

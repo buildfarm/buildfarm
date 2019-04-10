@@ -14,14 +14,20 @@
 
 package build.buildfarm.worker.operationqueue;
 
+import static build.buildfarm.common.IOUtils.formatIOError;
 import static build.buildfarm.instance.Utils.getBlob;
 import static build.buildfarm.worker.CASFileCache.getInterruptiblyOrIOException;
 import static build.buildfarm.worker.Utils.removeDirectory;
 import static com.google.common.collect.Maps.uniqueIndex;
 import static com.google.common.util.concurrent.Futures.allAsList;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
+import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
+import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
 import static java.lang.String.format;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.concurrent.TimeUnit.DAYS;
+import static java.util.concurrent.TimeUnit.MINUTES;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.Action;
@@ -73,7 +79,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
-import com.google.common.util.concurrent.MoreExecutors;
 import com.google.devtools.common.options.OptionsParser;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
@@ -104,8 +109,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListSet;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
@@ -125,7 +128,8 @@ public class Worker {
   private final Map<Path, Iterable<Digest>> rootInputDirectories = new ConcurrentHashMap<>();
 
   private static final ListeningScheduledExecutorService retryScheduler =
-      MoreExecutors.listeningDecorator(Executors.newScheduledThreadPool(1));
+      listeningDecorator(newSingleThreadScheduledExecutor());
+  private static final Retrier retrier = createStubRetrier();
   private final Set<String> activeOperations = new ConcurrentSkipListSet<>();
 
   private static ManagedChannel createChannel(String target) {
@@ -170,8 +174,8 @@ public class Worker {
         Retrier.DEFAULT_IS_RETRIABLE);
   }
 
-  private static ByteStreamUploader createStubUploader(Channel channel) {
-    return new ByteStreamUploader("", channel, null, 300, createStubRetrier(), retryScheduler);
+  private static ByteStreamUploader createStubUploader(Channel channel, Retrier retrier) {
+    return new ByteStreamUploader("", channel, null, 300, retrier, retryScheduler);
   }
 
   private static Instance newStubInstance(
@@ -189,10 +193,11 @@ public class Worker {
       DigestUtil digestUtil) {
     return new StubInstance(
         name,
-        "",
+        /* identifier=*/ "",
         digestUtil,
         channel,
-        60 /* FIXME CONFIG */, TimeUnit.SECONDS);
+        60 /* FIXME CONFIG */, SECONDS,
+        retrier, retryScheduler);
   }
 
   public Worker(WorkerConfig config) throws ConfigurationException {
@@ -211,14 +216,14 @@ public class Worker {
     DigestUtil digestUtil = new DigestUtil(hashFunction);
     InstanceEndpoint casEndpoint = config.getContentAddressableStorage();
     ManagedChannel casChannel = createChannel(casEndpoint.getTarget());
-    uploader = createStubUploader(casChannel);
+    uploader = createStubUploader(casChannel, retrier);
     casInstance = newStubInstance(casEndpoint.getInstanceName(), casChannel, digestUtil);
     acInstance = newStubInstance(config.getActionCache(), digestUtil);
     operationQueueInstance = newStubInstance(config.getOperationQueue(), digestUtil);
     InputStreamFactory inputStreamFactory = new InputStreamFactory() {
       @Override
-      public InputStream newInput(Digest digest, long offset) throws IOException, InterruptedException {
-        return casInstance.newStreamInput(casInstance.getBlobName(digest), offset);
+      public InputStream newInput(Digest digest, long offset) throws IOException {
+        return casInstance.newBlobInput(digest, offset);
       }
     };
     fileCache = new InjectedCASFileCache(
@@ -714,8 +719,8 @@ public class Worker {
 
       // doesn't belong in CAS or AC, must be in OQ
       @Override
-      public OutputStream getStreamOutput(String name) {
-        return operationQueueInstance.getStreamOutput(name, -1);
+      public OutputStream getOperationStreamOutput(String name) throws IOException {
+        return operationQueueInstance.getOperationStreamWrite(name).getOutput();
       }
 
       @Override
@@ -745,6 +750,10 @@ public class Worker {
     if (Thread.interrupted()) {
       throw new InterruptedException();
     }
+    retryScheduler.shutdown();
+    if (!shutdownAndAwaitTermination(retryScheduler, 1, MINUTES)) {
+      logger.severe("unable to terminate retry scheduler");
+    }
   }
 
   private static WorkerConfig toWorkerConfig(Readable input, WorkerOptions options) throws IOException {
@@ -766,19 +775,34 @@ public class Worker {
                                               OptionsParser.HelpVerbosity.LONG));
   }
 
-  public static void main(String[] args) throws Exception {
+  /**
+   * returns success or failure
+   */
+  static boolean workerMain(String[] args) {
     OptionsParser parser = OptionsParser.newOptionsParser(WorkerOptions.class);
     parser.parseAndExitUponError(args);
     List<String> residue = parser.getResidue();
     if (residue.isEmpty()) {
       printUsage(parser);
-      throw new IllegalArgumentException("Missing CONFIG_PATH");
+      return false;
     }
     Path configPath = Paths.get(residue.get(0));
-    Worker worker;
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
-      worker = new Worker(toWorkerConfig(new InputStreamReader(configInputStream), parser.getOptions(WorkerOptions.class)));
+      Worker worker = new Worker(toWorkerConfig(new InputStreamReader(configInputStream), parser.getOptions(WorkerOptions.class)));
+      configInputStream.close();
+      worker.start();
+      return true;
+    } catch (IOException e) {
+      System.err.println("error: " + formatIOError(e));
+    } catch (ConfigurationException e) {
+      System.err.println("error: " + e.getMessage());
+    } catch (InterruptedException e) {
+      System.err.println("error: interrupted");
     }
-    worker.start();
+    return false;
+  }
+
+  public static void main(String[] args) {
+    System.exit(workerMain(args) ? 0 : 1);
   }
 }

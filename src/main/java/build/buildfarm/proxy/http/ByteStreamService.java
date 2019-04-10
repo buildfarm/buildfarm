@@ -20,6 +20,7 @@ import static build.buildfarm.common.UrlPath.parseBlobDigest;
 import static com.google.common.util.concurrent.Futures.addCallback;
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.UrlPath.InvalidResourceNameException;
@@ -123,7 +124,8 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
             }
             onError(Status.fromThrowable(t));
           }
-        });
+        },
+        directExecutor());
   }
 
   @Override

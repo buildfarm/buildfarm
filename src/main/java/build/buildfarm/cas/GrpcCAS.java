@@ -15,22 +15,31 @@
 package build.buildfarm.cas;
 
 import static build.buildfarm.common.grpc.Retrier.NO_RETRIES;
+import static com.google.common.util.concurrent.Futures.transform;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
+import build.bazel.remote.execution.v2.BatchReadBlobsRequest;
+import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageBlockingStub;
+import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageFutureStub;
 import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.ByteStreamHelper;
 import build.buildfarm.common.grpc.RetryException;
+import build.buildfarm.common.grpc.StubWriteOutputStream;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Chunker;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.bytestream.ByteStreamGrpc;
+import com.google.bytestream.ByteStreamGrpc.ByteStreamBlockingStub;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamStub;
 import com.google.bytestream.ByteStreamProto.ReadRequest;
 import com.google.bytestream.ByteStreamProto.ReadResponse;
-import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
-import com.google.bytestream.ByteStreamProto.QueryWriteStatusResponse;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.Iterators;
@@ -40,12 +49,12 @@ import io.grpc.Channel;
 import io.grpc.StatusRuntimeException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.UUID;
 
-class GrpcCAS implements ContentAddressableStorage {
+public class GrpcCAS implements ContentAddressableStorage {
   private final String instanceName;
   private final Channel channel;
   private final ByteStreamUploader uploader;
@@ -67,6 +76,15 @@ class GrpcCAS implements ContentAddressableStorage {
             }
           });
 
+  private final Supplier<ContentAddressableStorageFutureStub> casFutureStub =
+      Suppliers.memoize(
+          new Supplier<ContentAddressableStorageFutureStub>() {
+            @Override
+            public ContentAddressableStorageFutureStub get() {
+              return ContentAddressableStorageGrpc.newFutureStub(channel);
+            }
+          });
+
   private final Supplier<ByteStreamStub> bsStub =
       Suppliers.memoize(
           new Supplier<ByteStreamStub>() {
@@ -76,9 +94,9 @@ class GrpcCAS implements ContentAddressableStorage {
             }
           });
 
-  public InputStream newStreamInput(String name, long offset) {
+  private InputStream newStreamInput(String resourceName, long offset) {
     return ByteStreamHelper.newInput(
-        name,
+        resourceName,
         offset,
         bsStub,
         NO_RETRIES::newBackoff,
@@ -86,15 +104,17 @@ class GrpcCAS implements ContentAddressableStorage {
         /* retryService=*/ null);
   }
 
-  public OutputStream newStreamOutput(String name) {
-    throw new UnsupportedOperationException();
-  }
-
   private String getBlobName(Digest digest) {
     return String.format(
         "%sblobs/%s",
         instanceName.isEmpty() ? "" : (instanceName + "/"),
         DigestUtil.toString(digest));
+  }
+
+  @Override
+  public boolean contains(Digest digest) {
+    // QueryWriteStatusRequest?
+    return Iterables.isEmpty(findMissingBlobs(ImmutableList.of(digest)));
   }
 
   @Override
@@ -122,6 +142,24 @@ class GrpcCAS implements ContentAddressableStorage {
   }
 
   @Override
+  public InputStream newInput(Digest digest, long offset) {
+    return newStreamInput(getBlobName(digest), offset);
+  }
+
+  @Override
+  public ListenableFuture<Iterable<Response>> getAllFuture(Iterable<Digest> digests) {
+    // FIXME limit to 4MiB total response
+    return transform(
+        casFutureStub.get()
+            .batchReadBlobs(BatchReadBlobsRequest.newBuilder()
+                .setInstanceName(instanceName)
+                .addAllDigests(digests)
+                .build()),
+        (response) -> response.getResponsesList(),
+        directExecutor());
+  }
+
+  @Override
   public Blob get(Digest digest) {
     try (InputStream in = newStreamInput(getBlobName(digest), /* offset=*/ 0)) {
       ByteString content = ByteString.readFrom(in);
@@ -138,14 +176,27 @@ class GrpcCAS implements ContentAddressableStorage {
     }
   }
 
-  @Override
-  public InputStream newInput(Digest digest, long offset) {
-    return newStreamInput(getBlobName(digest), offset);
+  public static Write newWrite(
+      Channel channel,
+      String instanceName,
+      Digest digest,
+      UUID uuid) {
+    String resourceName = ByteStreamUploader.getResourceName(uuid, instanceName, digest);
+    Supplier<ByteStreamBlockingStub> bsBlockingStub = Suppliers.memoize(
+        () -> ByteStreamGrpc.newBlockingStub(channel));
+    Supplier<ByteStreamStub> bsStub = Suppliers.memoize(
+        () -> ByteStreamGrpc.newStub(channel));
+    return new StubWriteOutputStream(
+        bsBlockingStub,
+        bsStub,
+        resourceName,
+        digest.getSizeBytes(),
+        /* autoflush=*/ false);
   }
 
   @Override
-  public OutputStream newOutput(Digest digest) {
-    return newStreamOutput(getBlobName(digest));
+  public Write getWrite(Digest digest, UUID uuid) {
+    return newWrite(channel, instanceName, digest, uuid);
   }
 
   @Override

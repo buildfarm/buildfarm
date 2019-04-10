@@ -85,6 +85,7 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import org.junit.After;
@@ -460,11 +461,11 @@ public class ShardInstanceTest {
 
     when(mockWorkerInstance.findMissingBlobs(any(Iterable.class), any(ExecutorService.class))).thenReturn(immediateFuture(ImmutableList.of()));
 
-    doAnswer(answer((resourceName, sizeBytes) -> new CommittingNullSink()))
+    doAnswer(answer((digest, uuid) -> new NullWrite()))
         .when(mockWorkerInstance)
-        .getStreamOutput(
-            matches("^uploads/[^/]+/blobs/.*$"),
-            any(Long.class));
+        .getBlobWrite(
+            any(Digest.class),
+            any(UUID.class));
 
     StatusRuntimeException queueException = Status.UNAVAILABLE.asRuntimeException();
     doAnswer((invocation) -> {
@@ -563,11 +564,11 @@ public class ShardInstanceTest {
     when(mockWorkerInstance.findMissingBlobs(any(Iterable.class), any(ExecutorService.class)))
         .thenReturn(immediateFailedFuture(Status.RESOURCE_EXHAUSTED.asException()));
 
-    doAnswer(answer((resourceName, sizeBytes) -> new CommittingNullSink()))
+    doAnswer(answer((digest, uuid) -> new NullWrite()))
         .when(mockWorkerInstance)
-        .getStreamOutput(
-            matches("^uploads/[^/]+/blobs/.*$"),
-            any(Long.class));
+        .getBlobWrite(
+            any(Digest.class),
+            any(UUID.class));
 
     Poller poller = mock(Poller.class);
 

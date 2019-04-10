@@ -62,7 +62,8 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
               responseObserver.onError(Status.fromThrowable(t).asException());
             }
           }
-        });
+        },
+        directExecutor());
     Context.current().addListener(
         (context) -> future.cancel(false),
         directExecutor());

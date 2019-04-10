@@ -48,7 +48,7 @@ import java.util.logging.Logger;
 public class Util {
   private static final Logger logger = Logger.getLogger(Util.class.getName());
   public static final Predicate<Status> SHARD_IS_RETRIABLE =
-      st -> st.getCode() != Code.CANCELLED && Retrier.DEFAULT_IS_RETRIABLE.test(st);
+      st -> st.getCode() != Code.CANCELLED && Retrier.DEFAULT_IS_RETRIABLE.apply(st);
 
   private Util() { }
 
@@ -110,7 +110,7 @@ public class Util {
               } else if (status.getCode() == Code.CANCELLED || Context.current().isCancelled()) {
                 // do nothing further if we're cancelled
                 return immediateFailedFuture(e);
-              } else if (SHARD_IS_RETRIABLE.test(status)) {
+              } else if (SHARD_IS_RETRIABLE.apply(status)) {
                 return checkMissingBlobOnInstance(digest, instance, service);
               }
               return immediateFailedFuture(status.asException());

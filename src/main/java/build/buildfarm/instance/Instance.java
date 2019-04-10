@@ -15,6 +15,8 @@
 package build.buildfarm.instance;
 
 import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
+import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
@@ -26,16 +28,20 @@ import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.Watcher;
+import build.buildfarm.common.Write;
 import build.buildfarm.v1test.QueueEntry;
-import build.buildfarm.v1test.QueuedOperation;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
+import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.Executor;
 import javax.annotation.Nullable;
 
@@ -51,18 +57,25 @@ public interface Instance {
   void putActionResult(ActionKey actionKey, ActionResult actionResult) throws InterruptedException;
 
   ListenableFuture<Iterable<Digest>> findMissingBlobs(Iterable<Digest> digests, Executor executor);
+  boolean containsBlob(Digest digest);
 
   String getBlobName(Digest blobDigest);
   void getBlob(Digest blobDigest, long offset, long limit, StreamObserver<ByteString> blobObserver);
-  ChunkObserver getWriteBlobObserver(Digest blobDigest);
-  ChunkObserver getWriteOperationStreamObserver(String operationStream);
+  InputStream newBlobInput(Digest digest, long offset) throws IOException;
+  ListenableFuture<Iterable<Response>> getAllBlobsFuture(Iterable<Digest> digests);
   String getTree(
       Digest rootDigest,
       int pageSize,
       String pageToken,
-      ImmutableList.Builder<Directory> directories);
-  CommittingOutputStream getStreamOutput(String name, long expectedSize);
-  InputStream newStreamInput(String name, long offset) throws IOException;
+      ImmutableList.Builder<Directory> directories)
+      throws IOException, InterruptedException;
+
+  Write getBlobWrite(Digest digest, UUID uuid);
+  Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs)
+      throws IOException, IllegalArgumentException, InterruptedException;
+
+  Write getOperationStreamWrite(String name);
+  InputStream newOperationStreamInput(String name, long offset) throws IOException;
 
   ListenableFuture<Void> execute(
       Digest actionDigest,
@@ -111,5 +124,18 @@ public interface Instance {
 
   public static abstract class CommittingOutputStream extends OutputStream {
     public abstract ListenableFuture<Long> getCommittedFuture();
+  }
+
+  public static class PutAllBlobsException extends RuntimeException {
+    private final List<BatchUpdateBlobsResponse.Response> failedResponses = Lists.newArrayList();
+
+    public void addFailedResponse(BatchUpdateBlobsResponse.Response response) {
+      failedResponses.add(response);
+      addSuppressed(StatusProto.toStatusException(response.getStatus()));
+    }
+
+    public List<BatchUpdateBlobsResponse.Response> getFailedResponses() {
+      return ImmutableList.copyOf(failedResponses);
+    }
   }
 }

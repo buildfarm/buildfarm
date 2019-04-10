@@ -92,12 +92,12 @@ public class ByteStreamServiceTest {
     fakeServer.awaitTermination();
   }
 
-  private String createBlobUploadResourceName(String id, Digest digest) {
+  static String createBlobUploadResourceName(String id, Digest digest) {
     return createBlobUploadResourceName(
         /* instanceName=*/ "", id, digest);
   }
 
-  private String createBlobUploadResourceName(
+  static String createBlobUploadResourceName(
       String instanceName, String id, Digest digest) {
     return String.format(
         "%suploads/%s/blobs/%s",
@@ -170,7 +170,7 @@ public class ByteStreamServiceTest {
 
     Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
     ClientCall<WriteRequest, WriteResponse> call =
-        channel.newCall(ByteStreamGrpc.METHOD_WRITE, CallOptions.DEFAULT);
+        channel.newCall(ByteStreamGrpc.getWriteMethod(), CallOptions.DEFAULT);
     ClientCall.Listener<WriteResponse> callListener = new ClientCall.Listener<WriteResponse>() {
       boolean complete = false;
       boolean callHalfClosed = false;
@@ -214,7 +214,7 @@ public class ByteStreamServiceTest {
 
     Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
     ClientCall<WriteRequest, WriteResponse> initialCall =
-        channel.newCall(ByteStreamGrpc.METHOD_WRITE, CallOptions.DEFAULT);
+        channel.newCall(ByteStreamGrpc.getWriteMethod(), CallOptions.DEFAULT);
     ByteString initialData = helloWorld.substring(0, 6);
     ClientCall.Listener<WriteResponse> initialCallListener = new ClientCall.Listener<WriteResponse>() {
       boolean complete = false;
@@ -252,7 +252,7 @@ public class ByteStreamServiceTest {
     assertThat(response.getComplete()).isFalse();
 
     ClientCall<WriteRequest, WriteResponse> finishCall =
-        channel.newCall(ByteStreamGrpc.METHOD_WRITE, CallOptions.DEFAULT);
+        channel.newCall(ByteStreamGrpc.getWriteMethod(), CallOptions.DEFAULT);
     ClientCall.Listener<WriteResponse> finishCallListener = new ClientCall.Listener<WriteResponse>() {
       boolean complete = false;
       boolean callHalfClosed = false;

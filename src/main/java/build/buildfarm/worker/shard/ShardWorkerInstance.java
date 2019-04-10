@@ -38,6 +38,7 @@ import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watcher;
+import build.buildfarm.common.Write;
 import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
@@ -63,8 +64,8 @@ import java.io.OutputStream;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.util.concurrent.ExecutionException;
-import javax.naming.ConfigurationException;
 import java.util.logging.Logger;
+import javax.naming.ConfigurationException;
 
 public class ShardWorkerInstance extends AbstractServerInstance {
   private static final Logger logger = Logger.getLogger(ShardWorkerInstance.class.getName());
@@ -152,34 +153,6 @@ public class ShardWorkerInstance extends AbstractServerInstance {
     }
   }
 
-  @Override
-  public ByteString getBlob(Digest blobDigest, long offset, long limit) {
-    Blob blob = contentAddressableStorage.get(blobDigest);
-    if (blob == null) {
-      try {
-        backplane.removeBlobLocation(blobDigest, getName());
-      } catch (IOException e) {
-        logger.log(SEVERE, "error removing blob location for " + DigestUtil.toString(blobDigest), e);
-      }
-      return null;
-    }
-    ByteString content = blob.getData();
-    if (offset != 0 || limit != 0) {
-      content = content.substring((int) offset, (int) (limit == 0 ? (content.size() - offset) : (limit + offset)));
-    }
-    return content;
-  }
-
-  @Override
-  public ChunkObserver getWriteBlobObserver(Digest blobDigest) {
-    return new OutputStreamChunkObserver() {
-      @Override
-      protected OutputStream newOutput() throws IOException {
-        return outputStreamFactory.newOutput(blobDigest);
-      }
-    };
-  }
-
   protected TokenizableIterator<DirectoryEntry> createTreeIterator(
       String reason, Digest rootDigest, String pageToken) {
     throw new UnsupportedOperationException();
@@ -195,12 +168,12 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  public CommittingOutputStream getStreamOutput(String name, long expectedSize) {
+  public Write getOperationStreamWrite(String name) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public InputStream newStreamInput(String name, long offset) {
+  public InputStream newOperationStreamInput(String name, long offset) {
     throw new UnsupportedOperationException();
   }
 

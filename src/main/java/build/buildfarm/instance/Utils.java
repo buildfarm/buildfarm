@@ -15,17 +15,20 @@ package build.buildfarm.instance;
 
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.transform;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
 import build.bazel.remote.execution.v2.Digest;
-import build.buildfarm.instance.Instance.ChunkObserver;
-import com.google.common.base.Function;
+import build.buildfarm.common.Write;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 
 /** Utility methods for the instance package. * */
@@ -38,7 +41,7 @@ public class Utils {
   }
 
   public static ByteString getBlob(Instance instance, Digest blobDigest, long offset) throws IOException, InterruptedException {
-    try (InputStream in = instance.newStreamInput(instance.getBlobName(blobDigest), offset)) {
+    try (InputStream in = instance.newBlobInput(blobDigest, offset)) {
       return ByteString.readFrom(in);
     } catch (StatusRuntimeException e) {
       if (e.getStatus().equals(Status.NOT_FOUND)) {
@@ -62,21 +65,17 @@ public class Utils {
           invalidDigestSize(digest.getSizeBytes(), data.size())
               .asRuntimeException());
     }
-    ChunkObserver observer = instance.getWriteBlobObserver(digest);
-    observer.onNext(data);
-    observer.onCompleted();
-    return transform(
-        observer.getCommittedFuture(),
-        new Function<Long, Digest>() {
-          @Override
-          public Digest apply(Long committedSize) {
-            if (committedSize != digest.getSizeBytes()) {
-              throw invalidDigestSize(committedSize, digest.getSizeBytes())
-                  .asRuntimeException();
-            }
-            return digest;
-          }
-        });
+    Write write = instance.getBlobWrite(digest, UUID.randomUUID());
+    SettableFuture<Digest> future = SettableFuture.create();
+    write.addListener(
+        () -> future.set(digest),
+        directExecutor());
+    try (OutputStream out = write.getOutput()) {
+      data.writeTo(out);
+    } catch (IOException e) {
+      future.setException(e);
+    }
+    return future;
   }
 
   public static Digest putBlob(Instance instance, Digest digest, ByteString blob)

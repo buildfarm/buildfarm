@@ -2199,29 +2199,35 @@ class LocalCache<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V> 
         }
         return value;
       }, directExecutor());
-      addCallback(valueFuture, new FutureCallback<V>() {
-        @Override
-        public void onSuccess(V value) {
-          // re-read ticker now that loading has completed
-          long now = map.ticker.read();
-          recordRead(e, now);
-        }
+      addCallback(
+          valueFuture,
+          new FutureCallback<V>() {
+            @Override
+            public void onSuccess(V value) {
+              // re-read ticker now that loading has completed
+              long now = map.ticker.read();
+              recordRead(e, now);
+            }
 
-        @Override
-        public void onFailure(Throwable t) {
-        }
-      });
-      addCallback(valueFuture, new FutureCallback<V>() {
-        @Override
-        public void onSuccess(V value) {
-          statsCounter.recordMisses(1);
-        }
+            @Override
+            public void onFailure(Throwable t) {
+            }
+          },
+          directExecutor());
+      addCallback(
+          valueFuture,
+          new FutureCallback<V>() {
+            @Override
+            public void onSuccess(V value) {
+              statsCounter.recordMisses(1);
+            }
 
-        @Override
-        public void onFailure(Throwable t) {
-          statsCounter.recordMisses(1);
-        }
-      });
+            @Override
+            public void onFailure(Throwable t) {
+              statsCounter.recordMisses(1);
+            }
+          },
+          directExecutor());
       return valueFuture;
     }
 
@@ -2353,19 +2359,22 @@ class LocalCache<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V> 
         }
         return value;
       }, directExecutor());
-      addCallback(newValueExists, new FutureCallback<V>() {
-        @Override
-        public void onSuccess(V value) {
-          statsCounter.recordLoadSuccess(loadingValueReference.elapsedNanos());
-          storeLoadedValue(key, hash, loadingValueReference, value);
-        }
+      addCallback(
+          newValueExists,
+          new FutureCallback<V>() {
+            @Override
+            public void onSuccess(V value) {
+              statsCounter.recordLoadSuccess(loadingValueReference.elapsedNanos());
+              storeLoadedValue(key, hash, loadingValueReference, value);
+            }
 
-        @Override
-        public void onFailure(Throwable t) {
-          statsCounter.recordLoadException(loadingValueReference.elapsedNanos());
-          removeLoadingValue(key, hash, loadingValueReference);
-        }
-      });
+            @Override
+            public void onFailure(Throwable t) {
+              statsCounter.recordLoadException(loadingValueReference.elapsedNanos());
+              removeLoadingValue(key, hash, loadingValueReference);
+            }
+          },
+          directExecutor());
       return newValueExists;
     }
 

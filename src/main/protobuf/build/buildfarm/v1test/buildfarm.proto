@@ -526,3 +526,9 @@ message TreeIteratorToken {
 message OperationIteratorToken {
   string operation_name = 1;
 }
+
+message BlobWriteKey {
+  build.bazel.remote.execution.v2.Digest digest = 1;
+
+  string identifier = 2;
+}

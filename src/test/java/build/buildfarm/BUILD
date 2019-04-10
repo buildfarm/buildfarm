@@ -12,10 +12,26 @@ java_library(
     ],
 )
 
+java_library(
+    name = "test-common-grpc",
+    srcs = ["common/grpc/ByteStreamServiceWriter.java"],
+    deps = [
+        "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java",
+        "//3rdparty/jvm/io/grpc:grpc_core",
+        "//3rdparty/jvm/io/grpc:grpc_stub",
+        "//src/main/java/build/buildfarm:common-grpc",
+        "@googleapis//:google_bytestream_bytestream_java_grpc",
+        "@googleapis//:google_bytestream_bytestream_java_proto",
+    ],
+)
+
 java_test(
     name = "common-tests",
     size = "small",
-    srcs = glob(["common/**/*.java"]),
+    srcs = glob(
+        ["common/**/*.java"],
+        exclude=["common/grpc/ByteStreamServiceWriter.java"]),
     test_class = "build.buildfarm.AllTests",
     deps = [
         ":test_runner",
@@ -34,6 +50,7 @@ java_test(
     test_class = "build.buildfarm.AllTests",
     deps = [
         ":test_runner",
+        ":test-common-grpc",
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "//3rdparty/jvm/com/google/truth",
@@ -225,6 +242,7 @@ java_test(
     test_class = "build.buildfarm.AllTests",
     deps = [
         ":test_runner",
+        ":test-common-grpc",
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "//3rdparty/jvm/com/google/truth",
@@ -232,6 +250,7 @@ java_test(
         "//3rdparty/jvm/io/grpc:grpc_stub",
         "//3rdparty/jvm/org/mockito:mockito_core",
         "//src/main/java/build/buildfarm:common",
+        "//src/main/java/build/buildfarm:common-grpc",
         "//src/main/java/build/buildfarm:instance",
         "//src/main/java/build/buildfarm:stub-instance",
         "@googleapis//:google_bytestream_bytestream_java_grpc",

@@ -14,6 +14,8 @@
 
 package build.buildfarm.server;
 
+import static build.buildfarm.common.IOUtils.formatIOError;
+
 import build.buildfarm.common.grpc.TracingMetadataUtils.ServerHeadersInterceptor;
 import build.buildfarm.v1test.BuildFarmServerConfig;
 import com.google.common.io.ByteStreams;
@@ -131,7 +133,10 @@ public class BuildFarmServer {
                                               OptionsParser.HelpVerbosity.LONG));
   }
 
-  public static void main(String[] args) throws Exception {
+  /**
+   * returns success or failure
+   */
+  static boolean serverMain(String[] args) {
     // Only log severe log messages from Netty. Otherwise it logs warnings that look like this:
     //
     // 170714 08:16:28.552:WT 18 [io.grpc.netty.NettyServerHandler.onStreamError] Stream Error
@@ -144,8 +149,9 @@ public class BuildFarmServer {
     List<String> residue = parser.getResidue();
     if (residue.isEmpty()) {
       printUsage(parser);
-      throw new IllegalArgumentException("Missing CONFIG_PATH");
+      return false;
     }
+
     Path configPath = Paths.get(residue.get(0));
     BuildFarmServerOptions options = parser.getOptions(BuildFarmServerOptions.class);
 
@@ -157,9 +163,22 @@ public class BuildFarmServer {
     BuildFarmServer server;
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
       server = new BuildFarmServer(session, toBuildFarmServerConfig(new InputStreamReader(configInputStream), options));
+      configInputStream.close();
+      server.start();
+      server.blockUntilShutdown();
+      server.stop();
+      return true;
+    } catch (IOException e) {
+      System.err.println("error: " + formatIOError(e));
+    } catch (ConfigurationException e) {
+      System.err.println("error: " + e.getMessage());
+    } catch (InterruptedException e) {
+      System.err.println("error: interrupted");
     }
-    server.start();
-    server.blockUntilShutdown();
-    server.stop();
+    return false;
+  }
+
+  public static void main(String[] args) {
+    System.exit(serverMain(args) ? 0 : 1);
   }
 }

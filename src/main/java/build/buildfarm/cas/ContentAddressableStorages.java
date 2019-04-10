@@ -14,25 +14,33 @@
 
 package build.buildfarm.cas;
 
+import static build.buildfarm.common.grpc.Retrier.NO_RETRIES;
 import static com.google.common.collect.Multimaps.synchronizedListMultimap;
+import static com.google.common.util.concurrent.Futures.immediateFuture;
 
+import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.Digest;
-import build.buildfarm.common.grpc.Retrier;
+import build.buildfarm.common.Write;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.v1test.ContentAddressableStorageConfig;
 import build.buildfarm.v1test.GrpcCASConfig;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.MultimapBuilder;
 import com.google.protobuf.ByteString;
+import com.google.common.util.concurrent.ListenableFuture;
 import io.grpc.Channel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
+import java.nio.file.NoSuchFileException;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 public final class ContentAddressableStorages {
   private static Channel createChannel(String target) {
@@ -44,9 +52,8 @@ public final class ContentAddressableStorages {
 
   private static ContentAddressableStorage createGrpcCAS(GrpcCASConfig config) {
     Channel channel = createChannel(config.getTarget());
-    Retrier retrier = Retrier.NO_RETRIES;
     ByteStreamUploader byteStreamUploader
-        = new ByteStreamUploader("", channel, null, 300, Retrier.NO_RETRIES, null);
+        = new ByteStreamUploader("", channel, null, 300, NO_RETRIES, null);
     ListMultimap<Digest, Runnable> onExpirations = synchronizedListMultimap(
         MultimapBuilder
             .hashKeys()
@@ -74,37 +81,11 @@ public final class ContentAddressableStorages {
    */
   public static ContentAddressableStorage casMapDecorator(Map<Digest, ByteString> map) {
     return new ContentAddressableStorage() {
-      @Override
-      public InputStream newInput(Digest digest, long offset) throws IOException {
-        InputStream in = map.get(digest).newInput();
-        in.skip(offset);
-        return in;
-      }
+      final Writes writes = new Writes(this);
 
       @Override
-      public OutputStream newOutput(Digest digest) throws IOException {
-        if (digest.getSizeBytes() == 0 || digest.getSizeBytes() > Integer.MAX_VALUE) {
-          return null;
-        }
-
-        return new ByteArrayOutputStream((int) digest.getSizeBytes()) {
-          boolean hasPut = false;
-
-          @Override
-          public void close() throws IOException {
-            if (count != digest.getSizeBytes()) {
-              throw new IOException(
-                  String.format(
-                      "content size was %d, expected %d",
-                      count,
-                      digest.getSizeBytes()));
-            }
-            if (!hasPut) {
-              map.put(digest, ByteString.copyFrom(buf, 0, count));
-              hasPut = true;
-            }
-          }
-        };
+      public boolean contains(Digest digest) {
+        return map.containsKey(digest);
       }
 
       @Override
@@ -119,22 +100,46 @@ public final class ContentAddressableStorages {
       }
 
       @Override
+      public Write getWrite(Digest digest, UUID uuid) {
+        return writes.get(digest, uuid);
+      }
+
+      @Override
+      public InputStream newInput(Digest digest, long offset) throws IOException {
+        ByteString data = map.get(digest);
+        if (data == null) {
+          throw new NoSuchFileException(digest.getHash());
+        }
+        InputStream in = data.newInput();
+        in.skip(offset);
+        return in;
+      }
+
+      @Override
+      public ListenableFuture<Iterable<Response>> getAllFuture(
+          Iterable<Digest> digests) {
+        return immediateFuture(MemoryCAS.getAll(digests, map::get));
+      }
+
+      @Override
       public Blob get(Digest digest) {
         ByteString data = map.get(digest);
         if (data == null) {
           return null;
         }
-        return new Blob(map.get(digest), digest);
+        return new Blob(data, digest);
       }
 
       @Override
       public void put(Blob blob) {
         map.put(blob.getDigest(), blob.getData());
+
+        writes.getFuture(blob.getDigest()).set(blob.getData());
       }
 
       @Override
       public void put(Blob blob, Runnable onExpiration) {
-        map.put(blob.getDigest(), blob.getData());
+        put(blob);
       }
     };
   }

@@ -14,6 +14,7 @@
 
 package build.buildfarm.instance.stub;
 
+import static build.buildfarm.common.grpc.Retrier.NO_RETRIES;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
@@ -27,6 +28,9 @@ import static org.mockito.Mockito.verifyZeroInteractions;
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionCacheGrpc.ActionCacheImplBase;
 import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
+import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
+import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse.Response;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageImplBase;
 import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
 import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
@@ -35,6 +39,8 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.UpdateActionResultRequest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.Write;
+import build.buildfarm.common.grpc.ByteStreamServiceWriter;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamImplBase;
@@ -42,8 +48,12 @@ import com.google.bytestream.ByteStreamProto.ReadRequest;
 import com.google.bytestream.ByteStreamProto.ReadResponse;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
+import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
+import com.google.bytestream.ByteStreamProto.QueryWriteStatusResponse;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
 import com.google.common.io.ByteStreams;
+import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Empty;
 import io.grpc.Server;
@@ -58,6 +68,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.After;
 import org.junit.Before;
@@ -196,12 +207,20 @@ public class StubInstanceTest {
     AtomicReference<ByteString> writtenContent = new AtomicReference<>();
     serviceRegistry.addService(
         new ByteStreamImplBase() {
+          ByteString content = ByteString.EMPTY;
+          boolean finished = false;
+
+          public void queryWriteStatus(QueryWriteStatusRequest request, StreamObserver<QueryWriteStatusResponse> responseObserver) {
+            responseObserver.onNext(QueryWriteStatusResponse.newBuilder()
+                .setCommittedSize(content.size())
+                .setComplete(finished)
+                .build());
+            responseObserver.onCompleted();
+          }
+
           @Override
           public StreamObserver<WriteRequest> write(StreamObserver<WriteResponse> responseObserver) {
             return new StreamObserver<WriteRequest>() {
-              ByteString content = ByteString.EMPTY;
-              boolean finished = false;
-
               @Override
               public void onNext(WriteRequest request) {
                 checkState(!finished);
@@ -233,29 +252,63 @@ public class StubInstanceTest {
     Instance instance = newStubInstance("outputStream-test");
     String resourceName = "output-stream-test";
     ByteString content = ByteString.copyFromUtf8("test-content");
-    try (OutputStream out = instance.getStreamOutput(resourceName, -1)) {
-      out.write(content.toByteArray());
+    Write operationStreamWrite = instance.getOperationStreamWrite(resourceName);
+    try (OutputStream out = operationStreamWrite.getOutput()) {
+      content.writeTo(out);
     }
     assertThat(writtenContent.get()).isEqualTo(content);
     instance.stop();
   }
 
   @Test
+  public void putAllBlobsUploadsBlobs() throws IOException, InterruptedException {
+    String instanceName = "putAllBlobs-test";
+    serviceRegistry.addService(
+        new ContentAddressableStorageImplBase() {
+          @Override
+          public void batchUpdateBlobs(
+              BatchUpdateBlobsRequest batchRequest,
+              StreamObserver<BatchUpdateBlobsResponse> responseObserver) {
+            checkState(batchRequest.getInstanceName().equals(instanceName));
+            responseObserver.onNext(BatchUpdateBlobsResponse.newBuilder()
+                .addAllResponses(
+                    Iterables.transform(
+                        batchRequest.getRequestsList(),
+                        request -> Response.newBuilder().setDigest(request.getDigest()).build()))
+                .build());
+            responseObserver.onCompleted();
+          }
+        });
+    Instance instance = newStubInstance("putAllBlobs-test");
+    ByteString first = ByteString.copyFromUtf8("first");
+    ByteString last = ByteString.copyFromUtf8("last");
+    ImmutableList<ByteString> blobs = ImmutableList.of(first, last);
+    ImmutableList<Digest> digests = ImmutableList.of(
+        DIGEST_UTIL.compute(first),
+        DIGEST_UTIL.compute(last));
+    assertThat(instance.putAllBlobs(blobs)).containsAllIn(digests);
+  }
+
+  @Test
   public void completedWriteBeforeCloseThrowsOnNextInteraction()
       throws IOException, InterruptedException {
+    String resourceName = "early-completed-output-stream-test";
     AtomicReference<ByteString> writtenContent = new AtomicReference<>();
     serviceRegistry.addService(
         new ByteStreamImplBase() {
+          boolean completed = false;
+          int writtenBytes = 0;
+
           @Override
           public StreamObserver<WriteRequest> write(StreamObserver<WriteResponse> responseObserver) {
             return new StreamObserver<WriteRequest>() {
-              boolean completed = false;
 
               @Override
               public void onNext(WriteRequest request) {
                 if (!completed) {
+                  writtenBytes = request.getData().size();
                   responseObserver.onNext(WriteResponse.newBuilder()
-                      .setCommittedSize(request.getData().size())
+                      .setCommittedSize(writtenBytes)
                       .build());
                   responseObserver.onCompleted();
                   completed = true;
@@ -272,17 +325,31 @@ public class StubInstanceTest {
               }
             };
           }
+
+          @Override
+          public void queryWriteStatus(
+              QueryWriteStatusRequest request,
+              StreamObserver<QueryWriteStatusResponse> responseObserver) {
+            if (request.getResourceName().equals(resourceName)) {
+              responseObserver.onNext(QueryWriteStatusResponse.newBuilder()
+                  .setCommittedSize(writtenBytes)
+                  .setComplete(completed)
+                  .build());
+              responseObserver.onCompleted();
+            } else {
+              responseObserver.onError(Status.NOT_FOUND.asException());
+            }
+          }
         });
     Instance instance = newStubInstance("early-completed-outputStream-test");
-    String resourceName = "early-completed-output-stream-test";
     ByteString content = ByteString.copyFromUtf8("test-content");
     boolean writeThrewException = false;
-    try (OutputStream out = instance.getStreamOutput(resourceName, -1)) {
-      out.write(content.toByteArray());
+    Write operationStreamWrite = instance.getOperationStreamWrite(resourceName);
+    try (OutputStream out = operationStreamWrite.getOutput()) {
+      content.writeTo(out);
       try {
-        out.write(content.toByteArray()); // should throw
+        content.writeTo(out);
       } catch (Exception e) {
-        e.printStackTrace();
         writeThrewException = true;
       }
     }
@@ -305,7 +372,11 @@ public class StubInstanceTest {
     OutputStream out = mock(OutputStream.class);
     IOException ioException = null;
     Instance instance = newStubInstance("input-stream-non-deadline-exceeded");
-    try (InputStream in = instance.newStreamInput("unavailable-blob-name", 0)) {
+    Digest unavailableDigest = Digest.newBuilder()
+        .setHash("unavailable-blob-name")
+        .setSizeBytes(1)
+        .build();
+    try (InputStream in = instance.newBlobInput(unavailableDigest, 0)) {
       ByteStreams.copy(in, out);
     } catch (IOException e) {
       ioException = e;
@@ -342,7 +413,11 @@ public class StubInstanceTest {
         });
     Instance instance = newStubInstance("input-stream-stalled");
     ByteArrayOutputStream out = new ByteArrayOutputStream();
-    try (InputStream in = instance.newStreamInput("delayed-blob-name", 0)) {
+    Digest delayedDigest = Digest.newBuilder()
+        .setHash("delayed-blob-name")
+        .setSizeBytes(1)
+        .build();
+    try (InputStream in = instance.newBlobInput(delayedDigest, 0)) {
       ByteStreams.copy(in, out);
     }
     assertThat(ByteString.copyFrom(out.toByteArray())).isEqualTo(content);
@@ -361,7 +436,11 @@ public class StubInstanceTest {
     OutputStream out = mock(OutputStream.class);
     IOException ioException = null;
     Instance instance = newStubInstance("input-stream-deadline-exceeded");
-    try (InputStream in = instance.newStreamInput("timeout-blob-name", 0)) {
+    Digest timeoutDigest = Digest.newBuilder()
+        .setHash("timeout-blob-name")
+        .setSizeBytes(1)
+        .build();
+    try (InputStream in = instance.newBlobInput(timeoutDigest, 0)) {
       ByteStreams.copy(in, out);
     } catch (IOException e) {
       ioException = e;

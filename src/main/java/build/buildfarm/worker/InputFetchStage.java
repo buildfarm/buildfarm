@@ -14,8 +14,12 @@
 
 package build.buildfarm.worker;
 
+import static java.util.logging.Level.WARNING;
+
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
+import java.io.IOException;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;

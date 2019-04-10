@@ -14,11 +14,13 @@
 
 package build.buildfarm.instance.shard;
 
-import build.buildfarm.instance.Instance.CommittingOutputStream;
+import build.buildfarm.common.Write;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
+import java.io.OutputStream;
+import java.util.concurrent.Executor;
 
-class CommittingNullSink extends CommittingOutputStream {
+class NullWrite extends OutputStream implements Write {
   private final SettableFuture<Long> committedFuture = SettableFuture.create();
   private long committedSize = 0;
 
@@ -37,8 +39,25 @@ class CommittingNullSink extends CommittingOutputStream {
     committedFuture.set(committedSize);
   }
 
+  // Write methods
+
   @Override
-  public ListenableFuture<Long> getCommittedFuture() {
-    return committedFuture;
+  public long getCommittedSize() {
+    return committedSize;
+  }
+
+  @Override
+  public boolean isComplete() {
+    return committedFuture.isDone();
+  }
+
+  @Override
+  public OutputStream getOutput() {
+    return this;
+  }
+
+  @Override
+  public void addListener(Runnable runnable, Executor executor) {
+    committedFuture.addListener(runnable, executor);
   }
 }

@@ -75,6 +75,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
+import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 
@@ -387,7 +388,7 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   private void insertFile(Digest digest, Path file) throws IOException {
-    OutputStream out = execFileSystem.getStorage().newOutput(digest);
+    OutputStream out = execFileSystem.getStorage().getWrite(digest, UUID.randomUUID()).getOutput();
     if (out != null) {
       try (InputStream in = Files.newInputStream(file)) {
         com.google.common.base.Preconditions.checkNotNull(in);
@@ -579,7 +580,7 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
-  public OutputStream getStreamOutput(String name) {
+  public OutputStream getOperationStreamOutput(String name) {
     throw new UnsupportedOperationException();
   }
 }

@@ -18,6 +18,7 @@ import static build.buildfarm.instance.shard.Util.correctMissingBlob;
 import static com.google.common.util.concurrent.Futures.addCallback;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.transform;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
@@ -84,7 +85,7 @@ class RemoteInputStreamFactory implements InputStreamFactory {
     try {
       Instance instance = workerStub(worker);
 
-      InputStream input = instance.newStreamInput(instance.getBlobName(blobDigest), offset);
+      InputStream input = instance.newBlobInput(blobDigest, offset);
       // ensure that if the blob cannot be fetched, that we throw here
       input.available();
       if (Thread.interrupted()) {
@@ -134,62 +135,67 @@ class RemoteInputStreamFactory implements InputStreamFactory {
           (foundOnWorkers) -> {
             Iterables.addAll(workersList, foundOnWorkers);
             return workersList;
-          });
+          },
+          directExecutor());
     } else {
       populatedWorkerListFuture = immediateFuture(workersList);
     }
     SettableFuture<InputStream> inputStreamFuture = SettableFuture.create();
-    addCallback(populatedWorkerListFuture, new WorkersCallback(rand) {
-      boolean triedCheck = emptyWorkerList;
+    addCallback(
+        populatedWorkerListFuture,
+        new WorkersCallback(rand) {
+          boolean triedCheck = emptyWorkerList;
 
-      @Override
-      public void onQueue(Deque<String> workers) {
-        Set<String> locationSet = Sets.newHashSet(workers);
-        boolean complete = false;
-        while (!complete && !workers.isEmpty()) {
-          try {
-            inputStreamFuture.set(fetchBlobFromRemoteWorker(blobDigest, workers, offset));
-            complete = true;
-          } catch (IOException e) {
-            if (workers.isEmpty()) {
-              if (triedCheck) {
-                onFailure(e);
-                return;
-              }
-              triedCheck = true;
-
-              workersList.clear();
+          @Override
+          public void onQueue(Deque<String> workers) {
+            Set<String> locationSet = Sets.newHashSet(workers);
+            boolean complete = false;
+            while (!complete && !workers.isEmpty()) {
               try {
-                ListenableFuture<List<String>> checkedWorkerListFuture = transform(
-                    correctMissingBlob(backplane, remoteWorkers, locationSet, RemoteInputStreamFactory.this::workerStub, blobDigest, newDirectExecutorService()),
-                    (foundOnWorkers) -> {
-                      Iterables.addAll(workersList, foundOnWorkers);
-                      return workersList;
-                    });
-                addCallback(checkedWorkerListFuture, this);
+                inputStreamFuture.set(fetchBlobFromRemoteWorker(blobDigest, workers, offset));
                 complete = true;
-              } catch (IOException checkException) {
+              } catch (IOException e) {
+                if (workers.isEmpty()) {
+                  if (triedCheck) {
+                    onFailure(e);
+                    return;
+                  }
+                  triedCheck = true;
+
+                  workersList.clear();
+                  try {
+                    ListenableFuture<List<String>> checkedWorkerListFuture = transform(
+                        correctMissingBlob(backplane, remoteWorkers, locationSet, RemoteInputStreamFactory.this::workerStub, blobDigest, newDirectExecutorService()),
+                        (foundOnWorkers) -> {
+                          Iterables.addAll(workersList, foundOnWorkers);
+                          return workersList;
+                        },
+                        directExecutor());
+                    addCallback(checkedWorkerListFuture, this, directExecutor());
+                    complete = true;
+                  } catch (IOException checkException) {
+                    complete = true;
+                    onFailure(checkException);
+                  }
+                }
+              } catch (InterruptedException e) {
                 complete = true;
-                onFailure(checkException);
+                onFailure(e);
               }
             }
-          } catch (InterruptedException e) {
-            complete = true;
-            onFailure(e);
           }
-        }
-      }
 
-      @Override
-      public void onFailure(Throwable t) {
-        Status status = Status.fromThrowable(t);
-        if (status.getCode() == Code.NOT_FOUND) {
-          inputStreamFuture.setException(new NoSuchFileException(DigestUtil.toString(blobDigest)));
-        } else {
-          inputStreamFuture.setException(t);
-        }
-      }
-    });
+          @Override
+          public void onFailure(Throwable t) {
+            Status status = Status.fromThrowable(t);
+            if (status.getCode() == Code.NOT_FOUND) {
+              inputStreamFuture.setException(new NoSuchFileException(DigestUtil.toString(blobDigest)));
+            } else {
+              inputStreamFuture.setException(t);
+            }
+          }
+        },
+        directExecutor());
     try {
       return inputStreamFuture.get();
     } catch (ExecutionException e) {

@@ -54,6 +54,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -131,7 +132,7 @@ class CFCExecFileSystem implements ExecFileSystem {
 
   @Override
   public OutputStream newOutput(Digest digest) throws IOException {
-    return fileCache.newOutput(digest);
+    return fileCache.getWrite(digest, UUID.randomUUID()).getOutput();
   }
 
   private ListenableFuture<Void> put(

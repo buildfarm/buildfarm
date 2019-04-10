@@ -40,12 +40,12 @@ import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorages;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
-import build.buildfarm.common.function.InterruptingPredicate;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watchdog;
 import build.buildfarm.common.Watcher;
+import build.buildfarm.common.Write;
 import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.instance.OperationsMap;
 import build.buildfarm.instance.WatchFuture;
@@ -287,13 +287,15 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  public CommittingOutputStream getStreamOutput(String name, long expectedSize) {
-    return getSource(name).getOutputStream();
+  public Write getOperationStreamWrite(String name) {
+    throw new UnsupportedOperationException(); // needs source->write conversion
   }
 
   @Override
-  public InputStream newStreamInput(String name, long offset) {
-    return getSource(name).openStream();
+  public InputStream newOperationStreamInput(String name, long offset) throws IOException {
+    InputStream in = getSource(name).openStream();
+    in.skip(offset);
+    return in;
   }
 
   @Override
@@ -449,6 +451,15 @@ public class MemoryInstance extends AbstractServerInstance {
     new Thread(requeuer).start();
   }
 
+  List<Directory> getCompleteTree(Digest rootDigest) {
+    ImmutableList.Builder<Directory> directories = ImmutableList.builder();
+    String pageToken = "";
+    do {
+      pageToken = getTree(rootDigest, 1024, pageToken, directories);
+    } while (!pageToken.isEmpty());
+    return directories.build();
+  }
+
   @Override
   protected boolean matchOperation(Operation operation) throws InterruptedException {
     ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
@@ -460,10 +471,12 @@ public class MemoryInstance extends AbstractServerInstance {
     Command command = getUnchecked(expect(action.getCommandDigest(), Command.parser(), newDirectExecutorService()));
     Preconditions.checkState(command != null, "command not found");
 
+    Iterable<Directory> directories = getCompleteTree(action.getInputRootDigest());
+
     QueuedOperation queuedOperation = QueuedOperation.newBuilder()
         .setAction(action)
         .setCommand(command)
-        // .addAllDirectories(directories)
+        .addAllDirectories(directories)
         .build();
     ByteString queuedOperationBlob = queuedOperation.toByteString();
     Digest queuedOperationDigest = getDigestUtil().compute(queuedOperationBlob);

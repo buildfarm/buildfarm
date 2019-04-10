@@ -16,15 +16,20 @@ package build.buildfarm.instance.stub;
 
 import static build.buildfarm.common.grpc.Retrier.NO_RETRIES;
 import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.transform;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.lang.String.format;
 import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.ActionCacheGrpc;
 import build.bazel.remote.execution.v2.ActionCacheGrpc.ActionCacheBlockingStub;
 import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.BatchReadBlobsRequest;
+import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
+import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
+import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest.Request;
+import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageBlockingStub;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageFutureStub;
@@ -45,11 +50,14 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.bazel.remote.execution.v2.UpdateActionResultRequest;
+import build.buildfarm.common.Write;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.Watcher;
+import build.buildfarm.common.function.InterruptingPredicate;
 import build.buildfarm.common.grpc.ByteStreamHelper;
 import build.buildfarm.common.grpc.Retrier;
+import build.buildfarm.common.grpc.StubWriteOutputStream;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Utils;
 import build.buildfarm.v1test.OperationQueueGrpc;
@@ -62,40 +70,42 @@ import com.google.bytestream.ByteStreamGrpc.ByteStreamBlockingStub;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamStub;
 import com.google.bytestream.ByteStreamProto.ReadRequest;
 import com.google.bytestream.ByteStreamProto.ReadResponse;
-import com.google.bytestream.ByteStreamProto.WriteRequest;
-import com.google.bytestream.ByteStreamProto.WriteResponse;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Iterators;
-import com.google.common.util.concurrent.ListeningScheduledExecutorService;
+import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.common.util.concurrent.SettableFuture;
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.longrunning.CancelOperationRequest;
 import com.google.longrunning.DeleteOperationRequest;
 import com.google.longrunning.GetOperationRequest;
 import com.google.longrunning.ListOperationsRequest;
 import com.google.longrunning.ListOperationsResponse;
+import com.google.longrunning.Operation;
 import com.google.longrunning.OperationsGrpc;
 import com.google.longrunning.OperationsGrpc.OperationsBlockingStub;
-import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.rpc.Code;
+import io.grpc.Channel;
 import io.grpc.ManagedChannel;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
+import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Iterator;
-import java.util.concurrent.ExecutionException;
+import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Consumer;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
 
@@ -105,14 +115,15 @@ public class StubInstance implements Instance {
   private static final long DEFAULT_DEADLINE_DAYS = 100 * 365;
 
   private final String name;
+  private final String identifier;
   private final DigestUtil digestUtil;
   private final ManagedChannel channel;
   private final long deadlineAfter;
   private final TimeUnit deadlineAfterUnits;
   private final Retrier retrier;
   private final @Nullable ListeningScheduledExecutorService retryService;
-  private final String identifier;
   private boolean isStopped = false;
+  private final int maxBatchUpdateBlobsSize = 3 * 1024 * 1024;
 
   public StubInstance(
       String name,
@@ -147,17 +158,21 @@ public class StubInstance implements Instance {
       Retrier retrier,
       @Nullable ListeningScheduledExecutorService retryService) {
     this.name = name;
+    this.identifier = identifier;
     this.digestUtil = digestUtil;
     this.channel = channel;
     this.deadlineAfter = deadlineAfter;
     this.deadlineAfterUnits = deadlineAfterUnits;
     this.retrier = retrier;
     this.retryService = retryService;
-    this.identifier = identifier;
+  }
+
+  public Channel getChannel() {
+    return channel;
   }
 
   // no deadline for this
-  private ExecutionStub newEXStub() {
+  private ExecutionStub newExStub() {
     return ExecutionGrpc.newStub(channel);
   }
 
@@ -170,7 +185,16 @@ public class StubInstance implements Instance {
             }
           });
 
-  private final Supplier<ContentAddressableStorageBlockingStub> contentAddressableStorageBlockingStub =
+  private final Supplier<ContentAddressableStorageFutureStub> casFutureStub =
+      Suppliers.memoize(
+          new Supplier<ContentAddressableStorageFutureStub>() {
+            @Override
+            public ContentAddressableStorageFutureStub get() {
+              return ContentAddressableStorageGrpc.newFutureStub(channel);
+            }
+          });
+
+  private final Supplier<ContentAddressableStorageBlockingStub> casBlockingStub =
       Suppliers.memoize(
           new Supplier<ContentAddressableStorageBlockingStub>() {
             @Override
@@ -295,167 +319,18 @@ public class StubInstance implements Instance {
         executor);
   }
 
-  /** expectedSize == -1 for unlimited */
-  @Override
-  public CommittingOutputStream getStreamOutput(String name, long expectedSize) {
-    throwIfStopped();
-    if (expectedSize == 0) {
-      return new CommittingOutputStream() {
-        @Override
-        public void close() {
-        }
-
-        void writeLengthFail(int len) throws IOException {
-          throw new IOException("write of " + len + " would exceed expectedSize by " + len);
-        }
-
-        @Override
-        public void write(int b) throws IOException {
-          writeLengthFail(1);
-        }
-
-        @Override
-        public void write(byte[] b) throws IOException {
-          writeLengthFail(b.length);
-        }
-
-        @Override
-        public void write(byte[] b, int off, int len) throws IOException {
-          writeLengthFail(len);
-        }
-
-        @Override
-        public ListenableFuture<Long> getCommittedFuture() {
-          return immediateFuture(0l);
-        }
-      };
-    }
-    return new CommittingOutputStream() {
-      boolean closed = false;
-      String resourceName = name;
-      long writtenBytes = 0;
-      SettableFuture<WriteResponse> writeResponseFuture = SettableFuture.create();
-      StreamObserver<WriteRequest> requestObserver = newBSStub()
-          .write(
-              new StreamObserver<WriteResponse>() {
-                @Override
-                public void onNext(WriteResponse response) {
-                  writeResponseFuture.set(response);
-                }
-
-                @Override
-                public void onError(Throwable t) {
-                  writeResponseFuture.setException(
-                      Status.fromThrowable(t).asRuntimeException());
-                }
-
-                @Override
-                public void onCompleted() {
-                  if (!closed && !writeResponseFuture.isDone()) {
-                    logger.severe("Server closed connection before output stream for " + resourceName + " at " + writtenBytes);
-                    // FIXME(werkt) better error, status
-                    writeResponseFuture.setException(
-                        new RuntimeException("Server closed connection before output stream."));
-                  }
-                }
-              }
-          );
-
-      private long checkWriteResponse() throws IOException {
-        try {
-          return writeResponseFuture.get().getCommittedSize();
-        } catch (ExecutionException e) {
-          if (e.getCause() instanceof IOException) {
-            throw (IOException) e.getCause();
-          }
-          throw new IOException(e.getCause());
-        } catch (InterruptedException e) {
-          throw new IOException(e);
-        }
-      }
-
-      @Override
-      public void close() throws IOException {
-        boolean finish = !closed && !writeResponseFuture.isDone();
-        if (finish) {
-          closed = true;
-          if (expectedSize < 0 || writtenBytes < expectedSize) {
-            WriteRequest.Builder builder = WriteRequest.newBuilder()
-                .setFinishWrite(true);
-            if (writtenBytes == 0) {
-              builder.setResourceName(resourceName);
-            }
-            logger.fine(format("writing to %s(%s): finish request", resourceName, identifier));
-            requestObserver.onNext(builder.build());
-          }
-          requestObserver.onCompleted();
-        }
-        if (checkWriteResponse() != writtenBytes) {
-          throw new IOException("committed_size did not match bytes written");
-        }
-      }
-
-      @Override
-      public void write(int b) throws IOException {
-        byte[] buf = new byte[1];
-        buf[0] = (byte) b;
-        write(buf);
-      }
-
-      @Override
-      public void write(byte[] b) throws IOException {
-        write(b, 0, b.length);
-      }
-
-      boolean isFinishWrite(long sizeAfterWrite) {
-        return expectedSize < 0 ? false : (sizeAfterWrite >= expectedSize);
-      }
-
-      WriteRequest createWriteRequest(ByteString chunk, boolean finishWrite) {
-        WriteRequest.Builder builder = WriteRequest.newBuilder()
-            .setData(chunk)
-            .setWriteOffset(writtenBytes)
-            .setFinishWrite(finishWrite);
-        if (writtenBytes == 0) {
-          builder.setResourceName(resourceName);
-        }
-        return builder.build();
-      }
-
-      @Override
-      public void write(byte[] b, int off, int len) throws IOException {
-        if (closed) {
-          throw new IOException("stream is closed");
-        }
-        if (writeResponseFuture.isDone()) {
-          long committedSize = checkWriteResponse();
-          throw new IOException("write response with committed_size " + committedSize + " received before write");
-        }
-        if (expectedSize >= 0 && writtenBytes + len > expectedSize) {
-          throw new IOException("write of " + len + " would exceed expectedSize by " + (writtenBytes + len - expectedSize));
-        }
-        WriteRequest request = createWriteRequest(
-            ByteString.copyFrom(b, off, len),
-            isFinishWrite(writtenBytes + len));
-        if (writtenBytes == 0) {
-          logger.fine(format("writing to %s(%s)", resourceName, identifier));
-        }
-        requestObserver.onNext(request);
-        writtenBytes += len;
-      }
-
-      @Override
-      public ListenableFuture<Long> getCommittedFuture() {
-        return transform(writeResponseFuture, (writeResponse) -> writeResponse.getCommittedSize());
-      }
-    };
+  public Write getOperationStreamWrite(String name) {
+    return getWrite(name, StubWriteOutputStream.UNLIMITED_EXPECTED_SIZE, /* autoflush=*/ true);
   }
 
   @Override
-  public InputStream newStreamInput(String name, long offset) {
-    throwIfStopped();
+  public InputStream newOperationStreamInput(String resourceName, long offset) {
+    return newInput(resourceName, offset);
+  }
+
+  InputStream newInput(String resourceName, long offset) {
     return ByteStreamHelper.newInput(
-        name,
+        resourceName,
         offset,
         this::newBSStub,
         retrier::newBackoff,
@@ -499,14 +374,91 @@ public class StubInstance implements Instance {
             });
   }
 
-  @Override
-  public ChunkObserver getWriteBlobObserver(Digest blobDigest) {
-    throw new UnsupportedOperationException();
+  public InputStream newBlobInput(Digest digest, long offset) {
+    return newInput(getBlobName(digest), offset);
   }
 
   @Override
-  public ChunkObserver getWriteOperationStreamObserver(String operationStream) {
-    throw new UnsupportedOperationException();
+  public ListenableFuture<Iterable<Response>> getAllBlobsFuture(
+      Iterable<Digest> digests) {
+    return transform(
+        casFutureStub.get()
+            .batchReadBlobs(BatchReadBlobsRequest.newBuilder()
+                .setInstanceName(getName())
+                .addAllDigests(digests)
+                .build()),
+        (response) -> response.getResponsesList(),
+        directExecutor());
+  }
+
+  @Override
+  public boolean containsBlob(Digest digest) {
+    try {
+      return Iterables.isEmpty(findMissingBlobs(ImmutableList.of(digest), directExecutor()).get());
+    } catch (ExecutionException e) {
+      Throwable cause = e.getCause();
+      if (cause instanceof RuntimeException) {
+        throw (RuntimeException) cause;
+      }
+      throw new UncheckedExecutionException(e);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      return false;
+    }
+  }
+
+  Write getWrite(String resourceName, long expectedSize, boolean autoflush) {
+    return new StubWriteOutputStream(
+        bsBlockingStub,
+        this::newBSStub,
+        resourceName,
+        expectedSize,
+        autoflush);
+  }
+
+  /**
+   * no express synchronization, callers are expected to register listeners
+   * prior to initiating writes
+   */
+  @Override
+  public Write getBlobWrite(Digest digest, UUID uuid) {
+    String resourceName = ByteStreamUploader.getResourceName(uuid, getName(), digest);
+    return getWrite(resourceName, digest.getSizeBytes(), /* autoflush=*/ false);
+  }
+
+  @Override
+  public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs) {
+    long totalSize = 0;
+    ImmutableList.Builder<Request> requests = ImmutableList.builder();
+    for (ByteString blob : blobs) {
+      checkState(totalSize + blob.size() <= maxBatchUpdateBlobsSize);
+      requests.add(Request.newBuilder()
+          .setDigest(digestUtil.compute(blob))
+          .setData(blob)
+          .build());
+      totalSize += blob.size();
+    }
+    BatchUpdateBlobsRequest batchRequest = BatchUpdateBlobsRequest.newBuilder()
+        .setInstanceName(getName())
+        .addAllRequests(requests.build())
+        .build();
+    BatchUpdateBlobsResponse batchResponse = casBlockingStub.get()
+        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
+        .batchUpdateBlobs(batchRequest);
+    PutAllBlobsException exception = null;
+    for (BatchUpdateBlobsResponse.Response response : batchResponse.getResponsesList()) {
+      com.google.rpc.Status status = response.getStatus();
+      if (Code.forNumber(status.getCode()) != Code.OK) {
+        if (exception == null) {
+          exception = new PutAllBlobsException();
+        }
+        exception.addFailedResponse(response);
+      }
+    }
+    if (exception != null) {
+      throw exception;
+    }
+    return Iterables.transform(batchResponse.getResponsesList(), (response) -> response.getDigest());
   }
 
   @Override
@@ -516,8 +468,7 @@ public class StubInstance implements Instance {
       String pageToken,
       ImmutableList.Builder<Directory> directories) {
     throwIfStopped();
-    Iterator<GetTreeResponse> replies = contentAddressableStorageBlockingStub
-        .get()
+    Iterator<GetTreeResponse> replies = casBlockingStub.get()
         .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
         .getTree(GetTreeRequest.newBuilder()
             .setInstanceName(getName())
@@ -599,7 +550,7 @@ public class StubInstance implements Instance {
         .setName(operationName)
         .build();
     SettableFuture<Void> result = SettableFuture.create();
-    newEXStub().waitExecution(
+    newExStub().waitExecution(
         request,
         new StreamObserver<Operation>() {
           @Override

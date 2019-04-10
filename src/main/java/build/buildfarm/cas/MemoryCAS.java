@@ -14,32 +14,51 @@
 
 package build.buildfarm.cas;
 
+import static com.google.common.util.concurrent.Futures.immediateFuture;
+import static java.util.logging.Level.SEVERE;
+
+import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.Write;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Maps;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.protobuf.ByteString;
-import java.io.ByteArrayOutputStream;
+import com.google.rpc.Code;
+import com.google.rpc.Status;
+import io.grpc.protobuf.StatusProto;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.NoSuchFileException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.logging.Logger;
 
 public class MemoryCAS implements ContentAddressableStorage {
   private static final Logger logger = Logger.getLogger(MemoryCAS.class.getName());
 
-  private final long maxSizeInBytes;
-  private Consumer<Digest> onPut;
+  static final Status OK = Status.newBuilder()
+      .setCode(Code.OK.getNumber())
+      .build();
 
-  private final Map<Digest, Entry> storage = new HashMap<>();
-  private final Map<Digest, Object> mutexes = new HashMap<>();
-  private final Entry header = new SentinelEntry();
-  private transient long sizeInBytes = 0;
+  static final Status NOT_FOUND = Status.newBuilder()
+      .setCode(Code.NOT_FOUND.getNumber())
+      .build();
+
+  private final Writes writes = new Writes(this);
+  private final long maxSizeInBytes;
+  private final Consumer<Digest> onPut;
+  private final Map<Digest, Entry> storage;
+  private final Entry header;
+  private long sizeInBytes;
 
   public MemoryCAS(long maxSizeInBytes) {
     this(maxSizeInBytes, (digest) -> {});
@@ -48,6 +67,15 @@ public class MemoryCAS implements ContentAddressableStorage {
   public MemoryCAS(long maxSizeInBytes, Consumer<Digest> onPut) {
     this.maxSizeInBytes = maxSizeInBytes;
     this.onPut = onPut;
+    sizeInBytes = 0;
+    header = new SentinelEntry();
+    header.before = header.after = header;
+    storage = Maps.newHashMap();
+  }
+
+  @Override
+  public synchronized boolean contains(Digest digest) {
+    return get(digest) != null;
   }
 
   @Override
@@ -55,25 +83,11 @@ public class MemoryCAS implements ContentAddressableStorage {
     ImmutableList.Builder<Digest> missing = ImmutableList.builder();
     // incur access use of the digest
     for (Digest digest : digests) {
-      if (digest.getSizeBytes() != 0 && get(digest) == null) {
+      if (digest.getSizeBytes() != 0 && !contains(digest)) {
         missing.add(digest);
       }
     }
     return missing.build();
-  }
-
-  @Override
-  public synchronized Blob get(Digest digest) {
-    if (digest.getSizeBytes() == 0) {
-      throw new IllegalArgumentException("Cannot fetch empty blob");
-    }
-
-    Entry e = storage.get(digest);
-    if (e == null) {
-      return null;
-    }
-    e.recordAccess(header);
-    return e.value;
   }
 
   @Override
@@ -90,33 +104,78 @@ public class MemoryCAS implements ContentAddressableStorage {
     if (blob == null) {
       throw new NoSuchFileException(DigestUtil.toString(digest));
     }
-    return blob.getData().substring((int) offset).newInput();
+    InputStream in = blob.getData().newInput();
+    in.skip(offset);
+    return in;
   }
 
   @Override
-  public OutputStream newOutput(Digest digest) throws IOException {
-    if (digest.getSizeBytes() == 0 || digest.getSizeBytes() > Integer.MAX_VALUE) {
-      return null;
+  public ListenableFuture<Iterable<Response>> getAllFuture(Iterable<Digest> digests) {
+    return immediateFuture(getAll(digests));
+  }
+
+  synchronized Iterable<Response> getAll(Iterable<Digest> digests) {
+    return getAll(digests, (digest) -> {
+      Blob blob = get(digest);
+      if (blob == null) {
+        return null;
+      }
+      return blob.getData();
+    });
+  }
+
+  public static Iterable<Response> getAll(
+      Iterable<Digest> digests,
+      Function<Digest, ByteString> blobGetter) {
+    ImmutableList.Builder<Response> responses =
+        ImmutableList.builder();
+    for (Digest digest : digests) {
+      responses.add(getResponse(digest, blobGetter));
+    }
+    return responses.build();
+  }
+
+  private static Status statusFromThrowable(Throwable t) {
+    Status status = StatusProto.fromThrowable(t);
+    if (status == null) {
+      status = Status.newBuilder()
+          .setCode(io.grpc.Status.fromThrowable(t).getCode().value())
+          .build();
+    }
+    return status;
+  }
+
+  public static Response getResponse(Digest digest, Function<Digest, ByteString> blobGetter) {
+    Response.Builder response = Response.newBuilder()
+        .setDigest(digest);
+    try {
+      ByteString blob = blobGetter.apply(digest);
+      if (blob == null) {
+        response.setStatus(NOT_FOUND);
+      } else {
+        response
+            .setData(blob)
+            .setStatus(OK);
+      }
+    } catch (Throwable t) {
+      logger.log(SEVERE, "error getting " + DigestUtil.toString(digest), t);
+      response.setStatus(statusFromThrowable(t));
+    }
+    return response.build();
+  }
+
+  @Override
+  public synchronized Blob get(Digest digest) {
+    if (digest.getSizeBytes() == 0) {
+      throw new IllegalArgumentException("Cannot fetch empty blob");
     }
 
-    return new ByteArrayOutputStream((int) digest.getSizeBytes()) {
-      boolean hasPut = false;
-
-      @Override
-      public void close() throws IOException {
-        if (count != digest.getSizeBytes()) {
-          throw new IOException(
-              String.format(
-                  "content size was %d, expected %d",
-                  count,
-                  digest.getSizeBytes()));
-        }
-        if (!hasPut) {
-          put(new Blob(ByteString.copyFrom(buf, 0, count), digest));
-          hasPut = true;
-        }
-      }
-    };
+    Entry e = storage.get(digest);
+    if (e == null) {
+      return null;
+    }
+    e.recordAccess(header);
+    return e.value;
   }
 
   private long size() {
@@ -127,6 +186,11 @@ public class MemoryCAS implements ContentAddressableStorage {
       e = e.before;
     }
     return count;
+  }
+
+  @Override
+  public Write getWrite(Digest digest, UUID uuid) {
+    return writes.get(digest, uuid);
   }
 
   @Override
@@ -168,6 +232,8 @@ public class MemoryCAS implements ContentAddressableStorage {
     createEntry(blob, onExpiration);
 
     storage.put(blob.getDigest(), header.before);
+
+    writes.getFuture(blob.getDigest()).set(blob.getData());
   }
 
   private void createEntry(Blob blob, Runnable onExpiration) {

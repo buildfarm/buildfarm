@@ -14,15 +14,20 @@
 
 package build.buildfarm.cas;
 
+import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
+import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.OutputStreamFactory;
 import build.buildfarm.common.ThreadSafety.ThreadSafe;
-import build.bazel.remote.execution.v2.Digest;
+import build.buildfarm.common.Write;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.protobuf.ByteString;
+import java.io.IOException;
 import java.io.InputStream;
+import java.util.UUID;
 
-public interface ContentAddressableStorage extends InputStreamFactory, OutputStreamFactory {
+public interface ContentAddressableStorage extends InputStreamFactory {
   /**
    * Blob storage for the CAS. This class should be used at all times when interacting with
    * complete blobs in order to cut down on independent digest computation.
@@ -58,6 +63,10 @@ public interface ContentAddressableStorage extends InputStreamFactory, OutputStr
     }
   }
 
+  /** Indicates presence in the CAS for a single digest. */
+  @ThreadSafe
+  boolean contains(Digest digest);
+
   /** Indicates presence in the CAS for a sequence of digests. */
   @ThreadSafe
   Iterable<Digest> findMissingBlobs(Iterable<Digest> digests) throws InterruptedException;
@@ -65,6 +74,15 @@ public interface ContentAddressableStorage extends InputStreamFactory, OutputStr
   /** Retrieve a value from the CAS. */
   @ThreadSafe
   Blob get(Digest digest);
+
+  /** Retrieve a set of blobs from the CAS represented by a future. */
+  ListenableFuture<Iterable<Response>> getAllFuture(Iterable<Digest> digests);
+
+  @ThreadSafe
+  InputStream newInput(Digest digest, long offset) throws IOException;
+
+  @ThreadSafe
+  Write getWrite(Digest digest, UUID uuid);
 
   /** Insert a blob into the CAS. */
   @ThreadSafe

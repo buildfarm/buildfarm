@@ -158,7 +158,7 @@ class CASFileCacheTest {
     ByteString blob = ByteString.copyFromUtf8("");
     Digest blobDigest = DIGEST_UTIL.compute(blob);
     // supply an empty input stream if called for test clarity
-    when(mockInputStreamFactory.newInput(blobDigest, 0))
+    when(mockInputStreamFactory.newInput(blobDigest, /* offset=*/ 0))
         .thenReturn(ByteString.EMPTY.newInput());
     try {
       fileCache.put(blobDigest, false);

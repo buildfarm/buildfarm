@@ -37,6 +37,9 @@ import com.google.common.util.concurrent.ListenableScheduledFuture;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
+import build.bazel.remote.execution.v2.Digest;
+import build.buildfarm.common.grpc.Retrier;
+import build.buildfarm.common.grpc.RetryException;
 import io.grpc.CallCredentials;
 import io.grpc.CallOptions;
 import io.grpc.Channel;
@@ -113,15 +116,6 @@ public class ByteStreamUploader {
     this.callTimeoutSecs = callTimeoutSecs;
     this.retrier = retrier;
     this.retryService = retryService;
-  }
-
-  public static String getResourceName(String upload, @Nullable String instanceName, Digest digest) {
-    String resourceName =
-        format("uploads/%s/blobs/%s", upload, DigestUtil.toString(digest));
-    if (!Strings.isNullOrEmpty(instanceName)) {
-      resourceName = instanceName + "/" + resourceName;
-    }
-    return resourceName;
   }
 
   /**
@@ -311,6 +305,17 @@ public class ByteStreamUploader {
     newUpload.start();
   }
 
+  public static String getResourceName(UUID uuid, String instanceName, Digest digest) {
+    String resourceName =
+        format(
+            "uploads/%s/blobs/%s/%d",
+            uuid, digest.getHash(), digest.getSizeBytes());
+    if (!Strings.isNullOrEmpty(instanceName)) {
+      resourceName = instanceName + "/" + resourceName;
+    }
+    return resourceName;
+  }
+
   private static class AsyncUpload {
 
     interface Listener {
@@ -343,16 +348,12 @@ public class ByteStreamUploader {
       this.listener = listener;
     }
 
-    private String newResourceName(Digest digest) {
-      return getResourceName(UUID.randomUUID().toString(), instanceName, digest);
-    }
-
     void start() {
       CallOptions callOptions =
           CallOptions.DEFAULT
               .withCallCredentials(callCredentials)
               .withDeadlineAfter(callTimeoutSecs, SECONDS);
-      call = channel.newCall(ByteStreamGrpc.METHOD_WRITE, callOptions);
+      call = channel.newCall(ByteStreamGrpc.getWriteMethod(), callOptions);
 
       ClientCall.Listener<WriteResponse> callListener =
           new ClientCall.Listener<WriteResponse>() {
@@ -420,6 +421,10 @@ public class ByteStreamUploader {
                   }
                 }
               }
+            }
+
+            private String newResourceName(Digest digest) {
+              return getResourceName(UUID.randomUUID(), instanceName, digest);
             }
           };
       call.start(callListener, new Metadata());

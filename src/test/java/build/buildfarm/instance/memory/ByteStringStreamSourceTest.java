@@ -15,6 +15,7 @@
 package build.buildfarm.instance.memory;
 
 import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.eq;
@@ -37,7 +38,10 @@ public class ByteStringStreamSourceTest {
   public void closeCallsCommittedFuture() throws IOException {
     FutureCallback<Long> mockCallback = mock(FutureCallback.class);
     ByteStringStreamSource source = new ByteStringStreamSource();
-    Futures.addCallback(source.getOutputStream().getCommittedFuture(), mockCallback);
+    Futures.addCallback(
+        source.getOutputStream().getCommittedFuture(),
+        mockCallback,
+        directExecutor());
     verify(mockCallback, never()).onSuccess(any(Long.class));
     source.getOutputStream().close();
     verify(mockCallback, times(1)).onSuccess(eq(new Long(0)));

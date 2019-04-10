@@ -1,5 +1,9 @@
 workspace(name = "build_buildfarm")
 
+load("//3rdparty:workspace.bzl", "maven_dependencies")
+
+maven_dependencies()
+
 load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_jar")
 
@@ -7,18 +11,40 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_jar")
 http_archive(
     name = "com_google_protobuf",
     patch_args = ["-p1"],
-    patches = ["//third_party/protobuf:4fcb36c.patch"],
-    sha256 = "d7a221b3d4fb4f05b7473795ccea9e05dab3b8721f6286a95fffbffc2d926f8b",
-    strip_prefix = "protobuf-3.6.1",
-    urls = ["https://github.com/google/protobuf/archive/v3.6.1.zip"],
+    patches = [
+        "//third_party/com_google_protobuf:b6375e03aa.patch",
+        "//third_party/com_google_protobuf:7e1d9e419e.patch",
+        "//third_party/com_google_protobuf:qualified_error_prone_annotations.patch",
+    ],
+    sha256 = "b50be32ea806bdb948c22595ba0742c75dc2f8799865def414cf27ea5706f2b7",
+    strip_prefix = "protobuf-3.7.0",
+    urls = ["https://github.com/google/protobuf/archive/v3.7.0.zip"],
 )
+
+load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
+
+protobuf_deps()
 
 # Needed for @grpc_java//compiler:grpc_java_plugin.
 http_archive(
-    name = "grpc_java",
-    sha256 = "20a35772b20d8194854f6d149324f971472b7acc1a76a0969a048c4c02a1da0d",
-    strip_prefix = "grpc-java-1.8.0",
-    urls = ["https://github.com/grpc/grpc-java/archive/v1.8.0.zip"],
+    name = "io_grpc_grpc_java",
+    patch_args = ["-p1"],
+    patches = [
+        "//third_party/io_grpc_grpc_java:054def3c63.patch",
+        "//third_party/io_grpc_grpc_java:0959a846c8.patch",
+        "//third_party/io_grpc_grpc_java:952a767b9c.patch",
+        "//third_party/io_grpc_grpc_java:3c24dc6fe1.patch",
+    ],
+    sha256 = "f5d0bdebc2a50d0e28f0d228d6c35081d3e973e6159f2695aa5c8c7f93d1e4d6",
+    strip_prefix = "grpc-java-1.19.0",
+    urls = ["https://github.com/grpc/grpc-java/archive/v1.19.0.zip"],
+)
+
+load("@io_grpc_grpc_java//:repositories.bzl", "grpc_java_repositories")
+
+grpc_java_repositories(
+    omit_com_google_guava = True,
+    omit_com_google_guava_failureaccess = True
 )
 
 http_archive(
@@ -32,32 +58,27 @@ http_archive(
 # The API that we implement.
 http_archive(
     name = "remote_apis",
-    sha256 = "865c6950a64b859cf211761330e5d13e6c4b54e22a454ae1195238594299de34",
-    url = "https://github.com/bazelbuild/remote-apis/archive/fdeb922b595df28650d12fc2335c4426df2fc726.zip",
-    strip_prefix = "remote-apis-fdeb922b595df28650d12fc2335c4426df2fc726",
+    sha256 = "6f22ba09356f8dbecb87ba03cacf147939f77fef1c9cfaffb3826691f3686e9b",
+    url = "https://github.com/bazelbuild/remote-apis/archive/cfe8e540cbb424e3ebc649ddcbc91190f70e23a6.zip",
+    strip_prefix = "remote-apis-cfe8e540cbb424e3ebc649ddcbc91190f70e23a6",
     build_file = "@build_buildfarm//:BUILD.remote_apis",
 )
 
-load("//3rdparty:workspace.bzl", "maven_dependencies")
-
-maven_dependencies()
-
-git_repository(
+http_archive(
     name = "bazel_skylib",
-    remote = "https://github.com/bazelbuild/bazel-skylib.git",
-    tag = "0.6.0",
+    sha256 = "eb5c57e4c12e68c0c20bc774bfbc60a568e800d025557bc4ea022c6479acc867",
+    strip_prefix = "bazel-skylib-0.6.0",
+    urls = ["https://github.com/bazelbuild/bazel-skylib/archive/0.6.0.tar.gz"],
 )
 
-git_repository(
+http_archive(
     name = "io_bazel_rules_docker",
-    remote = "https://github.com/bazelbuild/rules_docker.git",
-    tag = "v0.7.0",
+    sha256 = "aed1c249d4ec8f703edddf35cbe9dfaca0b5f5ea6e4cd9e83e99f3b0d1136c3d",
+    strip_prefix = "rules_docker-0.7.0",
+    urls = ["https://github.com/bazelbuild/rules_docker/archive/v0.7.0.tar.gz"],
 )
 
-load(
-    "@io_bazel_rules_docker//container:container.bzl",
-    "container_pull",
-)
+load("@io_bazel_rules_docker//container:container.bzl", "container_pull")
 
 load(
     "@io_bazel_rules_docker//java:image.bzl",

@@ -18,6 +18,7 @@ import com.google.common.hash.Funnels;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
+import com.google.common.hash.HashingOutputStream;
 import com.google.common.io.ByteSource;
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Digest;
@@ -27,6 +28,7 @@ import com.google.protobuf.Message;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
@@ -60,6 +62,19 @@ public class DigestUtil {
         return DigestFunction.MD5;
       }
       return DigestFunction.UNKNOWN;
+    }
+
+    public static HashFunction forHash(String hexDigest) {
+      if (SHA256.isValidHexDigest(hexDigest)) {
+        return SHA256;
+      }
+      if (SHA1.isValidHexDigest(hexDigest)) {
+        return SHA1;
+      }
+      if (MD5.isValidHexDigest(hexDigest)) {
+        return MD5;
+      }
+      throw new IllegalArgumentException("hash type unrecognized: " + hexDigest);
     }
 
     public static HashFunction get(DigestFunction digestFunction) {
@@ -196,6 +211,10 @@ public class DigestUtil {
     return Digest.newBuilder().setHash(hexHash).setSizeBytes(size).build();
   }
 
+  public HashingOutputStream newHashingOutputStream(OutputStream out) {
+    return new HashingOutputStream(hashFn.getHash(), out);
+  }
+
   public static String toString(Digest digest) {
     return String.format("%s/%d", digest.getHash(), digest.getSizeBytes());
   }
@@ -206,5 +225,9 @@ public class DigestUtil {
         .setHash(components[0])
         .setSizeBytes(Integer.parseInt(components[1]))
         .build();
+  }
+
+  public static DigestUtil forDigest(Digest digest) {
+    return new DigestUtil(HashFunction.forHash(digest.getHash()));
   }
 }

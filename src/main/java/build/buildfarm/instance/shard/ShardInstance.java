@@ -61,6 +61,7 @@ import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watcher;
+import build.buildfarm.common.Write;
 import build.buildfarm.common.cache.Cache;
 import build.buildfarm.common.cache.CacheBuilder;
 import build.buildfarm.common.cache.CacheLoader.InvalidCacheLoadException;
@@ -70,7 +71,6 @@ import build.buildfarm.common.grpc.RetryException;
 import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.ByteStreamUploader;
-import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.OperationIteratorToken;
@@ -161,6 +161,7 @@ public class ShardInstance extends AbstractServerInstance {
       .maximumSize(64 * 1024)
       .build();
   private final Random rand = new Random();
+  private final Writes writes = new Writes(this::writeInstanceSupplier);
 
   private final ListeningExecutorService operationTransformService =
       listeningDecorator(newFixedThreadPool(24));
@@ -535,7 +536,7 @@ public class ShardInstance extends AbstractServerInstance {
             throw status.asRuntimeException();
           } else if (status.getCode() == Code.CANCELLED
               || Context.current().isCancelled()
-              || !SHARD_IS_RETRIABLE.test(status)) {
+              || !SHARD_IS_RETRIABLE.apply(status)) {
             // do nothing further if we're cancelled
             throw status.asRuntimeException();
           } else {
@@ -580,7 +581,7 @@ public class ShardInstance extends AbstractServerInstance {
         } else if (status.getCode() == Code.NOT_FOUND) {
           logger.info(worker + " did not contain " + DigestUtil.toString(blobDigest));
           // ignore this, the worker will update the backplane eventually
-        } else if (status.getCode() == Code.CANCELLED /* yes, gross */ || SHARD_IS_RETRIABLE.test(status)) {
+        } else if (status.getCode() == Code.CANCELLED /* yes, gross */ || SHARD_IS_RETRIABLE.apply(status)) {
           // why not, always
           workers.addLast(worker);
         } else {
@@ -637,7 +638,8 @@ public class ShardInstance extends AbstractServerInstance {
             (foundOnWorkers) -> {
               Iterables.addAll(workersList, foundOnWorkers);
               return workersList;
-            });
+            },
+            directExecutor());
       } catch (IOException e) {
         blobObserver.onError(e);
         return;
@@ -673,23 +675,27 @@ public class ShardInstance extends AbstractServerInstance {
                 (foundOnWorkers) -> {
                   Iterables.addAll(workersList, foundOnWorkers);
                   return workersList;
-                });
+                },
+                directExecutor());
           } catch (IOException e) {
             blobObserver.onError(e);
             return;
           }
           final StreamObserver<ByteString> checkedChunkObserver = this;
-          addCallback(workersListFuture, new WorkersCallback(rand) {
-            @Override
-            public void onQueue(Deque<String> workers) {
-              fetchBlobFromWorker(blobDigest, workers, offset, limit, checkedChunkObserver);
-            }
+          addCallback(
+              workersListFuture,
+              new WorkersCallback(rand) {
+                @Override
+                public void onQueue(Deque<String> workers) {
+                  fetchBlobFromWorker(blobDigest, workers, offset, limit, checkedChunkObserver);
+                }
 
-            @Override
-            public void onFailure(Throwable t) {
-              blobObserver.onError(t);
-            }
-          });
+                @Override
+                public void onFailure(Throwable t) {
+                  blobObserver.onError(t);
+                }
+              },
+              directExecutor());
         } else {
           blobObserver.onError(t);
         }
@@ -700,17 +706,20 @@ public class ShardInstance extends AbstractServerInstance {
         blobObserver.onCompleted();
       }
     };
-    addCallback(populatedWorkerListFuture, new WorkersCallback(rand) {
-      @Override
-      public void onQueue(Deque<String> workers) {
-        fetchBlobFromWorker(blobDigest, workers, offset, limit, chunkObserver);
-      }
+    addCallback(
+        populatedWorkerListFuture,
+        new WorkersCallback(rand) {
+          @Override
+          public void onQueue(Deque<String> workers) {
+            fetchBlobFromWorker(blobDigest, workers, offset, limit, chunkObserver);
+          }
 
-      @Override
-      public void onFailure(Throwable t) {
-        blobObserver.onError(t);
-      }
-    });
+          @Override
+          public void onFailure(Throwable t) {
+            blobObserver.onError(t);
+          }
+        },
+        directExecutor());
   }
 
   public abstract static class WorkersCallback implements FutureCallback<List<String>> {
@@ -733,41 +742,29 @@ public class ShardInstance extends AbstractServerInstance {
     protected abstract void onQueue(Deque<String> workers);
   }
 
-  @Override
-  public ByteString getBlob(Digest blobDigest, long offset, long limit) throws InterruptedException {
-    SettableFuture<ByteString> blobFuture = SettableFuture.create();
-    getBlob(blobDigest, offset, limit, new StreamObserver<ByteString>() {
-      ByteString content = ByteString.EMPTY;
+  private Instance writeInstanceSupplier() {
+    String worker = getRandomWorker();
+    return workerStub(worker);
+  }
 
-      @Override
-      public void onNext(ByteString nextChunk) {
-        content = content.concat(nextChunk);
-      }
-
-      @Override
-      public void onError(Throwable t) {
-        Status status = Status.fromThrowable(t);
-        if (status.getCode() == Code.NOT_FOUND) {
-          blobFuture.set(null);
-        } else {
-          blobFuture.setException(t);
-        }
-      }
-
-      @Override
-      public void onCompleted() {
-        blobFuture.set(content);
-      }
-    });
+  String getRandomWorker() {
+    Set<String> workers;
     try {
-      return blobFuture.get();
-    } catch (ExecutionException e) {
-      logger.log(SEVERE, "error fetching blob", e);
-      if (e.getCause() instanceof RuntimeException) {
-        throw (RuntimeException) e.getCause();
-      }
-      return null;
+      workers = backplane.getWorkers();
+    } catch (IOException e) {
+      throw Status.fromThrowable(e).asRuntimeException();
     }
+    if (workers.isEmpty()) {
+      throw Status.UNAVAILABLE.withDescription("no available workers").asRuntimeException();
+    }
+    int index = rand.nextInt(workers.size());
+    // best case no allocation average n / 2 selection
+    Iterator<String> iter = workers.iterator();
+    String worker = null;
+    while (iter.hasNext() && index-- >= 0) {
+      worker = iter.next();
+    }
+    return worker;
   }
 
   private Instance workerStub(String worker) {
@@ -814,25 +811,10 @@ public class ShardInstance extends AbstractServerInstance {
     }
   }
 
-  CommittingOutputStream createBlobOutputStream(Digest blobDigest) throws IOException {
-    String worker = null;
-    while (worker == null) {
-      Set<String> workers = backplane.getWorkers();
-      if (workers.isEmpty()) {
-        throw new IOException("no available workers");
-      }
-      int index = rand.nextInt(workers.size());
-      // best case no allocation average n / 2 selection
-      Iterator<String> iter = workers.iterator();
-      while (iter.hasNext() && index-- >= 0) {
-        worker = iter.next();
-      }
-    }
-    Instance instance = workerStub(worker);
-    String resourceName = String.format(
-        "uploads/%s/blobs/%s",
-        UUID.randomUUID(), DigestUtil.toString(blobDigest));
-    return instance.getStreamOutput(resourceName, blobDigest.getSizeBytes());
+  @Override
+  public Write getBlobWrite(Digest digest, UUID uuid) {
+    // FIXME small blob write to proto cache
+    return writes.get(digest, uuid);
   }
 
   private class FailedChunkObserver implements ChunkObserver {
@@ -868,87 +850,6 @@ public class ShardInstance extends AbstractServerInstance {
     public void onError(Throwable t) {
       logger.log(SEVERE, "Received error in failed chunkObserver", t);
     }
-  }
-
-  public ChunkObserver getWriteBlobObserver(Digest blobDigest) {
-    final CommittingOutputStream initialOutput;
-    try {
-      initialOutput = createBlobOutputStream(blobDigest);
-    } catch (IOException e) {
-      return new FailedChunkObserver(e);
-    }
-
-    ChunkObserver chunkObserver = new ChunkObserver() {
-      long committedSize = 0l;
-      ByteString smallBlob = ByteString.EMPTY;
-      CommittingOutputStream out = initialOutput;
-
-      @Override
-      public long getCommittedSize() {
-        return committedSize;
-      }
-
-      @Override
-      public ListenableFuture<Long> getCommittedFuture() {
-        return out.getCommittedFuture();
-      }
-
-      @Override
-      public void reset() {
-        try {
-          out.close();
-          out = createBlobOutputStream(blobDigest);
-        } catch (IOException e) {
-          throw Status.INTERNAL.withCause(e).asRuntimeException();
-        }
-        committedSize = 0;
-        smallBlob = ByteString.EMPTY;
-      }
-
-      @Override
-      public void onNext(ByteString chunk) {
-        try {
-          chunk.writeTo(out);
-          committedSize += chunk.size();
-          if (smallBlob != null && committedSize < 4 * 1024 * 1024) {
-            smallBlob = smallBlob.concat(chunk);
-          } else {
-            smallBlob = null;
-          }
-        } catch (Throwable t) {
-          throw Status.fromThrowable(t).asRuntimeException();
-        }
-      }
-
-      @Override
-      public void onCompleted() {
-        try {
-          // need to cancel the request if size or digest doesn't match
-          out.close();
-        } catch (IOException e) {
-          throw Status.fromThrowable(e).asRuntimeException();
-        }
-
-        try {
-          if (smallBlob != null) {
-            updateCaches(blobDigest, smallBlob);
-          }
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          throw Status.CANCELLED.withCause(e).asRuntimeException();
-        }
-      }
-
-      @Override
-      public void onError(Throwable t) {
-        try {
-          out.close(); // yup.
-        } catch (IOException e) {
-          // ignore?
-        }
-      }
-    };
-    return chunkObserver;
   }
 
   protected int getTreeDefaultPageSize() { return 1024; }
@@ -1040,7 +941,8 @@ public class ShardInstance extends AbstractServerInstance {
           }
         }),
         InvalidCacheLoadException.class,
-        (e) -> { return null; });
+        (e) -> { return null; },
+        directExecutor());
   }
 
   ListenableFuture<Action> expectAction(Digest actionBlobDigest, Executor executor) {
@@ -1053,7 +955,8 @@ public class ShardInstance extends AbstractServerInstance {
           }
         }),
         InvalidCacheLoadException.class,
-        (e) -> { return null; });
+        (e) -> { return null; },
+        directExecutor());
   }
 
   private void removeMalfunctioningWorker(String worker, Throwable t, String context) {
@@ -1069,12 +972,12 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @Override
-  public CommittingOutputStream getStreamOutput(String name, long expectedSize) {
+  public Write getOperationStreamWrite(String name) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public InputStream newStreamInput(String name, long offset) {
+  public InputStream newOperationStreamInput(String name, long offset) {
     throw new UnsupportedOperationException();
   }
 
@@ -1170,34 +1073,19 @@ public class ShardInstance extends AbstractServerInstance {
 
   private ListenableFuture<Long> writeBlobFuture(Digest digest, ByteString content) {
     checkState(digest.getSizeBytes() == content.size());
-    int attempts = 5;
-    for (;;) {
-      try (CommittingOutputStream out = createBlobOutputStream(digest)) {
-        content.writeTo(out);
-        return transformAsync(
-            out.getCommittedFuture(),
-            (committedSize) -> {
-              if (committedSize != content.size()) {
-                throw new IOException(
-                    String.format(
-                        "committedSize %d did not match expected size for %s",
-                        committedSize,
-                        DigestUtil.toString(digest)));
-              }
-              return immediateFuture(committedSize);
-            });
-      } catch (IOException e) {
-        return immediateFailedFuture(e);
-      } catch (Throwable t) {
-        Status status = Status.fromThrowable(t);
-        if (--attempts == 0 ||
-            !Retrier.DEFAULT_IS_RETRIABLE.test(status)) {
-          return immediateFailedFuture(t);
-        } else {
-          logger.log(INFO, format("failed to output %s, retrying", digest), t);
-        }
+    SettableFuture<Long> writtenFuture = SettableFuture.create();
+    Write write = getBlobWrite(digest, UUID.randomUUID());
+    write.addListener(
+        () -> writtenFuture.set(digest.getSizeBytes()),
+        directExecutor());
+    try (OutputStream out = write.getOutput()) {
+      content.writeTo(out);
+    } catch (IOException e) {
+      if (!writtenFuture.isDone()) {
+        writtenFuture.setException(e);
       }
     }
+    return writtenFuture;
   }
 
   private ListenableFuture<QueuedOperation> buildQueuedOperation(
@@ -1228,7 +1116,8 @@ public class ShardInstance extends AbstractServerInstance {
     ListenableFuture<QueuedOperation> queuedOperationFuture = catchingAsync(
         fetchQueuedOperationFuture,
         Throwable.class,
-        (e) -> buildQueuedOperation(operation.getName(), actionDigest, operationTransformService));
+        (e) -> buildQueuedOperation(operation.getName(), actionDigest, operationTransformService),
+        directExecutor());
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
     ListenableFuture<QueuedOperation> validatedFuture = transformAsync(
         queuedOperationFuture,
@@ -1265,7 +1154,8 @@ public class ShardInstance extends AbstractServerInstance {
                 operationTransformService),
             Throwable.class,
             (e) -> uploadQueuedOperation(queuedOperation, executeEntry, operationTransformService),
-            operationTransformService));
+            operationTransformService),
+        directExecutor());
 
     SettableFuture<Void> requeuedFuture = SettableFuture.create();
     addCallback(
