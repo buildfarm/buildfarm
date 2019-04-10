@@ -165,6 +165,7 @@ java_library(
     name = "server",
     srcs = glob(["server/**/*.java"]),
     deps = [
+        ":cas",
         ":common",
         ":common-grpc",
         ":instance",

@@ -148,7 +148,11 @@ class CASFileCacheTest {
   @Test(expected = IllegalStateException.class)
   public void putEmptyFileThrowsIllegalStateException() throws IOException, InterruptedException {
     InputStreamFactory mockInputStreamFactory = mock(InputStreamFactory.class);
-    CASFileCache fileCache = new CASFileCache(root, /* maxSizeInBytes=*/ 1024, DIGEST_UTIL, /* expireService=*/ newDirectExecutorService()) {
+    CASFileCache fileCache = new CASFileCache(
+        root,
+        /* maxSizeInBytes=*/ 1024,
+        DIGEST_UTIL,
+        /* expireService=*/ newDirectExecutorService()) {
       @Override
       protected InputStream newExternalInput(Digest digest, long offset) throws IOException, InterruptedException {
         return mockInputStreamFactory.newInput(digest, offset);
@@ -179,13 +183,10 @@ class CASFileCacheTest {
   @Test
   public void putDirectoryCreatesTree() throws IOException, InterruptedException {
     ByteString file = ByteString.copyFromUtf8("Peanut Butter");
-    Digest fileDigest = Digest.newBuilder()
-        .setHash("file")
-        .setSizeBytes(file.size())
-        .build();
+    Digest fileDigest = DIGEST_UTIL.compute(file);
     blobs.put(fileDigest, file);
-    Directory subDirectory = Directory.newBuilder().build();
-    Digest subdirDigest = Digest.newBuilder().setHash("subdir").build();
+    Directory subDirectory = Directory.getDefaultInstance();
+    Digest subdirDigest = DIGEST_UTIL.compute(subDirectory);
     Directory directory = Directory.newBuilder()
         .addFiles(FileNode.newBuilder()
             .setName("file")
@@ -196,7 +197,7 @@ class CASFileCacheTest {
             .setDigest(subdirDigest)
             .build())
         .build();
-    Digest dirDigest = Digest.newBuilder().setHash("test").build();
+    Digest dirDigest = DIGEST_UTIL.compute(directory);
     Map<Digest, Directory> directoriesIndex = ImmutableMap.of(
         dirDigest, directory,
         subdirDigest, subDirectory);
@@ -210,13 +211,10 @@ class CASFileCacheTest {
   @Test
   public void putDirectoryIOExceptionRollsBack() throws IOException, InterruptedException {
     ByteString file = ByteString.copyFromUtf8("Peanut Butter");
-    Digest fileDigest = Digest.newBuilder()
-        .setHash("file")
-        .setSizeBytes(file.size())
-        .build();
+    Digest fileDigest = DIGEST_UTIL.compute(file);
     // omitting blobs.put to incur IOException
-    Directory subDirectory = Directory.newBuilder().build();
-    Digest subdirDigest = Digest.newBuilder().setHash("subdir").build();
+    Directory subDirectory = Directory.getDefaultInstance();
+    Digest subdirDigest = DIGEST_UTIL.compute(subDirectory);
     Directory directory = Directory.newBuilder()
         .addFiles(FileNode.newBuilder()
             .setName("file")
@@ -227,7 +225,7 @@ class CASFileCacheTest {
             .setDigest(subdirDigest)
             .build())
         .build();
-    Digest dirDigest = Digest.newBuilder().setHash("test").build();
+    Digest dirDigest = DIGEST_UTIL.compute(directory);
     Map<Digest, Directory> directoriesIndex = ImmutableMap.of(
         dirDigest, directory,
         subdirDigest, subDirectory);
@@ -257,10 +255,7 @@ class CASFileCacheTest {
 
     byte[] strawData = new byte[30]; // take us beyond our 1024 limit
     ByteString strawBlob = ByteString.copyFrom(strawData);
-    Digest strawDigest = Digest.newBuilder()
-        .setHash("straw")
-        .setSizeBytes(strawBlob.size())
-        .build();
+    Digest strawDigest = DIGEST_UTIL.compute(strawBlob);
     blobs.put(strawDigest, strawBlob);
     Path strawPath = fileCache.put(strawDigest, false);
 

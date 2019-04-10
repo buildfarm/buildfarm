@@ -17,7 +17,7 @@ class MemoryWriteOutputStream extends OutputStream implements Write {
   private final Digest digest;
   private final ListenableFuture<ByteString> writtenFuture;
   private final ByteString.Output out;
-  private final HashingOutputStream hashOut;
+  private HashingOutputStream hashOut;
 
   MemoryWriteOutputStream(ContentAddressableStorage storage, Digest digest, ListenableFuture<ByteString> writtenFuture) {
     this.storage = storage;
@@ -93,6 +93,12 @@ class MemoryWriteOutputStream extends OutputStream implements Write {
   @Override
   public OutputStream getOutput() {
     return this;
+  }
+
+  @Override
+  public void reset() {
+    out.reset();
+    hashOut = DigestUtil.forDigest(digest).newHashingOutputStream(out);
   }
 
   @Override

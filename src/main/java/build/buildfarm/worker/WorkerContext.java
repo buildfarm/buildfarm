@@ -17,16 +17,14 @@ package build.buildfarm.worker;
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
-import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.Poller;
-import build.buildfarm.common.function.InterruptingConsumer;
+import build.buildfarm.common.Write;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Instance.MatchListener;
-import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.QueueEntry;
@@ -35,7 +33,6 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.Duration;
 import io.grpc.Deadline;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.nio.file.Path;
 
 public interface WorkerContext {
@@ -64,6 +61,6 @@ public interface WorkerContext {
   void destroyExecDir(Path execDir) throws IOException, InterruptedException;
   void uploadOutputs(ActionResult.Builder resultBuilder, Path actionRoot, Iterable<String> outputFiles, Iterable<String> outputDirs) throws IOException, InterruptedException;
   boolean putOperation(Operation operation, Action Action) throws IOException, InterruptedException;
-  OutputStream getOperationStreamOutput(String name) throws IOException;
   void putActionResult(ActionKey actionKey, ActionResult actionResult) throws IOException, InterruptedException;
+  Write getOperationStreamWrite(String name) throws IOException;
 }

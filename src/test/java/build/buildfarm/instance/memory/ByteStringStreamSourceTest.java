@@ -36,22 +36,22 @@ import java.io.InputStream;
 public class ByteStringStreamSourceTest {
   @Test
   public void closeCallsCommittedFuture() throws IOException {
-    FutureCallback<Long> mockCallback = mock(FutureCallback.class);
+    FutureCallback<Void> mockCallback = mock(FutureCallback.class);
     ByteStringStreamSource source = new ByteStringStreamSource();
     Futures.addCallback(
-        source.getOutputStream().getCommittedFuture(),
+        source.getClosedFuture(),
         mockCallback,
         directExecutor());
-    verify(mockCallback, never()).onSuccess(any(Long.class));
-    source.getOutputStream().close();
-    verify(mockCallback, times(1)).onSuccess(eq(new Long(0)));
+    verify(mockCallback, never()).onSuccess(any(Void.class));
+    source.getOutput().close();
+    verify(mockCallback, times(1)).onSuccess(null);
   }
 
   @Test
   public void closeShouldSetIsClosed() throws IOException {
     ByteStringStreamSource source = new ByteStringStreamSource();
     assertThat(source.isClosed()).isFalse();
-    source.getOutputStream().close();
+    source.getOutput().close();
     assertThat(source.isClosed()).isTrue();
   }
 
@@ -60,7 +60,7 @@ public class ByteStringStreamSourceTest {
     ByteStringStreamSource source = new ByteStringStreamSource();
     InputStream inputStream = source.openStream();
     assertThat(inputStream.available()).isEqualTo(0);
-    source.getOutputStream().write('a');
+    source.getOutput().write('a');
     assertThat(inputStream.available()).isEqualTo(1);
     assertThat(inputStream.read()).isEqualTo('a');
   }
@@ -69,7 +69,7 @@ public class ByteStringStreamSourceTest {
   public void readAtClosedEnd() throws IOException {
     ByteStringStreamSource source = new ByteStringStreamSource();
     InputStream inputStream = source.openStream();
-    source.getOutputStream().close();
+    source.getOutput().close();
     assertThat(inputStream.read()).isEqualTo(-1);
   }
 
@@ -96,7 +96,7 @@ public class ByteStringStreamSourceTest {
     while (!thread.isAlive()) {
       Thread.sleep(10);
     }
-    source.getOutputStream().write('a');
+    source.getOutput().write('a');
     while (thread.isAlive()) {
       Thread.sleep(10);
     }
@@ -117,7 +117,7 @@ public class ByteStringStreamSourceTest {
     while (!thread.isAlive()) {
       Thread.sleep(10);
     }
-    source.getOutputStream().write('a');
+    source.getOutput().write('a');
     while (thread.isAlive()) {
       Thread.sleep(10);
     }

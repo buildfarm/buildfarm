@@ -56,6 +56,12 @@ import build.buildfarm.v1test.MemoryInstanceConfig;
 import build.buildfarm.v1test.OperationIteratorToken;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueueEntry;
+import com.google.common.base.Throwables;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
+import com.google.common.cache.RemovalListener;
+import com.google.common.cache.RemovalNotification;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -68,6 +74,7 @@ import com.google.common.collect.SetMultimap;
 import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.AbstractFuture;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -97,7 +104,10 @@ import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
 
@@ -109,7 +119,24 @@ public class MemoryInstance extends AbstractServerInstance {
 
   private final MemoryInstanceConfig config;
   private final SetMultimap<String, WatchFuture> watchers;
-  private final Map<String, ByteStringStreamSource> streams = Maps.newConcurrentMap();
+  private final LoadingCache<String, ByteStringStreamSource> streams = CacheBuilder.newBuilder()
+      .expireAfterWrite(1, TimeUnit.HOURS)
+      .removalListener(new RemovalListener<String, ByteStringStreamSource>() {
+        @Override
+        public void onRemoval(RemovalNotification<String, ByteStringStreamSource> notification) {
+          try {
+            notification.getValue().getOutput().close();
+          } catch (IOException e) {
+            logger.log(SEVERE, "error closing stream source " + notification.getKey(), e);
+          }
+        }
+      })
+      .build(new CacheLoader<String, ByteStringStreamSource>() {
+        @Override
+        public ByteStringStreamSource load(String name) {
+          return newStreamSource(name);
+        }
+      });
   private final List<Operation> queuedOperations = Lists.newArrayList();
   private final List<Worker> workers = Lists.newArrayList();
   private final Map<String, Watchdog> requeuers = Maps.newConcurrentMap();
@@ -276,24 +303,56 @@ public class MemoryInstance extends AbstractServerInstance {
     };
   }
 
-  private ByteStringStreamSource getSource(String name) {
-    ByteStringStreamSource source = streams.get(name);
-    if (source == null) {
-      source = new ByteStringStreamSource();
-      source.getOutputStream().getCommittedFuture().addListener(() -> streams.remove(name), directExecutor());
-      streams.put(name, source);
-    }
+  ByteStringStreamSource newStreamSource(String name) {
+    ByteStringStreamSource source = new ByteStringStreamSource();
+    source.getClosedFuture().addListener(
+        () -> streams.invalidate(name),
+        directExecutor());
     return source;
+  }
+
+  ByteStringStreamSource getStreamSource(String name) {
+    try {
+      return streams.get(name);
+    } catch (ExecutionException e) {
+      Throwables.propagateIfInstanceOf(e.getCause(), RuntimeException.class);
+      throw new UncheckedExecutionException(e.getCause());
+    }
   }
 
   @Override
   public Write getOperationStreamWrite(String name) {
-    throw new UnsupportedOperationException(); // needs source->write conversion
+    return new Write() {
+      @Override
+      public long getCommittedSize() {
+        return getStreamSource(name).getCommittedSize();
+      }
+
+      @Override
+      public boolean isComplete() {
+        return getStreamSource(name).isClosed();
+      }
+
+      @Override
+      public OutputStream getOutput() {
+        return getStreamSource(name).getOutput();
+      }
+
+      @Override
+      public void reset() {
+        streams.invalidate(name);
+      }
+
+      @Override
+      public void addListener(Runnable onCompleted, Executor executor) {
+        getStreamSource(name).getClosedFuture().addListener(onCompleted, executor);
+      }
+    };
   }
 
   @Override
   public InputStream newOperationStreamInput(String name, long offset) throws IOException {
-    InputStream in = getSource(name).openStream();
+    InputStream in = getStreamSource(name).openStream();
     in.skip(offset);
     return in;
   }

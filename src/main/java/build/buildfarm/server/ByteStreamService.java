@@ -26,9 +26,12 @@ import static io.grpc.Status.INVALID_ARGUMENT;
 import static io.grpc.Status.NOT_FOUND;
 import static io.grpc.Status.OUT_OF_RANGE;
 import static java.lang.String.format;
+import static java.util.logging.Level.FINE;
+import static java.util.logging.Level.FINER;
 import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.Digest;
+import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.common.UrlPath.InvalidResourceNameException;
 import build.buildfarm.common.Write;
 import build.buildfarm.instance.Instance;
@@ -49,6 +52,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.NoSuchFileException;
 import java.util.UUID;
+import java.util.concurrent.Executor;
 import java.util.logging.Logger;
 
 public class ByteStreamService extends ByteStreamImplBase {
@@ -72,7 +76,7 @@ public class ByteStreamService extends ByteStreamImplBase {
     long remaining = limit;
     boolean complete = false;
     while (!complete) {
-      int readBytes = in.read(buf);
+      int readBytes = in.read(buf, 0, (int) Math.min(remaining, buf.length));
       if (readBytes == -1) {
         if (!unlimited) {
           responseObserver.onError(OUT_OF_RANGE.asException());
@@ -155,7 +159,7 @@ public class ByteStreamService extends ByteStreamImplBase {
       throws InstanceNotFoundException, InvalidResourceNameException {
     switch (detectResourceOperation(resourceName)) {
       case Blob:
-        readLimitedBlob(
+        readBlob(
             instances.getFromBlob(resourceName),
             parseBlobDigest(resourceName),
             offset,
@@ -183,7 +187,7 @@ public class ByteStreamService extends ByteStreamImplBase {
       StreamObserver<ReadResponse> responseObserver) {
     String resourceName = request.getResourceName();
     long offset = request.getReadOffset(), limit = request.getReadLimit();
-    logger.fine(
+    logger.finest(
         format(
             "read resourceName=%s offset=%d limit=%d",
             resourceName,
@@ -203,34 +207,91 @@ public class ByteStreamService extends ByteStreamImplBase {
   public void queryWriteStatus(
       QueryWriteStatusRequest request,
       StreamObserver<QueryWriteStatusResponse> responseObserver) {
-    responseObserver.onError(Status.UNIMPLEMENTED.asException());
+    String resourceName = request.getResourceName();
+    try {
+      logger.finer(
+          format(
+              "queryWriteStatus(%s)",
+              resourceName));
+      Write write = getWrite(resourceName);
+      responseObserver.onNext(
+          QueryWriteStatusResponse.newBuilder()
+              .setCommittedSize(write.getCommittedSize())
+              .setComplete(write.isComplete())
+              .build());
+      responseObserver.onCompleted();
+      logger.fine(
+          format(
+              "queryWriteStatus(%s) => committed_size = %d, complete = %s",
+              resourceName,
+              write.getCommittedSize(),
+              write.isComplete()));
+    } catch (InstanceNotFoundException e) {
+      logger.log(SEVERE, format("queryWriteStatus(%s)", resourceName), e);
+      responseObserver.onError(BuildFarmInstances.toStatusException(e));
+    } catch (IllegalArgumentException|InvalidResourceNameException e) {
+      logger.log(SEVERE, format("queryWriteStatus(%s)", resourceName), e);
+      responseObserver.onError(Status.fromThrowable(e).asException());
+    }
   }
 
-  long getBlobCommittedSize(Instance instance, Digest digest) {
-    return instance.containsBlob(digest) ? digest.getSizeBytes() : 0;
+  static Write getBlobWrite(
+      Instance instance,
+      Digest digest) {
+    return new Write() {
+      @Override
+      public long getCommittedSize() {
+        return isComplete() ? digest.getSizeBytes() : 0;
+      }
+
+      @Override
+      public boolean isComplete() {
+        return instance.containsBlob(digest);
+      }
+
+      @Override
+      public OutputStream getOutput() throws IOException {
+        throw new IOException("cannot get output of blob write");
+      }
+
+      @Override
+      public void reset() {
+        throw new RuntimeException("cannot reset a blob write");
+      }
+
+      @Override
+      public void addListener(Runnable onCompleted, Executor executor) {
+        throw new RuntimeException("cannot add listener to blob write");
+      }
+    };
   }
 
-  long getUploadBlobCommittedSize(Instance instance, Digest digest, UUID uuid) {
-    return instance.getBlobWrite(digest, uuid).getCommittedSize();
+  static Write getUploadBlobWrite(
+      Instance instance,
+      Digest digest,
+      UUID uuid) {
+    return instance.getBlobWrite(digest, uuid);
   }
 
-  long getOperationStreamCommittedSize(Instance instance, String resourceName) {
-    return instance.getOperationStreamWrite(resourceName).getCommittedSize();
+  static Write getOperationStreamWrite(
+      Instance instance,
+      String resourceName) {
+    return instance.getOperationStreamWrite(resourceName);
   }
 
-  long getCommittedSize(String resourceName) throws InstanceNotFoundException, InvalidResourceNameException {
+  Write getWrite(String resourceName) throws InstanceNotFoundException, InvalidResourceNameException {
     switch (detectResourceOperation(resourceName)) {
       case Blob:
-        return getBlobCommittedSize(
+        return getBlobWrite(
             instances.getFromBlob(resourceName),
             parseBlobDigest(resourceName));
       case UploadBlob:
-        return getUploadBlobCommittedSize(
+        return getUploadBlobWrite(
             instances.getFromUploadBlob(resourceName),
             parseUploadBlobDigest(resourceName),
             parseUploadBlobUUID(resourceName));
       case OperationStream:
-        return getOperationStreamCommittedSize(
+        return getOperationStreamWrite(
             instances.getFromOperationStream(resourceName),
             resourceName);
       default:
@@ -245,7 +306,7 @@ public class ByteStreamService extends ByteStreamImplBase {
     return new StreamObserver<WriteRequest>() {
       boolean initialized = false;
       String name = null;
-      OutputStream out = null;
+      Write write = null;
       Instance instance = null;
 
       @Override
@@ -257,23 +318,10 @@ public class ByteStreamService extends ByteStreamImplBase {
         }
       }
 
-      Write getBlobWrite(
-          Instance instance,
-          Digest digest,
-          UUID uuid) throws IOException {
-        return instance.getBlobWrite(digest, uuid);
-      }
-
-      Write getOperationStreamWrite(
-          Instance instance,
-          String resourceName) throws IOException {
-        return instance.getOperationStreamWrite(name);
-      }
-
       Write getWrite(String resourceName) throws IOException, InstanceNotFoundException, InvalidResourceNameException {
         switch (detectResourceOperation(resourceName)) {
           case UploadBlob:
-            return getBlobWrite(
+            return getUploadBlobWrite(
                 instances.getFromUploadBlob(resourceName),
                 parseUploadBlobDigest(resourceName),
                 parseUploadBlobUUID(resourceName));
@@ -298,23 +346,33 @@ public class ByteStreamService extends ByteStreamImplBase {
         } else {
           name = resourceName;
           try {
-            Write write = getWrite(resourceName);
+            write = getWrite(resourceName);
+            logger.finer(
+                format(
+                    "registering callback for %s: committed_size = %d, complete = %s",
+                    resourceName,
+                    write.getCommittedSize(),
+                    write.isComplete()));
             write.addListener(
                 () -> {
                   if (!Context.current().isCancelled()) {
                     try {
+                      logger.finer(format("delivering committedSize for %s", resourceName));
                       responseObserver.onNext(WriteResponse.newBuilder()
                           .setCommittedSize(write.getCommittedSize())
                           .build());
                     } catch (Throwable t) {
-                      logger.log(SEVERE, "error delivering committedSize to " + resourceName, t);
+                      logger.log(SEVERE, format("error delivering committedSize to %s", resourceName), t);
                     }
+                  } else {
+                    logger.finest(format("skipped delivering committedSize to %s for cancelled context", resourceName));
                   }
                 },
                 withCancellation.fixedContextExecutor(directExecutor()));
-            out = write.getOutput();
-            initialized = true;
-            handleRequest(request);
+            if (!write.isComplete()) {
+              initialized = true;
+              handleRequest(request);
+            }
           } catch (InstanceNotFoundException e) {
             responseObserver.onError(BuildFarmInstances.toStatusException(e));
           } catch (IOException|InvalidResourceNameException e) {
@@ -340,44 +398,46 @@ public class ByteStreamService extends ByteStreamImplBase {
           long offset,
           ByteString data,
           boolean finishWrite) {
-        try {
-          long committedSize = getCommittedSize(name);
-          if (offset != 0 && offset != committedSize) {
-            responseObserver.onError(INVALID_ARGUMENT
-                .withDescription(format("offset %d does not match committed size %d", offset, committedSize))
-                .asException());
-          } else if (!resourceName.equals(name)) {
-            responseObserver.onError(INVALID_ARGUMENT
-                .withDescription(format("request resource_name %s does not match previous resource_name %s", resourceName, name))
-                .asException());
-          } else {
-            if (offset == 0 && offset != committedSize) {
-              // reset the write
-              try {
-                out.close();
-              } catch (IOException e) {
-                // ignore, cancelling
-              }
-              out = getWrite(resourceName).getOutput();
-              checkState(getCommittedSize(resourceName) == 0);
-            }
-            if (!data.isEmpty()) {
-              writeData(data);
-            }
-            if (finishWrite) {
-              out.close();
-            }
+        long committedSize = write.getCommittedSize();
+        if (offset != 0 && offset != committedSize) {
+          responseObserver.onError(INVALID_ARGUMENT
+              .withDescription(format("offset %d does not match committed size %d", offset, committedSize))
+              .asException());
+        } else if (!resourceName.equals(name)) {
+          responseObserver.onError(INVALID_ARGUMENT
+              .withDescription(format("request resource_name %s does not match previous resource_name %s", resourceName, name))
+              .asException());
+        } else {
+          if (offset == 0 && offset != committedSize) {
+            write.reset();
           }
-        } catch (InstanceNotFoundException e) {
-          responseObserver.onError(BuildFarmInstances.toStatusException(e));
-        } catch (IOException|InvalidResourceNameException e) {
+
+          if (!data.isEmpty()) {
+            writeData(data);
+          }
+          if (finishWrite) {
+            close();
+          }
+        }
+      }
+
+      void close() {
+        logger.finest("closing stream due to finishWrite for " + name);
+        try {
+          write.getOutput().close();
+        } catch (DigestMismatchException e) {
+          responseObserver.onError(Status.INVALID_ARGUMENT
+              .withDescription(e.getMessage())
+              .asException());
+        } catch (IOException e) {
           responseObserver.onError(Status.fromThrowable(e).asException());
         }
       }
 
       void writeData(ByteString data) {
         try {
-          data.writeTo(out);
+          logger.finest(format("writing %d to %s", data.size(), name));
+          data.writeTo(write.getOutput());
         } catch (IOException e) {
           responseObserver.onError(Status.fromThrowable(e).asException());
         }
@@ -388,17 +448,19 @@ public class ByteStreamService extends ByteStreamImplBase {
         if (initialized
             && !DEFAULT_IS_RETRIABLE.apply(Status.fromThrowable(t))) {
           try {
-            out.close();
+            write.getOutput().close();
           } catch (IOException e) {
             logger.log(SEVERE, "error closing output stream after error", e);
           }
         } else {
+          logger.log(FINER, "cancelling context for " + name, t);
           withCancellation.cancel(t);
         }
       }
 
       @Override
       public void onCompleted() {
+        logger.finer("calling completed for " + name);
         responseObserver.onCompleted();
       }
     };

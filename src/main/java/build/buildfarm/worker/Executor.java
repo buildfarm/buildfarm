@@ -29,12 +29,12 @@ import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.Platform.Property;
-import build.buildfarm.common.Poller;
+import build.buildfarm.common.Write;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.ExecutionPolicy;
 import com.google.common.base.Stopwatch;
-import com.google.common.io.ByteStreams;
 import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.SettableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -54,7 +54,6 @@ import java.util.logging.Logger;
 class Executor implements Runnable {
   private static final int INCOMPLETE_EXIT_CODE = -1;
   private static final Logger logger = Logger.getLogger(Executor.class.getName());
-  private static final OutputStream nullOutputStream = ByteStreams.nullOutputStream();
 
   private final WorkerContext workerContext;
   private final OperationContext operationContext;
@@ -65,6 +64,65 @@ class Executor implements Runnable {
     this.workerContext = workerContext;
     this.operationContext = operationContext;
     this.owner = owner;
+  }
+
+  static Write nullWrite() {
+    return new Write() {
+      volatile long committedSize = 0;
+      volatile boolean closed = false;
+      SettableFuture<Void> listenerFuture = SettableFuture.create();
+
+      @Override
+      public long getCommittedSize() {
+        return committedSize;
+      }
+
+      @Override
+      public boolean isComplete() {
+        return closed;
+      }
+
+      @Override
+      public OutputStream getOutput() {
+        return new OutputStream() {
+          @Override
+          public void close() {
+            if (!closed) {
+              closed = true;
+              listenerFuture.set(null);
+            }
+          }
+
+          @Override
+          public void write(int b) throws IOException {
+            checkNotClosed();
+            committedSize++;
+          }
+
+          @Override
+          public void write(byte[] b, int off, int len) throws IOException {
+            checkNotClosed();
+            committedSize += len;
+          }
+
+          void checkNotClosed() throws IOException {
+            if (closed) {
+              throw new IOException("stream is closed");
+            }
+          }
+        };
+      }
+
+      @Override
+      public void reset() {
+        committedSize = 0;
+      }
+
+      @Override
+      public void addListener(Runnable onCompleted, java.util.concurrent.Executor executor) {
+        listenerFuture.addListener(onCompleted, executor);
+      }
+    };
   }
 
   private long runInterruptible(Stopwatch stopwatch) throws InterruptedException {
@@ -289,17 +347,17 @@ class Executor implements Runnable {
       environment.put(environmentVariable.getName(), environmentVariable.getValue());
     }
 
-    OutputStream stdoutSink = null, stderrSink = null;
+    final Write stdoutWrite, stderrWrite;
 
     if (stdoutStreamName != null && !stdoutStreamName.isEmpty() && workerContext.getStreamStdout()) {
-      stdoutSink = workerContext.getOperationStreamOutput(stdoutStreamName);
+      stdoutWrite = workerContext.getOperationStreamWrite(stdoutStreamName);
     } else {
-      stdoutSink = nullOutputStream;
+      stdoutWrite = nullWrite();
     }
     if (stderrStreamName != null && !stderrStreamName.isEmpty() && workerContext.getStreamStderr()) {
-      stderrSink = workerContext.getOperationStreamOutput(stderrStreamName);
+      stderrWrite = workerContext.getOperationStreamWrite(stderrStreamName);
     } else {
-      stderrSink = nullOutputStream;
+      stderrWrite = nullWrite();
     }
 
     long startNanoTime = System.nanoTime();
@@ -316,10 +374,12 @@ class Executor implements Runnable {
       return Code.INVALID_ARGUMENT;
     }
 
-    ByteStringSinkReader stdoutReader = new ByteStringSinkReader(
-        process.getInputStream(), stdoutSink);
-    ByteStringSinkReader stderrReader = new ByteStringSinkReader(
-        process.getErrorStream(), stderrSink);
+    stdoutWrite.reset();
+    stderrWrite.reset();
+    ByteStringWriteReader stdoutReader = new ByteStringWriteReader(
+        process.getInputStream(), stdoutWrite);
+    ByteStringWriteReader stderrReader = new ByteStringWriteReader(
+        process.getErrorStream(), stderrWrite);
 
     Thread stdoutReaderThread = new Thread(stdoutReader);
     Thread stderrReaderThread = new Thread(stderrReader);
@@ -353,16 +413,9 @@ class Executor implements Runnable {
         process.waitFor(100, TimeUnit.MILLISECONDS);
       }
       throw e;
-    } finally {
-      if (!stdoutReader.isComplete()) {
-        stdoutReaderThread.interrupt();
-      }
-      stdoutReaderThread.join();
-      if (!stderrReader.isComplete()) {
-        stderrReaderThread.interrupt();
-      }
-      stderrReaderThread.join();
     }
+    stdoutReaderThread.join();
+    stderrReaderThread.join();
     resultBuilder
         .setExitCode(exitCode)
         .setStdoutRaw(stdoutReader.getData())

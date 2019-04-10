@@ -14,25 +14,25 @@
 
 package build.buildfarm.instance.memory;
 
-import build.buildfarm.instance.Instance.CommittingOutputStream;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
 import java.io.InputStream;
+import java.io.OutputStream;
 
 class ByteStringStreamSource {
-  private final CommittingOutputStream outputStream;
-
+  private final OutputStream outputStream;
+  private final SettableFuture<Void> closedFuture = SettableFuture.create();
   private final Object bufferSync;
+
   private ByteString buffer;
   private boolean closed;
 
   public ByteStringStreamSource() {
     buffer = ByteString.EMPTY;
-    outputStream = new CommittingOutputStream() {
-      long committedSize = 0;
-      SettableFuture<Long> committedFuture = SettableFuture.create();
-
+    bufferSync = new Object();
+    closed = false;
+    outputStream = new OutputStream() {
       @Override
       public void write(int b) {
         byte[] buf = new byte[1];
@@ -51,33 +51,39 @@ class ByteStringStreamSource {
           buffer = buffer.concat(ByteString.copyFrom(b, off, len));
           bufferSync.notifyAll();
         }
-        committedSize += len;
       }
 
       @Override
       public void close() {
         synchronized (bufferSync) {
-          closed = true;
-          bufferSync.notifyAll();
+          if (!closed) {
+            closed = true;
+            bufferSync.notifyAll();
+            closedFuture.set(null);
+          }
         }
-        committedFuture.set(committedSize);
-      }
-
-      @Override
-      public ListenableFuture<Long> getCommittedFuture() {
-        return committedFuture;
       }
     };
-    bufferSync = new Object();
-    closed = false;
   }
 
   public boolean isClosed() {
-    return closed;
+    synchronized (bufferSync) {
+      return closed;
+    }
   }
 
-  public CommittingOutputStream getOutputStream() {
+  public OutputStream getOutput() {
     return outputStream;
+  }
+
+  public long getCommittedSize() {
+    synchronized (bufferSync) {
+      return buffer.size();
+    }
+  }
+
+  public ListenableFuture<Void> getClosedFuture() {
+    return closedFuture;
   }
 
   public InputStream openStream() {

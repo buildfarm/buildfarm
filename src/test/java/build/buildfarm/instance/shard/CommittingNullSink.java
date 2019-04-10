@@ -42,6 +42,12 @@ class NullWrite extends OutputStream implements Write {
   // Write methods
 
   @Override
+  public void reset() {
+    // hopefully we are not closed...
+    committedSize = 0;
+  }
+
+  @Override
   public long getCommittedSize() {
     return committedSize;
   }

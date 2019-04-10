@@ -37,6 +37,7 @@ import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.Poller;
 import build.buildfarm.common.ShardBackplane;
+import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.Retrier.Backoff;
 import build.buildfarm.instance.Instance;
@@ -580,7 +581,7 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
-  public OutputStream getOperationStreamOutput(String name) {
+  public Write getOperationStreamWrite(String name) {
     throw new UnsupportedOperationException();
   }
 }

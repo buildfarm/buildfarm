@@ -33,6 +33,7 @@ http_archive(
         "//third_party/io_grpc_grpc_java:054def3c63.patch",
         "//third_party/io_grpc_grpc_java:0959a846c8.patch",
         "//third_party/io_grpc_grpc_java:952a767b9c.patch",
+        "//third_party/io_grpc_grpc_java:c63752789e.patch",
         "//third_party/io_grpc_grpc_java:3c24dc6fe1.patch",
     ],
     sha256 = "f5d0bdebc2a50d0e28f0d228d6c35081d3e973e6159f2695aa5c8c7f93d1e4d6",
@@ -49,19 +50,19 @@ grpc_java_repositories(
 
 http_archive(
     name = "googleapis",
-    sha256 = "7b6ea252f0b8fb5cd722f45feb83e115b689909bbb6a393a873b6cbad4ceae1d",
-    url = "https://github.com/googleapis/googleapis/archive/143084a2624b6591ee1f9d23e7f5241856642f4d.zip",
-    strip_prefix = "googleapis-143084a2624b6591ee1f9d23e7f5241856642f4d",
     build_file = "@build_buildfarm//:BUILD.googleapis",
+    sha256 = "7b6ea252f0b8fb5cd722f45feb83e115b689909bbb6a393a873b6cbad4ceae1d",
+    strip_prefix = "googleapis-143084a2624b6591ee1f9d23e7f5241856642f4d",
+    url = "https://github.com/googleapis/googleapis/archive/143084a2624b6591ee1f9d23e7f5241856642f4d.zip",
 )
 
 # The API that we implement.
 http_archive(
     name = "remote_apis",
-    sha256 = "6f22ba09356f8dbecb87ba03cacf147939f77fef1c9cfaffb3826691f3686e9b",
-    url = "https://github.com/bazelbuild/remote-apis/archive/cfe8e540cbb424e3ebc649ddcbc91190f70e23a6.zip",
-    strip_prefix = "remote-apis-cfe8e540cbb424e3ebc649ddcbc91190f70e23a6",
     build_file = "@build_buildfarm//:BUILD.remote_apis",
+    sha256 = "6f22ba09356f8dbecb87ba03cacf147939f77fef1c9cfaffb3826691f3686e9b",
+    strip_prefix = "remote-apis-cfe8e540cbb424e3ebc649ddcbc91190f70e23a6",
+    url = "https://github.com/bazelbuild/remote-apis/archive/cfe8e540cbb424e3ebc649ddcbc91190f70e23a6.zip",
 )
 
 http_archive(
@@ -79,7 +80,6 @@ http_archive(
 )
 
 load("@io_bazel_rules_docker//container:container.bzl", "container_pull")
-
 load(
     "@io_bazel_rules_docker//java:image.bzl",
     _java_image_repos = "repositories",
@@ -99,8 +99,8 @@ bind(
 _java_image_repos()
 
 container_pull(
-  name = "java_base",
-  registry = "gcr.io",
-  repository = "distroless/java",
-  digest = "sha256:8c1769cb253bdecc257470f7fba05446a55b70805fa686f227a11655a90dfe9e",
+    name = "java_base",
+    digest = "sha256:8c1769cb253bdecc257470f7fba05446a55b70805fa686f227a11655a90dfe9e",
+    registry = "gcr.io",
+    repository = "distroless/java",
 )

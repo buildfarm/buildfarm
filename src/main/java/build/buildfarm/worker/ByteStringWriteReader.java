@@ -14,26 +14,24 @@
 
 package build.buildfarm.worker;
 
-import static java.util.logging.Level.SEVERE;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
+import build.buildfarm.common.Write;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.logging.Logger;
 
-public class ByteStringSinkReader implements Runnable {
-  private static final Logger logger = Logger.getLogger(ByteStringSinkReader.class.getName());
-
+public class ByteStringWriteReader implements Runnable {
   private final InputStream input;
-  private final OutputStream sink;
-  private ByteString data;
+  private final Write write;
+  private ByteString.Output data = ByteString.newOutput();
   private boolean completed;
+  private IOException exception = null;
 
-  public ByteStringSinkReader(InputStream input, OutputStream sink) {
+  public ByteStringWriteReader(InputStream input, Write write) {
     this.input = input;
-    this.sink = sink;
-    data = ByteString.EMPTY;
+    this.write = write;
     completed = false;
   }
 
@@ -41,35 +39,49 @@ public class ByteStringSinkReader implements Runnable {
     boolean closed = false;
     byte[] buffer = new byte[1024 * 16];
     int len;
-    try {
-      while (!isComplete() && (len = input.read(buffer, 0, buffer.length)) != -1) {
+    write.addListener(this::complete, directExecutor());
+    try (OutputStream writeOut = write.getOutput()) {
+      while (!isComplete() && (len = input.read(buffer)) != -1) {
         if (len != 0) {
-          data = data.concat(ByteString.copyFrom(buffer, 0, len));
-          sink.write(buffer, 0, len);
+          data.write(buffer, 0, len);
+          writeOut.write(buffer, 0, len);
         }
       }
     } catch(IOException e) {
-      logger.log(SEVERE, "error during sink read", e);
+      exception = e;
     } finally {
-      try { input.close(); } catch(IOException e) { }
-      try { sink.close(); } catch(IOException e) { }
-      complete();
+      try {
+        input.close();
+      } catch(IOException e) {
+        if (exception == null) {
+          exception = e;
+        } else {
+          exception.addSuppressed(e);
+        }
+      }
+    }
+  }
+
+  private synchronized void waitForComplete() throws InterruptedException {
+    while (!completed) {
+      wait();
     }
   }
 
   private synchronized void complete() {
     completed = true;
+    notify();
   }
 
   public synchronized boolean isComplete() {
-    return completed; 
+    return completed;
   }
 
-  public ByteString getData() {
-    if (!isComplete()) {
-      throw new IllegalStateException("cannot retrieve data while reader is running");
+  public ByteString getData() throws IOException, InterruptedException {
+    if (exception != null) {
+      throw exception;
     }
-    return data;
+    waitForComplete();
+    return data.toByteString();
   }
 }
-

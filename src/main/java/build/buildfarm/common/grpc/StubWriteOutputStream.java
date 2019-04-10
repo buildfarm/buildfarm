@@ -30,10 +30,17 @@ public class StubWriteOutputStream extends OutputStream implements Write {
   private final long expectedSize;
   private final boolean autoflush;
   private final byte buf[];
+  private boolean wasReset = false;
   private final Supplier<QueryWriteStatusResponse> writeStatus = Suppliers.memoize(
       new Supplier() {
         @Override
         public QueryWriteStatusResponse get() {
+          if (wasReset) {
+            return QueryWriteStatusResponse.newBuilder()
+                .setCommittedSize(0)
+                .setComplete(false)
+                .build();
+          }
           return bsBlockingStub.get()
               .queryWriteStatus(QueryWriteStatusRequest.newBuilder()
                   .setResourceName(resourceName)
@@ -195,6 +202,13 @@ public class StubWriteOutputStream extends OutputStream implements Write {
   @Override
   public OutputStream getOutput() {
     return this;
+  }
+
+  @Override
+  public void reset() {
+    wasReset = true;
+    offset = 0;
+    writtenBytes = 0;
   }
 
   @Override

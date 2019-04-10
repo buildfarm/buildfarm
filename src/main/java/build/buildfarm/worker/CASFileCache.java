@@ -466,6 +466,22 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       boolean complete = false;
 
       @Override
+      public void reset() {
+        if (out != null) {
+          try {
+            Path path = out.getPath();
+            if (Files.exists(path)) {
+              Files.delete(path);
+            }
+            out.close();
+          } catch (IOException e) {
+            logger.log(SEVERE, "could not reset write " + DigestUtil.toString(key.getDigest()) + ":" + key.getIdentifier(), e);
+          }
+          out = null;
+        }
+      }
+
+      @Override
       public long getCommittedSize() {
         if (isComplete()) {
           return key.getDigest().getSizeBytes();
@@ -1087,7 +1103,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         Files.delete(path);
       }
     }
-    Directory directory = directoriesIndex.get(digest);
+    Directory directory;
+    if (digest.getSizeBytes() == 0) {
+      directory = Directory.getDefaultInstance();
+    } else {
+      directory = directoriesIndex.get(digest);
+    }
     if (directory == null) {
       throw new IOException(
           format(
@@ -1303,7 +1324,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         (results) -> {
           logger.fine(format("directory fetch complete, inserting %s", path.getFileName()));
           DirectoryEntry e = new DirectoryEntry(
-              directoriesIndex.get(digest),
+              // might want to have this treatment ahead of this
+              digest.getSizeBytes() == 0 ? Directory.getDefaultInstance() : directoriesIndex.get(digest),
               inputsBuilder.build(),
               Deadline.after(10, SECONDS));
           synchronized (this) {

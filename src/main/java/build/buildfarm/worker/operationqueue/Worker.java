@@ -45,6 +45,7 @@ import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.Poller;
+import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.Retrier.Backoff;
 import build.buildfarm.instance.Instance;
@@ -91,7 +92,6 @@ import io.grpc.Deadline;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
-import java.io.File;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.IOException;
@@ -242,9 +242,14 @@ public class Worker {
       ImmutableList.Builder<Path> inputFiles,
       ImmutableList.Builder<Digest> inputDirectories)
       throws IOException, InterruptedException {
-    Directory directory = directoriesIndex.get(inputRoot);
-    if (directory == null) {
-      throw new IOException("Directory " + DigestUtil.toString(inputRoot) + " is not in input index");
+    Directory directory;
+    if (inputRoot.getSizeBytes() == 0) {
+      directory = Directory.getDefaultInstance();
+    } else {
+      directory = directoriesIndex.get(inputRoot);
+      if (directory == null) {
+        throw new IOException("Directory " + DigestUtil.toString(inputRoot) + " is not in input index");
+      }
     }
 
     getInterruptiblyOrIOException(
@@ -719,8 +724,8 @@ public class Worker {
 
       // doesn't belong in CAS or AC, must be in OQ
       @Override
-      public OutputStream getOperationStreamOutput(String name) throws IOException {
-        return operationQueueInstance.getOperationStreamWrite(name).getOutput();
+      public Write getOperationStreamWrite(String name) {
+        return operationQueueInstance.getOperationStreamWrite(name);
       }
 
       @Override
