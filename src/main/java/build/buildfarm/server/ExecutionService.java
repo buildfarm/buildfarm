@@ -33,6 +33,7 @@ import com.google.longrunning.Operation;
 import io.grpc.Context;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
+import io.grpc.stub.ServerCallStreamObserver;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -63,28 +64,40 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
   }
 
   private void withCancellation(StreamObserver<Operation> responseObserver, ListenableFuture<Void> future) {
+    ServerCallStreamObserver serverCallStreamObserver =
+        (ServerCallStreamObserver) responseObserver;
     addCallback(
         future,
         new FutureCallback<Void>() {
+          boolean isCancelled() {
+            return (serverCallStreamObserver != null && serverCallStreamObserver.isCancelled())
+                || Context.current().isCancelled();
+          }
+
           @Override
           public void onSuccess(Void result) {
-            if (!Context.current().isCancelled()) {
-              responseObserver.onCompleted();
+            if (!isCancelled()) {
+              try {
+                responseObserver.onCompleted();
+              } catch (Exception e) {
+                onFailure(e);
+              }
             }
           }
 
           @Override
           public void onFailure(Throwable t) {
-            if (!Context.current().isCancelled() &&
+            if (!isCancelled() &&
                 !(t instanceof CancellationException)) {
               responseObserver.onError(Status.fromThrowable(t).asException());
             }
           }
         },
         Context.current().fixedContextExecutor(directExecutor()));
-    Context.current().addListener(
-        (context) -> future.cancel(false),
-        directExecutor());
+    if (serverCallStreamObserver != null) {
+      serverCallStreamObserver.setOnCancelHandler(
+          () -> future.cancel(false));
+    }
   }
 
   abstract class KeepaliveWatcher implements Watcher {
