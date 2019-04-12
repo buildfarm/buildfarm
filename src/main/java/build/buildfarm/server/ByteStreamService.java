@@ -361,6 +361,7 @@ class ByteStreamService extends ByteStreamImplBase {
                       responseObserver.onNext(WriteResponse.newBuilder()
                           .setCommittedSize(write.getCommittedSize())
                           .build());
+                      responseObserver.onCompleted();
                     } catch (Throwable t) {
                       logger.log(SEVERE, format("error delivering committedSize to %s", resourceName), t);
                     }
@@ -460,8 +461,7 @@ class ByteStreamService extends ByteStreamImplBase {
 
       @Override
       public void onCompleted() {
-        logger.finer("calling completed for " + name);
-        responseObserver.onCompleted();
+        logger.finer("got completed for " + name);
       }
     };
   }
