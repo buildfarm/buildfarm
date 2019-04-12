@@ -52,6 +52,7 @@ import io.grpc.stub.StreamObserver;
 import io.grpc.util.MutableHandlerRegistry;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.After;
@@ -205,7 +206,7 @@ public class StubInstanceTest {
         DIGEST_UTIL.compute(first),
         DIGEST_UTIL.compute(last));
     assertThat(instance.putAllBlobs(blobs)).isEqualTo(digests);
-    verify(uploader, times(1)).uploadBlobs(any(Iterable.class));
+    verify(uploader, times(1)).uploadBlobs(any(Map.class));
   }
 
   @Test

@@ -27,10 +27,13 @@ import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Chunker;
 import build.buildfarm.worker.PipelineStage.NullStage;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
+import com.google.common.hash.HashCode;
 import com.google.common.jimfs.Configuration;
 import com.google.common.jimfs.Jimfs;
 import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.FileNode;
@@ -41,6 +44,9 @@ import java.io.IOException;
 import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collections;
+import java.util.Map;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.junit.Before;
@@ -95,13 +101,16 @@ public class ReportResultStageTest {
     Tree emptyTree = Tree.newBuilder()
         .setRoot(Directory.getDefaultInstance())
         .build();
+    Digest emptyTreeDigest = digestUtil.compute(emptyTree);
+    ArgumentCaptor<Map<HashCode, Chunker>> captor = ArgumentCaptor.forClass(Map.class);
     verify(mockUploader)
-        .uploadBlobs(eq(ImmutableList.<Chunker>of(
-            new Chunker(emptyTree.toByteString(), digestUtil.compute(emptyTree)))));
+        .uploadBlobs(captor.capture());
+    Map<HashCode, Chunker> chunkers = captor.getValue();
+    assertThat(chunkers).containsKey(HashCode.fromString(emptyTreeDigest.getHash()));
     assertThat(resultBuilder.getOutputDirectoriesList()).containsExactly(
         OutputDirectory.newBuilder()
             .setPath("foo")
-            .setTreeDigest(digestUtil.compute(emptyTree))
+            .setTreeDigest(emptyTreeDigest)
             .build());
   }
 
@@ -128,14 +137,17 @@ public class ReportResultStageTest {
                 .build())
             .build())
         .build();
+    Digest treeDigest = digestUtil.compute(tree);
+    ArgumentCaptor<Map<HashCode, Chunker>> captor = ArgumentCaptor.forClass(Map.class);
     verify(mockUploader)
-        .uploadBlobs(eq(ImmutableList.<Chunker>of(
-            new Chunker(ByteString.EMPTY, digestUtil.empty()),
-            new Chunker(tree.toByteString(), digestUtil.compute(tree)))));
+        .uploadBlobs(captor.capture());
+    Map<HashCode, Chunker> chunkers = captor.getValue();
+    assertThat(chunkers).containsKey(HashCode.fromString(digestUtil.empty().getHash()));
+    assertThat(chunkers).containsKey(HashCode.fromString(treeDigest.getHash()));
     assertThat(resultBuilder.getOutputDirectoriesList()).containsExactly(
         OutputDirectory.newBuilder()
             .setPath("foo")
-            .setTreeDigest(digestUtil.compute(tree))
+            .setTreeDigest(treeDigest)
             .build());
   }
 
@@ -171,14 +183,17 @@ public class ReportResultStageTest {
             .build())
         .addChildren(subDirectory)
         .build();
+    Digest treeDigest = digestUtil.compute(tree);
+    ArgumentCaptor<Map<HashCode, Chunker>> captor = ArgumentCaptor.forClass(Map.class);
     verify(mockUploader)
-        .uploadBlobs(eq(ImmutableList.<Chunker>of(
-            new Chunker(ByteString.EMPTY, digestUtil.empty()),
-            new Chunker(tree.toByteString(), digestUtil.compute(tree)))));
+        .uploadBlobs(captor.capture());
+    Map<HashCode, Chunker> chunkers = captor.getValue();
+    assertThat(chunkers).containsKey(HashCode.fromString(digestUtil.empty().getHash()));
+    assertThat(chunkers).containsKey(HashCode.fromString(treeDigest.getHash()));
     assertThat(resultBuilder.getOutputDirectoriesList()).containsExactly(
         OutputDirectory.newBuilder()
             .setPath("foo")
-            .setTreeDigest(digestUtil.compute(tree))
+            .setTreeDigest(treeDigest)
             .build());
   }
 

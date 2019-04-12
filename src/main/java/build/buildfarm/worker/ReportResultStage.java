@@ -23,6 +23,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Maps;
+import com.google.common.hash.HashCode;
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
@@ -121,24 +123,26 @@ public class ReportResultStage extends PipelineStage {
           result::setStderrDigest);
     }
 
-    List<Chunker> filesToUpload = new ArrayList<>();
+    Map<HashCode, Chunker> filesToUpload = Maps.newHashMap();
 
     Map<Digest, Path> digestToFile = manifest.getDigestToFile();
     Map<Digest, Chunker> digestToChunkers = manifest.getDigestToChunkers();
-    Collection<Digest> digests = new ArrayList<>();
+    ImmutableList.Builder<Digest> digests = ImmutableList.builder();
     digests.addAll(digestToFile.keySet());
     digests.addAll(digestToChunkers.keySet());
 
-    for (Digest digest : digests) {
+    for (Digest digest : digests.build()) {
       Chunker chunker;
       Path file = digestToFile.get(digest);
       if (file != null) {
-        chunker = new Chunker(file, digest);
+        chunker = Chunker.builder()
+            .setInput(digest.getSizeBytes(), file)
+            .build();
       } else {
         chunker = digestToChunkers.get(digest);
       }
       if (chunker != null) {
-        filesToUpload.add(chunker);
+        filesToUpload.put(HashCode.fromString(digest.getHash()), chunker);
       }
     }
 
@@ -160,8 +164,9 @@ public class ReportResultStage extends PipelineStage {
     try {
       executeResponse = operationContext.operation
           .getResponse().unpack(ExecuteResponse.class);
-    } catch (InvalidProtocolBufferException ex) {
+    } catch (InvalidProtocolBufferException e) {
       poller.stop();
+      logger.log(SEVERE, "invalid ExecuteResponse for " + operationName, e);
       return null;
     }
 
@@ -177,8 +182,9 @@ public class ReportResultStage extends PipelineStage {
       status
           .setCode(Code.FAILED_PRECONDITION.getNumber())
           .setMessage(e.getMessage());
-    } catch (IOException ex) {
+    } catch (IOException e) {
       poller.stop();
+      logger.log(SEVERE, "error while uploading outputs for " + operationName, e);
       return null;
     }
 
@@ -203,6 +209,7 @@ public class ReportResultStage extends PipelineStage {
     poller.stop();
 
     if (!workerContext.putOperation(operation)) {
+      logger.severe("could not put operation " + operationName);
       return null;
     }
 

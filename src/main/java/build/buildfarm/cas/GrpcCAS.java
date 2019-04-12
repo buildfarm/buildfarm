@@ -32,14 +32,15 @@ import build.buildfarm.common.grpc.RetryException;
 import build.buildfarm.common.grpc.StubWriteOutputStream;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Chunker;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
-import com.google.common.util.concurrent.ListenableFuture;
 import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamBlockingStub;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamStub;
 import com.google.bytestream.ByteStreamProto.ReadRequest;
 import com.google.bytestream.ByteStreamProto.ReadResponse;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
+import com.google.common.hash.HashCode;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.Iterators;
@@ -187,7 +188,9 @@ class GrpcCAS implements ContentAddressableStorage {
 
   @Override
   public Write getWrite(Digest digest, UUID uuid) {
-    String resourceName = ByteStreamUploader.getResourceName(uuid, instanceName, digest);
+    HashCode hash = HashCode.fromString(digest.getHash());
+    String resourceName = ByteStreamUploader.uploadResourceName(
+        instanceName, uuid, hash, digest.getSizeBytes());
     return new StubWriteOutputStream(
         bsBlockingStub,
         bsStub,
@@ -198,9 +201,10 @@ class GrpcCAS implements ContentAddressableStorage {
 
   @Override
   public void put(Blob blob) throws InterruptedException {
-    Chunker chunker = new Chunker(blob.getData(), blob.getDigest());
+    Chunker chunker = Chunker.builder().setInput(blob.getData()).build();
     try {
-      uploader.uploadBlobs(Collections.singleton(chunker));
+      uploader.uploadBlob(
+          HashCode.fromString(blob.getDigest().getHash()), chunker);
     } catch (RetryException e) {
       if (e.getCause() instanceof StatusRuntimeException) {
         throw (StatusRuntimeException) e.getCause();

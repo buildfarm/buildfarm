@@ -57,8 +57,8 @@ import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Iterators;
-import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.hash.HashCode;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.common.util.concurrent.SettableFuture;
@@ -77,7 +77,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Collections;
 import java.util.Iterator;
-import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutionException;
@@ -205,13 +205,16 @@ public class StubInstance implements Instance {
   public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs)
       throws IOException, IllegalArgumentException, InterruptedException {
     // sort of a blatant misuse - one chunker per input, query digests before exhausting iterators
-    Iterable<Chunker> chunkers = Iterables.transform(
-        blobs, blob -> new Chunker(blob, digestUtil.compute(blob)));
-    List<Digest> digests = new ImmutableList.Builder<Digest>()
-        .addAll(Iterables.transform(chunkers, chunker -> chunker.digest()))
-        .build();
+    Map<HashCode, Chunker> chunkers = Maps.newHashMap();
+    ImmutableList.Builder<Digest> digests = ImmutableList.builder();
+    for (ByteString blob : blobs) {
+      Chunker chunker = Chunker.builder().setInput(blob).build();
+      Digest digest = digestUtil.compute(blob);
+      digests.add(digest);
+      chunkers.put(HashCode.fromString(digest.getHash()), chunker);
+    }
     uploader.uploadBlobs(chunkers);
-    return digests;
+    return digests.build();
   }
 
   @Override
@@ -297,7 +300,11 @@ public class StubInstance implements Instance {
    */
   @Override
   public Write getBlobWrite(Digest digest, UUID uuid) {
-    String resourceName = ByteStreamUploader.getResourceName(uuid, getName(), digest);
+    String resourceName = ByteStreamUploader.uploadResourceName(
+        getName(),
+        uuid,
+        HashCode.fromString(digest.getHash()),
+        digest.getSizeBytes());
     return getWrite(resourceName, digest.getSizeBytes(), /* autoflush=*/ false);
   }
 
@@ -307,9 +314,9 @@ public class StubInstance implements Instance {
     if (blob.size() == 0) {
       return digestUtil.empty();
     }
+    Chunker chunker = Chunker.builder().setInput(blob).build();
     Digest digest = digestUtil.compute(blob);
-    Chunker chunker = new Chunker(blob, digest);
-    uploader.uploadBlobs(Collections.singleton(chunker));
+    uploader.uploadBlob(HashCode.fromString(digest.getHash()), chunker);
     return digest;
   }
 

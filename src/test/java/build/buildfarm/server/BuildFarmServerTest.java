@@ -56,8 +56,9 @@ import build.buildfarm.v1test.TakeOperationRequest;
 import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
-import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
+import com.google.common.hash.HashCode;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.longrunning.CancelOperationRequest;
 import com.google.longrunning.GetOperationRequest;
@@ -341,19 +342,21 @@ public class BuildFarmServerTest {
     Command command = Command.newBuilder()
         .addArguments("echo")
         .build();
-    Digest commandBlobDigest = digestUtil.compute(command);
+    Digest commandDigest = digestUtil.compute(command);
     Directory root = Directory.getDefaultInstance();
     Digest rootBlobDigest = digestUtil.compute(root);
     Action action = actionBuilder
-        .setCommandDigest(commandBlobDigest)
+        .setCommandDigest(commandDigest)
         .setInputRootDigest(rootBlobDigest)
         .build();
     Digest actionDigest = digestUtil.compute(action);
-    ByteStreamUploader uploader = new ByteStreamUploader(INSTANCE_NAME, inProcessChannel, null, 60, Retrier.NO_RETRIES, null);
+    ByteStreamUploader uploader = new ByteStreamUploader(INSTANCE_NAME, inProcessChannel, null, 60, Retrier.NO_RETRIES);
 
-    uploader.uploadBlobs(ImmutableList.of(
-        new Chunker(action.toByteString(), actionDigest),
-        new Chunker(command.toByteString(), commandBlobDigest)));
+    uploader.uploadBlobs(ImmutableMap.of(
+        HashCode.fromString(actionDigest.getHash()),
+        Chunker.builder().setInput(action.toByteString()).build(),
+        HashCode.fromString(commandDigest.getHash()),
+        Chunker.builder().setInput(command.toByteString()).build()));
     return actionDigest;
   }
 
@@ -394,8 +397,9 @@ public class BuildFarmServerTest {
     DigestUtil digestUtil = new DigestUtil(HashFunction.SHA256);
     ByteString content = ByteString.copyFromUtf8("Hello, World!");
     Digest digest = digestUtil.compute(content);
+    HashCode hash = HashCode.fromString(digest.getHash());
     UUID uuid = UUID.randomUUID();
-    String resourceName = ByteStreamUploader.getResourceName(uuid, INSTANCE_NAME, digest);
+    String resourceName = ByteStreamUploader.uploadResourceName(INSTANCE_NAME, uuid, hash, content.size());
 
     assertThat(getBlob(digest)).isNull();
 
