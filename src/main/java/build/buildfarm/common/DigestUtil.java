@@ -164,14 +164,18 @@ public class DigestUtil {
     }.hash(hashFn.getHash()).toString();
   }
 
-  public Digest compute(ByteString blob) {
+  public HashCode computeHash(ByteString blob) {
     Hasher hasher = hashFn.getHash().newHasher();
     try {
       blob.writeTo(Funnels.asOutputStream(hasher));
     } catch (IOException e) {
       /* impossible, due to Funnels.asOutputStream behavior */
     }
-    return buildDigest(hasher.hash().toString(), blob.size());
+    return hasher.hash();
+  }
+
+  public Digest compute(ByteString blob) {
+    return buildDigest(computeHash(blob).toString(), blob.size());
   }
 
   public Digest build(String hexHash, long size) {

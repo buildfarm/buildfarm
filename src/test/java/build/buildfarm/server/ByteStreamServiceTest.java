@@ -18,6 +18,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Write;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.ByteStreamUploader;
+import com.google.common.hash.HashCode;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.bytestream.ByteStreamGrpc;
@@ -131,7 +132,8 @@ public class ByteStreamServiceTest {
     Instance instance = mock(Instance.class);
     when(instance.getBlobWrite(digest, uuid)).thenReturn(write);
 
-    String resourceName = ByteStreamUploader.getResourceName(uuid, /* instanceName=*/ null, digest);
+    HashCode hash = HashCode.fromString(digest.getHash());
+    String resourceName = ByteStreamUploader.uploadResourceName(/* instanceName=*/ null, uuid, hash, digest.getSizeBytes());
     when(instances.getFromUploadBlob(eq(resourceName))).thenReturn(instance);
 
     Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
@@ -196,7 +198,8 @@ public class ByteStreamServiceTest {
     Instance instance = mock(Instance.class);
     when(instance.getBlobWrite(digest, uuid)).thenReturn(write);
 
-    String resourceName = ByteStreamUploader.getResourceName(uuid, /* instanceName=*/ null, digest);
+    HashCode hash = HashCode.fromString(digest.getHash());
+    String resourceName = ByteStreamUploader.uploadResourceName(/* instanceName=*/ null, uuid, hash, digest.getSizeBytes());
     when(instances.getFromUploadBlob(eq(resourceName))).thenReturn(instance);
 
     Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();

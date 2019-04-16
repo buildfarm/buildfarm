@@ -17,6 +17,7 @@ package build.buildfarm.cas;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -30,12 +31,14 @@ import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.ByteStreamServiceWriter;
 import build.buildfarm.common.grpc.RetryException;
 import build.buildfarm.instance.stub.ByteStreamUploader;
+import build.buildfarm.instance.stub.Chunker;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamImplBase;
 import com.google.bytestream.ByteStreamProto.ReadRequest;
 import com.google.bytestream.ByteStreamProto.ReadResponse;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.MultimapBuilder;
+import com.google.common.hash.HashCode;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
 import io.grpc.Channel;
@@ -47,6 +50,7 @@ import io.grpc.stub.StreamObserver;
 import io.grpc.util.MutableHandlerRegistry;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -154,7 +158,8 @@ public class GrpcCASTest {
         onExpirations);
     Runnable onExpiration = mock(Runnable.class);
     cas.put(new Blob(uploadContent, digest), onExpiration);
-    verify(uploader, times(1)).uploadBlobs(any(Iterable.class));
+    verify(uploader, times(1)).uploadBlob(
+        eq(HashCode.fromString(digest.getHash())), any(Chunker.class));
     assertThat(onExpirations.get(digest)).containsExactly(onExpiration);
     verifyZeroInteractions(onExpiration);
   }
@@ -165,7 +170,8 @@ public class GrpcCASTest {
     ByteString writeContent = ByteString.copyFromUtf8("written");
     Digest digest = DIGEST_UTIL.compute(writeContent);
     String instanceName = "test";
-    String resourceName = ByteStreamUploader.getResourceName(uuid, instanceName, digest);
+    HashCode hash = HashCode.fromString(digest.getHash());
+    String resourceName = ByteStreamUploader.uploadResourceName(instanceName, uuid, hash, digest.getSizeBytes());
 
     // better test might just put a full gRPC CAS behind an in-process and validate state
     SettableFuture<ByteString> content = SettableFuture.create();

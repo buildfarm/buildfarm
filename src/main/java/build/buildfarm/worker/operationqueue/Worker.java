@@ -145,11 +145,12 @@ public class Worker {
             /*options.experimentalRemoteRetryMultiplier=*/ 2,
             /*options.experimentalRemoteRetryJitter=*/ 0.1,
             /*options.experimentalRemoteRetryMaxAttempts=*/ 5),
-        Retrier.DEFAULT_IS_RETRIABLE);
+        Retrier.DEFAULT_IS_RETRIABLE,
+        retryScheduler);
   }
 
   private static ByteStreamUploader createStubUploader(Channel channel, Retrier retrier) {
-    return new ByteStreamUploader("", channel, null, 300, retrier, retryScheduler);
+    return new ByteStreamUploader("", channel, null, 300, retrier);
   }
 
   private static Instance createInstance(
