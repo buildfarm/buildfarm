@@ -16,6 +16,7 @@ import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
@@ -430,10 +431,13 @@ class Cat {
     ManagedChannel channel = createChannel(host);
     Instance instance = new StubInstance(instanceName, "bf-cat", digestUtil, channel, 10, TimeUnit.SECONDS);
     String type = args[3];
+
+    ServerCapabilities capabilities = instance.getCapabilities();
     if (type.equals("Operations") && args.length == 4) {
       System.out.println("Listing Operations");
       listOperations(instance);
     }
+    // should do something to match caps against requested digests
     if (type.equals("Missing")) {
       ImmutableList.Builder<Digest> digests = ImmutableList.builder();
       for (int i = 4; i < args.length; i++) {

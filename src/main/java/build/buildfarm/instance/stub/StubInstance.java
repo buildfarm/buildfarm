@@ -30,6 +30,8 @@ import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest.Request;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
+import build.bazel.remote.execution.v2.CapabilitiesGrpc;
+import build.bazel.remote.execution.v2.CapabilitiesGrpc.CapabilitiesBlockingStub;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageBlockingStub;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageFutureStub;
@@ -43,6 +45,7 @@ import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
 import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
 import build.bazel.remote.execution.v2.GetActionResultRequest;
+import build.bazel.remote.execution.v2.GetCapabilitiesRequest;
 import build.bazel.remote.execution.v2.GetTreeRequest;
 import build.bazel.remote.execution.v2.GetTreeResponse;
 import build.bazel.remote.execution.v2.Platform;
@@ -182,6 +185,15 @@ public class StubInstance implements Instance {
             @Override
             public ActionCacheBlockingStub get() {
               return ActionCacheGrpc.newBlockingStub(channel);
+            }
+          });
+
+  private final Supplier<CapabilitiesBlockingStub> capsBlockingStub =
+      Suppliers.memoize(
+          new Supplier<CapabilitiesBlockingStub>() {
+            @Override
+            public CapabilitiesBlockingStub get() {
+              return CapabilitiesGrpc.newBlockingStub(channel);
             }
           });
 
@@ -635,12 +647,17 @@ public class StubInstance implements Instance {
     operationsBlockingStub.get()
         .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
         .cancelOperation(CancelOperationRequest.newBuilder()
-        .setName(operationName)
-        .build());
+            .setName(operationName)
+            .build());
   }
 
   @Override
   public ServerCapabilities getCapabilities() {
-    throw new UnsupportedOperationException();
+    throwIfStopped();
+    return capsBlockingStub.get()
+        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
+        .getCapabilities(GetCapabilitiesRequest.newBuilder()
+            .setInstanceName(getName())
+            .build());
   }
 }
