@@ -22,6 +22,7 @@ import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static java.lang.String.format;
+import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.BatchReadBlobsRequest;
@@ -39,6 +40,7 @@ import build.bazel.remote.execution.v2.GetTreeRequest;
 import build.bazel.remote.execution.v2.GetTreeResponse;
 import build.buildfarm.instance.Instance;
 import com.google.common.base.Function;
+import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.FutureCallback;
@@ -76,6 +78,7 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
   public void findMissingBlobs(
       FindMissingBlobsRequest request,
       StreamObserver<FindMissingBlobsResponse> responseObserver) {
+    Stopwatch stopwatch = Stopwatch.createStarted();
     Instance instance;
     try {
       instance = instances.get(request.getInstanceName());
@@ -96,7 +99,14 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
             try {
               responseObserver.onNext(builder.build());
               responseObserver.onCompleted();
-              logger.log(requestLogLevel, format("FindMissingBlobs(%s) for %d blobs", instance.getName(), request.getBlobDigestsList().size()));
+              long elapsedMicros = stopwatch.elapsed(MICROSECONDS);
+              logger.log(
+                  requestLogLevel,
+                  format(
+                      "FindMissingBlobs(%s) for %d blobs in %gms",
+                      instance.getName(),
+                      request.getBlobDigestsList().size(),
+                      elapsedMicros / 1000.0));
             } catch (Throwable t) {
               onFailure(t);
             }
