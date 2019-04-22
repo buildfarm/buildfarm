@@ -9,35 +9,17 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_jar")
 # Needed for "well-known protos" and @com_google_protobuf//:protoc.
 http_archive(
     name = "com_google_protobuf",
-    patch_args = ["-p1"],
-    patches = [
-        "//third_party/com_google_protobuf:b6375e03aa.patch",
-        "//third_party/com_google_protobuf:7e1d9e419e.patch",
-        "//third_party/com_google_protobuf:qualified_error_prone_annotations.patch",
-    ],
-    sha256 = "b50be32ea806bdb948c22595ba0742c75dc2f8799865def414cf27ea5706f2b7",
-    strip_prefix = "protobuf-3.7.0",
-    urls = ["https://github.com/google/protobuf/archive/v3.7.0.zip"],
+    sha256 = "f976a4cd3f1699b6d20c1e944ca1de6754777918320c719742e1674fcf247b7e",
+    strip_prefix = "protobuf-3.7.1",
+    urls = ["https://github.com/google/protobuf/archive/v3.7.1.zip"],
 )
-
-load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
-
-protobuf_deps()
 
 # Needed for @grpc_java//compiler:grpc_java_plugin.
 http_archive(
     name = "io_grpc_grpc_java",
-    patch_args = ["-p1"],
-    patches = [
-        "//third_party/io_grpc_grpc_java:054def3c63.patch",
-        "//third_party/io_grpc_grpc_java:0959a846c8.patch",
-        "//third_party/io_grpc_grpc_java:952a767b9c.patch",
-        "//third_party/io_grpc_grpc_java:c63752789e.patch",
-        "//third_party/io_grpc_grpc_java:3c24dc6fe1.patch",
-    ],
-    sha256 = "f5d0bdebc2a50d0e28f0d228d6c35081d3e973e6159f2695aa5c8c7f93d1e4d6",
-    strip_prefix = "grpc-java-1.19.0",
-    urls = ["https://github.com/grpc/grpc-java/archive/v1.19.0.zip"],
+    sha256 = "9d23d9fec84e24bd3962f5ef9d1fd61ce939d3f649a22bcab0f19e8167fae8ef",
+    strip_prefix = "grpc-java-1.20.0",
+    urls = ["https://github.com/grpc/grpc-java/archive/v1.20.0.zip"],
 )
 
 load("@io_grpc_grpc_java//:repositories.bzl", "grpc_java_repositories")
@@ -66,9 +48,9 @@ http_archive(
 
 http_archive(
     name = "bazel_skylib",
-    sha256 = "eb5c57e4c12e68c0c20bc774bfbc60a568e800d025557bc4ea022c6479acc867",
-    strip_prefix = "bazel-skylib-0.6.0",
-    urls = ["https://github.com/bazelbuild/bazel-skylib/archive/0.6.0.tar.gz"],
+    sha256 = "2ea8a5ed2b448baf4a6855d3ce049c4c452a6470b1efd1504fdb7c1c134d220a",
+    strip_prefix = "bazel-skylib-0.8.0",
+    url = "https://github.com/bazelbuild/bazel-skylib/archive/0.8.0.tar.gz",
 )
 
 http_archive(

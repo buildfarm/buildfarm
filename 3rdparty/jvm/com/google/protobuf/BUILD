@@ -19,6 +19,7 @@ java_library(
     runtime_deps = [
         ":protobuf_java",
         "//3rdparty/jvm/com/google/code/gson",
+        "//3rdparty/jvm/com/google/errorprone:error_prone_annotations",
         "//3rdparty/jvm/com/google/guava",
     ],
 )
