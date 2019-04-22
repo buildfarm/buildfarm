@@ -1,7 +1,7 @@
 package build.buildfarm;
 
 import static build.buildfarm.instance.Utils.getBlob;
-import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.lang.String.format;
 
 import build.bazel.remote.execution.v2.Action;
@@ -131,7 +131,7 @@ class Cat {
 
   private static void printFindMissing(Instance instance, Iterable<Digest> digests) throws ExecutionException, InterruptedException {
     Stopwatch stopwatch = Stopwatch.createStarted();
-    Iterable<Digest> missingDigests = instance.findMissingBlobs(digests, newDirectExecutorService()).get();
+    Iterable<Digest> missingDigests = instance.findMissingBlobs(digests, directExecutor()).get();
     long elapsedMicros = stopwatch.elapsed(TimeUnit.MICROSECONDS);
 
     boolean missing = false;
