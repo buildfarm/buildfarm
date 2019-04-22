@@ -44,7 +44,7 @@ load("@io_grpc_grpc_java//:repositories.bzl", "grpc_java_repositories")
 
 grpc_java_repositories(
     omit_com_google_guava = True,
-    omit_com_google_guava_failureaccess = True
+    omit_com_google_guava_failureaccess = True,
 )
 
 http_archive(
@@ -86,8 +86,8 @@ load(
 
 http_jar(
     name = "jedis",
-    url = "https://github.com/werkt/jedis/releases/download/3.0.1-2418e3e2c6/jedis-3.0.1-2418e3e2c6.jar",
     sha256 = "9af738bf341a5f34ed38a7ab5c7666f76d17624e29071b49cc2113f5acbf21e5",
+    url = "https://github.com/werkt/jedis/releases/download/3.0.1-2418e3e2c6/jedis-3.0.1-2418e3e2c6.jar",
 )
 
 bind(

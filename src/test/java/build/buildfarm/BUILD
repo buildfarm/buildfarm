@@ -31,7 +31,8 @@ java_test(
     size = "small",
     srcs = glob(
         ["common/**/*.java"],
-        exclude=["common/grpc/ByteStreamServiceWriter.java"]),
+        exclude = ["common/grpc/ByteStreamServiceWriter.java"],
+    ),
     test_class = "build.buildfarm.AllTests",
     deps = [
         ":test_runner",
@@ -49,8 +50,8 @@ java_test(
     srcs = glob(["cas/*.java"]),
     test_class = "build.buildfarm.AllTests",
     deps = [
-        ":test_runner",
         ":test-common-grpc",
+        ":test_runner",
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "//3rdparty/jvm/com/google/truth",
@@ -241,8 +242,8 @@ java_test(
     srcs = glob(["instance/stub/*.java"]),
     test_class = "build.buildfarm.AllTests",
     deps = [
-        ":test_runner",
         ":test-common-grpc",
+        ":test_runner",
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "//3rdparty/jvm/com/google/truth",
