@@ -20,10 +20,8 @@ import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
-import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
-import build.bazel.remote.execution.v2.GetTreeResponse;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.ShardBackplane;
@@ -40,7 +38,6 @@ import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.RedisShardBackplaneConfig;
 import build.buildfarm.v1test.ShardWorker;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -52,7 +49,6 @@ import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
-import com.google.protobuf.Any;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.JsonFormat;
@@ -68,7 +64,6 @@ import java.net.SocketTimeoutException;
 import java.time.Instant;
 import java.util.AbstractMap;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -1284,10 +1279,6 @@ public class RedisShardBackplane implements ShardBackplane {
     return config.getCasPrefix() + ":" + DigestUtil.toString(blobDigest);
   }
 
-  private String treeKey(Digest blobDigest) {
-    return config.getTreePrefix() + ":" + DigestUtil.toString(blobDigest);
-  }
-
   private String acKey(ActionKey actionKey) {
     return config.getActionCachePrefix() + ":" + DigestUtil.toString(actionKey.getDigest());
   }
@@ -1310,36 +1301,6 @@ public class RedisShardBackplane implements ShardBackplane {
 
   public static String parseOperationChannel(String channel) {
     return channel.split(":")[1];
-  }
-
-  @Override
-  public void putTree(Digest inputRoot, Iterable<Directory> directories) throws IOException {
-    String treeValue = JsonFormat.printer().print(GetTreeResponse.newBuilder()
-        .addAllDirectories(directories)
-        .build());
-    withVoidBackplaneException((jedis) -> jedis.setex(treeKey(inputRoot), config.getTreeExpire(), treeValue));
-  }
-
-  @Override
-  public Iterable<Directory> getTree(Digest inputRoot) throws IOException {
-    String json = withBackplaneException((jedis) -> jedis.get(treeKey(inputRoot)));
-    if (json == null) {
-      return null;
-    }
-
-    try {
-      GetTreeResponse.Builder builder = GetTreeResponse.newBuilder();
-      JsonFormat.parser().merge(json, builder);
-      return builder.build().getDirectoriesList();
-    } catch (InvalidProtocolBufferException e) {
-      logger.log(SEVERE, "error parsing tree " + json, e);
-      return null;
-    }
-  }
-
-  @Override
-  public void removeTree(Digest inputRoot) throws IOException {
-    withVoidBackplaneException((jedis) -> jedis.del(treeKey(inputRoot)));
   }
 
   @Override

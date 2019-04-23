@@ -157,8 +157,6 @@ message RedisShardBackplaneConfig {
   string operation_channel_prefix = 9;
   string cas_prefix = 10;
   int32 cas_expire = 11;
-  string tree_prefix = 12;
-  int32 tree_expire = 13;
   bool subscribe_to_operation = 14;
   int32 max_queue_depth = 16;
   int32 max_pre_queue_depth = 17;

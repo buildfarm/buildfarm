@@ -16,7 +16,6 @@ package build.buildfarm.common;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
-import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.ThreadSafety.ThreadSafe;
@@ -293,24 +292,6 @@ public interface ShardBackplane {
 
   @ThreadSafe
   void queue(QueueEntry queueEntry, Operation operation) throws IOException;
-
-  /**
-   * Store a directory tree and all of its descendants
-   */
-  @ThreadSafe
-  void putTree(Digest inputRoot, Iterable<Directory> directories) throws IOException;
-
-  /**
-   * Retrieve a directory tree and all of its descendants
-   */
-  @ThreadSafe
-  Iterable<Directory> getTree(Digest inputRoot) throws IOException;
-
-  /**
-   * Destroy a cached directory tree of a completed operation
-   */
-  @ThreadSafe
-  void removeTree(Digest inputRoot) throws IOException;
 
   /**
    * Page through action cache
