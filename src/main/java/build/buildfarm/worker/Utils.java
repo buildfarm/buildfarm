@@ -79,7 +79,7 @@ public class Utils {
   /**
    * Returns the status of a file.
    */
-  private static FileStatus stat(final Path path, final boolean followSymlinks) throws IOException {
+  public static FileStatus stat(final Path path, final boolean followSymlinks) throws IOException {
     final BasicFileAttributes attributes;
     try {
       attributes =

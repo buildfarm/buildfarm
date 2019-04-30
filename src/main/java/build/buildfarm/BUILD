@@ -444,6 +444,8 @@ java_binary(
     main_class = "build.buildfarm.Executor",
     deps = [
         ":common",
+        ":stub-instance",
+        ":worker",
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "//3rdparty/jvm/io/grpc:grpc_api",
@@ -452,9 +454,31 @@ java_binary(
         "//3rdparty/jvm/io/grpc:grpc_netty",
         "//3rdparty/jvm/io/grpc:grpc_protobuf",
         "//3rdparty/jvm/io/grpc:grpc_stub",
+        "@googleapis//:google_bytestream_bytestream_java_grpc",
+        "@googleapis//:google_bytestream_bytestream_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
         "@googleapis//:google_rpc_status_java_proto",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+    ],
+)
+
+java_binary(
+    name = "bf-extractor",
+    srcs = ["Extract.java"],
+    main_class = "build.buildfarm.Extract",
+    deps = [
+        ":common",
+        "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java",
+        "//3rdparty/jvm/io/grpc:grpc_api",
+        "//3rdparty/jvm/io/grpc:grpc_context",
+        "//3rdparty/jvm/io/grpc:grpc_core",
+        "//3rdparty/jvm/io/grpc:grpc_netty",
+        "//3rdparty/jvm/io/grpc:grpc_protobuf",
+        "//3rdparty/jvm/io/grpc:grpc_stub",
+        "@googleapis//:google_bytestream_bytestream_java_grpc",
+        "@googleapis//:google_bytestream_bytestream_java_proto",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )

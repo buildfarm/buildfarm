@@ -1,31 +1,59 @@
 package build.buildfarm;
 
 import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.EXECUTING;
+import static build.buildfarm.instance.stub.ByteStreamUploader.uploadResourceName;
+import static build.buildfarm.worker.Utils.stat;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
+import static com.google.common.collect.Iterables.all;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 
+import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
+import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest.Request;
+import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
+import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc;
+import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageBlockingStub;
+import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteRequest;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecutionGrpc;
 import build.bazel.remote.execution.v2.ExecutionGrpc.ExecutionStub;
-import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
+import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.worker.Dirent;
+import build.buildfarm.worker.FileStatus;
+import com.google.bytestream.ByteStreamGrpc;
+import com.google.bytestream.ByteStreamGrpc.ByteStreamStub;
+import com.google.bytestream.ByteStreamProto.WriteRequest;
+import com.google.bytestream.ByteStreamProto.WriteResponse;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import com.google.common.hash.HashCode;
+import com.google.common.util.concurrent.SettableFuture;
 import com.google.longrunning.Operation;
+import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.rpc.Code;
 import com.google.rpc.Status;
+import io.grpc.Channel;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.stub.StreamObserver;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Scanner;
+import java.util.UUID;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -169,9 +197,167 @@ class Executor {
     return builder.build();
   }
 
-  public static void main(String[] args) throws InterruptedException {
+  private static void loadFilesIntoCAS(String instanceName, Channel channel, Path blobsDir) throws Exception {
+    ContentAddressableStorageBlockingStub casStub = ContentAddressableStorageGrpc.newBlockingStub(channel);
+    List<Digest> missingDigests = findMissingBlobs(instanceName, blobsDir, casStub);
+    UUID uploadId = UUID.randomUUID();
+
+    int[] bucketSizes = new int[128];
+    BatchUpdateBlobsRequest.Builder[] buckets = new BatchUpdateBlobsRequest.Builder[128];
+    for (int i = 0; i < 128; i++) {
+      bucketSizes[i] = 0;
+      buckets[i] = BatchUpdateBlobsRequest.newBuilder()
+          .setInstanceName(instanceName);
+    }
+
+    ByteStreamStub bsStub = ByteStreamGrpc.newStub(channel);
+    for (Digest missingDigest : missingDigests) {
+      Path path = blobsDir.resolve(missingDigest.getHash());
+      if (missingDigest.getSizeBytes() < 1024 * 1024) {
+        Request request = Request.newBuilder()
+            .setDigest(missingDigest)
+            .setData(ByteString.copyFrom(Files.readAllBytes(path)))
+            .build();
+        boolean foundBucket = false;
+        int maxBucketSize = 0;
+        int minBucketSize = 2 * 1024 * 1024 + 1;
+        int maxBucketIndex = 0;
+        int minBucketIndex = -1;
+        int size = (int) missingDigest.getSizeBytes() + 48;
+        for (int i = 0; i < 128; i++) {
+          int newBucketSize = bucketSizes[i] + size;
+          if (newBucketSize < 2 * 1024 * 1024) {
+            if (bucketSizes[i] < minBucketSize) {
+              minBucketSize = bucketSizes[i];
+              minBucketIndex = i;
+            }
+          }
+          if (bucketSizes[i] > maxBucketSize) {
+            maxBucketSize = bucketSizes[i];
+            maxBucketIndex = i;
+          }
+        }
+        if (minBucketIndex < 0) {
+          bucketSizes[maxBucketIndex] = size;
+          BatchUpdateBlobsRequest batchRequest = buckets[maxBucketIndex].build();
+          Stopwatch stopwatch = Stopwatch.createStarted();
+          BatchUpdateBlobsResponse batchResponse = casStub.batchUpdateBlobs(batchRequest);
+          long usecs = stopwatch.elapsed(MICROSECONDS);
+          checkState(all(batchResponse.getResponsesList(), response -> Code.forNumber(response.getStatus().getCode()) == Code.OK));
+          System.out.println("Updated " + batchRequest.getRequestsCount() + " blobs in " + (usecs / 1000.0) + "ms");
+          buckets[maxBucketIndex] = BatchUpdateBlobsRequest.newBuilder()
+              .setInstanceName(instanceName)
+              .addRequests(request);
+        } else {
+          bucketSizes[minBucketIndex] += size;
+          buckets[minBucketIndex].addRequests(request);
+        }
+      } else {
+        Stopwatch stopwatch = Stopwatch.createStarted();
+        SettableFuture<WriteResponse> writtenFuture = SettableFuture.create();
+        StreamObserver<WriteRequest> requestObserver = bsStub.write(new StreamObserver<WriteResponse>() {
+          @Override
+          public void onNext(WriteResponse response) {
+            writtenFuture.set(response);
+          }
+
+          @Override
+          public void onCompleted() {
+          }
+
+          @Override
+          public void onError(Throwable t) {
+            writtenFuture.setException(t);
+          }
+        });
+        HashCode hash = HashCode.fromString(missingDigest.getHash());
+        String resourceName = uploadResourceName(
+            instanceName, uploadId, hash, missingDigest.getSizeBytes());
+        try (InputStream in = Files.newInputStream(path)) {
+          boolean first = true;
+          long writtenBytes = 0;
+          byte[] buf = new byte[64 * 1024];
+          while (writtenBytes != missingDigest.getSizeBytes()) {
+            int len = in.read(buf);
+            WriteRequest.Builder request = WriteRequest.newBuilder();
+            if (first) {
+              request.setResourceName(resourceName);
+            }
+            request
+                .setData(ByteString.copyFrom(buf, 0, len))
+                .setWriteOffset(writtenBytes);
+            if (writtenBytes + len == missingDigest.getSizeBytes()) {
+              request.setFinishWrite(true);
+            }
+            requestObserver.onNext(request.build());
+            writtenBytes += len;
+          }
+          WriteResponse response = writtenFuture.get();
+          System.out.println("Wrote long " + DigestUtil.toString(missingDigest) + " in " + (stopwatch.elapsed(MICROSECONDS) / 1000.0) + "us");
+        }
+      }
+    }
+    for (int i = 0; i < 128; i++) {
+      if (bucketSizes[i] > 0) {
+        BatchUpdateBlobsRequest batchRequest = buckets[i].build();
+        Stopwatch stopwatch = Stopwatch.createStarted();
+        BatchUpdateBlobsResponse batchResponse = casStub.batchUpdateBlobs(batchRequest);
+        long usecs = stopwatch.elapsed(MICROSECONDS);
+        checkState(all(batchResponse.getResponsesList(), response -> Code.forNumber(response.getStatus().getCode()) == Code.OK));
+        System.out.println("Updated " + batchRequest.getRequestsCount() + " blobs in " + (usecs / 1000.0) + "ms");
+      }
+    }
+  }
+
+  private static List<Digest> findMissingBlobs(
+      String instanceName,
+      Path blobsDir,
+      ContentAddressableStorageBlockingStub casStub) throws IOException {
+    FindMissingBlobsRequest.Builder request = FindMissingBlobsRequest.newBuilder()
+        .setInstanceName(instanceName);
+
+    int size = 0;
+
+    ImmutableList.Builder<Digest> missingDigests = ImmutableList.builder();
+
+    System.out.println("Looking for missing blobs");
+
+    Stopwatch stopwatch = Stopwatch.createUnstarted();
+    try (DirectoryStream<Path> stream = Files.newDirectoryStream(blobsDir)) {
+      for (Path file : stream) {
+        FileStatus stat = stat(file, /* followSymlinks=*/ false);
+
+        request.addBlobDigests(DigestUtil.buildDigest(file.getFileName().toString(), stat.getSize()));
+        size++;
+        if (size == 2 * 1024 * 1024 / 48) {
+          stopwatch.reset().start();
+          FindMissingBlobsResponse response = casStub.findMissingBlobs(request.build());
+          System.out.println("Found " + response.getMissingBlobDigestsCount() + " missing digests in " + (stopwatch.elapsed(MICROSECONDS) / 1000.0) + "ms");
+          missingDigests.addAll(response.getMissingBlobDigestsList());
+          request = FindMissingBlobsRequest.newBuilder()
+              .setInstanceName(instanceName);
+          size = 0;
+        }
+      }
+    }
+
+    if (size > 0) {
+      FindMissingBlobsResponse response = casStub.findMissingBlobs(request.build());
+      System.out.println("Found " + response.getMissingBlobDigestsCount() + " missing digests");
+      missingDigests.addAll(response.getMissingBlobDigestsList());
+    }
+    return missingDigests.build();
+  }
+
+  public static void main(String[] args) throws Exception {
     String host = args[0];
     String instanceName = args[1];
+    String blobsDir;
+    if (args.length == 3) {
+      blobsDir = args[2];
+    } else {
+      blobsDir = null;
+    }
 
     Scanner scanner = new Scanner(System.in);
 
@@ -181,6 +367,11 @@ class Executor {
     }
 
     ManagedChannel channel = createChannel(host);
+
+    if (blobsDir != null) {
+      System.out.println("Loading blobs into cas");
+      loadFilesIntoCAS(instanceName, channel, Paths.get(blobsDir));
+    }
 
     ExecutionStub execStub = ExecutionGrpc.newStub(channel);
 
