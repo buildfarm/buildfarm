@@ -180,7 +180,7 @@ public class Utils {
     try (DirectoryStream<Path> stream = Files.newDirectoryStream(path)) {
       for (Path file : stream) {
         FileStatus stat = statNullable(file, followSymlinks);
-        Dirent.Type type = direntTypeFromStat(statNullable(file, followSymlinks));
+        Dirent.Type type = direntTypeFromStat(stat);
         dirents.add(new Dirent(file.getFileName().toString(), type, stat));
       }
     }
