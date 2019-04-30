@@ -35,7 +35,9 @@ import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 import static java.nio.file.StandardOpenOption.APPEND;
 import static java.nio.file.StandardOpenOption.CREATE;
 import static java.nio.file.StandardOpenOption.TRUNCATE_EXISTING;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.MINUTES;
+import static java.util.concurrent.TimeUnit.HOURS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.WARNING;
 import static java.util.logging.Level.SEVERE;
@@ -78,6 +80,7 @@ import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.FileVisitOption;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -117,7 +120,13 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private final Consumer<Iterable<Digest>> onExpire;
   private final ExecutorService expireService;
   private final LoadingCache<BlobWriteKey, Write> writes = CacheBuilder.newBuilder()
-      .expireAfterWrite(10, TimeUnit.MINUTES)
+      .expireAfterAccess(1, HOURS)
+      .removalListener(new RemovalListener<BlobWriteKey, Write>() {
+        @Override
+        public void onRemoval(RemovalNotification<BlobWriteKey, Write> notification) {
+          notification.getValue().reset();
+        }
+      })
       .build(new CacheLoader<BlobWriteKey, Write>() {
         @Override
         public Write load(BlobWriteKey key) {
@@ -125,7 +134,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         }
       });
   private final LoadingCache<Digest, SettableFuture<Long>> writesInProgress = CacheBuilder.newBuilder()
-      .expireAfterWrite(10, TimeUnit.MINUTES)
+      .expireAfterAccess(1, HOURS)
       .removalListener(new RemovalListener<Digest, SettableFuture<Long>>() {
         @Override
         public void onRemoval(RemovalNotification<Digest, SettableFuture<Long>> notification) {
@@ -148,6 +157,24 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   public static class DigestMismatchException extends IOException {
     DigestMismatchException(String message) {
       super(message);
+    }
+  }
+
+  public static class IncompleteBlobException extends IOException {
+    private final Path writePath;
+    private final Path key;
+    private final long committed;
+    private final long expected;
+
+    IncompleteBlobException(Path writePath, Path key, long committed, long expected) {
+      super(
+          format(
+              "blob %s => %s: committed %d, expected %d",
+              writePath, key, committed, expected));
+      this.writePath = writePath;
+      this.key = key;
+      this.committed = committed;
+      this.expected = expected;
     }
   }
 
@@ -454,22 +481,23 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   Write newWrite(BlobWriteKey key) {
     return new Write() {
-      WriteOutputStream out = null;
+      CancellableOutputStream out = null;
+      Path path = null;
       boolean complete = false;
 
       @Override
       public void reset() {
-        if (out != null) {
-          try {
-            Path path = out.getPath();
-            if (Files.exists(path)) {
-              Files.delete(path);
-            }
-            out.close();
-          } catch (IOException e) {
-            logger.log(SEVERE, "could not reset write " + DigestUtil.toString(key.getDigest()) + ":" + key.getIdentifier(), e);
+        try {
+          if (out != null) {
+            out.cancel();
+          } else if (path != null && Files.exists(path)) {
+            Files.delete(path);
+            path = null;
           }
-          out = null;
+        } catch (IOException e) {
+          logger.log(SEVERE, "could not reset write " + DigestUtil.toString(key.getDigest()) + ":" + key.getIdentifier(), e);
+        } finally {
+          onClosed();
         }
       }
 
@@ -494,29 +522,19 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         return complete || (out == null && contains(key.getDigest()));
       }
 
+      public void onClosed() {
+        out = null;
+      }
+
       @Override
       public OutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits) throws IOException {
         if (out == null) {
-          out = newOutput(key.getDigest(), UUID.fromString(key.getIdentifier()));
+          out = newOutput(key.getDigest(), UUID.fromString(key.getIdentifier()), this::onClosed);
           if (out == null) {
             complete = true;
-            out = new WriteOutputStream(nullOutputStream());
+            out = new CancellableOutputStream(nullOutputStream());
           } else {
-            addListener(
-                () -> {
-                  // winner will already be renamed
-                  Path path = out.getPath();
-                  try {
-                    if (Files.exists(path)) {
-                      Files.delete(path);
-                    }
-                    out.close();
-                    out = null;
-                  } catch (IOException e) {
-                    logger.log(SEVERE, "error closing and deleting " + path, e);
-                  }
-                },
-                directExecutor());
+            path = out.getPath();
           }
         }
         return out;
@@ -537,12 +555,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     };
   }
 
-  WriteOutputStream newOutput(Digest digest, UUID uuid) throws IOException {
+  CancellableOutputStream newOutput(Digest digest, UUID uuid, Runnable onClosed) throws IOException {
     Path blobPath = getKey(digest, false);
-    final WriteOutputStream out;
+    final CancellableOutputStream cancellableOut;
     try {
       logger.finer(format("getWrite: %s", blobPath.getFileName()));
-      out = putImpl(
+      cancellableOut = putImpl(
           blobPath,
           uuid,
           () -> completeWrite(digest),
@@ -556,19 +574,37 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     } catch (InterruptedException e) {
       throw new IOException(e);
     }
-    if (out == null) {
+    if (cancellableOut == null) {
       decrementReference(blobPath);
       return null;
     }
-    return new WriteOutputStream(out) {
+    return new CancellableOutputStream(cancellableOut) {
       AtomicBoolean closed = new AtomicBoolean(false);
 
       @Override
-      public void close() throws IOException {
-        if (closed.compareAndSet(/* expected=*/ false, /* update=*/ true)) {
-          out.close();
+      public void cancel() throws IOException {
+        try {
+          if (closed.compareAndSet(/* expected=*/ false, /* update=*/ true)) {
+            cancellableOut.cancel();
+          }
+        } finally {
+          onClosed.run();
+        }
+      }
 
-          decrementReference(blobPath);
+      @Override
+      public void close() throws IOException {
+        try {
+          if (closed.compareAndSet(/* expected=*/ false, /* update=*/ true)) {
+            try {
+              out.close();
+              decrementReference(blobPath);
+            } catch (IncompleteBlobException e) {
+              // ignore
+            }
+          }
+        } finally {
+          onClosed.run();
         }
       }
     };
@@ -1391,7 +1427,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     void run() throws IOException;
   }
 
-  private static abstract class CancellableOutputStream extends WriteOutputStream {
+  private static class CancellableOutputStream extends WriteOutputStream {
     CancellableOutputStream(OutputStream out) {
       super(out);
     }
@@ -1500,6 +1536,27 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
+  private synchronized boolean referenceIfExists(Path key, Digest containingDirectory) throws IOException {
+    Entry e = storage.get(key);
+    if (e == null) {
+      return false;
+    }
+
+    if (!entryExists(e)) {
+      Entry removedEntry = storage.remove(key);
+      if (removedEntry != null) {
+        unlinkEntry(removedEntry);
+      }
+      return false;
+    }
+
+    if (containingDirectory != null) {
+      e.containingDirectories.add(containingDirectory);
+    }
+    e.incrementReference();
+    return true;
+  }
+
   private CancellableOutputStream putImplSynchronized(
       Path key,
       UUID writeId,
@@ -1512,23 +1569,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     final ListenableFuture<Set<Digest>> expiredDigestsFuture;
 
     synchronized (this) {
-      Entry e = storage.get(key);
-      if (e != null && !entryExists(e)) {
-        Entry removedEntry = storage.remove(key);
-        if (removedEntry != null) {
-          unlinkEntry(removedEntry);
-        }
-        e = null;
-      }
-
-      if (e != null) {
-        if (containingDirectory != null) {
-          e.containingDirectories.add(containingDirectory);
-        }
-        e.incrementReference();
+      if (referenceIfExists(key, containingDirectory)) {
         return DUPLICATE_OUTPUT_STREAM;
       }
-
       sizeInBytes += blobSizeInBytes;
 
       ImmutableList.Builder<ListenableFuture<Digest>> expiredKeysFutures = ImmutableList.builder();
@@ -1624,40 +1667,73 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         long size = getWritten();
         hashOut.close();
 
-        String hash = hashOut.hash().toString();
         if (size > blobSizeInBytes) {
           Files.delete(writePath);
           throw new DigestMismatchException("blob digest size mismatch, expected " + blobSizeInBytes + ", was " + size);
-        } else if (size == blobSizeInBytes) {
-          String fileName = writePath.getFileName().toString();
-          if (!fileName.startsWith(hash)) {
-            throw new DigestMismatchException("blob digest mismatch, expected " + fileName + " to start with " + hash);
+        }
+
+        if (size != blobSizeInBytes) {
+          throw new IncompleteBlobException(writePath, key, size, blobSizeInBytes);
+        }
+
+        commit();
+      }
+
+      void commit() throws IOException {
+        String hash = hashOut.hash().toString();
+        String fileName = writePath.getFileName().toString();
+        if (!fileName.startsWith(hash)) {
+          throw new DigestMismatchException("blob digest mismatch, expected " + fileName + " to start with " + hash);
+        }
+        setPermissions(writePath, isExecutable);
+
+        Entry entry = new Entry(
+            key,
+            blobSizeInBytes,
+            containingDirectory,
+            Deadline.after(10, SECONDS));
+
+        Entry existingEntry = null;
+        boolean inserted = false;
+        try {
+          Files.createLink(key, writePath);
+          existingEntry = storage.putIfAbsent(key, entry);
+          inserted = existingEntry == null;
+        } catch (FileAlreadyExistsException e) {
+          logger.finer("file already exists for " + key + ", nonexistent entry will fail");
+        } finally {
+          Files.delete(writePath);
+        }
+
+        int attempts = 10;
+        while (!inserted && existingEntry == null && attempts-- != 0) {
+          existingEntry = storage.get(key);
+          try {
+            MILLISECONDS.sleep(10);
+          } catch (InterruptedException intEx) {
+            throw new IOException(intEx);
           }
-          setPermissions(writePath, isExecutable);
+        }
 
-          Entry entry = new Entry(
-              key,
-              blobSizeInBytes,
-              containingDirectory,
-              Deadline.after(10, SECONDS));
+        if (!inserted && existingEntry == null) {
+          throw new IOException("existing entry did not appear for " + key);
+        }
 
-          // maybe don't replace existing?
-          Files.move(writePath, key, REPLACE_EXISTING);
-
-          if (writeWinner.get()) {
-            logger.finest("won the race to insert " + key);
-            if (storage.putIfAbsent(key, entry) != null) {
-              throw new IllegalStateException("storage conflict with existing key for " + key);
-            }
-            try {
-              onInsert.run();
-            } catch (RuntimeException e) {
-              throw new IOException(e);
-            }
-          } else {
+        if (existingEntry != null) {
+          logger.finer("lost the race to insert " + key);
+          if (!referenceIfExists(key, containingDirectory)) {
             // we would lose our accountability and have a presumed reference if we returned
-            throw new IllegalStateException("lost the race to insert " + key);
+            throw new IllegalStateException("storage conflict with existing key for " + key);
           }
+        } else if (writeWinner.get()) {
+          logger.finer("won the race to insert " + key);
+          try {
+            onInsert.run();
+          } catch (RuntimeException e) {
+            throw new IOException(e);
+          }
+        } else {
+          logger.finer("did not win the race to insert " + key);
         }
       }
     };
