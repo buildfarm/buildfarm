@@ -41,6 +41,7 @@ import com.google.protobuf.ByteString;
 import io.grpc.Context;
 import io.grpc.Context.CancellableContext;
 import io.grpc.Status;
+import io.grpc.stub.CallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
@@ -72,36 +73,71 @@ public class ByteStreamService extends ByteStreamImplBase {
   void readFrom(
       InputStream in,
       long limit,
-      StreamObserver<ReadResponse> responseObserver)
-      throws IOException {
-    byte buf[] = new byte[CHUNK_SIZE];
-    boolean unlimited = limit == 0;
-    long remaining = limit;
-    boolean complete = false;
-    while (!complete) {
-      int readBytes = in.read(buf, 0, (int) Math.min(remaining, buf.length));
-      if (readBytes == -1) {
-        if (!unlimited) {
-          logger.finer(format("read bytes indicated eof with %d remaining for limited read", remaining));
-          responseObserver.onError(OUT_OF_RANGE.asException());
-          remaining = -1;
+      StreamObserver<ReadResponse> responseObserver) {
+    CallStreamObserver<ReadResponse> target =
+        (CallStreamObserver<ReadResponse>) responseObserver;
+
+    final class ReadFromOnReadyHandler implements Runnable {
+      private final byte buf[] = new byte[CHUNK_SIZE];
+      private final boolean unlimited = limit == 0;
+      private long remaining = limit;
+      private boolean complete = false;
+
+      ReadResponse next() throws IOException {
+        int readBytes = in.read(buf, 0, (int) Math.min(remaining, buf.length));
+        if (readBytes <= 0) {
+          if (readBytes == -1) {
+            if (!unlimited) {
+              throw OUT_OF_RANGE.asRuntimeException();
+            }
+            complete = true;
+          }
+          return ReadResponse.getDefaultInstance();
         }
-        complete = true;
-      } else if (readBytes > 0) {
+
         if (readBytes > remaining) {
           logger.warning(format("read %d bytes, expected %d", readBytes, remaining));
           readBytes = (int) remaining;
         }
-        responseObserver.onNext(ReadResponse.newBuilder()
-            .setData(ByteString.copyFrom(buf, 0, readBytes))
-            .build());
         remaining -= readBytes;
         complete = remaining == 0;
+        return ReadResponse.newBuilder()
+            .setData(ByteString.copyFrom(buf, 0, readBytes))
+            .build();
+      }
+
+      @Override
+      public void run() {
+        if (complete) {
+          return;
+        }
+
+        try {
+          while (target.isReady() && !complete) {
+            ReadResponse response = next();
+            if (response.getData().size() != 0) {
+              target.onNext(response);
+            }
+          }
+
+          if (complete) {
+            in.close();
+            target.onCompleted();
+          }
+        } catch (Exception e) {
+          complete = true;
+          try {
+            in.close();
+          } catch (IOException closeEx) {
+            e.addSuppressed(closeEx);
+          }
+          logger.log(SEVERE, "error reading from stream", e);
+          target.onError(e);
+        }
       }
     }
-    if (remaining == 0) {
-      responseObserver.onCompleted();
-    }
+
+    target.setOnReadyHandler(new ReadFromOnReadyHandler());
   }
 
   void readLimitedBlob(
@@ -110,7 +146,8 @@ public class ByteStreamService extends ByteStreamImplBase {
       long offset,
       long limit,
       StreamObserver<ReadResponse> responseObserver) {
-    try (InputStream in = instance.newBlobInput(digest, offset, deadlineAfter, deadlineAfterUnits)) {
+    try {
+      InputStream in = instance.newBlobInput(digest, offset, deadlineAfter, deadlineAfterUnits);
       readFrom(in, limit, responseObserver);
     } catch (NoSuchFileException e) {
       responseObserver.onError(NOT_FOUND.asException());
@@ -147,7 +184,8 @@ public class ByteStreamService extends ByteStreamImplBase {
       long offset,
       long limit,
       StreamObserver<ReadResponse> responseObserver) {
-    try (InputStream in = instance.newOperationStreamInput(resourceName, offset, deadlineAfter, deadlineAfterUnits)) {
+    try {
+      InputStream in = instance.newOperationStreamInput(resourceName, offset, deadlineAfter, deadlineAfterUnits);
       readFrom(in, limit, responseObserver);
     } catch (NoSuchFileException e) {
       responseObserver.onError(NOT_FOUND.asException());
