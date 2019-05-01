@@ -63,22 +63,21 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
     logger.info(format("ExecutionSuccess: %s: %s", instanceName, DigestUtil.toString(request.getActionDigest())));
   }
 
-  private void withCancellation(StreamObserver<Operation> responseObserver, ListenableFuture<Void> future) {
-    ServerCallStreamObserver serverCallStreamObserver =
-        (ServerCallStreamObserver) responseObserver;
+  private void withCancellation(
+      ServerCallStreamObserver<Operation> serverCallStreamObserver,
+      ListenableFuture<Void> future) {
     addCallback(
         future,
         new FutureCallback<Void>() {
           boolean isCancelled() {
-            return (serverCallStreamObserver != null && serverCallStreamObserver.isCancelled())
-                || Context.current().isCancelled();
+            return serverCallStreamObserver.isCancelled() || Context.current().isCancelled();
           }
 
           @Override
           public void onSuccess(Void result) {
             if (!isCancelled()) {
               try {
-                responseObserver.onCompleted();
+                serverCallStreamObserver.onCompleted();
               } catch (Exception e) {
                 onFailure(e);
               }
@@ -87,30 +86,25 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
 
           @Override
           public void onFailure(Throwable t) {
-            if (!isCancelled() &&
-                !(t instanceof CancellationException)) {
-              responseObserver.onError(Status.fromThrowable(t).asException());
+            if (!isCancelled() && !(t instanceof CancellationException)) {
+              serverCallStreamObserver.onError(Status.fromThrowable(t).asException());
             }
           }
         },
         Context.current().fixedContextExecutor(directExecutor()));
-    if (serverCallStreamObserver != null) {
-      serverCallStreamObserver.setOnCancelHandler(
-          () -> future.cancel(false));
-    }
+    serverCallStreamObserver.setOnCancelHandler(
+        () -> future.cancel(false));
   }
 
   abstract class KeepaliveWatcher implements Watcher {
-    private final Context ctx;
+    private final ServerCallStreamObserver<Operation> serverCallStreamObserver;
     private ListenableFuture<?> keepaliveFuture = null;
 
     abstract void deliver(Operation operation);
 
-    KeepaliveWatcher(Context ctx) {
-      this.ctx = ctx;
-      ctx.addListener(
-          (context) -> cancel(),
-          directExecutor());
+    KeepaliveWatcher(ServerCallStreamObserver serverCallStreamObserver) {
+      this.serverCallStreamObserver = serverCallStreamObserver;
+      serverCallStreamObserver.setOnCancelHandler(this::cancel);
     }
 
     @Nullable ListenableFuture<?> getFuture() {
@@ -149,19 +143,26 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
     }
 
     private synchronized void deliverKeepalive(String operationName) {
-      if (!ctx.isCancelled()) {
-        deliver(Operation.newBuilder()
-            .setName(operationName)
-            .build());
-        keepaliveFuture = scheduleKeepalive(operationName);
+      if (!serverCallStreamObserver.isCancelled()) {
+        try {
+          deliver(Operation.newBuilder()
+              .setName(operationName)
+              .build());
+          keepaliveFuture = scheduleKeepalive(operationName);
+        } catch (IllegalStateException e) {
+          if (!e.getMessage().equals("call is closed")) {
+            throw e;
+          }
+        }
       }
     }
   }
 
-  KeepaliveWatcher createWatcher(StreamObserver<Operation> responseObserver) {
-    return new KeepaliveWatcher(Context.current()) {
+  KeepaliveWatcher createWatcher(ServerCallStreamObserver<Operation> serverCallStreamObserver) {
+    return new KeepaliveWatcher(serverCallStreamObserver) {
+      @Override
       void deliver(Operation operation) {
-        responseObserver.onNext(operation);
+        serverCallStreamObserver.onNext(operation);
       }
     };
   }
@@ -178,11 +179,13 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
       return;
     }
 
+    ServerCallStreamObserver<Operation> serverCallStreamObserver =
+        (ServerCallStreamObserver<Operation>) responseObserver;
     withCancellation(
-        responseObserver,
+        serverCallStreamObserver,
         instance.watchOperation(
             operationName,
-            createWatcher(responseObserver)));
+            createWatcher(serverCallStreamObserver)));
   }
 
   @Override
@@ -198,16 +201,18 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
 
     logExecute(instance.getName(), request);
 
+    ServerCallStreamObserver<Operation> serverCallStreamObserver =
+        (ServerCallStreamObserver<Operation>) responseObserver;
     try {
       withCancellation(
-          responseObserver,
+          serverCallStreamObserver,
           instance.execute(
               request.getActionDigest(),
               request.getSkipCacheLookup(),
               request.getExecutionPolicy(),
               request.getResultsCachePolicy(),
               TracingMetadataUtils.fromCurrentContext(),
-              createWatcher(responseObserver)));
+              createWatcher(serverCallStreamObserver)));
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
