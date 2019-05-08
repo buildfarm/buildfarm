@@ -30,6 +30,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.google.common.io.ByteStreams;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -43,6 +44,7 @@ import io.grpc.Status;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -459,17 +461,21 @@ class Cat {
           } else if (type.equals("TreeLayout")) {
             printTreeLayout(instance, digestUtil, blobDigest);
           } else {
-            ByteString blob = getBlob(instance, blobDigest);
-            if (type.equals("Action")) {
-              printAction(blob);
-            } else if (type.equals("Command")) {
-              printCommand(blob);
-            } else if (type.equals("Directory")) {
-              printDirectory(blob);
-            } else if (type.equals("File")) {
-              blob.writeTo(System.out);
+            if (type.equals("File")) {
+              try (InputStream in = instance.newBlobInput(blobDigest, 0, 60, TimeUnit.SECONDS)) {
+                ByteStreams.copy(in, System.out);
+              }
             } else {
-              System.err.println("Unknown type: " + type);
+              ByteString blob = getBlob(instance, blobDigest);
+              if (type.equals("Action")) {
+                printAction(blob);
+              } else if (type.equals("Command")) {
+                printCommand(blob);
+              } else if (type.equals("Directory")) {
+                printDirectory(blob);
+              } else {
+                System.err.println("Unknown type: " + type);
+              }
             }
           }
         }
