@@ -139,6 +139,7 @@ public class InputFetchStageTest {
         .setPoller(poller)
         .setQueueEntry(badEntry)
         .build();
+    inputFetchStage.claim();
     inputFetchStage.put(badContext);
     inputFetchStage.run();
     verify(poller, times(1)).pause();

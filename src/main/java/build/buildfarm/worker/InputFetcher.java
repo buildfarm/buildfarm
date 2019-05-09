@@ -162,11 +162,19 @@ public class InputFetcher implements Runnable {
       }
       throw e;
     } finally {
-      owner.releaseInputFetcher(
-          operationName,
-          stopwatch.elapsed(MICROSECONDS),
-          stallUSecs,
-          success);
+      boolean wasInterrupted = Thread.interrupted();
+      // allow release to occur without interrupted state
+      try {
+        owner.releaseInputFetcher(
+            operationName,
+            stopwatch.elapsed(MICROSECONDS),
+            stallUSecs,
+            success);
+      } finally {
+        if (wasInterrupted) {
+          Thread.currentThread().interrupt();
+        }
+      }
     }
   }
 }

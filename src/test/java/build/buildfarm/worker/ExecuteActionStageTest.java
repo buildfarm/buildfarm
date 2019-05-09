@@ -17,6 +17,7 @@ package build.buildfarm.worker;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;
@@ -31,6 +32,7 @@ public class ExecuteActionStageTest {
   @Test
   public void errorPathDestroysExecDir() throws Exception {
     WorkerContext context = mock(WorkerContext.class);
+    when(context.getExecuteStageWidth()).thenReturn(1);
     PipelineStage error = mock(PipelineStage.class);
 
     QueueEntry errorEntry = QueueEntry.newBuilder()

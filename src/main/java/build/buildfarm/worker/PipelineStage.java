@@ -213,7 +213,7 @@ public abstract class PipelineStage implements Runnable {
     @Override
     public OperationContext take() { throw new UnsupportedOperationException(); }
     @Override
-    public void put(OperationContext operation) throws InterruptedException { }
+    public void put(OperationContext operationContext) throws InterruptedException { }
     @Override
     public void setInput(PipelineStage input) { }
     @Override

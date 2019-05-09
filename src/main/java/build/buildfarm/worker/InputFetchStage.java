@@ -14,10 +14,6 @@
 
 package build.buildfarm.worker;
 
-import static java.util.logging.Level.WARNING;
-
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.Set;
@@ -26,14 +22,19 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
-public class InputFetchStage extends PipelineStage {
+public class InputFetchStage extends SuperscalarPipelineStage {
   private static final Logger logger = Logger.getLogger(InputFetchStage.class.getName());
 
   private final Set<Thread> fetchers = Sets.newHashSet();
   private final BlockingQueue<OperationContext> queue = new ArrayBlockingQueue<>(1);
 
   public InputFetchStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
-    super("InputFetchStage", workerContext, output, error);
+    super(
+        "InputFetchStage",
+        workerContext,
+        output,
+        error,
+        workerContext.getInputFetchStageWidth());
   }
 
   @Override
@@ -43,18 +44,7 @@ public class InputFetchStage extends PipelineStage {
 
   @Override
   public OperationContext take() throws InterruptedException {
-    while (!isClosed() && !output.isClosed()) {
-      OperationContext context = queue.poll(10, TimeUnit.MILLISECONDS);
-      if (context != null) {
-        return context;
-      }
-    }
-    synchronized (this) {
-      while (isClaimed()) {
-        wait();
-      }
-    }
-    throw new InterruptedException();
+    return takeOrDrain(queue);
   }
 
   @Override
@@ -62,41 +52,16 @@ public class InputFetchStage extends PipelineStage {
     queue.put(operationContext);
   }
 
-  @Override
-  public synchronized boolean claim() throws InterruptedException {
-    if (isClosed()) {
-      return false;
-    }
-
-    while (fetchers.size() + queue.size() >= workerContext.getInputFetchStageWidth()) {
-      wait();
-    }
-    return true;
-  }
-
-  public synchronized int removeAndNotify() {
+  synchronized int removeAndRelease(String operationName) {
     if (!fetchers.remove(Thread.currentThread())) {
       throw new IllegalStateException("tried to remove unknown fetcher thread");
     }
-    this.notify();
+    releaseClaim(operationName);
     return fetchers.size();
   }
 
-  private String getUsage(int size) {
-    return String.format("%s/%d", size, workerContext.getInputFetchStageWidth());
-  }
-
-  private void logComplete(int size) {
-    logger.info(String.format("%s: %s", name, getUsage(size)));
-  }
-
-  @Override
-  public void release() {
-    // do nothing. no state is maintained for claims
-  }
-
   public void releaseInputFetcher(String operationName, long usecs, long stallUSecs, boolean success) {
-    int size = removeAndNotify();
+    int size = removeAndRelease(operationName);
     logComplete(
         operationName,
         usecs,
@@ -105,24 +70,16 @@ public class InputFetchStage extends PipelineStage {
   }
 
   @Override
-  protected synchronized boolean isClaimed() {
-    return Iterables.any(fetchers, (fetcher) -> fetcher.isAlive());
-  }
-
-  @Override
   protected void iterate() throws InterruptedException {
     OperationContext operationContext = take();
     Thread fetcher = new Thread(new InputFetcher(workerContext, operationContext, this));
 
-    int size;
     synchronized (this) {
       fetchers.add(fetcher);
-      size = fetchers.size();
+      logStart(
+          operationContext.queueEntry.getExecuteEntry().getOperationName(),
+          getUsage(fetchers.size()));
+      fetcher.start();
     }
-    logStart(
-        operationContext.queueEntry.getExecuteEntry().getOperationName(),
-        getUsage(size));
-
-    fetcher.start();
   }
 }

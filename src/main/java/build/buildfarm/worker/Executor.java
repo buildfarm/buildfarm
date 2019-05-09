@@ -312,11 +312,18 @@ class Executor implements Runnable {
       }
       throw e;
     } finally {
-      owner.releaseExecutor(
-          operationName,
-          stopwatch.elapsed(MICROSECONDS),
-          stallUSecs,
-          exitCode);
+      boolean wasInterrupted = Thread.interrupted();
+      try {
+        owner.releaseExecutor(
+            operationName,
+            stopwatch.elapsed(MICROSECONDS),
+            stallUSecs,
+            exitCode);
+      } finally {
+        if (wasInterrupted) {
+          Thread.currentThread().interrupt();
+        }
+      }
     }
   }
 
