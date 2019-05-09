@@ -145,7 +145,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       .build(new CacheLoader<Digest, SettableFuture<Long>>() {
         @Override
         public SettableFuture<Long> load(Digest digest) {
-          return SettableFuture.create();
+          SettableFuture<Long> future = SettableFuture.create();
+          if (contains(digest)) {
+            future.set(digest.getSizeBytes());
+          }
+          return future;
         }
       });
 
@@ -480,13 +484,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   Write newWrite(BlobWriteKey key) {
-    return new Write() {
+    Write write = new Write() {
       CancellableOutputStream out = null;
       Path path = null;
-      boolean complete = false;
 
       @Override
-      public void reset() {
+      public synchronized void reset() {
         try {
           if (out != null) {
             out.cancel();
@@ -502,7 +505,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       }
 
       @Override
-      public long getCommittedSize() {
+      public synchronized long getCommittedSize() {
         if (isComplete()) {
           return key.getDigest().getSizeBytes();
         }
@@ -518,8 +521,16 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       }
 
       @Override
-      public boolean isComplete() {
-        return complete || (out == null && contains(key.getDigest()));
+      public synchronized boolean isComplete() {
+        return getFuture().isDone() || (out == null && contains(key.getDigest()));
+      }
+
+      public ListenableFuture<Long> getFuture() {
+        try {
+          return writesInProgress.get(key.getDigest());
+        } catch (ExecutionException e) {
+          throw new UncheckedExecutionException(e.getCause());
+        }
       }
 
       public void onClosed() {
@@ -527,11 +538,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       }
 
       @Override
-      public OutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits) throws IOException {
+      public synchronized OutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits) throws IOException {
         if (out == null) {
           out = newOutput(key.getDigest(), UUID.fromString(key.getIdentifier()), this::onClosed);
           if (out == null) {
-            complete = true;
             out = new CancellableOutputStream(nullOutputStream());
           } else {
             path = out.getPath();
@@ -542,17 +552,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
       @Override
       public void addListener(Runnable onCompleted, Executor executor) {
-        if (isComplete()) {
-          executor.execute(onCompleted);
-        } else {
-          try {
-            writesInProgress.get(key.getDigest()).addListener(onCompleted, executor);
-          } catch (ExecutionException e) {
-            throw new UncheckedExecutionException(e.getCause());
-          }
-        }
+        getFuture().addListener(onCompleted, executor);
       }
     };
+    write.addListener(write::reset, directExecutor());
+    return write;
   }
 
   CancellableOutputStream newOutput(Digest digest, UUID uuid, Runnable onClosed) throws IOException {
