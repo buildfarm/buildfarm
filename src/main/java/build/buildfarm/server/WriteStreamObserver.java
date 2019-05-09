@@ -60,7 +60,12 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
       try {
         onUncommittedNext(request);
       } catch (RuntimeException e) {
-        responseObserver.onError(Status.fromThrowable(e).asException());
+        Status status = Status.fromThrowable(e);
+        logger.log(
+            status.getCode() == Status.Code.CANCELLED ? FINER : SEVERE,
+            "error writing " + (name == null ? request.getResourceName() : name),
+            e);
+        responseObserver.onError(status.asException());
       }
     }
   }
@@ -105,7 +110,12 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
       try {
         commitActive(write.getCommittedSize());
       } catch (RuntimeException e) {
-        responseObserver.onError(Status.fromThrowable(e).asException());
+        Status status = Status.fromThrowable(e);
+        logger.log(
+            status.getCode() == Status.Code.CANCELLED ? FINER : SEVERE,
+            "error committing " + name,
+            e);
+        responseObserver.onError(status.asException());
       }
     }
   }
@@ -224,6 +234,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
     try {
       data.writeTo(getOutput());
     } catch (IOException e) {
+      logger.log(SEVERE, "error writing data for " + name, e);
       responseObserver.onError(Status.fromThrowable(e).asException());
     }
   }
