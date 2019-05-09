@@ -10,6 +10,7 @@ import com.google.bytestream.ByteStreamProto.QueryWriteStatusResponse;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.util.concurrent.SettableFuture;
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
@@ -26,7 +27,7 @@ public class StubWriteOutputStream extends OutputStream implements Write {
   private final Supplier<ByteStreamBlockingStub> bsBlockingStub;
   private final Supplier<ByteStreamStub> bsStub;
   private final String resourceName;
-  private final SettableFuture<Void> writeFuture = SettableFuture.create();
+  private final SettableFuture<Long> writeFuture = SettableFuture.create();
   private final long expectedSize;
   private final boolean autoflush;
   private final byte buf[];
@@ -41,16 +42,23 @@ public class StubWriteOutputStream extends OutputStream implements Write {
                 .setComplete(false)
                 .build();
           }
-          return bsBlockingStub.get()
+          QueryWriteStatusResponse response = bsBlockingStub.get()
               .queryWriteStatus(QueryWriteStatusRequest.newBuilder()
                   .setResourceName(resourceName)
                   .build());
+          if (response.getComplete()) {
+            writeFuture.set(response.getCommittedSize());
+          }
+          return response;
         }
       });
   private boolean sentResourceName = false;
   private int offset = 0;
   private long writtenBytes = 0;
   private StreamObserver<WriteRequest> writeObserver = null;
+
+  static class WriteCompleteException extends IOException {
+  }
 
   public StubWriteOutputStream(
       Supplier<ByteStreamBlockingStub> bsBlockingStub,
@@ -109,47 +117,49 @@ public class StubWriteOutputStream extends OutputStream implements Write {
     }
   }
 
-  private boolean checkComplete() throws IOException {
+  private boolean checkComplete() {
     try {
-      return writeFuture.isDone() && writeFuture.get() == null;
+      return writeFuture.isDone() && writeFuture.get() >= 0;
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
-      if (cause instanceof IOException) {
-        throw (IOException) cause;
+      if (cause instanceof RuntimeException) {
+        throw (RuntimeException) cause;
       }
-      throw new IOException(cause);
+      throw new UncheckedExecutionException(cause);
     } catch (InterruptedException e) {
       // unlikely, since we only get for isDone()
-      throw new IOException(e);
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(e);
     }
   }
 
   private void initiateWrite() throws IOException {
     if (writeObserver == null) {
-      writeObserver = bsStub.get().write(new StreamObserver<WriteResponse>() {
-        @Override
-        public void onNext(WriteResponse response) {
-          writtenBytes += response.getCommittedSize() - getCommittedSize();
-          writeFuture.set(null);
-        }
+      writeObserver = bsStub.get()
+          .write(
+              new StreamObserver<WriteResponse>() {
+                @Override
+                public void onNext(WriteResponse response) {
+                  writeFuture.set(response.getCommittedSize());
+                }
 
-        @Override
-        public void onError(Throwable t) {
-          writeFuture.setException(t);
-        }
+                @Override
+                public void onError(Throwable t) {
+                  writeFuture.setException(t);
+                }
 
-        @Override
-        public void onCompleted() {
-          writeObserver = null;
-        }
-      });
+                @Override
+                public void onCompleted() {
+                  writeObserver = null;
+                }
+              });
     }
   }
 
   @Override
   public void write(byte[] b, int off, int len) throws IOException {
-    if (isComplete() || checkComplete()) {
-      throw new IOException("write is complete");
+    if (isComplete()) {
+      throw new WriteCompleteException();
     }
     if (getCommittedSize() + offset + len > expectedSize) {
       throw new IndexOutOfBoundsException("write would exceed expected size");
@@ -173,8 +183,8 @@ public class StubWriteOutputStream extends OutputStream implements Write {
 
   @Override
   public void write(int b) throws IOException {
-    if (isComplete() || checkComplete()) {
-      throw new IOException("write is complete");
+    if (isComplete()) {
+      throw new WriteCompleteException();
     }
     if (!checkComplete()) {
       buf[offset++] = (byte) b;
@@ -188,12 +198,23 @@ public class StubWriteOutputStream extends OutputStream implements Write {
 
   @Override
   public long getCommittedSize() {
+    if (checkComplete()) {
+      try {
+        return writeFuture.get();
+      } catch (InterruptedException e) {
+        // impossible, future must be done
+        throw new RuntimeException(e);
+      } catch (ExecutionException e) {
+        // impossible, future throws in checkComplete for this
+        throw new UncheckedExecutionException(e.getCause());
+      }
+    }
     return writeStatus.get().getCommittedSize() + writtenBytes;
   }
 
   @Override
   public boolean isComplete() {
-    return writeStatus.get().getComplete() || getCommittedSize() == expectedSize;
+    return checkComplete() || getCommittedSize() == expectedSize;
   }
 
   @Override
@@ -203,9 +224,11 @@ public class StubWriteOutputStream extends OutputStream implements Write {
 
   @Override
   public void reset() {
-    wasReset = true;
-    offset = 0;
-    writtenBytes = 0;
+    if (!writeFuture.isDone()) {
+      wasReset = true;
+      offset = 0;
+      writtenBytes = 0;
+    }
   }
 
   @Override
