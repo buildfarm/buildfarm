@@ -1,0 +1,167 @@
+commit 3a0c621ae20a86c6c774a850b6e6d201d94c1f43
+Author: George Gensure <ggensure@uber.com>
+Date:   Mon May 13 14:07:55 2019 -0400
+
+    Remove rules_go and C++ dependency
+
+diff --git a/build/bazel/remote/execution/v2/BUILD b/build/bazel/remote/execution/v2/BUILD
+index a29bb71..cd2b72a 100644
+--- a/build/bazel/remote/execution/v2/BUILD
++++ b/build/bazel/remote/execution/v2/BUILD
+@@ -1,7 +1,4 @@
+ package(default_visibility = ["//visibility:public"])
+-load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
+-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+-load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
+ 
+ licenses(["notice"])
+ 
+@@ -23,37 +20,3 @@ java_proto_library(
+     name = "remote_execution_java_proto",
+     deps = [":remote_execution_proto"],
+ )
+-
+-cc_grpc_library(
+-    name = "remote_execution_cc_proto",
+-    srcs = ["remote_execution.proto"],
+-    deps = [
+-        "//build/bazel/semver:semver_cc_proto",
+-        "@googleapis//:google_api_annotations_cc_proto",
+-        "@googleapis//:google_api_http_cc_proto",
+-        "@googleapis//:google_longrunning_operations_cc_proto",
+-        "@googleapis//:google_rpc_status_cc_proto",
+-    ],
+-    proto_only = False,
+-    well_known_protos = True,
+-    use_external = False,
+-)
+-
+-go_proto_library(
+-    name = "remote_execution_go_proto",
+-    compilers = ["@io_bazel_rules_go//proto:go_grpc"],
+-    importpath = "github.com/bazelbuild/remote-apis/build/bazel/remote/execution/v2",
+-    proto = ":remote_execution_proto",
+-    deps = [
+-        "//build/bazel/semver:go_default_library",
+-        "@go_googleapis//google/api:annotations_go_proto",
+-        "@go_googleapis//google/longrunning:longrunning_go_proto",
+-        "@go_googleapis//google/rpc:status_go_proto",
+-    ],
+-)
+-
+-go_library(
+-    name = "go_default_library",
+-    embed = [":remote_execution_go_proto"],
+-    importpath = "github.com/bazelbuild/remote-apis/build/bazel/remote/execution/v2",
+-)
+diff --git a/build/bazel/semver/BUILD b/build/bazel/semver/BUILD
+index 1e6f902..ee2a98c 100644
+--- a/build/bazel/semver/BUILD
++++ b/build/bazel/semver/BUILD
+@@ -1,7 +1,4 @@
+ package(default_visibility = ["//visibility:public"])
+-load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
+-load("@io_bazel_rules_go//go:def.bzl", "go_library")
+-load("@io_bazel_rules_go//proto:def.bzl", "go_proto_library")
+ 
+ licenses(["notice"])
+ 
+@@ -14,24 +11,3 @@ java_proto_library(
+     name = "semver_java_proto",
+     deps = [":semver_proto"],
+ )
+-
+-cc_grpc_library(
+-    name = "semver_cc_proto",
+-    srcs = ["semver.proto"],
+-    deps = [],
+-    proto_only = False,
+-    well_known_protos = True,
+-    use_external = False,
+-)
+-
+-go_proto_library(
+-    name = "semver_go_proto",
+-    importpath = "github.com/bazelbuild/remote-apis/build/bazel/semver",
+-    proto = ":semver_proto",
+-)
+-
+-go_library(
+-    name = "go_default_library",
+-    embed = [":semver_go_proto"],
+-    importpath = "github.com/bazelbuild/remote-apis/build/bazel/semver",
+-)
+diff --git a/external/BUILD.googleapis b/external/BUILD.googleapis
+index 1cfef9f..11d4008 100644
+--- a/external/BUILD.googleapis
++++ b/external/BUILD.googleapis
+@@ -1,7 +1,5 @@
+ package(default_visibility = ["//visibility:public"])
+ 
+-load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
+-
+ licenses(["notice"])
+ 
+ proto_library(
+@@ -13,29 +11,11 @@ proto_library(
+     ],
+ )
+ 
+-cc_grpc_library(
+-    name = "google_api_annotations_cc_proto",
+-    srcs = ["google/api/annotations.proto"],
+-    deps = [":google_api_http_cc_proto"],
+-    proto_only = False,
+-    well_known_protos = True,
+-    use_external = False,
+-)
+-
+ proto_library(
+     name = "google_api_http_proto",
+     srcs = ["google/api/http.proto"],
+ )
+ 
+-cc_grpc_library(
+-    name = "google_api_http_cc_proto",
+-    srcs = ["google/api/http.proto"],
+-    deps = [],
+-    proto_only = False,
+-    well_known_protos = True,
+-    use_external = False,
+-)
+-
+ proto_library(
+     name = "google_longrunning_operations_proto",
+     srcs = ["google/longrunning/operations.proto"],
+@@ -48,31 +28,8 @@ proto_library(
+     ],
+ )
+ 
+-cc_grpc_library(
+-    name = "google_longrunning_operations_cc_proto",
+-    srcs = ["google/longrunning/operations.proto"],
+-    deps = [
+-        ":google_api_annotations_cc_proto",
+-        ":google_api_http_cc_proto",
+-        ":google_rpc_status_cc_proto",
+-    ],
+-    proto_only = False,
+-    well_known_protos = True,
+-    use_external = False,
+-)
+-
+ proto_library(
+     name = "google_rpc_status_proto",
+     srcs = ["google/rpc/status.proto"],
+     deps = ["@com_google_protobuf//:any_proto"],
+ )
+-
+-cc_grpc_library(
+-    name = "google_rpc_status_cc_proto",
+-    srcs = ["google/rpc/status.proto"],
+-    deps = [],
+-    proto_only = False,
+-    well_known_protos = True,
+-    use_external = False,
+-)
+-
