@@ -399,7 +399,6 @@ public class ByteStreamUploader {
               // upload was completed either by us or someone else
               committedOffset.set(response.getCommittedSize());
               halfClose();
-              System.out.println("Got message response for resource_name = " + resourceName + " with " + response.getCommittedSize());
             }
 
             @Override
@@ -428,11 +427,8 @@ public class ByteStreamUploader {
                   }
 
                   if (chunk.getOffset() == committedOffset.get()) {
-                    System.out.println("SETTING resource_name TO " + resourceName + " because " + chunk.getOffset() + " == " + committedOffset.get());
                     // Resource name only needs to be set on the first write for each file.
                     requestBuilder.setResourceName(resourceName);
-                  } else {
-                    System.out.println("NOT SETTING resource_name TO " + resourceName + " because " + chunk.getOffset() + " != " + committedOffset.get());
                   }
 
                   boolean isLastChunk = !chunker.hasNext();
