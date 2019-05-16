@@ -14,6 +14,8 @@
 
 package build.buildfarm.common;
 
+import static com.google.common.io.ByteStreams.nullOutputStream;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.concurrent.Executor;
@@ -29,4 +31,36 @@ public interface Write {
 
   /** add a callback to be invoked when blob has been completed */
   void addListener(Runnable onCompleted, Executor executor);
+
+  public class CompleteWrite implements Write {
+    private final long committedSize;
+
+    public CompleteWrite(long committedSize) {
+      this.committedSize = committedSize;
+    }
+
+    @Override
+    public long getCommittedSize() {
+      return committedSize;
+    }
+
+    @Override
+    public boolean isComplete() {
+      return true;
+    }
+
+    @Override
+    public OutputStream getOutput() {
+      return nullOutputStream();
+    }
+
+    @Override
+    public void reset() {
+    }
+
+    @Override
+    public void addListener(Runnable onCompleted, Executor executor) {
+      executor.execute(onCompleted);
+    }
+  }
 }

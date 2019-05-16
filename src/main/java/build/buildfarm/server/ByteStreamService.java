@@ -25,8 +25,10 @@ import static java.lang.String.format;
 import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.Digest;
+import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.UrlPath.InvalidResourceNameException;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.Write.CompleteWrite;
 import build.buildfarm.instance.Instance;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamImplBase;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
@@ -263,6 +265,9 @@ class ByteStreamService extends ByteStreamImplBase {
       Instance instance,
       Digest digest,
       UUID uuid) {
+    if (digest.getSizeBytes() == 0) {
+      return new CompleteWrite(0);
+    }
     return instance.getBlobWrite(digest, uuid);
   }
 
