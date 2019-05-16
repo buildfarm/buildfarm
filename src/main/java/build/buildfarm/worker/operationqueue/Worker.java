@@ -149,8 +149,8 @@ public class Worker {
         retryScheduler);
   }
 
-  private static ByteStreamUploader createStubUploader(Channel channel, Retrier retrier) {
-    return new ByteStreamUploader("", channel, null, 300, retrier);
+  private static ByteStreamUploader createStubUploader(String instanceName, Channel channel, Retrier retrier) {
+    return new ByteStreamUploader(instanceName, channel, null, 300, retrier);
   }
 
   private static Instance createInstance(
@@ -187,7 +187,7 @@ public class Worker {
     InstanceEndpoint casEndpoint = config.getContentAddressableStorage();
     Channel casChannel = createChannel(casEndpoint.getTarget());
     Retrier retrier = createStubRetrier();
-    uploader = createStubUploader(casChannel, retrier);
+    uploader = createStubUploader(casEndpoint.getInstanceName(), casChannel, retrier);
     casInstance = createInstance(casEndpoint.getInstanceName(), digestUtil, casChannel, uploader, retrier);
     acInstance = createInstance(config.getActionCache(), digestUtil, retrier);
     operationQueueInstance = createInstance(config.getOperationQueue(), digestUtil, retrier);
