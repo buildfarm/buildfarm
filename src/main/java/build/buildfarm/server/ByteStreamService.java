@@ -74,6 +74,7 @@ class ByteStreamService extends ByteStreamImplBase {
       int readBytes = in.read(buf, 0, (int) Math.min(remaining, buf.length));
       if (readBytes == -1) {
         if (!unlimited) {
+          logger.finer(format("read bytes indicated eof with %d remaining for limited read", remaining));
           responseObserver.onError(OUT_OF_RANGE.asException());
           remaining = -1;
         }
@@ -119,6 +120,7 @@ class ByteStreamService extends ByteStreamImplBase {
     if (offset == digest.getSizeBytes()) {
       responseObserver.onCompleted();
     } else if (offset > digest.getSizeBytes()) {
+      logger.finer(format("offset %d is out of range of %s", offset, DigestUtil.toString(digest)));
       responseObserver.onError(OUT_OF_RANGE.asException());
     } else {
       long available = digest.getSizeBytes() - offset;
