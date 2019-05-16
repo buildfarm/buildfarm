@@ -170,6 +170,7 @@ public class StubWriteOutputStream extends OutputStream implements Write {
       int copyLen = Math.min(buf.length - offset, len);
       System.arraycopy(b, off, buf, offset, copyLen);
       offset += copyLen;
+      off += copyLen;
       len -= copyLen;
       if (offset == buf.length || getCommittedSize() + offset == expectedSize) {
         flush();
