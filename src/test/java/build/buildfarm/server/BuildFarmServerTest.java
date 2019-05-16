@@ -40,7 +40,6 @@ import build.bazel.remote.execution.v2.GetActionResultRequest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.grpc.Retrier;
-import build.buildfarm.common.grpc.RetryException;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Chunker;
 import build.buildfarm.server.BuildFarmServer;
@@ -79,6 +78,7 @@ import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.StreamObserver;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.UUID;
 import java.util.function.Function;
@@ -218,7 +218,7 @@ public class BuildFarmServerTest {
   }
 
   @Test
-  public void canceledOperationIsNoLongerOutstanding() throws RetryException, InterruptedException {
+  public void canceledOperationIsNoLongerOutstanding() throws IOException, InterruptedException {
     Operation operation = executeAction(createSimpleAction());
 
     // should appear in outstanding list
@@ -248,7 +248,7 @@ public class BuildFarmServerTest {
 
   @Test
   public void cancelledOperationHasCancelledState()
-      throws RetryException, InterruptedException, InvalidProtocolBufferException {
+      throws IOException, InterruptedException, InvalidProtocolBufferException {
     Operation operation = executeAction(createSimpleAction());
 
     OperationsGrpc.OperationsBlockingStub operationsStub =
@@ -280,7 +280,7 @@ public class BuildFarmServerTest {
 
   @Test
   public void cancellingExecutingOperationFailsPoll()
-      throws RetryException, InterruptedException, InvalidProtocolBufferException {
+      throws IOException, InterruptedException, InvalidProtocolBufferException {
     Operation operation = executeAction(createSimpleAction());
 
     // take our operation from the queue
@@ -333,11 +333,11 @@ public class BuildFarmServerTest {
         .getCode()).isEqualTo(Code.UNAVAILABLE.getNumber());
   }
 
-  private Digest createSimpleAction() throws RetryException, InterruptedException {
+  private Digest createSimpleAction() throws IOException, InterruptedException {
     return createAction(Action.newBuilder());
   }
 
-  private Digest createAction(Action.Builder actionBuilder) throws RetryException, InterruptedException {
+  private Digest createAction(Action.Builder actionBuilder) throws IOException, InterruptedException {
     DigestUtil digestUtil = new DigestUtil(HashFunction.SHA256);
     Command command = Command.newBuilder()
         .addArguments("echo")

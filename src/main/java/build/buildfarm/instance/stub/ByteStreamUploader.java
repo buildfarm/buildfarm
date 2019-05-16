@@ -16,6 +16,7 @@ package build.buildfarm.instance.stub;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Throwables.propagateIfInstanceOf;
 import static com.google.common.base.Throwables.throwIfUnchecked;
 import static java.lang.String.format;
 import static java.util.Collections.singletonMap;
@@ -38,7 +39,6 @@ import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.Retrier.ProgressiveBackoff;
-import build.buildfarm.common.grpc.RetryException;
 import io.grpc.CallCredentials;
 import io.grpc.CallOptions;
 import io.grpc.Channel;
@@ -121,10 +121,10 @@ public class ByteStreamUploader {
    * <p>Trying to upload the same BLOB multiple times concurrently, results in only one upload being
    * performed. This is transparent to the user of this API.
    *
-   * @throws RetryException when the upload failed after a retry
+   * @throws IOException when the upload failed due to content issues
    */
   public void uploadBlob(HashCode hash, Chunker chunker)
-      throws RetryException, InterruptedException {
+      throws IOException, InterruptedException {
     uploadBlobs(singletonMap(hash, chunker));
   }
 
@@ -140,10 +140,10 @@ public class ByteStreamUploader {
    * <p>Trying to upload the same BLOB multiple times concurrently, results in only one upload being
    * performed. This is transparent to the user of this API.
    *
-   * @throws RetryException when the upload failed after a retry
+   * @throws IOException when the upload failed due to content issues
    */
   public void uploadBlobs(Map<HashCode, Chunker> chunkers)
-      throws RetryException, InterruptedException {
+      throws IOException, InterruptedException {
     List<ListenableFuture<Void>> uploads = Lists.newArrayList();
 
     for (Map.Entry<HashCode, Chunker> chunkerEntry : chunkers.entrySet()) {
@@ -156,12 +156,9 @@ public class ByteStreamUploader {
       }
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
-      if (cause instanceof RetryException) {
-        throw (RetryException) cause;
-      } else {
-        throwIfUnchecked(cause);
-        throw new RuntimeException(cause);
-      }
+      propagateIfInstanceOf(cause, IOException.class);
+      throwIfUnchecked(cause);
+      throw new RuntimeException(cause);
     }
   }
 
