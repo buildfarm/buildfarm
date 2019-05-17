@@ -1,14 +1,19 @@
 package build.buildfarm.cas;
 
+import static com.google.common.base.Throwables.throwIfUnchecked;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Write;
 import com.google.common.hash.HashingOutputStream;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 
@@ -32,6 +37,15 @@ class MemoryWriteOutputStream extends OutputStream implements Write {
     }
     out = ByteString.newOutput((int) digest.getSizeBytes());
     hashOut = DigestUtil.forDigest(digest).newHashingOutputStream(out);
+    addListener(
+        () -> {
+          try {
+            hashOut.close();
+          } catch (IOException e) {
+            // ignore
+          }
+        },
+        directExecutor());
   }
 
   String hash() {
@@ -44,7 +58,7 @@ class MemoryWriteOutputStream extends OutputStream implements Write {
 
   @Override
   public void close() throws IOException {
-    out.close();
+    hashOut.close();
     Digest actual = getActual();
     if (actual.equals(digest)) {
       try {
@@ -60,7 +74,7 @@ class MemoryWriteOutputStream extends OutputStream implements Write {
 
   @Override
   public void flush() throws IOException {
-    out.flush();
+    hashOut.flush();
   }
 
   @Override
@@ -78,16 +92,29 @@ class MemoryWriteOutputStream extends OutputStream implements Write {
     hashOut.write(b);
   }
 
+  boolean checkComplete() {
+    try {
+      return writtenFuture.isDone() && writtenFuture.get().size() == digest.getSizeBytes();
+    } catch (ExecutionException e) {
+      Throwable cause = e.getCause();
+      throwIfUnchecked(cause);
+      throw new UncheckedExecutionException(cause);
+    } catch (InterruptedException e) {
+      // unlikely, get only called if done
+      throw new RuntimeException(e);
+    }
+  }
+
   // Write methods
 
   @Override
   public long getCommittedSize() {
-    return out.size();
+    return isComplete() ? digest.getSizeBytes() : out.size();
   }
 
   @Override
   public boolean isComplete() {
-    return false;
+    return checkComplete();
   }
 
   @Override

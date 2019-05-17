@@ -15,13 +15,28 @@
 package build.buildfarm.worker;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.mockito.AdditionalAnswers.answerVoid;
 import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.DirectoryNode;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
+import build.bazel.remote.execution.v2.ExecuteResponse;
+import build.bazel.remote.execution.v2.FileNode;
+import build.bazel.remote.execution.v2.OutputDirectory;
+import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Chunker;
@@ -32,13 +47,8 @@ import com.google.common.collect.Iterables;
 import com.google.common.hash.HashCode;
 import com.google.common.jimfs.Configuration;
 import com.google.common.jimfs.Jimfs;
-import build.bazel.remote.execution.v2.ActionResult;
-import build.bazel.remote.execution.v2.Digest;
-import build.bazel.remote.execution.v2.Directory;
-import build.bazel.remote.execution.v2.DirectoryNode;
-import build.bazel.remote.execution.v2.FileNode;
-import build.bazel.remote.execution.v2.OutputDirectory;
-import build.bazel.remote.execution.v2.Tree;
+import com.google.longrunning.Operation;
+import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.nio.file.FileSystem;
@@ -61,6 +71,9 @@ public class ReportResultStageTest {
   @Mock
   private ByteStreamUploader mockUploader;
 
+  @Mock
+  private WorkerContext mockWorkerContext;
+
   private DigestUtil digestUtil;
   private ReportResultStage reportResultStage;
 
@@ -78,7 +91,6 @@ public class ReportResultStageTest {
     root = Iterables.getFirst(fileSystem.getRootDirectories(), null);
 
     digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
-    WorkerContext mockWorkerContext = mock(WorkerContext.class);
     when(mockWorkerContext.getUploader()).thenReturn(mockUploader);
     when(mockWorkerContext.getDigestUtil()).thenReturn(digestUtil);
     PipelineStage error = mock(PipelineStage.class);
@@ -232,5 +244,38 @@ public class ReportResultStageTest {
         root,
         ImmutableList.<String>of(),
         ImmutableList.<String>of("foo"));
+  }
+
+  @Test
+  public void stageReturnsNullForFailedUpload() throws IOException, InterruptedException {
+    Operation operation = Operation.newBuilder()
+        .setName("fails on upload")
+        .setResponse(Any.pack(ExecuteResponse.getDefaultInstance()))
+        .build();
+    Path execDir = Files.createDirectory(root.resolve("exec"));
+    Files.createFile(execDir.resolve("foo"));
+    Command command = Command.newBuilder()
+        .addOutputFiles("exec/foo")
+        .build();
+    OperationContext operationContext = new OperationContext(
+        operation,
+        execDir,
+        ExecuteOperationMetadata.getDefaultInstance(),
+        Action.getDefaultInstance(),
+        command);
+	  doAnswer(
+        answerVoid(
+            (Map<HashCode, Chunker> chunkers) -> {
+              throw new IOException("failed upload");
+            })
+        ).when(mockUploader).uploadBlobs(any(Map.class));
+    Poller poller = mock(Poller.class);
+    when(mockWorkerContext.createPoller(
+        any(String.class),
+        any(String.class),
+        any(Stage.class),
+        any(Runnable.class))).thenReturn(poller);
+    assertThat(reportResultStage.tick(operationContext)).isNull();
+    verify(poller, atLeastOnce()).stop();
   }
 }

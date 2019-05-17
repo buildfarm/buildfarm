@@ -205,7 +205,7 @@ class GrpcCAS implements ContentAddressableStorage {
     try {
       uploader.uploadBlob(
           HashCode.fromString(blob.getDigest().getHash()), chunker);
-    } catch (RetryException e) {
+    } catch (IOException e) {
       if (e.getCause() instanceof StatusRuntimeException) {
         throw (StatusRuntimeException) e.getCause();
       }

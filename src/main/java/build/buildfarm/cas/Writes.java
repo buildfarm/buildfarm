@@ -14,23 +14,19 @@
 
 package build.buildfarm.cas;
 
-import static com.google.common.io.ByteStreams.nullOutputStream;
-import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
-import static com.google.common.collect.Multimaps.synchronizedListMultimap;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.Write.CompleteWrite;
 import build.buildfarm.v1test.BlobWriteKey;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.protobuf.ByteString;
-import java.io.OutputStream;
 import java.util.UUID;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -42,38 +38,6 @@ class Writes {
   private final Cache<Digest, SettableFuture<ByteString>> writesInProgress = CacheBuilder.newBuilder()
       .expireAfterWrite(10, TimeUnit.MINUTES)
       .build();
-
-  static class CompleteWrite implements Write {
-    private final long committedSize;
-
-    CompleteWrite(long committedSize) {
-      this.committedSize = committedSize;
-    }
-
-    @Override
-    public long getCommittedSize() {
-      return committedSize;
-    }
-
-    @Override
-    public boolean isComplete() {
-      return true;
-    }
-
-    @Override
-    public OutputStream getOutput() {
-      return nullOutputStream();
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void addListener(Runnable onCompleted, Executor executor) {
-      executor.execute(onCompleted);
-    }
-  }
 
   Writes(ContentAddressableStorage storage) {
     this.storage = storage;

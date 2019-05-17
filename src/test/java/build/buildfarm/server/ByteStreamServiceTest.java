@@ -32,7 +32,6 @@ import io.grpc.Status;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.stub.StreamObserver;
-import io.grpc.util.MutableHandlerRegistry;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.UUID;
@@ -51,8 +50,6 @@ import org.mockito.stubbing.Answer;
 @RunWith(JUnit4.class)
 public class ByteStreamServiceTest {
   private static final DigestUtil DIGEST_UTIL = new DigestUtil(SHA256);
-
-  private final MutableHandlerRegistry serviceRegistry = new MutableHandlerRegistry();
 
   private Server fakeServer;
   private String fakeServerName;

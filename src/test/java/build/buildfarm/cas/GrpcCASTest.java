@@ -143,7 +143,7 @@ public class GrpcCASTest {
   }
 
   @Test
-  public void putAddsExpiration() throws RetryException, InterruptedException {
+  public void putAddsExpiration() throws IOException, InterruptedException {
     ByteString uploadContent = ByteString.copyFromUtf8("uploaded");
     Digest digest = DIGEST_UTIL.compute(uploadContent);
     String instanceName = "test";
