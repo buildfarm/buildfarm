@@ -98,11 +98,14 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
     }
   }
 
-  synchronized void commit() {
+  void commit() {
+    committed = true;
+    commitSynchronized();
+  }
+
+  synchronized void commitSynchronized() {
     checkNotNull(name);
     checkNotNull(write);
-
-    committed = true;
 
     if (Context.current().isCancelled()) {
       logger.finest(format("skipped delivering committed_size to %s for cancelled context", name));
@@ -234,8 +237,10 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
     try {
       data.writeTo(getOutput());
     } catch (IOException e) {
-      logger.log(SEVERE, "error writing data for " + name, e);
-      responseObserver.onError(Status.fromThrowable(e).asException());
+      if (!committed) {
+        logger.log(SEVERE, "error writing data for " + name, e);
+        responseObserver.onError(Status.fromThrowable(e).asException());
+      }
     }
   }
 
