@@ -1,6 +1,7 @@
 package build.buildfarm.cas;
 
 import static com.google.common.base.Throwables.throwIfUnchecked;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.cas.ContentAddressableStorage;
@@ -36,6 +37,15 @@ class MemoryWriteOutputStream extends OutputStream implements Write {
     }
     out = ByteString.newOutput((int) digest.getSizeBytes());
     hashOut = DigestUtil.forDigest(digest).newHashingOutputStream(out);
+    addListener(
+        () -> {
+          try {
+            hashOut.close();
+          } catch (IOException e) {
+            // ignore
+          }
+        },
+        directExecutor());
   }
 
   String hash() {
@@ -48,7 +58,7 @@ class MemoryWriteOutputStream extends OutputStream implements Write {
 
   @Override
   public void close() throws IOException {
-    out.close();
+    hashOut.close();
     Digest actual = getActual();
     if (actual.equals(digest)) {
       try {
@@ -64,7 +74,7 @@ class MemoryWriteOutputStream extends OutputStream implements Write {
 
   @Override
   public void flush() throws IOException {
-    out.flush();
+    hashOut.flush();
   }
 
   @Override
@@ -99,7 +109,7 @@ class MemoryWriteOutputStream extends OutputStream implements Write {
 
   @Override
   public long getCommittedSize() {
-    return checkComplete() ? digest.getSizeBytes() :  out.size();
+    return isComplete() ? digest.getSizeBytes() : out.size();
   }
 
   @Override
