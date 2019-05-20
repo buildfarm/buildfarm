@@ -79,7 +79,7 @@ abstract class SuperscalarPipelineStage extends PipelineStage {
 
   @Override
   public void release() {
-    // no claim release can take place here
+    releaseClaim("unidentified operation");
   }
 
   @Override
