@@ -158,6 +158,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private transient long sizeInBytes = 0;
   private transient Entry header = new SentinelEntry();
 
+  synchronized long size() {
+    return sizeInBytes;
+  }
+
   public static class DigestMismatchException extends IOException {
     DigestMismatchException(String message) {
       super(message);
@@ -933,6 +937,16 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
+  private synchronized void dischargeAndNotify(long size) {
+    discharge(size);
+    notify();
+  }
+
+  /** must be called in synchronized context */
+  private void discharge(long size) {
+    sizeInBytes -= size;
+  }
+
   /** must be called in synchronized context */
   private void unlinkEntry(Entry entry) throws IOException {
     if (entry.referenceCount == 0) {
@@ -951,7 +965,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       throw new IOException(e);
     }
     // still debating this one being in this method
-    sizeInBytes -= entry.size;
+    discharge(entry.size);
     // technically we should attempt to remove the file here,
     // but we're only called in contexts where it doesn't exist...
   }
@@ -995,6 +1009,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           "CASFileCache::expireEntry(%d) unreferenced list is empty, %d bytes, %d keys with %d references, min(%d, %s), max(%d, %s)",
           blobSizeInBytes, sizeInBytes, keys, references, min, minkey, max, maxkey));
       wait();
+      if (sizeInBytes <= maxSizeInBytes) {
+        return null;
+      }
     }
     return header.after;
   }
@@ -1004,12 +1021,13 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       long blobSizeInBytes,
       ExecutorService service) throws IOException, InterruptedException {
     for (;;) {
-      Entry e = null;
-      while (e == null) {
-        e = waitForLastUnreferencedEntry(blobSizeInBytes);
-        if (e.referenceCount != 0) {
-          throw new IllegalStateException("ERROR: Reference counts lru ordering has not been maintained correctly, attempting to expire referenced (or negatively counted) content " + e.key.getFileName() + " with " + e.referenceCount + " references");
-        }
+      Entry e = waitForLastUnreferencedEntry(blobSizeInBytes);
+      if (e == null) {
+        // sizeInBytes is no longer above maxSizeInBytes
+        return null;
+      }
+      if (e.referenceCount != 0) {
+        throw new IllegalStateException("ERROR: Reference counts lru ordering has not been maintained correctly, attempting to expire referenced (or negatively counted) content " + e.key.getFileName() + " with " + e.referenceCount + " references");
       }
       Path key = e.key;
       if (storage.remove(key) == e) {
@@ -1018,7 +1036,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           directoryExpirationFutures.add(expireDirectory(containingDirectory, service));
         }
         e.unlink();
-        sizeInBytes -= e.size;
+        discharge(e.size);
         return transform(allAsList(directoryExpirationFutures.build()), (result) -> key, service);
       }
     }
@@ -1580,9 +1598,13 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
       ImmutableList.Builder<ListenableFuture<Digest>> expiredKeysFutures = ImmutableList.builder();
       while (sizeInBytes > maxSizeInBytes) {
+        ListenableFuture<Path> expiredFuture = expireEntry(blobSizeInBytes, expireService);
+        if (expiredFuture == null) {
+          continue;
+        }
         expiredKeysFutures.add(
             transformAsync(
-                expireEntry(blobSizeInBytes, expireService),
+                expiredFuture,
                 (expiredKey) -> {
                   try {
                     Files.delete(expiredKey);
@@ -1643,8 +1665,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
       @Override
       public void cancel() throws IOException {
-        hashOut.close();
-        Files.delete(writePath);
+        try {
+          hashOut.close();
+          Files.delete(writePath);
+        } finally {
+          dischargeAndNotify(blobSizeInBytes);
+        }
       }
 
       @Override
@@ -1669,10 +1695,14 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       public void close() throws IOException {
         // has some trouble with multiple closes, fortunately we have something above to handle this
         long size = getWritten();
-        hashOut.close();
+        hashOut.close(); // should probably discharge here as well
 
         if (size > blobSizeInBytes) {
-          Files.delete(writePath);
+          try {
+            Files.delete(writePath);
+          } finally {
+            dischargeAndNotify(blobSizeInBytes);
+          }
           throw new DigestMismatchException("blob digest size mismatch, expected " + blobSizeInBytes + ", was " + size);
         }
 
@@ -1687,9 +1717,15 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         String hash = hashOut.hash().toString();
         String fileName = writePath.getFileName().toString();
         if (!fileName.startsWith(hash)) {
+          dischargeAndNotify(blobSizeInBytes);
           throw new DigestMismatchException("blob digest mismatch, expected " + fileName + " to start with " + hash);
         }
-        setPermissions(writePath, isExecutable);
+        try {
+          setPermissions(writePath, isExecutable);
+        } catch (IOException e) {
+          dischargeAndNotify(blobSizeInBytes);
+          throw e;
+        }
 
         Entry entry = new Entry(
             key,
@@ -1707,20 +1743,25 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           logger.finer("file already exists for " + key + ", nonexistent entry will fail");
         } finally {
           Files.delete(writePath);
-        }
-
-        int attempts = 10;
-        while (!inserted && existingEntry == null && attempts-- != 0) {
-          existingEntry = storage.get(key);
-          try {
-            MILLISECONDS.sleep(10);
-          } catch (InterruptedException intEx) {
-            throw new IOException(intEx);
+          if (!inserted) {
+            dischargeAndNotify(blobSizeInBytes);
           }
         }
 
-        if (!inserted && existingEntry == null) {
-          throw new IOException("existing entry did not appear for " + key);
+        int attempts = 10;
+        if (!inserted) {
+          while (existingEntry == null && attempts-- != 0) {
+            existingEntry = storage.get(key);
+            try {
+              MILLISECONDS.sleep(10);
+            } catch (InterruptedException intEx) {
+              throw new IOException(intEx);
+            }
+          }
+
+          if (existingEntry == null) {
+            throw new IOException("existing entry did not appear for " + key);
+          }
         }
 
         if (existingEntry != null) {

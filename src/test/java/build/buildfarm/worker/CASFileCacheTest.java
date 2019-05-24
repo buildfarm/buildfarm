@@ -422,6 +422,30 @@ class CASFileCacheTest {
     }
   }
 
+  @Test
+  public void asyncWriteCompletionDischargesWriteSize() throws IOException {
+    ByteString content = ByteString.copyFromUtf8("Hello, World");
+    Digest digest = DIGEST_UTIL.compute(content);
+
+    Write completingWrite = fileCache.getWrite(digest, UUID.randomUUID());
+    Write incompleteWrite = fileCache.getWrite(digest, UUID.randomUUID());
+    AtomicBoolean notified = new AtomicBoolean(false);
+    // both should be size committed
+    incompleteWrite.addListener(
+        () -> notified.set(true),
+        directExecutor());
+    OutputStream incompleteOut = incompleteWrite.getOutput(1, SECONDS);
+    try (OutputStream out = completingWrite.getOutput(1, SECONDS)) {
+      assertThat(fileCache.size()).isEqualTo(digest.getSizeBytes() * 2);
+      content.writeTo(out);
+    }
+    assertThat(notified.get()).isTrue();
+    assertThat(fileCache.size()).isEqualTo(digest.getSizeBytes());
+    assertThat(incompleteWrite.getCommittedSize()).isEqualTo(digest.getSizeBytes());
+    assertThat(incompleteWrite.isComplete()).isTrue();
+    incompleteOut.close(); // redundant
+  }
+
   @RunWith(JUnit4.class)
   public static class NativeCASFileCacheTest extends CASFileCacheTest {
     public NativeCASFileCacheTest() throws IOException {
