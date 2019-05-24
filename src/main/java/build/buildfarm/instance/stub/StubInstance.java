@@ -16,9 +16,9 @@ package build.buildfarm.instance.stub;
 
 import static build.buildfarm.common.grpc.Retrier.NO_RETRIES;
 import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
 import static java.lang.String.format;
 import static java.util.logging.Level.SEVERE;
 
@@ -274,6 +274,9 @@ public class StubInstance implements Instance {
     isStopped = true;
     channel.shutdownNow();
     channel.awaitTermination(0, TimeUnit.SECONDS);
+    if (retryService != null && !shutdownAndAwaitTermination(retryService, 10, TimeUnit.SECONDS)) {
+      logger.severe("Could not shut down retry service for " + identifier);
+    }
   }
 
   private void throwIfStopped() {
