@@ -1161,12 +1161,14 @@ public abstract class AbstractServerInstance implements Instance {
             try {
               future.set(parser.parseFrom(blob));
             } catch (InvalidProtocolBufferException e) {
+              logger.warn(format("expect parse for %s failed", DigestUtil.toString(digest)), e);
               future.setException(e);
             }
           }
 
           @Override
           public void onFailure(Throwable t) {
+            logger.warn(format("expect for %s failed", DigestUtil.toString(digest)), t);
             future.setException(t);
           }
         },

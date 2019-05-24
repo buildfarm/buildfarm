@@ -38,6 +38,7 @@ import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
 import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
 import build.bazel.remote.execution.v2.GetTreeRequest;
 import build.bazel.remote.execution.v2.GetTreeResponse;
+import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance;
 import com.google.common.base.Function;
 import com.google.common.base.Stopwatch;
@@ -74,6 +75,10 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
     this.requestLogLevel = requestLogLevel;
   }
 
+  String checkMessage(Digest digest, boolean found) {
+    return format(" (%s, %sfound)", DigestUtil.toString(digest), found ? "" : "not ");
+  }
+
   @Override
   public void findMissingBlobs(
       FindMissingBlobsRequest request,
@@ -97,15 +102,18 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
           @Override
           public void onSuccess(FindMissingBlobsResponse.Builder builder) {
             try {
-              responseObserver.onNext(builder.build());
+              FindMissingBlobsResponse response = builder.build();
+              responseObserver.onNext(response);
               responseObserver.onCompleted();
               long elapsedMicros = stopwatch.elapsed(MICROSECONDS);
+              boolean checkQualifier = request.getBlobDigestsCount() == 1;
               logger.log(
-                  requestLogLevel,
+                  checkQualifier ? Level.INFO : requestLogLevel,
                   format(
-                      "FindMissingBlobs(%s) for %d blobs in %gms",
+                      "FindMissingBlobs(%s) for %d blobs%s in %gms",
                       instance.getName(),
                       request.getBlobDigestsList().size(),
+                      checkQualifier ? checkMessage(request.getBlobDigests(0), response.getMissingBlobDigestsCount() == 0) : "",
                       elapsedMicros / 1000.0));
             } catch (Throwable t) {
               onFailure(t);

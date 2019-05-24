@@ -642,9 +642,11 @@ public class ShardInstance extends AbstractServerInstance {
     boolean emptyWorkerList = workersList.isEmpty();
     final ListenableFuture<List<String>> populatedWorkerListFuture;
     if (emptyWorkerList) {
+      logger.info(format("worker list was initially empty for %s, attempting to correct", DigestUtil.toString(blobDigest)));
       populatedWorkerListFuture = transform(
           correctMissingBlob(backplane, workerSet, locationSet, this::workerStub, blobDigest, newDirectExecutorService()),
           (foundOnWorkers) -> {
+            logger.info(format("worker list was corrected for %s to be %s", DigestUtil.toString(blobDigest), foundOnWorkers.toString()));
             Iterables.addAll(workersList, foundOnWorkers);
             return workersList;
           },
@@ -668,6 +670,7 @@ public class ShardInstance extends AbstractServerInstance {
           triedCheck = true;
           workersList.clear();
           final ListenableFuture<List<String>> workersListFuture;
+          logger.info(format("worker list was depleted for %s, attempting to correct", DigestUtil.toString(blobDigest)));
           workersListFuture = transform(
               correctMissingBlob(
                   backplane,
@@ -677,6 +680,7 @@ public class ShardInstance extends AbstractServerInstance {
                   blobDigest,
                   directExecutor()),
               (foundOnWorkers) -> {
+                logger.info(format("worker list was corrected after depletion for %s to be %s", DigestUtil.toString(blobDigest), foundOnWorkers.toString()));
                 Iterables.addAll(workersList, foundOnWorkers);
                 return workersList;
               },

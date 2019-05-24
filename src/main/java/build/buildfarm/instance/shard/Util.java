@@ -106,6 +106,7 @@ public class Util {
         fail(Status.fromThrowable(t).asRuntimeException());
       }
     };
+    logger.info(format("scanning through %d workers to find %s", workerSet.size(), DigestUtil.toString(digest)));
     for (String worker : workerSet) {
       Instance instance = workerInstanceFactory.apply(worker);
       checkMissingBlobOnInstance(
@@ -155,13 +156,16 @@ public class Util {
         new FutureCallback<Iterable<Digest>>() {
           @Override
           public void onSuccess(Iterable<Digest> missingDigests) {
-            foundCallback.onSuccess(Iterables.isEmpty(missingDigests));
+            boolean found = Iterables.isEmpty(missingDigests);
+            logger.info(format("check missing response for %s to %s was %sfound", DigestUtil.toString(digest), worker, found ? "" : "not "));
+            foundCallback.onSuccess(found);
           }
 
           @Override
           public void onFailure(Throwable t) {
             Status status = Status.fromThrowable(t);
             if (status.getCode() == Code.UNAVAILABLE) {
+              logger.info(format("check missing response for %s to %s was not found for unavailable", DigestUtil.toString(digest), worker));
               foundCallback.onSuccess(false);
             } else if (status.getCode() == Code.CANCELLED || Context.current().isCancelled()
                 || status.getCode() == Code.DEADLINE_EXCEEDED
