@@ -446,6 +446,31 @@ class CASFileCacheTest {
     incompleteOut.close(); // redundant
   }
 
+  @Test
+  public void incompleteWriteFileIsResumed() throws IOException {
+    ByteString content = ByteString.copyFromUtf8("Hello, World");
+    Digest digest = DIGEST_UTIL.compute(content);
+
+    UUID writeId = UUID.randomUUID();
+    Path key = fileCache.getKey(digest, false);
+    Path writePath = key.resolveSibling(key.getFileName() + "." + writeId);
+    try (OutputStream out = Files.newOutputStream(writePath)) {
+      content.substring(0, 6).writeTo(out);
+    }
+    Write write = fileCache.getWrite(digest, writeId);
+    AtomicBoolean notified = new AtomicBoolean(false);
+    write.addListener(
+        () -> notified.set(true),
+        directExecutor());
+    assertThat(write.getCommittedSize()).isEqualTo(6);
+    try (OutputStream out = write.getOutput(1, SECONDS)) {
+      content.substring(6).writeTo(out);
+    }
+    assertThat(notified.get()).isTrue();
+    assertThat(write.getCommittedSize()).isEqualTo(digest.getSizeBytes());
+    assertThat(write.isComplete()).isTrue();
+  }
+
   @RunWith(JUnit4.class)
   public static class NativeCASFileCacheTest extends CASFileCacheTest {
     public NativeCASFileCacheTest() throws IOException {
