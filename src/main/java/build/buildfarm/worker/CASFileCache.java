@@ -927,16 +927,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return root.resolve(filename);
   }
 
-  private void remove(Digest digest, boolean isExecutable) throws IOException, InterruptedException {
-    Path key = getKey(digest, isExecutable);
-    Entry e = storage.remove(key);
-    if (e != null) {
-      synchronized (this) {
-        unlinkEntry(e);
-      }
-    }
-  }
-
   private synchronized void dischargeAndNotify(long size) {
     discharge(size);
     notify();
