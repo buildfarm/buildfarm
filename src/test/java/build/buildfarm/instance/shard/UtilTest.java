@@ -49,6 +49,56 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class UtilTest {
   @Test
+  public void correctMissingBlobChecksAllWorkers() throws Exception {
+    String worker1Name = "worker1";
+    String worker2Name = "worker2";
+    String worker3Name = "worker3";
+    Set<String> workerSet = ImmutableSet.of(worker1Name, worker2Name, worker3Name);
+
+    Digest digest = Digest.newBuilder()
+        .setHash("digest")
+        .setSizeBytes(1)
+        .build();
+    ImmutableList<Digest> digests = ImmutableList.of(digest);
+
+    Instance foundInstance = mock(Instance.class);
+    when(foundInstance.findMissingBlobs(eq(digests), any(Executor.class)))
+        .thenReturn(immediateFuture(ImmutableList.of()));
+    Instance missingInstance = mock(Instance.class);
+    when(missingInstance.findMissingBlobs(eq(digests), any(Executor.class)))
+        .thenReturn(immediateFuture(ImmutableList.of(digest)));
+
+    ShardBackplane backplane = mock(ShardBackplane.class);
+
+    Function<String, Instance> workerInstanceFactory = new Function<String, Instance>() {
+      @Override
+      public Instance apply(String worker) {
+        if (worker.equals(worker1Name)) {
+          return missingInstance;
+        }
+        if (worker.equals(worker2Name) || worker.equals(worker3Name)) {
+          return foundInstance;
+        }
+        return null;
+      }
+    };
+    ListenableFuture<Set<String>> correctFuture = correctMissingBlob(
+        backplane,
+        workerSet,
+        /* originalLocationSet=*/ ImmutableSet.of(),
+        workerInstanceFactory,
+        digest,
+        directExecutor());
+    assertThat(correctFuture.get()).isEqualTo(ImmutableSet.of(worker2Name, worker3Name));
+    verify(foundInstance, times(2)).findMissingBlobs(eq(digests), any(Executor.class));
+    verify(missingInstance, times(1)).findMissingBlobs(eq(digests), any(Executor.class));
+    verify(backplane, times(1)).adjustBlobLocations(
+        eq(digest),
+        eq(ImmutableSet.of(worker2Name, worker3Name)),
+        eq(ImmutableSet.of()));
+  }
+
+  @Test
   public void correctMissingBlobFailsImmediatelyOnUnretriable() throws InterruptedException {
     String workerName = "worker";
     ShardBackplane backplane = mock(ShardBackplane.class);

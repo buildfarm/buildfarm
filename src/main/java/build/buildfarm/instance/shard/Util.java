@@ -57,8 +57,8 @@ public class Util {
   static abstract class AggregateCallback<T> implements FutureCallback<T> {
     private final AtomicInteger outstanding;
 
-    AggregateCallback(AtomicInteger outstanding) {
-      this.outstanding = outstanding;
+    AggregateCallback(int completions) {
+      outstanding = new AtomicInteger(completions);
     }
 
     public boolean complete() {
@@ -82,14 +82,10 @@ public class Util {
       Executor executor) {
     SettableFuture<Void> foundFuture = SettableFuture.create();
     Set<String> foundWorkers = Sets.newConcurrentHashSet();
-    AtomicInteger outstanding = new AtomicInteger(1);
-    AggregateCallback<String> foundCallback = new AggregateCallback<String>(outstanding) {
+    AggregateCallback<String> foundCallback = new AggregateCallback<String>(workerSet.size() + 1) {
+      @Override
       public boolean complete() {
-        if (super.complete() && !foundFuture.isDone()) {
-          foundFuture.set(null);
-          return true;
-        }
-        return false;
+        return super.complete() && foundFuture.set(null);
       }
 
       protected void fail(StatusRuntimeException e) {
@@ -111,7 +107,6 @@ public class Util {
       }
     };
     for (String worker : workerSet) {
-      outstanding.incrementAndGet();
       Instance instance = workerInstanceFactory.apply(worker);
       checkMissingBlobOnInstance(
           digest,

@@ -65,8 +65,6 @@ import build.buildfarm.common.Write;
 import build.buildfarm.common.cache.Cache;
 import build.buildfarm.common.cache.CacheBuilder;
 import build.buildfarm.common.cache.CacheLoader.InvalidCacheLoadException;
-import build.buildfarm.common.grpc.Retrier;
-import build.buildfarm.common.grpc.Retrier.Backoff;
 import build.buildfarm.common.grpc.RetryException;
 import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.instance.Instance;
@@ -645,7 +643,6 @@ public class ShardInstance extends AbstractServerInstance {
     final ListenableFuture<List<String>> populatedWorkerListFuture;
     if (emptyWorkerList) {
       populatedWorkerListFuture = transform(
-          // should be sending this the blob location set and worker set we used
           correctMissingBlob(backplane, workerSet, locationSet, this::workerStub, blobDigest, newDirectExecutorService()),
           (foundOnWorkers) -> {
             Iterables.addAll(workersList, foundOnWorkers);
@@ -678,7 +675,7 @@ public class ShardInstance extends AbstractServerInstance {
                   locationSet,
                   ShardInstance.this::workerStub,
                   blobDigest,
-                  newDirectExecutorService()),
+                  directExecutor()),
               (foundOnWorkers) -> {
                 Iterables.addAll(workersList, foundOnWorkers);
                 return workersList;
