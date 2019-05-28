@@ -1056,38 +1056,79 @@ public abstract class AbstractServerInstance implements Instance {
     return watchFuture;
   }
 
+  protected static QueuedOperationMetadata maybeQueuedOperationMetadata(String name, Any metadata) {
+    if (metadata.is(QueuedOperationMetadata.class)) {
+      try {
+        return metadata.unpack(QueuedOperationMetadata.class);
+      } catch (InvalidProtocolBufferException e) {
+        logger.log(SEVERE, format("invalid executing operation metadata %s", name), e);
+      }
+    }
+    return null;
+  }
+
+  protected static ExecutingOperationMetadata maybeExecutingOperationMetadata(String name, Any metadata) {
+    if (metadata.is(ExecutingOperationMetadata.class)) {
+      try {
+        return metadata.unpack(ExecutingOperationMetadata.class);
+      } catch (InvalidProtocolBufferException e) {
+        logger.log(SEVERE, format("invalid executing operation metadata %s", name), e);
+      }
+    }
+    return null;
+  }
+
+  protected static CompletedOperationMetadata maybeCompletedOperationMetadata(String name, Any metadata) {
+    if (metadata.is(CompletedOperationMetadata.class)) {
+      try {
+        return metadata.unpack(CompletedOperationMetadata.class);
+      } catch (InvalidProtocolBufferException e) {
+        logger.log(SEVERE, format("invalid completed operation metadata %s", name), e);
+      }
+    }
+    return null;
+  }
+
+  protected static RequestMetadata expectRequestMetadata(Operation operation) {
+    String name = operation.getName();
+    Any metadata = operation.getMetadata();
+    QueuedOperationMetadata queuedOperationMetadata = maybeQueuedOperationMetadata(name, metadata);
+    if (queuedOperationMetadata != null) {
+      return queuedOperationMetadata.getRequestMetadata();
+    }
+    ExecutingOperationMetadata executingOperationMetadata = maybeExecutingOperationMetadata(name, metadata);
+    if (executingOperationMetadata != null) {
+      return executingOperationMetadata.getRequestMetadata();
+    }
+    CompletedOperationMetadata completedOperationMetadata = maybeCompletedOperationMetadata(name, metadata);
+    if (completedOperationMetadata != null) {
+      return completedOperationMetadata.getRequestMetadata();
+    }
+    return RequestMetadata.getDefaultInstance();
+  }
+
   protected static ExecuteOperationMetadata expectExecuteOperationMetadata(
       Operation operation) {
-    if (operation.getMetadata().is(QueuedOperationMetadata.class)) {
-      try {
-        return operation.getMetadata().unpack(QueuedOperationMetadata.class).getExecuteOperationMetadata();
-      } catch (InvalidProtocolBufferException e) {
-        logger.log(SEVERE, format("invalid executing operation metadata %s", operation.getName()), e);
-        return null;
-      }
+    String name = operation.getName();
+    Any metadata = operation.getMetadata();
+    QueuedOperationMetadata queuedOperationMetadata = maybeQueuedOperationMetadata(name, metadata);
+    if (queuedOperationMetadata != null) {
+      return queuedOperationMetadata.getExecuteOperationMetadata();
     }
-    if (operation.getMetadata().is(ExecutingOperationMetadata.class)) {
-      try {
-        return operation.getMetadata().unpack(ExecutingOperationMetadata.class).getExecuteOperationMetadata();
-      } catch (InvalidProtocolBufferException e) {
-        logger.log(SEVERE, format("invalid executing operation metadata %s", operation.getName()), e);
-        return null;
-      }
+    ExecutingOperationMetadata executingOperationMetadata = maybeExecutingOperationMetadata(name, metadata);
+    if (executingOperationMetadata != null) {
+      return executingOperationMetadata.getExecuteOperationMetadata();
     }
-    if (operation.getMetadata().is(CompletedOperationMetadata.class)) {
-      try {
-        return operation.getMetadata().unpack(CompletedOperationMetadata.class).getExecuteOperationMetadata();
-      } catch (InvalidProtocolBufferException e) {
-        logger.log(SEVERE, format("invalid completed operation metadata %s", operation.getName()), e);
-        return null;
-      }
+    CompletedOperationMetadata completedOperationMetadata = maybeCompletedOperationMetadata(name, metadata);
+    if (completedOperationMetadata != null) {
+      return completedOperationMetadata.getExecuteOperationMetadata();
     }
     try {
       return operation.getMetadata().unpack(ExecuteOperationMetadata.class);
     } catch (InvalidProtocolBufferException e) {
       logger.log(SEVERE, format("invalid execute operation metadata %s", operation.getName()), e);
-      return null;
     }
+    return null;
   }
 
   protected Action expectAction(Operation operation) throws InterruptedException {
@@ -1283,9 +1324,13 @@ public abstract class AbstractServerInstance implements Instance {
           .setMetadata(Any.pack(ExecuteOperationMetadata.getDefaultInstance()))
           .build();
     }
-    errorOperation(operation, com.google.rpc.Status.newBuilder()
-        .setCode(Code.CANCELLED.getNumber())
-        .build());
+    RequestMetadata requestMetadata = expectRequestMetadata(operation);
+    errorOperation(
+        operation,
+        requestMetadata,
+        com.google.rpc.Status.newBuilder()
+            .setCode(Code.CANCELLED.getNumber())
+            .build());
   }
 
   @Override
@@ -1300,15 +1345,19 @@ public abstract class AbstractServerInstance implements Instance {
   public boolean requeueOperation(Operation operation) throws InterruptedException {
     String name = operation.getName();
     ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
+    RequestMetadata requestMetadata = expectRequestMetadata(operation);
     if (metadata == null) {
       // ensure that watchers are notified
       String message = String.format(
           "Operation %s does not contain ExecuteOperationMetadata",
           name);
-      errorOperation(operation, com.google.rpc.Status.newBuilder()
-          .setCode(Code.INTERNAL.getNumber())
-          .setMessage(message)
-          .build());
+      errorOperation(
+          operation,
+          requestMetadata,
+          com.google.rpc.Status.newBuilder()
+              .setCode(Code.INTERNAL.getNumber())
+              .setMessage(message)
+              .build());
       return false;
     }
 
@@ -1317,10 +1366,13 @@ public abstract class AbstractServerInstance implements Instance {
       String message = String.format(
           "Operation %s stage is not QUEUED",
           name);
-      errorOperation(operation, com.google.rpc.Status.newBuilder()
-          .setCode(com.google.rpc.Code.INTERNAL.getNumber())
-          .setMessage(message)
-          .build());
+      errorOperation(
+          operation,
+          requestMetadata,
+          com.google.rpc.Status.newBuilder()
+              .setCode(com.google.rpc.Code.INTERNAL.getNumber())
+              .setMessage(message)
+              .build());
       return false;
     }
     Digest actionDigest = metadata.getActionDigest();
@@ -1335,7 +1387,7 @@ public abstract class AbstractServerInstance implements Instance {
             .build();
       }
       logFailedStatus(actionDigest, status);
-      errorOperation(operation, status);
+      errorOperation(operation, requestMetadata, status);
       return false;
     }
 
@@ -1351,6 +1403,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   protected void errorOperation(
       Operation operation,
+      RequestMetadata requestMetadata,
       com.google.rpc.Status status) throws InterruptedException {
     if (operation.getDone()) {
       throw new IllegalStateException("Trying to error already completed operation [" + name + "]");
@@ -1359,11 +1412,17 @@ public abstract class AbstractServerInstance implements Instance {
     if (metadata == null) {
       metadata = ExecuteOperationMetadata.getDefaultInstance();
     }
+    long completedAt = System.currentTimeMillis();
+    CompletedOperationMetadata completedMetadata = CompletedOperationMetadata.newBuilder()
+        .setExecuteOperationMetadata(metadata.toBuilder()
+            .setStage(Stage.COMPLETED)
+            .build())
+        .setCompletedAt(completedAt)
+        .setRequestMetadata(requestMetadata)
+        .build();
     putOperation(operation.toBuilder()
         .setDone(true)
-        .setMetadata(Any.pack(metadata.toBuilder()
-            .setStage(Stage.COMPLETED)
-            .build()))
+        .setMetadata(Any.pack(completedMetadata))
         .setResponse(Any.pack(ExecuteResponse.newBuilder()
             .setStatus(status)
             .build()))

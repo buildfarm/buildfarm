@@ -1213,7 +1213,7 @@ public class ShardInstance extends AbstractServerInstance {
             }
             logFailedStatus(actionDigest, status);
             SettableFuture<Void> errorFuture = SettableFuture.create();
-            errorOperationFuture(operation, status, errorFuture);
+            errorOperationFuture(operation, executeEntry.getRequestMetadata(), status, errorFuture);
             errorFuture.addListener(
                 () -> requeuedFuture.set(null),
                 operationTransformService);
@@ -1317,7 +1317,11 @@ public class ShardInstance extends AbstractServerInstance {
     }
   }
 
-  private <T> void errorOperationFuture(Operation operation, com.google.rpc.Status status, SettableFuture<T> errorFuture) {
+  private <T> void errorOperationFuture(
+      Operation operation,
+      RequestMetadata requestMetadata,
+      com.google.rpc.Status status,
+      SettableFuture<T> errorFuture) {
     operationDeletionService.execute(new Runnable() {
       // we must make all efforts to delete this thing
       int attempt = 1;
@@ -1325,7 +1329,7 @@ public class ShardInstance extends AbstractServerInstance {
       @Override
       public void run() {
         try {
-          errorOperation(operation, status);
+          errorOperation(operation, requestMetadata, status);
           errorFuture.setException(StatusProto.toStatusException(status));
         } catch (StatusRuntimeException e) {
           if (attempt % 100 == 0) {
@@ -1623,7 +1627,7 @@ public class ShardInstance extends AbstractServerInstance {
                   .build();
             }
             logFailedStatus(actionDigest, status);
-            errorOperationFuture(operation, status, queueFuture);
+            errorOperationFuture(operation, executeEntry.getRequestMetadata(), status, queueFuture);
           }
         },
         operationTransformService);

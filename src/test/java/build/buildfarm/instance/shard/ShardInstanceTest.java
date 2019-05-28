@@ -63,6 +63,7 @@ import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.instance.Instance.CommittingOutputStream;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
@@ -320,16 +321,7 @@ public class ShardInstanceTest {
                     .setDescription(MISSING_ACTION))
                 .build())))
         .build();
-    Operation erroredOperation = Operation.newBuilder()
-        .setName(executeEntry.getOperationName())
-        .setDone(true)
-        .setMetadata(Any.pack(ExecuteOperationMetadata.newBuilder()
-            .setActionDigest(actionDigest)
-            .setStage(COMPLETED)
-            .build()))
-        .setResponse(Any.pack(executeResponse))
-        .build();
-    verify(mockBackplane, times(1)).putOperation(eq(erroredOperation), eq(COMPLETED));
+    assertResponse(executeResponse);
     verify(poller, atLeastOnce()).pause();
   }
 
@@ -361,7 +353,6 @@ public class ShardInstanceTest {
       }
     }
     assertThat(failedPreconditionExceptionCaught).isTrue();
-
     ExecuteResponse executeResponse = ExecuteResponse.newBuilder()
         .setStatus(com.google.rpc.Status.newBuilder()
             .setCode(Code.FAILED_PRECONDITION.getNumber())
@@ -373,17 +364,19 @@ public class ShardInstanceTest {
                     .setDescription(MISSING_COMMAND))
                 .build())))
         .build();
-    Operation erroredOperation = Operation.newBuilder()
-        .setName(executeEntry.getOperationName())
-        .setDone(true)
-        .setMetadata(Any.pack(ExecuteOperationMetadata.newBuilder()
-            .setActionDigest(actionDigest)
-            .setStage(COMPLETED)
-            .build()))
-        .setResponse(Any.pack(executeResponse))
-        .build();
-    verify(mockBackplane, times(1)).putOperation(eq(erroredOperation), eq(COMPLETED));
+    assertResponse(executeResponse);
+
     verify(poller, atLeastOnce()).pause();
+  }
+
+  void assertResponse(ExecuteResponse executeResponse) throws Exception {
+    ArgumentCaptor<Operation> operationCaptor = ArgumentCaptor.forClass(Operation.class);
+    verify(mockBackplane, times(1)).putOperation(operationCaptor.capture(), eq(COMPLETED));
+    Operation erroredOperation = operationCaptor.getValue();
+    assertThat(erroredOperation.getDone()).isTrue();
+    CompletedOperationMetadata completedMetadata = erroredOperation.getMetadata().unpack(CompletedOperationMetadata.class);
+    assertThat(completedMetadata.getExecuteOperationMetadata().getStage()).isEqualTo(COMPLETED);
+    assertThat(erroredOperation.getResponse().unpack(ExecuteResponse.class)).isEqualTo(executeResponse);
   }
 
   @Test
@@ -443,16 +436,7 @@ public class ShardInstanceTest {
                     .setDescription("The directory `/missing-subdir` was not found in the CAS."))
                 .build())))
         .build();
-    Operation erroredOperation = Operation.newBuilder()
-        .setName(executeEntry.getOperationName())
-        .setDone(true)
-        .setMetadata(Any.pack(ExecuteOperationMetadata.newBuilder()
-            .setActionDigest(actionDigest)
-            .setStage(COMPLETED)
-            .build()))
-        .setResponse(Any.pack(executeResponse))
-        .build();
-    verify(mockBackplane, times(1)).putOperation(eq(erroredOperation), eq(COMPLETED));
+    assertResponse(executeResponse);
     verify(poller, atLeastOnce()).pause();
   }
 
@@ -504,16 +488,7 @@ public class ShardInstanceTest {
         .setStatus(com.google.rpc.Status.newBuilder()
             .setCode(queueException.getStatus().getCode().value()))
         .build();
-    Operation erroredOperation = Operation.newBuilder()
-        .setName(executeEntry.getOperationName())
-        .setDone(true)
-        .setMetadata(Any.pack(ExecuteOperationMetadata.newBuilder()
-            .setActionDigest(actionDigest)
-            .setStage(COMPLETED)
-            .build()))
-        .setResponse(Any.pack(executeResponse))
-        .build();
-    verify(mockBackplane, times(1)).putOperation(eq(erroredOperation), eq(COMPLETED));
+    assertResponse(executeResponse);
     verify(poller, atLeastOnce()).pause();
   }
 

@@ -60,6 +60,7 @@ import build.buildfarm.common.Watcher;
 import build.buildfarm.instance.OperationsMap;
 import build.buildfarm.instance.WatchFuture;
 import build.buildfarm.v1test.ActionCacheConfig;
+import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.DelegateCASConfig;
 import build.buildfarm.v1test.MemoryInstanceConfig;
 import com.google.common.collect.ImmutableList;
@@ -78,6 +79,7 @@ import com.google.rpc.Code;
 import com.google.rpc.PreconditionFailure;
 import com.google.rpc.PreconditionFailure.Violation;
 import com.google.rpc.Status;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ExecutionException;
@@ -352,13 +354,24 @@ public class MemoryInstanceTest {
   }
 
   @Test
-  public void requeueFailureNotifiesWatchers() throws ExecutionException, InterruptedException {
+  public void requeueFailureNotifiesWatchers() throws Exception {
     ExecuteOperationMetadata metadata = ExecuteOperationMetadata.newBuilder()
         .setActionDigest(simpleActionDigest)
         .setStage(QUEUED)
         .build();
     Operation queuedOperation = createOperation("missing-action-operation", metadata);
     outstandingOperations.put(queuedOperation.getName(), queuedOperation);
+    Watcher watcher = mock(Watcher.class);
+    ListenableFuture<Void> watchFuture = instance.watchOperation(queuedOperation.getName(), watcher);
+    assertThat(instance.requeueOperation(queuedOperation)).isFalse();
+    watchFuture.get();
+    ArgumentCaptor<Operation> operationCaptor = ArgumentCaptor.forClass(Operation.class);
+    verify(watcher, atLeastOnce()).observe(operationCaptor.capture());
+    List<Operation> operations = operationCaptor.getAllValues();
+    Operation erroredOperation = operations.get(operations.size() - 1);
+    assertThat(erroredOperation.getDone()).isTrue();
+    CompletedOperationMetadata completedMetadata = erroredOperation.getMetadata().unpack(CompletedOperationMetadata.class);
+    assertThat(completedMetadata.getExecuteOperationMetadata().getStage()).isEqualTo(COMPLETED);
     ExecuteResponse executeResponse = ExecuteResponse.newBuilder()
         .setStatus(Status.newBuilder()
             .setCode(Code.FAILED_PRECONDITION.getNumber())
@@ -370,19 +383,7 @@ public class MemoryInstanceTest {
                     .setDescription(MISSING_ACTION))
                 .build())))
         .build();
-    Operation erroredOperation = queuedOperation.toBuilder()
-        .setDone(true)
-        .setMetadata(Any.pack(metadata.toBuilder()
-            .setStage(COMPLETED)
-            .build()))
-        .setResponse(Any.pack(executeResponse))
-        .build();
-    Watcher watcher = mock(Watcher.class);
-    ListenableFuture<Void> watchFuture = instance.watchOperation(queuedOperation.getName(), watcher);
-    assertThat(instance.requeueOperation(queuedOperation)).isFalse();
-    watchFuture.get();
-    verify(watcher, times(1)).observe(eq(queuedOperation));
-    verify(watcher, times(1)).observe(eq(erroredOperation));
+    assertThat(erroredOperation.getResponse().unpack(ExecuteResponse.class)).isEqualTo(executeResponse);
   }
 
   private Operation createOperation(String name, ExecuteOperationMetadata metadata) {
