@@ -426,7 +426,11 @@ public class ShardInstance extends AbstractServerInstance {
 
     Deque<String> workers;
     try {
-      List<String> workersList = new ArrayList<>(backplane.getWorkers());
+      Set<String> workerSet = backplane.getWorkers();
+      List<String> workersList;
+      synchronized (workerSet) {
+        workersList = new ArrayList<>(workerSet);
+      }
       Collections.shuffle(workersList, rand);
       workers = new ArrayDeque(workersList);
     } catch (IOException e) {
@@ -634,7 +638,9 @@ public class ShardInstance extends AbstractServerInstance {
     try {
       workerSet = backplane.getWorkers();
       locationSet = backplane.getBlobLocationSet(blobDigest);
-      workersList = new ArrayList<>(Sets.intersection(locationSet, workerSet));
+      synchronized (workerSet) {
+        workersList = new ArrayList<>(Sets.intersection(locationSet, workerSet));
+      }
     } catch (IOException e) {
       blobObserver.onError(e);
       return;
@@ -766,23 +772,25 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   String getRandomWorker() {
-    Set<String> workers;
+    Set<String> workerSet;
     try {
-      workers = backplane.getWorkers();
+      workerSet = backplane.getWorkers();
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }
-    if (workers.isEmpty()) {
-      throw Status.UNAVAILABLE.withDescription("no available workers").asRuntimeException();
+    synchronized (workerSet) {
+      if (workerSet.isEmpty()) {
+        throw Status.UNAVAILABLE.withDescription("no available workers").asRuntimeException();
+      }
+      int index = rand.nextInt(workerSet.size());
+      // best case no allocation average n / 2 selection
+      Iterator<String> iter = workerSet.iterator();
+      String worker = null;
+      while (iter.hasNext() && index-- >= 0) {
+        worker = iter.next();
+      }
+      return worker;
     }
-    int index = rand.nextInt(workers.size());
-    // best case no allocation average n / 2 selection
-    Iterator<String> iter = workers.iterator();
-    String worker = null;
-    while (iter.hasNext() && index-- >= 0) {
-      worker = iter.next();
-    }
-    return worker;
   }
 
   private Instance workerStub(String worker) {

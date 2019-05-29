@@ -15,11 +15,14 @@
 package build.buildfarm.instance.shard;
 
 import static build.buildfarm.instance.shard.RedisShardBackplane.parseOperationChange;
+import static build.buildfarm.instance.shard.RedisShardBackplane.parseWorkerChange;
 import static java.lang.String.format;
 import static java.util.logging.Level.FINE;
+import static java.util.logging.Level.WARNING;
 
 import build.buildfarm.instance.WatchFuture;
 import build.buildfarm.v1test.OperationChange;
+import build.buildfarm.v1test.WorkerChange;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ListMultimap;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -28,6 +31,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Timestamp;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -36,8 +40,8 @@ import javax.annotation.Nullable;
 import redis.clients.jedis.Client;
 import redis.clients.jedis.JedisPubSub;
 
-class OperationSubscriber extends JedisPubSub {
-  private static final Logger logger = Logger.getLogger(OperationSubscriber.class.getName());
+class RedisShardSubscriber extends JedisPubSub {
+  private static final Logger logger = Logger.getLogger(RedisShardSubscriber.class.getName());
 
   abstract static class TimedWatchFuture extends WatchFuture {
     private final TimedWatcher watcher;
@@ -57,12 +61,18 @@ class OperationSubscriber extends JedisPubSub {
   }
 
   private final ListMultimap<String, TimedWatchFuture> watchers;
+  private final Set<String> workers;
+  private final String workerChannel;
   private final Executor executor;
 
-  OperationSubscriber(
+  RedisShardSubscriber(
       ListMultimap<String, TimedWatchFuture> watchers,
+      Set<String> workers,
+      String workerChannel,
       Executor executor) {
     this.watchers = watchers;
+    this.workers = workers;
+    this.workerChannel = workerChannel;
     this.executor = executor;
   }
 
@@ -70,6 +80,14 @@ class OperationSubscriber extends JedisPubSub {
     synchronized (watchers) {
       return ImmutableList.copyOf(watchers.keySet());
     }
+  }
+
+  public List<String> subscribedChannels() {
+    ImmutableList.Builder<String> channels = ImmutableList.builder();
+    synchronized (watchers) {
+      channels.addAll(watchers.keySet());
+    }
+    return channels.add(workerChannel).build();
   }
 
   public List<String> expiredWatchedOperationChannels(Instant now) {
@@ -131,7 +149,7 @@ class OperationSubscriber extends JedisPubSub {
       @Override
       public void unwatch() {
         logger.fine("unwatching " + channel);
-        OperationSubscriber.this.unwatch(channel, this);
+        RedisShardSubscriber.this.unwatch(channel, this);
       }
     };
     boolean hasSubscribed;
@@ -220,6 +238,52 @@ class OperationSubscriber extends JedisPubSub {
 
   @Override
   public void onMessage(String channel, String message) {
+    if (channel.equals(workerChannel)) {
+      onWorkerMessage(message);
+    } else {
+      onOperationMessage(channel, message);
+    }
+  }
+
+  void onWorkerMessage(String message) {
+    try {
+      onWorkerChange(parseWorkerChange(message));
+    } catch (InvalidProtocolBufferException e) {
+      logger.log(WARNING, format("invalid worker change message: %s", message), e);
+    }
+  }
+
+  void onWorkerChange(WorkerChange workerChange) {
+    switch (workerChange.getTypeCase()) {
+      case TYPE_NOT_SET:
+        logger.warning(
+            format(
+                "WorkerChange oneof type is not set from %s at %s",
+                workerChange.getName(),
+                workerChange.getEffectiveAt()));
+        break;
+      case ADD:
+        addWorker(workerChange.getName());
+        break;
+      case REMOVE:
+        removeWorker(workerChange.getName());
+        break;
+    }
+  }
+
+  void addWorker(String worker) {
+    synchronized (workers) {
+      workers.add(worker);
+    }
+  }
+
+  boolean removeWorker(String worker) {
+    synchronized (workers) {
+      return workers.remove(worker);
+    }
+  }
+
+  void onOperationMessage(String channel, String message) {
     try {
       onOperationChange(channel, parseOperationChange(message));
     } catch (InvalidProtocolBufferException e) {

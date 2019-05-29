@@ -139,7 +139,9 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
       if (publicName == null) {
         remoteWorkers = workers;
       } else {
-        remoteWorkers = Sets.difference(workers, ImmutableSet.<String>of(publicName));
+        synchronized (workers) {
+          remoteWorkers = Sets.difference(workers, ImmutableSet.<String>of(publicName)).immutableCopy();
+        }
       }
       locationSet = Sets.newHashSet(Sets.intersection(backplane.getBlobLocationSet(blobDigest), workers));
     } catch (IOException e) {

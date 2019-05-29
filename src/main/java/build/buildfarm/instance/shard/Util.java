@@ -80,8 +80,47 @@ public class Util {
       Function<String, Instance> workerInstanceFactory,
       Digest digest,
       Executor executor) {
-    SettableFuture<Void> foundFuture = SettableFuture.create();
+    ListenableFuture<Void> foundFuture;
     Set<String> foundWorkers = Sets.newConcurrentHashSet();
+    synchronized (workerSet) {
+      foundFuture = correctMissingBlobSynchronized(
+          backplane,
+          workerSet,
+          originalLocationSet,
+          workerInstanceFactory,
+          digest,
+          executor,
+          foundWorkers);
+    }
+    return transform(
+        foundFuture,
+        (result) -> {
+          Set<String> newLocationSet;
+          synchronized (workerSet) {
+            newLocationSet = Sets.difference(Sets.intersection(originalLocationSet, workerSet), foundWorkers).immutableCopy();
+          }
+          try {
+            backplane.adjustBlobLocations(
+                digest,
+                foundWorkers,
+                newLocationSet);
+          } catch (IOException e) {
+            logger.log(SEVERE, format("error adjusting blob location for %s", DigestUtil.toString(digest)), e);
+          }
+          return foundWorkers;
+        },
+        executor);
+  }
+
+  static ListenableFuture<Void> correctMissingBlobSynchronized(
+      ShardBackplane backplane,
+      Set<String> workerSet,
+      Set<String> originalLocationSet,
+      Function<String, Instance> workerInstanceFactory,
+      Digest digest,
+      Executor executor,
+      Set<String> foundWorkers) {
+    SettableFuture<Void> foundFuture = SettableFuture.create();
     AggregateCallback<String> foundCallback = new AggregateCallback<String>(workerSet.size() + 1) {
       @Override
       public boolean complete() {
@@ -127,20 +166,7 @@ public class Util {
           executor);
     }
     foundCallback.complete();
-    return transform(
-        foundFuture,
-        (result) -> {
-          try {
-            backplane.adjustBlobLocations(
-                digest,
-                foundWorkers,
-                Sets.difference(Sets.intersection(originalLocationSet, workerSet), foundWorkers));
-          } catch (IOException e) {
-            logger.log(SEVERE, format("error adjusting blob location for %s", DigestUtil.toString(digest)), e);
-          }
-          return foundWorkers;
-        },
-        executor);
+    return foundFuture;
   }
 
   static void checkMissingBlobOnInstance(

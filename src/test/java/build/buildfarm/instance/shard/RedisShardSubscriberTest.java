@@ -27,7 +27,7 @@ import static org.mockito.Mockito.verify;
 import static redis.clients.jedis.Protocol.Keyword.SUBSCRIBE;
 import static redis.clients.jedis.Protocol.Keyword.UNSUBSCRIBE;
 
-import build.buildfarm.instance.shard.OperationSubscriber.TimedWatchFuture;
+import build.buildfarm.instance.shard.RedisShardSubscriber.TimedWatchFuture;
 import build.buildfarm.v1test.OperationChange;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -51,7 +51,7 @@ import org.junit.runners.JUnit4;
 import redis.clients.jedis.Client;
 
 @RunWith(JUnit4.class)
-public class OperationSubscriberTest {
+public class RedisShardSubscriberTest {
   /* he cannot unsee */
   private static class LidlessTimedWatchFuture extends TimedWatchFuture {
     LidlessTimedWatchFuture(TimedWatcher timedWatcher) {
@@ -120,12 +120,22 @@ public class OperationSubscriberTest {
     }
   };
 
+  RedisShardSubscriber createSubscriber(
+      ListMultimap<String, TimedWatchFuture> watchers,
+      Executor executor) {
+    return new RedisShardSubscriber(watchers, /* workers=*/ null, "worker-channel", executor);
+  }
+
+  RedisShardSubscriber createSubscriber(ListMultimap<String, TimedWatchFuture> watchers) {
+    return createSubscriber(watchers, /* executor=*/ null);
+  }
+
   @Test
   public void novelChannelWatcherSubscribes() throws InterruptedException {
     ListMultimap<String, TimedWatchFuture> watchers =
         Multimaps.<String, TimedWatchFuture>synchronizedListMultimap(
             MultimapBuilder.linkedHashKeys().arrayListValues().build());
-    OperationSubscriber operationSubscriber = new OperationSubscriber(watchers, directExecutor());
+    RedisShardSubscriber operationSubscriber = createSubscriber(watchers, directExecutor());
 
     TestClient testClient = new TestClient();
     Thread proceedThread = new Thread(() -> operationSubscriber.proceed(testClient));
@@ -149,7 +159,7 @@ public class OperationSubscriberTest {
   public void watchedOperationChannelsReflectsWatchers() {
     ListMultimap<String, TimedWatchFuture> watchers =
         MultimapBuilder.linkedHashKeys().arrayListValues().build();
-    OperationSubscriber operationSubscriber = new OperationSubscriber(watchers, /* executor=*/ null);
+    RedisShardSubscriber operationSubscriber = createSubscriber(watchers);
     assertThat(operationSubscriber.watchedOperationChannels()).isEmpty();
     String addedChannel = "added-channel";
     watchers.put(addedChannel, null);
@@ -162,7 +172,7 @@ public class OperationSubscriberTest {
   public void expiredWatchedOperationChannelsReflectsWatchers() {
     ListMultimap<String, TimedWatchFuture> watchers =
         MultimapBuilder.linkedHashKeys().arrayListValues().build();
-    OperationSubscriber operationSubscriber = new OperationSubscriber(watchers, /* executor=*/ null);
+    RedisShardSubscriber operationSubscriber = createSubscriber(watchers);
 
     TimedWatcher unexpiredWatcher = new UnobservableWatcher(Instant.MAX);
     TimedWatcher expiredWatcher = new UnobservableWatcher(Instant.EPOCH);
@@ -197,7 +207,7 @@ public class OperationSubscriberTest {
   public void existingChannelWatcherSuppressesSubscription() {
     ListMultimap<String, TimedWatchFuture> watchers =
         MultimapBuilder.linkedHashKeys().arrayListValues().build();
-    OperationSubscriber operationSubscriber = new OperationSubscriber(watchers, directExecutor());
+    RedisShardSubscriber operationSubscriber = createSubscriber(watchers, directExecutor());
     String existingChannel = "existing-channel";
     TimedWatcher existingWatcher = new UnobservableWatcher();
     watchers.put(existingChannel, new LidlessTimedWatchFuture(existingWatcher));
@@ -211,7 +221,7 @@ public class OperationSubscriberTest {
     ListMultimap<String, TimedWatchFuture> watchers =
         Multimaps.<String, TimedWatchFuture>synchronizedListMultimap(
             MultimapBuilder.linkedHashKeys().arrayListValues().build());
-    OperationSubscriber operationSubscriber = new OperationSubscriber(watchers, directExecutor());
+    RedisShardSubscriber operationSubscriber = createSubscriber(watchers, directExecutor());
 
     TestClient testClient = new TestClient();
     Thread proceedThread = new Thread(() -> operationSubscriber.proceed(testClient));
@@ -258,7 +268,7 @@ public class OperationSubscriberTest {
     String resetChannel = "reset-channel";
     watchers.put(resetChannel, new LidlessTimedWatchFuture(resetWatcher));
 
-    OperationSubscriber operationSubscriber = new OperationSubscriber(watchers, /* executor=*/ null);
+    RedisShardSubscriber operationSubscriber = createSubscriber(watchers);
     operationSubscriber.resetWatchers(resetChannel, Instant.MAX);
     assertThat(resetWatcher.isExpiredAt(now)).isFalse();
   }
@@ -270,7 +280,7 @@ public class OperationSubscriberTest {
     TimedWatcher expiredWatcher = mock(TimedWatcher.class);
     when(expiredWatcher.isExpiredAt(any(Instant.class))).thenReturn(true);
 
-    OperationSubscriber operationSubscriber = new OperationSubscriber(watchers, directExecutor());
+    RedisShardSubscriber operationSubscriber = createSubscriber(watchers, directExecutor());
 
     String expireChannel = "expire-channel";
     TimedWatchFuture watchFuture = new TimedWatchFuture(expiredWatcher) {
@@ -297,7 +307,7 @@ public class OperationSubscriberTest {
   public void unsetTypeOperationChangeIsIgnored() {
     ListMultimap<String, TimedWatchFuture> watchers =
         MultimapBuilder.linkedHashKeys().arrayListValues().build();
-    OperationSubscriber operationSubscriber = new OperationSubscriber(watchers, directExecutor());
+    RedisShardSubscriber operationSubscriber = createSubscriber(watchers, directExecutor());
 
     operationSubscriber.onOperationChange(
         "unset-type-operation",
@@ -308,7 +318,7 @@ public class OperationSubscriberTest {
   public void invalidOperationChangeIsIgnored() {
     ListMultimap<String, TimedWatchFuture> watchers =
         MultimapBuilder.linkedHashKeys().arrayListValues().build();
-    OperationSubscriber operationSubscriber = new OperationSubscriber(watchers, directExecutor());
+    RedisShardSubscriber operationSubscriber = createSubscriber(watchers, directExecutor());
 
     operationSubscriber.onMessage("invalid-operation-change", "not-json!#?");
   }

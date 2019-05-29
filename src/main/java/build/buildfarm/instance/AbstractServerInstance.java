@@ -24,6 +24,7 @@ import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorS
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static java.lang.String.format;
 import static java.util.logging.Level.SEVERE;
+import static java.util.logging.Level.WARNING;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 import build.bazel.remote.execution.v2.Action;
@@ -1161,14 +1162,14 @@ public abstract class AbstractServerInstance implements Instance {
             try {
               future.set(parser.parseFrom(blob));
             } catch (InvalidProtocolBufferException e) {
-              logger.warn(format("expect parse for %s failed", DigestUtil.toString(digest)), e);
+              logger.log(WARNING, format("expect parse for %s failed", DigestUtil.toString(digest)), e);
               future.setException(e);
             }
           }
 
           @Override
           public void onFailure(Throwable t) {
-            logger.warn(format("expect for %s failed", DigestUtil.toString(digest)), t);
+            logger.log(WARNING, format("expect for %s failed", DigestUtil.toString(digest)), t);
             future.setException(t);
           }
         },

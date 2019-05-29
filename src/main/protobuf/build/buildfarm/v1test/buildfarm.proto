@@ -141,6 +141,7 @@ message RedisShardBackplaneConfig {
   string redis_uri = 1;
   int32 jedis_pool_max_total = 15;
   string workers_hash_name = 2;
+  string worker_channel = 25;
   string action_cache_prefix = 3;
   int32 action_cache_expire = 4;
   string operation_prefix = 5;
@@ -157,7 +158,7 @@ message RedisShardBackplaneConfig {
   string operation_channel_prefix = 9;
   string cas_prefix = 10;
   int32 cas_expire = 11;
-  bool subscribe_to_operation = 14;
+  bool subscribe_to_backplane = 26;
   int32 max_queue_depth = 16;
   int32 max_pre_queue_depth = 17;
 }
@@ -288,6 +289,25 @@ message ShardWorker {
   string endpoint = 1;
 
   int64 expire_at = 2;
+}
+
+message WorkerChange {
+  message Add {
+  }
+
+  message Remove {
+    string source = 1;
+  }
+
+  string name = 1;
+
+  google.protobuf.Timestamp effectiveAt = 2;
+
+  oneof type {
+    Add add = 3;
+
+    Remove remove = 4;
+  }
 }
 
 message OperationChange {
