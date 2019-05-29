@@ -159,6 +159,7 @@ message RedisShardBackplaneConfig {
   string cas_prefix = 10;
   int32 cas_expire = 11;
   bool subscribe_to_backplane = 26;
+  bool run_failsafe_operation = 27;
   int32 max_queue_depth = 16;
   int32 max_pre_queue_depth = 17;
 }

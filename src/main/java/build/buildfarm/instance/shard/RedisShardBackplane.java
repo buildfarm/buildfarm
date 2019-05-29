@@ -520,7 +520,9 @@ public class RedisShardBackplane implements ShardBackplane {
     subscriptionThread = new Thread(operationSubscription);
 
     subscriptionThread.start();
+  }
 
+  private void startFailsafeOperationThread() {
     failsafeOperationThread = new Thread(() -> {
       while (true) {
         try {
@@ -545,6 +547,9 @@ public class RedisShardBackplane implements ShardBackplane {
     poolStarted = true;
     if (config.getSubscribeToBackplane()) {
       startSubscriptionThread();
+    }
+    if (config.getRunFailsafeOperation()) {
+      startFailsafeOperationThread();
     }
   }
 
