@@ -41,7 +41,7 @@ import com.google.protobuf.ByteString;
 import io.grpc.Context;
 import io.grpc.Context.CancellableContext;
 import io.grpc.Status;
-import io.grpc.stub.CallStreamObserver;
+import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
@@ -74,8 +74,8 @@ public class ByteStreamService extends ByteStreamImplBase {
       InputStream in,
       long limit,
       StreamObserver<ReadResponse> responseObserver) {
-    CallStreamObserver<ReadResponse> target =
-        (CallStreamObserver<ReadResponse>) responseObserver;
+    ServerCallStreamObserver<ReadResponse> target =
+        (ServerCallStreamObserver<ReadResponse>) responseObserver;
 
     final class ReadFromOnReadyHandler implements Runnable {
       private final byte buf[] = new byte[CHUNK_SIZE];
@@ -137,6 +137,13 @@ public class ByteStreamService extends ByteStreamImplBase {
       }
     }
 
+    target.setOnCancelHandler(() -> {
+      try {
+        in.close();
+      } catch (IOException e) {
+        logger.log(SEVERE, "error closing stream", e);
+      }
+    });
     target.setOnReadyHandler(new ReadFromOnReadyHandler());
   }
 
