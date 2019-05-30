@@ -14,8 +14,8 @@
 
 package build.buildfarm.worker.shard;
 
+import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.instance.Instance.ChunkObserver;
-import build.buildfarm.worker.CASFileCache.DigestMismatchException;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;

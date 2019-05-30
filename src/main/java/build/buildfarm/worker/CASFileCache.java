@@ -48,6 +48,7 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.FileNode;
 import build.buildfarm.cas.ContentAddressableStorage;
+import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Write;
 import build.buildfarm.v1test.BlobWriteKey;
@@ -160,12 +161,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   synchronized long size() {
     return sizeInBytes;
-  }
-
-  public static class DigestMismatchException extends IOException {
-    DigestMismatchException(String message) {
-      super(message);
-    }
   }
 
   public static class IncompleteBlobException extends IOException {
@@ -1688,12 +1683,18 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         hashOut.close(); // should probably discharge here as well
 
         if (size > blobSizeInBytes) {
+          String hash = hashOut.hash().toString();
           try {
             Files.delete(writePath);
           } finally {
             dischargeAndNotify(blobSizeInBytes);
           }
-          throw new DigestMismatchException("blob digest size mismatch, expected " + blobSizeInBytes + ", was " + size);
+          Digest actual = Digest.newBuilder()
+              .setHash(hash)
+              .setSizeBytes(size)
+              .build();
+          Digest expected = keyToDigest(key, digestUtil);
+          throw new DigestMismatchException(actual, expected);
         }
 
         if (size != blobSizeInBytes) {
@@ -1708,7 +1709,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         String fileName = writePath.getFileName().toString();
         if (!fileName.startsWith(hash)) {
           dischargeAndNotify(blobSizeInBytes);
-          throw new DigestMismatchException("blob digest mismatch, expected " + fileName + " to start with " + hash);
+          Digest actual = Digest.newBuilder()
+              .setHash(hash)
+              .setSizeBytes(blobSizeInBytes)
+              .build();
+          Digest expected = keyToDigest(key, digestUtil);
+          throw new DigestMismatchException(actual, expected);
         }
         try {
           setPermissions(writePath, isExecutable);

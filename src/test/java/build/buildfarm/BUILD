@@ -87,6 +87,7 @@ java_test(
         "//3rdparty/jvm/io/grpc:grpc_context",
         "//3rdparty/jvm/io/grpc:grpc_core",
         "//3rdparty/jvm/org/mockito:mockito_core",
+        "//src/main/java/build/buildfarm:cas",
         "//src/main/java/build/buildfarm:common",
         "//src/main/java/build/buildfarm:instance",
         "//src/main/java/build/buildfarm:stub-instance",

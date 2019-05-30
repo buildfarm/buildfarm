@@ -31,6 +31,7 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.FileNode;
+import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
@@ -469,6 +470,17 @@ class CASFileCacheTest {
     assertThat(notified.get()).isTrue();
     assertThat(write.getCommittedSize()).isEqualTo(digest.getSizeBytes());
     assertThat(write.isComplete()).isTrue();
+  }
+
+  @Test(expected = DigestMismatchException.class)
+  public void invalidContentThrowsDigestMismatch() throws IOException {
+    ByteString content = ByteString.copyFromUtf8("Hello, World");
+    Digest digest = DIGEST_UTIL.compute(content);
+
+    Write write = fileCache.getWrite(digest, UUID.randomUUID());
+    try (OutputStream out = write.getOutput(1, SECONDS)) {
+      ByteString.copyFromUtf8("H3110, W0r1d").writeTo(out);
+    }
   }
 
   @RunWith(JUnit4.class)

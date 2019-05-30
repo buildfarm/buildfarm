@@ -8,7 +8,7 @@ public class DigestMismatchException extends IOException {
   private final Digest actual;
   private final Digest expected;
 
-  DigestMismatchException(Digest actual, Digest expected) {
+  public DigestMismatchException(Digest actual, Digest expected) {
     super(
         String.format(
             "computed digest %s does not match expected %s",
