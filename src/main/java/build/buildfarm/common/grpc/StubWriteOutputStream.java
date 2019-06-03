@@ -13,6 +13,8 @@ import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
+import io.grpc.Status.Code;
+import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -23,6 +25,12 @@ public class StubWriteOutputStream extends OutputStream implements Write {
   public static final long UNLIMITED_EXPECTED_SIZE = Long.MAX_VALUE;
 
   private static final int CHUNK_SIZE = 16 * 1024;
+
+  private static final QueryWriteStatusResponse resetResponse =
+      QueryWriteStatusResponse.newBuilder()
+          .setCommittedSize(0)
+          .setComplete(false)
+          .build();
 
   private final Supplier<ByteStreamBlockingStub> bsBlockingStub;
   private final Supplier<ByteStreamStub> bsStub;
@@ -37,19 +45,24 @@ public class StubWriteOutputStream extends OutputStream implements Write {
         @Override
         public QueryWriteStatusResponse get() {
           if (wasReset) {
-            return QueryWriteStatusResponse.newBuilder()
-                .setCommittedSize(0)
-                .setComplete(false)
-                .build();
+            return resetResponse;
           }
-          QueryWriteStatusResponse response = bsBlockingStub.get()
-              .queryWriteStatus(QueryWriteStatusRequest.newBuilder()
-                  .setResourceName(resourceName)
-                  .build());
-          if (response.getComplete()) {
-            writeFuture.set(response.getCommittedSize());
+          try {
+            QueryWriteStatusResponse response = bsBlockingStub.get()
+                .queryWriteStatus(QueryWriteStatusRequest.newBuilder()
+                    .setResourceName(resourceName)
+                    .build());
+            if (response.getComplete()) {
+              writeFuture.set(response.getCommittedSize());
+            }
+            return response;
+          } catch (StatusRuntimeException e) {
+            Status status = Status.fromThrowable(e);
+            if (status.getCode() == Code.UNIMPLEMENTED) {
+              return resetResponse;
+            }
+            throw e;
           }
-          return response;
         }
       });
   private boolean sentResourceName = false;
@@ -102,6 +115,7 @@ public class StubWriteOutputStream extends OutputStream implements Write {
       request.setResourceName(resourceName);
     }
     writeObserver.onNext(request.build());
+    wasReset = false;
     writtenBytes += offset;
     offset = 0;
     sentResourceName = true;
