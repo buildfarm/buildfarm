@@ -25,7 +25,7 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
-import redis.clients.jedis.Jedis;
+import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisPubSub;
 import redis.clients.jedis.exceptions.JedisConnectionException;
 
@@ -39,17 +39,17 @@ class RedisShardSubscription implements Runnable {
 
   private final JedisPubSub subscriber;
   private final InterruptingRunnable onUnsubscribe;
-  private final Consumer<Jedis> onReset;
+  private final Consumer<JedisCluster> onReset;
   private final Supplier<List<String>> subscriptions;
-  private final IOSupplier<Jedis> jedisFactory;
+  private final IOSupplier<JedisCluster> jedisFactory;
   private final AtomicBoolean stopped = new AtomicBoolean(false);
 
   RedisShardSubscription(
       JedisPubSub subscriber,
       InterruptingRunnable onUnsubscribe,
-      Consumer<Jedis> onReset,
+      Consumer<JedisCluster> onReset,
       Supplier<List<String>> subscriptions,
-      IOSupplier<Jedis> jedisFactory) {
+      IOSupplier<JedisCluster> jedisFactory) {
     this.subscriber = subscriber;
     this.onUnsubscribe = onUnsubscribe;
     this.onReset = onReset;
@@ -61,7 +61,7 @@ class RedisShardSubscription implements Runnable {
     return subscriber;
   }
 
-  private void subscribe(Jedis jedis, boolean isReset) throws IOException {
+  private void subscribe(JedisCluster jedis, boolean isReset) throws IOException {
     try {
       if (isReset) {
         onReset.accept(jedis);
@@ -77,7 +77,7 @@ class RedisShardSubscription implements Runnable {
   }
 
   private void iterate(boolean isReset) throws IOException {
-    try (Jedis jedis = jedisFactory.get()) {
+    try (JedisCluster jedis = jedisFactory.get()) {
       subscribe(jedis, isReset);
     } catch (SocketTimeoutException e) {
       // ignore

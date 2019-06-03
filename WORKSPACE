@@ -89,8 +89,10 @@ load(
 
 http_jar(
     name = "jedis",
-    sha256 = "9af738bf341a5f34ed38a7ab5c7666f76d17624e29071b49cc2113f5acbf21e5",
-    url = "https://github.com/werkt/jedis/releases/download/3.0.1-2418e3e2c6/jedis-3.0.1-2418e3e2c6.jar",
+    sha256 = "10c844cb3338884da468608f819c11d5c90354b170c3fe445203497000c06ba3",
+    urls =  [
+        "https://github.com/werkt/jedis/releases/download/jedis-3.0.1-8209fd5a88/jedis-3.0.1-8209fd5a88.jar",
+    ],
 )
 
 bind(

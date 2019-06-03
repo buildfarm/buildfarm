@@ -74,7 +74,7 @@ public class RedisShardSubscriberTest {
     }
 
     @Override
-    public List<Object> getRawObjectMultiBulkReply() {
+    public List<Object> getUnflushedObjectMultiBulkReply() {
       try {
         return replyQueue.take();
       } catch (InterruptedException e) {
