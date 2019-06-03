@@ -84,7 +84,7 @@ class MemoryCAS implements ContentAddressableStorage {
   }
 
   @Override
-  public InputStream newInput(Digest digest, long offset) throws IOException {
+  public synchronized InputStream newInput(Digest digest, long offset) throws IOException {
     Entry e = storage.get(digest);
     if (e == null) {
       throw new NoSuchFileException(digest.getHash());
