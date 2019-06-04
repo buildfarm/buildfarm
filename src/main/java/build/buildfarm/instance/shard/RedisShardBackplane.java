@@ -1091,7 +1091,7 @@ public class RedisShardBackplane implements ShardBackplane {
       executeEntryJson = jedis.brpoplpush(
           config.getPreQueuedOperationsListName(),
           config.getProcessingListName(),
-          1000);
+          1);
       if (Thread.currentThread().isInterrupted()) {
         return null;
       }
@@ -1139,7 +1139,7 @@ public class RedisShardBackplane implements ShardBackplane {
       queueEntryJson = jedis.brpoplpush(
           config.getQueuedOperationsListName(),
           config.getDispatchingListName(),
-          1000);
+          1);
       // right here is an operation loss risk
       if (Thread.currentThread().isInterrupted()) {
         return null;
