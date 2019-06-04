@@ -14,9 +14,11 @@ import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.FileNode;
+import build.bazel.remote.execution.v2.OutputDirectory;
 import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ServerCapabilities;
+import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
@@ -116,6 +118,9 @@ class Cat {
         attrs = " (" + attrs + ")";
       }
       indentOut(indentLevel, "Output File: " + outputFile.getPath() + attrs + " File " + DigestUtil.toString(outputFile.getDigest()));
+    }
+    for (OutputDirectory outputDirectory : result.getOutputDirectoriesList()) {
+      indentOut(indentLevel, "Output Directory: " + outputDirectory.getPath() + " Directory " + DigestUtil.toString(outputDirectory.getTreeDigest()));
     }
     indentOut(indentLevel, "Exit Code: " + result.getExitCode());
     if (!result.getStdoutRaw().isEmpty()) {
@@ -232,7 +237,13 @@ class Cat {
     printTreeAt(0, directoriesIndex.get(rootDigest), directoriesIndex, totalWeight, directoryWeights);
   }
 
-  private static void printTree(Instance instance, Digest rootDigest) throws IOException, InterruptedException {
+  private static void printTree(ByteString treeBlob) throws InvalidProtocolBufferException {
+    Tree tree = Tree.parseFrom(treeBlob);
+    printDirectory(0, tree.getRoot());
+    // children
+  }
+
+  private static void printDirectoryTree(Instance instance, Digest rootDigest) throws IOException, InterruptedException {
     for (Directory directory : fetchTree(instance, rootDigest)) {
       System.out.println("Directory: " + DigestUtil.toString(instance.getDigestUtil().compute(directory)));
       printDirectory(1, directory);
@@ -456,8 +467,8 @@ class Cat {
           Digest blobDigest = DigestUtil.parseDigest(args[i]);
           if (type.equals("ActionResult")) {
             printActionResult(instance.getActionResult(DigestUtil.asActionKey(blobDigest)), 0);
-          } else if (type.equals("Tree")) {
-            printTree(instance, blobDigest);
+          } else if (type.equals("DirectoryTree")) {
+            printDirectoryTree(instance, blobDigest);
           } else if (type.equals("TreeLayout")) {
             printTreeLayout(instance, digestUtil, blobDigest);
           } else {
@@ -473,6 +484,8 @@ class Cat {
                 printCommand(blob);
               } else if (type.equals("Directory")) {
                 printDirectory(blob);
+              } else if (type.equals("Tree")) {
+                printTree(blob);
               } else {
                 System.err.println("Unknown type: " + type);
               }
