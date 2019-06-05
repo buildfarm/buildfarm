@@ -16,7 +16,7 @@ diff --git a/BUILD b/BUILD
 index 0189fd9b51..0a279412a9 100644
 --- a/BUILD
 +++ b/BUILD
-@@ -639,6 +639,7 @@ java_library(
+@@ -638,6 +638,7 @@ java_library(
      visibility = ["//visibility:public"],
      deps = [
          "protobuf_java",
