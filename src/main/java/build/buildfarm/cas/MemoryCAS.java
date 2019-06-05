@@ -40,6 +40,7 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.logging.Logger;
+import javax.annotation.concurrent.GuardedBy;
 
 class MemoryCAS implements ContentAddressableStorage {
   private static final Logger logger = Logger.getLogger(MemoryCAS.class.getName());
@@ -54,8 +55,14 @@ class MemoryCAS implements ContentAddressableStorage {
 
   private final Writes writes = new Writes(this);
   private final long maxSizeInBytes;
+
+  @GuardedBy("this")
   private final Map<Digest, Entry> storage;
+
+  @GuardedBy("this")
   private final Entry header;
+
+  @GuardedBy("this")
   private long sizeInBytes;
 
   public MemoryCAS(long maxSizeInBytes) {
@@ -84,7 +91,7 @@ class MemoryCAS implements ContentAddressableStorage {
   }
 
   @Override
-  public InputStream newInput(Digest digest, long offset) throws IOException {
+  public synchronized InputStream newInput(Digest digest, long offset) throws IOException {
     Entry e = storage.get(digest);
     if (e == null) {
       throw new NoSuchFileException(digest.getHash());
@@ -164,6 +171,7 @@ class MemoryCAS implements ContentAddressableStorage {
     return e.value;
   }
 
+  @GuardedBy("this")
   private long size() {
     Entry e = header.before;
     long count = 0;
@@ -222,6 +230,7 @@ class MemoryCAS implements ContentAddressableStorage {
     writes.getFuture(blob.getDigest()).set(blob.getData());
   }
 
+  @GuardedBy("this")
   private void createEntry(Blob blob, Runnable onExpiration) {
     Entry e = new Entry(blob);
     if (onExpiration != null) {
@@ -230,6 +239,7 @@ class MemoryCAS implements ContentAddressableStorage {
     e.addBefore(header);
   }
 
+  @GuardedBy("this")
   private void expireEntry(Entry e) {
     storage.remove(e.key);
     e.expire();
