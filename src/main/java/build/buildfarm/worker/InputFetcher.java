@@ -110,9 +110,26 @@ public class InputFetcher implements Runnable {
     }
     success = true;
 
-    long fetchUSecs = stopwatch.elapsed(MICROSECONDS);
-    Duration fetchedIn = Durations.fromMicros(fetchUSecs - fetchStartAt);
+    // we are now responsible for destroying the exec dir if anything goes wrong
+    boolean completed = false;
+    try {
+      long fetchUSecs = stopwatch.elapsed(MICROSECONDS);
+      Duration fetchedIn = Durations.fromMicros(fetchUSecs - fetchStartAt);
+      proceedToOutput(queuedOperation, execDir, fetchedIn);
+      completed = true;
+      return stopwatch.elapsed(MICROSECONDS) - fetchUSecs;
+    } finally {
+      if (!completed) {
+        try {
+          workerContext.destroyExecDir(execDir);
+        } catch (IOException e) {
+          logger.severe("error deleting exec dir for " + operationName + " after interrupt");
+        }
+      }
+    }
+  }
 
+  private void proceedToOutput(QueuedOperation queuedOperation, Path execDir, Duration fetchedIn) throws InterruptedException {
     OperationContext executeOperationContext = operationContext.toBuilder()
         .setExecDir(execDir)
         .setFetchedIn(fetchedIn)
@@ -129,11 +146,12 @@ public class InputFetcher implements Runnable {
         throw e;
       }
     } else {
+      String operationName = operationContext.queueEntry
+          .getExecuteEntry().getOperationName();
       workerContext.logInfo("InputFetcher: Operation " + operationName + " Failed to claim output");
 
       owner.error().put(operationContext);
     }
-    return stopwatch.elapsed(MICROSECONDS) - fetchUSecs;
   }
 
   @Override
