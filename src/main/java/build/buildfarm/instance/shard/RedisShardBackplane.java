@@ -552,7 +552,7 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   @Override
-  public void stop() throws InterruptedException {
+  public synchronized void stop() throws InterruptedException {
     if (failsafeOperationThread != null) {
       failsafeOperationThread.stop();
       failsafeOperationThread.join();
