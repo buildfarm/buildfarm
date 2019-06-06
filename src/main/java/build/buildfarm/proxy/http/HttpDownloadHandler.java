@@ -75,7 +75,7 @@ final class HttpDownloadHandler extends AbstractHttpHandler<HttpObject> {
       if (!HttpUtil.isContentLengthSet(response) && !HttpUtil.isTransferEncodingChunked(response)) {
         HttpException error =
             new HttpException(
-                response, "Missing 'Content-Length' or 'Transfer-Encoding: chunked' header", null);
+                response, String.format("Missing 'Content-Length' or 'Transfer-Encoding: chunked' header %s", response), null);
         failAndClose(error, ctx);
         return;
       }
