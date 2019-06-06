@@ -58,8 +58,8 @@ import com.google.rpc.Code;
 import com.google.rpc.PreconditionFailure;
 import com.google.rpc.PreconditionFailure.Violation;
 import io.grpc.Status;
-import java.io.IOException;
 import io.grpc.StatusException;
+import io.grpc.StatusRuntimeException;
 import io.grpc.protobuf.StatusProto;
 import java.io.IOException;
 import java.io.InputStream;
@@ -164,7 +164,18 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public ActionResult getActionResult(ActionKey actionKey) {
-    return actionCache.get(actionKey);
+    ActionResult actionResult;
+    try {
+      actionResult = actionCache.get(actionKey);
+    } catch (StatusRuntimeException ex) {
+      if (ex.getStatus().getCode() == Status.Code.NOT_FOUND) {
+        // Return null to indicate that it was a cache miss.
+        actionResult = null;
+      } else {
+        throw ex;
+      }
+    }
+    return actionResult;
   }
 
   @Override
