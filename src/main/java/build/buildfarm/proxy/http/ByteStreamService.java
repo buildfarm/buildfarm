@@ -226,7 +226,14 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
           .build());
       responseObserver.onCompleted();
     } else {
-      responseObserver.onError(Status.NOT_FOUND.asException());
+      // responseObserver.onError(Status.NOT_FOUND.asException());
+      // queryWriteStatus can be called before a write has started. Return
+      // empty blob status.
+      responseObserver.onNext(QueryWriteStatusResponse.newBuilder()
+          .setCommittedSize(0)
+          .setComplete(false)
+          .build());
+      responseObserver.onCompleted();
     }
   }
 
