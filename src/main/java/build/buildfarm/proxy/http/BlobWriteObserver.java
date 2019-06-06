@@ -97,6 +97,7 @@ class BlobWriteObserver implements WriteObserver {
       committedSize += data.size();
       shutdownBuffer = false;
       if (request.getFinishWrite()) {
+        buffer.writeEndOfFile();
         putThread.join();
         complete = true;
       }

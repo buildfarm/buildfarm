@@ -9,20 +9,25 @@ public class RingBufferInputStream extends InputStream {
   int outIndex = 0;
   boolean flipped = false;
   boolean shutdown = false; // ignores available data
-  boolean closed = false;
+  boolean eofWritten = false;
 
   public RingBufferInputStream(int size) {
     buffer = new byte[size];
   }
 
-  public synchronized void close() {
-    closed = true;
+  public synchronized void writeEndOfFile() {
+    eofWritten = true;
+    notify();
   }
 
-  public synchronized void shutdown() {
-    close();
+  public synchronized void close() {
+    writeEndOfFile();
     shutdown = true;
     notify();
+  }
+
+  public void shutdown() {
+    close();
   }
 
   @Override
@@ -50,7 +55,7 @@ public class RingBufferInputStream extends InputStream {
       if (len > 0) {
         return len;
       }
-      if (len == 0 && closed) {
+      if (len == 0 && eofWritten) {
         return -1;
       }
       wait();
@@ -59,7 +64,7 @@ public class RingBufferInputStream extends InputStream {
   }
 
   private int waitForOutAvailable() throws InterruptedException {
-    while (!closed && !shutdown) {
+    while (!eofWritten && !shutdown) {
       int len = outAvailable();
       if (len > 0) {
         return len;
@@ -141,7 +146,7 @@ public class RingBufferInputStream extends InputStream {
   public synchronized void write(byte[] buf) throws InterruptedException {
     int len = buf.length;
     int off = 0;
-    while (!shutdown && !closed && len > 0) {
+    while (!shutdown && !eofWritten && len > 0) {
       int bytesWritten = writePartial(buf, off, len);
       if (bytesWritten > 0) {
         off += bytesWritten;
