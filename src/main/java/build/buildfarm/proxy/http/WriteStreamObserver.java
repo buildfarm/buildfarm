@@ -42,15 +42,13 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
             "write onNext supplied with empty WriteRequest for %s at %d",
             request.getResourceName(),
             request.getWriteOffset()));
-    if (request.getData().size() != 0) {
-      try {
-        writeOnNext(request);
-        if (request.getFinishWrite()) {
-          writeObserverSource.remove(request.getResourceName());
-        }
-      } catch (Throwable t) {
-        onError(t);
+    try {
+      writeOnNext(request);
+      if (request.getFinishWrite()) {
+        writeObserverSource.remove(request.getResourceName());
       }
+    } catch (Throwable t) {
+      onError(t);
     }
   }
 
