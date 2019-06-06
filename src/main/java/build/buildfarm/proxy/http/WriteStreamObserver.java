@@ -27,7 +27,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
       write = writeObserverSource.get(request.getResourceName());
     }
     write.onNext(request);
-    if (request.getFinishWrite()) {
+    if (write.getComplete()) {
       responseObserver.onNext(WriteResponse.newBuilder()
           .setCommittedSize(write.getCommittedSize())
           .build());
