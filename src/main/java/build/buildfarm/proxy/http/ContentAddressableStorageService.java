@@ -18,6 +18,8 @@ import static com.google.common.util.concurrent.Futures.catching;
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
+import build.bazel.remote.execution.v2.BatchReadBlobsRequest;
+import build.bazel.remote.execution.v2.BatchReadBlobsResponse;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest.Request;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
@@ -32,6 +34,8 @@ import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.protobuf.ByteString;
 import io.grpc.Metadata;
 import io.grpc.Status;
@@ -40,6 +44,7 @@ import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.StreamObserver;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
 
@@ -57,6 +62,16 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
     this.treeMaxPageSize = treeMaxPageSize;
   }
 
+  private final static class ContainsKeyResponse {
+    public final Digest blobDigest;
+    public final ListenableFuture<Boolean> containsKeyFuture;
+
+    ContainsKeyResponse(Digest blobDigest, ListenableFuture<Boolean> containsKeyFuture) {
+      this.blobDigest = blobDigest;
+      this.containsKeyFuture = containsKeyFuture;
+    }
+  }
+
   @Override
   public void findMissingBlobs(
       FindMissingBlobsRequest request,
@@ -64,9 +79,27 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
     FindMissingBlobsResponse.Builder responseBuilder =
         FindMissingBlobsResponse.newBuilder();
     try {
-      for (Digest blobDigest : request.getBlobDigestsList()) {
-        if (!simpleBlobStore.containsKey(blobDigest.getHash())) {
-          responseBuilder.addMissingBlobDigests(blobDigest);
+      List<ContainsKeyResponse> containsKeyResponseList = Lists.transform(
+        request.getBlobDigestsList(),
+        (blobDigest) -> {
+          return new ContainsKeyResponse(blobDigest, simpleBlobStore.containsKey(blobDigest.getHash()));
+        });
+      for (ContainsKeyResponse containsKeyResponse : containsKeyResponseList) {
+        Boolean containsKey;
+        try {
+          containsKey = containsKeyResponse.containsKeyFuture.get();
+        } catch (ExecutionException e) {
+          containsKey = false;
+          if (e.getCause() instanceof IOException) {
+            throw (IOException) e.getCause();
+          }
+          if (e.getCause() instanceof InterruptedException) {
+            throw (InterruptedException) e.getCause();
+          }
+          throw new IOException(e.getCause());
+        }
+        if (!containsKey) {
+          responseBuilder.addMissingBlobDigests(containsKeyResponse.blobDigest);
         }
       }
       responseObserver.onNext(responseBuilder.build());

@@ -14,6 +14,7 @@
 package build.buildfarm.proxy.http;
 
 import static build.buildfarm.proxy.http.Utils.getFromFuture;
+import static com.google.common.io.ByteStreams.nullOutputStream;
 
 import com.google.auth.Credentials;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -374,8 +375,8 @@ public final class HttpBlobStore implements SimpleBlobStore {
   }
 
   @Override
-  public boolean containsKey(String key) {
-    throw new UnsupportedOperationException("HTTP Caching does not use this method.");
+  public ListenableFuture<Boolean> containsKey(String key) {
+    return get(key, nullOutputStream(), true, false);
   }
 
   @Override

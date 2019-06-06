@@ -41,6 +41,7 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.logging.Logger;
 
 public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
@@ -165,8 +166,18 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
   private Write findBlobWrite(String resourceName)
       throws IOException, InterruptedException, InvalidResourceNameException {
     Digest digest = parseUploadBlobDigest(resourceName);
-    if (!simpleBlobStore.containsKey(digest.getHash())) {
-      return null;
+    try {
+      if (!simpleBlobStore.containsKey(digest.getHash()).get()) {
+        return null;
+      }
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof IOException) {
+        throw (IOException) e.getCause();
+      }
+      if (e.getCause() instanceof InterruptedException) {
+        throw (InterruptedException) e.getCause();
+      }
+      throw new IOException(e.getCause());
     }
 
     return new CompleteWrite() {

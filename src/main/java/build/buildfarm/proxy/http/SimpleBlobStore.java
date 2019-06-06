@@ -28,7 +28,7 @@ public interface SimpleBlobStore {
   /**
    * Returns {@code key} if the provided {@code key} is stored in the CAS.
    */
-  boolean containsKey(String key) throws IOException, InterruptedException;
+  ListenableFuture<Boolean> containsKey(String key);
 
   /**
    * Fetches the BLOB associated with the {@code key} from the CAS and writes it to {@code out}.
