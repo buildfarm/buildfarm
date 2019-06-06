@@ -362,11 +362,11 @@ public final class HttpBlobStore implements SimpleBlobStore {
 
   @Override
   public ListenableFuture<Boolean> get(String key, OutputStream out) {
-    return get(key, out, true);
+    return get(key, out, true, true);
   }
 
   @SuppressWarnings("FutureReturnValueIgnored")
-  private ListenableFuture<Boolean> get(String key, final OutputStream out, boolean casDownload) {
+  private ListenableFuture<Boolean> get(String key, final OutputStream out, boolean casDownload, boolean downloadContent) {
     final AtomicBoolean dataWritten = new AtomicBoolean();
     OutputStream wrappedOut =
         new OutputStream() {
@@ -391,7 +391,7 @@ public final class HttpBlobStore implements SimpleBlobStore {
             out.flush();
           }
         };
-    DownloadCommand download = new DownloadCommand(uri, casDownload, key, wrappedOut);
+    DownloadCommand download = new DownloadCommand(uri, casDownload, key, wrappedOut, downloadContent);
     SettableFuture<Boolean> outerF = SettableFuture.create();
     acquireDownloadChannel()
         .addListener(
@@ -475,7 +475,7 @@ public final class HttpBlobStore implements SimpleBlobStore {
   @Override
   public boolean getActionResult(String actionKey, OutputStream out)
       throws IOException, InterruptedException {
-    return getFromFuture(get(actionKey, out, false));
+    return getFromFuture(get(actionKey, out, false, true));
   }
 
   @Override
