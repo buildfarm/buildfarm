@@ -165,6 +165,13 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
   }
 
   @Override
+  public void batchReadBlobs(
+      BatchReadBlobsRequest batchRequest,
+      StreamObserver<BatchReadBlobsResponse> responseObserver) {
+    throw new UnsupportedOperationException("HTTP Caching does not use this method.");
+  }
+
+  @Override
   public void getTree(
       GetTreeRequest request,
       StreamObserver<GetTreeResponse> responseObserver) {
