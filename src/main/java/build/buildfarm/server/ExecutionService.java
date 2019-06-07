@@ -19,6 +19,7 @@ import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.scheduleAsync;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.lang.String.format;
+import static java.util.logging.Level.WARNING;
 
 import build.bazel.remote.execution.v2.ExecuteRequest;
 import build.bazel.remote.execution.v2.ExecutionGrpc;
@@ -87,6 +88,7 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
           @Override
           public void onFailure(Throwable t) {
             if (!isCancelled() && !(t instanceof CancellationException)) {
+              logger.log(WARNING, "error occurred during execution", t);
               serverCallStreamObserver.onError(Status.fromThrowable(t).asException());
             }
           }

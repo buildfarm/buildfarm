@@ -268,13 +268,15 @@ public class ShardInstanceTest {
         .setHash("action")
         .setSizeBytes(10)
         .build();
+    Watcher mockWatcher = mock(Watcher.class);
     instance.execute(
         actionDigest,
         /* skipCacheLookup=*/ false,
         ExecutionPolicy.getDefaultInstance(),
         ResultsCachePolicy.getDefaultInstance(),
         RequestMetadata.getDefaultInstance(),
-        /* watcher=*/ null);
+        /* watcher=*/ mockWatcher);
+    verify(mockWatcher, times(1)).observe(any(Operation.class));
     ArgumentCaptor<ExecuteEntry> executeEntryCaptor = ArgumentCaptor.forClass(ExecuteEntry.class);
     verify(mockBackplane, times(1)).prequeue(executeEntryCaptor.capture(), any(Operation.class));
     ExecuteEntry executeEntry = executeEntryCaptor.getValue();
@@ -623,14 +625,16 @@ public class ShardInstanceTest {
     assertThat(executeResponse.getResult()).isEqualTo(actionResult);
     assertThat(executeResponse.getCachedResult()).isTrue();
 
-    ArgumentCaptor<ExecuteEntry> executeEntryCaptor = ArgumentCaptor.forClass(ExecuteEntry.class);
+    Watcher mockWatcher = mock(Watcher.class);
     instance.execute(
         actionDigest,
         /* skipCacheLookup=*/ false,
         ExecutionPolicy.getDefaultInstance(),
         ResultsCachePolicy.getDefaultInstance(),
         requestMetadata,
-        /* watcher=*/ null);
+        /* watcher=*/ mockWatcher);
+    verify(mockWatcher, times(1)).observe(any(Operation.class));
+    ArgumentCaptor<ExecuteEntry> executeEntryCaptor = ArgumentCaptor.forClass(ExecuteEntry.class);
     verify(mockBackplane, times(1)).prequeue(executeEntryCaptor.capture(), any(Operation.class));
     ExecuteEntry executeEntry = executeEntryCaptor.getValue();
     assertThat(executeEntry.getSkipCacheLookup()).isTrue();

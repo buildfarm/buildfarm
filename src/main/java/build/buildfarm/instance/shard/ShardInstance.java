@@ -1287,16 +1287,9 @@ public class ShardInstance extends AbstractServerInstance {
       RequestMetadata requestMetadata,
       Watcher watcher) {
     try {
-      if (!backplane.canPrequeue()) {
-        return immediateFailedFuture(
-            Status.UNAVAILABLE
-                .withDescription("Too many jobs pending")
-                .asException());
-      }
-
       String operationName = createOperationName(UUID.randomUUID().toString());
 
-      if (recentCacheServedExecutions.getIfPresent(requestMetadata) != null) {
+      if (!skipCacheLookup && recentCacheServedExecutions.getIfPresent(requestMetadata) != null) {
         logger.fine(format("Operation %s will have skip_cache_lookup = true due to retry", operationName));
         skipCacheLookup = true;
       }
@@ -1322,8 +1315,13 @@ public class ShardInstance extends AbstractServerInstance {
           .setName(operationName)
           .setMetadata(Any.pack(metadata))
           .build();
+      try {
+        watcher.observe(operation);
+      } catch (Exception e) {
+        return immediateFailedFuture(e);
+      }
       backplane.prequeue(executeEntry, operation);
-      return watchOperation(operation.getName(), watcher);
+      return watchOperation(operation, watcher, /* initial=*/ false);
     } catch (IOException e) {
       return immediateFailedFuture(e);
     }
@@ -1754,25 +1752,30 @@ public class ShardInstance extends AbstractServerInstance {
     }
   }
 
-  @Override
-  public ListenableFuture<Void> watchOperation(
-      String operationName,
-      Watcher watcher) {
-    Operation operation = getOperation(operationName);
-    try {
-      watcher.observe(stripOperation(operation));
-    } catch (Throwable t) {
-      return immediateFailedFuture(t);
+  ListenableFuture<Void> watchOperation(Operation operation, Watcher watcher, boolean initial) {
+    if (initial) {
+      try {
+        watcher.observe(stripOperation(operation));
+      } catch (Exception e) {
+        return immediateFailedFuture(e);
+      }
     }
     if (operation == null || operation.getDone()) {
       return immediateFuture(null);
     }
 
     try {
-      return backplane.watchOperation(operationName, watcher);
+      return backplane.watchOperation(operation.getName(), watcher);
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }
+  }
+
+  @Override
+  public ListenableFuture<Void> watchOperation(
+      String operationName,
+      Watcher watcher) {
+    return watchOperation(getOperation(operationName), watcher, /* initial=*/ true);
   }
 
   private static Operation stripOperation(Operation operation) {
