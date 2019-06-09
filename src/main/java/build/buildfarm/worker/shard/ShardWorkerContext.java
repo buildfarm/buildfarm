@@ -15,6 +15,7 @@
 package build.buildfarm.worker.shard;
 
 import static com.google.common.collect.Maps.uniqueIndex;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.logging.Level.SEVERE;
@@ -78,6 +79,7 @@ import java.util.Set;
 import java.util.Stack;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 
@@ -396,11 +398,18 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   private void insertFile(Digest digest, Path file) throws IOException {
+    AtomicBoolean complete = new AtomicBoolean(false);
     Write write = execFileSystem.getStorage().getWrite(digest, UUID.randomUUID());
+    write.addListener(() -> complete.set(true), directExecutor());
     try (OutputStream out = write.getOutput(deadlineAfter, deadlineAfterUnits)) {
       try (InputStream in = Files.newInputStream(file)) {
         com.google.common.base.Preconditions.checkNotNull(in);
         ByteStreams.copy(in, out);
+      }
+    } catch (IOException e) {
+      // complete writes should be ignored
+      if (!complete.get()) {
+        throw e;
       }
     }
   }
