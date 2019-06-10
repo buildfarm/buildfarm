@@ -42,6 +42,7 @@ import com.google.rpc.Code;
 import io.grpc.Deadline;
 import io.grpc.StatusRuntimeException;
 import java.io.IOException;
+import java.nio.channels.ClosedByInterruptException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -118,6 +119,9 @@ public class ReportResultStage extends PipelineStage {
           operationContext.execDir,
           operationContext.command.getOutputFilesList(),
           operationContext.command.getOutputDirectoriesList());
+    } catch (InterruptedException|ClosedByInterruptException e) {
+      // cancellation here should not be logged
+      return null;
     } catch (IOException e) {
       logger.log(SEVERE, "error while uploading outputs for " + operationName, e);
       return null;
@@ -130,7 +134,7 @@ public class ReportResultStage extends PipelineStage {
           .unpack(ExecutingOperationMetadata.class)
           .getExecuteOperationMetadata();
     } catch (InvalidProtocolBufferException e) {
-      logger.log(SEVERE, "invalid execute operation metadata", e);
+      logger.log(SEVERE, "invalid execute operation metadata for " + operationName, e);
       return null;
     }
 
@@ -177,7 +181,7 @@ public class ReportResultStage extends PipelineStage {
         return null;
       }
     } catch (IOException e) {
-      logger.log(SEVERE, "error reporting complete operation " + operationName, e);
+      logger.log(SEVERE, "error reporting complete operation for " + operationName, e);
       return null;
     }
 

@@ -419,6 +419,7 @@ class ShardWorkerContext implements WorkerContext {
     } catch (IOException e) {
       // complete writes should be ignored
       if (!complete.get()) {
+        write.reset(); // we will not attempt retry with current behavior, abandon progress
         throw e;
       }
     }
