@@ -63,6 +63,7 @@ import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.grpc.Deadline;
 import io.grpc.Status;
+import io.grpc.Status.Code;
 import io.grpc.StatusRuntimeException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -226,7 +227,16 @@ class ShardWorkerContext implements WorkerContext {
   private void matchInterruptible(Platform platform, MatchListener listener)
       throws IOException, InterruptedException {
     listener.onWaitStart();
-    QueueEntry queueEntry = backplane.dispatchOperation();
+    QueueEntry queueEntry = null;
+    try {
+      queueEntry = backplane.dispatchOperation();
+    } catch (IOException e) {
+      Status status = Status.fromThrowable(e);
+      if (status.getCode() != Code.UNAVAILABLE) {
+        throw e;
+      }
+      // unavailable backplane will propagate a null queueEntry
+    }
     listener.onWaitEnd();
     // FIXME platform match
     listener.onEntry(queueEntry);

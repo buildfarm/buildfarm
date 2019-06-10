@@ -90,6 +90,7 @@ import redis.clients.jedis.Transaction;
 import redis.clients.jedis.exceptions.JedisConnectionException;
 import redis.clients.jedis.exceptions.JedisDataException;
 import redis.clients.jedis.exceptions.JedisException;
+import redis.clients.jedis.exceptions.JedisNoReachableClusterNodeException;
 
 public class RedisShardBackplane implements ShardBackplane {
   private static final Logger logger = Logger.getLogger(RedisShardBackplane.class.getName());
@@ -656,6 +657,8 @@ public class RedisShardBackplane implements ShardBackplane {
       // this looks simply to me like a good opportunity to use UNAVAILABLE
       // we are technically not at RESOURCE_EXHAUSTED, this is a
       // persistent state which can exist long past the error
+      throw new IOException(Status.UNAVAILABLE.withCause(e).asRuntimeException());
+    } catch (JedisNoReachableClusterNodeException e) {
       throw new IOException(Status.UNAVAILABLE.withCause(e).asRuntimeException());
     } catch (JedisConnectionException e) {
       if ((e.getMessage() != null && e.getMessage().equals("Unexpected end of stream."))
