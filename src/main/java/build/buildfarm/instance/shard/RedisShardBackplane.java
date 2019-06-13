@@ -80,9 +80,9 @@ import java.util.logging.Logger;
 import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
 import redis.clients.jedis.HostAndPort;
-import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisClusterPipeline;
+import redis.clients.jedis.JedisPoolConfig;
 import redis.clients.jedis.Response;
 import redis.clients.jedis.ScanParams;
 import redis.clients.jedis.ScanResult;
@@ -149,6 +149,12 @@ public class RedisShardBackplane implements ShardBackplane {
     }
   }
 
+  private static JedisPoolConfig createJedisPoolConfig(RedisShardBackplaneConfig config) {
+    JedisPoolConfig jedisPoolConfig = new JedisPoolConfig();
+    jedisPoolConfig.setMaxTotal(config.getJedisPoolMaxTotal());
+    return jedisPoolConfig;
+  }
+
   private static URI parseRedisURI(String redisURI) throws ConfigurationException {
     try {
       return new URI(redisURI);
@@ -157,8 +163,10 @@ public class RedisShardBackplane implements ShardBackplane {
     }
   }
 
-  private static Supplier<JedisCluster> createJedisClusterFactory(URI redisURI) {
-    return () -> new JedisCluster(new HostAndPort(redisURI.getHost(), redisURI.getPort()));
+  private static Supplier<JedisCluster> createJedisClusterFactory(URI redisURI, JedisPoolConfig poolConfig) {
+    return () -> new JedisCluster(
+        new HostAndPort(redisURI.getHost(), redisURI.getPort()),
+        poolConfig);
   }
 
   public RedisShardBackplane(
@@ -175,7 +183,7 @@ public class RedisShardBackplane implements ShardBackplane {
         onComplete,
         isPrequeued,
         isDispatched,
-        createJedisClusterFactory(parseRedisURI(config.getRedisUri())));
+        createJedisClusterFactory(parseRedisURI(config.getRedisUri()), createJedisPoolConfig(config)));
   }
 
   public RedisShardBackplane(
