@@ -1775,7 +1775,11 @@ public class ShardInstance extends AbstractServerInstance {
   public ListenableFuture<Void> watchOperation(
       String operationName,
       Watcher watcher) {
-    return watchOperation(getOperation(operationName), watcher, /* initial=*/ true);
+    Operation operation = getOperation(operationName);
+    if (operation == null) {
+      return immediateFailedFuture(Status.NOT_FOUND.asException());
+    }
+    return watchOperation(operation, watcher, /* initial=*/ true);
   }
 
   private static Operation stripOperation(Operation operation) {
