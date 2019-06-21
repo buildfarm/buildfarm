@@ -236,27 +236,6 @@ class CFCExecFileSystem implements ExecFileSystem {
         fetchService);
   }
 
-  /**
-   * get a future value through any number of interrupts
-   *
-   * sets interrupt status if any interrupt occurred
-   */
-  private static <T> T getWithoutInterrupt(ListenableFuture<T> future) throws ExecutionException {
-    boolean wasInterrupted = false;
-    for (;;) {
-      try {
-        return future.get();
-      } catch (InterruptedException e) {
-        Thread.interrupted(); // clear the flag to permit continuation
-        wasInterrupted = true;
-      } finally {
-        if (wasInterrupted) {
-          Thread.currentThread().interrupt();
-        }
-      }
-    }
-  }
-
   private static class ExecDirException extends IOException {
     private final Path path;
     private final List<Throwable> exceptions;
@@ -311,27 +290,36 @@ class CFCExecFileSystem implements ExecFileSystem {
             inputDirectories);
     boolean success = false;
     try {
+      InterruptedException exception = null;
       boolean wasInterrupted = false;
       ImmutableList.Builder<Throwable> exceptions = ImmutableList.builder();
       for (ListenableFuture<Void> fetchedFuture : fetchedFutures) {
-        try {
-          getWithoutInterrupt(fetchedFuture);
-        } catch (ExecutionException e) {
-          // just to ensure that no other code can react to interrupt status
-          boolean isInterrupted = Thread.interrupted();
-          exceptions.add(e.getCause());
-          if (isInterrupted) {
-            Thread.currentThread().interrupt();
+        if (exception != null || wasInterrupted) {
+          fetchedFuture.cancel(true);
+        } else {
+          try {
+            fetchedFuture.get();
+          } catch (ExecutionException e) {
+            // just to ensure that no other code can react to interrupt status
+            exceptions.add(e.getCause());
+          } catch (InterruptedException e) {
+            fetchedFuture.cancel(true);
+            exception = e;
           }
         }
-        if (Thread.interrupted()) {
-          wasInterrupted = true;
+        wasInterrupted = Thread.interrupted() || wasInterrupted;
+      }
+      if (wasInterrupted) {
+        Thread.currentThread().interrupt();
+        // unlikely, but worth guarding
+        if (exception == null) {
+          exception = new InterruptedException();
         }
       }
-      checkExecErrors(execDir, exceptions.build());
-      if (wasInterrupted) {
-        throw new InterruptedException();
+      if (exception != null) {
+        throw exception;
       }
+      checkExecErrors(execDir, exceptions.build());
       success = true;
     } finally {
       if (!success) {
