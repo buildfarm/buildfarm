@@ -35,20 +35,50 @@ abstract class SuperscalarPipelineStage extends PipelineStage {
     claims = new ArrayBlockingQueue(width);
   }
 
+  protected abstract void interruptAll();
+
+  synchronized void waitForReleaseOrCatastrophe() {
+    boolean interrupted = false;
+    while (!catastrophic && isClaimed()) {
+      if (output.isClosed()) {
+        // interrupt the currently running threads, because they have nowhere to go
+        interruptAll();
+      }
+      try {
+        wait();
+      } catch (InterruptedException e) {
+        interrupted = Thread.interrupted() || interrupted;
+        // ignore, we will throw it eventually
+      }
+    }
+    if (interrupted) {
+      Thread.currentThread().interrupt();
+    }
+  }
+
   protected OperationContext takeOrDrain(BlockingQueue<OperationContext> queue)
       throws InterruptedException {
-    while (!isClosed() && !output.isClosed()) {
-      OperationContext context = queue.poll(10, TimeUnit.MILLISECONDS);
-      if (context != null) {
-        return context;
+    boolean interrupted = false;
+    InterruptedException exception;
+    try {
+      while (!isClosed() && !output.isClosed()) {
+        OperationContext context = queue.poll(10, TimeUnit.MILLISECONDS);
+        if (context != null) {
+          return context;
+        }
       }
+      exception = new InterruptedException();
+    } catch (InterruptedException e) {
+      // only possible way to be terminated
+      exception = e;
+      // clear interrupted flag
+      interrupted = Thread.interrupted();
     }
-    synchronized (this) {
-      while (!catastrophic && isClaimed()) {
-        wait();
-      }
+    waitForReleaseOrCatastrophe();
+    if (interrupted) {
+      Thread.currentThread().interrupt();
     }
-    throw new InterruptedException();
+    throw exception;
   }
 
   protected synchronized void releaseClaim(String operationName) {

@@ -130,10 +130,15 @@ public class MatchStage extends PipelineStage {
     if (!output.claim()) {
       return;
     }
-    MatchOperationListener listener = new MatchOperationListener(stopwatch);
+    try {
+      MatchOperationListener listener = new MatchOperationListener(stopwatch);
 
-    logStart();
-    workerContext.match(listener);
+      logStart();
+      workerContext.match(listener);
+    } catch (InterruptedException e) {
+      output.release();
+      throw e;
+    }
   }
 
   private OperationContext match(

@@ -86,6 +86,13 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
   }
 
   @Override
+  protected synchronized void interruptAll() {
+    for (Thread executor : executors) {
+      executor.interrupt();
+    }
+  }
+
+  @Override
   protected void iterate() throws InterruptedException {
     OperationContext operationContext = take();
     Thread executor = new Thread(new Executor(workerContext, operationContext, this));
