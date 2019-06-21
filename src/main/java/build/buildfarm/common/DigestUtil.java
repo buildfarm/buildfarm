@@ -227,7 +227,7 @@ public class DigestUtil {
     String[] components = digest.split("/");
     return Digest.newBuilder()
         .setHash(components[0])
-        .setSizeBytes(Integer.parseInt(components[1]))
+        .setSizeBytes(Long.parseLong(components[1]))
         .build();
   }
 

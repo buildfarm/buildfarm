@@ -235,7 +235,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
     String hashComponent = components[0];
     String sizeComponent = components[1];
-    int parsedSizeComponent = Integer.parseInt(sizeComponent);
+    long parsedSizeComponent = Long.parseLong(sizeComponent);
 
     return digestUtil.build(hashComponent, parsedSizeComponent);
   }
@@ -255,7 +255,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     Digest digest;
     try {
       String sizeComponent = components[1];
-      int parsedSizeComponent = Integer.parseInt(sizeComponent);
+      long parsedSizeComponent = Long.parseLong(sizeComponent);
 
       if (size > 0 && parsedSizeComponent != size) {
         return null;
