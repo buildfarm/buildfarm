@@ -1396,9 +1396,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   private void copyExternalInput(Digest digest, CancellableOutputStream out) throws IOException, InterruptedException {
-    try {
-      logger.finest(format("downloading %s", DigestUtil.toString(digest)));
-      ByteStreams.copy(newExternalInput(digest, /* offset=*/ 0), out);
+    logger.finest(format("downloading %s", DigestUtil.toString(digest)));
+    try (InputStream in = newExternalInput(digest, /* offset=*/ 0)) {
+      ByteStreams.copy(in, out);
       logger.finest(format("download of %s complete", DigestUtil.toString(digest)));
     } catch (IOException e) {
       out.cancel();
