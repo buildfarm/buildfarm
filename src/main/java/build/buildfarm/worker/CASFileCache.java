@@ -53,6 +53,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Write;
 import build.buildfarm.v1test.BlobWriteKey;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Throwables;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -394,6 +395,14 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
+  void completePut(Digest digest) {
+    try {
+      onPut.accept(digest);
+    } finally {
+      writesInProgress.invalidate(digest);
+    }
+  }
+
   @Override
   public void put(Blob blob) throws InterruptedException {
     Path blobPath = getKey(blob.getDigest(), false);
@@ -405,12 +414,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           () -> completeWrite(blob.getDigest()),
           blob.getDigest().getSizeBytes(),
           /* isExecutable=*/ false,
-          null,
-          () -> {
-            Digest digest = blob.getDigest();
-            onPut.accept(digest);
-            writesInProgress.invalidate(digest);
-          });
+          /* containingDirectory=*/ null,
+          () -> completePut(blob.getDigest()));
       boolean referenced = out == null;
       try {
         if (out != null) {
@@ -1347,22 +1352,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   public Path put(Digest digest, boolean isExecutable) throws IOException, InterruptedException {
     checkState(digest.getSizeBytes() > 0, "file entries may not be empty");
 
-    Path key = getKey(digest, isExecutable);
-    CancellableOutputStream out = putImpl(
-        key,
-        UUID.randomUUID(),
-        () -> completeWrite(digest),
-        digest.getSizeBytes(),
-        isExecutable,
-        /* containingDirectory=*/ null,
-        () -> {
-          onPut.accept(digest);
-          writesInProgress.invalidate(digest);
-        });
-    if (out != null) {
-      copyExternalInput(digest, out);
-    }
-    return key;
+    return putAndCopy(digest, isExecutable, /* containingDirectory=*/ null);
   }
 
   public ListenableFuture<Path> put(
@@ -1372,56 +1362,65 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Executor executor) {
     checkState(digest.getSizeBytes() > 0, "file entries may not be empty");
 
-    Path key = getKey(digest, isExecutable);
     return transformAsync(
         immediateFuture(null),
         (result) -> {
-          CancellableOutputStream out = putImpl(
-              key,
-              UUID.randomUUID(),
-              () -> completeWrite(digest),
-              digest.getSizeBytes(),
-              isExecutable,
-              containingDirectory,
-              () -> {
-                onPut.accept(digest);
-                writesInProgress.invalidate(digest);
-              });
-          if (out != null) {
-            copyExternalInput(digest, out);
-          }
-          return immediateFuture(key);
+          return immediateFuture(putAndCopy(digest, isExecutable, containingDirectory));
         },
         executor);
   }
 
+  Path putAndCopy(Digest digest, boolean isExecutable, Digest containingDirectory) throws IOException, InterruptedException {
+    Path key = getKey(digest, isExecutable);
+    CancellableOutputStream out = putImpl(
+        key,
+        UUID.randomUUID(),
+        () -> completeWrite(digest),
+        digest.getSizeBytes(),
+        isExecutable,
+        containingDirectory,
+        () -> completePut(digest));
+    if (out != null) {
+      boolean complete = false;
+      try {
+        copyExternalInput(digest, out);
+        complete = true;
+      } finally {
+        try {
+          logger.finest(format("closing output stream for %s", DigestUtil.toString(digest)));
+          if (complete) {
+            out.close();
+          } else {
+            out.cancel();
+          }
+          logger.finest(format("output stream closed for %s", DigestUtil.toString(digest)));
+        } catch (IOException e) {
+          if (Thread.interrupted()) {
+            logger.log(SEVERE, format("could not close stream for %s", DigestUtil.toString(digest)), e);
+            Throwables.propagateIfInstanceOf(e.getCause(), InterruptedException.class);
+            throw new InterruptedException();
+          } else {
+            logger.log(WARNING, format("failed output stream close for %s", DigestUtil.toString(digest)), e);
+          }
+          throw e;
+        }
+      }
+    }
+    return key;
+  }
+
   private void copyExternalInput(Digest digest, CancellableOutputStream out) throws IOException, InterruptedException {
     logger.finest(format("downloading %s", DigestUtil.toString(digest)));
+    boolean complete = false;
     try (InputStream in = newExternalInput(digest, /* offset=*/ 0)) {
       ByteStreams.copy(in, out);
-      logger.finest(format("download of %s complete", DigestUtil.toString(digest)));
+      complete = true;
     } catch (IOException e) {
       out.cancel();
       logger.log(WARNING, format("error downloading %s", DigestUtil.toString(digest)), e); // prevent burial by early end of stream during close
       throw e;
-    } finally {
-      try {
-        logger.finest(format("closing output stream for %s", DigestUtil.toString(digest)));
-        out.close();
-        logger.finest(format("output stream closed for %s", DigestUtil.toString(digest)));
-      } catch (IOException e) {
-        if (Thread.interrupted()) {
-          logger.log(SEVERE, format("could not close stream for %s", DigestUtil.toString(digest)), e);
-          if (e.getCause() instanceof InterruptedException) {
-            throw (InterruptedException) e.getCause();
-          }
-          throw new InterruptedException();
-        } else {
-          logger.log(WARNING, format("failed output stream close for %s", DigestUtil.toString(digest)), e);
-        }
-        throw e;
-      }
     }
+    logger.finest(format("download of %s complete", DigestUtil.toString(digest)));
   }
 
   @FunctionalInterface
