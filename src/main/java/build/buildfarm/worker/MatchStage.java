@@ -62,10 +62,15 @@ public class MatchStage extends PipelineStage {
     private long operationNamedAtUSecs;
     private Poller poller = null;
     private QueueEntry queueEntry = null;
+    private boolean matched = false;
 
     public MatchOperationListener(Stopwatch stopwatch) {
       this.stopwatch = stopwatch;
       waitDuration = this.stopwatch.elapsed(MICROSECONDS);
+    }
+
+    boolean wasMatched() {
+      return matched;
     }
 
     @Override
@@ -83,7 +88,6 @@ public class MatchStage extends PipelineStage {
     @Override
     public boolean onEntry(@Nullable QueueEntry queueEntry) throws InterruptedException {
       if (queueEntry == null) {
-        output.release();
         return false;
       }
 
@@ -115,6 +119,7 @@ public class MatchStage extends PipelineStage {
         error.put(operationContext);
         throw e;
       }
+      matched = true;
       return true;
     }
   }
@@ -130,14 +135,14 @@ public class MatchStage extends PipelineStage {
     if (!output.claim()) {
       return;
     }
+    MatchOperationListener listener = new MatchOperationListener(stopwatch);
     try {
-      MatchOperationListener listener = new MatchOperationListener(stopwatch);
-
       logStart();
       workerContext.match(listener);
-    } catch (InterruptedException e) {
-      output.release();
-      throw e;
+    } finally {
+      if (!listener.wasMatched()) {
+        output.release();
+      }
     }
   }
 
