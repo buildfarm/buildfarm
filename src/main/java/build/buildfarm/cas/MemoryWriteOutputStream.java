@@ -1,6 +1,5 @@
 package build.buildfarm.cas;
 
-import static com.google.common.base.Throwables.throwIfUnchecked;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
 import build.bazel.remote.execution.v2.Digest;
@@ -9,7 +8,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Write;
 import com.google.common.hash.HashingOutputStream;
 import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.UncheckedExecutionException;
+import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -22,9 +21,13 @@ class MemoryWriteOutputStream extends OutputStream implements Write {
   private final Digest digest;
   private final ListenableFuture<ByteString> writtenFuture;
   private final ByteString.Output out;
+  private final SettableFuture<Void> future = SettableFuture.create();
   private HashingOutputStream hashOut;
 
-  MemoryWriteOutputStream(ContentAddressableStorage storage, Digest digest, ListenableFuture<ByteString> writtenFuture) {
+  MemoryWriteOutputStream(
+      ContentAddressableStorage storage,
+      Digest digest,
+      ListenableFuture<ByteString> writtenFuture) {
     this.storage = storage;
     this.digest = digest;
     this.writtenFuture = writtenFuture;
@@ -39,6 +42,7 @@ class MemoryWriteOutputStream extends OutputStream implements Write {
     hashOut = DigestUtil.forDigest(digest).newHashingOutputStream(out);
     addListener(
         () -> {
+          future.set(null);
           try {
             hashOut.close();
           } catch (IOException e) {
@@ -60,15 +64,18 @@ class MemoryWriteOutputStream extends OutputStream implements Write {
   public void close() throws IOException {
     hashOut.close();
     Digest actual = getActual();
-    if (actual.equals(digest)) {
-      try {
-        storage.put(
-            new ContentAddressableStorage.Blob(out.toByteString(), digest));
-      } catch (InterruptedException e) {
-        throw new IOException(e);
-      }
-    } else {
-      throw new DigestMismatchException(actual, digest);
+    if (!actual.equals(digest)) {
+      DigestMismatchException e = new DigestMismatchException(actual, digest);
+      future.setException(e);
+      throw e;
+    }
+
+    try {
+      storage.put(
+          new ContentAddressableStorage.Blob(out.toByteString(), digest));
+    } catch (InterruptedException e) {
+      future.setException(e);
+      throw new IOException(e);
     }
   }
 
@@ -93,16 +100,7 @@ class MemoryWriteOutputStream extends OutputStream implements Write {
   }
 
   boolean checkComplete() {
-    try {
-      return writtenFuture.isDone() && writtenFuture.get().size() == digest.getSizeBytes();
-    } catch (ExecutionException e) {
-      Throwable cause = e.getCause();
-      throwIfUnchecked(cause);
-      throw new UncheckedExecutionException(cause);
-    } catch (InterruptedException e) {
-      // unlikely, get only called if done
-      throw new RuntimeException(e);
-    }
+    return writtenFuture.isDone();
   }
 
   // Write methods
@@ -131,5 +129,9 @@ class MemoryWriteOutputStream extends OutputStream implements Write {
   @Override
   public void addListener(Runnable onCompleted, Executor executor) {
     writtenFuture.addListener(onCompleted, executor);
+  }
+
+  public ListenableFuture<Void> getFuture() {
+    return future;
   }
 }
