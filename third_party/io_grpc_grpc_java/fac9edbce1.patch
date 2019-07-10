@@ -12,7 +12,7 @@ diff --git a/java_grpc_library.bzl b/java_grpc_library.bzl
 index 7c1b1f2b8..2c00ee956 100644
 --- a/java_grpc_library.bzl
 +++ b/java_grpc_library.bzl
-@@ -62,7 +62,20 @@ java_rpc_toolchain = rule(
+@@ -1,7 +1,20 @@ java_rpc_toolchain = rule(
  def _path_ignoring_repository(f):
      if len(f.owner.workspace_root) == 0:
          return f.short_path
@@ -32,8 +32,8 @@ index 7c1b1f2b8..2c00ee956 100644
 +        # before "external/workspace", so we need to add the starting index of "external/workspace"
 +        return f.path[f.path.find(f.owner.workspace_root) + len(f.owner.workspace_root) + 1:]
  
- def _java_rpc_library_impl(ctx):
-     if len(ctx.attr.srcs) != 1:
+ def _create_include_path(include):
+     return "-I{0}={1}".format(_path_ignoring_repository(include), include.path)
 -- 
 2.22.0.410.gd8fdbe21b5-goog
 
