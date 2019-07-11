@@ -856,41 +856,6 @@ public class ShardInstance extends AbstractServerInstance {
     return writes.get(digest, uuid);
   }
 
-  private class FailedChunkObserver implements ChunkObserver {
-    ListenableFuture<Long> failedFuture;
-
-    FailedChunkObserver(Throwable t) {
-      failedFuture = immediateFailedFuture(t);
-    }
-
-    @Override
-    public ListenableFuture<Long> getCommittedFuture() {
-      return failedFuture;
-    }
-
-    @Override
-    public long getCommittedSize() {
-      return 0l;
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void onNext(ByteString chunk) {
-    }
-
-    @Override
-    public void onCompleted() {
-    }
-
-    @Override
-    public void onError(Throwable t) {
-      logger.log(SEVERE, "Received error in failed chunkObserver", t);
-    }
-  }
-
   protected int getTreeDefaultPageSize() { return 1024; }
   protected int getTreeMaxPageSize() { return 1024; }
   protected TokenizableIterator<DirectoryEntry> createTreeIterator(
