@@ -76,10 +76,27 @@ message GrpcCASConfig {
   string target = 2;
 }
 
+message FilesystemCASConfig {
+  // path to cached files from CAS
+  // if relative, is made relative to root
+  string path = 2;
+
+  // limit for contents of files retained
+  // from CAS in the cache
+  int64 max_size_bytes = 3;
+}
+
+message FuseCASConfig {
+  // used to identify the backing store
+  string name = 1;
+}
+
 message ContentAddressableStorageConfig {
   oneof type {
     MemoryCASConfig memory = 1;
     GrpcCASConfig grpc = 2;
+    FilesystemCASConfig filesystem = 3;
+    FuseCASConfig fuse = 4;
   }
 }
 
@@ -217,26 +234,8 @@ message ShardWorkerConfig {
   // base directory for all work being performed
   string root = 4;
 
-  // path to cached files from CAS
-  // if relative, is made relative to root
-  string cas_cache_directory = 5;
-
-  // limit for contents of files retained
-  // from CAS in the cache
-  int64 cas_cache_max_size_bytes = 6;
-
-  // limit for CAS total content size
-  int64 cas_max_size_bytes = 7;
-
-  // page size for getTree request
-  uint32 tree_page_size = 8;
-
-  // whether the worker should attempt to requeue
-  // an operation when an unexpected failure
-  // occurs during an execution
-  bool requeue_on_failure = 11;
-
-  bool use_fuse_cas = 12;
+  // the sequence of cas into which expirations cascade
+  repeated ContentAddressableStorageConfig cas = 27;
 
   // period of poll requests during execution
   google.protobuf.Duration operation_poll_period = 13;
@@ -274,12 +273,6 @@ message ShardWorkerConfig {
   oneof backplane {
     RedisShardBackplaneConfig redis_shard_backplane_config = 21;
   }
-
-  string logging_host = 22;
-
-  string logging_project_id = 23;
-
-  string aws_namespace = 24;
 
   // available execution policies, will be used to match
   // with an action's platform for selection

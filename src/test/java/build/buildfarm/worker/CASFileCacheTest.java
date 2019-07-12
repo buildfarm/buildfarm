@@ -122,7 +122,8 @@ class CASFileCacheTest {
         newDirectExecutorService(),
         storage,
         onPut,
-        onExpire) {
+        onExpire,
+        /* delegate=*/ null) {
       @Override
       protected InputStream newExternalInput(Digest digest, long offset) {
         ByteString content = blobs.get(digest);

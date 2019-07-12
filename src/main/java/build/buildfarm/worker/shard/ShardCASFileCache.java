@@ -15,6 +15,7 @@
 package build.buildfarm.worker.shard;
 
 import build.bazel.remote.execution.v2.Digest;
+import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.worker.CASFileCache;
@@ -35,7 +36,8 @@ class ShardCASFileCache extends CASFileCache {
       DigestUtil digestUtil,
       ExecutorService expireService,
       Consumer<Digest> onPut,
-      Consumer<Iterable<Digest>> onExpire) {
+      Consumer<Iterable<Digest>> onExpire,
+      ContentAddressableStorage delegate) {
     super(
         root,
         maxSizeInBytes,
@@ -43,8 +45,9 @@ class ShardCASFileCache extends CASFileCache {
         expireService,
         /* storage=*/ Maps.newConcurrentMap(),
         onPut,
-        onExpire);
-    this.inputStreamFactory = createInputStreamFactory(this, shardInputStreamFactory);
+        onExpire,
+        delegate);
+    this.inputStreamFactory = createInputStreamFactory(this::newTransparentInput, shardInputStreamFactory);
   }
 
   /**

@@ -14,24 +14,90 @@
 
 package build.buildfarm.instance.shard;
 
+import static com.google.common.base.Throwables.throwIfInstanceOf;
+import static com.google.common.base.Throwables.throwIfUnchecked;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.BlobWriteKey;
-import com.google.common.base.Throwables;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.util.concurrent.UncheckedExecutionException;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 class Writes {
   private final Supplier<Instance> instanceSupplier;
   private final LoadingCache<BlobWriteKey, Instance> blobWriteInstances;
+
+  private class InvalidatingWrite implements Write {
+    private final Write delegate;
+    private final Runnable onInvalidation;
+
+    InvalidatingWrite(Write delegate, Runnable onInvalidation) {
+      this.delegate = delegate;
+      this.onInvalidation = onInvalidation;
+      addListener(onInvalidation, directExecutor());
+    }
+
+    @Override
+    public long getCommittedSize() {
+      try {
+        return delegate.getCommittedSize();
+      } catch (RuntimeException e) {
+        onInvalidation.run();
+        throw e;
+      }
+    }
+
+    @Override
+    public boolean isComplete() {
+      boolean complete = true; // complete if it throws
+      try {
+        complete = delegate.isComplete();
+      } finally {
+        if (complete) {
+          onInvalidation.run();
+        }
+      }
+      return complete;
+    }
+
+    @Override
+    public OutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits) throws IOException {
+      try {
+        return delegate.getOutput(deadlineAfter, deadlineAfterUnits);
+      } catch (Exception e) {
+        onInvalidation.run();
+        throwIfInstanceOf(e, IOException.class);
+        throwIfUnchecked(e);
+        throw new RuntimeException(e);
+      }
+    }
+
+    @Override
+    public void reset() {
+      try {
+        delegate.reset();
+      } finally {
+        onInvalidation.run();
+      }
+    }
+
+    /** add a callback to be invoked when blob has been completed */
+    public void addListener(Runnable onCompleted, Executor executor) {
+      delegate.addListener(onCompleted, executor);
+    }
+  }
 
   Writes(Supplier<Instance> instanceSupplier) {
     this(
@@ -64,10 +130,12 @@ class Writes {
         .setIdentifier(uuid.toString())
         .build();
     try {
-      return blobWriteInstances.get(key).getBlobWrite(digest, uuid);
+      return new InvalidatingWrite(
+          blobWriteInstances.get(key).getBlobWrite(digest, uuid),
+          () -> blobWriteInstances.invalidate(key));
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
-      Throwables.propagateIfInstanceOf(cause, RuntimeException.class);
+      throwIfInstanceOf(cause, RuntimeException.class);
       throw new UncheckedExecutionException(cause);
     }
   }

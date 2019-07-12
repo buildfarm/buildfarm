@@ -187,9 +187,10 @@ class CFCExecFileSystem implements ExecFileSystem {
       OutputDirectory outputDirectory,
       ImmutableList.Builder<Path> inputFiles,
       ImmutableList.Builder<Digest> inputDirectories)
-      throws IOException, InterruptedException {
+      throws IOException {
     Directory directory = directoriesIndex.get(directoryDigest);
     if (directory == null) {
+      // not quite IO...
       throw new IOException("Directory " + DigestUtil.toString(directoryDigest) + " is not in directories index");
     }
 
@@ -218,6 +219,9 @@ class CFCExecFileSystem implements ExecFileSystem {
               return null;
             },
             fetchService)));
+      }
+      if (Thread.currentThread().isInterrupted()) {
+        break;
       }
     }
     return downloads;
@@ -279,7 +283,7 @@ class CFCExecFileSystem implements ExecFileSystem {
     ImmutableList.Builder<Path> inputFiles = new ImmutableList.Builder<>();
     ImmutableList.Builder<Digest> inputDirectories = new ImmutableList.Builder<>();
 
-    logger.info("ExecFileSystem::createExecDir(" + DigestUtil.toString(action.getInputRootDigest()) + ") calling fetchInputs");
+    logger.info("ExecFileSystem::createExecDir(" + operationName + ") calling fetchInputs");
     Iterable<ListenableFuture<Void>> fetchedFutures =
         fetchInputs(
             execDir,
@@ -331,7 +335,8 @@ class CFCExecFileSystem implements ExecFileSystem {
     rootInputFiles.put(execDir, inputFiles.build());
     rootInputDirectories.put(execDir, inputDirectories.build());
 
-    logger.info("ExecFileSystem::createExecDir(" + DigestUtil.toString(action.getInputRootDigest()) + ") stamping output directories");
+    logger.info("ExecFileSystem::createExecDir(" + operationName + ") stamping output directories");
+    boolean stamped = false;
     try {
       outputDirectory.stamp(execDir);
     } catch (IOException e) {

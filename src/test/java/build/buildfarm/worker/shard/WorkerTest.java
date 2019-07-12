@@ -27,7 +27,6 @@ public class WorkerTest {
     new Worker(
         "test",
         ShardWorkerConfig.newBuilder()
-            .setCasCacheDirectory("/cache")
             .build());
   }
 

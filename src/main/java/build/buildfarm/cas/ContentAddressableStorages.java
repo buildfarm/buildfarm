@@ -50,7 +50,7 @@ public final class ContentAddressableStorages {
     return builder.build();
   }
 
-  private static ContentAddressableStorage createGrpcCAS(GrpcCASConfig config) {
+  public static ContentAddressableStorage createGrpcCAS(GrpcCASConfig config) {
     Channel channel = createChannel(config.getTarget());
     ByteStreamUploader byteStreamUploader
         = new ByteStreamUploader("", channel, null, 300, NO_RETRIES);

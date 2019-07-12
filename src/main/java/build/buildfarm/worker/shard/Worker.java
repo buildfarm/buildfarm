@@ -14,6 +14,8 @@
 
 package build.buildfarm.worker.shard;
 
+import static build.buildfarm.cas.ContentAddressableStorages.createGrpcCAS;
+import static com.google.common.base.Preconditions.checkState;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -32,7 +34,6 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.RedisShardBackplane;
 import build.buildfarm.instance.shard.RemoteInputStreamFactory;
 import build.buildfarm.instance.shard.WorkerStubs;
-import build.buildfarm.server.InstanceNotFoundException;
 import build.buildfarm.server.Instances;
 import build.buildfarm.server.ContentAddressableStorageService;
 import build.buildfarm.server.ByteStreamService;
@@ -46,10 +47,14 @@ import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.ReportResultStage;
 import build.buildfarm.worker.WorkerContext;
+import build.buildfarm.v1test.ContentAddressableStorageConfig;
+import build.buildfarm.v1test.FilesystemCASConfig;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ShardWorkerConfig;
 import build.buildfarm.v1test.ShardWorker;
 import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 import com.google.common.cache.LoadingCache;
 import com.google.common.io.ByteStreams;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -108,12 +113,12 @@ public class Worker {
     return root;
   }
 
-  private static Path getValidCasCacheDirectory(ShardWorkerConfig config, Path root) throws ConfigurationException {
-    String casCacheValue = config.getCasCacheDirectory();
-    if (Strings.isNullOrEmpty(casCacheValue)) {
+  private static Path getValidFilesystemCASPath(FilesystemCASConfig config, Path root) throws ConfigurationException {
+    String pathValue = config.getPath();
+    if (Strings.isNullOrEmpty(pathValue)) {
       throw new ConfigurationException("Cas cache directory value in config missing");
     }
-    return root.resolve(casCacheValue);
+    return root.resolve(pathValue);
   }
 
   private static HashFunction getValidHashFunction(ShardWorkerConfig config) throws ConfigurationException {
@@ -157,13 +162,23 @@ public class Worker {
 
     workerStubs = WorkerStubs.create(digestUtil);
 
+    ExecutorService removeDirectoryService =
+        newFixedThreadPool(
+            /* nThreads=*/ 32,
+            new ThreadFactoryBuilder().setNameFormat("remove-directory-pool-%d").build());
+
     InputStreamFactory remoteInputStreamFactory =
         new RemoteInputStreamFactory(
             config.getPublicName(),
             backplane,
             new Random(),
             workerStubs);
-    execFileSystem = createExecFileSystem(remoteInputStreamFactory);
+    ContentAddressableStorage storage = createStorages(
+        remoteInputStreamFactory, removeDirectoryService, config.getCasList());
+    execFileSystem = createExecFileSystem(
+        remoteInputStreamFactory,
+        removeDirectoryService,
+        storage);
 
     instance = new ShardWorkerInstance(
         config.getPublicName(),
@@ -221,13 +236,15 @@ public class Worker {
     logger.info(String.format("%s initialized", identifier));
   }
 
-  private ExecFileSystem createFuseExecFileSystem(InputStreamFactory remoteInputStreamFactory) {
-    final ContentAddressableStorage storage = new MemoryCAS(config.getCasMaxSizeBytes(), this::onStoragePut);
+  private ExecFileSystem createFuseExecFileSystem(
+      InputStreamFactory remoteInputStreamFactory,
+      ContentAddressableStorage storage) {
     InputStreamFactory storageInputStreamFactory = (digest, offset) -> storage.get(digest).getData().substring((int) offset).newInput();
 
     InputStreamFactory localPopulatingInputStreamFactory = new InputStreamFactory() {
       @Override
       public InputStream newInput(Digest blobDigest, long offset) throws IOException, InterruptedException {
+        // FIXME use write
         ByteString content = ByteString.readFrom(remoteInputStreamFactory.newInput(blobDigest, offset));
 
         if (offset == 0) {
@@ -248,30 +265,64 @@ public class Worker {
         storage);
   }
 
-  private ExecFileSystem createExecFileSystem(InputStreamFactory remoteInputStreamFactory) throws ConfigurationException {
-    if (config.getUseFuseCas()) {
-      return createFuseExecFileSystem(remoteInputStreamFactory);
+  private ExecFileSystem createExecFileSystem(
+      InputStreamFactory remoteInputStreamFactory,
+      ExecutorService removeDirectoryService,
+      ContentAddressableStorage storage) {
+    checkState(storage != null, "no exec fs cas specified");
+    if (storage instanceof CASFileCache) {
+      return createCFCExecFileSystem(removeDirectoryService, (CASFileCache) storage);
+    } else {
+      // FIXME not the only fuse backing capacity...
+      return createFuseExecFileSystem(remoteInputStreamFactory, storage);
     }
-    return createCFCExecFileSystem(
-        remoteInputStreamFactory,
-        getValidCasCacheDirectory(config, root));
   }
 
-  private ExecFileSystem createCFCExecFileSystem(InputStreamFactory remoteInputStreamFactory, Path casCacheDirectory) {
-    ExecutorService removeDirectoryService =
-        newFixedThreadPool(
-            /* nThreads=*/ 32,
-            new ThreadFactoryBuilder().setNameFormat("remove-directory-pool-%d").build());
+  private ContentAddressableStorage createStorage(
+      InputStreamFactory remoteInputStreamFactory,
+      ExecutorService removeDirectoryService,
+      ContentAddressableStorageConfig config,
+      ContentAddressableStorage delegate) throws ConfigurationException {
+    switch (config.getTypeCase()) {
+      default:
+      case TYPE_NOT_SET:
+        throw new IllegalArgumentException("Invalid cas type specified");
+      case MEMORY:
+      case FUSE: // FIXME have FUSE refer to a name for storage backing, and topo
+        return new MemoryCAS(config.getMemory().getMaxSizeBytes(), this::onStoragePut, delegate);
+      case GRPC:
+        checkState(delegate == null, "grpc cas cannot delegate");
+        return createGrpcCAS(config.getGrpc());
+      case FILESYSTEM:
+        FilesystemCASConfig fsCASConfig = config.getFilesystem();
+        return new ShardCASFileCache(
+            remoteInputStreamFactory,
+            root.resolve(getValidFilesystemCASPath(fsCASConfig, root)),
+            fsCASConfig.getMaxSizeBytes(),
+            digestUtil,
+            removeDirectoryService,
+            this::onStoragePut,
+            delegate == null ? this::onStorageExpire : (digests) -> {},
+            delegate);
+    }
+  }
 
-    CASFileCache fileCache = new ShardCASFileCache(
-        remoteInputStreamFactory,
-        root.resolve(casCacheDirectory),
-        config.getCasCacheMaxSizeBytes(),
-        digestUtil,
-        removeDirectoryService,
-        this::onStoragePut,
-        this::onStorageExpire);
+  private ContentAddressableStorage createStorages(
+      InputStreamFactory remoteInputStreamFactory,
+      ExecutorService removeDirectoryService,
+      List<ContentAddressableStorageConfig> configs) throws ConfigurationException {
+    ImmutableList.Builder<ContentAddressableStorage> storages = ImmutableList.builder();
+    // must construct delegates first
+    ContentAddressableStorage storage = null, delegate = null;
+    for (ContentAddressableStorageConfig config : Lists.reverse(configs)) {
+      storage = createStorage(remoteInputStreamFactory, removeDirectoryService, config, delegate);
+      storages.add(storage);
+      delegate = storage;
+    }
+    return storage;
+  }
 
+  private ExecFileSystem createCFCExecFileSystem(ExecutorService removeDirectoryService, CASFileCache fileCache) {
     return new CFCExecFileSystem(
         root,
         fileCache,
@@ -467,9 +518,6 @@ public class Worker {
     TextFormat.merge(input, builder);
     if (!Strings.isNullOrEmpty(options.root)) {
       builder.setRoot(options.root);
-    }
-    if (!Strings.isNullOrEmpty(options.casCacheDirectory)) {
-      builder.setCasCacheDirectory(options.casCacheDirectory);
     }
     if (!Strings.isNullOrEmpty(options.publicName)) {
       builder.setPublicName(options.publicName);

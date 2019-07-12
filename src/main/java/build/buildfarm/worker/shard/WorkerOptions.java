@@ -38,13 +38,6 @@ public class WorkerOptions extends OptionsBase {
   public String root;
 
   @Option(
-      name = "cas_cache_directory",
-      help = "(Absolute or relative to root) path to cached files from CAS.",
-      defaultValue = ""
-    )
-  public String casCacheDirectory;
-
-  @Option(
       name = "public_name",
       help = "HOST:PORT pair used when registering this worker as a CAS member.",
       defaultValue = ""
