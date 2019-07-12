@@ -33,7 +33,7 @@ public interface Write {
   /** add a callback to be invoked when blob has been completed */
   void addListener(Runnable onCompleted, Executor executor);
 
-  public class CompleteWrite implements Write {
+  public static class CompleteWrite implements Write {
     private final long committedSize;
 
     public CompleteWrite(long committedSize) {

@@ -2,6 +2,7 @@ package build.buildfarm.instance.shard;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.Write.CompleteWrite;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.BlobWriteKey;
 import com.google.common.base.Throwables;
@@ -41,6 +42,9 @@ class Writes {
   }
 
   public Write get(Digest digest, UUID uuid) {
+    if (digest.getSizeBytes() == 0) {
+      return new CompleteWrite(0);
+    }
     BlobWriteKey key = BlobWriteKey.newBuilder()
         .setDigest(digest)
         .setIdentifier(uuid.toString())

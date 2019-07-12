@@ -154,7 +154,7 @@ public class UrlPath {
     } catch (NumberFormatException e) {
       throw new InvalidResourceNameException(resourceName, e.getMessage(), e);
     }
-    if (size <= 0) {
+    if (size < 0) {
       throw new InvalidResourceNameException(
           resourceName,
           String.format("upload size invalid: %d", size));

@@ -51,6 +51,7 @@ import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.Write.CompleteWrite;
 import build.buildfarm.v1test.BlobWriteKey;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
@@ -438,6 +439,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   @Override
   public Write getWrite(Digest digest, UUID uuid) {
+    if (digest.getSizeBytes() == 0) {
+      return new CompleteWrite(0);
+    }
     try {
       return writes.get(BlobWriteKey.newBuilder()
           .setDigest(digest)
