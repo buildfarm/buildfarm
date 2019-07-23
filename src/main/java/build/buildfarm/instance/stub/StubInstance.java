@@ -40,6 +40,7 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecutionGrpc;
 import build.bazel.remote.execution.v2.ExecutionGrpc.ExecutionStub;
+import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.WaitExecutionRequest;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
@@ -569,7 +570,7 @@ public class StubInstance implements Instance {
   @Override
   public boolean pollOperation(
       String operationName,
-      ExecuteOperationMetadata.Stage stage) {
+      ExecutionStage.Value stage) {
     throwIfStopped();
     return operationQueueBlockingStub
         .get()

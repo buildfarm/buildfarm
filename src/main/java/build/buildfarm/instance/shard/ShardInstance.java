@@ -48,9 +48,9 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
+import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.buildfarm.common.DigestUtil;
@@ -1004,7 +1004,7 @@ public class ShardInstance extends AbstractServerInstance {
       QueuedOperation queuedOperation) {
     return QueuedOperationMetadata.newBuilder()
         .setExecuteOperationMetadata(executeOperationMetadata.toBuilder()
-            .setStage(Stage.QUEUED))
+            .setStage(ExecutionStage.Value.QUEUED))
         .setRequestMetadata(requestMetadata)
         .setQueuedOperationDigest(getDigestUtil().compute(queuedOperation))
         .build();
@@ -1062,7 +1062,7 @@ public class ShardInstance extends AbstractServerInstance {
             .setActionDigest(executeEntry.getActionDigest())
             .setStdoutStreamName(executeEntry.getStdoutStreamName())
             .setStderrStreamName(executeEntry.getStderrStreamName())
-            .setStage(Stage.QUEUED))
+            .setStage(ExecutionStage.Value.QUEUED))
         .setQueuedOperationDigest(queuedOperationDigest)
         .build();
     QueueEntry entry = QueueEntry.newBuilder()
@@ -1149,7 +1149,7 @@ public class ShardInstance extends AbstractServerInstance {
                           .setActionDigest(executeEntry.getActionDigest())
                           .setStdoutStreamName(executeEntry.getStdoutStreamName())
                           .setStderrStreamName(executeEntry.getStderrStreamName())
-                          .setStage(Stage.QUEUED))
+                          .setStage(ExecutionStage.Value.QUEUED))
                       .setQueuedOperationDigest(queueEntry.getQueuedOperationDigest())
                       .setRequestMetadata(executeEntry.getRequestMetadata())
                       .build();
@@ -1335,7 +1335,7 @@ public class ShardInstance extends AbstractServerInstance {
     ExecuteOperationMetadata metadata =
         ExecuteOperationMetadata.newBuilder()
             .setActionDigest(actionKey.getDigest())
-            .setStage(Stage.CACHE_CHECK)
+            .setStage(ExecutionStage.Value.CACHE_CHECK)
             .build();
     backplane.putOperation(
         operation.toBuilder()
@@ -1355,7 +1355,7 @@ public class ShardInstance extends AbstractServerInstance {
         recentCacheServedExecutions.put(requestMetadata, true);
 
         ExecuteOperationMetadata completeMetadata = metadata.toBuilder()
-            .setStage(Stage.COMPLETED)
+            .setStage(ExecutionStage.Value.COMPLETED)
             .build();
         Operation completedOperation = operation.toBuilder()
             .setDone(true)
@@ -1618,7 +1618,7 @@ public class ShardInstance extends AbstractServerInstance {
   public boolean putOperation(Operation operation) throws InterruptedException {
     if (isErrored(operation)) {
       try {
-        return backplane.putOperation(operation, Stage.COMPLETED);
+        return backplane.putOperation(operation, ExecutionStage.Value.COMPLETED);
       } catch (IOException e) {
         throw Status.fromThrowable(e).asRuntimeException();
       }
@@ -1631,7 +1631,7 @@ public class ShardInstance extends AbstractServerInstance {
   protected Object operationLock(String operationName) { throw new UnsupportedOperationException(); }
 
   @Override
-  public boolean pollOperation(String operationName, Stage stage) {
+  public boolean pollOperation(String operationName, ExecutionStage.Value stage) {
     throw new UnsupportedOperationException();
   }
 

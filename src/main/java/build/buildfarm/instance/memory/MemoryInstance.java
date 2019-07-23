@@ -34,6 +34,7 @@ import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.buildfarm.ac.ActionCache;
 import build.buildfarm.ac.GrpcActionCache;
@@ -411,7 +412,7 @@ public class MemoryInstance extends AbstractServerInstance {
   @Override
   public boolean pollOperation(
       String operationName,
-      ExecuteOperationMetadata.Stage stage) {
+      ExecutionStage.Value stage) {
     if (!super.pollOperation(operationName, stage)) {
       return false;
     }

@@ -14,10 +14,10 @@
 
 package build.buildfarm.instance.shard;
 
-import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.UNKNOWN;
-import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.CACHE_CHECK;
-import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.QUEUED;
-import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.COMPLETED;
+import static build.bazel.remote.execution.v2.ExecutionStage.Value.UNKNOWN;
+import static build.bazel.remote.execution.v2.ExecutionStage.Value.CACHE_CHECK;
+import static build.bazel.remote.execution.v2.ExecutionStage.Value.QUEUED;
+import static build.bazel.remote.execution.v2.ExecutionStage.Value.COMPLETED;
 import static build.buildfarm.instance.AbstractServerInstance.MISSING_ACTION;
 import static build.buildfarm.instance.AbstractServerInstance.MISSING_COMMAND;
 import static build.buildfarm.instance.AbstractServerInstance.MISSING_INPUT;

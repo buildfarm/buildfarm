@@ -21,7 +21,6 @@ import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorS
 
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.common.function.InterruptingPredicate;

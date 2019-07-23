@@ -14,7 +14,7 @@
 
 package build.buildfarm.worker;
 
-import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.QUEUED;
+import static build.bazel.remote.execution.v2.ExecutionStage.Value.QUEUED;
 import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;

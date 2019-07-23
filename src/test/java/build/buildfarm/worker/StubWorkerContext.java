@@ -19,7 +19,7 @@ import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
+import build.bazel.remote.execution.v2.ExecutionStage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.Poller;
@@ -40,8 +40,8 @@ import java.util.function.Predicate;
 
 class StubWorkerContext implements WorkerContext {
   @Override public String getName() { throw new UnsupportedOperationException(); }
-  @Override public Poller createPoller(String name, QueueEntry queueEntry, Stage stage) { throw new UnsupportedOperationException(); }
-  @Override public void resumePoller(Poller poller, String name, QueueEntry queueEntry, Stage stage, Runnable onFailure, Deadline deadline) { throw new UnsupportedOperationException(); }
+  @Override public Poller createPoller(String name, QueueEntry queueEntry, ExecutionStage.Value stage) { throw new UnsupportedOperationException(); }
+  @Override public void resumePoller(Poller poller, String name, QueueEntry queueEntry, ExecutionStage.Value stage, Runnable onFailure, Deadline deadline) { throw new UnsupportedOperationException(); }
   @Override public void match(MatchListener listener) throws InterruptedException { throw new UnsupportedOperationException(); }
   @Override public void requeue(Operation operation) { throw new UnsupportedOperationException(); }
   @Override public void deactivate(String operationName) { throw new UnsupportedOperationException(); }

@@ -14,11 +14,11 @@
 
 package build.buildfarm.worker.shard;
 
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
+import build.bazel.remote.execution.v2.ExecutionStage;
 import build.buildfarm.v1test.QueueEntry;
 import java.io.IOException;
 
 @FunctionalInterface
 interface OperationPoller {
-  boolean poll(QueueEntry queueEntry, Stage stage, long requeueAt) throws IOException;
+  boolean poll(QueueEntry queueEntry, ExecutionStage.Value stage, long requeueAt) throws IOException;
 }

@@ -24,8 +24,8 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
+import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.cas.ContentAddressableStorage;
@@ -231,7 +231,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  public boolean pollOperation(String operationName, Stage stage) {
+  public boolean pollOperation(String operationName, ExecutionStage.Value stage) {
     throw new UnsupportedOperationException();
   }
 

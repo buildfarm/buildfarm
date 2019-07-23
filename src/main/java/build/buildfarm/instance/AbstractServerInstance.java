@@ -33,16 +33,16 @@ import build.bazel.remote.execution.v2.ActionCacheUpdateCapabilities;
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
 import build.bazel.remote.execution.v2.CacheCapabilities;
-import build.bazel.remote.execution.v2.CacheCapabilities.SymlinkAbsolutePathStrategy;
+import build.bazel.remote.execution.v2.SymlinkAbsolutePathStrategy;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecutionCapabilities;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
+import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
@@ -981,7 +981,7 @@ public abstract class AbstractServerInstance implements Instance {
       Operation operation = Operation.newBuilder()
           .setDone(true)
           .setMetadata(Any.pack(ExecuteOperationMetadata.newBuilder()
-              .setStage(Stage.COMPLETED)
+              .setStage(ExecutionStage.Value.COMPLETED)
               .build()))
           .setResponse(Any.pack(ExecuteResponse.newBuilder()
               .setStatus(status)
@@ -1018,7 +1018,7 @@ public abstract class AbstractServerInstance implements Instance {
     ActionResult actionResult = null;
     if (!skipCacheLookup) {
       metadata = metadata.toBuilder()
-          .setStage(Stage.CACHE_CHECK)
+          .setStage(ExecutionStage.Value.CACHE_CHECK)
           .build();
       putOperation(operationBuilder
           .setMetadata(Any.pack(metadata))
@@ -1028,7 +1028,7 @@ public abstract class AbstractServerInstance implements Instance {
 
     if (actionResult != null) {
       metadata = metadata.toBuilder()
-          .setStage(Stage.COMPLETED)
+          .setStage(ExecutionStage.Value.COMPLETED)
           .build();
       operationBuilder
           .setDone(true)
@@ -1041,7 +1041,7 @@ public abstract class AbstractServerInstance implements Instance {
               .build()));
     } else {
       metadata = metadata.toBuilder()
-          .setStage(Stage.QUEUED)
+          .setStage(ExecutionStage.Value.QUEUED)
           .build();
     }
 
@@ -1184,14 +1184,14 @@ public abstract class AbstractServerInstance implements Instance {
         expectExecuteResponse(operation).getStatus().getCode() != Code.OK.getNumber();
   }
 
-  private static boolean isStage(Operation operation, Stage stage) {
+  private static boolean isStage(Operation operation, ExecutionStage.Value stage) {
     ExecuteOperationMetadata metadata
         = expectExecuteOperationMetadata(operation);
     return metadata != null && metadata.getStage() == stage;
   }
 
   protected static boolean isUnknown(Operation operation) {
-    return isStage(operation, Stage.UNKNOWN);
+    return isStage(operation, ExecutionStage.Value.UNKNOWN);
   }
 
   protected boolean isCancelled(Operation operation) {
@@ -1210,15 +1210,15 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   protected static boolean isQueued(Operation operation) {
-    return isStage(operation, Stage.QUEUED);
+    return isStage(operation, ExecutionStage.Value.QUEUED);
   }
 
   protected static boolean isExecuting(Operation operation) {
-    return isStage(operation, Stage.EXECUTING);
+    return isStage(operation, ExecutionStage.Value.EXECUTING);
   }
 
   protected static boolean isComplete(Operation operation) {
-    return isStage(operation, Stage.COMPLETED);
+    return isStage(operation, ExecutionStage.Value.COMPLETED);
   }
 
   protected abstract boolean matchOperation(Operation operation) throws InterruptedException;
@@ -1364,7 +1364,7 @@ public abstract class AbstractServerInstance implements Instance {
       return false;
     }
 
-    if (metadata.getStage() != Stage.QUEUED) {
+    if (metadata.getStage() != ExecutionStage.Value.QUEUED) {
       // ensure that watchers are notified
       String message = String.format(
           "Operation %s stage is not QUEUED",
@@ -1418,7 +1418,7 @@ public abstract class AbstractServerInstance implements Instance {
     long completedAt = System.currentTimeMillis();
     CompletedOperationMetadata completedMetadata = CompletedOperationMetadata.newBuilder()
         .setExecuteOperationMetadata(metadata.toBuilder()
-            .setStage(Stage.COMPLETED)
+            .setStage(ExecutionStage.Value.COMPLETED)
             .build())
         .setCompletedAt(completedAt)
         .setRequestMetadata(requestMetadata)
@@ -1448,7 +1448,7 @@ public abstract class AbstractServerInstance implements Instance {
       throw new IllegalStateException("Operation " + operation.getName() + " did not contain valid metadata");
     }
     metadata = metadata.toBuilder()
-        .setStage(Stage.COMPLETED)
+        .setStage(ExecutionStage.Value.COMPLETED)
         .build();
     putOperation(operation.toBuilder()
         .setDone(true)
@@ -1458,8 +1458,8 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public boolean pollOperation(String operationName, Stage stage) {
-    if (stage != Stage.QUEUED && stage != Stage.EXECUTING) {
+  public boolean pollOperation(String operationName, ExecutionStage.Value stage) {
+    if (stage != ExecutionStage.Value.QUEUED && stage != ExecutionStage.Value.EXECUTING) {
       return false;
     }
     Operation operation = getOperation(operationName);
@@ -1486,7 +1486,7 @@ public abstract class AbstractServerInstance implements Instance {
         .setActionCacheUpdateCapabilities(ActionCacheUpdateCapabilities.newBuilder()
             .setUpdateEnabled(true))
         .setMaxBatchTotalSizeBytes(4 * 1024 * 1024)
-        .setSymlinkAbsolutePathStrategy(SymlinkAbsolutePathStrategy.DISALLOWED)
+        .setSymlinkAbsolutePathStrategy(SymlinkAbsolutePathStrategy.Value.DISALLOWED)
         .build();
   }
 

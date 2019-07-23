@@ -48,12 +48,17 @@ http_archive(
 # The API that we implement.
 http_archive(
     name = "remote_apis",
-    patch_args = ["-p1"],
-    patches = ["//third_party/remote-apis:remote-apis.patch"],
     build_file = "@build_buildfarm//:BUILD.remote_apis",
-    sha256 = "4c4bf662fb08c827d787f560c5f5fdea3d5880a4509704871bbee7be64308e29",
-    strip_prefix = "remote-apis-25805c9108847dbbee45ad86ba70370b547ae165",
-    url = "https://github.com/bazelbuild/remote-apis/archive/25805c9108847dbbee45ad86ba70370b547ae165.zip",
+    sha256 = "69c47e26efbfac605e07d9963fdeda9f5ed22a73e692f290a0b6150207207cb5",
+    strip_prefix = "remote-apis-e7282cf0f0e16e7ba84209be5417279e6815bee7",
+    url = "https://github.com/bazelbuild/remote-apis/archive/e7282cf0f0e16e7ba84209be5417279e6815bee7.zip",
+)
+
+load("@remote_apis//:repository_rules.bzl", "switched_rules_by_language")
+
+switched_rules_by_language(
+    name = "bazel_remote_apis_imports",
+    java = True,
 )
 
 http_archive(

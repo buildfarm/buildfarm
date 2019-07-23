@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker;
 
+import static build.bazel.remote.execution.v2.ExecutionStage.Value.QUEUED;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.logging.Level.SEVERE;
 
@@ -22,7 +23,6 @@ import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Poller;
 import build.buildfarm.instance.Instance.MatchListener;
@@ -93,10 +93,7 @@ public class MatchStage extends PipelineStage {
 
       operationNamedAtUSecs = stopwatch.elapsed(MICROSECONDS);
       Preconditions.checkState(poller == null);
-      Poller poller = workerContext.createPoller(
-          "MatchStage",
-          queueEntry,
-          Stage.QUEUED);
+      Poller poller = workerContext.createPoller("MatchStage", queueEntry, QUEUED);
       return onOperationPolled(queueEntry, poller);
     }
 
@@ -157,7 +154,7 @@ public class MatchStage extends PipelineStage {
         .setName(executeEntry.getOperationName())
         .setMetadata(Any.pack(ExecuteOperationMetadata.newBuilder()
             .setActionDigest(executeEntry.getActionDigest())
-            .setStage(Stage.QUEUED)
+            .setStage(QUEUED)
             .setStdoutStreamName(executeEntry.getStdoutStreamName())
             .setStderrStreamName(executeEntry.getStderrStreamName())
             .build()))

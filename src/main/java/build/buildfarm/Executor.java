@@ -14,7 +14,7 @@
 
 package build.buildfarm;
 
-import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.EXECUTING;
+import static build.bazel.remote.execution.v2.ExecutionStage.Value.EXECUTING;
 import static build.buildfarm.instance.stub.ByteStreamUploader.uploadResourceName;
 import static build.buildfarm.worker.Utils.stat;
 import static com.google.common.base.Preconditions.checkState;

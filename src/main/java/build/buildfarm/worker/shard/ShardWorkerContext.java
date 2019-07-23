@@ -27,7 +27,7 @@ import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
+import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.Platform;
@@ -151,7 +151,7 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
-  public Poller createPoller(String name, QueueEntry queueEntry, Stage stage) {
+  public Poller createPoller(String name, QueueEntry queueEntry, ExecutionStage.Value stage) {
     Poller poller = new Poller(operationPollPeriod);
     resumePoller(poller, name, queueEntry, stage, () -> {}, Deadline.after(10, DAYS));
     return poller;
@@ -162,7 +162,7 @@ class ShardWorkerContext implements WorkerContext {
       Poller poller,
       String name,
       QueueEntry queueEntry,
-      Stage stage,
+      ExecutionStage.Value stage,
       Runnable onFailure,
       Deadline deadline) {
     String operationName = queueEntry.getExecuteEntry().getOperationName();
@@ -323,7 +323,7 @@ class ShardWorkerContext implements WorkerContext {
   private void requeue(String operationName) {
     QueueEntry queueEntry = activeOperations.remove(operationName);
     try {
-      operationPoller.poll(queueEntry, Stage.QUEUED, 0);
+      operationPoller.poll(queueEntry, ExecutionStage.Value.QUEUED, 0);
     } catch (IOException e) {
       // ignore, at least dispatcher will pick us up in 30s
       logger.log(SEVERE, "Failure while trying to fast requeue " + operationName, e);

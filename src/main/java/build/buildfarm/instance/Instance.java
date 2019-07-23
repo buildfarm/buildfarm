@@ -21,7 +21,7 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
+import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ServerCapabilities;
@@ -102,7 +102,7 @@ public interface Instance {
   void match(Platform platform, MatchListener listener) throws InterruptedException;
   boolean putOperation(Operation operation) throws InterruptedException;
   boolean putAndValidateOperation(Operation operation) throws InterruptedException;
-  boolean pollOperation(String operationName, Stage stage);
+  boolean pollOperation(String operationName, ExecutionStage.Value stage);
   // returns nextPageToken suitable for list restart
   String listOperations(
       int pageSize,

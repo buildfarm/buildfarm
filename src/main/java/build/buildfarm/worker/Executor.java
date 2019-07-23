@@ -25,8 +25,8 @@ import static java.util.logging.Level.SEVERE;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import build.bazel.remote.execution.v2.ExecuteResponse;
+import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.Platform.Property;
 import build.buildfarm.common.Write;
@@ -135,7 +135,7 @@ class Executor implements Runnable {
       return 0;
     }
     ExecuteOperationMetadata executingMetadata = metadata.toBuilder()
-        .setStage(Stage.EXECUTING)
+        .setStage(ExecutionStage.Value.EXECUTING)
         .build();
 
     long startedAt = System.currentTimeMillis();
@@ -195,7 +195,7 @@ class Executor implements Runnable {
         operationContext.poller,
         "Executor",
         operationContext.queueEntry,
-        Stage.EXECUTING,
+        ExecutionStage.Value.EXECUTING,
         Thread.currentThread()::interrupt,
         pollDeadline);
 

@@ -23,7 +23,7 @@ import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
+import build.bazel.remote.execution.v2.ExecutionStage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Poller;
 import build.buildfarm.v1test.ExecuteEntry;
@@ -108,7 +108,7 @@ public class InputFetchStageTest {
           Poller poller,
           String name,
           QueueEntry queueEntry,
-          Stage stage,
+          ExecutionStage.Value stage,
           Runnable onFailure,
           Deadline deadline) {
       }

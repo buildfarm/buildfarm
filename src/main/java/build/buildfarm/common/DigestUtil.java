@@ -52,17 +52,17 @@ public class DigestUtil {
       empty = this.hash.newHasher().hash();
     }
 
-    public DigestFunction getDigestFunction() {
+    public DigestFunction.Value getDigestFunction() {
       if (this == SHA256) {
-        return DigestFunction.SHA256;
+        return DigestFunction.Value.SHA256;
       }
       if (this == SHA1) {
-        return DigestFunction.SHA1;
+        return DigestFunction.Value.SHA1;
       }
       if (this == MD5) {
-        return DigestFunction.MD5;
+        return DigestFunction.Value.MD5;
       }
-      return DigestFunction.UNKNOWN;
+      return DigestFunction.Value.UNKNOWN;
     }
 
     public static HashFunction forHash(String hexDigest) {
@@ -78,7 +78,7 @@ public class DigestUtil {
       throw new IllegalArgumentException("hash type unrecognized: " + hexDigest);
     }
 
-    public static HashFunction get(DigestFunction digestFunction) {
+    public static HashFunction get(DigestFunction.Value digestFunction) {
       switch(digestFunction) {
       default:
       case UNRECOGNIZED:
@@ -137,8 +137,8 @@ public class DigestUtil {
   private final Digest empty;
 
   public static DigestUtil forHash(String hashName) {
-    DigestFunction digestFunction = DigestFunction.valueOf(
-        DigestFunction.getDescriptor().findValueByName(hashName));
+    DigestFunction.Value digestFunction = DigestFunction.Value.valueOf(
+        DigestFunction.Value.getDescriptor().findValueByName(hashName));
     HashFunction hashFunction = HashFunction.get(digestFunction);
     return new DigestUtil(hashFunction);
   }
@@ -148,7 +148,7 @@ public class DigestUtil {
     empty = buildDigest(hashFn.empty().toString(), 0);
   }
 
-  public DigestFunction getDigestFunction() {
+  public DigestFunction.Value getDigestFunction() {
     return hashFn.getDigestFunction();
   }
 

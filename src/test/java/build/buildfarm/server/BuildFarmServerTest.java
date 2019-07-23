@@ -14,9 +14,11 @@
 
 package build.buildfarm.server;
 
+import static build.bazel.remote.execution.v2.ExecutionStage.Value.COMPLETED;
+import static build.bazel.remote.execution.v2.ExecutionStage.Value.EXECUTING;
+import static build.buildfarm.instance.AbstractServerInstance.VIOLATION_TYPE_INVALID;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.fail;
-import static build.buildfarm.instance.AbstractServerInstance.VIOLATION_TYPE_INVALID;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionCacheGrpc;
@@ -32,7 +34,6 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import build.bazel.remote.execution.v2.ExecuteRequest;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecutionGrpc;
@@ -126,7 +127,7 @@ public class BuildFarmServerTest {
         BuildFarmServerConfig.newBuilder().setPort(0);
     configBuilder.addInstancesBuilder()
         .setName(INSTANCE_NAME)
-        .setDigestFunction(DigestFunction.SHA256)
+        .setDigestFunction(DigestFunction.Value.SHA256)
         .setMemoryInstanceConfig(memoryInstanceConfig);
 
     server = new BuildFarmServer(
@@ -305,7 +306,7 @@ public class BuildFarmServerTest {
       givenOperation.getMetadata().unpack(ExecuteOperationMetadata.class);
 
     executingMetadata = executingMetadata.toBuilder()
-        .setStage(Stage.EXECUTING)
+        .setStage(EXECUTING)
         .build();
 
     Operation executingOperation = givenOperation.toBuilder()
@@ -318,7 +319,7 @@ public class BuildFarmServerTest {
     assertThat(operationQueueStub
         .poll(PollOperationRequest.newBuilder()
             .setOperationName(executingOperation.getName())
-            .setStage(Stage.EXECUTING)
+            .setStage(EXECUTING)
             .build())
         .getCode()).isEqualTo(Code.OK.getNumber());
 
@@ -332,7 +333,7 @@ public class BuildFarmServerTest {
     // poll should fail
     assertThat(operationQueueStub
         .poll(PollOperationRequest.newBuilder()
-            .setStage(Stage.EXECUTING)
+            .setStage(EXECUTING)
             .setOperationName(executingOperation.getName())
             .build())
         .getCode()).isEqualTo(Code.UNAVAILABLE.getNumber());
@@ -361,7 +362,7 @@ public class BuildFarmServerTest {
         failedOperation
             .getMetadata()
             .unpack(ExecuteOperationMetadata.class).getStage())
-        .isEqualTo(Stage.COMPLETED);
+        .isEqualTo(COMPLETED);
     ExecuteResponse executeResponse = failedOperation.getResponse().unpack(ExecuteResponse.class);
     com.google.rpc.Status status = executeResponse.getStatus();
     assertThat(status.getCode())

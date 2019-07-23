@@ -37,7 +37,7 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
+import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.Platform;
 import build.buildfarm.common.DigestUtil;
@@ -424,7 +424,7 @@ public class Worker {
       }
 
       @Override
-      public Poller createPoller(String name, QueueEntry queueEntry, Stage stage) {
+      public Poller createPoller(String name, QueueEntry queueEntry, ExecutionStage.Value stage) {
         Poller poller = new Poller(config.getOperationPollPeriod());
         resumePoller(poller, name, queueEntry, stage, () -> {}, Deadline.after(10, DAYS));
         return poller;
@@ -435,7 +435,7 @@ public class Worker {
           Poller poller,
           String name,
           QueueEntry queueEntry,
-          Stage stage,
+          ExecutionStage.Value stage,
           Runnable onFailure,
           Deadline deadline) {
         poller.resume(
@@ -500,7 +500,7 @@ public class Worker {
                           .setActionDigest(executeEntry.getActionDigest())
                           .setStdoutStreamName(executeEntry.getStdoutStreamName())
                           .setStderrStreamName(executeEntry.getStderrStreamName())
-                          .setStage(Stage.QUEUED))
+                          .setStage(ExecutionStage.Value.QUEUED))
                       .setQueuedOperationDigest(queueEntry.getQueuedOperationDigest())
                       .build()))
                   .build());
@@ -521,7 +521,7 @@ public class Worker {
               operation.getMetadata().unpack(ExecuteOperationMetadata.class);
 
           ExecuteOperationMetadata executingMetadata = metadata.toBuilder()
-              .setStage(ExecuteOperationMetadata.Stage.QUEUED)
+              .setStage(ExecutionStage.Value.QUEUED)
               .build();
 
           operation = operation.toBuilder()

@@ -14,11 +14,11 @@
 
 package build.buildfarm.instance.memory;
 
-import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.CACHE_CHECK;
-import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.COMPLETED;
-import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.EXECUTING;
-import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.QUEUED;
-import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.UNKNOWN;
+import static build.bazel.remote.execution.v2.ExecutionStage.Value.CACHE_CHECK;
+import static build.bazel.remote.execution.v2.ExecutionStage.Value.COMPLETED;
+import static build.bazel.remote.execution.v2.ExecutionStage.Value.EXECUTING;
+import static build.bazel.remote.execution.v2.ExecutionStage.Value.QUEUED;
+import static build.bazel.remote.execution.v2.ExecutionStage.Value.UNKNOWN;
 import static build.buildfarm.instance.AbstractServerInstance.INVALID_DIGEST;
 import static build.buildfarm.instance.AbstractServerInstance.MISSING_ACTION;
 import static build.buildfarm.instance.AbstractServerInstance.VIOLATION_TYPE_INVALID;
@@ -48,9 +48,9 @@ import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
+import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.buildfarm.cas.ContentAddressableStorage;
@@ -393,7 +393,7 @@ public class MemoryInstanceTest {
         .build();
   }
 
-  private Operation createOperation(String name, Stage stage) {
+  private Operation createOperation(String name, ExecutionStage.Value stage) {
     return createOperation(
         name,
         ExecuteOperationMetadata.newBuilder()
@@ -402,7 +402,7 @@ public class MemoryInstanceTest {
             .build());
   }
 
-  private boolean putNovelOperation(Stage stage) throws InterruptedException {
+  private boolean putNovelOperation(ExecutionStage.Value stage) throws InterruptedException {
     storage.put(simpleActionDigest, simpleAction.toByteString());
     storage.put(simpleCommandDigest, simpleCommand.toByteString());
     return instance.putOperation(createOperation("does-not-exist", stage));
@@ -508,7 +508,7 @@ public class MemoryInstanceTest {
         .setName("test-operation")
         .setMetadata(Any.pack(
             ExecuteOperationMetadata.newBuilder()
-                .setStage(Stage.EXECUTING)
+                .setStage(EXECUTING)
                 .build()))
         .build();
 
@@ -516,6 +516,6 @@ public class MemoryInstanceTest {
 
     assertThat(instance.pollOperation(
         operation.getName(),
-        Stage.EXECUTING)).isFalse();
+        EXECUTING)).isFalse();
   }
 }

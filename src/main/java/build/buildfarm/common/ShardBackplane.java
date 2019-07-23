@@ -16,7 +16,7 @@ package build.buildfarm.common;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
+import build.bazel.remote.execution.v2.ExecutionStage;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.ThreadSafety.ThreadSafe;
 import build.buildfarm.common.Watcher;
@@ -216,7 +216,7 @@ public interface ShardBackplane {
    * Stores an operation in the hash map.
    */
   @ThreadSafe
-  boolean putOperation(Operation operation, Stage stage) throws IOException;
+  boolean putOperation(Operation operation, ExecutionStage.Value stage) throws IOException;
 
   @ThreadSafe
   ExecuteEntry deprequeueOperation() throws IOException, InterruptedException;
@@ -248,7 +248,7 @@ public interface ShardBackplane {
    * operation is still valid.
    */
   @ThreadSafe
-  boolean pollOperation(QueueEntry queueEntry, Stage stage, long requeueAt) throws IOException;
+  boolean pollOperation(QueueEntry queueEntry, ExecutionStage.Value stage, long requeueAt) throws IOException;
 
   /**
    * Complete an operation

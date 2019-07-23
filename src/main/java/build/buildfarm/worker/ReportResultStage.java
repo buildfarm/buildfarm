@@ -14,6 +14,8 @@
 
 package build.buildfarm.worker;
 
+import static build.bazel.remote.execution.v2.ExecutionStage.Value.COMPLETED;
+import static build.bazel.remote.execution.v2.ExecutionStage.Value.EXECUTING;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.SEVERE;
 
@@ -86,7 +88,7 @@ public class ReportResultStage extends PipelineStage {
         operationContext.poller,
         "ReportResultStage",
         operationContext.queueEntry,
-        ExecuteOperationMetadata.Stage.EXECUTING,
+        EXECUTING,
         this::cancelTick,
         Deadline.after(60, SECONDS));
     try {
@@ -160,7 +162,7 @@ public class ReportResultStage extends PipelineStage {
         .setExecutedIn(operationContext.executedIn)
         .setReportedIn(reportedIn)
         .setExecuteOperationMetadata(metadata.toBuilder()
-            .setStage(ExecuteOperationMetadata.Stage.COMPLETED)
+            .setStage(COMPLETED)
             .build())
         .setRequestMetadata(operationContext.queueEntry.getExecuteEntry().getRequestMetadata())
         .build();

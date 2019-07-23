@@ -21,7 +21,7 @@ import static java.util.logging.Level.SEVERE;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
+import build.bazel.remote.execution.v2.ExecutionStage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.ShardBackplane;
@@ -977,12 +977,12 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   @Override
-  public boolean putOperation(Operation operation, Stage stage) throws IOException {
+  public boolean putOperation(Operation operation, ExecutionStage.Value stage) throws IOException {
     // FIXME queue and prequeue should no longer be passed to here
-    boolean prequeue = stage == Stage.UNKNOWN && !operation.getDone();
-    boolean queue = stage == Stage.QUEUED;
+    boolean prequeue = stage == ExecutionStage.Value.UNKNOWN && !operation.getDone();
+    boolean queue = stage == ExecutionStage.Value.QUEUED;
     boolean complete = !queue && operation.getDone();
-    boolean publish = !queue && stage != Stage.UNKNOWN;
+    boolean publish = !queue && stage != ExecutionStage.Value.UNKNOWN;
 
     if (complete) {
       // for filtering anything that shouldn't be stored
@@ -1208,7 +1208,7 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   @Override
-  public boolean pollOperation(QueueEntry queueEntry, Stage stage, long requeueAt) throws IOException {
+  public boolean pollOperation(QueueEntry queueEntry, ExecutionStage.Value stage, long requeueAt) throws IOException {
     String operationName = queueEntry.getExecuteEntry().getOperationName();
     DispatchedOperation o = DispatchedOperation.newBuilder()
         .setQueueEntry(queueEntry)
