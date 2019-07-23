@@ -27,6 +27,7 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteResponse;
+import build.bazel.remote.execution.v2.ExecutedActionMetadata;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.OutputDirectory;
 import build.bazel.remote.execution.v2.OutputFile;
@@ -50,8 +51,8 @@ import com.google.common.io.ByteStreams;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
-import com.google.protobuf.util.Durations;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.util.Timestamps;
 import com.google.rpc.Code;
 import com.google.rpc.RetryInfo;
 import com.google.rpc.PreconditionFailure;
@@ -148,6 +149,20 @@ class Cat {
     }
     if (result.hasStderrDigest()) {
       indentOut(indentLevel, "Stderr Digest: " + DigestUtil.toString(result.getStderrDigest()));
+    }
+    if (result.hasExecutionMetadata()) {
+      indentOut(indentLevel, "ExecutionMetadata:");
+      ExecutedActionMetadata executedActionMetadata = result.getExecutionMetadata();
+      indentOut(indentLevel + 1, "Worker: "                  + executedActionMetadata.getWorker());
+      indentOut(indentLevel + 1, "Queued At: "               + Timestamps.toString(executedActionMetadata.getQueuedTimestamp()));
+      indentOut(indentLevel + 1, "Worker Start: "            + Timestamps.toString(executedActionMetadata.getWorkerStartTimestamp()));
+      indentOut(indentLevel + 1, "Input Fetch Start: "       + Timestamps.toString(executedActionMetadata.getInputFetchStartTimestamp()));
+      indentOut(indentLevel + 1, "Input Fetch Completed: "   + Timestamps.toString(executedActionMetadata.getInputFetchCompletedTimestamp()));
+      indentOut(indentLevel + 1, "Execution Start: "         + Timestamps.toString(executedActionMetadata.getExecutionStartTimestamp()));
+      indentOut(indentLevel + 1, "Execution Completed: "     + Timestamps.toString(executedActionMetadata.getExecutionCompletedTimestamp()));
+      indentOut(indentLevel + 1, "Output Upload Start: "     + Timestamps.toString(executedActionMetadata.getOutputUploadStartTimestamp()));
+      indentOut(indentLevel + 1, "Output Upload Completed: " + Timestamps.toString(executedActionMetadata.getOutputUploadCompletedTimestamp()));
+      indentOut(indentLevel + 1, "Worker Completed: "        + Timestamps.toString(executedActionMetadata.getWorkerCompletedTimestamp()));
     }
   }
 
@@ -396,12 +411,6 @@ class Cat {
         requestMetadata = executingMetadata.getRequestMetadata();
       } else if (operation.getMetadata().is(CompletedOperationMetadata.class)) {
         CompletedOperationMetadata completedMetadata = operation.getMetadata().unpack(CompletedOperationMetadata.class);
-        System.out.println("  Completed At: " + new Date(completedMetadata.getCompletedAt()));
-        System.out.println("  Executed On: " + completedMetadata.getExecutedOn());
-        System.out.println(String.format("  Matched In: %gms", Durations.toNanos(completedMetadata.getMatchedIn()) / 1000000.0));
-        System.out.println(String.format("  Fetched In: %gms", Durations.toNanos(completedMetadata.getFetchedIn()) / 1000000.0));
-        System.out.println(String.format("  Executed In: %gms", Durations.toNanos(completedMetadata.getExecutedIn()) / 1000000.0));
-        System.out.println(String.format("  Reported In: %gms", Durations.toNanos(completedMetadata.getReportedIn()) / 1000000.0));
         metadata = completedMetadata.getExecuteOperationMetadata();
         requestMetadata = completedMetadata.getRequestMetadata();
       } else {

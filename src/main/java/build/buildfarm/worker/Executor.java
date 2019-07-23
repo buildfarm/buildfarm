@@ -40,7 +40,7 @@ import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.protobuf.util.Durations;
+import com.google.protobuf.util.Timestamps;
 import com.google.rpc.Code;
 import io.grpc.Deadline;
 import java.nio.file.Path;
@@ -225,9 +225,11 @@ class Executor implements Runnable {
       }
     }
 
-    long executeStartAt = System.nanoTime();
+    ActionResult.Builder resultBuilder = operationContext.executeResponse
+        .getResultBuilder();
+    resultBuilder.getExecutionMetadataBuilder()
+        .setExecutionStartTimestamp(Timestamps.fromMillis(System.currentTimeMillis()));
 
-    ActionResult.Builder resultBuilder = ActionResult.newBuilder();
     Code statusCode;
     try {
       statusCode = executeCommand(
@@ -246,7 +248,9 @@ class Executor implements Runnable {
       return 0;
     }
 
-    Duration executedIn = Durations.fromNanos(System.nanoTime() - executeStartAt);
+    resultBuilder.getExecutionMetadataBuilder()
+        .setExecutionCompletedTimestamp(Timestamps.fromMillis(System.currentTimeMillis()));
+    long executeUSecs = stopwatch.elapsed(MICROSECONDS);
 
     logger.info(
         String.format(
@@ -254,19 +258,11 @@ class Executor implements Runnable {
             operation.getName(),
             resultBuilder.getExitCode()));
 
-    long executeUSecs = stopwatch.elapsed(MICROSECONDS);
-    operation = operation.toBuilder()
-        .setResponse(Any.pack(ExecuteResponse.newBuilder()
-            .setResult(resultBuilder.build())
-            .setStatus(com.google.rpc.Status.newBuilder()
-                .setCode(statusCode.getNumber())
-                .build())
-            .build()))
-        .build();
+    operationContext.executeResponse.getStatusBuilder()
+        .setCode(statusCode.getNumber());
     OperationContext reportOperationContext = operationContext.toBuilder()
-          .setOperation(operation)
-          .setExecutedIn(executedIn)
-          .build();
+				.setOperation(operation)
+				.build();
     boolean claimed = owner.output().claim();
     operationContext.poller.pause();
     if (claimed) {

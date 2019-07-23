@@ -16,35 +16,18 @@ package build.buildfarm.worker;
 
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.QUEUED;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
-import static java.util.logging.Level.SEVERE;
 
-import build.bazel.remote.execution.v2.Action;
-import build.bazel.remote.execution.v2.Command;
-import build.bazel.remote.execution.v2.Digest;
-import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
-import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Poller;
 import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.base.Stopwatch;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
-import com.google.protobuf.ByteString;
-import com.google.protobuf.Duration;
-import com.google.protobuf.util.Durations;
-import com.google.protobuf.InvalidProtocolBufferException;
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
+import com.google.protobuf.Timestamp;
+import com.google.protobuf.util.Timestamps;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
 
@@ -148,6 +131,9 @@ public class MatchStage extends PipelineStage {
       Poller poller,
       Stopwatch stopwatch,
       long matchStartAtUSecs) {
+    OperationContext.Builder builder = OperationContext.newBuilder();
+    Timestamp workerStartTimestamp = Timestamps.fromMillis(System.currentTimeMillis());
+
     ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
     // this may be superfluous - we can probably just set the name and action digest
     Operation operation = Operation.newBuilder()
@@ -160,15 +146,17 @@ public class MatchStage extends PipelineStage {
             .build()))
         .build();
 
-    OperationContext.Builder builder = OperationContext.newBuilder()
+    OperationContext operationContext = OperationContext.newBuilder()
         .setOperation(operation)
         .setPoller(poller)
-        .setQueueEntry(queueEntry);
-
-    Duration matchedIn = Durations.fromMicros(stopwatch.elapsed(MICROSECONDS) - matchStartAtUSecs);
-    return builder
-        .setMatchedIn(matchedIn)
+        .setQueueEntry(queueEntry)
         .build();
+
+    operationContext.executeResponse.getResultBuilder().getExecutionMetadataBuilder()
+        .setWorker(workerContext.getName())
+        .setQueuedTimestamp(executeEntry.getQueuedTimestamp())
+        .setWorkerStartTimestamp(workerStartTimestamp);
+    return operationContext;
   }
 
   @Override

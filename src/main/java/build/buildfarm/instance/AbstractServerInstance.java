@@ -1415,12 +1415,10 @@ public abstract class AbstractServerInstance implements Instance {
     if (metadata == null) {
       metadata = ExecuteOperationMetadata.getDefaultInstance();
     }
-    long completedAt = System.currentTimeMillis();
     CompletedOperationMetadata completedMetadata = CompletedOperationMetadata.newBuilder()
         .setExecuteOperationMetadata(metadata.toBuilder()
             .setStage(ExecutionStage.Value.COMPLETED)
             .build())
-        .setCompletedAt(completedAt)
         .setRequestMetadata(requestMetadata)
         .build();
     putOperation(operation.toBuilder()

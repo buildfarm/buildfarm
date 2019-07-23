@@ -20,36 +20,20 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.ActionResult;
-import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.buildfarm.common.DigestUtil;
-import build.buildfarm.common.Poller;
-import build.buildfarm.instance.stub.Chunker;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Maps;
-import com.google.common.hash.HashCode;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
-import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.protobuf.util.Durations;
+import com.google.protobuf.Timestamp;
+import com.google.protobuf.util.Timestamps;
 import com.google.rpc.Status;
-import com.google.rpc.Code;
 import io.grpc.Deadline;
-import io.grpc.StatusRuntimeException;
 import java.io.IOException;
 import java.nio.channels.ClosedByInterruptException;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.logging.Logger;
@@ -99,22 +83,13 @@ public class ReportResultStage extends PipelineStage {
   }
 
   private OperationContext reportPolled(OperationContext operationContext) throws InterruptedException {
-    final Operation operation = operationContext.operation;
-    final String operationName = operation.getName();
-    ExecuteResponse executeResponse;
-    try {
-      executeResponse = operation
-          .getResponse().unpack(ExecuteResponse.class);
-    } catch (InvalidProtocolBufferException e) {
-      logger.log(SEVERE, "invalid ExecuteResponse for " + operationName, e);
-      return null;
-    }
+    String operationName = operationContext.operation.getName();
 
-    ActionResult.Builder resultBuilder = executeResponse.getResult().toBuilder();
+    ActionResult.Builder resultBuilder = operationContext.executeResponse.getResultBuilder();
+    resultBuilder.getExecutionMetadataBuilder()
+        .setOutputUploadStartTimestamp(Timestamps.fromMillis(System.currentTimeMillis()));
 
-    long reportStartAt = System.nanoTime();
-
-    Status.Builder status = executeResponse.getStatus().toBuilder();
+    Status.Builder status = operationContext.executeResponse.getStatus().toBuilder();
     try {
       workerContext.uploadOutputs(
           resultBuilder,
@@ -131,8 +106,7 @@ public class ReportResultStage extends PipelineStage {
 
     ExecuteOperationMetadata metadata;
     try {
-      metadata = operation
-          .getMetadata()
+      metadata = operationContext.operation.getMetadata()
           .unpack(ExecutingOperationMetadata.class)
           .getExecuteOperationMetadata();
     } catch (InvalidProtocolBufferException e) {
@@ -140,46 +114,39 @@ public class ReportResultStage extends PipelineStage {
       return null;
     }
 
-    ActionResult result = resultBuilder.build();
-    if (!operationContext.action.getDoNotCache() && resultBuilder.getExitCode() == 0) {
+    Timestamp now = Timestamps.fromMillis(System.currentTimeMillis());
+    resultBuilder.getExecutionMetadataBuilder()
+        .setWorkerCompletedTimestamp(now)
+        .setOutputUploadCompletedTimestamp(now);
+
+    ExecuteResponse executeResponse = operationContext.executeResponse.build();
+
+    if (!operationContext.action.getDoNotCache() && executeResponse.getResult().getExitCode() == 0) {
       try {
-        workerContext.putActionResult(DigestUtil.asActionKey(metadata.getActionDigest()), result);
+        workerContext.putActionResult(DigestUtil.asActionKey(metadata.getActionDigest()), executeResponse.getResult());
       } catch (IOException e) {
         logger.log(SEVERE, "error reporting action result for " + operationName, e);
         return null;
       }
     }
 
-    Duration reportedIn = Durations.fromNanos(System.nanoTime() - reportStartAt);
-
-    long completedAt = System.currentTimeMillis();
-
     CompletedOperationMetadata completedMetadata = CompletedOperationMetadata.newBuilder()
-        .setCompletedAt(completedAt)
-        .setExecutedOn(workerContext.getName())
-        .setMatchedIn(operationContext.matchedIn)
-        .setFetchedIn(operationContext.fetchedIn)
-        .setExecutedIn(operationContext.executedIn)
-        .setReportedIn(reportedIn)
         .setExecuteOperationMetadata(metadata.toBuilder()
             .setStage(COMPLETED)
             .build())
         .setRequestMetadata(operationContext.queueEntry.getExecuteEntry().getRequestMetadata())
         .build();
 
-    Operation doneOperation = operation.toBuilder()
+    Operation operation = operationContext.operation.toBuilder()
         .setDone(true)
         .setMetadata(Any.pack(completedMetadata))
-        .setResponse(Any.pack(executeResponse.toBuilder()
-            .setResult(result)
-            .setStatus(status)
-            .build()))
+        .setResponse(Any.pack(executeResponse))
         .build();
 
     operationContext.poller.pause();
 
     try {
-      if (!workerContext.putOperation(doneOperation, operationContext.action)) {
+      if (!workerContext.putOperation(operation, operationContext.action)) {
         return null;
       }
     } catch (IOException e) {
@@ -188,7 +155,7 @@ public class ReportResultStage extends PipelineStage {
     }
 
     return operationContext.toBuilder()
-        .setOperation(doneOperation)
+        .setOperation(operation)
         .build();
   }
 

@@ -99,6 +99,7 @@ import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.Durations;
+import com.google.protobuf.util.Timestamps;
 import com.google.rpc.PreconditionFailure;
 import io.grpc.Channel;
 import io.grpc.Context;
@@ -1289,6 +1290,7 @@ public class ShardInstance extends AbstractServerInstance {
           .setRequestMetadata(requestMetadata)
           .setStdoutStreamName(stdoutStreamName)
           .setStderrStreamName(stderrStreamName)
+          .setQueuedTimestamp(Timestamps.fromMillis(System.currentTimeMillis()))
           .build();
       ExecuteOperationMetadata metadata = ExecuteOperationMetadata.newBuilder()
           .setActionDigest(actionDigest)

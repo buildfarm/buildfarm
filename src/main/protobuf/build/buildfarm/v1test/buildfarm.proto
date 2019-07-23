@@ -364,6 +364,8 @@ message ExecuteEntry {
   string stdout_stream_name = 7;
 
   string stderr_stream_name = 8;
+
+  google.protobuf.Timestamp queued_timestamp = 9;
 }
 
 message QueueEntry {
@@ -403,17 +405,7 @@ message CompletedOperationMetadata {
 
   build.bazel.remote.execution.v2.RequestMetadata request_metadata = 2;
 
-  int64 completed_at = 3;
-
-  string executed_on = 4;
-
-  google.protobuf.Duration matched_in = 5;
-
-  google.protobuf.Duration fetched_in = 6;
-
-  google.protobuf.Duration executed_in = 7;
-
-  google.protobuf.Duration reported_in = 8;
+  reserved 3 to 8; // fields now in ExecutedActionMetadata
 }
 
 message InstanceConfig {

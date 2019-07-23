@@ -23,11 +23,12 @@ import static java.util.logging.Level.WARNING;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.ExecutedActionMetadata;
 import build.buildfarm.common.Poller;
 import build.buildfarm.v1test.QueuedOperation;
 import com.google.common.base.Stopwatch;
 import com.google.protobuf.Duration;
-import com.google.protobuf.util.Durations;
+import com.google.protobuf.util.Timestamps;
 import io.grpc.Deadline;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -85,7 +86,10 @@ public class InputFetcher implements Runnable {
         .getExecuteEntry().getOperationName();
     logger.info(format("fetching inputs: %s", operationName));
 
-    long fetchStartAt = stopwatch.elapsed(MICROSECONDS);
+    ExecutedActionMetadata.Builder executedAction = operationContext.executeResponse
+        .getResultBuilder()
+        .getExecutionMetadataBuilder()
+        .setInputFetchStartTimestamp(Timestamps.fromMillis(System.currentTimeMillis()));
 
     QueuedOperation queuedOperation;
     Path execDir;
@@ -110,12 +114,14 @@ public class InputFetcher implements Runnable {
     }
     success = true;
 
+    executedAction
+        .setInputFetchCompletedTimestamp(Timestamps.fromMillis(System.currentTimeMillis()));
+
     // we are now responsible for destroying the exec dir if anything goes wrong
     boolean completed = false;
     try {
       long fetchUSecs = stopwatch.elapsed(MICROSECONDS);
-      Duration fetchedIn = Durations.fromMicros(fetchUSecs - fetchStartAt);
-      proceedToOutput(queuedOperation, execDir, fetchedIn);
+      proceedToOutput(queuedOperation, execDir);
       completed = true;
       return stopwatch.elapsed(MICROSECONDS) - fetchUSecs;
     } finally {
@@ -129,10 +135,9 @@ public class InputFetcher implements Runnable {
     }
   }
 
-  private void proceedToOutput(QueuedOperation queuedOperation, Path execDir, Duration fetchedIn) throws InterruptedException {
+  private void proceedToOutput(QueuedOperation queuedOperation, Path execDir) throws InterruptedException {
     OperationContext executeOperationContext = operationContext.toBuilder()
         .setExecDir(execDir)
-        .setFetchedIn(fetchedIn)
         .setAction(queuedOperation.getAction())
         .setCommand(queuedOperation.getCommand())
         .build();

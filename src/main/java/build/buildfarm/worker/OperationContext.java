@@ -18,76 +18,67 @@ import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.buildfarm.common.Poller;
 import build.buildfarm.v1test.QueueEntry;
 import com.google.longrunning.Operation;
-import com.google.protobuf.Duration;
 import java.nio.file.Path;
 
-// FIXME MAKE THIS A PROTOBUF MESSAGE FOR EXECUTECONTEXT
-// hm, can we encode maps???
 final class OperationContext {
+  final ExecuteResponse.Builder executeResponse;
   final Operation operation;
   final Poller poller;
   final Path execDir;
   final Action action;
   final Command command;
-  final Duration matchedIn;
-  final Duration fetchedIn;
-  final Duration executedIn;
   final QueueEntry queueEntry;
 
   private OperationContext(
+      ExecuteResponse.Builder executeResponse,
       Operation operation,
       Poller poller,
       Path execDir,
       Action action,
       Command command,
-      Duration matchedIn,
-      Duration fetchedIn,
-      Duration executedIn,
       QueueEntry queueEntry) {
+    this.executeResponse = executeResponse;
     this.operation = operation;
     this.poller = poller;
     this.execDir = execDir;
     this.action = action;
     this.command = command;
-    this.matchedIn = matchedIn;
-    this.fetchedIn = fetchedIn;
-    this.executedIn = executedIn;
     this.queueEntry = queueEntry;
   }
 
   public static class Builder {
+    private ExecuteResponse.Builder executeResponse;
     private Operation operation;
     private Poller poller;
     private Path execDir;
     private Action action;
     private Command command;
-    private Duration matchedIn;
-    private Duration fetchedIn;
-    private Duration executedIn;
     private QueueEntry queueEntry;
 
     private Builder(
+        ExecuteResponse.Builder executeResponse,
         Operation operation,
         Poller poller,
         Path execDir,
         Action action,
         Command command,
-        Duration matchedIn,
-        Duration fetchedIn,
-        Duration executedIn,
         QueueEntry queueEntry) {
+      this.executeResponse = executeResponse;
       this.operation = operation;
       this.poller = poller;
       this.execDir = execDir;
       this.action = action;
       this.command = command;
-      this.matchedIn = matchedIn;
-      this.fetchedIn = fetchedIn;
-      this.executedIn = executedIn;
       this.queueEntry = queueEntry;
+    }
+
+    public Builder setExecuteResponseBuilder(ExecuteResponse.Builder executeResponse) {
+      this.executeResponse = executeResponse;
+      return this;
     }
 
     public Builder setOperation(Operation operation) {
@@ -115,21 +106,6 @@ final class OperationContext {
       return this;
     }
 
-    public Builder setMatchedIn(Duration matchedIn) {
-      this.matchedIn = matchedIn;
-      return this;
-    }
-
-    public Builder setFetchedIn(Duration fetchedIn) {
-      this.fetchedIn = fetchedIn;
-      return this;
-    }
-
-    public Builder setExecutedIn(Duration executedIn) {
-      this.executedIn = executedIn;
-      return this;
-    }
-
     public Builder setQueueEntry(QueueEntry queueEntry) {
       this.queueEntry = queueEntry;
       return this;
@@ -137,41 +113,35 @@ final class OperationContext {
 
     public OperationContext build() {
       return new OperationContext(
+          executeResponse,
           operation,
           poller,
           execDir,
           action,
           command,
-          matchedIn,
-          fetchedIn,
-          executedIn,
           queueEntry);
     }
   }
 
   public static Builder newBuilder() {
     return new Builder(
+        /* executeResponse=*/ ExecuteResponse.newBuilder(),
         /* operation=*/ null,
         /* poller=*/ null,
         /* execDir=*/ null,
         /* action=*/ null,
         /* command=*/ null,
-        /* matchedIn=*/ null,
-        /* fetchedIn=*/ null,
-        /* executedIn=*/ null,
         /* queueEntry=*/ null);
   }
 
   public Builder toBuilder() {
     return new Builder(
+        executeResponse,
         operation,
         poller,
         execDir,
         action,
         command,
-        matchedIn,
-        fetchedIn,
-        executedIn,
         queueEntry);
   }
 }

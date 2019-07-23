@@ -31,6 +31,7 @@ import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
 public class WorkerStubs {
@@ -71,8 +72,8 @@ public class WorkerStubs {
   private static Retrier newStubRetrier() {
     return new Retrier(
       Backoff.exponential(
-          java.time.Duration.ofMillis(/*options.experimentalRemoteRetryStartDelayMillis=*/ 100),
-          java.time.Duration.ofMillis(/*options.experimentalRemoteRetryMaxDelayMillis=*/ 5000),
+          Duration.ofMillis(/*options.experimentalRemoteRetryStartDelayMillis=*/ 100),
+          Duration.ofMillis(/*options.experimentalRemoteRetryMaxDelayMillis=*/ 5000),
           /*options.experimentalRemoteRetryMultiplier=*/ 2,
           /*options.experimentalRemoteRetryJitter=*/ 0.1,
           /*options.experimentalRemoteRetryMaxAttempts=*/ 5),
