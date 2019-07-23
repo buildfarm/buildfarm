@@ -181,33 +181,16 @@ class Cat {
     }
   }
 
-  private static List<Directory> fetchTree(Instance instance, Digest rootDigest)
+  private static Tree fetchTree(Instance instance, Digest rootDigest)
       throws IOException, InterruptedException {
-    ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
+    Tree.Builder tree = Tree.newBuilder();
     String pageToken = "";
 
     do {
-      pageToken = instance.getTree(rootDigest, 1024, pageToken, directories);
+      pageToken = instance.getTree(rootDigest, 1024, pageToken, tree);
     } while (!pageToken.isEmpty());
 
-    return directories.build();
-  }
-
-  private static Map<Digest, Directory> createDirectoriesIndex(
-      Iterable<Directory> directories,
-      DigestUtil digestUtil) {
-    Set<Digest> directoryDigests = Sets.newHashSet();
-    ImmutableMap.Builder<Digest, Directory> directoriesIndex = ImmutableMap.builder();
-    for (Directory directory : directories) {
-      // double compute here...
-      Digest directoryDigest = digestUtil.compute(directory);
-      if (!directoryDigests.add(directoryDigest)) {
-        continue;
-      }
-      directoriesIndex.put(directoryDigest, directory);
-    }
-
-    return directoriesIndex.build();
+    return tree.build();
   }
 
   private static long computeDirectoryWeights(
@@ -257,8 +240,7 @@ class Cat {
   }
 
   private static void printTreeLayout(Instance instance, DigestUtil digestUtil, Digest rootDigest) throws IOException, InterruptedException {
-    Map<Digest, Directory> directoriesIndex = createDirectoriesIndex(
-        fetchTree(instance, rootDigest), digestUtil);
+    Map<Digest, Directory> directoriesIndex = digestUtil.createDirectoriesIndex(fetchTree(instance, rootDigest));
 
     Map<Digest, Long> directoryWeights = Maps.newHashMap();
     long totalWeight = computeDirectoryWeights(rootDigest, directoriesIndex, directoryWeights);
@@ -273,7 +255,10 @@ class Cat {
   }
 
   private static void printDirectoryTree(Instance instance, Digest rootDigest) throws IOException, InterruptedException {
-    for (Directory directory : fetchTree(instance, rootDigest)) {
+    Tree tree = fetchTree(instance, rootDigest);
+    System.out.println("Directory (Root): " + rootDigest);
+    printDirectory(1, tree.getRoot());
+    for (Directory directory : tree.getChildrenList()) {
       System.out.println("Directory: " + DigestUtil.toString(instance.getDigestUtil().compute(directory)));
       printDirectory(1, directory);
     }

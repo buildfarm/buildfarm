@@ -583,10 +583,10 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
-  public Path createExecDir(String operationName, Iterable<Directory> directories, Action action, Command command) throws IOException, InterruptedException {
+  public Path createExecDir(String operationName, Tree tree, Action action, Command command) throws IOException, InterruptedException {
     return execFileSystem.createExecDir(
         operationName,
-        createDirectoriesIndex(directories),
+        getDigestUtil().createDirectoriesIndex(tree),
         action,
         command);
   }

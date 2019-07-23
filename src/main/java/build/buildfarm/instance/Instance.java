@@ -25,6 +25,7 @@ import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ServerCapabilities;
+import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.Watcher;
@@ -74,11 +75,7 @@ public interface Instance {
       long deadlineAfter,
       TimeUnit deadlineAfterUnits) throws IOException;
   ListenableFuture<Iterable<Response>> getAllBlobsFuture(Iterable<Digest> digests);
-  String getTree(
-      Digest rootDigest,
-      int pageSize,
-      String pageToken,
-      ImmutableList.Builder<Directory> directories)
+  String getTree(Digest rootDigest, int pageSize, String pageToken, Tree.Builder tree)
       throws IOException, InterruptedException;
 
   Write getBlobWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata);

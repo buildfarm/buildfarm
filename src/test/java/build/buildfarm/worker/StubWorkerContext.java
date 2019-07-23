@@ -20,6 +20,7 @@ import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecutionStage;
+import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.Poller;
@@ -60,7 +61,7 @@ class StubWorkerContext implements WorkerContext {
   @Override public Duration getDefaultActionTimeout() { throw new UnsupportedOperationException(); }
   @Override public Duration getMaximumActionTimeout() { throw new UnsupportedOperationException(); }
   @Override public QueuedOperation getQueuedOperation(QueueEntry queueEntry) { throw new UnsupportedOperationException(); }
-  @Override public Path createExecDir(String operationName, Iterable<Directory> directories, Action action, Command command) { throw new UnsupportedOperationException(); }
+  @Override public Path createExecDir(String operationName, Tree tree, Action action, Command command) { throw new UnsupportedOperationException(); }
   @Override public void destroyExecDir(Path execDir) { throw new UnsupportedOperationException(); }
   @Override public void uploadOutputs(ActionResult.Builder resultBuilder, Path actionRoot, Iterable<String> outputFiles, Iterable<String> outputDirs) { throw new UnsupportedOperationException(); }
   @Override public boolean putOperation(Operation operation, Action action) { throw new UnsupportedOperationException(); }

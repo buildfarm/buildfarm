@@ -104,7 +104,7 @@ public class InputFetcher implements Runnable {
 
       execDir = workerContext.createExecDir(
           operationName,
-          queuedOperation.getDirectoriesList(),
+          queuedOperation.getTree(),
           queuedOperation.getAction(),
           queuedOperation.getCommand());
     } catch (IOException e) {

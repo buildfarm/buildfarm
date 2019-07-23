@@ -37,6 +37,7 @@ import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.ac.ActionCache;
 import build.buildfarm.ac.GrpcActionCache;
 import build.buildfarm.cas.ContentAddressableStorage;
@@ -506,13 +507,13 @@ public class MemoryInstance extends AbstractServerInstance {
     new Thread(requeuer).start();
   }
 
-  List<Directory> getCompleteTree(Digest rootDigest) {
-    ImmutableList.Builder<Directory> directories = ImmutableList.builder();
+  Tree getCompleteTree(Digest rootDigest) {
+    Tree.Builder tree = Tree.newBuilder();
     String pageToken = "";
     do {
-      pageToken = getTree(rootDigest, 1024, pageToken, directories);
+      pageToken = getTree(rootDigest, 1024, pageToken, tree);
     } while (!pageToken.isEmpty());
-    return directories.build();
+    return tree.build();
   }
 
   @Override
@@ -526,12 +527,12 @@ public class MemoryInstance extends AbstractServerInstance {
     Command command = getUnchecked(expect(action.getCommandDigest(), Command.parser(), newDirectExecutorService()));
     Preconditions.checkState(command != null, "command not found");
 
-    Iterable<Directory> directories = getCompleteTree(action.getInputRootDigest());
+    Tree tree = getCompleteTree(action.getInputRootDigest());
 
     QueuedOperation queuedOperation = QueuedOperation.newBuilder()
         .setAction(action)
         .setCommand(command)
-        .addAllDirectories(directories)
+        .setTree(tree)
         .build();
     ByteString queuedOperationBlob = queuedOperation.toByteString();
     Digest queuedOperationDigest = getDigestUtil().compute(queuedOperationBlob);

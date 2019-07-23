@@ -47,6 +47,7 @@ import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ServerCapabilities;
+import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.QueuedOperation;
@@ -374,9 +375,7 @@ public abstract class AbstractServerInstance implements Instance {
       String reason, Digest rootDigest, String pageToken);
 
   @Override
-  public String getTree(
-      Digest rootDigest, int pageSize, String pageToken,
-      ImmutableList.Builder<Directory> directories) {
+  public String getTree(Digest rootDigest, int pageSize, String pageToken, Tree.Builder tree) {
     if (pageSize == 0) {
       pageSize = getTreeDefaultPageSize();
     }
@@ -388,11 +387,16 @@ public abstract class AbstractServerInstance implements Instance {
         createTreeIterator("getTree", rootDigest, pageToken);
 
     while (iter.hasNext() && pageSize != 0) {
-      Directory directory = iter.next().getDirectory();
+      DirectoryEntry entry = iter.next();
+      Directory directory = entry.getDirectory();
       // If part of the tree is missing from the CAS, the server will return the
       // portion present and omit the rest.
       if (directory != null) {
-        directories.add(directory);
+        if (entry.getDigest().equals(rootDigest)) {
+          tree.setRoot(directory);
+        } else {
+          tree.addChildren(directory);
+        }
         if (pageSize > 0) {
           pageSize--;
         }
@@ -614,39 +618,28 @@ public abstract class AbstractServerInstance implements Instance {
     visited.add(directoryDigest);
   }
 
-  protected ListenableFuture<Iterable<Directory>> getTreeDirectories(
+  protected ListenableFuture<Tree> getTreeFuture(
       String reason,
       Digest inputRoot,
       ExecutorService service) {
     return listeningDecorator(service).submit(() -> {
-      ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
+      Tree.Builder tree = Tree.newBuilder();
 
       TokenizableIterator<DirectoryEntry> iterator = createTreeIterator(reason, inputRoot, /* pageToken=*/ "");
       while (iterator.hasNext()) {
         DirectoryEntry entry = iterator.next();
         Directory directory = entry.getDirectory();
         if (directory != null) {
-          directories.add(directory);
+          if (entry.getDigest().equals(inputRoot)) {
+            tree.setRoot(directory);
+          } else {
+            tree.addChildren(directory);
+          }
         }
       }
 
-      return directories.build();
+      return tree.build();
     });
-  }
-
-  protected Map<Digest, Directory> createDirectoriesIndex(Iterable<Directory> directories) {
-    Set<Digest> directoryDigests = Sets.newHashSet();
-    ImmutableMap.Builder<Digest, Directory> directoriesIndex = ImmutableMap.builder();
-    for (Directory directory : directories) {
-      // double compute here...
-      Digest directoryDigest = digestUtil.compute(directory);
-      if (!directoryDigests.add(directoryDigest)) {
-        continue;
-      }
-      directoriesIndex.put(directoryDigest, directory);
-    }
-
-    return directoriesIndex.build();
   }
 
   private void validateInputs(
@@ -711,7 +704,7 @@ public abstract class AbstractServerInstance implements Instance {
       validateAction(
           queuedOperation.getAction(),
           queuedOperation.hasCommand() ? queuedOperation.getCommand() : null,
-          queuedOperation.getDirectoriesList(),
+          queuedOperation.getTree(),
           inputDigestsBuilder,
           preconditionFailure);
       validateInputs(
@@ -764,7 +757,7 @@ public abstract class AbstractServerInstance implements Instance {
     validateAction(
         action,
         getUnchecked(expect(action.getCommandDigest(), Command.parser(), service)),
-        getUnchecked(getTreeDirectories(operationName, action.getInputRootDigest(), service)),
+        getUnchecked(getTreeFuture(operationName, action.getInputRootDigest(), service)),
         inputDigestsBuilder,
         preconditionFailure);
     validateInputs(
@@ -795,7 +788,7 @@ public abstract class AbstractServerInstance implements Instance {
     validateAction(
         action,
         queuedOperation.hasCommand() ? queuedOperation.getCommand() : null,
-        queuedOperation.getDirectoriesList(),
+        queuedOperation.getTree(),
         ImmutableSet.builder(),
         preconditionFailure);
     checkPreconditionFailure(actionDigest, preconditionFailure.build());
@@ -804,10 +797,10 @@ public abstract class AbstractServerInstance implements Instance {
   private void validateAction(
       Action action,
       @Nullable Command command,
-      Iterable<Directory> directories,
+      Tree tree,
       ImmutableSet.Builder<Digest> inputDigests,
       PreconditionFailure.Builder preconditionFailure) {
-    Map<Digest, Directory> directoriesIndex = createDirectoriesIndex(directories);
+    Map<Digest, Directory> directoriesIndex = digestUtil.createDirectoriesIndex(tree);
     ImmutableSet.Builder<String> inputDirectoriesBuilder = ImmutableSet.builder();
     ImmutableSet.Builder<String> inputFilesBuilder = ImmutableSet.builder();
 

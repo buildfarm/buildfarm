@@ -1050,8 +1050,8 @@ public class ShardInstance extends AbstractServerInstance {
                 },
                 service),
             transform(
-                getTreeDirectories(operationName, inputRootDigest, service),
-                queuedOperationBuilder::addAllDirectories,
+                getTreeFuture(operationName, inputRootDigest, service),
+                queuedOperationBuilder::setTree,
                 service)),
         (result) -> queuedOperationBuilder.setAction(action).build(),
         service);

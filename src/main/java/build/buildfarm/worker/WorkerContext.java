@@ -19,6 +19,7 @@ import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecutionStage;
+import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.Poller;
@@ -57,7 +58,7 @@ public interface WorkerContext {
   Duration getDefaultActionTimeout();
   Duration getMaximumActionTimeout();
   QueuedOperation getQueuedOperation(QueueEntry queueEntry) throws IOException, InterruptedException;
-  Path createExecDir(String operationName, Iterable<Directory> directories, Action action, Command command) throws IOException, InterruptedException;
+  Path createExecDir(String operationName, Tree tree, Action action, Command command) throws IOException, InterruptedException;
   void destroyExecDir(Path execDir) throws IOException, InterruptedException;
   void uploadOutputs(ActionResult.Builder resultBuilder, Path actionRoot, Iterable<String> outputFiles, Iterable<String> outputDirs) throws IOException, InterruptedException;
   boolean putOperation(Operation operation, Action Action) throws IOException, InterruptedException;

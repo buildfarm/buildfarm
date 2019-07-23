@@ -38,6 +38,7 @@ import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
 import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
 import build.bazel.remote.execution.v2.GetTreeRequest;
 import build.bazel.remote.execution.v2.GetTreeResponse;
+import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.instance.Instance;
@@ -231,12 +232,17 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
       StreamObserver<GetTreeResponse> responseObserver) {
     try {
       do {
-        ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
+        Tree.Builder builder = Tree.newBuilder();
         String nextPageToken = instance.getTree(
-            rootDigest, pageSize, pageToken, directories);
+            rootDigest, pageSize, pageToken, builder);
+        Tree tree = builder.build();
 
+        GetTreeResponse.Builder response = GetTreeResponse.newBuilder();
+        if (tree.hasRoot()) {
+          response.addDirectories(tree.getRoot());
+        }
         responseObserver.onNext(GetTreeResponse.newBuilder()
-            .addAllDirectories(directories.build())
+            .addAllDirectories(tree.getChildrenList())
             .setNextPageToken(nextPageToken)
             .build());
         pageToken = nextPageToken;

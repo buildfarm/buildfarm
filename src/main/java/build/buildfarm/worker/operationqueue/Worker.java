@@ -40,6 +40,7 @@ import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.Platform;
+import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
@@ -613,22 +614,6 @@ public class Worker {
             config.getStderrCasPolicy());
       }
 
-      private Map<Digest, Directory> createDirectoriesIndex(
-          Iterable<Directory> directories) {
-        Set<Digest> directoryDigests = Sets.newHashSet();
-        ImmutableMap.Builder<Digest, Directory> directoriesIndex = new ImmutableMap.Builder<>();
-        for (Directory directory : directories) {
-          // double compute here...
-          Digest directoryDigest = getDigestUtil().compute(directory);
-          if (!directoryDigests.add(directoryDigest)) {
-            continue;
-          }
-          directoriesIndex.put(directoryDigest, directory);
-        }
-
-        return directoriesIndex.build();
-      }
-
       @Override
       public QueuedOperation getQueuedOperation(QueueEntry queueEntry)
           throws IOException, InterruptedException {
@@ -652,10 +637,10 @@ public class Worker {
       @Override
       public Path createExecDir(
           String operationName,
-          Iterable<Directory> directories,
+          Tree tree,
           Action action,
           Command command) throws IOException, InterruptedException {
-        Map<Digest, Directory> directoriesIndex = createDirectoriesIndex(directories);
+        Map<Digest, Directory> directoriesIndex = casInstance.getDigestUtil().createDirectoriesIndex(tree);
         OutputDirectory outputDirectory = OutputDirectory.parse(
             command.getOutputFilesList(),
             command.getOutputDirectoriesList());

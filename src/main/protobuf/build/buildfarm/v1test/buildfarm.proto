@@ -387,7 +387,7 @@ message QueuedOperation {
 
   build.bazel.remote.execution.v2.Command command = 2;
 
-  repeated build.bazel.remote.execution.v2.Directory directories = 3;
+  build.bazel.remote.execution.v2.Tree tree = 4;
 }
 
 message ExecutingOperationMetadata {

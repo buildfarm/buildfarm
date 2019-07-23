@@ -54,6 +54,7 @@ import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ServerCapabilities;
+import build.bazel.remote.execution.v2.Tree;
 import build.bazel.remote.execution.v2.UpdateActionResultRequest;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.DigestUtil;
@@ -511,7 +512,7 @@ public class StubInstance implements Instance {
       Digest rootDigest,
       int pageSize,
       String pageToken,
-      ImmutableList.Builder<Directory> directories) {
+      Tree.Builder tree) {
     throwIfStopped();
     Iterator<GetTreeResponse> replies = casBlockingStub.get()
         .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
@@ -523,9 +524,17 @@ public class StubInstance implements Instance {
             .build());
     // new streaming interface doesn't really fit with what we're trying to do here...
     String nextPageToken = "";
+    boolean rootIsSet = false;
     while (replies.hasNext()) {
       GetTreeResponse response = replies.next();
-      directories.addAll(response.getDirectoriesList());
+      for (Directory directory : response.getDirectoriesList()) {
+        if (!rootIsSet && digestUtil.compute(directory).equals(rootDigest)) {
+          tree.setRoot(directory);
+          rootIsSet = false;
+        } else {
+          tree.addChildren(directory);
+        }
+      }
       nextPageToken = response.getNextPageToken();
     }
     return nextPageToken;
