@@ -62,6 +62,7 @@ import build.buildfarm.common.TreeIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.Write.CompleteWrite;
 import build.buildfarm.common.cache.Cache;
 import build.buildfarm.common.cache.CacheBuilder;
 import build.buildfarm.common.cache.CacheLoader.InvalidCacheLoadException;
@@ -146,6 +147,7 @@ public class ShardInstance extends AbstractServerInstance {
   private static ListenableFuture<Void> IMMEDIATE_VOID_FUTURE = Futures.<Void>immediateFuture(null);
 
   private final Runnable onStop;
+  private final long maxBlobSize;
   private final ShardBackplane backplane;
   private final RemoteInputStreamFactory remoteInputStreamFactory;
   private final LoadingCache<String, Instance> workerStubs;
@@ -185,6 +187,7 @@ public class ShardInstance extends AbstractServerInstance {
         config.getRunDispatchedMonitor(),
         config.getDispatchedMonitorIntervalSeconds(),
         config.getRunOperationQueuer(),
+        config.getMaxBlobSize(),
         onStop,
         WorkerStubs.create(digestUtil));
   }
@@ -214,6 +217,7 @@ public class ShardInstance extends AbstractServerInstance {
       boolean runDispatchedMonitor,
       int dispatchedMonitorIntervalSeconds,
       boolean runOperationQueuer,
+      long maxBlobSize,
       Runnable onStop,
       LoadingCache<String, Instance> workerStubs)
       throws InterruptedException {
@@ -221,6 +225,7 @@ public class ShardInstance extends AbstractServerInstance {
     this.backplane = backplane;
     this.workerStubs = workerStubs;
     this.onStop = onStop;
+    this.maxBlobSize = maxBlobSize;
     backplane.setOnUnsubscribe(this::stop);
 
     remoteInputStreamFactory = new RemoteInputStreamFactory(backplane, rand, workerStubs);
@@ -850,10 +855,24 @@ public class ShardInstance extends AbstractServerInstance {
     }
   }
 
+  String requestFormat(RequestMetadata request, String f, Object... args) {
+    return format("%s -> %s -> %s: ", request.getCorrelatedInvocationsId(), request.getToolInvocationId(), request.getActionId()) +
+        format(f, args);
+  }
+
   @Override
-  public Write getBlobWrite(Digest digest, UUID uuid) {
+  public Write getBlobWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata) {
+    if (maxBlobSize > 0 && digest.getSizeBytes() > maxBlobSize) {
+      throw Status.UNAVAILABLE
+          .withDescription(
+              requestFormat(
+                  requestMetadata,
+                  "attempted write of %s exceeds max_blob_size of %d",
+                  DigestUtil.toString(digest), maxBlobSize))
+          .asRuntimeException();
+    }
     // FIXME small blob write to proto cache
-    return writes.get(digest, uuid);
+    return writes.get(digest, uuid, requestMetadata);
   }
 
   protected int getTreeDefaultPageSize() { return 1024; }
@@ -1070,15 +1089,15 @@ public class ShardInstance extends AbstractServerInstance {
         .setQueuedOperationDigest(queuedOperationDigest)
         .build();
     return transform(
-        writeBlobFuture(queuedOperationDigest, queuedOperationBlob),
+        writeBlobFuture(queuedOperationDigest, queuedOperationBlob, executeEntry.getRequestMetadata()),
         (committedSize) -> new QueuedOperationResult(entry, metadata),
         service);
   }
 
-  private ListenableFuture<Long> writeBlobFuture(Digest digest, ByteString content) {
+  private ListenableFuture<Long> writeBlobFuture(Digest digest, ByteString content, RequestMetadata requestMetadata) {
     checkState(digest.getSizeBytes() == content.size());
     SettableFuture<Long> writtenFuture = SettableFuture.create();
-    Write write = getBlobWrite(digest, UUID.randomUUID());
+    Write write = getBlobWrite(digest, UUID.randomUUID(), requestMetadata);
     write.addListener(
         () -> writtenFuture.set(digest.getSizeBytes()),
         directExecutor());
@@ -1542,7 +1561,7 @@ public class ShardInstance extends AbstractServerInstance {
                   .getQueuedOperationDigest();
           long startUploadUSecs = stopwatch.elapsed(MICROSECONDS);
           return transform(
-              writeBlobFuture(queuedOperationDigest, queuedOperationBlob),
+              writeBlobFuture(queuedOperationDigest, queuedOperationBlob, executeEntry.getRequestMetadata()),
               (committedSize) -> profiledQueuedMetadata
                   .setUploadedIn(Durations.fromMicros(stopwatch.elapsed(MICROSECONDS) - startUploadUSecs))
                   .build(),

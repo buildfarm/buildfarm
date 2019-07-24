@@ -38,6 +38,7 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.FileNode;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
@@ -139,7 +140,7 @@ class CFCExecFileSystem implements ExecFileSystem {
 
   @Override
   public OutputStream newOutput(Digest digest) throws IOException {
-    return fileCache.getWrite(digest, UUID.randomUUID())
+    return fileCache.getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance())
         .getOutput(deadlineAfter, deadlineAfterUnits);
   }
 

@@ -30,6 +30,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.UrlPath.InvalidResourceNameException;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
+import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.instance.Instance;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamImplBase;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
@@ -398,7 +399,7 @@ public class ByteStreamService extends ByteStreamImplBase {
     if (digest.getSizeBytes() == 0) {
       return new CompleteWrite(0);
     }
-    return instance.getBlobWrite(digest, uuid);
+    return instance.getBlobWrite(digest, uuid, TracingMetadataUtils.fromCurrentContext());
   }
 
   static Write getOperationStreamWrite(

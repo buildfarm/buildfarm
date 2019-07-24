@@ -81,8 +81,8 @@ public interface Instance {
       ImmutableList.Builder<Directory> directories)
       throws IOException, InterruptedException;
 
-  Write getBlobWrite(Digest digest, UUID uuid);
-  Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs)
+  Write getBlobWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata);
+  Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs, RequestMetadata requestMetadata)
       throws IOException, IllegalArgumentException, InterruptedException;
 
   Write getOperationStreamWrite(String name);

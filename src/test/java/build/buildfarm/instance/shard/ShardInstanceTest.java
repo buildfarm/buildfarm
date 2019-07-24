@@ -137,6 +137,7 @@ public class ShardInstanceTest {
         /* runDispatchedMonitor=*/ false,
         /* dispatchedMonitorIntervalSeconds=*/ 0,
         /* runOperationQueuer=*/ false,
+        /* maxBlobSize=*/ 0,
         mockOnStop,
         CacheBuilder.newBuilder()
             .build(mockInstanceLoader));
@@ -453,7 +454,8 @@ public class ShardInstanceTest {
         .when(mockWorkerInstance)
         .getBlobWrite(
             any(Digest.class),
-            any(UUID.class));
+            any(UUID.class),
+            any(RequestMetadata.class));
 
     StatusRuntimeException queueException = Status.UNAVAILABLE.asRuntimeException();
     doAnswer((invocation) -> {
@@ -545,7 +547,8 @@ public class ShardInstanceTest {
         .when(mockWorkerInstance)
         .getBlobWrite(
             any(Digest.class),
-            any(UUID.class));
+            any(UUID.class),
+            any(RequestMetadata.class));
 
     Poller poller = mock(Poller.class);
 

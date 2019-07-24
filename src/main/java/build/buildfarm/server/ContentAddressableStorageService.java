@@ -39,6 +39,7 @@ import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
 import build.bazel.remote.execution.v2.GetTreeRequest;
 import build.bazel.remote.execution.v2.GetTreeResponse;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.instance.Instance;
 import com.google.common.base.Function;
 import com.google.common.base.Stopwatch;
@@ -161,13 +162,17 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
     ImmutableList.Builder<ListenableFuture<Response>> responses = new ImmutableList.Builder<>();
     for (Request request : requests) {
       Digest digest = request.getDigest();
+      ListenableFuture<Digest> future = putBlobFuture(
+          instance,
+          digest,
+          request.getData(),
+          writeDeadlineAfter,
+          writeDeadlineAfterUnits,
+          TracingMetadataUtils.fromCurrentContext());
       responses.add(
           toResponseFuture(
               catching(
-                  transform(
-                      putBlobFuture(instance, digest, request.getData(), writeDeadlineAfter, writeDeadlineAfterUnits),
-                      (d) -> Code.OK,
-                      directExecutor()),
+                  transform(future, (d) -> Code.OK, directExecutor()),
                   Throwable.class,
                   (e) -> Status.fromThrowable(e).getCode(),
                   directExecutor()),

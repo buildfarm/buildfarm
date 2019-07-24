@@ -19,6 +19,7 @@ import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.Write;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
@@ -71,13 +72,14 @@ public class Utils {
       Digest digest,
       ByteString data,
       long writeDeadlineAfter,
-      TimeUnit writeDeadlineAfterUnits) {
+      TimeUnit writeDeadlineAfterUnits,
+      RequestMetadata requestMetadata) {
     if (digest.getSizeBytes() != data.size()) {
       return immediateFailedFuture(
           invalidDigestSize(digest.getSizeBytes(), data.size())
               .asRuntimeException());
     }
-    Write write = instance.getBlobWrite(digest, UUID.randomUUID());
+    Write write = instance.getBlobWrite(digest, UUID.randomUUID(), requestMetadata);
     SettableFuture<Digest> future = SettableFuture.create();
     write.addListener(
         () -> future.set(digest),
@@ -95,7 +97,8 @@ public class Utils {
       Digest digest,
       ByteString blob,
       long writeDeadlineAfter,
-      TimeUnit writeDeadlineAfterUnits)
+      TimeUnit writeDeadlineAfterUnits,
+      RequestMetadata requestMetadata)
       throws IOException, InterruptedException, StatusException {
     try {
       return putBlobFuture(
@@ -103,7 +106,8 @@ public class Utils {
           digest,
           blob,
           writeDeadlineAfter,
-          writeDeadlineAfterUnits).get();
+          writeDeadlineAfterUnits,
+          requestMetadata).get();
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
       if (cause instanceof IOException) {

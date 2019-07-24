@@ -36,6 +36,7 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.ac.ActionCache;
 import build.buildfarm.ac.GrpcActionCache;
 import build.buildfarm.cas.ContentAddressableStorage;
@@ -536,7 +537,7 @@ public class MemoryInstance extends AbstractServerInstance {
     Digest queuedOperationDigest = getDigestUtil().compute(queuedOperationBlob);
     String operationName = operation.getName();
     try {
-      putBlob(this, queuedOperationDigest, queuedOperationBlob, 60, SECONDS);
+      putBlob(this, queuedOperationDigest, queuedOperationBlob, 60, SECONDS, RequestMetadata.getDefaultInstance());
     } catch (StatusException|IOException e) {
       logger.log(SEVERE, format("could not emplace queued operation: %s", operationName), e);
       return false;
@@ -599,7 +600,7 @@ public class MemoryInstance extends AbstractServerInstance {
         Digest queuedOperationDigest = getDigestUtil().compute(queuedOperationBlob);
         // maybe do this elsewhere
         try {
-          putBlob(this, queuedOperationDigest, queuedOperationBlob, 60, SECONDS);
+          putBlob(this, queuedOperationDigest, queuedOperationBlob, 60, SECONDS, RequestMetadata.getDefaultInstance());
 
           QueueEntry queueEntry = QueueEntry.newBuilder()
               // FIXME find a way to get this properly populated...

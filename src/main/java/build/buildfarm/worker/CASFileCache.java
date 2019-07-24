@@ -47,6 +47,7 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.FileNode;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.common.DigestUtil;
@@ -476,7 +477,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   @Override
-  public Write getWrite(Digest digest, UUID uuid) {
+  public Write getWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata) {
     if (digest.getSizeBytes() == 0) {
       return new CompleteWrite(0);
     }
@@ -502,7 +503,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       this.in = in;
       skip = offset;
       remaining = digest.getSizeBytes();
-      write = getWrite(digest, UUID.randomUUID());
+      write = getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
       out = write.getOutput(1, MINUTES);
     }
 
@@ -1173,7 +1174,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         if (fileEntryKey == null) {
           logger.severe(format("error parsing expired key %s", key));
         } else {
-          Write write = delegate.getWrite(fileEntryKey.getDigest(), UUID.randomUUID());
+          Write write = delegate.getWrite(fileEntryKey.getDigest(), UUID.randomUUID(), RequestMetadata.getDefaultInstance());
           try (OutputStream out = write.getOutput(1, MINUTES); InputStream in = Files.newInputStream(key)) {
             ByteStreams.copy(in, out);
           } catch (IOException ioEx) {

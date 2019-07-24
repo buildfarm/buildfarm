@@ -20,6 +20,7 @@ import static com.google.common.util.concurrent.Futures.immediateFuture;
 
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.Write;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.v1test.ContentAddressableStorageConfig;
@@ -100,7 +101,7 @@ public final class ContentAddressableStorages {
       }
 
       @Override
-      public Write getWrite(Digest digest, UUID uuid) {
+      public Write getWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata) {
         return writes.get(digest, uuid);
       }
 

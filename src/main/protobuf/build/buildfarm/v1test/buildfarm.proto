@@ -191,6 +191,8 @@ message ShardInstanceConfig {
   oneof backplane {
     RedisShardBackplaneConfig redis_shard_backplane_config = 4;
   }
+
+  int64 max_blob_size = 5;
 }
 
 message ShardWorkerInstanceConfig {

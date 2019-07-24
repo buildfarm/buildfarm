@@ -32,10 +32,11 @@ import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse.Response;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageImplBase;
+import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
 import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
 import build.bazel.remote.execution.v2.GetActionResultRequest;
-import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.UpdateActionResultRequest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
@@ -286,7 +287,7 @@ public class StubInstanceTest {
     ImmutableList<Digest> digests = ImmutableList.of(
         DIGEST_UTIL.compute(first),
         DIGEST_UTIL.compute(last));
-    assertThat(instance.putAllBlobs(blobs)).containsAllIn(digests);
+    assertThat(instance.putAllBlobs(blobs, RequestMetadata.getDefaultInstance())).containsAllIn(digests);
   }
 
   @Test

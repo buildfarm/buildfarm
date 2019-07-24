@@ -25,6 +25,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
@@ -185,11 +186,12 @@ public class GrpcCASTest {
         channel,
         /* uploader=*/ null,
         onExpirations);
-    Write initialWrite = cas.getWrite(digest, uuid);
+    RequestMetadata requestMetadata = RequestMetadata.getDefaultInstance();
+    Write initialWrite = cas.getWrite(digest, uuid, requestMetadata);
     try (OutputStream writeOut = initialWrite.getOutput(1, SECONDS)) {
       writeContent.substring(0, 4).writeTo(writeOut);
     }
-    Write finalWrite = cas.getWrite(digest, uuid);
+    Write finalWrite = cas.getWrite(digest, uuid, requestMetadata);
     try (OutputStream writeOut = finalWrite.getOutput(1, SECONDS)) {
       writeContent.substring(4).writeTo(writeOut);
     }

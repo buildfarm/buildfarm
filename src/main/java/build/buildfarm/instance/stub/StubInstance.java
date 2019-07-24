@@ -15,6 +15,7 @@
 package build.buildfarm.instance.stub;
 
 import static build.buildfarm.common.grpc.Retrier.NO_RETRIES;
+import static build.buildfarm.common.grpc.TracingMetadataUtils.attachMetadataInterceptor;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
@@ -336,7 +337,7 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs) {
+  public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs, RequestMetadata requestMetadata) {
     long totalSize = 0;
     ImmutableList.Builder<Request> requests = ImmutableList.builder();
     for (ByteString blob : blobs) {
@@ -352,6 +353,7 @@ public class StubInstance implements Instance {
         .addAllRequests(requests.build())
         .build();
     BatchUpdateBlobsResponse batchResponse = casBlockingStub.get()
+        .withInterceptors(attachMetadataInterceptor(requestMetadata))
         .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
         .batchUpdateBlobs(batchRequest);
     PutAllBlobsException exception = null;
@@ -371,7 +373,7 @@ public class StubInstance implements Instance {
   }
 
   public Write getOperationStreamWrite(String name) {
-    return getWrite(name, StubWriteOutputStream.UNLIMITED_EXPECTED_SIZE, /* autoflush=*/ true);
+    return getWrite(name, StubWriteOutputStream.UNLIMITED_EXPECTED_SIZE, /* autoflush=*/ true, RequestMetadata.getDefaultInstance());
   }
 
   @Override
@@ -478,10 +480,13 @@ public class StubInstance implements Instance {
     }
   }
 
-  Write getWrite(String resourceName, long expectedSize, boolean autoflush) {
+  Write getWrite(String resourceName, long expectedSize, boolean autoflush, RequestMetadata requestMetadata) {
     return new StubWriteOutputStream(
-        bsBlockingStub,
-        Suppliers.memoize(() -> ByteStreamGrpc.newStub(channel)), // explicitly avoiding deadline due to client cancellation determination
+        () -> bsBlockingStub.get()
+            .withInterceptors(attachMetadataInterceptor(requestMetadata)),
+        Suppliers.memoize(
+            () -> ByteStreamGrpc.newStub(channel)
+                .withInterceptors(attachMetadataInterceptor(requestMetadata))), // explicitly avoiding deadline due to client cancellation determination
         resourceName,
         expectedSize,
         autoflush);
@@ -492,13 +497,13 @@ public class StubInstance implements Instance {
    * prior to initiating writes
    */
   @Override
-  public Write getBlobWrite(Digest digest, UUID uuid) {
+  public Write getBlobWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata) {
     String resourceName = ByteStreamUploader.uploadResourceName(
         getName(),
         uuid,
         HashCode.fromString(digest.getHash()),
         digest.getSizeBytes());
-    return getWrite(resourceName, digest.getSizeBytes(), /* autoflush=*/ false);
+    return getWrite(resourceName, digest.getSizeBytes(), /* autoflush=*/ false, requestMetadata);
   }
 
   @Override

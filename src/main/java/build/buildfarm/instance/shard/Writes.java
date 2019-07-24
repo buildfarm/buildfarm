@@ -19,6 +19,7 @@ import static com.google.common.base.Throwables.throwIfUnchecked;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
 import build.buildfarm.instance.Instance;
@@ -121,7 +122,7 @@ class Writes {
         });
   }
 
-  public Write get(Digest digest, UUID uuid) {
+  public Write get(Digest digest, UUID uuid, RequestMetadata requestMetadata) {
     if (digest.getSizeBytes() == 0) {
       return new CompleteWrite(0);
     }
@@ -131,7 +132,7 @@ class Writes {
         .build();
     try {
       return new InvalidatingWrite(
-          blobWriteInstances.get(key).getBlobWrite(digest, uuid),
+          blobWriteInstances.get(key).getBlobWrite(digest, uuid, requestMetadata),
           () -> blobWriteInstances.invalidate(key));
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();

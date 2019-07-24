@@ -31,6 +31,7 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.FileNode;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
@@ -403,13 +404,17 @@ class CASFileCacheTest {
     assertThat(storage.get(pathThree).after).isEqualTo(storage.get(pathOne));
   }
 
+  Write getWrite(Digest digest) {
+    return fileCache.getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
+  }
+
   @Test
   public void writeAddsEntry() throws IOException {
     ByteString content = ByteString.copyFromUtf8("Hello, World");
     Digest digest = DIGEST_UTIL.compute(content);
 
     AtomicBoolean notified = new AtomicBoolean(false);
-    Write write = fileCache.getWrite(digest, UUID.randomUUID());
+    Write write = getWrite(digest);
     write.addListener(
         () -> notified.set(true),
         directExecutor());
@@ -429,8 +434,8 @@ class CASFileCacheTest {
     ByteString content = ByteString.copyFromUtf8("Hello, World");
     Digest digest = DIGEST_UTIL.compute(content);
 
-    Write completingWrite = fileCache.getWrite(digest, UUID.randomUUID());
-    Write incompleteWrite = fileCache.getWrite(digest, UUID.randomUUID());
+    Write completingWrite = getWrite(digest);
+    Write incompleteWrite = getWrite(digest);
     AtomicBoolean notified = new AtomicBoolean(false);
     // both should be size committed
     incompleteWrite.addListener(
@@ -459,7 +464,7 @@ class CASFileCacheTest {
     try (OutputStream out = Files.newOutputStream(writePath)) {
       content.substring(0, 6).writeTo(out);
     }
-    Write write = fileCache.getWrite(digest, writeId);
+    Write write = fileCache.getWrite(digest, writeId, RequestMetadata.getDefaultInstance());
     AtomicBoolean notified = new AtomicBoolean(false);
     write.addListener(
         () -> notified.set(true),
@@ -478,7 +483,7 @@ class CASFileCacheTest {
     ByteString content = ByteString.copyFromUtf8("Hello, World");
     Digest digest = DIGEST_UTIL.compute(content);
 
-    Write write = fileCache.getWrite(digest, UUID.randomUUID());
+    Write write = getWrite(digest);
     try (OutputStream out = write.getOutput(1, SECONDS)) {
       ByteString.copyFromUtf8("H3110, W0r1d").writeTo(out);
     }

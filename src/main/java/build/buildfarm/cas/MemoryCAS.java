@@ -20,6 +20,7 @@ import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Write;
 import com.google.common.cache.Cache;
@@ -213,7 +214,7 @@ public class MemoryCAS implements ContentAddressableStorage {
   }
 
   @Override
-  public Write getWrite(Digest digest, UUID uuid) {
+  public Write getWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata) {
     return writes.get(digest, uuid);
   }
 
@@ -273,7 +274,7 @@ public class MemoryCAS implements ContentAddressableStorage {
   private void expireEntry(Entry e) {
     logger.info("MemoryLRUCAS: expiring " + DigestUtil.toString(e.key));
     if (delegate != null) {
-      Write write = delegate.getWrite(e.key, UUID.randomUUID());
+      Write write = delegate.getWrite(e.key, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
       try (OutputStream out = write.getOutput(1, MINUTES)) {
         e.value.getData().writeTo(out);
       } catch (IOException ioEx) {

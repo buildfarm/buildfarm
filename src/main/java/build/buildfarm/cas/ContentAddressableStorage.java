@@ -16,6 +16,7 @@ package build.buildfarm.cas;
 
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.OutputStreamFactory;
@@ -82,7 +83,7 @@ public interface ContentAddressableStorage extends InputStreamFactory {
   InputStream newInput(Digest digest, long offset) throws IOException;
 
   @ThreadSafe
-  Write getWrite(Digest digest, UUID uuid);
+  Write getWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata);
 
   /** Insert a blob into the CAS. */
   @ThreadSafe

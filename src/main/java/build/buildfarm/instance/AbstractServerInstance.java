@@ -231,8 +231,8 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public Write getBlobWrite(Digest digest, UUID uuid) {
-    return contentAddressableStorage.getWrite(digest, uuid);
+  public Write getBlobWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata) {
+    return contentAddressableStorage.getWrite(digest, uuid, requestMetadata);
   }
 
   @Override
@@ -326,7 +326,7 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs)
+  public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs, RequestMetadata requestMetadata)
       throws IOException, InterruptedException {
     ImmutableList.Builder<Digest> blobDigestsBuilder =
         new ImmutableList.Builder<Digest>();
@@ -334,7 +334,7 @@ public abstract class AbstractServerInstance implements Instance {
     for (ByteString blob : blobs) {
       Digest digest = digestUtil.compute(blob);
       try {
-        blobDigestsBuilder.add(putBlob(this, digest, blob, 1, SECONDS));
+        blobDigestsBuilder.add(putBlob(this, digest, blob, 1, SECONDS, requestMetadata));
       } catch (StatusException e) {
         if (exception == null) {
           exception = new PutAllBlobsException();

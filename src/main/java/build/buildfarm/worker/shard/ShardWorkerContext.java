@@ -31,6 +31,7 @@ import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.Platform;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
@@ -409,7 +410,7 @@ class ShardWorkerContext implements WorkerContext {
 
   private void insertFile(Digest digest, Path file) throws IOException {
     AtomicBoolean complete = new AtomicBoolean(false);
-    Write write = execFileSystem.getStorage().getWrite(digest, UUID.randomUUID());
+    Write write = execFileSystem.getStorage().getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
     write.addListener(() -> complete.set(true), directExecutor());
     try (OutputStream out = write.getOutput(deadlineAfter, deadlineAfterUnits)) {
       try (InputStream in = Files.newInputStream(file)) {

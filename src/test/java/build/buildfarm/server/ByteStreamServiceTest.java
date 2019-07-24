@@ -29,6 +29,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Write;
 import build.buildfarm.instance.Instance;
@@ -143,7 +144,7 @@ public class ByteStreamServiceTest {
         .when(write).addListener(any(Runnable.class), any(Executor.class));
 
     Instance instance = mock(Instance.class);
-    when(instance.getBlobWrite(digest, uuid)).thenReturn(write);
+    when(instance.getBlobWrite(digest, uuid, RequestMetadata.getDefaultInstance())).thenReturn(write);
 
     HashCode hash = HashCode.fromString(digest.getHash());
     String resourceName = ByteStreamUploader.uploadResourceName(/* instanceName=*/ null, uuid, hash, digest.getSizeBytes());
@@ -209,7 +210,7 @@ public class ByteStreamServiceTest {
         .when(write).addListener(any(Runnable.class), any(Executor.class));
 
     Instance instance = mock(Instance.class);
-    when(instance.getBlobWrite(digest, uuid)).thenReturn(write);
+    when(instance.getBlobWrite(digest, uuid, RequestMetadata.getDefaultInstance())).thenReturn(write);
 
     HashCode hash = HashCode.fromString(digest.getHash());
     String resourceName = ByteStreamUploader.uploadResourceName(/* instanceName=*/ null, uuid, hash, digest.getSizeBytes());
