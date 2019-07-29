@@ -211,7 +211,9 @@ public class Worker {
                 remoteInputStreamFactory)),
         config.getExecutionPoliciesList(),
         instance,
-        /* deadlineAfter=*/ 1, /* deadlineAfterUnits=*/ DAYS);
+        /* deadlineAfter=*/ 1, /* deadlineAfterUnits=*/ DAYS,
+        config.getDefaultActionTimeout(),
+        config.getMaximumActionTimeout());
 
     PipelineStage completeStage = new PutOperationStage((operation) -> context.deactivate(operation.getName()));
     PipelineStage errorStage = completeStage; /* new ErrorStage(); */

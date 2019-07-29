@@ -102,6 +102,8 @@ class ShardWorkerContext implements WorkerContext {
   private final Instance instance;
   private final long deadlineAfter;
   private final TimeUnit deadlineAfterUnits;
+  private final Duration defaultActionTimeout;
+  private final Duration maximumActionTimeout;
   private final Map<String, QueueEntry> activeOperations = Maps.newConcurrentMap();
   
   ShardWorkerContext(
@@ -118,7 +120,9 @@ class ShardWorkerContext implements WorkerContext {
       Iterable<ExecutionPolicy> policies,
       Instance instance,
       long deadlineAfter,
-      TimeUnit deadlineAfterUnits) {
+      TimeUnit deadlineAfterUnits,
+      Duration defaultActionTimeout,
+      Duration maximumActionTimeout) {
     this.name = name;
     this.platform = platform;
     this.operationPollPeriod = operationPollPeriod;
@@ -133,6 +137,8 @@ class ShardWorkerContext implements WorkerContext {
     this.instance = instance;
     this.deadlineAfter = deadlineAfter;
     this.deadlineAfterUnits = deadlineAfterUnits;
+    this.defaultActionTimeout = defaultActionTimeout;
+    this.maximumActionTimeout = maximumActionTimeout;
   }
 
   private static Retrier createBackplaneRetrier() {
@@ -373,12 +379,12 @@ class ShardWorkerContext implements WorkerContext {
 
   @Override
   public boolean hasDefaultActionTimeout() {
-    return false;
+    return defaultActionTimeout.getSeconds() > 0 || defaultActionTimeout.getNanos() > 0;
   }
 
   @Override
   public boolean hasMaximumActionTimeout() {
-    return false;
+    return maximumActionTimeout.getSeconds() > 0 || maximumActionTimeout.getNanos() > 0;
   }
 
   @Override
@@ -393,12 +399,12 @@ class ShardWorkerContext implements WorkerContext {
 
   @Override
   public Duration getDefaultActionTimeout() {
-    return null;
+    return defaultActionTimeout;
   }
 
   @Override
   public Duration getMaximumActionTimeout() {
-    return null;
+    return maximumActionTimeout;
   }
 
   private void insertBlob(Digest digest, ByteString content) throws InterruptedException {
