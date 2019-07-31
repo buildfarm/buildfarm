@@ -535,7 +535,7 @@ public class RedisShardBackplane implements ShardBackplane {
       while (true) {
         try {
           TimeUnit.SECONDS.sleep(10);
-          updateWatchers(jedisCluster);
+          updateWatchers(getJedis());
         } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
           break;
@@ -650,7 +650,7 @@ public class RedisShardBackplane implements ShardBackplane {
   public <T> T withBackplaneException(JedisContext<T> withJedis) throws IOException {
     try {
       try {
-        return withJedis.run(jedisCluster);
+        return withJedis.run(getJedis());
       } catch (JedisDataException e) {
         if (e.getMessage().startsWith(MISCONF_RESPONSE)) {
           throw new JedisMisconfigurationException(e.getMessage());
