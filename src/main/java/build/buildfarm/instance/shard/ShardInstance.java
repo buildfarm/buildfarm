@@ -386,8 +386,8 @@ public class ShardInstance extends AbstractServerInstance {
     contextDeadlineScheduler.shutdown();
     operationDeletionService.shutdown();
     operationTransformService.shutdown();
-    backplane.stop();
     onStop.run();
+    backplane.stop();
     if (!contextDeadlineScheduler.awaitTermination(10, SECONDS)) {
       logger.severe("Could not shut down operation deletion service, some operations may be zombies");
     }

@@ -118,10 +118,10 @@ public class BuildFarmServer {
       stopping = true;
     }
     try {
-      instances.stop();
       if (server != null) {
         server.shutdown();
       }
+      instances.stop();
       server.awaitTermination(10, TimeUnit.SECONDS);
     } catch (InterruptedException e) {
       if (server != null) {
