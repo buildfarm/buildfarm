@@ -46,6 +46,25 @@ java_test(
 )
 
 java_test(
+    name = "ac-tests",
+    size = "small",
+    srcs = glob(["ac/*.java"]),
+    test_class = "build.buildfarm.AllTests",
+    deps = [
+        ":test_runner",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java",
+        "//3rdparty/jvm/com/google/truth",
+        "//3rdparty/jvm/io/grpc:grpc_api",
+        "//3rdparty/jvm/io/grpc:grpc_core",
+        "//3rdparty/jvm/io/grpc:grpc_stub",
+        "//src/main/java/build/buildfarm:ac",
+        "//src/main/java/build/buildfarm:common",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+    ],
+)
+
+java_test(
     name = "cas-tests",
     size = "small",
     srcs = glob(["cas/*.java"]),
@@ -185,6 +204,7 @@ java_test(
     test_class = "build.buildfarm.AllTests",
     deps = [
         ":test_runner",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "//3rdparty/jvm/com/google/truth",
         "//3rdparty/jvm/io/grpc:grpc_api",
         "//3rdparty/jvm/io/grpc:grpc_core",
@@ -225,6 +245,7 @@ java_test(
         ":test_runner",
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java_util",
         "//3rdparty/jvm/com/google/truth",
         "//3rdparty/jvm/io/grpc:grpc_api",
         "//3rdparty/jvm/io/grpc:grpc_core",

@@ -14,14 +14,21 @@
 
 package build.buildfarm.instance.shard;
 
+import static build.buildfarm.instance.shard.RedisShardBackplane.parseOperationChange;
 import static com.google.common.truth.Truth.assertThat;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import build.buildfarm.v1test.ExecuteEntry;
+import build.buildfarm.v1test.OperationChange;
+import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.RedisShardBackplaneConfig;
 import com.google.common.collect.ImmutableMap;
+import com.google.longrunning.Operation;
+import com.google.protobuf.util.JsonFormat;
 import io.grpc.Status;
 import io.grpc.Status.Code;
 import java.io.IOException;
@@ -32,6 +39,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import redis.clients.jedis.JedisCluster;
@@ -138,5 +146,159 @@ public class RedisShardBackplaneTest {
     verify(jedisCluster, times(1)).pipelined();
     verify(pipeline, times(1)).hdel(config.getWorkersHashName(), "foo");
     verify(pipeline, times(1)).sync();
+  }
+
+  void verifyChangePublished(JedisCluster jedis, String opName) throws IOException {
+    ArgumentCaptor<String> changeCaptor = ArgumentCaptor.forClass(String.class);
+    verify(jedis, times(1)).publish(eq(backplane.operationChannel(opName)), changeCaptor.capture());
+    OperationChange opChange = parseOperationChange(changeCaptor.getValue());
+    assertThat(opChange.hasReset()).isTrue();
+    assertThat(opChange.getReset().getOperation().getName()).isEqualTo(opName);
+  }
+
+  @Test
+  public void prequeueUpdatesOperationPrequeuesAndPublishes() throws IOException {
+    RedisShardBackplaneConfig config = RedisShardBackplaneConfig.newBuilder()
+        .setOperationChannelPrefix("OperationChannel")
+        .setOperationExpire(10)
+        .setOperationPrefix("Operation")
+        .setPreQueuedOperationsListName("PreQueuedOperations")
+        .build();
+    JedisCluster jedisCluster = mock(JedisCluster.class);
+    when(mockJedisClusterFactory.get()).thenReturn(jedisCluster);
+    backplane = new RedisShardBackplane(
+        config,
+        "prequeue-operation-test",
+        (o) -> o,
+        (o) -> o,
+        (o) -> false,
+        (o) -> false,
+        mockJedisClusterFactory);
+    backplane.start();
+
+    final String opName = "op";
+    ExecuteEntry executeEntry = ExecuteEntry.newBuilder()
+        .setOperationName(opName)
+        .build();
+    Operation op = Operation.newBuilder()
+        .setName(opName)
+        .build();
+    backplane.prequeue(executeEntry, op);
+
+    verify(mockJedisClusterFactory, times(1)).get();
+    verify(jedisCluster, times(1)).setex(backplane.operationKey(opName), config.getOperationExpire(), RedisShardBackplane.operationPrinter.print(op));
+    verify(jedisCluster, times(1)).lpush(config.getPreQueuedOperationsListName(), JsonFormat.printer().print(executeEntry));
+    verifyChangePublished(jedisCluster, opName);
+  }
+
+  @Test
+  public void queuingPublishes() throws IOException {
+    RedisShardBackplaneConfig config = RedisShardBackplaneConfig.newBuilder()
+        .setOperationChannelPrefix("OperationChannel")
+        .build();
+    JedisCluster jedisCluster = mock(JedisCluster.class);
+    when(mockJedisClusterFactory.get()).thenReturn(jedisCluster);
+    backplane = new RedisShardBackplane(
+        config,
+        "requeue-operation-test",
+        (o) -> o,
+        (o) -> o,
+        (o) -> false,
+        (o) -> false,
+        mockJedisClusterFactory);
+    backplane.start();
+
+    final String opName = "op";
+    backplane.queueing(opName);
+
+    verify(mockJedisClusterFactory, times(1)).get();
+    verifyChangePublished(jedisCluster, opName);
+  }
+
+  @Test
+  public void requeueDispatchedOperationQueuesAndPublishes() throws IOException {
+    RedisShardBackplaneConfig config = RedisShardBackplaneConfig.newBuilder()
+        .setDispatchedOperationsHashName("DispatchedOperations")
+        .setOperationChannelPrefix("OperationChannel")
+        .setQueuedOperationsListName("QueuedOperations")
+        .build();
+    JedisCluster jedisCluster = mock(JedisCluster.class);
+    when(mockJedisClusterFactory.get()).thenReturn(jedisCluster);
+    backplane = new RedisShardBackplane(
+        config,
+        "requeue-operation-test",
+        (o) -> o,
+        (o) -> o,
+        (o) -> false,
+        (o) -> false,
+        mockJedisClusterFactory);
+    backplane.start();
+
+    final String opName = "op";
+    when(jedisCluster.hdel(config.getDispatchedOperationsHashName(), opName)).thenReturn(1l);
+
+    QueueEntry queueEntry = QueueEntry.newBuilder()
+        .setExecuteEntry(ExecuteEntry.newBuilder().setOperationName("op").build())
+        .build();
+    backplane.requeueDispatchedOperation(queueEntry);
+
+    verify(mockJedisClusterFactory, times(1)).get();
+    verify(jedisCluster, times(1)).hdel(config.getDispatchedOperationsHashName(), opName);
+    verify(jedisCluster, times(1)).lpush(config.getQueuedOperationsListName(), JsonFormat.printer().print(queueEntry));
+    verifyChangePublished(jedisCluster, opName);
+  }
+
+  @Test
+  public void completeOperationUndispatches() throws IOException {
+    RedisShardBackplaneConfig config = RedisShardBackplaneConfig.newBuilder()
+        .setDispatchedOperationsHashName("DispatchedOperations")
+        .build();
+    JedisCluster jedisCluster = mock(JedisCluster.class);
+    when(mockJedisClusterFactory.get()).thenReturn(jedisCluster);
+    backplane = new RedisShardBackplane(
+        config,
+        "complete-operation-test",
+        (o) -> o,
+        (o) -> o,
+        (o) -> false,
+        (o) -> false,
+        mockJedisClusterFactory);
+    backplane.start();
+
+    final String opName = "op";
+
+    backplane.completeOperation(opName);
+
+    verify(mockJedisClusterFactory, times(1)).get();
+    verify(jedisCluster, times(1)).hdel(config.getDispatchedOperationsHashName(), opName);
+  }
+
+  @Test
+  public void deleteOperationDeletesAndPublishes() throws IOException {
+    RedisShardBackplaneConfig config = RedisShardBackplaneConfig.newBuilder()
+        .setDispatchedOperationsHashName("DispatchedOperations")
+        .setOperationPrefix("Operation")
+        .setOperationChannelPrefix("OperationChannel")
+        .build();
+    JedisCluster jedisCluster = mock(JedisCluster.class);
+    when(mockJedisClusterFactory.get()).thenReturn(jedisCluster);
+    backplane = new RedisShardBackplane(
+        config,
+        "delete-operation-test",
+        (o) -> o,
+        (o) -> o,
+        (o) -> false,
+        (o) -> false,
+        mockJedisClusterFactory);
+    backplane.start();
+
+    final String opName = "op";
+
+    backplane.deleteOperation(opName);
+
+    verify(mockJedisClusterFactory, times(1)).get();
+    verify(jedisCluster, times(1)).hdel(config.getDispatchedOperationsHashName(), opName);
+    verify(jedisCluster, times(1)).del(backplane.operationKey(opName));
+    verifyChangePublished(jedisCluster, opName);
   }
 }

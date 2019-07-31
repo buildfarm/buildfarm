@@ -106,7 +106,7 @@ public class RedisShardBackplane implements ShardBackplane {
               .build())
       .ignoringUnknownFields();
 
-  private static final JsonFormat.Printer operationPrinter = JsonFormat.printer().usingTypeRegistry(
+  static final JsonFormat.Printer operationPrinter = JsonFormat.printer().usingTypeRegistry(
       JsonFormat.TypeRegistry.newBuilder()
           .add(CompletedOperationMetadata.getDescriptor())
           .add(ExecutingOperationMetadata.getDescriptor())
@@ -1290,16 +1290,9 @@ public class RedisShardBackplane implements ShardBackplane {
             .setCode(Code.UNAVAILABLE.value())
             .build())
         .build();
-    String json;
-    try {
-      json = JsonFormat.printer().print(o);
-    } catch (InvalidProtocolBufferException e) {
-      json = null;
-      logger.log(SEVERE, "error printing deleted operation " + operationName, e);
-    }
 
     withVoidBackplaneException((jedis) -> {
-      jedis.hdel(config.getDispatchedOperationsHashName(), operationName);
+      completeOperation(jedis, operationName);
       // FIXME find a way to get rid of this thing from the queue by name
       // jedis.lrem(config.getQueuedOperationsListName(), 0, operationName);
       jedis.del(operationKey(operationName));
@@ -1332,11 +1325,11 @@ public class RedisShardBackplane implements ShardBackplane {
     return config.getActionCachePrefix() + ":" + DigestUtil.toString(actionKey.getDigest());
   }
 
-  private String operationKey(String operationName) {
+  String operationKey(String operationName) {
     return config.getOperationPrefix() + ":" + operationName;
   }
 
-  private String operationChannel(String operationName) {
+  String operationChannel(String operationName) {
     return config.getOperationChannelPrefix() + ":" + operationName;
   }
 

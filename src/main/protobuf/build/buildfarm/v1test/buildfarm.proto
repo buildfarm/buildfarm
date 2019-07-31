@@ -9,6 +9,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "google/rpc/status.proto";
 
+option go_package = "buildfarm";
 option java_package = "build.buildfarm.v1test";
 option java_multiple_files = true;
 option java_outer_classname = "OperationQueueProto";
