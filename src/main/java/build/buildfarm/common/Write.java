@@ -16,6 +16,7 @@ package build.buildfarm.common;
 
 import static com.google.common.io.ByteStreams.nullOutputStream;
 
+import com.google.common.util.concurrent.SettableFuture;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.concurrent.Executor;
@@ -62,6 +63,54 @@ public interface Write {
     @Override
     public void addListener(Runnable onCompleted, Executor executor) {
       executor.execute(onCompleted);
+    }
+  }
+
+  public class NullWrite extends OutputStream implements Write {
+    private final SettableFuture<Long> committedFuture = SettableFuture.create();
+    private long committedSize = 0;
+
+    @Override
+    public void write(int b) {
+      committedSize++;
+    }
+
+    @Override
+    public void write(byte[] b, int off, int len) {
+      committedSize += len;
+    }
+
+    @Override
+    public void close() {
+      committedFuture.set(committedSize);
+    }
+
+    // Write methods
+
+    @Override
+    public void reset() {
+      // hopefully we are not closed...
+      committedSize = 0;
+    }
+
+    @Override
+    public long getCommittedSize() {
+      return committedSize;
+    }
+
+    @Override
+    public boolean isComplete() {
+      return committedFuture.isDone();
+    }
+
+    @Override
+    public OutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits) throws IOException {
+      return this;
+    }
+
+    @Override
+    public void addListener(Runnable runnable, Executor executor) {
+      committedFuture.addListener(runnable, executor);
     }
   }
 }

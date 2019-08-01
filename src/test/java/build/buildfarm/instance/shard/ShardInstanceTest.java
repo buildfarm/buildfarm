@@ -61,6 +61,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Poller;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.Watcher;
+import build.buildfarm.common.Write.NullWrite;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecuteEntry;

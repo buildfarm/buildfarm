@@ -52,6 +52,7 @@ import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
@@ -414,7 +415,7 @@ class ShardWorkerContext implements WorkerContext {
     }
   }
 
-  private void insertFile(Digest digest, Path file) throws IOException {
+  private void insertFile(Digest digest, Path file) throws IOException, InterruptedException {
     AtomicBoolean complete = new AtomicBoolean(false);
     Write write = execFileSystem.getStorage().getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
     write.addListener(() -> complete.set(true), directExecutor());
@@ -427,6 +428,9 @@ class ShardWorkerContext implements WorkerContext {
       // complete writes should be ignored
       if (!complete.get()) {
         write.reset(); // we will not attempt retry with current behavior, abandon progress
+        if (e.getCause() != null) {
+          Throwables.propagateIfInstanceOf(e.getCause(), InterruptedException.class);
+        }
         throw e;
       }
     }
@@ -514,7 +518,11 @@ class ShardWorkerContext implements WorkerContext {
               .setName(file.getFileName().toString())
               .setDigest(digest)
               .setIsExecutable(Files.isExecutable(file));
-          insertFile(digest, file);
+          try {
+            insertFile(digest, file);
+          } catch (InterruptedException e) {
+            throw new IOException(e);
+          }
           return FileVisitResult.CONTINUE;
         }
 

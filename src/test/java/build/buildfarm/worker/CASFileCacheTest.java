@@ -23,7 +23,11 @@ import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.junit.Assert.fail;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
@@ -32,11 +36,14 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.cas.ContentAddressableStorage;
+import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.Write.NullWrite;
 import build.buildfarm.worker.CASFileCache.Entry;
 import build.buildfarm.worker.CASFileCache.PutDirectoryException;
 import com.google.common.collect.ImmutableList;
@@ -63,10 +70,13 @@ import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.junit.After;
 import org.junit.Before;
@@ -90,46 +100,40 @@ class CASFileCacheTest {
   @Mock
   private Consumer<Iterable<Digest>> onExpire;
 
+  @Mock
+  private ContentAddressableStorage delegate;
+
+  private ExecutorService expireService;
+
   private ConcurrentMap<Path, Entry> storage;
 
   protected CASFileCacheTest(Path root) {
     this.root = root;
   }
 
-  private static final class BrokenInputStream extends InputStream {
-    private final IOException exception;
-
-    public BrokenInputStream(IOException exception) {
-      this.exception = exception;
-    }
-
-    @Override
-    public int read() throws IOException {
-      throw exception;
-    }
-  }
-
   @Before
-  public void setUp() {
+  public void setUp() throws IOException {
     MockitoAnnotations.initMocks(this);
+    when(delegate.getWrite(any(Digest.class), any(UUID.class), any(RequestMetadata.class))).thenReturn(new NullWrite());
+    when(delegate.newInput(any(Digest.class), any(Long.class))).thenThrow(new NoSuchFileException("null sink delegate"));
     blobs = Maps.newHashMap();
     putService = newSingleThreadExecutor();
     storage = Maps.newConcurrentMap();
+    expireService = newSingleThreadExecutor();
     fileCache = new CASFileCache(
         root,
         /* maxSizeInBytes=*/ 1024,
         DIGEST_UTIL,
-        /* expireService=*/
-        newDirectExecutorService(),
+        expireService,
         storage,
         onPut,
         onExpire,
-        /* delegate=*/ null) {
+        delegate) {
       @Override
-      protected InputStream newExternalInput(Digest digest, long offset) {
+      protected InputStream newExternalInput(Digest digest, long offset) throws IOException {
         ByteString content = blobs.get(digest);
         if (content == null) {
-          return new BrokenInputStream(new IOException("NOT_FOUND: " + DigestUtil.toString(digest)));
+          return fileCache.newTransparentInput(digest, offset);
         }
         return content.substring((int) offset).newInput();
       }
@@ -140,6 +144,9 @@ class CASFileCacheTest {
   public void tearDown() {
     if (!shutdownAndAwaitTermination(putService, 1, SECONDS)) {
       throw new RuntimeException("could not shut down put service");
+    }
+    if (!shutdownAndAwaitTermination(expireService, 1, SECONDS)) {
+      throw new RuntimeException("could not shut down expire service");
     }
   }
 
@@ -258,7 +265,7 @@ class CASFileCacheTest {
     blobs.put(bigDigest, bigBlob);
     Path bigPath = fileCache.put(bigDigest, false);
 
-    fileCache.decrementReferences(ImmutableList.<Path>of(bigPath), ImmutableList.of());
+    decrementReference(bigPath);
 
     byte[] strawData = new byte[30]; // take us beyond our 1024 limit
     ByteString strawBlob = ByteString.copyFrom(strawData);
@@ -368,7 +375,7 @@ class CASFileCacheTest {
     }
     // minimal test to ensure that we're blocked
     assertThat(putFuture.isDone()).isFalse();
-    fileCache.decrementReferences(ImmutableList.<Path>of(bigPath), ImmutableList.of());
+    decrementReference(bigPath);
     try {
       putFuture.get();
     } finally {
@@ -487,6 +494,204 @@ class CASFileCacheTest {
     try (OutputStream out = write.getOutput(1, SECONDS)) {
       ByteString.copyFromUtf8("H3110, W0r1d").writeTo(out);
     }
+  }
+
+  @Test
+  public void containsRemovesNonexistentEntry() throws IOException, InterruptedException {
+    ByteString content = ByteString.copyFromUtf8("Hello, World");
+    Blob blob = new Blob(content, DIGEST_UTIL);
+
+    fileCache.put(blob);
+    Path path = fileCache.getKey(blob.getDigest(), /* isExecutable=*/ false);
+    // putCreatesFile verifies this
+    Files.delete(path);
+    // update entry with expired deadline
+    storage.get(path).existsDeadline = Deadline.after(0, SECONDS);
+    assertThat(fileCache.contains(blob.getDigest())).isFalse();
+    assertThat(storage.containsKey(path)).isFalse();
+  }
+
+  @Test
+  public void emptyWriteIsComplete() {
+    Write write = fileCache.getWrite(
+        DIGEST_UTIL.compute(ByteString.EMPTY),
+        UUID.randomUUID(),
+        RequestMetadata.getDefaultInstance());
+    assertThat(write.isComplete()).isTrue();
+  }
+
+  @Test
+  public void expireInterruptCausesExpirySequenceHalt() throws IOException, InterruptedException {
+    Blob expiringBlob;
+    try (ByteString.Output out = ByteString.newOutput(1024)) {
+      for (int i = 0; i < 1024; i++) {
+        out.write(0);
+      }
+      expiringBlob = new Blob(out.toByteString(), DIGEST_UTIL);
+      fileCache.put(expiringBlob);
+    }
+    Digest expiringDigest = expiringBlob.getDigest();
+
+    // set the delegate to throw interrupted on write output creation
+    Write interruptingWrite = new Write() {
+      boolean canReset = false;
+
+      @Override
+      public long getCommittedSize() {
+        throw new UnsupportedOperationException();
+      }
+
+      @Override
+      public boolean isComplete() {
+        throw new UnsupportedOperationException();
+      }
+
+      @Override
+      public OutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits) throws IOException {
+        canReset = true;
+        throw new IOException(new InterruptedException());
+      }
+
+      @Override
+      public void reset() {
+        if (!canReset) {
+          throw new UnsupportedOperationException();
+        }
+      }
+
+      @Override
+      public void addListener(Runnable onCompleted, Executor executor) {
+        throw new UnsupportedOperationException();
+      }
+    };
+    when(delegate.getWrite(eq(expiringDigest), any(UUID.class), any(RequestMetadata.class)))
+        .thenReturn(interruptingWrite);
+
+    // FIXME we should have a guarantee that we did not iterate over another expiration
+    InterruptedException sequenceException = null;
+    try {
+      fileCache.put(new Blob(ByteString.copyFromUtf8("Hello, World"), DIGEST_UTIL));
+      fail("should not get here");
+    } catch (InterruptedException e) {
+      sequenceException = e;
+    }
+    assertThat(sequenceException).isNotNull();
+
+    verify(delegate, times(1)).getWrite(eq(expiringDigest), any(UUID.class), any(RequestMetadata.class));
+  }
+
+  void decrementReference(Path path) {
+    fileCache.decrementReferences(ImmutableList.of(path), ImmutableList.of());
+  }
+
+  @Test
+  public void duplicateExpiredEntrySuppressesDigestExpiration() throws IOException, InterruptedException {
+    Blob expiringBlob;
+    try (ByteString.Output out = ByteString.newOutput(512)) {
+      for (int i = 0; i < 512; i++) {
+        out.write(0);
+      }
+      expiringBlob = new Blob(out.toByteString(), DIGEST_UTIL);
+    }
+    blobs.put(expiringBlob.getDigest(), expiringBlob.getData());
+    decrementReference(fileCache.put(expiringBlob.getDigest(), /* isExecutable=*/ false)); // expected eviction
+    blobs.clear();
+    decrementReference(fileCache.put(expiringBlob.getDigest(), /* isExecutable=*/ true)); // should be fed from storage directly, not through delegate
+
+    fileCache.put(new Blob(ByteString.copyFromUtf8("Hello, World"), DIGEST_UTIL));
+
+    verifyZeroInteractions(onExpire);
+    // assert expiration of non-executable digest
+    Path expiringKey = fileCache.getKey(expiringBlob.getDigest(), /* isExecutable=*/ false);
+    assertThat(storage.containsKey(expiringKey)).isFalse();
+    assertThat(Files.exists(expiringKey)).isFalse();
+  }
+
+  @Test
+  public void interruptDeferredDuringExpirations() throws IOException, InterruptedException {
+    Blob expiringBlob;
+    try (ByteString.Output out = ByteString.newOutput(1024)) {
+      for (int i = 0; i < 1024; i++) {
+        out.write(0);
+      }
+      expiringBlob = new Blob(out.toByteString(), DIGEST_UTIL);
+    }
+    fileCache.put(expiringBlob);
+    // state of CAS
+    //   1024-byte key
+
+    AtomicReference<Throwable> exRef = new AtomicReference(null);
+    // 0 = not blocking
+    // 1 = blocking
+    // 2 = delegate write
+    AtomicInteger writeState = new AtomicInteger(0);
+    // this will ensure that the discharge task is blocked until we release it
+    Future<Void> blockingExpiration = expireService.submit(() -> {
+      writeState.getAndIncrement();
+      while (writeState.get() != 0) {
+        try {
+          MICROSECONDS.sleep(1);
+        } catch (InterruptedException e) {
+          // ignore
+        }
+      }
+      return null;
+    });
+    when(delegate.getWrite(eq(expiringBlob.getDigest()), any(UUID.class), any(RequestMetadata.class))).thenReturn(new NullWrite() {
+      @Override
+      public OutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits) throws IOException {
+        try {
+          while (writeState.get() != 1) {
+            MICROSECONDS.sleep(1);
+          }
+        } catch (InterruptedException e) {
+          throw new IOException(e);
+        }
+        writeState.getAndIncrement(); // move into output stream state
+        return super.getOutput(deadlineAfter, deadlineAfterUnits);
+      }
+    });
+    Thread expiringThread = new Thread(() -> {
+      try {
+        fileCache.put(new Blob(ByteString.copyFromUtf8("Hello, World"), DIGEST_UTIL));
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
+      fail("should not get here");
+    });
+    expiringThread.setUncaughtExceptionHandler((t, e) -> exRef.set(e));
+    // wait for blocking state
+    while (writeState.get() != 1) {
+      MICROSECONDS.sleep(1);
+    }
+    expiringThread.start();
+    while (writeState.get() != 2) {
+      MICROSECONDS.sleep(1);
+    }
+    // expiry has been initiated, thread should be waiting
+    MICROSECONDS.sleep(10); // just trying to ensure that we've reached the future wait point
+    // hopefully this will be scheduled *after* the discharge task
+    Future<Void> completedExpiration = expireService.submit(() -> null);
+    // interrupt it
+    expiringThread.interrupt();
+
+    assertThat(expiringThread.isAlive()).isTrue();
+    assertThat(completedExpiration.isDone()).isFalse();
+    writeState.set(0);
+    while (!blockingExpiration.isDone()) {
+      MICROSECONDS.sleep(1);
+    }
+    expiringThread.join();
+    // CAS should now be empty due to expiration and failed put
+    while (!completedExpiration.isDone()) {
+      MICROSECONDS.sleep(1);
+    }
+    assertThat(fileCache.size()).isEqualTo(0);
+    Throwable t = exRef.get();
+    assertThat(t).isNotNull();
+    t = t.getCause();
+    assertThat(t).isNotNull();
+    assertThat(t).isInstanceOf(InterruptedException.class);
   }
 
   @RunWith(JUnit4.class)
