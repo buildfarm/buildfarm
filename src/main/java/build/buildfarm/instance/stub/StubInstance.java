@@ -530,7 +530,7 @@ public class StubInstance implements Instance {
       for (Directory directory : response.getDirectoriesList()) {
         if (!rootIsSet && digestUtil.compute(directory).equals(rootDigest)) {
           tree.setRoot(directory);
-          rootIsSet = false;
+          rootIsSet = true;
         } else {
           tree.addChildren(directory);
         }

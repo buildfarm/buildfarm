@@ -237,14 +237,13 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
             rootDigest, pageSize, pageToken, builder);
         Tree tree = builder.build();
 
-        GetTreeResponse.Builder response = GetTreeResponse.newBuilder();
+        GetTreeResponse.Builder response = GetTreeResponse.newBuilder()
+            .setNextPageToken(nextPageToken);
         if (tree.hasRoot()) {
           response.addDirectories(tree.getRoot());
         }
-        responseObserver.onNext(GetTreeResponse.newBuilder()
-            .addAllDirectories(tree.getChildrenList())
-            .setNextPageToken(nextPageToken)
-            .build());
+        response.addAllDirectories(tree.getChildrenList());
+        responseObserver.onNext(response.build());
         pageToken = nextPageToken;
       } while (!pageToken.isEmpty());
       responseObserver.onCompleted();
