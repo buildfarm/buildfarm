@@ -314,8 +314,8 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   public Operation stripQueuedOperation(Operation operation) {
     if (operation.getMetadata().is(QueuedOperationMetadata.class)) {
       operation = operation.toBuilder()
-        .setMetadata(Any.pack(expectExecuteOperationMetadata(operation)))
-        .build();
+          .setMetadata(Any.pack(expectExecuteOperationMetadata(operation)))
+          .build();
     }
     return operation;
   }

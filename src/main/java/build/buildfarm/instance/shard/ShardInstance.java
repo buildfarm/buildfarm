@@ -70,7 +70,6 @@ import build.buildfarm.common.grpc.RetryException;
 import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.ByteStreamUploader;
-import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.OperationIteratorToken;
 import build.buildfarm.v1test.ShardInstanceConfig;
@@ -78,7 +77,6 @@ import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ProfiledQueuedOperationMetadata;
-import build.buildfarm.v1test.ExecutingOperationMetadata;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Stopwatch;
 import com.google.common.cache.LoadingCache;
@@ -205,7 +203,7 @@ public class ShardInstance extends AbstractServerInstance {
             config.getRedisShardBackplaneConfig(),
             identifier,
             ShardInstance::stripOperation,
-            ShardInstance::stripOperation,
+            ShardInstance::stripQueuedOperation,
             /* isPrequeued=*/ ShardInstance::isUnknown,
             /* isExecuting=*/ or(ShardInstance::isExecuting, ShardInstance::isQueued));
     }
@@ -1776,6 +1774,15 @@ public class ShardInstance extends AbstractServerInstance {
     return operation.toBuilder()
         .setMetadata(Any.pack(metadata))
         .build();
+  }
+
+  private static Operation stripQueuedOperation(Operation operation) {
+    if (operation.getMetadata().is(QueuedOperationMetadata.class)) {
+      operation = operation.toBuilder()
+          .setMetadata(Any.pack(expectExecuteOperationMetadata(operation)))
+          .build();
+    }
+    return operation;
   }
 
   @Override
