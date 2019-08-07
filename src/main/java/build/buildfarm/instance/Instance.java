@@ -18,7 +18,6 @@ import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
 import build.bazel.remote.execution.v2.Digest;
-import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ExecutionStage;
@@ -124,18 +123,6 @@ public interface Instance {
 
     // returns false if this listener will not handle this match
     boolean onEntry(@Nullable QueueEntry queueEntry) throws InterruptedException;
-  }
-
-  public static interface ChunkObserver extends StreamObserver<ByteString> {
-    long getCommittedSize();
-
-    void reset();
-
-    ListenableFuture<Long> getCommittedFuture();
-  }
-
-  public static abstract class CommittingOutputStream extends OutputStream {
-    public abstract ListenableFuture<Long> getCommittedFuture();
   }
 
   public static class PutAllBlobsException extends RuntimeException {

@@ -14,8 +14,8 @@
 
 package build.buildfarm.ac;
 
-import build.buildfarm.common.DigestUtil.ActionKey;
 import build.bazel.remote.execution.v2.ActionResult;
+import build.buildfarm.common.DigestUtil.ActionKey;
 
 public interface ActionCache {
   ActionResult get(ActionKey actionKey);

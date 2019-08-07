@@ -167,15 +167,6 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  public String getTree(
-      Digest rootDigest,
-      int pageSize,
-      String pageToken,
-      Tree.Builder tree) {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public Write getOperationStreamWrite(String name) {
     throw new UnsupportedOperationException();
   }
@@ -233,16 +224,6 @@ public class ShardWorkerInstance extends AbstractServerInstance {
 
   @Override
   public boolean pollOperation(String operationName, ExecutionStage.Value stage) {
-    throw new UnsupportedOperationException();
-  }
-
-  // returns nextPageToken suitable for list restart
-  @Override
-  public String listOperations(
-      int pageSize,
-      String pageToken,
-      String filter,
-      ImmutableList.Builder<Operation> operations) {
     throw new UnsupportedOperationException();
   }
 
