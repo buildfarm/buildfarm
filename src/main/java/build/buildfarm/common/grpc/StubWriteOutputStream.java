@@ -37,6 +37,7 @@ import java.io.OutputStream;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.concurrent.GuardedBy;
 
 public class StubWriteOutputStream extends OutputStream implements Write {
   public static final long UNLIMITED_EXPECTED_SIZE = Long.MAX_VALUE;
@@ -85,7 +86,10 @@ public class StubWriteOutputStream extends OutputStream implements Write {
   private boolean sentResourceName = false;
   private int offset = 0;
   private long writtenBytes = 0;
+
+  @GuardedBy("this")
   private StreamObserver<WriteRequest> writeObserver = null;
+
   private long deadlineAfter = 0;
   private TimeUnit deadlineAfterUnits = null;
 
@@ -114,13 +118,15 @@ public class StubWriteOutputStream extends OutputStream implements Write {
         initiateWrite();
         flushSome(finishWrite);
       }
-      if (writeObserver != null) {
-        if (finishWrite || getCommittedSize() + offset == expectedSize) {
-          writeObserver.onCompleted();
-        } else {
-          writeObserver.onError(Status.CANCELLED.asException());
+      synchronized (this) {
+        if (writeObserver != null) {
+          if (finishWrite || getCommittedSize() + offset == expectedSize) {
+            writeObserver.onCompleted();
+          } else {
+            writeObserver.onError(Status.CANCELLED.asException());
+          }
+          writeObserver = null;
         }
-        writeObserver = null;
       }
     }
   }
@@ -133,7 +139,9 @@ public class StubWriteOutputStream extends OutputStream implements Write {
     if (!sentResourceName) {
       request.setResourceName(resourceName);
     }
-    writeObserver.onNext(request.build());
+    synchronized (this) {
+      writeObserver.onNext(request.build());
+    }
     wasReset = false;
     writtenBytes += offset;
     offset = 0;
@@ -166,7 +174,7 @@ public class StubWriteOutputStream extends OutputStream implements Write {
     }
   }
 
-  private void initiateWrite() throws IOException {
+  private synchronized void initiateWrite() throws IOException {
     if (writeObserver == null) {
       checkNotNull(deadlineAfterUnits);
       writeObserver = bsStub.get()
@@ -185,7 +193,9 @@ public class StubWriteOutputStream extends OutputStream implements Write {
 
                 @Override
                 public void onCompleted() {
-                  writeObserver = null;
+                  synchronized (StubWriteOutputStream.this) {
+                    writeObserver = null;
+                  }
                 }
               });
     }
