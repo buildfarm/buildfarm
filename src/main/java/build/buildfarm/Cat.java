@@ -342,26 +342,26 @@ class Cat {
   }
 
   private static void printStatus(com.google.rpc.Status status) throws InvalidProtocolBufferException {
-    System.out.println("    Code: " + Code.forNumber(status.getCode()));
+    System.out.println("  Code: " + Code.forNumber(status.getCode()));
     if (!status.getMessage().isEmpty()) {
-      System.out.println("    Message: " + status.getMessage());
+      System.out.println("  Message: " + status.getMessage());
     }
     if (status.getDetailsCount() > 0) {
-      System.out.println("    Details:");
+      System.out.println("  Details:");
       for (Any detail : status.getDetailsList()) {
         if (detail.is(RetryInfo.class)) {
           RetryInfo retryInfo = detail.unpack(RetryInfo.class);
-          System.out.println("      RetryDelay: " + (retryInfo.getRetryDelay().getSeconds() + retryInfo.getRetryDelay().getNanos() / 1000000000.0f));
+          System.out.println("    RetryDelay: " + (retryInfo.getRetryDelay().getSeconds() + retryInfo.getRetryDelay().getNanos() / 1000000000.0f));
         } else if (detail.is(PreconditionFailure.class)) {
           PreconditionFailure preconditionFailure = detail.unpack(PreconditionFailure.class);
-          System.out.println("      PreconditionFailure:");
+          System.out.println("    PreconditionFailure:");
           for (PreconditionFailure.Violation violation : preconditionFailure.getViolationsList()) {
-            System.out.println("        Violation: " + violation.getType());
-            System.out.println("          Subject: " + violation.getSubject());
-            System.out.println("          Description: " + violation.getDescription());
+            System.out.println("      Violation: " + violation.getType());
+            System.out.println("        Subject: " + violation.getSubject());
+            System.out.println("        Description: " + violation.getDescription());
           }
         } else {
-          System.out.println("      Unknown Detail: " + detail.getTypeUrl());
+          System.out.println("    Unknown Detail: " + detail.getTypeUrl());
         }
       }
     }
@@ -371,7 +371,7 @@ class Cat {
     printStatus(response.getStatus());
     if (Code.forNumber(response.getStatus().getCode()) == Code.OK) {
       printActionResult(response.getResult(), 2);
-      System.out.println("    CachedResult: " + (response.getCachedResult() ? "true" : "false"));
+      System.out.println("  CachedResult: " + (response.getCachedResult() ? "true" : "false"));
     }
     // FIXME server_logs
   }
@@ -415,7 +415,7 @@ class Cat {
     if (operation.getDone()) {
       switch(operation.getResultCase()) {
         case RESPONSE:
-          System.out.println("  Response:");
+          System.out.println("Response:");
           try {
             printExecuteResponse(operation.getResponse().unpack(ExecuteResponse.class));
           } catch (InvalidProtocolBufferException e) {
@@ -423,7 +423,7 @@ class Cat {
           }
           break;
         case ERROR:
-          System.out.println("  Error: " + Code.forNumber(operation.getError().getCode()));
+          System.out.println("Error: " + Code.forNumber(operation.getError().getCode()));
           break;
         default:
           System.out.println("  UNKNOWN RESULT!");
