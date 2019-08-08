@@ -444,6 +444,7 @@ public class StubInstance implements Instance {
             });
   }
 
+  @Override
   public InputStream newBlobInput(
       Digest digest,
       long offset,

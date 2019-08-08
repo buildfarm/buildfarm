@@ -32,6 +32,7 @@ import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.ShardInstance.WorkersCallback;
+import com.google.common.base.Throwables;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -219,16 +220,11 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
     try {
       return inputStreamFuture.get();
     } catch (ExecutionException e) {
-      if (e.getCause() instanceof IOException) {
-        throw (IOException) e.getCause();
-      }
-      if (e.getCause() instanceof InterruptedException) {
-        throw (InterruptedException) e.getCause();
-      }
-      if (e.getCause() instanceof RuntimeException) {
-        throw (RuntimeException) e.getCause();
-      }
-      throw new UncheckedExecutionException(e.getCause());
+      Throwable cause = e.getCause();
+      Throwables.throwIfUnchecked(cause);
+      Throwables.throwIfInstanceOf(cause, IOException.class);
+      Throwables.throwIfInstanceOf(cause, InterruptedException.class);
+      throw new UncheckedExecutionException(cause);
     }
   }
 }

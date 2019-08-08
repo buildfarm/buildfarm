@@ -83,12 +83,12 @@ public class ByteStringQueueInputStream extends InputStream {
         }
         atInputEndOfFile = true;
         advance();
-        continue; // restart read with EOF indicator
+      } else {
+        atInputEndOfFile = false;
+        len -= readLen;
+        off += readLen;
+        totalLen += readLen;
       }
-      atInputEndOfFile = false;
-      len -= readLen;
-      off += readLen;
-      totalLen += readLen;
     }
     return totalLen;
   }

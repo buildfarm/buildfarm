@@ -181,7 +181,7 @@ public class Worker {
         config.getPublicName(),
         digestUtil,
         backplane,
-        execFileSystem.getStorage(),
+        storage,
         execFileSystem,
         execFileSystem,
         config.getShardWorkerInstanceConfig());

@@ -127,10 +127,12 @@ public class ByteStreamService extends ByteStreamImplBase {
 
       @Override
       public void run() {
-        if (complete) {
-          return;
+        if (!complete) {
+          copy();
         }
+      }
 
+      void copy() {
         try {
           while (target.isReady() && !complete) {
             ReadResponse response = next();

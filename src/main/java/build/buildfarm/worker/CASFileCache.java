@@ -1693,11 +1693,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   @FunctionalInterface
-  private static interface InputStreamSupplier {
-    InputStream newInput() throws IOException, InterruptedException;
-  }
-
-  @FunctionalInterface
   private static interface IORunnable {
     void run() throws IOException;
   }
