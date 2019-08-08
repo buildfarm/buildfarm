@@ -154,7 +154,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         @Override
         public SettableFuture<Long> load(Digest digest) {
           SettableFuture<Long> future = SettableFuture.create();
-          if (contains(digest)) {
+          if (containsLocal(digest)) {
             future.set(digest.getSizeBytes());
           }
           return future;
@@ -366,11 +366,16 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return false;
   }
 
+  boolean containsLocal(Digest digest) {
+    /* maybe swap the order here if we're higher in ratio on one side */
+    return contains(digest, false) || contains(digest, true);
+  }
+
   @Override
   public Iterable<Digest> findMissingBlobs(Iterable<Digest> digests) throws InterruptedException {
     ImmutableList.Builder<Digest> builder = ImmutableList.builder();
     for (Digest digest : digests) {
-      if (!contains(digest)) {
+      if (!containsLocal(digest)) {
         builder.add(digest);
       }
     }
@@ -383,8 +388,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   @Override
   public boolean contains(Digest digest) {
-    /* maybe swap the order here if we're higher in ratio on one side */
-    return contains(digest, false) || contains(digest, true) || (delegate != null && delegate.contains(digest));
+    return containsLocal(digest) || (delegate != null && delegate.contains(digest));
   }
 
   @Override
@@ -701,7 +705,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
       @Override
       public synchronized boolean isComplete() {
-        return getFuture().isDone() || (out == null && contains(key.getDigest()));
+        return getFuture().isDone() || (out == null && containsLocal(key.getDigest()));
       }
 
       public ListenableFuture<Long> getFuture() {
