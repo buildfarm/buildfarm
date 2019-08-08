@@ -169,7 +169,8 @@ public class Worker {
             config.getPublicName(),
             backplane,
             new Random(),
-            workerStubs);
+            workerStubs,
+            (worker, t, context) -> {});
     ContentAddressableStorage storage = createStorages(
         remoteInputStreamFactory, removeDirectoryService, config.getCasList());
     execFileSystem = createExecFileSystem(

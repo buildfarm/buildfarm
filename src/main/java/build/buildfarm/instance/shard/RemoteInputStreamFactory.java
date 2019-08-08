@@ -59,27 +59,35 @@ import javax.annotation.Nullable;
 public class RemoteInputStreamFactory implements InputStreamFactory {
   private static final Logger logger = Logger.getLogger(RemoteInputStreamFactory.class.getName());
 
+  public interface UnavailableConsumer {
+    void accept(String worker, Throwable t, String context);
+  }
+
   private final @Nullable String publicName;
   private final ShardBackplane backplane;
   private final Random rand;
   private final LoadingCache<String, Instance> workerStubs;
+  private final UnavailableConsumer onUnavailable;
 
   RemoteInputStreamFactory(
       ShardBackplane backplane,
       Random rand,
-      LoadingCache<String, Instance> workerStubs) {
-    this(/* publicName=*/ null, backplane, rand, workerStubs);
+      LoadingCache<String, Instance> workerStubs,
+      UnavailableConsumer onUnavailable) {
+    this(/* publicName=*/ null, backplane, rand, workerStubs, onUnavailable);
   }
 
   public RemoteInputStreamFactory(
       String publicName,
       ShardBackplane backplane,
       Random rand,
-      LoadingCache<String, Instance> workerStubs) {
+      LoadingCache<String, Instance> workerStubs,
+      UnavailableConsumer onUnavailable) {
     this.publicName = publicName;
     this.backplane = backplane;
     this.rand = rand;
     this.workerStubs = workerStubs;
+    this.onUnavailable = onUnavailable;
   }
 
   private Instance workerStub(String worker) {
@@ -112,7 +120,7 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
       Status st = Status.fromThrowable(e);
       if (st.getCode().equals(Code.UNAVAILABLE)) {
         // for now, leave this up to schedulers
-        // removeMalfunctioningWorker(worker, e, "getBlob(" + DigestUtil.toString(blobDigest) + ")");
+        onUnavailable.accept(worker, e, "getBlob(" + DigestUtil.toString(blobDigest) + ")");
       } else if (st.getCode() == Code.NOT_FOUND) {
         // ignore this, the worker will update the backplane eventually
       } else if (Retrier.DEFAULT_IS_RETRIABLE.test(st)) {

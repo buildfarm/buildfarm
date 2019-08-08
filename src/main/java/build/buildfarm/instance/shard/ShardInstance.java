@@ -227,7 +227,7 @@ public class ShardInstance extends AbstractServerInstance {
     this.maxBlobSize = maxBlobSize;
     backplane.setOnUnsubscribe(this::stop);
 
-    remoteInputStreamFactory = new RemoteInputStreamFactory(backplane, rand, workerStubs);
+    remoteInputStreamFactory = new RemoteInputStreamFactory(backplane, rand, workerStubs, this::removeMalfunctioningWorker);
 
     if (runDispatchedMonitor) {
       dispatchedMonitor = new Thread(new DispatchedMonitor(
