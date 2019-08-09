@@ -326,31 +326,35 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   private boolean contains(Digest digest, boolean isExecutable) {
     Path key = getKey(digest, isExecutable);
-    Entry e = storage.get(key);
-    if (e == null) {
+    if (!storage.containsKey(key)) {
       return false;
     }
     synchronized (this) {
       // refetch to ensure that it has not been removed
       // this seems soooo jank, but prevents us from waiting on sync when we know we
       // don't have an entry
-      e = storage.get(key);
+      Entry e = storage.get(key);
       if (e == null) {
         return false;
       }
-      if (!entryExists(e)) {
+      boolean exists = entryExists(e);
+      if (exists) {
+        e.recordAccess(header);
+      } else {
         Entry removedEntry = storage.remove(key);
-        if (removedEntry != null) {
+        if (removedEntry == e) {
           try {
             unlinkEntry(removedEntry);
           } catch (IOException unlinkEx) {
             logger.log(SEVERE, "error unlinking non-existent entry " + key, unlinkEx);
           }
+        } else if (removedEntry != null) {
+          logger.severe(format("nonexistent entry %s did not match removed entry, restoring it", key));
+          storage.put(key, removedEntry);
+          // but we still return that the digest is not contained
         }
-        return false;
       }
-      e.recordAccess(header);
-      return true;
+      return exists;
     }
   }
 
