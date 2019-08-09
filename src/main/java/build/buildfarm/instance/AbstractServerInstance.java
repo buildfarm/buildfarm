@@ -20,6 +20,7 @@ import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.Futures.transformAsync;
 import static com.google.common.util.concurrent.Futures.allAsList;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static java.lang.String.format;
@@ -80,6 +81,7 @@ import com.google.protobuf.Parser;
 import com.google.rpc.Code;
 import com.google.rpc.PreconditionFailure;
 import com.google.rpc.PreconditionFailure.Violation;
+import io.grpc.Context;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import io.grpc.StatusException;
@@ -361,8 +363,17 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public ListenableFuture<Iterable<Digest>> findMissingBlobs(Iterable<Digest> digests, Executor executor) {
+    Thread findingThread = Thread.currentThread();
+    Context.CancellationListener cancellationListener = (context) -> {
+      findingThread.interrupt();
+    };
+    Context.current().addListener(
+        cancellationListener,
+        directExecutor());
     try {
-      return immediateFuture(contentAddressableStorage.findMissingBlobs(digests));
+      ListenableFuture<Iterable<Digest>> future = immediateFuture(contentAddressableStorage.findMissingBlobs(digests));
+      Context.current().removeListener(cancellationListener);
+      return future;
     } catch (InterruptedException e) {
       return immediateFailedFuture(e);
     }

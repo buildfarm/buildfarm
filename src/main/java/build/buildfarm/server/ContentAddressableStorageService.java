@@ -85,15 +85,21 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
   public void findMissingBlobs(
       FindMissingBlobsRequest request,
       StreamObserver<FindMissingBlobsResponse> responseObserver) {
-    Stopwatch stopwatch = Stopwatch.createStarted();
-    Instance instance;
     try {
-      instance = instances.get(request.getInstanceName());
+      instanceFindMissingBlobs(
+          instances.get(request.getInstanceName()),
+          request,
+          responseObserver);
     } catch (InstanceNotFoundException e) {
       responseObserver.onError(BuildFarmInstances.toStatusException(e));
-      return;
     }
+  }
 
+  void instanceFindMissingBlobs(
+      Instance instance,
+      FindMissingBlobsRequest request,
+      StreamObserver<FindMissingBlobsResponse> responseObserver) {
+    Stopwatch stopwatch = Stopwatch.createStarted();
     FindMissingBlobsResponse.Builder builder = FindMissingBlobsResponse.newBuilder();
     addCallback(
         transform(
