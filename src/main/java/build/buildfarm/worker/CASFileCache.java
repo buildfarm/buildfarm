@@ -533,22 +533,59 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   class ReadThroughInputStream extends InputStream {
-    private final InputStream in;
+    private InputStream in;
     private final Write write;
     private final OutputStream out;
+    private final Digest digest;
+
+    @GuardedBy("this")
+    private boolean local = false;
+
+    @GuardedBy("this")
+    private long localOffset;
+
+    @GuardedBy("this")
     private long skip;
+
+    @GuardedBy("this")
     private long remaining;
+
+    @GuardedBy("this")
+    private IOException exception = null;
 
     ReadThroughInputStream(InputStream in, Digest digest, long offset) throws IOException {
       this.in = in;
+      this.localOffset = offset;
+      this.digest = digest;
       skip = offset;
       remaining = digest.getSizeBytes();
       write = getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
+      write.addListener(
+          this::switchToLocal,
+          directExecutor());
       out = write.getOutput(1, MINUTES);
     }
 
+    private synchronized void switchToLocal() {
+      if (!local && localOffset < digest.getSizeBytes()) {
+        local = true;
+        try {
+          in.close();
+        } catch (IOException e) {
+          // ignore
+        }
+        try {
+          in = newTransparentInput(digest, localOffset);
+        } catch (IOException e) {
+          in = null;
+          exception = e;
+        }
+      }
+    }
+
+    @GuardedBy("this")
     private void readToSkip() throws IOException {
-      while (skip > 0) {
+      while (!local && skip > 0) {
         byte[] buf = new byte[8192];
 
         int len = (int) Math.min(buf.length, skip);
@@ -557,6 +594,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           out.write(buf, 0, n);
           skip -= n;
           remaining -= n;
+          localOffset += n;
         } else if (n < 0) {
           throw new IOException("premature EOF for delegate");
         }
@@ -569,12 +607,26 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
 
     @Override
-    public int read() throws IOException {
+    public synchronized int read() throws IOException {
+      if (local) {
+        if (exception != null) {
+          throw exception;
+        }
+        return in.read();
+      }
       readToSkip();
       int b = in.read();
       if (b != -1) {
-        out.write(b);
+        try {
+          out.write(b);
+        } catch (IOException e) {
+          if (!write.isComplete()) {
+            throw e;
+          }
+          // complete writes will switch to local
+        }
         remaining--;
+        localOffset++;
       } else if (remaining != 0) {
         throw new IOException("premature EOF for delegate");
       }
@@ -590,12 +642,19 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
 
     @Override
-    public int read(byte[] buf, int ofs, int len) throws IOException {
+    public synchronized int read(byte[] buf, int ofs, int len) throws IOException {
+      if (local) {
+        if (exception != null) {
+          throw exception;
+        }
+        return in.read(buf, ofs, len);
+      }
       readToSkip();
       int n = in.read(buf, ofs, len);
       if (n > 0) {
         out.write(buf, ofs, n);
         remaining -= n;
+        localOffset += n;
       } else if (remaining != 0) {
         throw new IOException("premature EOF for delegate");
       }
@@ -606,7 +665,13 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
 
     @Override
-    public long skip(long n) {
+    public synchronized long skip(long n) throws IOException {
+      if (local) {
+        if (exception != null) {
+          throw exception;
+        }
+        return in.skip(n);
+      }
       if (n <= 0) {
         return 0;
       }
@@ -614,18 +679,24 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         n = remaining - skip;
       }
       skip += n;
+      localOffset += n;
       return n;
     }
 
     @Override
-    public void close() throws IOException {
-      if (remaining != 0) {
-        write.reset();
-      } else {
-        try {
-          out.close();
-        } catch (IOException e) {
-          // ignore, may be incomplete
+    public synchronized void close() throws IOException {
+      if (exception != null) {
+        throw exception;
+      }
+      if (!local) {
+        if (remaining != 0) {
+          write.reset();
+        } else {
+          try {
+            out.close();
+          } catch (IOException e) {
+            // ignore, may be incomplete
+          }
         }
       }
       in.close();
