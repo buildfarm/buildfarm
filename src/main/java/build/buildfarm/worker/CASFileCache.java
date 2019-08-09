@@ -1066,7 +1066,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               fileKeysBuilder.put(attrs.fileKey(), e);
               storage.put(e.key, e);
               onPut.accept(fileEntryKey.getDigest());
-              synchronized (this) {
+              synchronized (CASFileCache.this) {
                 e.decrementReference(header);
               }
               sizeInBytes += size;
