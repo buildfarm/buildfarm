@@ -84,6 +84,7 @@ import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.channels.ClosedChannelException;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.FileVisitOption;
@@ -580,6 +581,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           in = null;
           exception = e;
         }
+        notify(); // wake up a writer
       }
     }
 
@@ -614,21 +616,35 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         }
         return in.read();
       }
-      readToSkip();
-      int b = in.read();
-      if (b != -1) {
-        try {
-          out.write(b);
-        } catch (IOException e) {
-          if (!write.isComplete()) {
-            throw e;
+      int b;
+      try {
+        readToSkip();
+        b = in.read();
+        if (b != -1) {
+          try {
+            out.write(b);
+          } catch (IOException e) {
+            if (!write.isComplete()) {
+              throw e;
+            }
+            // complete writes will switch to local
           }
-          // complete writes will switch to local
+          remaining--;
+          localOffset++;
+        } else if (remaining != 0) {
+          throw new IOException("premature EOF for delegate");
         }
-        remaining--;
-        localOffset++;
-      } else if (remaining != 0) {
-        throw new IOException("premature EOF for delegate");
+      } catch (ClosedChannelException e) {
+        // if either in or out are closed, it should be due to a local switch
+        while (!local) {
+          try {
+            wait();
+          } catch (InterruptedException intEx) {
+            throw new IOException(intEx);
+          }
+        }
+        // we reacquire, meaning we should have completed the local switch
+        return in.read();
       }
       if (remaining == 0) {
         out.close();
@@ -649,14 +665,28 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         }
         return in.read(buf, ofs, len);
       }
-      readToSkip();
-      int n = in.read(buf, ofs, len);
-      if (n > 0) {
-        out.write(buf, ofs, n);
-        remaining -= n;
-        localOffset += n;
-      } else if (remaining != 0) {
-        throw new IOException("premature EOF for delegate");
+      int n;
+      try {
+        readToSkip();
+        n = in.read(buf, ofs, len);
+        if (n > 0) {
+          out.write(buf, ofs, n);
+          remaining -= n;
+          localOffset += n;
+        } else if (remaining != 0) {
+          throw new IOException("premature EOF for delegate");
+        }
+      } catch (ClosedChannelException e) {
+        // if either in or out are closed, it should be due to a local switch
+        while (!local) {
+          try {
+            wait();
+          } catch (InterruptedException intEx) {
+            throw new IOException(intEx);
+          }
+        }
+        // we reacquire, meaning we should have completed the local switch
+        return in.read(buf, ofs, len);
       }
       if (remaining == 0) {
         out.close();

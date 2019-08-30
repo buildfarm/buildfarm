@@ -53,12 +53,14 @@ import com.google.common.collect.Maps;
 import com.google.common.jimfs.Configuration;
 import com.google.common.jimfs.Jimfs;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.protobuf.ByteString;
 import io.grpc.Deadline;
 import java.io.InputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.channels.ClosedChannelException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
@@ -380,7 +382,7 @@ class CASFileCacheTest {
       putFuture.get();
     } finally {
       if (!shutdownAndAwaitTermination(service, 1, SECONDS)) {
-        throw new RuntimeException("could not shut down put service");
+        throw new RuntimeException("could not shut down service");
       }
     }
   }
@@ -692,6 +694,81 @@ class CASFileCacheTest {
     t = t.getCause();
     assertThat(t).isNotNull();
     assertThat(t).isInstanceOf(InterruptedException.class);
+  }
+
+  @Test
+  public void readThroughSwitchesToLocalOnComplete() throws IOException, InterruptedException {
+    ByteString content = ByteString.copyFromUtf8("Hello, World");
+    Blob blob = new Blob(content, DIGEST_UTIL);
+    when(delegate.newInput(eq(blob.getDigest()), eq(0l))).thenReturn(content.newInput());
+    InputStream in = fileCache.newInput(blob.getDigest(), 0);
+    byte[] buf = new byte[content.size()];
+    // advance to the middle of the content
+    assertThat(in.read(buf, 0, 6)).isEqualTo(6);
+    assertThat(ByteString.copyFrom(buf, 0, 6)).isEqualTo(content.substring(0, 6));
+    verify(delegate, times(1)).newInput(blob.getDigest(), 0l);
+    // trigger the read through to complete immediately by supplying the blob
+    fileCache.put(blob);
+    // read the remaining content
+    int remaining = content.size() - 6;
+    assertThat(in.read(buf, 6, remaining)).isEqualTo(remaining);
+    assertThat(ByteString.copyFrom(buf)).isEqualTo(content);
+  }
+
+  @Test
+  public void readThroughSwitchedToLocalContinues() throws Exception {
+    ByteString content = ByteString.copyFromUtf8("Hello, World");
+    Blob blob = new Blob(content, DIGEST_UTIL);
+    ExecutorService service = newSingleThreadExecutor();
+    SettableFuture<Void> writeComplete = SettableFuture.create();
+    // we need to register callbacks on the shared write future
+    Write write = new NullWrite() {
+      @Override
+      public void addListener(Runnable onCompleted, Executor executor) {
+        writeComplete.addListener(onCompleted, executor);
+      }
+
+      @Override
+      public OutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits) {
+        return new OutputStream() {
+          int offset = 0;
+
+          @Override
+          public void write(int b) {
+            throw new UnsupportedOperationException();
+          }
+
+          @Override
+          public void write(byte[] buf, int ofs, int len) throws IOException {
+            // hangs on second read
+            if (offset == 6) {
+              service.submit(() -> writeComplete.set(null));
+              throw new ClosedChannelException();
+            }
+            offset += len;
+          }
+        };
+      }
+    };
+    when(delegate.getWrite(eq(blob.getDigest()), any(UUID.class), any(RequestMetadata.class))).thenReturn(write);
+    when(delegate.newInput(eq(blob.getDigest()), eq(0l))).thenReturn(content.newInput());
+    // the switch will reset to this point
+    InputStream switchedIn = content.newInput();
+    switchedIn.skip(6);
+    when(delegate.newInput(eq(blob.getDigest()), eq(6l))).thenReturn(switchedIn);
+    InputStream in = fileCache.newReadThroughInput(blob.getDigest(), 0, write);
+    byte[] buf = new byte[content.size()];
+    // advance to the middle of the content
+    assertThat(in.read(buf, 0, 6)).isEqualTo(6);
+    assertThat(ByteString.copyFrom(buf, 0, 6)).isEqualTo(content.substring(0, 6));
+    verify(delegate, times(1)).newInput(blob.getDigest(), 0l);
+    // read the remaining content
+    int remaining = content.size() - 6;
+    assertThat(in.read(buf, 6, remaining)).isEqualTo(remaining);
+    assertThat(ByteString.copyFrom(buf)).isEqualTo(content);
+    if (!shutdownAndAwaitTermination(service, 1, SECONDS)) {
+      throw new RuntimeException("could not shut down service");
+    }
   }
 
   @RunWith(JUnit4.class)
