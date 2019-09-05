@@ -16,7 +16,9 @@ package build.buildfarm;
 
 import static build.buildfarm.instance.Utils.getBlob;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
 import static java.lang.String.format;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
@@ -56,6 +58,7 @@ import com.google.protobuf.util.Timestamps;
 import com.google.rpc.Code;
 import com.google.rpc.RetryInfo;
 import com.google.rpc.PreconditionFailure;
+import io.grpc.Context;
 import io.grpc.ManagedChannel;
 import io.grpc.Status;
 import io.grpc.netty.NegotiationType;
@@ -67,6 +70,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 class Cat {
@@ -450,6 +454,9 @@ class Cat {
     String instanceName = args[1];
     DigestUtil digestUtil = DigestUtil.forHash(args[2]);
     ManagedChannel channel = createChannel(host);
+    ScheduledExecutorService service = newSingleThreadScheduledExecutor();
+    Context.CancellableContext ctx = Context.current().withDeadlineAfter(10, TimeUnit.SECONDS, service);
+    Context prevContext = ctx.attach();
     Instance instance = new StubInstance(instanceName, "bf-cat", digestUtil, channel, 10, TimeUnit.SECONDS);
     String type = args[3];
 
@@ -501,6 +508,11 @@ class Cat {
           }
         }
       }
+    }
+    ctx.cancel(null);
+    ctx.detach(prevContext);
+    if (!shutdownAndAwaitTermination(service, 1, TimeUnit.SECONDS)) {
+      throw new RuntimeException("could not shut down service");
     }
   }
 };

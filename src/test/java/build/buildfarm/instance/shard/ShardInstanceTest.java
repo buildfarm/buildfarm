@@ -207,7 +207,7 @@ public class ShardInstanceTest {
     doAnswer(new Answer<Void>() {
       @Override
       public Void answer(InvocationOnMock invocation) {
-        StreamObserver<ByteString> blobObserver = (StreamObserver) invocation.getArguments()[5];
+        StreamObserver<ByteString> blobObserver = (StreamObserver) invocation.getArguments()[3];
         if (provideAction) {
           blobObserver.onNext(action.toByteString());
           blobObserver.onCompleted();
@@ -216,7 +216,7 @@ public class ShardInstanceTest {
         }
         return null;
       }
-    }).when(mockWorkerInstance).getBlob(eq(actionDigest), eq(0l), eq(0l), any(Long.class), any(TimeUnit.class), any(StreamObserver.class));
+    }).when(mockWorkerInstance).getBlob(eq(actionDigest), eq(0l), eq(0l), any(StreamObserver.class));
     when(mockBackplane.getBlobLocationSet(eq(actionDigest))).thenReturn(provideAction ? workers : ImmutableSet.of());
     when(mockWorkerInstance.findMissingBlobs(eq(ImmutableList.of(actionDigest)), any(Executor.class), any(RequestMetadata.class)))
         .thenReturn(immediateFuture(ImmutableList.of()));
@@ -697,12 +697,12 @@ public class ShardInstanceTest {
     doAnswer(new Answer<Void>() {
       @Override
       public Void answer(InvocationOnMock invocation) {
-        StreamObserver<ByteString> blobObserver = (StreamObserver) invocation.getArguments()[5];
+        StreamObserver<ByteString> blobObserver = (StreamObserver) invocation.getArguments()[3];
         blobObserver.onNext(content);
         blobObserver.onCompleted();
         return null;
       }
-    }).when(mockWorkerInstance).getBlob(eq(digest), eq(0l), eq(0l), any(Long.class), any(TimeUnit.class), any(StreamObserver.class));
+    }).when(mockWorkerInstance).getBlob(eq(digest), eq(0l), eq(0l), any(StreamObserver.class));
   }
 
   @Test

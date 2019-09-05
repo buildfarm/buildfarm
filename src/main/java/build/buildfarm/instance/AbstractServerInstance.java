@@ -286,7 +286,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   protected ListenableFuture<ByteString> getBlobFuture(Digest blobDigest, long offset, long limit) {
     SettableFuture<ByteString> future = SettableFuture.create();
-    getBlob(blobDigest, offset, limit, 60, SECONDS, new StreamObserver<ByteString>() {
+    getBlob(blobDigest, offset, limit, new StreamObserver<ByteString>() {
       ByteString content = ByteString.EMPTY;
 
       @Override
@@ -312,8 +312,6 @@ public abstract class AbstractServerInstance implements Instance {
       Digest blobDigest,
       long offset,
       long limit,
-      long readDeadlineAfter,
-      TimeUnit readDeadlineAfterUnits,
       StreamObserver<ByteString> blobObserver) {
     try {
       ByteString blob = getBlob(blobDigest, offset, limit);

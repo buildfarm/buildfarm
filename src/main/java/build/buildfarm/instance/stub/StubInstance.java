@@ -418,12 +418,9 @@ public class StubInstance implements Instance {
       Digest blobDigest,
       long offset,
       long limit,
-      long readDeadlineAfter,
-      TimeUnit readDeadlineAfterUnits,
       StreamObserver<ByteString> blobObserver) {
     throwIfStopped();
     newBSStub()
-        .withDeadlineAfter(readDeadlineAfter, readDeadlineAfterUnits)
         .read(
             ReadRequest.newBuilder()
                 .setResourceName(getBlobName(blobDigest))

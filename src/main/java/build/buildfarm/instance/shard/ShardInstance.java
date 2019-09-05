@@ -98,6 +98,7 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.Parser;
 import com.google.protobuf.util.Durations;
 import com.google.protobuf.util.Timestamps;
 import com.google.rpc.PreconditionFailure;
@@ -575,16 +576,12 @@ public class ShardInstance extends AbstractServerInstance {
       Deque<String> workers,
       long offset,
       long limit,
-      long readDeadlineAfter,
-      TimeUnit readDeadlineAfterUnits,
       StreamObserver<ByteString> blobObserver) {
     String worker = workers.removeFirst();
     workerStub(worker).getBlob(
         blobDigest,
         offset,
         limit,
-        readDeadlineAfter,
-        readDeadlineAfterUnits,
         new StreamObserver<ByteString>() {
           long received = 0;
 
@@ -597,16 +594,12 @@ public class ShardInstance extends AbstractServerInstance {
           @Override
           public void onError(Throwable t) {
             Status status = Status.fromThrowable(t);
-            if (Context.current().isCancelled()) {
-              blobObserver.onError(t);
-              return;
-            }
-            if (status.getCode() == Code.UNAVAILABLE) {
+            if (status.getCode() == Code.UNAVAILABLE || status.getCode() == Code.UNIMPLEMENTED) {
               removeMalfunctioningWorker(worker, t, "getBlob(" + DigestUtil.toString(blobDigest) + ")");
             } else if (status.getCode() == Code.NOT_FOUND) {
               logger.info(worker + " did not contain " + DigestUtil.toString(blobDigest));
               // ignore this, the worker will update the backplane eventually
-            } else if (status.getCode() == Code.CANCELLED /* yes, gross */ || SHARD_IS_RETRIABLE.apply(status)) {
+            } else if (status.getCode() != Code.DEADLINE_EXCEEDED || SHARD_IS_RETRIABLE.apply(status)) {
               // why not, always
               workers.addLast(worker);
             } else {
@@ -633,8 +626,6 @@ public class ShardInstance extends AbstractServerInstance {
                     workers,
                     offset + received,
                     nextLimit,
-                    readDeadlineAfter,
-                    readDeadlineAfterUnits,
                     blobObserver);
               }
             }
@@ -652,8 +643,6 @@ public class ShardInstance extends AbstractServerInstance {
       Digest blobDigest,
       long offset,
       long limit,
-      long readDeadlineAfter,
-      TimeUnit readDeadlineAfterUnits,
       StreamObserver<ByteString> blobObserver) {
     List<String> workersList;
     Set<String> workerSet;
@@ -684,6 +673,7 @@ public class ShardInstance extends AbstractServerInstance {
       populatedWorkerListFuture = immediateFuture(workersList);
     }
 
+    Context ctx = Context.current();
     StreamObserver<ByteString> chunkObserver = new StreamObserver<ByteString>() {
       boolean triedCheck = emptyWorkerList;
 
@@ -721,14 +711,13 @@ public class ShardInstance extends AbstractServerInstance {
               new WorkersCallback(rand) {
                 @Override
                 public void onQueue(Deque<String> workers) {
-                  fetchBlobFromWorker(
-                      blobDigest,
-                      workers,
-                      offset,
-                      limit,
-                      readDeadlineAfter,
-                      readDeadlineAfterUnits,
-                      checkedChunkObserver);
+                  ctx.run(
+                      () -> fetchBlobFromWorker(
+                          blobDigest,
+                          workers,
+                          offset,
+                          limit,
+                          checkedChunkObserver));
                 }
 
                 @Override
@@ -752,14 +741,13 @@ public class ShardInstance extends AbstractServerInstance {
         new WorkersCallback(rand) {
           @Override
           public void onQueue(Deque<String> workers) {
-            fetchBlobFromWorker(
-                blobDigest,
-                workers,
-                offset,
-                limit,
-                readDeadlineAfter,
-                readDeadlineAfterUnits,
-                chunkObserver);
+            ctx.run(() ->
+                fetchBlobFromWorker(
+                    blobDigest,
+                    workers,
+                    offset,
+                    limit,
+                    chunkObserver));
           }
 
           @Override
@@ -982,6 +970,21 @@ public class ShardInstance extends AbstractServerInstance {
       InvalidCacheLoadException.class,
       (e) -> { return null; },
       directExecutor());
+  }
+
+  @Override
+  protected <T> ListenableFuture<T> expect(Digest digest, Parser<T> parser, Executor executor) {
+    Context.CancellableContext withDeadline = Context.current().withDeadlineAfter(60, SECONDS, contextDeadlineScheduler);
+    Context previousContext = withDeadline.attach();
+    try {
+      ListenableFuture<T> future = super.expect(digest, parser, executor);
+      future.addListener(() -> {
+        withDeadline.cancel(null);
+      }, directExecutor());
+      return future;
+    } finally {
+      withDeadline.detach(previousContext);
+    }
   }
 
   ListenableFuture<Command> expectCommand(Digest commandBlobDigest, Executor executor) {

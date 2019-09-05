@@ -144,8 +144,6 @@ public class ShardWorkerInstance extends AbstractServerInstance {
       Digest blobDigest,
       long offset,
       long limit,
-      long readDeadlineAfter,
-      TimeUnit readDeadlineAfterUnits,
       StreamObserver<ByteString> blobObserver) {
     try (InputStream input = inputStreamFactory.newInput(blobDigest, offset)) {
       getBlob(input, blobDigest.getSizeBytes() - offset, limit, blobObserver);

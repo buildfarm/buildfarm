@@ -68,8 +68,6 @@ public interface Instance {
       Digest blobDigest,
       long offset,
       long limit,
-      long deadlineAfter,
-      TimeUnit deadlineAfterUnits,
       StreamObserver<ByteString> blobObserver);
   InputStream newBlobInput(
       Digest digest,
