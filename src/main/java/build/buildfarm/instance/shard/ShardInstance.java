@@ -814,41 +814,6 @@ public class ShardInstance extends AbstractServerInstance {
     }
   }
 
-  void updateCaches(Digest digest, ByteString blob) throws InterruptedException {
-    try {
-      commandCache.get(digest, new Callable<ListenableFuture<? extends Command>>() {
-        @Override
-        public ListenableFuture<Command> call() throws IOException {
-          return immediateFuture(Command.parseFrom(blob));
-        }
-      }).get();
-    } catch (ExecutionException e) {
-      /* not a command */
-    }
-
-    try {
-      actionCache.get(digest, new Callable<ListenableFuture<? extends Action>>() {
-        @Override
-        public ListenableFuture<Action> call() throws IOException {
-          return immediateFuture(Action.parseFrom(blob));
-        }
-      }).get();
-    } catch (ExecutionException e) {
-      /* not an action */
-    }
-
-    try {
-      directoryCache.get(digest, new Callable<ListenableFuture<? extends Directory>>() {
-        @Override
-        public ListenableFuture<Directory> call() throws IOException {
-          return immediateFuture(Directory.parseFrom(blob));
-        }
-      }).get();
-    } catch (ExecutionException e) {
-      /* not a directory */
-    }
-  }
-
   @Override
   public InputStream newBlobInput(
       Digest digest,

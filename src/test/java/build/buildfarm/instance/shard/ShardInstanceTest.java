@@ -225,46 +225,6 @@ public class ShardInstanceTest {
   }
 
   @Test
-  public void updateCachesParsesCommandCorrectly() throws Exception {
-    Command command = Command.newBuilder()
-        .addAllArguments(ImmutableList.of("gcc", "foo.c", "-o", "foo.o"))
-        .addAllOutputFiles(ImmutableList.of("foo.o"))
-        .build();
-    ByteString commandBlob = command.toByteString();
-    Digest commandDigest = DIGEST_UTIL.compute(commandBlob);
-    instance.updateCaches(commandDigest, commandBlob);
-    assertThat(instance.expectCommand(commandDigest, directExecutor()).get()).isEqualTo(command);
-  }
-
-  @Test
-  public void updateCachesParsesActionCorrectly() throws Exception {
-    Action action = Action.newBuilder()
-        .setCommandDigest(Digest.newBuilder().setHash("command").setSizeBytes(10))
-        .setInputRootDigest(Digest.newBuilder().setHash("input-root").setSizeBytes(10))
-        .build();
-    ByteString actionBlob = action.toByteString();
-    Digest actionDigest = DIGEST_UTIL.compute(actionBlob);
-    instance.updateCaches(actionDigest, actionBlob);
-    assertThat(instance.expectAction(actionDigest, directExecutor()).get()).isEqualTo(action);
-  }
-
-  @Test
-  public void updateCachesParsesDirectoryCorrectly() throws Exception {
-    Directory directory = Directory.newBuilder()
-        .addFiles(FileNode.newBuilder()
-            .setName("foo")
-            .setDigest(Digest.newBuilder()
-                .setHash("foo")
-                .setSizeBytes(10)
-                .build()))
-        .build();
-    ByteString directoryBlob = directory.toByteString();
-    Digest directoryDigest = DIGEST_UTIL.compute(directoryBlob);
-    instance.updateCaches(directoryDigest, directoryBlob);
-    assertThat(instance.expectDirectory("testing", directoryDigest, directExecutor()).get()).isEqualTo(directory);
-  }
-
-  @Test
   public void executeCallsPrequeueWithAction() throws IOException {
     when(mockBackplane.canPrequeue()).thenReturn(true);
     Digest actionDigest = Digest.newBuilder()
