@@ -22,6 +22,7 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
+import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.BlobWriteKey;
 import com.google.common.cache.CacheBuilder;
@@ -29,7 +30,6 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
@@ -74,9 +74,9 @@ class Writes {
     }
 
     @Override
-    public OutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits) throws IOException {
+    public FeedbackOutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) throws IOException {
       try {
-        return delegate.getOutput(deadlineAfter, deadlineAfterUnits);
+        return delegate.getOutput(deadlineAfter, deadlineAfterUnits, onReadyHandler);
       } catch (Exception e) {
         onInvalidation.run();
         throwIfInstanceOf(e, IOException.class);

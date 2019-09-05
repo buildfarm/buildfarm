@@ -53,6 +53,7 @@ import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
+import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.v1test.BlobWriteKey;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
@@ -580,7 +581,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       write.addListener(
           this::switchToLocal,
           directExecutor());
-      out = write.getOutput(1, MINUTES);
+      out = write.getOutput(1, MINUTES, () -> {});
     }
 
     private synchronized void switchToLocal() {
@@ -749,17 +750,23 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
-  static class WriteOutputStream extends FilterOutputStream {
+  static class WriteOutputStream extends FeedbackOutputStream {
+    protected final OutputStream out;
     private final WriteOutputStream writeOut;
 
     WriteOutputStream(OutputStream out) {
-      super(out);
+      this.out = out;
       this.writeOut = null;
     }
 
     WriteOutputStream(WriteOutputStream writeOut) {
-      super(writeOut);
+      this.out = writeOut;
       this.writeOut = writeOut;
+    }
+
+    @Override
+    public void write(int b) throws IOException {
+      out.write(b);
     }
 
     @Override
@@ -770,6 +777,19 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     @Override
     public void write(byte[] b, int off, int len) throws IOException {
       out.write(b, off, len);
+    }
+
+    @Override
+    public void close() throws IOException {
+      out.close();
+    }
+
+    @Override
+    public boolean isReady() {
+      if (writeOut != null) {
+        return writeOut.isReady();
+      }
+      return true; // fs blocking guarantees readiness
     }
 
     public Path getPath() {
@@ -842,7 +862,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       }
 
       @Override
-      public synchronized OutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits) throws IOException {
+      public synchronized FeedbackOutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) throws IOException {
         if (out == null) {
           out = newOutput(key.getDigest(), UUID.fromString(key.getIdentifier()), this::onClosed);
           if (out == null) {
@@ -1393,7 +1413,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           logger.severe(format("error parsing expired key %s", key));
         } else {
           Write write = delegate.getWrite(fileEntryKey.getDigest(), UUID.randomUUID(), RequestMetadata.getDefaultInstance());
-          try (OutputStream out = write.getOutput(1, MINUTES); InputStream in = Files.newInputStream(key)) {
+          try (OutputStream out = write.getOutput(1, MINUTES, () -> {}); InputStream in = Files.newInputStream(key)) {
             ByteStreams.copy(in, out);
           } catch (IOException ioEx) {
             interrupted = Thread.interrupted() || ioEx.getCause() instanceof InterruptedException || ioEx instanceof ClosedByInterruptException;

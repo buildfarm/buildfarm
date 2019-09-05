@@ -18,23 +18,18 @@ import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.Futures.allAsList;
 import static java.util.logging.Level.SEVERE;
 
-import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
-import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.RequestMetadata;
-import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.cas.ContentAddressableStorage;
-import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.InputStreamFactory;
-import build.buildfarm.common.OutputStreamFactory;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
@@ -47,24 +42,16 @@ import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ShardWorkerInstanceConfig;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.protobuf.util.JsonFormat;
 import io.grpc.Status;
 import io.grpc.Status.Code;
-import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.SocketException;
-import java.net.SocketTimeoutException;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
@@ -75,7 +62,6 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   private final ShardWorkerInstanceConfig config;
   private final ShardBackplane backplane;
   private final InputStreamFactory inputStreamFactory;
-  private final OutputStreamFactory outputStreamFactory;
 
   public ShardWorkerInstance(
       String name,
@@ -83,13 +69,11 @@ public class ShardWorkerInstance extends AbstractServerInstance {
       ShardBackplane backplane,
       ContentAddressableStorage contentAddressableStorage,
       InputStreamFactory inputStreamFactory,
-      OutputStreamFactory outputStreamFactory,
       ShardWorkerInstanceConfig config) throws ConfigurationException {
     super(name, digestUtil, contentAddressableStorage, null, null, null, null);
     this.config = config;
     this.backplane = backplane;
     this.inputStreamFactory = inputStreamFactory;
-    this.outputStreamFactory = outputStreamFactory;
   }
 
   @Override

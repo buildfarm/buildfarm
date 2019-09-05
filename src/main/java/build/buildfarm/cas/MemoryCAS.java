@@ -275,7 +275,7 @@ public class MemoryCAS implements ContentAddressableStorage {
     logger.info("MemoryLRUCAS: expiring " + DigestUtil.toString(e.key));
     if (delegate != null) {
       Write write = delegate.getWrite(e.key, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
-      try (OutputStream out = write.getOutput(1, MINUTES)) {
+      try (OutputStream out = write.getOutput(1, MINUTES, () -> {})) {
         e.value.getData().writeTo(out);
       } catch (IOException ioEx) {
         logger.log(SEVERE, String.format("error delegating %s", DigestUtil.toString(e.key)), ioEx);

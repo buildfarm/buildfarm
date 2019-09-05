@@ -51,6 +51,7 @@ import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watchdog;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.instance.OperationsMap;
 import build.buildfarm.instance.WatchFuture;
@@ -95,7 +96,6 @@ import io.grpc.Status.Code;
 import io.grpc.StatusException;
 import java.io.InputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -333,7 +333,10 @@ public class MemoryInstance extends AbstractServerInstance {
       }
 
       @Override
-      public OutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits) {
+      public FeedbackOutputStream getOutput(
+          long deadlineAfter,
+          TimeUnit deadlineAfterUnits,
+          Runnable onReadyHandler) {
         return getStreamSource(name).getOutput();
       }
 

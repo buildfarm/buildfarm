@@ -20,18 +20,17 @@ import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.io.FeedbackOutputStream;
 import com.google.common.hash.HashingOutputStream;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
-class MemoryWriteOutputStream extends OutputStream implements Write {
+class MemoryWriteOutputStream extends FeedbackOutputStream implements Write {
   private final ContentAddressableStorage storage;
   private final Digest digest;
   private final ListenableFuture<ByteString> writtenFuture;
@@ -114,6 +113,11 @@ class MemoryWriteOutputStream extends OutputStream implements Write {
     hashOut.write(b);
   }
 
+  @Override
+  public boolean isReady() {
+    return true;
+  }
+
   boolean checkComplete() {
     return writtenFuture.isDone();
   }
@@ -131,7 +135,7 @@ class MemoryWriteOutputStream extends OutputStream implements Write {
   }
 
   @Override
-  public OutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits) {
+  public FeedbackOutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
     return this;
   }
 

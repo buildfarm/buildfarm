@@ -14,8 +14,9 @@
 
 package build.buildfarm.common;
 
-import static com.google.common.io.ByteStreams.nullOutputStream;
+import static com.google.common.base.Preconditions.checkNotNull;
 
+import build.buildfarm.common.io.FeedbackOutputStream;
 import com.google.common.util.concurrent.SettableFuture;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -27,7 +28,7 @@ public interface Write {
 
   boolean isComplete();
 
-  OutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits) throws IOException;
+  FeedbackOutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) throws IOException;
 
   void reset();
 
@@ -52,8 +53,29 @@ public interface Write {
     }
 
     @Override
-    public OutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits) {
-      return nullOutputStream();
+    public FeedbackOutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+      return new FeedbackOutputStream() {
+        /** Discards the specified byte. */
+        @Override
+        public void write(int b) {}
+
+        /** Discards the specified byte array. */
+        @Override
+        public void write(byte[] b) {
+          checkNotNull(b);
+        }
+
+        /** Discards the specified byte array. */
+        @Override
+        public void write(byte[] b, int off, int len) {
+          checkNotNull(b);
+        }
+
+        @Override
+        public boolean isReady() {
+          return false;
+        }
+      };
     }
 
     @Override
@@ -66,7 +88,7 @@ public interface Write {
     }
   }
 
-  public class NullWrite extends OutputStream implements Write {
+  public class NullWrite extends FeedbackOutputStream implements Write {
     private final SettableFuture<Long> committedFuture = SettableFuture.create();
     private long committedSize = 0;
 
@@ -83,6 +105,11 @@ public interface Write {
     @Override
     public void close() {
       committedFuture.set(committedSize);
+    }
+
+    @Override
+    public boolean isReady() {
+      return true;
     }
 
     // Write methods
@@ -104,7 +131,10 @@ public interface Write {
     }
 
     @Override
-    public OutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits) throws IOException {
+    public FeedbackOutputStream getOutput(
+        long deadlineAfter,
+        TimeUnit deadlineAfterUnits,
+        Runnable onReadyHandler) throws IOException {
       return this;
     }
 

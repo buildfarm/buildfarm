@@ -29,6 +29,7 @@ import static java.util.logging.Level.WARNING;
 import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.common.UrlPath.InvalidResourceNameException;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.Instance;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
@@ -38,8 +39,8 @@ import io.grpc.Context.CancellableContext;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
 
 class WriteStreamObserver implements StreamObserver<WriteRequest> {
@@ -48,6 +49,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private final Instances instances;
   private final long deadlineAfter;
   private final TimeUnit deadlineAfterUnits;
+  private final Runnable requestNext;
   private final StreamObserver<WriteResponse> responseObserver;
   private final CancellableContext withCancellation;
 
@@ -56,15 +58,18 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private String name = null;
   private Write write = null;
   private Instance instance = null;
+  private final AtomicBoolean wasReady = new AtomicBoolean(false);
 
   WriteStreamObserver(
       Instances instances,
       long deadlineAfter,
       TimeUnit deadlineAfterUnits,
+      Runnable requestNext,
       StreamObserver<WriteResponse> responseObserver) {
     this.instances = instances;
     this.deadlineAfter = deadlineAfter;
     this.deadlineAfterUnits = deadlineAfterUnits;
+    this.requestNext = requestNext;
     this.responseObserver = responseObserver;
     withCancellation = Context.current().withCancellation();
   }
@@ -252,16 +257,43 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private void writeData(ByteString data) {
     try {
       data.writeTo(getOutput());
+      requestNextIfReady();
     } catch (IOException e) {
       if (!committed) {
         logger.log(SEVERE, "error writing data for " + name, e);
         responseObserver.onError(Status.fromThrowable(e).asException());
       }
+      // shouldn't we be erroring the stream at this point if !committed?
     }
   }
 
-  private OutputStream getOutput() throws IOException {
-    return write.getOutput(deadlineAfter, deadlineAfterUnits);
+  private void onNewlyReadyRequestNext() {
+    if (wasReady.compareAndSet(false, true)) {
+      requestNext.run();
+    }
+  }
+
+  private void requestNextIfReady(FeedbackOutputStream out) {
+    if (out.isReady()) {
+      requestNext.run();
+    } else {
+      wasReady.set(false);
+    }
+  }
+
+  private void requestNextIfReady() {
+    try {
+      requestNextIfReady(getOutput());
+    } catch (IOException e) {
+      if (!committed) {
+        logger.log(SEVERE, "error getting output stream for " + name, e);
+        responseObserver.onError(Status.fromThrowable(e).asException());
+      }
+    }
+  }
+
+  private FeedbackOutputStream getOutput() throws IOException {
+    return write.getOutput(deadlineAfter, deadlineAfterUnits, this::onNewlyReadyRequestNext);
   }
 
   @Override

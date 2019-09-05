@@ -188,11 +188,11 @@ public class GrpcCASTest {
         onExpirations);
     RequestMetadata requestMetadata = RequestMetadata.getDefaultInstance();
     Write initialWrite = cas.getWrite(digest, uuid, requestMetadata);
-    try (OutputStream writeOut = initialWrite.getOutput(1, SECONDS)) {
+    try (OutputStream writeOut = initialWrite.getOutput(1, SECONDS, () -> {})) {
       writeContent.substring(0, 4).writeTo(writeOut);
     }
     Write finalWrite = cas.getWrite(digest, uuid, requestMetadata);
-    try (OutputStream writeOut = finalWrite.getOutput(1, SECONDS)) {
+    try (OutputStream writeOut = finalWrite.getOutput(1, SECONDS, () -> {})) {
       writeContent.substring(4).writeTo(writeOut);
     }
     assertThat(content.get(1, TimeUnit.SECONDS)).isEqualTo(writeContent);

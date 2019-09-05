@@ -31,6 +31,7 @@ import build.buildfarm.common.UrlPath.InvalidResourceNameException;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
+import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.Instance;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamImplBase;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
@@ -48,7 +49,6 @@ import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.NoSuchFileException;
 import java.util.UUID;
 import java.util.concurrent.Executor;
@@ -391,7 +391,7 @@ public class ByteStreamService extends ByteStreamImplBase {
       }
 
       @Override
-      public OutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits) throws IOException {
+      public FeedbackOutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) throws IOException {
         throw new IOException("cannot get output of blob write");
       }
 
@@ -443,13 +443,24 @@ public class ByteStreamService extends ByteStreamImplBase {
     }
   }
 
+  private ServerCallStreamObserver<WriteResponse> initializeBackPressure(StreamObserver<WriteResponse> responseObserver) {
+    final ServerCallStreamObserver<WriteResponse> serverCallStreamObserver =
+        (ServerCallStreamObserver<WriteResponse>) responseObserver;
+    serverCallStreamObserver.disableAutoInboundFlowControl();
+    serverCallStreamObserver.request(1);
+    return serverCallStreamObserver;
+  }
+
   @Override
   public StreamObserver<WriteRequest> write(
       StreamObserver<WriteResponse> responseObserver) {
+    ServerCallStreamObserver<WriteResponse> serverCallStreamObserver =
+        initializeBackPressure(responseObserver);
     return new WriteStreamObserver(
         instances,
         deadlineAfter,
         deadlineAfterUnits,
+        () -> serverCallStreamObserver.request(1),
         responseObserver);
   }
 }

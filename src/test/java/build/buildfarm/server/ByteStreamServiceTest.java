@@ -32,6 +32,7 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import com.google.common.hash.HashCode;
@@ -49,7 +50,6 @@ import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
@@ -101,7 +101,7 @@ public class ByteStreamServiceTest {
 
     SettableFuture<ByteString> writtenFuture = SettableFuture.create();
     ByteString.Output output = ByteString.newOutput((int) digest.getSizeBytes());
-    OutputStream out = new OutputStream() {
+    FeedbackOutputStream out = new FeedbackOutputStream() {
       @Override
       public void close() {
         if (output.size() == digest.getSizeBytes()) {
@@ -128,6 +128,11 @@ public class ByteStreamServiceTest {
       public void write(int b) throws IOException {
         output.write(b);
       }
+
+      @Override
+      public boolean isReady() {
+        return true;
+      }
     };
 
     Write write = mock(Write.class);
@@ -138,7 +143,7 @@ public class ByteStreamServiceTest {
         return null;
       }
     }).when(write).reset();
-    when(write.getOutput(any(Long.class), any(TimeUnit.class))).thenReturn(out);
+    when(write.getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class))).thenReturn(out);
     doAnswer(invocation -> (long) output.size()).when(write).getCommittedSize();
     doAnswer(answerVoid((Runnable listener, Executor executor) -> writtenFuture.addListener(listener, executor)))
         .when(write).addListener(any(Runnable.class), any(Executor.class));
@@ -171,7 +176,7 @@ public class ByteStreamServiceTest {
         .build());
     requestObserver.onCompleted();
     verify(write, atLeastOnce()).getCommittedSize();
-    verify(write, atLeastOnce()).getOutput(any(Long.class), any(TimeUnit.class));
+    verify(write, atLeastOnce()).getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class));
     verify(write, times(1)).reset();
     verify(write, times(1)).addListener(any(Runnable.class), any(Executor.class));
   }
@@ -184,7 +189,7 @@ public class ByteStreamServiceTest {
 
     SettableFuture<ByteString> writtenFuture = SettableFuture.create();
     ByteString.Output output = ByteString.newOutput((int) digest.getSizeBytes());
-    OutputStream out = new OutputStream() {
+    FeedbackOutputStream out = new FeedbackOutputStream() {
       @Override
       public void close() {
         if (output.size() == digest.getSizeBytes()) {
@@ -201,10 +206,15 @@ public class ByteStreamServiceTest {
       public void write(int b) {
         output.write(b);
       }
+
+      @Override
+      public boolean isReady() {
+        return true;
+      }
     };
 
     Write write = mock(Write.class);
-    when(write.getOutput(any(Long.class), any(TimeUnit.class))).thenReturn(out);
+    when(write.getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class))).thenReturn(out);
     doAnswer(invocation -> (long) output.size()).when(write).getCommittedSize();
     doAnswer(answerVoid((Runnable listener, Executor executor) -> writtenFuture.addListener(listener, executor)))
         .when(write).addListener(any(Runnable.class), any(Executor.class));
@@ -243,7 +253,7 @@ public class ByteStreamServiceTest {
         .build());
     requestObserver.onCompleted();
     verify(write, atLeastOnce()).getCommittedSize();
-    verify(write, atLeastOnce()).getOutput(any(Long.class), any(TimeUnit.class));
+    verify(write, atLeastOnce()).getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class));
     verify(write, times(2)).addListener(any(Runnable.class), any(Executor.class));
   }
 }

@@ -14,14 +14,14 @@
 
 package build.buildfarm.instance.memory;
 
+import build.buildfarm.common.io.FeedbackOutputStream;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
 import java.io.InputStream;
-import java.io.OutputStream;
 
 class ByteStringStreamSource {
-  private final OutputStream outputStream;
+  private final FeedbackOutputStream outputStream;
   private final SettableFuture<Void> closedFuture = SettableFuture.create();
   private final Object bufferSync;
 
@@ -32,7 +32,7 @@ class ByteStringStreamSource {
     buffer = ByteString.EMPTY;
     bufferSync = new Object();
     closed = false;
-    outputStream = new OutputStream() {
+    outputStream = new FeedbackOutputStream() {
       @Override
       public void write(int b) {
         byte[] buf = new byte[1];
@@ -63,6 +63,11 @@ class ByteStringStreamSource {
           }
         }
       }
+
+      @Override
+      public boolean isReady() {
+        return true;
+      }
     };
   }
 
@@ -72,7 +77,7 @@ class ByteStringStreamSource {
     }
   }
 
-  public OutputStream getOutput() {
+  public FeedbackOutputStream getOutput() {
     return outputStream;
   }
 

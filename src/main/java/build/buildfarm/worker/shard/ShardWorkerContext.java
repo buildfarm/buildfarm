@@ -419,7 +419,7 @@ class ShardWorkerContext implements WorkerContext {
     AtomicBoolean complete = new AtomicBoolean(false);
     Write write = execFileSystem.getStorage().getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
     write.addListener(() -> complete.set(true), directExecutor());
-    try (OutputStream out = write.getOutput(deadlineAfter, deadlineAfterUnits)) {
+    try (OutputStream out = write.getOutput(deadlineAfter, deadlineAfterUnits, () -> {})) {
       try (InputStream in = Files.newInputStream(file)) {
         com.google.common.base.Preconditions.checkNotNull(in);
         ByteStreams.copy(in, out);

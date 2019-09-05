@@ -28,7 +28,6 @@ import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
-import build.buildfarm.common.OutputStreamFactory;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.v1test.ExecuteEntry;
@@ -62,9 +61,6 @@ public class ShardWorkerInstanceTest {
   @Mock
   private InputStreamFactory inputStreamFactory;
 
-  @Mock
-  private OutputStreamFactory outputStreamFactory;
-
   private ShardWorkerInstance instance;
 
   @Before
@@ -76,7 +72,6 @@ public class ShardWorkerInstanceTest {
         backplane,
         storage,
         inputStreamFactory,
-        outputStreamFactory,
         ShardWorkerInstanceConfig.getDefaultInstance());
   }
 

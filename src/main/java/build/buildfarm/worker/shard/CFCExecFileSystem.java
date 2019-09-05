@@ -138,12 +138,6 @@ class CFCExecFileSystem implements ExecFileSystem {
     return fileCache.newInput(digest, offset);
   }
 
-  @Override
-  public OutputStream newOutput(Digest digest) throws IOException {
-    return fileCache.getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance())
-        .getOutput(deadlineAfter, deadlineAfterUnits);
-  }
-
   private ListenableFuture<Void> put(
       Path path,
       FileNode fileNode,

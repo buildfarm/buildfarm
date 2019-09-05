@@ -44,6 +44,7 @@ import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.NullWrite;
+import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.worker.CASFileCache.Entry;
 import build.buildfarm.worker.CASFileCache.PutDirectoryException;
 import com.google.common.collect.ImmutableList;
@@ -429,7 +430,7 @@ class CASFileCacheTest {
     write.addListener(
         () -> notified.set(true),
         directExecutor());
-    try (OutputStream out = write.getOutput(1, SECONDS)) {
+    try (OutputStream out = write.getOutput(1, SECONDS, () -> {})) {
       content.writeTo(out);
     }
     assertThat(notified.get()).isTrue();
@@ -452,8 +453,8 @@ class CASFileCacheTest {
     incompleteWrite.addListener(
         () -> notified.set(true),
         directExecutor());
-    OutputStream incompleteOut = incompleteWrite.getOutput(1, SECONDS);
-    try (OutputStream out = completingWrite.getOutput(1, SECONDS)) {
+    OutputStream incompleteOut = incompleteWrite.getOutput(1, SECONDS, () -> {});
+    try (OutputStream out = completingWrite.getOutput(1, SECONDS, () -> {})) {
       assertThat(fileCache.size()).isEqualTo(digest.getSizeBytes() * 2);
       content.writeTo(out);
     }
@@ -481,7 +482,7 @@ class CASFileCacheTest {
         () -> notified.set(true),
         directExecutor());
     assertThat(write.getCommittedSize()).isEqualTo(6);
-    try (OutputStream out = write.getOutput(1, SECONDS)) {
+    try (OutputStream out = write.getOutput(1, SECONDS, () -> {})) {
       content.substring(6).writeTo(out);
     }
     assertThat(notified.get()).isTrue();
@@ -495,7 +496,7 @@ class CASFileCacheTest {
     Digest digest = DIGEST_UTIL.compute(content);
 
     Write write = getWrite(digest);
-    try (OutputStream out = write.getOutput(1, SECONDS)) {
+    try (OutputStream out = write.getOutput(1, SECONDS, () -> {})) {
       ByteString.copyFromUtf8("H3110, W0r1d").writeTo(out);
     }
   }
@@ -551,7 +552,10 @@ class CASFileCacheTest {
       }
 
       @Override
-      public OutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits) throws IOException {
+      public FeedbackOutputStream getOutput(
+          long deadlineAfter,
+          TimeUnit deadlineAfterUnits,
+          Runnable onReadyHandler) throws IOException {
         canReset = true;
         throw new IOException(new InterruptedException());
       }
@@ -643,7 +647,7 @@ class CASFileCacheTest {
     });
     when(delegate.getWrite(eq(expiringBlob.getDigest()), any(UUID.class), any(RequestMetadata.class))).thenReturn(new NullWrite() {
       @Override
-      public OutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits) throws IOException {
+      public FeedbackOutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) throws IOException {
         try {
           while (writeState.get() != 1) {
             MICROSECONDS.sleep(1);
@@ -652,7 +656,7 @@ class CASFileCacheTest {
           throw new IOException(e);
         }
         writeState.getAndIncrement(); // move into output stream state
-        return super.getOutput(deadlineAfter, deadlineAfterUnits);
+        return super.getOutput(deadlineAfter, deadlineAfterUnits, onReadyHandler);
       }
     });
     Thread expiringThread = new Thread(() -> {
@@ -731,8 +735,8 @@ class CASFileCacheTest {
       }
 
       @Override
-      public OutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits) {
-        return new OutputStream() {
+      public FeedbackOutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+        return new FeedbackOutputStream() {
           int offset = 0;
 
           @Override
@@ -748,6 +752,11 @@ class CASFileCacheTest {
               throw new ClosedChannelException();
             }
             offset += len;
+          }
+
+          @Override
+          public boolean isReady() {
+            return true;
           }
         };
       }

@@ -17,6 +17,7 @@ package build.buildfarm.common.grpc;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 import build.buildfarm.common.Write;
+import build.buildfarm.common.io.FeedbackOutputStream;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamBlockingStub;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamStub;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
@@ -31,15 +32,16 @@ import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.Status.Code;
 import io.grpc.StatusRuntimeException;
+import io.grpc.stub.ClientCallStreamObserver;
+import io.grpc.stub.ClientResponseObserver;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.concurrent.GuardedBy;
 
-public class StubWriteOutputStream extends OutputStream implements Write {
+public class StubWriteOutputStream extends FeedbackOutputStream implements Write {
   public static final long UNLIMITED_EXPECTED_SIZE = Long.MAX_VALUE;
 
   private static final int CHUNK_SIZE = 16 * 1024;
@@ -92,6 +94,7 @@ public class StubWriteOutputStream extends OutputStream implements Write {
 
   private long deadlineAfter = 0;
   private TimeUnit deadlineAfterUnits = null;
+  private Runnable onReadyHandler = null;
 
   static class WriteCompleteException extends IOException {
   }
@@ -180,7 +183,16 @@ public class StubWriteOutputStream extends OutputStream implements Write {
       writeObserver = bsStub.get()
           .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
           .write(
-              new StreamObserver<WriteResponse>() {
+              new ClientResponseObserver<WriteRequest, WriteResponse>() {
+                @Override
+                public void beforeStart(ClientCallStreamObserver<WriteRequest> requestStream) {
+                  requestStream.setOnReadyHandler(() -> {
+                    if (requestStream.isReady()) {
+                      onReadyHandler.run();
+                    }
+                  });
+                }
+
                 @Override
                 public void onNext(WriteResponse response) {
                   writeFuture.set(response.getCommittedSize());
@@ -240,6 +252,16 @@ public class StubWriteOutputStream extends OutputStream implements Write {
     }
   }
 
+  @Override
+  public synchronized boolean isReady() {
+    if (writeObserver == null) {
+      return false;
+    }
+    ClientCallStreamObserver<WriteRequest> clientCallStreamObserver =
+        (ClientCallStreamObserver<WriteRequest>) writeObserver;
+    return clientCallStreamObserver.isReady();
+  }
+
   // Write methods
 
   @Override
@@ -264,9 +286,10 @@ public class StubWriteOutputStream extends OutputStream implements Write {
   }
 
   @Override
-  public OutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits) {
+  public FeedbackOutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
     this.deadlineAfter = deadlineAfter;
     this.deadlineAfterUnits = deadlineAfterUnits;
+    this.onReadyHandler = onReadyHandler;
     return this;
   }
 

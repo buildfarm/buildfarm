@@ -253,7 +253,7 @@ public class StubInstanceTest {
     String resourceName = "output-stream-test";
     ByteString content = ByteString.copyFromUtf8("test-content");
     Write operationStreamWrite = instance.getOperationStreamWrite(resourceName);
-    try (OutputStream out = operationStreamWrite.getOutput(1, SECONDS)) {
+    try (OutputStream out = operationStreamWrite.getOutput(1, SECONDS, () -> {})) {
       content.writeTo(out);
     }
     assertThat(writtenContent.get()).isEqualTo(content);
@@ -345,7 +345,7 @@ public class StubInstanceTest {
     ByteString content = ByteString.copyFromUtf8("test-content");
     boolean writeThrewException = false;
     Write operationStreamWrite = instance.getOperationStreamWrite(resourceName);
-    try (OutputStream out = operationStreamWrite.getOutput(1, SECONDS)) {
+    try (OutputStream out = operationStreamWrite.getOutput(1, SECONDS, () -> {})) {
       content.writeTo(out);
       try {
         content.writeTo(out);

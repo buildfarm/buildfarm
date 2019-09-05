@@ -20,14 +20,13 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.InputStreamFactory;
-import build.buildfarm.common.OutputStreamFactory;
 import java.nio.file.Path;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
-interface ExecFileSystem extends InputStreamFactory, OutputStreamFactory {
+interface ExecFileSystem extends InputStreamFactory {
   void start(Consumer<List<Digest>> onDigests) throws IOException, InterruptedException;
   void stop();
   ContentAddressableStorage getStorage();

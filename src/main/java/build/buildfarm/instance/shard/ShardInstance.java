@@ -1104,7 +1104,7 @@ public class ShardInstance extends AbstractServerInstance {
     write.addListener(
         () -> writtenFuture.set(digest.getSizeBytes()),
         directExecutor());
-    try (OutputStream out = write.getOutput(60, SECONDS)) {
+    try (OutputStream out = write.getOutput(60, SECONDS, () -> {})) {
       content.writeTo(out);
     } catch (IOException e) {
       if (!writtenFuture.isDone()) {

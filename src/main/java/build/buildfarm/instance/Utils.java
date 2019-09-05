@@ -88,7 +88,7 @@ public class Utils {
     write.addListener(
         () -> future.set(digest),
         directExecutor());
-    try (OutputStream out = write.getOutput(writeDeadlineAfter, writeDeadlineAfterUnits)) {
+    try (OutputStream out = write.getOutput(writeDeadlineAfter, writeDeadlineAfterUnits, () -> {})) {
       data.writeTo(out);
     } catch (IOException e) {
       future.setException(e);

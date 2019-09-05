@@ -19,7 +19,6 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.InputStreamFactory;
-import build.buildfarm.common.OutputStreamFactory;
 import build.buildfarm.common.ThreadSafety.ThreadSafe;
 import build.buildfarm.common.Write;
 import com.google.common.util.concurrent.ListenableFuture;

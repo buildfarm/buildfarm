@@ -55,11 +55,6 @@ class FuseExecFileSystem implements ExecFileSystem {
   }
 
   @Override
-  public OutputStream newOutput(Digest digest) throws IOException {
-    throw new UnsupportedOperationException();
-  }
-
-  @Override
   public InputStream newInput(Digest digest, long offset) throws IOException, InterruptedException {
     return storage.newInput(digest, offset);
   }

@@ -184,7 +184,6 @@ public class Worker {
         backplane,
         storage,
         execFileSystem,
-        execFileSystem,
         config.getShardWorkerInstanceConfig());
 
     Instances instances = Instances.singular(instance);

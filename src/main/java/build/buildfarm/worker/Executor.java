@@ -30,6 +30,7 @@ import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.Platform.Property;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.Write.NullWrite;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.ExecutionPolicy;
 import com.google.common.base.Stopwatch;
@@ -64,65 +65,6 @@ class Executor implements Runnable {
     this.workerContext = workerContext;
     this.operationContext = operationContext;
     this.owner = owner;
-  }
-
-  static Write nullWrite() {
-    return new Write() {
-      volatile long committedSize = 0;
-      volatile boolean closed = false;
-      SettableFuture<Void> listenerFuture = SettableFuture.create();
-
-      @Override
-      public long getCommittedSize() {
-        return committedSize;
-      }
-
-      @Override
-      public boolean isComplete() {
-        return closed;
-      }
-
-      @Override
-      public OutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits) {
-        return new OutputStream() {
-          @Override
-          public void close() {
-            if (!closed) {
-              closed = true;
-              listenerFuture.set(null);
-            }
-          }
-
-          @Override
-          public void write(int b) throws IOException {
-            checkNotClosed();
-            committedSize++;
-          }
-
-          @Override
-          public void write(byte[] b, int off, int len) throws IOException {
-            checkNotClosed();
-            committedSize += len;
-          }
-
-          void checkNotClosed() throws IOException {
-            if (closed) {
-              throw new IOException("stream is closed");
-            }
-          }
-        };
-      }
-
-      @Override
-      public void reset() {
-        committedSize = 0;
-      }
-
-      @Override
-      public void addListener(Runnable onCompleted, java.util.concurrent.Executor executor) {
-        listenerFuture.addListener(onCompleted, executor);
-      }
-    };
   }
 
   private long runInterruptible(Stopwatch stopwatch) throws InterruptedException {
@@ -355,12 +297,12 @@ class Executor implements Runnable {
     if (stdoutStreamName != null && !stdoutStreamName.isEmpty() && workerContext.getStreamStdout()) {
       stdoutWrite = workerContext.getOperationStreamWrite(stdoutStreamName);
     } else {
-      stdoutWrite = nullWrite();
+      stdoutWrite = new NullWrite();
     }
     if (stderrStreamName != null && !stderrStreamName.isEmpty() && workerContext.getStreamStderr()) {
       stderrWrite = workerContext.getOperationStreamWrite(stderrStreamName);
     } else {
-      stderrWrite = nullWrite();
+      stderrWrite = new NullWrite();
     }
 
     long startNanoTime = System.nanoTime();

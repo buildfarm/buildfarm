@@ -41,7 +41,8 @@ public class ByteStringWriteReader implements Runnable {
     byte[] buffer = new byte[1024 * 16];
     int len;
     write.addListener(this::complete, directExecutor());
-    try (OutputStream writeOut = write.getOutput(1, SECONDS)) {
+    // may want to buffer this if not ready
+    try (OutputStream writeOut = write.getOutput(1, SECONDS, () -> {})) {
       while (!isComplete() && (len = input.read(buffer)) != -1) {
         if (len != 0) {
           data.write(buffer, 0, len);
