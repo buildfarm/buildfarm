@@ -120,6 +120,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   private final Path root;
   private final long maxSizeInBytes;
+  private final long maxEntrySizeInBytes;
   private final DigestUtil digestUtil;
   private final ConcurrentMap<Path, Entry> storage;
   private final Map<Digest, DirectoryEntry> directoryStorage = Maps.newHashMap();
@@ -192,11 +193,13 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   public CASFileCache(
       Path root,
       long maxSizeInBytes,
+      long maxEntrySizeInBytes,
       DigestUtil digestUtil,
       ExecutorService expireService) {
     this(
         root,
         maxSizeInBytes,
+        maxEntrySizeInBytes,
         digestUtil,
         expireService,
         /* storage=*/ Maps.newConcurrentMap(),
@@ -208,6 +211,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   public CASFileCache(
       Path root,
       long maxSizeInBytes,
+      long maxEntrySizeInBytes,
       DigestUtil digestUtil,
       ExecutorService expireService,
       ConcurrentMap<Path, Entry> storage,
@@ -216,6 +220,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       @Nullable ContentAddressableStorage delegate) {
     this.root = root;
     this.maxSizeInBytes = maxSizeInBytes;
+    this.maxEntrySizeInBytes = maxEntrySizeInBytes;
     this.digestUtil = digestUtil;
     this.expireService = expireService;
     this.storage = storage;
@@ -459,7 +464,18 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         throw e;
       }
     }
-    return new ReadThroughInputStream(delegate.newInput(digest, 0), digest, offset);
+    if (digest.getSizeBytes() > maxEntrySizeInBytes) {
+      return delegate.newInput(digest, offset);
+    }
+    Write write = getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
+    return newReadThroughInput(
+        digest,
+        offset,
+        write);
+  }
+
+  ReadThroughInputStream newReadThroughInput(Digest digest, long offset, Write write) throws IOException {
+    return new ReadThroughInputStream(delegate.newInput(digest, 0), digest, offset, write);
   }
 
   @Override
@@ -554,13 +570,13 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     @GuardedBy("this")
     private IOException exception = null;
 
-    ReadThroughInputStream(InputStream in, Digest digest, long offset) throws IOException {
+    ReadThroughInputStream(InputStream in, Digest digest, long offset, Write write) throws IOException {
       this.in = in;
       this.localOffset = offset;
       this.digest = digest;
       skip = offset;
       remaining = digest.getSizeBytes();
-      write = getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
+      this.write = write;
       write.addListener(
           this::switchToLocal,
           directExecutor());
@@ -1080,7 +1096,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         }
 
         long size = attrs.size();
-        if (sizeInBytes + size > maxSizeInBytes) {
+        if (sizeInBytes + size > maxSizeInBytes || size > maxEntrySizeInBytes) {
           Files.delete(file);
         } else {
           FileEntryKey fileEntryKey = null;
@@ -1975,6 +1991,23 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Runnable onInsert,
       AtomicBoolean requiresDischarge)
       throws IOException, InterruptedException {
+
+    if (blobSizeInBytes > maxEntrySizeInBytes) {
+      String fileName = key.getFileName().toString();
+      FileEntryKey fileEntryKey = parseFileEntryKey(fileName);
+      Digest digest;
+      if (fileEntryKey == null) {
+        logger.log(SEVERE, format("error parsing over limit key %s", key));
+        digest = Digest.newBuilder()
+            .setHash(fileName)
+            .setSizeBytes(blobSizeInBytes)
+            .build();
+      } else {
+        digest = fileEntryKey.getDigest();
+      }
+      throw new EntryLimitException(digest);
+    }
+
     final ListenableFuture<Set<Digest>> expiredDigestsFuture;
 
     boolean interrupted = false;

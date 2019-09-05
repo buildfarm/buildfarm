@@ -320,7 +320,7 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public ListenableFuture<Iterable<Digest>> findMissingBlobs(Iterable<Digest> digests, Executor executor) {
+  public ListenableFuture<Iterable<Digest>> findMissingBlobs(Iterable<Digest> digests, Executor executor, RequestMetadata requestMetadata) {
     throwIfStopped();
     FindMissingBlobsRequest request = FindMissingBlobsRequest.newBuilder()
         .setInstanceName(getName())
@@ -332,6 +332,7 @@ public class StubInstance implements Instance {
     return transform(
         contentAddressableStorageFutureStub.get()
             .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
+            .withInterceptors(attachMetadataInterceptor(requestMetadata))
             .findMissingBlobs(request),
         (response) -> response.getMissingBlobDigestsList(),
         executor);
@@ -382,20 +383,23 @@ public class StubInstance implements Instance {
       String resourceName,
       long offset,
       long deadlineAfter,
-      TimeUnit deadlineAfterUnits) {
-    return newInput(resourceName, offset, deadlineAfter, deadlineAfterUnits);
+      TimeUnit deadlineAfterUnits,
+      RequestMetadata requestMetadata) {
+    return newInput(resourceName, offset, deadlineAfter, deadlineAfterUnits, requestMetadata);
   }
 
   InputStream newInput(
       String resourceName,
       long offset,
       long deadlineAfter,
-      TimeUnit deadlineAfterUnits) {
+      TimeUnit deadlineAfterUnits,
+      RequestMetadata requestMetadata) {
     return ByteStreamHelper.newInput(
         resourceName,
         offset,
         Suppliers.memoize(() -> ByteStreamGrpc.newStub(channel)
-            .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)),
+            .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
+            .withInterceptors(attachMetadataInterceptor(requestMetadata))),
         retrier::newBackoff,
         retrier::isRetriable,
         retryService);
@@ -449,8 +453,9 @@ public class StubInstance implements Instance {
       Digest digest,
       long offset,
       long deadlineAfter,
-      TimeUnit deadlineAfterUnits) {
-    return newInput(getBlobName(digest), offset, deadlineAfter, deadlineAfterUnits);
+      TimeUnit deadlineAfterUnits,
+      RequestMetadata requestMetadata) {
+    return newInput(getBlobName(digest), offset, deadlineAfter, deadlineAfterUnits, requestMetadata);
   }
 
   @Override
@@ -467,9 +472,9 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public boolean containsBlob(Digest digest) {
+  public boolean containsBlob(Digest digest, RequestMetadata requestMetadata) {
     try {
-      return Iterables.isEmpty(findMissingBlobs(ImmutableList.of(digest), directExecutor()).get());
+      return Iterables.isEmpty(findMissingBlobs(ImmutableList.of(digest), directExecutor(), requestMetadata).get());
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
       if (cause instanceof RuntimeException) {

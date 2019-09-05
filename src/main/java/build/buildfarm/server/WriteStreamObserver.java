@@ -24,6 +24,7 @@ import static io.grpc.Status.INVALID_ARGUMENT;
 import static java.lang.String.format;
 import static java.util.logging.Level.FINER;
 import static java.util.logging.Level.SEVERE;
+import static java.util.logging.Level.WARNING;
 
 import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.common.UrlPath.InvalidResourceNameException;
@@ -178,7 +179,8 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
         }
       } catch (InstanceNotFoundException e) {
         responseObserver.onError(BuildFarmInstances.toStatusException(e));
-      } catch (InvalidResourceNameException e) {
+      } catch (InvalidResourceNameException|RuntimeException e) {
+        logger.log(WARNING, format("write: %s", request), e);
         responseObserver.onError(Status.fromThrowable(e).asException());
       }
     }

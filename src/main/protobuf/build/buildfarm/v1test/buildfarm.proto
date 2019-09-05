@@ -80,11 +80,15 @@ message GrpcCASConfig {
 message FilesystemCASConfig {
   // path to cached files from CAS
   // if relative, is made relative to root
-  string path = 2;
+  string path = 1;
 
   // limit for contents of files retained
   // from CAS in the cache
-  int64 max_size_bytes = 3;
+  int64 max_size_bytes = 2;
+
+  // limit for contents of a single file retained
+  // from CAS in the cache
+  int64 max_entry_size_bytes = 3;
 }
 
 message FuseCASConfig {
@@ -162,6 +166,8 @@ message RedisShardBackplaneConfig {
   string worker_channel = 25;
   string action_cache_prefix = 3;
   int32 action_cache_expire = 4;
+  string action_blacklist_prefix = 28;
+  int32 action_blacklist_expire = 29;
   string operation_prefix = 5;
   int32 operation_expire = 6;
   string pre_queued_operations_list_name = 18;
@@ -472,6 +478,10 @@ message WorkerConfig {
   // limit for contents of files retained
   // from CAS in the cache
   int64 cas_cache_max_size_bytes = 7;
+
+  // limit for contents of a single file retained
+  // from CAS in the cache
+  int64 cas_cache_max_entry_size_bytes = 24;
 
   // total size of the inline content for
   // action results

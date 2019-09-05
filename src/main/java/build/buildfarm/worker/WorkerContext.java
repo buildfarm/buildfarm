@@ -62,6 +62,7 @@ public interface WorkerContext {
   void destroyExecDir(Path execDir) throws IOException, InterruptedException;
   void uploadOutputs(ActionResult.Builder resultBuilder, Path actionRoot, Iterable<String> outputFiles, Iterable<String> outputDirs) throws IOException, InterruptedException;
   boolean putOperation(Operation operation, Action Action) throws IOException, InterruptedException;
+  void blacklistAction(String actionId) throws IOException, InterruptedException;
   void putActionResult(ActionKey actionKey, ActionResult actionResult) throws IOException, InterruptedException;
   Write getOperationStreamWrite(String name) throws IOException;
 }

@@ -57,8 +57,11 @@ public interface Instance {
   ActionResult getActionResult(ActionKey actionKey);
   void putActionResult(ActionKey actionKey, ActionResult actionResult) throws InterruptedException;
 
-  ListenableFuture<Iterable<Digest>> findMissingBlobs(Iterable<Digest> digests, Executor executor);
-  boolean containsBlob(Digest digest);
+  ListenableFuture<Iterable<Digest>> findMissingBlobs(
+      Iterable<Digest> digests,
+      Executor executor,
+      RequestMetadata requestMetadata);
+  boolean containsBlob(Digest digest, RequestMetadata requestMetadata);
 
   String getBlobName(Digest blobDigest);
   void getBlob(
@@ -72,7 +75,8 @@ public interface Instance {
       Digest digest,
       long offset,
       long deadlineAfter,
-      TimeUnit deadlineAfterUnits) throws IOException;
+      TimeUnit deadlineAfterUnits,
+      RequestMetadata requestMetadata) throws IOException;
   ListenableFuture<Iterable<Response>> getAllBlobsFuture(Iterable<Digest> digests);
   String getTree(Digest rootDigest, int pageSize, String pageToken, Tree.Builder tree)
       throws IOException, InterruptedException;
@@ -86,7 +90,8 @@ public interface Instance {
       String name,
       long offset,
       long deadlineAfter,
-      TimeUnit deadlineAfterUnits) throws IOException;
+      TimeUnit deadlineAfterUnits,
+      RequestMetadata requestMetadata) throws IOException;
 
   ListenableFuture<Void> execute(
       Digest actionDigest,

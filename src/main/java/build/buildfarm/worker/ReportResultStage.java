@@ -16,12 +16,15 @@ package build.buildfarm.worker;
 
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.COMPLETED;
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.EXECUTING;
+import static build.buildfarm.common.Actions.invalidActionMessage;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteResponse;
+import build.buildfarm.cas.ContentAddressableStorage.EntryLimitException;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
@@ -30,6 +33,8 @@ import com.google.protobuf.Any;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.Timestamps;
+import com.google.rpc.Code;
+import com.google.rpc.PreconditionFailure;
 import com.google.rpc.Status;
 import io.grpc.Deadline;
 import java.io.IOException;
@@ -89,13 +94,29 @@ public class ReportResultStage extends PipelineStage {
     resultBuilder.getExecutionMetadataBuilder()
         .setOutputUploadStartTimestamp(Timestamps.fromMillis(System.currentTimeMillis()));
 
-    Status.Builder status = operationContext.executeResponse.getStatus().toBuilder();
+    boolean blacklist = false;
     try {
       workerContext.uploadOutputs(
           resultBuilder,
           operationContext.execDir,
           operationContext.command.getOutputFilesList(),
           operationContext.command.getOutputDirectoriesList());
+    } catch (EntryLimitException e) {
+      if (operationContext.executeResponse.build().getStatus().getCode() == Code.OK.getNumber()) {
+        // if the status was already a failure, let them get to this failure on their own
+        PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
+        preconditionFailure.addViolationsBuilder()
+            .setType(VIOLATION_TYPE_MISSING)
+            .setSubject("blobs/" + DigestUtil.toString(e.getDigest()))
+            .setDescription("An output could not be uploaded because it exceeded the maximum size of an entry");
+        Status status = Status.newBuilder()
+            .setCode(Code.FAILED_PRECONDITION.getNumber())
+            .setMessage(invalidActionMessage(operationContext.queueEntry.getExecuteEntry().getActionDigest()))
+            .addDetails(Any.pack(preconditionFailure.build()))
+            .build();
+        operationContext.executeResponse.setStatus(status);
+      }
+      blacklist = true;
     } catch (InterruptedException|ClosedByInterruptException e) {
       // cancellation here should not be logged
       return null;
@@ -121,9 +142,13 @@ public class ReportResultStage extends PipelineStage {
 
     ExecuteResponse executeResponse = operationContext.executeResponse.build();
 
-    if (!operationContext.action.getDoNotCache() && executeResponse.getResult().getExitCode() == 0) {
+    if (blacklist || (!operationContext.action.getDoNotCache() && executeResponse.getResult().getExitCode() == 0)) {
       try {
-        workerContext.putActionResult(DigestUtil.asActionKey(metadata.getActionDigest()), executeResponse.getResult());
+        if (blacklist) {
+          workerContext.blacklistAction(metadata.getActionDigest().getHash());
+        } else {
+          workerContext.putActionResult(DigestUtil.asActionKey(metadata.getActionDigest()), executeResponse.getResult());
+        }
       } catch (IOException e) {
         logger.log(SEVERE, "error reporting action result for " + operationName, e);
         return null;

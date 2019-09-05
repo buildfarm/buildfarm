@@ -39,8 +39,11 @@ public class Utils {
 
   private Utils() {}
 
-  public static ByteString getBlob(Instance instance, Digest blobDigest) throws IOException, InterruptedException {
-    return getBlob(instance, blobDigest, /* offset=*/ 0, 60, TimeUnit.SECONDS);
+  public static ByteString getBlob(
+      Instance instance,
+      Digest blobDigest,
+      RequestMetadata requestMetadata) throws IOException, InterruptedException {
+    return getBlob(instance, blobDigest, /* offset=*/ 0, 60, TimeUnit.SECONDS, requestMetadata);
   }
 
   public static ByteString getBlob(
@@ -48,8 +51,9 @@ public class Utils {
       Digest blobDigest,
       long offset,
       long deadlineAfter,
-      TimeUnit deadlineAfterUnits) throws IOException, InterruptedException {
-    try (InputStream in = instance.newBlobInput(blobDigest, offset, deadlineAfter, deadlineAfterUnits)) {
+      TimeUnit deadlineAfterUnits,
+      RequestMetadata requestMetadata) throws IOException, InterruptedException {
+    try (InputStream in = instance.newBlobInput(blobDigest, offset, deadlineAfter, deadlineAfterUnits, requestMetadata)) {
       return ByteString.readFrom(in);
     } catch (StatusRuntimeException e) {
       if (e.getStatus().equals(Status.NOT_FOUND)) {

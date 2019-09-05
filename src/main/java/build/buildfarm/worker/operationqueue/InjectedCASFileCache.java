@@ -31,9 +31,10 @@ class InjectedCASFileCache extends CASFileCache {
       InputStreamFactory inputStreamFactory,
       Path root,
       long maxSizeInBytes,
+      long maxEntrySizeInBytes,
       DigestUtil digestUtil,
       ExecutorService expireService) {
-    super(root, maxSizeInBytes, digestUtil, expireService);
+    super(root, maxSizeInBytes, maxEntrySizeInBytes, digestUtil, expireService);
     this.inputStreamFactory = inputStreamFactory;
   }
 

@@ -14,6 +14,7 @@
 
 package build.buildfarm.instance.memory;
 
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.instance.Utils.putBlob;
 import static com.google.common.collect.Multimaps.synchronizedSetMultimap;
 import static com.google.common.util.concurrent.Futures.addCallback;
@@ -349,7 +350,12 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  public InputStream newOperationStreamInput(String name, long offset, long deadlineAfter, TimeUnit deadlineAfterUnits) throws IOException {
+  public InputStream newOperationStreamInput(
+      String name,
+      long offset,
+      long deadlineAfter,
+      TimeUnit deadlineAfterUnits,
+      RequestMetadata requestMetadata) throws IOException {
     InputStream in = getStreamSource(name).openStream();
     in.skip(offset);
     return in;
@@ -394,7 +400,8 @@ public class MemoryInstance extends AbstractServerInstance {
   protected void validateAction(
       String operationName,
       Action action,
-      PreconditionFailure.Builder preconditionFailure)
+      PreconditionFailure.Builder preconditionFailure,
+      RequestMetadata requestMetadata)
       throws InterruptedException, StatusException {
     if (action.hasTimeout() && config.hasMaximumActionTimeout()) {
       Duration timeout = action.getTimeout();
@@ -408,7 +415,7 @@ public class MemoryInstance extends AbstractServerInstance {
       }
     }
 
-    super.validateAction(operationName, action, preconditionFailure);
+    super.validateAction(operationName, action, preconditionFailure, requestMetadata);
   }
 
   @Override

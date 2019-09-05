@@ -168,7 +168,7 @@ class Cat {
 
   private static void printFindMissing(Instance instance, Iterable<Digest> digests) throws ExecutionException, InterruptedException {
     Stopwatch stopwatch = Stopwatch.createStarted();
-    Iterable<Digest> missingDigests = instance.findMissingBlobs(digests, directExecutor()).get();
+    Iterable<Digest> missingDigests = instance.findMissingBlobs(digests, directExecutor(), RequestMetadata.getDefaultInstance()).get();
     long elapsedMicros = stopwatch.elapsed(TimeUnit.MICROSECONDS);
 
     boolean missing = false;
@@ -481,11 +481,11 @@ class Cat {
             printTreeLayout(instance, digestUtil, blobDigest);
           } else {
             if (type.equals("File")) {
-              try (InputStream in = instance.newBlobInput(blobDigest, 0, 60, TimeUnit.SECONDS)) {
+              try (InputStream in = instance.newBlobInput(blobDigest, 0, 60, TimeUnit.SECONDS, RequestMetadata.getDefaultInstance())) {
                 ByteStreams.copy(in, System.out);
               }
             } else {
-              ByteString blob = getBlob(instance, blobDigest);
+              ByteString blob = getBlob(instance, blobDigest, RequestMetadata.getDefaultInstance());
               if (type.equals("Action")) {
                 printAction(blob);
               } else if (type.equals("Command")) {

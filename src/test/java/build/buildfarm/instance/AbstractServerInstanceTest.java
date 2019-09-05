@@ -15,18 +15,19 @@
 package build.buildfarm.instance;
 
 import static com.google.common.truth.Truth.assertThat;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.instance.AbstractServerInstance.ACTION_INPUT_ROOT_DIRECTORY_PATH;
 import static build.buildfarm.instance.AbstractServerInstance.DIRECTORY_NOT_SORTED;
 import static build.buildfarm.instance.AbstractServerInstance.DUPLICATE_DIRENT;
 import static build.buildfarm.instance.AbstractServerInstance.OUTPUT_DIRECTORY_IS_OUTPUT_ANCESTOR;
 import static build.buildfarm.instance.AbstractServerInstance.OUTPUT_FILE_IS_OUTPUT_ANCESTOR;
-import static build.buildfarm.instance.AbstractServerInstance.VIOLATION_TYPE_INVALID;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.Platform;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
@@ -139,7 +140,12 @@ public class AbstractServerInstanceTest {
     }
 
     @Override
-    public InputStream newOperationStreamInput(String name, long offset, long deadlineAfter, TimeUnit deadlineAfterUnits) {
+    public InputStream newOperationStreamInput(
+        String name,
+        long offset,
+        long deadlineAfter,
+        TimeUnit deadlineAfterUnits,
+        RequestMetadata requestMetadata) {
       throw new UnsupportedOperationException();
     }
 

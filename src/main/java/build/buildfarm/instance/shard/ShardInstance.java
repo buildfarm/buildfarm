@@ -14,6 +14,8 @@
 
 package build.buildfarm.instance.shard;
 
+import static build.buildfarm.common.Actions.invalidActionMessage;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static build.buildfarm.instance.shard.Util.SHARD_IS_RETRIABLE;
 import static build.buildfarm.instance.shard.Util.correctMissingBlob;
 import static com.google.common.base.Predicates.or;
@@ -422,7 +424,20 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @Override
-  public ListenableFuture<Iterable<Digest>> findMissingBlobs(Iterable<Digest> blobDigests, Executor executor) {
+  public ListenableFuture<Iterable<Digest>> findMissingBlobs(
+      Iterable<Digest> blobDigests,
+      Executor executor,
+      RequestMetadata requestMetadata) {
+    try {
+      if (backplane.isBlacklisted(requestMetadata)) {
+        throw Status.UNAVAILABLE
+            .withDescription("The action associated with this request is forbidden")
+            .asRuntimeException();
+      }
+    } catch (IOException e) {
+      throw Status.fromThrowable(e).asRuntimeException();
+    }
+
     Iterable<Digest> nonEmptyDigests = Iterables.filter(blobDigests, (digest) -> digest.getSizeBytes() > 0);
     if (Iterables.isEmpty(nonEmptyDigests)) {
       return immediateFuture(ImmutableList.of());
@@ -453,7 +468,8 @@ public class ShardInstance extends AbstractServerInstance {
         ImmutableList.builder(),
         Iterables.size(nonEmptyDigests),
         Context.current().fixedContextExecutor(executor),
-        missingDigestsFuture);
+        missingDigestsFuture,
+        requestMetadata);
     return missingDigestsFuture;
   }
 
@@ -478,10 +494,11 @@ public class ShardInstance extends AbstractServerInstance {
       ImmutableList.Builder<FindMissingResponseEntry> responses,
       int originalSize,
       Executor executor,
-      SettableFuture<Iterable<Digest>> missingDigestsFuture) {
+      SettableFuture<Iterable<Digest>> missingDigestsFuture,
+      RequestMetadata requestMetadata) {
     String worker = workers.removeFirst();
     ListenableFuture<Iterable<Digest>> workerMissingBlobsFuture =
-        workerStub(worker).findMissingBlobs(blobDigests, executor);
+        workerStub(worker).findMissingBlobs(blobDigests, executor, requestMetadata);
 
     Stopwatch stopwatch = Stopwatch.createStarted();
     addCallback(
@@ -500,7 +517,8 @@ public class ShardInstance extends AbstractServerInstance {
                   responses,
                   originalSize,
                   executor,
-                  missingDigestsFuture);
+                  missingDigestsFuture,
+                  requestMetadata);
             }
           }
 
@@ -543,7 +561,8 @@ public class ShardInstance extends AbstractServerInstance {
                     responses,
                     originalSize,
                     executor,
-                    missingDigestsFuture);
+                    missingDigestsFuture,
+                    requestMetadata);
               }
             }
           }
@@ -654,7 +673,7 @@ public class ShardInstance extends AbstractServerInstance {
     if (emptyWorkerList) {
       logger.info(format("worker list was initially empty for %s, attempting to correct", DigestUtil.toString(blobDigest)));
       populatedWorkerListFuture = transform(
-          correctMissingBlob(backplane, workerSet, locationSet, this::workerStub, blobDigest, newDirectExecutorService()),
+          correctMissingBlob(backplane, workerSet, locationSet, this::workerStub, blobDigest, newDirectExecutorService(), RequestMetadata.getDefaultInstance()),
           (foundOnWorkers) -> {
             logger.info(format("worker list was corrected for %s to be %s", DigestUtil.toString(blobDigest), foundOnWorkers.toString()));
             Iterables.addAll(workersList, foundOnWorkers);
@@ -688,7 +707,8 @@ public class ShardInstance extends AbstractServerInstance {
                   locationSet,
                   ShardInstance.this::workerStub,
                   blobDigest,
-                  directExecutor()),
+                  directExecutor(),
+                  RequestMetadata.getDefaultInstance()),
               (foundOnWorkers) -> {
                 logger.info(format("worker list was corrected after depletion for %s to be %s", DigestUtil.toString(blobDigest), foundOnWorkers.toString()));
                 Iterables.addAll(workersList, foundOnWorkers);
@@ -846,9 +866,10 @@ public class ShardInstance extends AbstractServerInstance {
       Digest digest,
       long offset,
       long deadlineAfter,
-      TimeUnit deadlineAfterUnits) throws IOException {
+      TimeUnit deadlineAfterUnits,
+      RequestMetadata requestMetadata) throws IOException {
     try {
-      return remoteInputStreamFactory.newInput(digest, offset, deadlineAfter, deadlineAfterUnits);
+      return remoteInputStreamFactory.newInput(digest, offset, deadlineAfter, deadlineAfterUnits, requestMetadata);
     } catch (InterruptedException e) {
       throw new IOException(e);
     }
@@ -861,6 +882,16 @@ public class ShardInstance extends AbstractServerInstance {
 
   @Override
   public Write getBlobWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata) {
+    try {
+      if (backplane.isBlacklisted(requestMetadata)) {
+        throw Status.UNAVAILABLE
+            .withDescription("This write request is forbidden")
+            .asRuntimeException();
+      }
+    } catch (IOException e) {
+      throw Status.fromThrowable(e).asRuntimeException();
+    }
+
     if (maxBlobSize > 0 && digest.getSizeBytes() > maxBlobSize) {
       throw Status.UNAVAILABLE
           .withDescription(
@@ -999,7 +1030,12 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @Override
-  public InputStream newOperationStreamInput(String name, long offset, long deadlineAfter, TimeUnit deadlineAfterUnits) {
+  public InputStream newOperationStreamInput(
+      String name,
+      long offset,
+      long deadlineAfter,
+      TimeUnit deadlineAfterUnits,
+      RequestMetadata requestMetadata) {
     throw new UnsupportedOperationException();
   }
 
@@ -1149,7 +1185,8 @@ public class ShardInstance extends AbstractServerInstance {
               actionDigest,
               queuedOperation,
               preconditionFailure,
-              newDirectExecutorService());
+              newDirectExecutorService(),
+              executeEntry.getRequestMetadata());
           return immediateFuture(queuedOperation);
         },
         operationTransformService);
@@ -1304,11 +1341,34 @@ public class ShardInstance extends AbstractServerInstance {
       } catch (Exception e) {
         return immediateFailedFuture(e);
       }
+
+      if (backplane.isBlacklisted(requestMetadata)) {
+        watcher.observe(operation.toBuilder()
+            .setDone(true)
+            .setResponse(Any.pack(blacklistResponse(actionDigest)))
+            .build());
+        return immediateFuture(null);
+      }
       backplane.prequeue(executeEntry, operation);
       return watchOperation(operation, watcher, /* initial=*/ false);
     } catch (IOException e) {
       return immediateFailedFuture(e);
     }
+  }
+
+  private static ExecuteResponse blacklistResponse(Digest actionDigest) {
+    PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
+    preconditionFailure.addViolationsBuilder()
+        .setType(VIOLATION_TYPE_MISSING)
+        .setSubject("blobs/" + DigestUtil.toString(actionDigest))
+        .setDescription("This execute request is forbidden");
+    return ExecuteResponse.newBuilder()
+        .setStatus(com.google.rpc.Status.newBuilder()
+            .setCode(Code.FAILED_PRECONDITION.value())
+            .setMessage(invalidActionMessage(actionDigest))
+            .addDetails(Any.pack(preconditionFailure.build()))
+            .build())
+        .build();
   }
 
   private <T> void errorOperationFuture(

@@ -38,8 +38,8 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecutionStage;
-import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.Platform;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
@@ -227,13 +227,14 @@ public class Worker {
     InputStreamFactory inputStreamFactory = new InputStreamFactory() {
       @Override
       public InputStream newInput(Digest digest, long offset) throws IOException {
-        return casInstance.newBlobInput(digest, offset, 60, SECONDS);
+        return casInstance.newBlobInput(digest, offset, 60, SECONDS, RequestMetadata.getDefaultInstance());
       }
     };
     fileCache = new InjectedCASFileCache(
         inputStreamFactory,
         root.resolve(casCacheDirectory),
         config.getCasCacheMaxSizeBytes(),
+        config.getCasCacheMaxEntrySizeBytes(),
         casInstance.getDigestUtil(),
         newDirectExecutorService());
   }
@@ -618,7 +619,10 @@ public class Worker {
       public QueuedOperation getQueuedOperation(QueueEntry queueEntry)
           throws IOException, InterruptedException {
         Digest queuedOperationDigest = queueEntry.getQueuedOperationDigest();
-        ByteString queuedOperationBlob = getBlob(casInstance, queuedOperationDigest);
+        ByteString queuedOperationBlob = getBlob(
+            casInstance,
+            queuedOperationDigest,
+            queueEntry.getExecuteEntry().getRequestMetadata());
         if (queuedOperationBlob == null) {
           return null;
         }
@@ -714,6 +718,11 @@ public class Worker {
       @Override
       public Write getOperationStreamWrite(String name) {
         return operationQueueInstance.getOperationStreamWrite(name);
+      }
+
+      @Override
+      public void blacklistAction(String actionId) {
+        // ignore
       }
 
       @Override

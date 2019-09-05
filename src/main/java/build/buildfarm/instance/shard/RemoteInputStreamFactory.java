@@ -26,6 +26,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.ShardBackplane;
@@ -104,12 +105,13 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
       Deque<String> workers,
       long offset,
       long deadlineAfter,
-      TimeUnit deadlineAfterUnits) throws IOException, InterruptedException {
+      TimeUnit deadlineAfterUnits,
+      RequestMetadata requestMetadata) throws IOException, InterruptedException {
     String worker = workers.removeFirst();
     try {
       Instance instance = workerStub(worker);
 
-      InputStream input = instance.newBlobInput(blobDigest, offset, deadlineAfter, deadlineAfterUnits);
+      InputStream input = instance.newBlobInput(blobDigest, offset, deadlineAfter, deadlineAfterUnits, requestMetadata);
       // ensure that if the blob cannot be fetched, that we throw here
       input.available();
       if (Thread.interrupted()) {
@@ -137,10 +139,16 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
 
   @Override
   public InputStream newInput(Digest blobDigest, long offset) throws IOException, InterruptedException {
-    return newInput(blobDigest, offset, 60, SECONDS);
+    return newInput(blobDigest, offset, 60, SECONDS, RequestMetadata.getDefaultInstance());
   }
 
-  public InputStream newInput(Digest blobDigest, long offset, long deadlineAfter, TimeUnit deadlineAfterUnits) throws IOException, InterruptedException {
+  public InputStream newInput(
+      Digest blobDigest,
+      long offset,
+      long deadlineAfter,
+      TimeUnit deadlineAfterUnits,
+      RequestMetadata requestMetadata)
+      throws IOException, InterruptedException {
     Set<String> remoteWorkers;
     Set<String> locationSet;
     try {
@@ -165,7 +173,7 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
     final ListenableFuture<List<String>> populatedWorkerListFuture;
     if (emptyWorkerList) {
       populatedWorkerListFuture = transform(
-          correctMissingBlob(backplane, remoteWorkers, locationSet, this::workerStub, blobDigest, newDirectExecutorService()),
+          correctMissingBlob(backplane, remoteWorkers, locationSet, this::workerStub, blobDigest, newDirectExecutorService(), requestMetadata),
           (foundOnWorkers) -> {
             Iterables.addAll(workersList, foundOnWorkers);
             return workersList;
@@ -186,7 +194,7 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
             boolean complete = false;
             while (!complete && !workers.isEmpty()) {
               try {
-                inputStreamFuture.set(fetchBlobFromRemoteWorker(blobDigest, workers, offset, deadlineAfter, deadlineAfterUnits));
+                inputStreamFuture.set(fetchBlobFromRemoteWorker(blobDigest, workers, offset, deadlineAfter, deadlineAfterUnits, requestMetadata));
                 complete = true;
               } catch (IOException e) {
                 if (workers.isEmpty()) {
@@ -198,7 +206,7 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
     
                   workersList.clear();
                   ListenableFuture<List<String>> checkedWorkerListFuture = transform(
-                      correctMissingBlob(backplane, remoteWorkers, locationSet, RemoteInputStreamFactory.this::workerStub, blobDigest, newDirectExecutorService()),
+                      correctMissingBlob(backplane, remoteWorkers, locationSet, RemoteInputStreamFactory.this::workerStub, blobDigest, newDirectExecutorService(), requestMetadata),
                       (foundOnWorkers) -> {
                         Iterables.addAll(workersList, foundOnWorkers);
                         return workersList;

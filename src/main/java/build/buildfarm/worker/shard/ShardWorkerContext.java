@@ -612,6 +612,15 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
+  public void blacklistAction(String actionId)
+      throws IOException, InterruptedException {
+    createBackplaneRetrier().execute(() -> {
+      backplane.blacklistAction(actionId);
+      return null;
+    });
+  }
+
+  @Override
   public void putActionResult(ActionKey actionKey, ActionResult actionResult)
       throws IOException, InterruptedException {
     createBackplaneRetrier().execute(() -> {

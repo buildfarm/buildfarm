@@ -101,11 +101,15 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
       StreamObserver<FindMissingBlobsResponse> responseObserver) {
     Stopwatch stopwatch = Stopwatch.createStarted();
     FindMissingBlobsResponse.Builder builder = FindMissingBlobsResponse.newBuilder();
+    ListenableFuture<FindMissingBlobsResponse.Builder> responseFuture = transform(
+        instance.findMissingBlobs(
+            request.getBlobDigestsList(),
+            directExecutor(),
+            TracingMetadataUtils.fromCurrentContext()),
+        builder::addAllMissingBlobDigests,
+        directExecutor());
     addCallback(
-        transform(
-            instance.findMissingBlobs(request.getBlobDigestsList(), newDirectExecutorService()),
-            builder::addAllMissingBlobDigests,
-            directExecutor()),
+        responseFuture,
         new FutureCallback<FindMissingBlobsResponse.Builder>() {
           @Override
           public void onSuccess(FindMissingBlobsResponse.Builder builder) {

@@ -14,6 +14,9 @@
 
 package build.buildfarm.instance;
 
+import static build.buildfarm.common.Actions.invalidActionMessage;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static build.buildfarm.instance.Utils.putBlob;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
@@ -171,10 +174,6 @@ public abstract class AbstractServerInstance implements Instance {
   public static final String OUTPUT_DIRECTORY_IS_OUTPUT_ANCESTOR =
       "An output directory is an ancestor to another output";
 
-  public static final String VIOLATION_TYPE_MISSING = "MISSING";
-
-  public static final String VIOLATION_TYPE_INVALID = "INVALID";
-
   public AbstractServerInstance(
       String name,
       DigestUtil digestUtil,
@@ -229,7 +228,12 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public InputStream newBlobInput(Digest digest, long offset, long deadlineAfter, TimeUnit deadlineAfterUnits) throws IOException {
+  public InputStream newBlobInput(
+      Digest digest,
+      long offset,
+      long deadlineAfter,
+      TimeUnit deadlineAfterUnits,
+      RequestMetadata requestMetadata) throws IOException {
     return contentAddressableStorage.newInput(digest, offset);
   }
 
@@ -324,7 +328,8 @@ public abstract class AbstractServerInstance implements Instance {
     }
   }
 
-  public boolean containsBlob(Digest digest) {
+  @Override
+  public boolean containsBlob(Digest digest, RequestMetadata requestMetadata) {
     return contentAddressableStorage.contains(digest);
   }
 
@@ -362,7 +367,10 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public ListenableFuture<Iterable<Digest>> findMissingBlobs(Iterable<Digest> digests, Executor executor) {
+  public ListenableFuture<Iterable<Digest>> findMissingBlobs(
+      Iterable<Digest> digests,
+      Executor executor,
+      RequestMetadata requestMetadata) {
     Thread findingThread = Thread.currentThread();
     Context.CancellationListener cancellationListener = (context) -> {
       findingThread.interrupt();
@@ -656,9 +664,10 @@ public abstract class AbstractServerInstance implements Instance {
   private void validateInputs(
       Iterable<Digest> inputDigests,
       PreconditionFailure.Builder preconditionFailure,
-      Executor executor) throws StatusException, InterruptedException {
+      Executor executor,
+      RequestMetadata requestMetadata) throws StatusException, InterruptedException {
     ListenableFuture<Void> result = transform(
-        findMissingBlobs(inputDigests, executor),
+        findMissingBlobs(inputDigests, executor, requestMetadata),
         (missingBlobDigests) -> {
           preconditionFailure.addAllViolations(
               Iterables.transform(
@@ -693,16 +702,12 @@ public abstract class AbstractServerInstance implements Instance {
     }
   }
 
-  @VisibleForTesting
-  public static String invalidActionMessage(Digest actionDigest) {
-    return String.format("Action %s is invalid", DigestUtil.toString(actionDigest));
-  }
-
   protected QueuedOperation validateQueuedOperationAndInputs(
       Digest actionDigest,
       QueuedOperation queuedOperation,
       PreconditionFailure.Builder preconditionFailure,
-      Executor executor) throws StatusException, InterruptedException {
+      Executor executor,
+      RequestMetadata requestMetadata) throws StatusException, InterruptedException {
     final ListenableFuture<Void> validatedFuture;
     if (!queuedOperation.hasAction()) {
       preconditionFailure.addViolationsBuilder()
@@ -721,13 +726,14 @@ public abstract class AbstractServerInstance implements Instance {
       validateInputs(
           inputDigestsBuilder.build(),
           preconditionFailure,
-          executor);
+          executor,
+          requestMetadata);
     }
     checkPreconditionFailure(actionDigest, preconditionFailure.build());
     return queuedOperation;
   }
 
-  private Action validateActionDigest(String operationName, Digest actionDigest)
+  private Action validateActionDigest(String operationName, Digest actionDigest, RequestMetadata requestMetadata)
       throws StatusException, InterruptedException {
     Action action = null;
     PreconditionFailure.Builder preconditionFailure =
@@ -751,7 +757,7 @@ public abstract class AbstractServerInstance implements Instance {
             .setDescription("Action " + DigestUtil.toString(actionDigest));
       }
       if (action != null) {
-        validateAction(operationName, action, preconditionFailure);
+        validateAction(operationName, action, preconditionFailure, requestMetadata);
       }
     }
     checkPreconditionFailure(actionDigest, preconditionFailure.build());
@@ -761,7 +767,8 @@ public abstract class AbstractServerInstance implements Instance {
   protected void validateAction(
       String operationName,
       Action action,
-      PreconditionFailure.Builder preconditionFailure)
+      PreconditionFailure.Builder preconditionFailure,
+      RequestMetadata requestMetadata)
       throws InterruptedException, StatusException {
     ExecutorService service = newDirectExecutorService();
     ImmutableSet.Builder<Digest> inputDigestsBuilder = ImmutableSet.builder();
@@ -774,7 +781,8 @@ public abstract class AbstractServerInstance implements Instance {
     validateInputs(
         inputDigestsBuilder.build(),
         preconditionFailure,
-        service);
+        service,
+        requestMetadata);
   }
 
   protected static void checkPreconditionFailure(
@@ -972,7 +980,7 @@ public abstract class AbstractServerInstance implements Instance {
       Watcher watcher) throws InterruptedException {
     Action action;
     try {
-      action = validateActionDigest("execute", actionDigest);
+      action = validateActionDigest("execute", actionDigest, requestMetadata);
     } catch (StatusException e) {
       com.google.rpc.Status status = StatusProto.fromThrowable(e);
       if (status == null) {
@@ -1384,7 +1392,7 @@ public abstract class AbstractServerInstance implements Instance {
     }
     Digest actionDigest = metadata.getActionDigest();
     try {
-      validateActionDigest(name, actionDigest);
+      validateActionDigest(name, actionDigest, requestMetadata);
     } catch (StatusException e) {
       com.google.rpc.Status status = StatusProto.fromThrowable(e);
       if (status == null) {

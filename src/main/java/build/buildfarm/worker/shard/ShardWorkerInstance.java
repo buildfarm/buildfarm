@@ -172,7 +172,12 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  public InputStream newOperationStreamInput(String name, long offset, long deadlineAfter, TimeUnit deadlineAfterUnits) {
+  public InputStream newOperationStreamInput(
+      String name,
+      long offset,
+      long deadlineAfter,
+      TimeUnit deadlineAfterUnits,
+      RequestMetadata requestMetadata) {
     throw new UnsupportedOperationException();
   }
 

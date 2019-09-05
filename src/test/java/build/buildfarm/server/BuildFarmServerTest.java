@@ -16,7 +16,7 @@ package build.buildfarm.server;
 
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.COMPLETED;
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.EXECUTING;
-import static build.buildfarm.instance.AbstractServerInstance.VIOLATION_TYPE_INVALID;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.fail;
 

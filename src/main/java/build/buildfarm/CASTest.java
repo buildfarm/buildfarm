@@ -33,7 +33,7 @@ class CASTest {
         long maxSizeInBytes,
         DigestUtil digestUtil,
         ExecutorService expireService) {
-      super(root, maxSizeInBytes, digestUtil, expireService);
+      super(root, maxSizeInBytes, maxSizeInBytes, digestUtil, expireService);
     }
 
     @Override

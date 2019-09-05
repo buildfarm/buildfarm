@@ -33,6 +33,7 @@ class ShardCASFileCache extends CASFileCache {
       InputStreamFactory shardInputStreamFactory,
       Path root,
       long maxSizeInBytes,
+      long maxEntrySizeInBytes,
       DigestUtil digestUtil,
       ExecutorService expireService,
       Consumer<Digest> onPut,
@@ -41,6 +42,7 @@ class ShardCASFileCache extends CASFileCache {
     super(
         root,
         maxSizeInBytes,
+        maxEntrySizeInBytes,
         digestUtil,
         expireService,
         /* storage=*/ Maps.newConcurrentMap(),

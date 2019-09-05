@@ -23,6 +23,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
@@ -156,7 +157,8 @@ public class ShardWorkerInstanceTest {
         /* name=*/ null,
         /* offset=*/ 0,
         /* deadlineAfter=*/ 0,
-        /* deadlineAfterUnits=*/ TimeUnit.SECONDS);
+        /* deadlineAfterUnits=*/ TimeUnit.SECONDS,
+        RequestMetadata.getDefaultInstance());
   }
 
   @Test(expected = UnsupportedOperationException.class)

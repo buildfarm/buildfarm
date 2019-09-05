@@ -66,5 +66,6 @@ class StubWorkerContext implements WorkerContext {
   @Override public void uploadOutputs(ActionResult.Builder resultBuilder, Path actionRoot, Iterable<String> outputFiles, Iterable<String> outputDirs) { throw new UnsupportedOperationException(); }
   @Override public boolean putOperation(Operation operation, Action action) { throw new UnsupportedOperationException(); }
   @Override public Write getOperationStreamWrite(String name) { throw new UnsupportedOperationException(); }
+  @Override public void blacklistAction(String actionId) { throw new UnsupportedOperationException(); }
   @Override public void putActionResult(ActionKey actionKey, ActionResult actionResult) { throw new UnsupportedOperationException(); }
 };

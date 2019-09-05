@@ -64,6 +64,19 @@ public interface ContentAddressableStorage extends InputStreamFactory {
     }
   }
 
+  public class EntryLimitException extends IOException {
+    private final Digest digest;
+
+    public EntryLimitException(Digest digest) {
+      super(DigestUtil.toString(digest));
+      this.digest = digest;
+    }
+
+    public Digest getDigest() {
+      return digest;
+    }
+  }
+
   /** Indicates presence in the CAS for a single digest. */
   @ThreadSafe
   boolean contains(Digest digest);

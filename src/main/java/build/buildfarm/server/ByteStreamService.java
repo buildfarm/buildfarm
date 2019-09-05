@@ -214,7 +214,12 @@ public class ByteStreamService extends ByteStreamImplBase {
       long limit,
       StreamObserver<ReadResponse> responseObserver) {
     try {
-      InputStream in = instance.newBlobInput(digest, offset, deadlineAfter, deadlineAfterUnits);
+      InputStream in = instance.newBlobInput(
+          digest,
+          offset,
+          deadlineAfter,
+          deadlineAfterUnits,
+          TracingMetadataUtils.fromCurrentContext());
       ServerCallStreamObserver<ReadResponse> target =
           (ServerCallStreamObserver<ReadResponse>) responseObserver;
       target.setOnCancelHandler(() -> {
@@ -261,7 +266,12 @@ public class ByteStreamService extends ByteStreamImplBase {
       long limit,
       StreamObserver<ReadResponse> responseObserver) {
     try {
-      InputStream in = instance.newOperationStreamInput(resourceName, offset, deadlineAfter, deadlineAfterUnits);
+      InputStream in = instance.newOperationStreamInput(
+          resourceName,
+          offset,
+          deadlineAfter,
+          deadlineAfterUnits,
+          TracingMetadataUtils.fromCurrentContext());
       ServerCallStreamObserver<ReadResponse> target =
           (ServerCallStreamObserver<ReadResponse>) responseObserver;
       target.setOnCancelHandler(() -> {
@@ -359,6 +369,9 @@ public class ByteStreamService extends ByteStreamImplBase {
       responseObserver.onError(BuildFarmInstances.toStatusException(e));
     } catch (IllegalArgumentException|InvalidResourceNameException e) {
       logger.log(SEVERE, format("queryWriteStatus(%s)", resourceName), e);
+      responseObserver.onError(INVALID_ARGUMENT.withDescription(e.getMessage()).asException());
+    } catch (RuntimeException e) {
+      logger.log(SEVERE, format("queryWriteStatus(%s)", resourceName), e);
       responseObserver.onError(Status.fromThrowable(e).asException());
     }
   }
@@ -374,7 +387,7 @@ public class ByteStreamService extends ByteStreamImplBase {
 
       @Override
       public boolean isComplete() {
-        return instance.containsBlob(digest);
+        return instance.containsBlob(digest, TracingMetadataUtils.fromCurrentContext());
       }
 
       @Override

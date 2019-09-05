@@ -22,6 +22,7 @@ import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecutionStage;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.ShardBackplane;
@@ -785,6 +786,12 @@ public class RedisShardBackplane implements ShardBackplane {
     return actionResult;
   }
 
+  // we do this by action hash only, so that we can use RequestMetadata to filter
+  @Override
+  public void blacklistAction(String actionId) throws IOException {
+    withVoidBackplaneException((jedis) -> jedis.setex(actionBlacklistKey(actionId), config.getActionBlacklistExpire(), ""));
+  }
+
   @Override
   public void putActionResult(ActionKey actionKey, ActionResult actionResult)
       throws IOException {
@@ -1341,8 +1348,21 @@ public class RedisShardBackplane implements ShardBackplane {
     return config.getDispatchingPrefix() + ":" + operationName;
   }
 
+  public String actionBlacklistKey(String actionId) {
+    return config.getActionBlacklistPrefix() + ":" + actionId;
+  }
+
   public static String parseOperationChannel(String channel) {
     return channel.split(":")[1];
+  }
+
+  @Override
+  public boolean isBlacklisted(RequestMetadata requestMetadata) throws IOException {
+    // TODO build blacklisting?
+    if (requestMetadata.getActionId().isEmpty()) {
+      return false;
+    }
+    return withBackplaneException((jedis) -> jedis.exists(actionBlacklistKey(requestMetadata.getActionId())));
   }
 
   @Override

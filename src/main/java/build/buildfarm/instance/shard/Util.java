@@ -25,6 +25,7 @@ import static java.lang.String.format;
 import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.grpc.Retrier;
@@ -79,7 +80,8 @@ public class Util {
       Set<String> originalLocationSet,
       Function<String, Instance> workerInstanceFactory,
       Digest digest,
-      Executor executor) {
+      Executor executor,
+      RequestMetadata requestMetadata) {
     ListenableFuture<Void> foundFuture;
     Set<String> foundWorkers = Sets.newConcurrentHashSet();
     synchronized (workerSet) {
@@ -90,7 +92,8 @@ public class Util {
           workerInstanceFactory,
           digest,
           executor,
-          foundWorkers);
+          foundWorkers,
+          requestMetadata);
     }
     return transform(
         foundFuture,
@@ -119,7 +122,8 @@ public class Util {
       Function<String, Instance> workerInstanceFactory,
       Digest digest,
       Executor executor,
-      Set<String> foundWorkers) {
+      Set<String> foundWorkers,
+      RequestMetadata requestMetadata) {
     SettableFuture<Void> foundFuture = SettableFuture.create();
     AggregateCallback<String> foundCallback = new AggregateCallback<String>(workerSet.size() + 1) {
       @Override
@@ -163,7 +167,8 @@ public class Util {
               foundCallback.onFailure(t);
             }
           },
-          executor);
+          executor,
+          requestMetadata);
     }
     foundCallback.complete();
     return foundFuture;
@@ -174,9 +179,10 @@ public class Util {
       String worker,
       Instance instance,
       FutureCallback<Boolean> foundCallback,
-      Executor executor) {
+      Executor executor,
+      RequestMetadata requestMetadata) {
     ListenableFuture<Iterable<Digest>> missingBlobsFuture =
-        instance.findMissingBlobs(ImmutableList.of(digest), executor);
+        instance.findMissingBlobs(ImmutableList.of(digest), executor, requestMetadata);
     addCallback(
         missingBlobsFuture,
         new FutureCallback<Iterable<Digest>>() {
@@ -204,7 +210,8 @@ public class Util {
                   worker,
                   instance,
                   foundCallback,
-                  executor);
+                  executor,
+                  requestMetadata);
             }
           }
         },

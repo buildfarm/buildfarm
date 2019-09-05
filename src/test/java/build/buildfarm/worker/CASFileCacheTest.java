@@ -125,6 +125,7 @@ class CASFileCacheTest {
     fileCache = new CASFileCache(
         root,
         /* maxSizeInBytes=*/ 1024,
+        /* maxEntrySizeInBytes=*/ 1024,
         DIGEST_UTIL,
         expireService,
         storage,
@@ -167,6 +168,7 @@ class CASFileCacheTest {
     CASFileCache fileCache = new CASFileCache(
         root,
         /* maxSizeInBytes=*/ 1024,
+        /* maxEntrySizeInBytes=*/ 1024,
         DIGEST_UTIL,
         /* expireService=*/ newDirectExecutorService()) {
       @Override

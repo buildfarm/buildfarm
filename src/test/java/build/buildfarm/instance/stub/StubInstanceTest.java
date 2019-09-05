@@ -198,7 +198,7 @@ public class StubInstanceTest {
     Instance instance = newStubInstance("findMissingBlobs-test");
     Iterable<Digest> digests = ImmutableList.of(
         Digest.newBuilder().setHash("present").setSizeBytes(1).build());
-    assertThat(instance.findMissingBlobs(digests, newDirectExecutorService()).get()).isEmpty();
+    assertThat(instance.findMissingBlobs(digests, newDirectExecutorService(), RequestMetadata.getDefaultInstance()).get()).isEmpty();
     instance.stop();
   }
 
@@ -376,7 +376,7 @@ public class StubInstanceTest {
         .setHash("unavailable-blob-name")
         .setSizeBytes(1)
         .build();
-    try (InputStream in = instance.newBlobInput(unavailableDigest, 0, 1, SECONDS)) {
+    try (InputStream in = instance.newBlobInput(unavailableDigest, 0, 1, SECONDS, RequestMetadata.getDefaultInstance())) {
       ByteStreams.copy(in, out);
     } catch (IOException e) {
       ioException = e;
@@ -417,7 +417,7 @@ public class StubInstanceTest {
         .setHash("delayed-blob-name")
         .setSizeBytes(1)
         .build();
-    try (InputStream in = instance.newBlobInput(delayedDigest, 0, 1, SECONDS)) {
+    try (InputStream in = instance.newBlobInput(delayedDigest, 0, 1, SECONDS, RequestMetadata.getDefaultInstance())) {
       ByteStreams.copy(in, out);
     }
     assertThat(ByteString.copyFrom(out.toByteArray())).isEqualTo(content);
@@ -440,7 +440,7 @@ public class StubInstanceTest {
         .setHash("timeout-blob-name")
         .setSizeBytes(1)
         .build();
-    try (InputStream in = instance.newBlobInput(timeoutDigest, 0, 1, SECONDS)) {
+    try (InputStream in = instance.newBlobInput(timeoutDigest, 0, 1, SECONDS, RequestMetadata.getDefaultInstance())) {
       ByteStreams.copy(in, out);
     } catch (IOException e) {
       ioException = e;

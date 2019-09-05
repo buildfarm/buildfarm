@@ -17,6 +17,7 @@ package build.buildfarm;
 import static build.buildfarm.instance.Utils.getBlob;
 
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.instance.Instance;
@@ -59,7 +60,7 @@ class Mount {
           return cache.get(blobDigest).substring((int) offset).newInput();
         }
         try {
-          ByteString value = getBlob(instance, blobDigest);
+          ByteString value = getBlob(instance, blobDigest, RequestMetadata.getDefaultInstance());
           if (offset == 0) {
             cache.put(blobDigest, value);
           }

@@ -18,10 +18,11 @@ import static build.bazel.remote.execution.v2.ExecutionStage.Value.UNKNOWN;
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.CACHE_CHECK;
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.QUEUED;
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.COMPLETED;
+import static build.buildfarm.common.Actions.invalidActionMessage;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static build.buildfarm.instance.AbstractServerInstance.MISSING_ACTION;
 import static build.buildfarm.instance.AbstractServerInstance.MISSING_COMMAND;
 import static build.buildfarm.instance.AbstractServerInstance.MISSING_INPUT;
-import static build.buildfarm.instance.AbstractServerInstance.VIOLATION_TYPE_MISSING;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
@@ -190,7 +191,7 @@ public class ShardInstanceTest {
         Iterable<Digest> digests = (Iterable<Digest>) invocation.getArguments()[0];
         return immediateFuture(Iterables.filter(digests, (digest) -> !blobDigests.contains(digest)));
       }
-    }).when(mockWorkerInstance).findMissingBlobs(any(Iterable.class), any(Executor.class));
+    }).when(mockWorkerInstance).findMissingBlobs(any(Iterable.class), any(Executor.class), any(RequestMetadata.class));
 
     Action action = Action.newBuilder()
         .setCommandDigest(commandDigest)
@@ -217,7 +218,8 @@ public class ShardInstanceTest {
       }
     }).when(mockWorkerInstance).getBlob(eq(actionDigest), eq(0l), eq(0l), any(Long.class), any(TimeUnit.class), any(StreamObserver.class));
     when(mockBackplane.getBlobLocationSet(eq(actionDigest))).thenReturn(provideAction ? workers : ImmutableSet.of());
-    when(mockWorkerInstance.findMissingBlobs(eq(ImmutableList.of(actionDigest)), any(Executor.class))).thenReturn(immediateFuture(ImmutableList.of()));
+    when(mockWorkerInstance.findMissingBlobs(eq(ImmutableList.of(actionDigest)), any(Executor.class), any(RequestMetadata.class)))
+        .thenReturn(immediateFuture(ImmutableList.of()));
 
     return action;
   }
@@ -316,7 +318,7 @@ public class ShardInstanceTest {
     ExecuteResponse executeResponse = ExecuteResponse.newBuilder()
         .setStatus(com.google.rpc.Status.newBuilder()
             .setCode(Code.FAILED_PRECONDITION.getNumber())
-            .setMessage(ShardInstance.invalidActionMessage(actionDigest))
+            .setMessage(invalidActionMessage(actionDigest))
             .addDetails(Any.pack(PreconditionFailure.newBuilder()
                 .addViolations(Violation.newBuilder()
                     .setType(VIOLATION_TYPE_MISSING)
@@ -359,7 +361,7 @@ public class ShardInstanceTest {
     ExecuteResponse executeResponse = ExecuteResponse.newBuilder()
         .setStatus(com.google.rpc.Status.newBuilder()
             .setCode(Code.FAILED_PRECONDITION.getNumber())
-            .setMessage(ShardInstance.invalidActionMessage(actionDigest))
+            .setMessage(invalidActionMessage(actionDigest))
             .addDetails(Any.pack(PreconditionFailure.newBuilder()
                 .addViolations(Violation.newBuilder()
                     .setType(VIOLATION_TYPE_MISSING)
@@ -431,7 +433,7 @@ public class ShardInstanceTest {
     ExecuteResponse executeResponse = ExecuteResponse.newBuilder()
         .setStatus(com.google.rpc.Status.newBuilder()
             .setCode(Code.FAILED_PRECONDITION.getNumber())
-            .setMessage(ShardInstance.invalidActionMessage(actionDigest))
+            .setMessage(invalidActionMessage(actionDigest))
             .addDetails(Any.pack(PreconditionFailure.newBuilder()
                 .addViolations(Violation.newBuilder()
                     .setType(VIOLATION_TYPE_MISSING)
@@ -448,7 +450,8 @@ public class ShardInstanceTest {
     Action action = createAction();
     Digest actionDigest = DIGEST_UTIL.compute(action);
 
-    when(mockWorkerInstance.findMissingBlobs(any(Iterable.class), any(Executor.class))).thenReturn(immediateFuture(ImmutableList.of()));
+    when(mockWorkerInstance.findMissingBlobs(any(Iterable.class), any(Executor.class), any(RequestMetadata.class)))
+        .thenReturn(immediateFuture(ImmutableList.of()));
 
     doAnswer(answer((digest, uuid) -> new NullWrite()))
         .when(mockWorkerInstance)
@@ -677,7 +680,7 @@ public class ShardInstanceTest {
     com.google.rpc.Status status = executeResponse.getStatus();
     com.google.rpc.Status expectedStatus = com.google.rpc.Status.newBuilder()
         .setCode(Code.FAILED_PRECONDITION.getNumber())
-        .setMessage(ShardInstance.invalidActionMessage(actionDigest))
+        .setMessage(invalidActionMessage(actionDigest))
         .addDetails(Any.pack(PreconditionFailure.newBuilder()
             .addViolations(Violation.newBuilder()
                 .setType(VIOLATION_TYPE_MISSING)
@@ -740,7 +743,8 @@ public class ShardInstanceTest {
         .build();
     Iterable<Digest> missingDigests = instance.findMissingBlobs(
         ImmutableList.of(digest),
-        newDirectExecutorService()).get();
+        newDirectExecutorService(),
+        RequestMetadata.getDefaultInstance()).get();
     assertThat(missingDigests).containsExactly(digest);
   }
 
@@ -758,12 +762,13 @@ public class ShardInstanceTest {
         .build();
     List<Digest> queryDigests = ImmutableList.of(digest);
     ArgumentMatcher<Iterable<Digest>> queryMatcher = (digests) -> Iterables.elementsEqual(digests, queryDigests);
-    when(mockWorkerInstance.findMissingBlobs(argThat(queryMatcher), any(Executor.class)))
+    when(mockWorkerInstance.findMissingBlobs(argThat(queryMatcher), any(Executor.class), any(RequestMetadata.class)))
         .thenReturn(immediateFuture(queryDigests));
     Iterable<Digest> missingDigests = instance.findMissingBlobs(
         queryDigests,
-        newDirectExecutorService()).get();
-    verify(mockWorkerInstance, times(1)).findMissingBlobs(argThat(queryMatcher), any(Executor.class));
+        newDirectExecutorService(),
+        RequestMetadata.getDefaultInstance()).get();
+    verify(mockWorkerInstance, times(1)).findMissingBlobs(argThat(queryMatcher), any(Executor.class), any(RequestMetadata.class));
     assertThat(missingDigests).containsExactly(digest);
   }
 

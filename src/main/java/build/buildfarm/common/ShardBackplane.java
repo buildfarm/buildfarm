@@ -17,6 +17,7 @@ package build.buildfarm.common;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecutionStage;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.ThreadSafety.ThreadSafe;
 import build.buildfarm.common.Watcher;
@@ -120,6 +121,13 @@ public interface ShardBackplane {
    */
   @ThreadSafe
   void removeActionResults(Iterable<ActionKey> actionKeys) throws IOException;
+
+  /**
+   * Identify an action that should not be executed, and respond to all
+   * requests it matches with failover-compatible responses.
+   */
+  @ThreadSafe
+  void blacklistAction(String actionId) throws IOException;
 
   /**
    * The AC stores full ActionResult objects in a hash map where the key is the
@@ -298,6 +306,12 @@ public interface ShardBackplane {
    */
   @ThreadSafe
   ActionCacheScanResult scanActionCache(String scanToken, int count) throws IOException;
+
+  /**
+   * Test for whether a request is blacklisted
+   */
+  @ThreadSafe
+  boolean isBlacklisted(RequestMetadata requestMetadata) throws IOException;
 
   /**
    * Test for whether an operation may be queued

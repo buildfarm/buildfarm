@@ -299,6 +299,7 @@ public class Worker {
             remoteInputStreamFactory,
             root.resolve(getValidFilesystemCASPath(fsCASConfig, root)),
             fsCASConfig.getMaxSizeBytes(),
+            fsCASConfig.getMaxEntrySizeBytes(),
             digestUtil,
             removeDirectoryService,
             this::onStoragePut,

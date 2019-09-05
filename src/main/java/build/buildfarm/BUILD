@@ -317,6 +317,7 @@ java_library(
         "//3rdparty/jvm/io/grpc:grpc_stub",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
+        "@googleapis//:google_rpc_error_details_java_proto",
     ],
 )
 
