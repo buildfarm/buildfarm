@@ -115,10 +115,10 @@ class Cat {
     }
     // FIXME platform
     System.out.println("Arguments: ('" + String.join("', '", command.getArgumentsList()) + "')");
-    if (command.getEnvironmentVariablesList().isEmpty()) {
+    if (!command.getEnvironmentVariablesList().isEmpty()) {
       System.out.println("Environment Variables:");
       for (EnvironmentVariable env : command.getEnvironmentVariablesList()) {
-        System.out.println("  " + env.getName() + "='" + env.getValue());
+        System.out.println("  " + env.getName() + "='" + env.getValue() + "'");
       }
     }
   }
@@ -235,27 +235,19 @@ class Cat {
     }
     for (FileNode fileNode : directory.getFilesList()) {
       String name = fileNode.getName();
-      String displayName = name;
-      if (fileNode.getIsExecutable()) {
-        displayName += "*";
-      }
+      String displayName = String.format("%s%s %s",
+          name,
+          fileNode.getIsExecutable() ? "*" : "",
+          DigestUtil.toString(fileNode.getDigest()));
       indentOut(indentLevel, displayName);
     }
   }
 
-  private static void printTreeLayout(Instance instance, DigestUtil digestUtil, Digest rootDigest) throws IOException, InterruptedException {
-    Map<Digest, Directory> directoriesIndex = digestUtil.createDirectoriesIndex(fetchTree(instance, rootDigest));
-
+  private static void printTreeLayout(Map<Digest, Directory> directoriesIndex, Digest rootDigest) throws IOException, InterruptedException {
     Map<Digest, Long> directoryWeights = Maps.newHashMap();
     long totalWeight = computeDirectoryWeights(rootDigest, directoriesIndex, directoryWeights);
 
     printTreeAt(0, directoriesIndex.get(rootDigest), directoriesIndex, totalWeight, directoryWeights);
-  }
-
-  private static void printTree(ByteString treeBlob) throws InvalidProtocolBufferException {
-    Tree tree = Tree.parseFrom(treeBlob);
-    printDirectory(0, tree.getRoot());
-    // children
   }
 
   private static void printDirectoryTree(Instance instance, Digest rootDigest) throws IOException, InterruptedException {
@@ -485,7 +477,7 @@ class Cat {
           } else if (type.equals("DirectoryTree")) {
             printDirectoryTree(instance, blobDigest);
           } else if (type.equals("TreeLayout")) {
-            printTreeLayout(instance, digestUtil, blobDigest);
+            printTreeLayout(digestUtil.createDirectoriesIndex(fetchTree(instance, blobDigest)), blobDigest);
           } else {
             if (type.equals("File")) {
               try (InputStream in = instance.newBlobInput(blobDigest, 0, 60, TimeUnit.SECONDS, RequestMetadata.getDefaultInstance())) {
@@ -499,8 +491,6 @@ class Cat {
                 printCommand(blob);
               } else if (type.equals("Directory")) {
                 printDirectory(blob);
-              } else if (type.equals("Tree")) {
-                printTree(blob);
               } else {
                 System.err.println("Unknown type: " + type);
               }
