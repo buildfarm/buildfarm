@@ -118,14 +118,12 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
               responseObserver.onNext(response);
               responseObserver.onCompleted();
               long elapsedMicros = stopwatch.elapsed(MICROSECONDS);
-              boolean checkQualifier = request.getBlobDigestsCount() == 1;
               logger.log(
-                  checkQualifier ? Level.INFO : requestLogLevel,
+                  requestLogLevel,
                   format(
-                      "FindMissingBlobs(%s) for %d blobs%s in %gms",
+                      "FindMissingBlobs(%s) for %d blobs in %gms",
                       instance.getName(),
                       request.getBlobDigestsList().size(),
-                      checkQualifier ? checkMessage(request.getBlobDigests(0), response.getMissingBlobDigestsCount() == 0) : "",
                       elapsedMicros / 1000.0));
             } catch (Throwable t) {
               onFailure(t);
