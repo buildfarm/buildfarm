@@ -31,6 +31,7 @@ http_archive(
         "//third_party/io_grpc_grpc_java:952a767b9c.patch",
         "//third_party/io_grpc_grpc_java:c63752789e.patch",
         "//third_party/io_grpc_grpc_java:1111913510.patch",
+        "//third_party/io_grpc_grpc_java:ced33960cd.patch",
     ],
     sha256 = "f5d0bdebc2a50d0e28f0d228d6c35081d3e973e6159f2695aa5c8c7f93d1e4d6",
     strip_prefix = "grpc-java-1.19.0",
