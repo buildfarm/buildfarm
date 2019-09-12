@@ -1013,12 +1013,12 @@ public class RedisShardBackplane implements ShardBackplane {
 
     String name = operation.getName();
     withVoidBackplaneException((jedis) -> {
-      if (complete) {
-        completeOperation(jedis, name);
-      }
       jedis.setex(operationKey(name), config.getOperationExpire(), json);
       if (publishOperation != null) {
         publishReset(jedis, publishOperation);
+      }
+      if (complete) {
+        completeOperation(jedis, name);
       }
     });
     return true;
