@@ -19,7 +19,7 @@ import static io.grpc.Status.Code.DEADLINE_EXCEEDED;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Platform;
-import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSetMultimap;
 import com.google.rpc.PreconditionFailure;
 import com.google.rpc.PreconditionFailure.Violation;
 import com.google.rpc.Code;
@@ -96,15 +96,15 @@ public final class Actions {
   public static boolean satisfiesRequirements(Platform provider, Platform requirements) {
     // string compare only
     // no duplicate names
-    ImmutableMap.Builder<String, String> provisionsBuilder =
-        new ImmutableMap.Builder<String, String>();
+    ImmutableSetMultimap.Builder<String, String> provisionsBuilder =
+        new ImmutableSetMultimap.Builder<>();
     for (Platform.Property property : provider.getPropertiesList()) {
       provisionsBuilder.put(property.getName(), property.getValue());
     }
-    Map<String, String> provisions = provisionsBuilder.build();
+    ImmutableSetMultimap<String, String> provisions = provisionsBuilder.build();
     for (Platform.Property property : requirements.getPropertiesList()) {
       if (!provisions.containsKey(property.getName()) ||
-          !provisions.get(property.getName()).equals(property.getValue())) {
+          !provisions.get(property.getName()).contains(property.getValue())) {
         return false;
       }
     }
