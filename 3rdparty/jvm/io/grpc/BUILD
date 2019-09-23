@@ -7,15 +7,32 @@ java_library(
         "//external:jar/io/grpc/grpc_all",
     ],
     runtime_deps = [
+        ":grpc_api",
         ":grpc_auth",
         ":grpc_context",
         ":grpc_core",
         ":grpc_netty",
         ":grpc_okhttp",
         ":grpc_protobuf",
-        ":grpc_protobuf_nano",
         ":grpc_stub",
         ":grpc_testing",
+    ],
+)
+
+java_library(
+    name = "grpc_api",
+    visibility = [
+        "//visibility:public",
+    ],
+    exports = [
+        "//external:jar/io/grpc/grpc_api",
+    ],
+    runtime_deps = [
+        ":grpc_context",
+        "//3rdparty/jvm/com/google/code/findbugs:jsr305",
+        "//3rdparty/jvm/com/google/errorprone:error_prone_annotations",
+        "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/org/codehaus/mojo:animal_sniffer_annotations",
     ],
 )
 
@@ -28,7 +45,7 @@ java_library(
         "//external:jar/io/grpc/grpc_auth",
     ],
     runtime_deps = [
-        ":grpc_core",
+        ":grpc_api",
         "//3rdparty/jvm/com/google/auth:google_auth_library_credentials",
     ],
 )
@@ -52,14 +69,12 @@ java_library(
         "//external:jar/io/grpc/grpc_core",
     ],
     runtime_deps = [
-        ":grpc_context",
-        "//3rdparty/jvm/com/google/code/findbugs:jsr305",
+        ":grpc_api",
+        "//3rdparty/jvm/com/google/android:annotations",
         "//3rdparty/jvm/com/google/code/gson",
-        "//3rdparty/jvm/com/google/errorprone:error_prone_annotations",
-        "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/io/opencensus:opencensus_api",
         "//3rdparty/jvm/io/opencensus:opencensus_contrib_grpc_metrics",
-        "//3rdparty/jvm/org/codehaus/mojo:animal_sniffer_annotations",
+        "//3rdparty/jvm/io/perfmark:perfmark_api",
     ],
 )
 
@@ -102,7 +117,7 @@ java_library(
         "//external:jar/io/grpc/grpc_protobuf",
     ],
     runtime_deps = [
-        ":grpc_core",
+        ":grpc_api",
         ":grpc_protobuf_lite",
         "//3rdparty/jvm/com/google/api/grpc:proto_google_common_protos",
         "//3rdparty/jvm/com/google/guava",
@@ -119,23 +134,8 @@ java_library(
         "//external:jar/io/grpc/grpc_protobuf_lite",
     ],
     runtime_deps = [
-        ":grpc_core",
+        ":grpc_api",
         "//3rdparty/jvm/com/google/guava",
-    ],
-)
-
-java_library(
-    name = "grpc_protobuf_nano",
-    visibility = [
-        "//3rdparty/jvm:__subpackages__",
-    ],
-    exports = [
-        "//external:jar/io/grpc/grpc_protobuf_nano",
-    ],
-    runtime_deps = [
-        ":grpc_core",
-        "//3rdparty/jvm/com/google/guava",
-        "//3rdparty/jvm/com/google/protobuf/nano:protobuf_javanano",
     ],
 )
 
@@ -148,7 +148,7 @@ java_library(
         "//external:jar/io/grpc/grpc_stub",
     ],
     runtime_deps = [
-        ":grpc_core",
+        ":grpc_api",
     ],
 )
 
@@ -164,6 +164,5 @@ java_library(
         ":grpc_core",
         ":grpc_stub",
         "//3rdparty/jvm/junit",
-        "//3rdparty/jvm/org/mockito:mockito_core",
     ],
 )
