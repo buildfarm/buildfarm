@@ -24,18 +24,9 @@ protobuf_deps()
 # Needed for @grpc_java//compiler:grpc_java_plugin.
 http_archive(
     name = "io_grpc_grpc_java",
-    patch_args = ["-p1"],
-    patches = [
-        "//third_party/io_grpc_grpc_java:054def3c63.patch",
-        "//third_party/io_grpc_grpc_java:0959a846c8.patch",
-        "//third_party/io_grpc_grpc_java:952a767b9c.patch",
-        "//third_party/io_grpc_grpc_java:c63752789e.patch",
-        "//third_party/io_grpc_grpc_java:1111913510.patch",
-        "//third_party/io_grpc_grpc_java:ced33960cd.patch",
-    ],
-    sha256 = "f5d0bdebc2a50d0e28f0d228d6c35081d3e973e6159f2695aa5c8c7f93d1e4d6",
-    strip_prefix = "grpc-java-1.19.0",
-    urls = ["https://github.com/grpc/grpc-java/archive/v1.19.0.zip"],
+    sha256 = "b1dcce395bdb6c620d3142597b5017f7175c527b0f9ae46c456726940876347e",
+    strip_prefix = "grpc-java-1.23.0",
+    urls = ["https://github.com/grpc/grpc-java/archive/v1.23.0.zip"],
 )
 
 load("@io_grpc_grpc_java//:repositories.bzl", "grpc_java_repositories")
