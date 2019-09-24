@@ -14,21 +14,21 @@
 
 package build.buildfarm.cas;
 
-import static com.google.common.io.ByteStreams.nullOutputStream;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.Write.CompleteWrite;
 import build.buildfarm.v1test.BlobWriteKey;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.protobuf.ByteString;
-import java.io.OutputStream;
 import java.util.UUID;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -40,38 +40,6 @@ class Writes {
   private final Cache<Digest, SettableFuture<ByteString>> writesInProgress = CacheBuilder.newBuilder()
       .expireAfterWrite(10, TimeUnit.MINUTES)
       .build();
-
-  static class CompleteWrite implements Write {
-    private final long committedSize;
-
-    CompleteWrite(long committedSize) {
-      this.committedSize = committedSize;
-    }
-
-    @Override
-    public long getCommittedSize() {
-      return committedSize;
-    }
-
-    @Override
-    public boolean isComplete() {
-      return true;
-    }
-
-    @Override
-    public OutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits) {
-      return nullOutputStream();
-    }
-
-    @Override
-    public void reset() {
-    }
-
-    @Override
-    public void addListener(Runnable onCompleted, Executor executor) {
-      executor.execute(onCompleted);
-    }
-  }
 
   Writes(ContentAddressableStorage storage) {
     this.storage = storage;
@@ -97,17 +65,22 @@ class Writes {
 
   private Write get(BlobWriteKey key) {
     try {
-      return blobWrites.get(key, () -> newWrite(key.getDigest()));
+      return blobWrites.get(key, () -> newWrite(key));
     } catch (ExecutionException e) {
       throw new UncheckedExecutionException(e);
     }
   }
 
-  private Write newWrite(Digest digest) {
-    return new MemoryWriteOutputStream(
+  private Write newWrite(BlobWriteKey key) {
+    Digest digest = key.getDigest();
+    MemoryWriteOutputStream write = new MemoryWriteOutputStream(
         storage,
         digest,
         getFuture(digest));
+    write.getFuture().addListener(
+        () -> blobWrites.invalidate(key),
+        directExecutor());
+    return write;
   }
 
   SettableFuture<ByteString> getFuture(Digest digest) {

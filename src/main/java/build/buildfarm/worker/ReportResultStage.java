@@ -30,6 +30,8 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Maps;
+import com.google.common.hash.HashCode;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.Duration;
@@ -94,12 +96,14 @@ public class ReportResultStage extends PipelineStage {
   }
 
   private OperationContext reportPolled(OperationContext operationContext) throws InterruptedException {
+    final Operation operation = operationContext.operation;
+    final String operationName = operation.getName();
     ExecuteResponse executeResponse;
     try {
-      executeResponse = operationContext.operation
+      executeResponse = operation
           .getResponse().unpack(ExecuteResponse.class);
     } catch (InvalidProtocolBufferException e) {
-      logger.log(SEVERE, "error unpacking execute response", e);
+      logger.log(SEVERE, "invalid ExecuteResponse for " + operationName, e);
       return null;
     }
 
@@ -115,13 +119,13 @@ public class ReportResultStage extends PipelineStage {
           operationContext.command.getOutputFilesList(),
           operationContext.command.getOutputDirectoriesList());
     } catch (IOException e) {
-      logger.log(SEVERE, "error uploading outputs", e);
+      logger.log(SEVERE, "error while uploading outputs for " + operationName, e);
       return null;
     }
 
     ExecuteOperationMetadata metadata;
     try {
-      metadata = operationContext.operation
+      metadata = operation
           .getMetadata()
           .unpack(ExecutingOperationMetadata.class)
           .getExecuteOperationMetadata();
@@ -135,7 +139,7 @@ public class ReportResultStage extends PipelineStage {
       try {
         workerContext.putActionResult(DigestUtil.asActionKey(metadata.getActionDigest()), result);
       } catch (IOException e) {
-        logger.log(SEVERE, "error reporting action result for " + operationContext.operation.getName(), e);
+        logger.log(SEVERE, "error reporting action result for " + operationName, e);
         return null;
       }
     }
@@ -157,7 +161,7 @@ public class ReportResultStage extends PipelineStage {
         .setRequestMetadata(operationContext.queueEntry.getExecuteEntry().getRequestMetadata())
         .build();
 
-    Operation operation = operationContext.operation.toBuilder()
+    Operation doneOperation = operation.toBuilder()
         .setDone(true)
         .setMetadata(Any.pack(completedMetadata))
         .setResponse(Any.pack(executeResponse.toBuilder()
@@ -169,16 +173,16 @@ public class ReportResultStage extends PipelineStage {
     operationContext.poller.pause();
 
     try {
-      if (!workerContext.putOperation(operation, operationContext.action)) {
+      if (!workerContext.putOperation(doneOperation, operationContext.action)) {
         return null;
       }
     } catch (IOException e) {
-      logger.log(SEVERE, "error reporting complete operation " + operation.getName(), e);
+      logger.log(SEVERE, "error reporting complete operation " + operationName, e);
       return null;
     }
 
     return operationContext.toBuilder()
-        .setOperation(operation)
+        .setOperation(doneOperation)
         .build();
   }
 

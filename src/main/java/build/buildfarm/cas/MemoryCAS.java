@@ -41,6 +41,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.logging.Logger;
+import javax.annotation.concurrent.GuardedBy;
 
 public class MemoryCAS implements ContentAddressableStorage {
   private static final Logger logger = Logger.getLogger(MemoryCAS.class.getName());
@@ -56,8 +57,14 @@ public class MemoryCAS implements ContentAddressableStorage {
   private final Writes writes = new Writes(this);
   private final long maxSizeInBytes;
   private final Consumer<Digest> onPut;
+
+  @GuardedBy("this")
   private final Map<Digest, Entry> storage;
+
+  @GuardedBy("this")
   private final Entry header;
+
+  @GuardedBy("this")
   private long sizeInBytes;
 
   public MemoryCAS(long maxSizeInBytes) {
@@ -91,7 +98,7 @@ public class MemoryCAS implements ContentAddressableStorage {
   }
 
   @Override
-  public InputStream newInput(Digest digest, long offset) throws IOException {
+  public synchronized InputStream newInput(Digest digest, long offset) throws IOException {
     // implicit int bounds compare against size bytes
     if (offset < 0 || offset > digest.getSizeBytes()) {
       throw new IndexOutOfBoundsException(
@@ -178,6 +185,7 @@ public class MemoryCAS implements ContentAddressableStorage {
     return e.value;
   }
 
+  @GuardedBy("this")
   private long size() {
     Entry e = header.before;
     long count = 0;
@@ -236,6 +244,7 @@ public class MemoryCAS implements ContentAddressableStorage {
     writes.getFuture(blob.getDigest()).set(blob.getData());
   }
 
+  @GuardedBy("this")
   private void createEntry(Blob blob, Runnable onExpiration) {
     Entry e = new Entry(blob);
     if (onExpiration != null) {
@@ -244,6 +253,7 @@ public class MemoryCAS implements ContentAddressableStorage {
     e.addBefore(header);
   }
 
+  @GuardedBy("this")
   private void expireEntry(Entry e) {
     logger.info("MemoryLRUCAS: expiring " + DigestUtil.toString(e.key));
     storage.remove(e.key);

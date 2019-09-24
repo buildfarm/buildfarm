@@ -60,11 +60,11 @@ dependencies:
   com.google.protobuf:
     protobuf-java:
       lang: java
-      version: "3.7.1"
+      version: "3.9.2"
 
     protobuf-java-util:
       lang: java
-      version: "3.7.1"
+      version: "3.9.2"
 
   com.google.truth:
     truth:
@@ -77,17 +77,17 @@ dependencies:
       modules: [ "buffer", "codec", "codec-http", "codec-http2", "codec-socks", "common", "handler",
         "handler-proxy", "resolver", "transport", "transport-native-epoll", "transport-native-kqueue",
         "transport-native-unix-common" ]
-      version: "4.1.35.Final"
+      version: "4.1.38.Final"
 
   io.grpc:
     grpc-all:
       lang: java
-      version: "1.20.0"
+      version: "1.23.0"
 
     grpc:
       lang: java
-      modules: [ "auth", "core", "context", "netty", "stub", "protobuf" ]
-      version: "1.20.0"
+      modules: [ "api", "auth", "core", "context", "netty", "stub", "protobuf" ]
+      version: "1.23.0"
 
   junit:
     junit:

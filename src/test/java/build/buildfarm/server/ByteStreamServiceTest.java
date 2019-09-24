@@ -19,6 +19,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Write;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.ByteStreamUploader;
+import com.google.common.hash.HashCode;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.bytestream.ByteStreamGrpc;
@@ -32,7 +33,6 @@ import io.grpc.Status;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.stub.StreamObserver;
-import io.grpc.util.MutableHandlerRegistry;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.UUID;
@@ -52,8 +52,6 @@ import org.mockito.stubbing.Answer;
 @RunWith(JUnit4.class)
 public class ByteStreamServiceTest {
   private static final DigestUtil DIGEST_UTIL = new DigestUtil(SHA256);
-
-  private final MutableHandlerRegistry serviceRegistry = new MutableHandlerRegistry();
 
   private Server fakeServer;
   private String fakeServerName;
@@ -133,7 +131,8 @@ public class ByteStreamServiceTest {
     Instance instance = mock(Instance.class);
     when(instance.getBlobWrite(digest, uuid)).thenReturn(write);
 
-    String resourceName = ByteStreamUploader.getResourceName(uuid, /* instanceName=*/ null, digest);
+    HashCode hash = HashCode.fromString(digest.getHash());
+    String resourceName = ByteStreamUploader.uploadResourceName(/* instanceName=*/ null, uuid, hash, digest.getSizeBytes());
     when(instances.getFromUploadBlob(eq(resourceName))).thenReturn(instance);
 
     Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
@@ -198,7 +197,8 @@ public class ByteStreamServiceTest {
     Instance instance = mock(Instance.class);
     when(instance.getBlobWrite(digest, uuid)).thenReturn(write);
 
-    String resourceName = ByteStreamUploader.getResourceName(uuid, /* instanceName=*/ null, digest);
+    HashCode hash = HashCode.fromString(digest.getHash());
+    String resourceName = ByteStreamUploader.uploadResourceName(/* instanceName=*/ null, uuid, hash, digest.getSizeBytes());
     when(instances.getFromUploadBlob(eq(resourceName))).thenReturn(instance);
 
     Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();

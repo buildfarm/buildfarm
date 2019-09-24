@@ -1,31 +1,11 @@
 ---
 platforms:
-  ubuntu1404:
-    build_targets:
-    - "..."
-    test_targets:
-    - "..."
   ubuntu1604:
     build_targets:
     - "..."
     test_targets:
     - "..."
   ubuntu1804:
-    build_targets:
-    - "..."
-    test_targets:
-    - "..."
-  ubuntu1804_java9:
-    build_targets:
-    - "..."
-    test_targets:
-    - "..."
-  ubuntu1804_java10:
-    build_targets:
-    - "..."
-    test_targets:
-    - "..."
-  ubuntu1804_java11:
     build_targets:
     - "..."
     test_targets:

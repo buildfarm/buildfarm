@@ -42,7 +42,6 @@ import build.bazel.remote.execution.v2.GetActionResultRequest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.grpc.Retrier;
-import build.buildfarm.common.grpc.RetryException;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Chunker;
 import build.buildfarm.server.BuildFarmServer;
@@ -59,8 +58,9 @@ import build.buildfarm.v1test.TakeOperationRequest;
 import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
-import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
+import com.google.common.hash.HashCode;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.longrunning.CancelOperationRequest;
 import com.google.longrunning.GetOperationRequest;
@@ -83,6 +83,7 @@ import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.StreamObserver;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.UUID;
 import java.util.function.Function;
@@ -223,7 +224,7 @@ public class BuildFarmServerTest {
   }
 
   @Test
-  public void canceledOperationIsNoLongerOutstanding() throws RetryException, InterruptedException {
+  public void canceledOperationIsNoLongerOutstanding() throws IOException, InterruptedException {
     Operation operation = executeAction(createSimpleAction());
 
     // should appear in outstanding list
@@ -253,7 +254,7 @@ public class BuildFarmServerTest {
 
   @Test
   public void cancelledOperationHasCancelledState()
-      throws RetryException, InterruptedException, InvalidProtocolBufferException {
+      throws IOException, InterruptedException, InvalidProtocolBufferException {
     Operation operation = executeAction(createSimpleAction());
 
     OperationsGrpc.OperationsBlockingStub operationsStub =
@@ -281,7 +282,7 @@ public class BuildFarmServerTest {
 
   @Test
   public void cancellingExecutingOperationFailsPoll()
-      throws RetryException, InterruptedException, InvalidProtocolBufferException {
+      throws IOException, InterruptedException, InvalidProtocolBufferException {
     Operation operation = executeAction(createSimpleAction());
 
     // take our operation from the queue
@@ -350,7 +351,7 @@ public class BuildFarmServerTest {
 
   @Test
   public void actionWithExcessiveTimeoutFailsValidation()
-      throws RetryException, InterruptedException, InvalidProtocolBufferException {
+      throws IOException, InterruptedException, InvalidProtocolBufferException {
     Digest actionDigestWithExcessiveTimeout = createAction(Action.newBuilder()
         .setTimeout(Duration.newBuilder().setSeconds(9000)));
 
@@ -373,28 +374,30 @@ public class BuildFarmServerTest {
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
   }
 
-  private Digest createSimpleAction() throws RetryException, InterruptedException {
+  private Digest createSimpleAction() throws IOException, InterruptedException {
     return createAction(Action.newBuilder());
   }
 
-  private Digest createAction(Action.Builder actionBuilder) throws RetryException, InterruptedException {
+  private Digest createAction(Action.Builder actionBuilder) throws IOException, InterruptedException {
     DigestUtil digestUtil = new DigestUtil(HashFunction.SHA256);
     Command command = Command.newBuilder()
         .addArguments("echo")
         .build();
-    Digest commandBlobDigest = digestUtil.compute(command);
+    Digest commandDigest = digestUtil.compute(command);
     Directory root = Directory.getDefaultInstance();
     Digest rootBlobDigest = digestUtil.compute(root);
     Action action = actionBuilder
-        .setCommandDigest(commandBlobDigest)
+        .setCommandDigest(commandDigest)
         .setInputRootDigest(rootBlobDigest)
         .build();
     Digest actionDigest = digestUtil.compute(action);
-    ByteStreamUploader uploader = new ByteStreamUploader(INSTANCE_NAME, inProcessChannel, null, 60, Retrier.NO_RETRIES, null);
+    ByteStreamUploader uploader = new ByteStreamUploader(INSTANCE_NAME, inProcessChannel, null, 60, Retrier.NO_RETRIES);
 
-    uploader.uploadBlobs(ImmutableList.of(
-        new Chunker(action.toByteString(), actionDigest),
-        new Chunker(command.toByteString(), commandBlobDigest)));
+    uploader.uploadBlobs(ImmutableMap.of(
+        HashCode.fromString(actionDigest.getHash()),
+        Chunker.builder().setInput(action.toByteString()).build(),
+        HashCode.fromString(commandDigest.getHash()),
+        Chunker.builder().setInput(command.toByteString()).build()));
     return actionDigest;
   }
 
@@ -435,8 +438,9 @@ public class BuildFarmServerTest {
     DigestUtil digestUtil = new DigestUtil(HashFunction.SHA256);
     ByteString content = ByteString.copyFromUtf8("Hello, World!");
     Digest digest = digestUtil.compute(content);
+    HashCode hash = HashCode.fromString(digest.getHash());
     UUID uuid = UUID.randomUUID();
-    String resourceName = ByteStreamUploader.getResourceName(uuid, INSTANCE_NAME, digest);
+    String resourceName = ByteStreamUploader.uploadResourceName(INSTANCE_NAME, uuid, hash, content.size());
 
     assertThat(getBlob(digest)).isNull();
 

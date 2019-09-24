@@ -25,8 +25,10 @@ import static java.lang.String.format;
 import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.Digest;
+import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.UrlPath.InvalidResourceNameException;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.Write.CompleteWrite;
 import build.buildfarm.instance.Instance;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamImplBase;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
@@ -80,6 +82,7 @@ public class ByteStreamService extends ByteStreamImplBase {
       int readBytes = in.read(buf, 0, (int) Math.min(remaining, buf.length));
       if (readBytes == -1) {
         if (!unlimited) {
+          logger.finer(format("read bytes indicated eof with %d remaining for limited read", remaining));
           responseObserver.onError(OUT_OF_RANGE.asException());
           remaining = -1;
         }
@@ -125,6 +128,7 @@ public class ByteStreamService extends ByteStreamImplBase {
     if (offset == digest.getSizeBytes()) {
       responseObserver.onCompleted();
     } else if (offset > digest.getSizeBytes()) {
+      logger.finer(format("offset %d is out of range of %s", offset, DigestUtil.toString(digest)));
       responseObserver.onError(OUT_OF_RANGE.asException());
     } else {
       long available = digest.getSizeBytes() - offset;
@@ -271,6 +275,9 @@ public class ByteStreamService extends ByteStreamImplBase {
       Instance instance,
       Digest digest,
       UUID uuid) {
+    if (digest.getSizeBytes() == 0) {
+      return new CompleteWrite(0);
+    }
     return instance.getBlobWrite(digest, uuid);
   }
 

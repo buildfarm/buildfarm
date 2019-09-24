@@ -34,7 +34,9 @@ import build.buildfarm.instance.stub.Chunker;
 import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.worker.PipelineStage.NullStage;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
+import com.google.common.hash.HashCode;
 import com.google.common.jimfs.Configuration;
 import com.google.common.jimfs.Jimfs;
 import com.google.protobuf.ByteString;
@@ -43,11 +45,13 @@ import java.io.IOException;
 import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 import javax.naming.ConfigurationException;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 
 public class UploadOutputsTest {
   private static final DigestUtil DIGEST_UTIL = new DigestUtil(DigestUtil.HashFunction.SHA256);
@@ -88,9 +92,14 @@ public class UploadOutputsTest {
     Tree emptyTree = Tree.newBuilder()
         .setRoot(Directory.getDefaultInstance())
         .build();
+    ByteString emptyTreeBlob = emptyTree.toByteString();
+    ArgumentCaptor<Map<HashCode, Chunker>> uploadCaptor =
+        ArgumentCaptor.forClass(Map.class);
     verify(mockUploader)
-        .uploadBlobs(eq(ImmutableList.<Chunker>of(
-            new Chunker(emptyTree.toByteString(), DIGEST_UTIL.compute(emptyTree)))));
+        .uploadBlobs(uploadCaptor.capture());
+    Map<HashCode, Chunker> upload = uploadCaptor.getValue();
+    Chunker chunker = upload.get(DIGEST_UTIL.computeHash(emptyTreeBlob));
+    assertThat(chunker.next().getData()).isEqualTo(emptyTreeBlob);
     assertThat(resultBuilder.getOutputDirectoriesList()).containsExactly(
         OutputDirectory.newBuilder()
             .setPath("foo")
@@ -118,10 +127,16 @@ public class UploadOutputsTest {
                 .build())
             .build())
         .build();
+    ByteString treeBlob = tree.toByteString();
+    ArgumentCaptor<Map<HashCode, Chunker>> uploadCaptor =
+        ArgumentCaptor.forClass(Map.class);
     verify(mockUploader)
-        .uploadBlobs(eq(ImmutableList.<Chunker>of(
-            new Chunker(ByteString.EMPTY, DIGEST_UTIL.empty()),
-            new Chunker(tree.toByteString(), DIGEST_UTIL.compute(tree)))));
+        .uploadBlobs(uploadCaptor.capture());
+    Map<HashCode, Chunker> upload = uploadCaptor.getValue();
+    Chunker emptyChunker = upload.get(DIGEST_UTIL.computeHash(ByteString.EMPTY));
+    assertThat(emptyChunker.next().getData()).isEqualTo(ByteString.EMPTY);
+    Chunker treeChunker = upload.get(DIGEST_UTIL.computeHash(treeBlob));
+    assertThat(treeChunker.next().getData()).isEqualTo(treeBlob);
     assertThat(resultBuilder.getOutputDirectoriesList()).containsExactly(
         OutputDirectory.newBuilder()
             .setPath("foo")
@@ -158,10 +173,16 @@ public class UploadOutputsTest {
             .build())
         .addChildren(subDirectory)
         .build();
+    ByteString treeBlob = tree.toByteString();
+    ArgumentCaptor<Map<HashCode, Chunker>> uploadCaptor =
+        ArgumentCaptor.forClass(Map.class);
     verify(mockUploader)
-        .uploadBlobs(eq(ImmutableList.<Chunker>of(
-            new Chunker(ByteString.EMPTY, DIGEST_UTIL.empty()),
-            new Chunker(tree.toByteString(), DIGEST_UTIL.compute(tree)))));
+        .uploadBlobs(uploadCaptor.capture());
+    Map<HashCode, Chunker> upload = uploadCaptor.getValue();
+    Chunker emptyChunker = upload.get(DIGEST_UTIL.computeHash(ByteString.EMPTY));
+    assertThat(emptyChunker.next().getData()).isEqualTo(ByteString.EMPTY);
+    Chunker treeChunker = upload.get(DIGEST_UTIL.computeHash(treeBlob));
+    assertThat(treeChunker.next().getData()).isEqualTo(treeBlob);
     assertThat(resultBuilder.getOutputDirectoriesList()).containsExactly(
         OutputDirectory.newBuilder()
             .setPath("foo")

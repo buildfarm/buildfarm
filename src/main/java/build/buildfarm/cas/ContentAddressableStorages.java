@@ -53,7 +53,7 @@ public final class ContentAddressableStorages {
   private static ContentAddressableStorage createGrpcCAS(GrpcCASConfig config) {
     Channel channel = createChannel(config.getTarget());
     ByteStreamUploader byteStreamUploader
-        = new ByteStreamUploader("", channel, null, 300, NO_RETRIES, null);
+        = new ByteStreamUploader("", channel, null, 300, NO_RETRIES);
     ListMultimap<Digest, Runnable> onExpirations = synchronizedListMultimap(
         MultimapBuilder
             .hashKeys()

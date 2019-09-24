@@ -77,8 +77,8 @@ import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Iterators;
-import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.hash.HashCode;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.common.util.concurrent.SettableFuture;
@@ -104,7 +104,7 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Iterator;
-import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutionException;
@@ -331,6 +331,41 @@ public class StubInstance implements Instance {
         executor);
   }
 
+  @Override
+  public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs) {
+    long totalSize = 0;
+    ImmutableList.Builder<Request> requests = ImmutableList.builder();
+    for (ByteString blob : blobs) {
+      checkState(totalSize + blob.size() <= maxBatchUpdateBlobsSize);
+      requests.add(Request.newBuilder()
+          .setDigest(digestUtil.compute(blob))
+          .setData(blob)
+          .build());
+      totalSize += blob.size();
+    }
+    BatchUpdateBlobsRequest batchRequest = BatchUpdateBlobsRequest.newBuilder()
+        .setInstanceName(getName())
+        .addAllRequests(requests.build())
+        .build();
+    BatchUpdateBlobsResponse batchResponse = casBlockingStub.get()
+        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
+        .batchUpdateBlobs(batchRequest);
+    PutAllBlobsException exception = null;
+    for (BatchUpdateBlobsResponse.Response response : batchResponse.getResponsesList()) {
+      com.google.rpc.Status status = response.getStatus();
+      if (Code.forNumber(status.getCode()) != Code.OK) {
+        if (exception == null) {
+          exception = new PutAllBlobsException();
+        }
+        exception.addFailedResponse(response);
+      }
+    }
+    if (exception != null) {
+      throw exception;
+    }
+    return Iterables.transform(batchResponse.getResponsesList(), (response) -> response.getDigest());
+  }
+
   public Write getOperationStreamWrite(String name) {
     return getWrite(name, StubWriteOutputStream.UNLIMITED_EXPECTED_SIZE, /* autoflush=*/ true);
   }
@@ -454,43 +489,12 @@ public class StubInstance implements Instance {
    */
   @Override
   public Write getBlobWrite(Digest digest, UUID uuid) {
-    String resourceName = ByteStreamUploader.getResourceName(uuid, getName(), digest);
+    String resourceName = ByteStreamUploader.uploadResourceName(
+        getName(),
+        uuid,
+        HashCode.fromString(digest.getHash()),
+        digest.getSizeBytes());
     return getWrite(resourceName, digest.getSizeBytes(), /* autoflush=*/ false);
-  }
-
-  @Override
-  public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs) {
-    long totalSize = 0;
-    ImmutableList.Builder<Request> requests = ImmutableList.builder();
-    for (ByteString blob : blobs) {
-      checkState(totalSize + blob.size() <= maxBatchUpdateBlobsSize);
-      requests.add(Request.newBuilder()
-          .setDigest(digestUtil.compute(blob))
-          .setData(blob)
-          .build());
-      totalSize += blob.size();
-    }
-    BatchUpdateBlobsRequest batchRequest = BatchUpdateBlobsRequest.newBuilder()
-        .setInstanceName(getName())
-        .addAllRequests(requests.build())
-        .build();
-    BatchUpdateBlobsResponse batchResponse = casBlockingStub.get()
-        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
-        .batchUpdateBlobs(batchRequest);
-    PutAllBlobsException exception = null;
-    for (BatchUpdateBlobsResponse.Response response : batchResponse.getResponsesList()) {
-      com.google.rpc.Status status = response.getStatus();
-      if (Code.forNumber(status.getCode()) != Code.OK) {
-        if (exception == null) {
-          exception = new PutAllBlobsException();
-        }
-        exception.addFailedResponse(response);
-      }
-    }
-    if (exception != null) {
-      throw exception;
-    }
-    return Iterables.transform(batchResponse.getResponsesList(), (response) -> response.getDigest());
   }
 
   @Override

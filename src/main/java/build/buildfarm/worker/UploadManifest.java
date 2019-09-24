@@ -148,7 +148,8 @@ public class UploadManifest {
         || (!withinLimit && policy.equals(CASInsertionPolicy.INSERT_ABOVE_LIMIT))) {
       Digest digest = digestUtil.compute(content);
       setDigest.accept(digest);
-      digestToChunkers.put(digest, new Chunker(content, digest));
+      Chunker chunker = Chunker.builder().setInput(content).build();
+      digestToChunkers.put(digest, chunker);
     }
   }
 
@@ -169,7 +170,7 @@ public class UploadManifest {
 
     ByteString blob = tree.build().toByteString();
     Digest digest = digestUtil.compute(blob);
-    Chunker chunker = new Chunker(blob, digest);
+    Chunker chunker = Chunker.builder().setInput(blob).build();
 
     if (result != null) {
       result
@@ -178,7 +179,7 @@ public class UploadManifest {
           .setTreeDigest(digest);
     }
 
-    digestToChunkers.put(chunker.digest(), chunker);
+    digestToChunkers.put(digest, chunker);
   }
 
   private Directory computeDirectory(Path path, Tree.Builder tree)

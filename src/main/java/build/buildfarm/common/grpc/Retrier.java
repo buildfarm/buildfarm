@@ -20,12 +20,18 @@ import com.google.common.base.Predicate;
 import com.google.common.base.Predicates;
 import com.google.common.base.Supplier;
 import com.google.common.base.Throwables;
+import com.google.common.util.concurrent.AsyncCallable;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningScheduledExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
 import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.concurrent.Callable;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
@@ -173,11 +179,21 @@ public class Retrier {
 
   private final Supplier<Backoff> backoffSupplier;
   private final Predicate<Status> isRetriable;
+  private final ListeningScheduledExecutorService retryScheduler;
 
-  public
-  Retrier(Supplier<Backoff> backoffSupplier, Predicate<Status> isRetriable) {
+  public Retrier(
+      Supplier<Backoff> backoffSupplier,
+      Predicate<Status> isRetriable) {
+    this(backoffSupplier, isRetriable, /* retryScheduler=*/ null);
+  }
+
+  public Retrier(
+      Supplier<Backoff> backoffSupplier,
+      Predicate<Status> isRetriable,
+      ListeningScheduledExecutorService retryScheduler) {
     this.backoffSupplier = backoffSupplier;
     this.isRetriable = isRetriable;
+    this.retryScheduler = retryScheduler;
   }
 
   /**
@@ -234,7 +250,89 @@ public class Retrier {
     TimeUnit.MILLISECONDS.sleep(timeMillis);
   }
 
+  /** Executes an {@link AsyncCallable}, retrying execution in case of failure. */
+  public <T> ListenableFuture<T> executeAsync(AsyncCallable<T> call) {
+    return executeAsync(call, newBackoff());
+  }
+
+  /**
+   * Executes an {@link AsyncCallable}, retrying execution in case of failure with the given
+   * backoff.
+   */
+  public <T> ListenableFuture<T> executeAsync(AsyncCallable<T> call, Backoff backoff) {
+    try {
+      return Futures.catchingAsync(
+          call.call(),
+          Exception.class,
+          t -> onExecuteAsyncFailure(t, call, backoff),
+          MoreExecutors.directExecutor());
+    } catch (Exception e) {
+      return onExecuteAsyncFailure(e, call, backoff);
+    }
+  }
+
+  private <T> ListenableFuture<T> onExecuteAsyncFailure(
+      Exception t, AsyncCallable<T> call, Backoff backoff) {
+    long waitMillis = backoff.nextDelayMillis();
+    if (waitMillis >= 0 && isRetriable.apply(Status.fromThrowable(t))) {
+      try {
+        return Futures.scheduleAsync(
+            () -> executeAsync(call, backoff), waitMillis, TimeUnit.MILLISECONDS, retryScheduler);
+      } catch (RejectedExecutionException e) {
+        // May be thrown by .scheduleAsync(...) if i.e. the executor is shutdown.
+        return Futures.immediateFailedFuture(new IOException(e));
+      }
+    } else {
+      return Futures.immediateFailedFuture(t);
+    }
+  }
+
   public Backoff newBackoff() {
     return backoffSupplier.get();
+  }
+
+  public static class ProgressiveBackoff implements Backoff {
+
+    private final Supplier<Backoff> backoffSupplier;
+    private Backoff currentBackoff = null;
+    private int retries = 0;
+
+    /**
+     * Creates a resettable Backoff for progressive reads. After a reset, the nextDelay returned
+     * indicates an immediate retry. Initially and after indicating an immediate retry, a delegate
+     * is generated to provide nextDelay until reset.
+     *
+     * @param backoffSupplier Delegate Backoff generator
+     */
+    public ProgressiveBackoff(Supplier<Backoff> backoffSupplier) {
+      this.backoffSupplier = backoffSupplier;
+      currentBackoff = backoffSupplier.get();
+    }
+
+    public void reset() {
+      if (currentBackoff != null) {
+        retries += currentBackoff.getRetryAttempts();
+      }
+      currentBackoff = null;
+    }
+
+    @Override
+    public long nextDelayMillis() {
+      if (currentBackoff == null) {
+        currentBackoff = backoffSupplier.get();
+        retries++;
+        return 0;
+      }
+      return currentBackoff.nextDelayMillis();
+    }
+
+    @Override
+    public int getRetryAttempts() {
+      int retryAttempts = retries;
+      if (currentBackoff != null) {
+        retryAttempts += currentBackoff.getRetryAttempts();
+      }
+      return retryAttempts;
+    }
   }
 }

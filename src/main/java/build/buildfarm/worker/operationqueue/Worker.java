@@ -78,7 +78,9 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.google.common.hash.HashCode;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.devtools.common.options.OptionsParser;
 import com.google.longrunning.Operation;
@@ -171,11 +173,12 @@ public class Worker {
             /*options.experimentalRemoteRetryMultiplier=*/ 2,
             /*options.experimentalRemoteRetryJitter=*/ 0.1,
             /*options.experimentalRemoteRetryMaxAttempts=*/ 5),
-        Retrier.DEFAULT_IS_RETRIABLE);
+        Retrier.DEFAULT_IS_RETRIABLE,
+        retryScheduler);
   }
 
-  private static ByteStreamUploader createStubUploader(Channel channel, Retrier retrier) {
-    return new ByteStreamUploader("", channel, null, 300, retrier, retryScheduler);
+  private static ByteStreamUploader createStubUploader(String instanceName, Channel channel, Retrier retrier) {
+    return new ByteStreamUploader(instanceName, channel, null, 300, retrier);
   }
 
   private static Instance newStubInstance(
@@ -216,7 +219,7 @@ public class Worker {
     DigestUtil digestUtil = new DigestUtil(hashFunction);
     InstanceEndpoint casEndpoint = config.getContentAddressableStorage();
     ManagedChannel casChannel = createChannel(casEndpoint.getTarget());
-    uploader = createStubUploader(casChannel, retrier);
+    uploader = createStubUploader(casEndpoint.getInstanceName(), casChannel, retrier);
     casInstance = newStubInstance(casEndpoint.getInstanceName(), casChannel, digestUtil);
     acInstance = newStubInstance(config.getActionCache(), digestUtil);
     operationQueueInstance = newStubInstance(config.getOperationQueue(), digestUtil);
@@ -332,7 +335,7 @@ public class Worker {
 
   private static void uploadManifest(UploadManifest manifest, ByteStreamUploader uploader)
       throws IOException, InterruptedException {
-    List<Chunker> filesToUpload = new ArrayList<>();
+    Map<HashCode, Chunker> filesToUpload = Maps.newHashMap();
 
     Map<Digest, Path> digestToFile = manifest.getDigestToFile();
     Map<Digest, Chunker> digestToChunkers = manifest.getDigestToChunkers();
@@ -344,7 +347,7 @@ public class Worker {
       Chunker chunker;
       Path file = digestToFile.get(digest);
       if (file != null) {
-        chunker = new Chunker(file, digest);
+        chunker = Chunker.builder().setInput(digest.getSizeBytes(), file).build();
       } else {
         chunker = digestToChunkers.get(digest);
         if (chunker == null) {
@@ -352,7 +355,7 @@ public class Worker {
           throw new IOException(message);
         }
       }
-      filesToUpload.add(chunker);
+      filesToUpload.put(HashCode.fromString(digest.getHash()), chunker);
     }
 
     if (!filesToUpload.isEmpty()) {

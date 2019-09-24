@@ -9,17 +9,25 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_jar")
 # Needed for "well-known protos" and @com_google_protobuf//:protoc.
 http_archive(
     name = "com_google_protobuf",
-    sha256 = "f976a4cd3f1699b6d20c1e944ca1de6754777918320c719742e1674fcf247b7e",
-    strip_prefix = "protobuf-3.7.1",
-    urls = ["https://github.com/google/protobuf/archive/v3.7.1.zip"],
+    patch_args = ["-p1"],
+    patches = [
+        "//third_party/com_google_protobuf:six.patch",
+    ],
+    sha256 = "cfcba2df10feec52a84208693937c17a4b5df7775e1635c1e3baffc487b24c9b",
+    strip_prefix = "protobuf-3.9.2",
+    urls = ["https://github.com/google/protobuf/archive/v3.9.2.zip"],
 )
+
+load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
+
+protobuf_deps()
 
 # Needed for @grpc_java//compiler:grpc_java_plugin.
 http_archive(
     name = "io_grpc_grpc_java",
-    sha256 = "9d23d9fec84e24bd3962f5ef9d1fd61ce939d3f649a22bcab0f19e8167fae8ef",
-    strip_prefix = "grpc-java-1.20.0",
-    urls = ["https://github.com/grpc/grpc-java/archive/v1.20.0.zip"],
+    sha256 = "b1dcce395bdb6c620d3142597b5017f7175c527b0f9ae46c456726940876347e",
+    strip_prefix = "grpc-java-1.23.0",
+    urls = ["https://github.com/grpc/grpc-java/archive/v1.23.0.zip"],
 )
 
 load("@io_grpc_grpc_java//:repositories.bzl", "grpc_java_repositories")
@@ -53,12 +61,23 @@ http_archive(
     url = "https://github.com/bazelbuild/bazel-skylib/archive/0.8.0.tar.gz",
 )
 
+# Download the rules_docker repository at release v0.10.1
 http_archive(
     name = "io_bazel_rules_docker",
-    sha256 = "aed1c249d4ec8f703edddf35cbe9dfaca0b5f5ea6e4cd9e83e99f3b0d1136c3d",
-    strip_prefix = "rules_docker-0.7.0",
-    urls = ["https://github.com/bazelbuild/rules_docker/archive/v0.7.0.tar.gz"],
+    sha256 = "9ff889216e28c918811b77999257d4ac001c26c1f7c7fb17a79bc28abf74182e",
+    strip_prefix = "rules_docker-0.10.1",
+    urls = ["https://github.com/bazelbuild/rules_docker/releases/download/v0.10.1/rules_docker-v0.10.1.tar.gz"],
 )
+
+load(
+    "@io_bazel_rules_docker//repositories:repositories.bzl",
+    container_repositories = "repositories",
+)
+container_repositories()
+
+load("@io_bazel_rules_docker//repositories:deps.bzl", container_deps = "deps")
+
+container_deps()
 
 load("@io_bazel_rules_docker//container:container.bzl", "container_pull")
 load(

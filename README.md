@@ -71,6 +71,12 @@ and
 
     bazel-bin/src/main/java/build/buildfarm/buildfarm-worker --jvm_flag=-Djava.util.logging.config.file=examples/debug.logging.properties ...
 
+To attach a remote debugger, run the executable with the `--debug=<PORT>` flag. For example:
+
+    bazel build //src/main/java/build/buildfarm:buildfarm-server && \
+    bazel-bin/src/main/java/build/buildfarm/buildfarm-server --debug=5005 \
+        config/server.config
+
 ## Developer Information
 
 ### Setting up intelliJ

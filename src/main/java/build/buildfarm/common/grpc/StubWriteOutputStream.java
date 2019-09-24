@@ -12,8 +12,11 @@ import com.google.bytestream.ByteStreamProto.QueryWriteStatusResponse;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.util.concurrent.SettableFuture;
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
+import io.grpc.Status.Code;
+import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -26,10 +29,16 @@ public class StubWriteOutputStream extends OutputStream implements Write {
 
   private static final int CHUNK_SIZE = 16 * 1024;
 
+  private static final QueryWriteStatusResponse resetResponse =
+      QueryWriteStatusResponse.newBuilder()
+          .setCommittedSize(0)
+          .setComplete(false)
+          .build();
+
   private final Supplier<ByteStreamBlockingStub> bsBlockingStub;
   private final Supplier<ByteStreamStub> bsStub;
   private final String resourceName;
-  private final SettableFuture<Void> writeFuture = SettableFuture.create();
+  private final SettableFuture<Long> writeFuture = SettableFuture.create();
   private final long expectedSize;
   private final boolean autoflush;
   private final byte buf[];
@@ -39,19 +48,24 @@ public class StubWriteOutputStream extends OutputStream implements Write {
         @Override
         public QueryWriteStatusResponse get() {
           if (wasReset) {
-            return QueryWriteStatusResponse.newBuilder()
-                .setCommittedSize(0)
-                .setComplete(false)
-                .build();
+            return resetResponse;
           }
-          QueryWriteStatusResponse response = bsBlockingStub.get()
-              .queryWriteStatus(QueryWriteStatusRequest.newBuilder()
-                  .setResourceName(resourceName)
-                  .build());
-          if (response.getComplete()) {
-            writeFuture.set(null);
+          try {
+            QueryWriteStatusResponse response = bsBlockingStub.get()
+                .queryWriteStatus(QueryWriteStatusRequest.newBuilder()
+                    .setResourceName(resourceName)
+                    .build());
+            if (response.getComplete()) {
+              writeFuture.set(response.getCommittedSize());
+            }
+            return response;
+          } catch (StatusRuntimeException e) {
+            Status status = Status.fromThrowable(e);
+            if (status.getCode() == Code.UNIMPLEMENTED) {
+              return resetResponse;
+            }
+            throw e;
           }
-          return response;
         }
       });
   private boolean sentResourceName = false;
@@ -106,6 +120,7 @@ public class StubWriteOutputStream extends OutputStream implements Write {
       request.setResourceName(resourceName);
     }
     writeObserver.onNext(request.build());
+    wasReset = false;
     writtenBytes += offset;
     offset = 0;
     sentResourceName = true;
@@ -121,18 +136,19 @@ public class StubWriteOutputStream extends OutputStream implements Write {
     }
   }
 
-  private boolean checkComplete() throws IOException {
+  private boolean checkComplete() {
     try {
-      return writeFuture.isDone() && writeFuture.get() == null;
+      return writeFuture.isDone() && writeFuture.get() >= 0;
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
-      if (cause instanceof IOException) {
-        throw (IOException) cause;
+      if (cause instanceof RuntimeException) {
+        throw (RuntimeException) cause;
       }
-      throw new IOException(cause);
+      throw new UncheckedExecutionException(cause);
     } catch (InterruptedException e) {
       // unlikely, since we only get for isDone()
-      throw new IOException(e);
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(e);
     }
   }
 
@@ -145,8 +161,7 @@ public class StubWriteOutputStream extends OutputStream implements Write {
               new StreamObserver<WriteResponse>() {
                 @Override
                 public void onNext(WriteResponse response) {
-                  writtenBytes += response.getCommittedSize() - getCommittedSize();
-                  writeFuture.set(null);
+                  writeFuture.set(response.getCommittedSize());
                 }
 
                 @Override
@@ -164,7 +179,7 @@ public class StubWriteOutputStream extends OutputStream implements Write {
 
   @Override
   public void write(byte[] b, int off, int len) throws IOException {
-    if (isComplete() || checkComplete()) {
+    if (isComplete()) {
       throw new WriteCompleteException();
     }
     if (getCommittedSize() + offset + len > expectedSize) {
@@ -190,7 +205,7 @@ public class StubWriteOutputStream extends OutputStream implements Write {
 
   @Override
   public void write(int b) throws IOException {
-    if (isComplete() || checkComplete()) {
+    if (isComplete()) {
       throw new WriteCompleteException();
     }
     if (!checkComplete()) {
@@ -205,12 +220,23 @@ public class StubWriteOutputStream extends OutputStream implements Write {
 
   @Override
   public long getCommittedSize() {
+    if (checkComplete()) {
+      try {
+        return writeFuture.get();
+      } catch (InterruptedException e) {
+        // impossible, future must be done
+        throw new RuntimeException(e);
+      } catch (ExecutionException e) {
+        // impossible, future throws in checkComplete for this
+        throw new UncheckedExecutionException(e.getCause());
+      }
+    }
     return writeStatus.get().getCommittedSize() + writtenBytes;
   }
 
   @Override
   public boolean isComplete() {
-    return writeStatus.get().getComplete() || getCommittedSize() == expectedSize;
+    return checkComplete() || getCommittedSize() == expectedSize;
   }
 
   @Override
@@ -222,9 +248,11 @@ public class StubWriteOutputStream extends OutputStream implements Write {
 
   @Override
   public void reset() {
-    wasReset = true;
-    offset = 0;
-    writtenBytes = 0;
+    if (!writeFuture.isDone()) {
+      wasReset = true;
+      offset = 0;
+      writtenBytes = 0;
+    }
   }
 
   @Override

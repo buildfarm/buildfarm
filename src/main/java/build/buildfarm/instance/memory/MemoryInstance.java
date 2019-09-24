@@ -463,6 +463,10 @@ public class MemoryInstance extends AbstractServerInstance {
       // This is in effect if the worker does not respond
       // within a configured delay with operation action timeout results
       Action action = expectAction(operation);
+      if (action == null) {
+        // cannot determine action timeout, action content does not exist
+        return false;
+      }
       Duration actionTimeout = null;
       if (action.hasTimeout()) {
         actionTimeout = action.getTimeout();
