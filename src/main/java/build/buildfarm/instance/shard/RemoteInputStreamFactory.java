@@ -14,6 +14,7 @@
 
 package build.buildfarm.instance.shard;
 
+import static build.buildfarm.instance.shard.Util.SHARD_IS_RETRIABLE;
 import static build.buildfarm.instance.shard.Util.correctMissingBlob;
 import static com.google.common.util.concurrent.Futures.addCallback;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
@@ -120,12 +121,12 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
       return input;
     } catch (StatusRuntimeException e) {
       Status st = Status.fromThrowable(e);
-      if (st.getCode().equals(Code.UNAVAILABLE)) {
+      if (st.getCode() == Code.UNAVAILABLE || st.getCode() == Code.UNIMPLEMENTED) {
         // for now, leave this up to schedulers
         onUnavailable.accept(worker, e, "getBlob(" + DigestUtil.toString(blobDigest) + ")");
       } else if (st.getCode() == Code.NOT_FOUND) {
         // ignore this, the worker will update the backplane eventually
-      } else if (Retrier.DEFAULT_IS_RETRIABLE.test(st)) {
+      } else if (st.getCode() != Code.DEADLINE_EXCEEDED && SHARD_IS_RETRIABLE.test(st)) {
         // why not, always
         workers.addLast(worker);
       } else if (st.getCode() == Code.CANCELLED) {
