@@ -47,6 +47,7 @@ import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
@@ -55,6 +56,7 @@ import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
+import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.Poller;
@@ -126,11 +128,13 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
@@ -139,8 +143,10 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
+import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
 
 public class ShardInstance extends AbstractServerInstance {
@@ -879,6 +885,77 @@ public class ShardInstance extends AbstractServerInstance {
             directExecutor()),
         rootDigest,
         pageToken);
+  }
+
+  static abstract class TreeCallback implements FutureCallback<Directory> {
+    private final SettableFuture<Void> future;
+
+    TreeCallback(SettableFuture<Void> future) {
+      this.future = future;
+    }
+
+    abstract protected void onDirectory(Directory directory);
+    abstract boolean next();
+
+    @Override
+    public void onSuccess(@Nullable Directory directory) {
+      if (directory != null) {
+        onDirectory(directory);
+      }
+      if (!next()) {
+        future.set(null);
+      }
+    }
+
+    @Override
+    public void onFailure(Throwable t) {
+      future.setException(t);
+    }
+  };
+
+  @Override
+  protected ListenableFuture<Tree> getTreeFuture(
+      String reason,
+      Digest inputRoot,
+      ExecutorService service) {
+    SettableFuture<Void> future = SettableFuture.create();
+    Tree.Builder tree = Tree.newBuilder();
+    Set<Digest> digests = Sets.newConcurrentHashSet();
+    Queue<Digest> remaining = new ConcurrentLinkedQueue();
+    remaining.offer(inputRoot);
+    Context ctx = Context.current();
+    TreeCallback callback = new TreeCallback(future) {
+      private boolean root = true;
+
+      @Override
+      protected void onDirectory(Directory directory) {
+        if (root) {
+          tree.setRoot(directory);
+          root = false;
+        } else {
+          tree.addChildren(directory);
+        }
+        for (DirectoryNode childNode : directory.getDirectoriesList()) {
+          Digest child = childNode.getDigest();
+          if (digests.add(child)) {
+            remaining.offer(child);
+          }
+        }
+      }
+
+      @Override
+      boolean next() {
+        Digest nextDigest = remaining.poll();
+        if (!future.isDone() && nextDigest != null) {
+          ctx.run(() -> addCallback(
+              expectDirectory(reason, nextDigest, service), this, service));
+          return true;
+        }
+        return false;
+      }
+    };
+    callback.next();
+    return transform(future, (result) -> tree.build(), service);
   }
 
   @Override
