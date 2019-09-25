@@ -486,6 +486,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   boolean completeWrite(Digest digest) {
     try {
+      onPut.accept(digest);
+    } catch (RuntimeException e) {
+      logger.log(SEVERE, "error during write completion onPut for " + DigestUtil.toString(digest), e);
+      /* ignore error, writes must complete */
+    }
+    try {
       return writesInProgress.get(digest).set(digest.getSizeBytes());
     } catch (ExecutionException e) {
       logger.log(SEVERE, "error getting write in progress future for " + DigestUtil.toString(digest), e);
@@ -493,12 +499,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
-  void completePut(Digest digest) {
-    try {
-      onPut.accept(digest);
-    } finally {
-      writesInProgress.invalidate(digest);
-    }
+  void invalidateWrite(Digest digest) {
+    writesInProgress.invalidate(digest);
   }
 
   @Override
@@ -513,7 +515,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           blob.getDigest().getSizeBytes(),
           /* isExecutable=*/ false,
           /* containingDirectory=*/ null,
-          () -> completePut(blob.getDigest()));
+          () -> invalidateWrite(blob.getDigest()));
       boolean referenced = out == null;
       try {
         if (out != null) {
@@ -895,10 +897,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           digest.getSizeBytes(),
           /* isExecutable=*/ false,
           null,
-          () -> {
-            onPut.accept(digest);
-            writesInProgress.invalidate(digest);
-          });
+          () -> invalidateWrite(digest));
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new IOException(e);
@@ -1793,7 +1792,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         digest.getSizeBytes(),
         isExecutable,
         containingDirectory,
-        () -> completePut(digest));
+        () -> invalidateWrite(digest));
     if (out != null) {
       boolean complete = false;
       try {
