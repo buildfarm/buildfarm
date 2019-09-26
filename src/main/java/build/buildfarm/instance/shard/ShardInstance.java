@@ -1284,9 +1284,7 @@ public class ShardInstance extends AbstractServerInstance {
             com.google.rpc.Status status = StatusProto.fromThrowable(t);
             if (status == null) {
               logger.log(SEVERE, "no rpc status from exception for " + operationName, t);
-              status = com.google.rpc.Status.newBuilder()
-                  .setCode(Status.fromThrowable(t).getCode().value())
-                  .build();
+              status = asExecutionStatus(t);
             }
             logFailedStatus(actionDigest, status);
             SettableFuture<Void> errorFuture = SettableFuture.create();
@@ -1560,6 +1558,22 @@ public class ShardInstance extends AbstractServerInstance {
         operationTransformService);
   }
 
+  private com.google.rpc.Status asExecutionStatus(Throwable t) {
+    com.google.rpc.Status.Builder status = com.google.rpc.Status.newBuilder();
+    Status grpcStatus = Status.fromThrowable(t);
+    switch (grpcStatus.getCode()) {
+    case DEADLINE_EXCEEDED:
+      // translate timeouts to retriable errors here, rather than
+      // indications that the execution timed out
+      status.setCode(com.google.rpc.Code.UNAVAILABLE.getNumber());
+      break;
+    default:
+      status.setCode(grpcStatus.getCode().value());
+      break;
+    }
+    return status.build();
+  }
+
   private ListenableFuture<Void> transformAndQueue(
       ExecuteEntry executeEntry,
       Poller poller,
@@ -1721,9 +1735,7 @@ public class ShardInstance extends AbstractServerInstance {
             com.google.rpc.Status status = StatusProto.fromThrowable(t);
             if (status == null) {
               logger.log(SEVERE, "no rpc status from exception for " + operation.getName(), t);
-              status = com.google.rpc.Status.newBuilder()
-                  .setCode(Status.fromThrowable(t).getCode().value())
-                  .build();
+              status = asExecutionStatus(t);
             }
             logFailedStatus(actionDigest, status);
             errorOperationFuture(operation, executeEntry.getRequestMetadata(), status, queueFuture);
