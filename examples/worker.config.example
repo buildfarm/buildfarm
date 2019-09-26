@@ -93,8 +93,15 @@ platform: {
 # from CAS in the cache
 cas_cache_max_size_bytes: 2147483648 # 2 * 1024 * 1024 * 1024
 
+# limit for content size of files retained
+# from CAS in the cache
+cas_cache_max_entry_size_bytes: 2147483648 # 2 * 1024 * 1024 * 1024
+
 # the number of concurrently available slots in the execute phase
 execute_stage_width: 1
+
+# the number of concurrently available slots in the input fetch phase
+input_fetch_stage_width: 1
 
 # an imposed action-key-invariant timeout used in the unspecified timeout case
 default_action_timeout: {

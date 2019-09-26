@@ -16,30 +16,28 @@ In general do not execute server binaries with bazel run, since bazel does not s
 
 All commandline options override corresponding config settings.
 
-### Bazel BuildfarmServer
+### Bazel Buildfarm Server
 
 Run via
 
-    bazel build //src/main/java/build/buildfarm:buildfarm-server && \
-    bazel-bin/src/main/java/build/buildfarm/buildfarm-server <configfile> [-p PORT] [--port PORT]
+    bazel run //src/main/java/build/buildfarm/buildfarm-server <configfile> [-p PORT] [--port PORT]
 
 - **`configfile`** has to be in (undocumented) Protocol Buffer text format.
 
-  For an example, see the [examples](examples) directory.
+  For an example, see the [examples](examples) directory, which contains the working example [examples/worker.config.example](config).
   For format details see [here](https://stackoverflow.com/questions/18873924/what-does-the-protobuf-text-format-look-like). Protocol Buffer structure at [src/main/protobuf/build/buildfarm/v1test/buildfarm.proto](src/main/protobuf/build/buildfarm/v1test/buildfarm.proto)
 
 - **`PORT`** to expose service endpoints on
 
-### Bazel BuildfarmWorker
+### Bazel Buildfarm Worker
 
 Run via
 
-    bazel build //src/main/java/build/buildfarm:buildfarm-worker && \
-    bazel-bin/src/main/java/build/buildfarm/buildfarm-worker <configfile> [--root ROOT] [--cas_cache_directory CAS_CACHE_DIRECTORY]
+    bazel run //src/main/java/build/buildfarm/buildfarm-operationqueue-worker <configfile> [--root ROOT] [--cas_cache_directory CAS_CACHE_DIRECTORY]
 
 - **`configfile`** has to be in (undocumented) Protocol Buffer text format.
 
-  For an example, see the [examples](examples) directory.
+  For an example, see the [examples](examples) directory, which contains the working example [examples/server.config.example](config).
   For format details see [here](https://stackoverflow.com/questions/18873924/what-does-the-protobuf-text-format-look-like). Protocol Buffer structure at [src/main/protobuf/build/buildfarm/v1test/buildfarm.proto](src/main/protobuf/build/buildfarm/v1test/buildfarm.proto)
 
 - **`ROOT`** base directory path for all work being performed.
@@ -69,13 +67,12 @@ An example `logging.properties` file has been provided at [examples/debug.loggin
 
 and
 
-    bazel-bin/src/main/java/build/buildfarm/buildfarm-worker --jvm_flag=-Djava.util.logging.config.file=examples/debug.logging.properties ...
+    bazel run //src/main/java/build/buildfarm/buildfarm-operationqueue-worker --jvm_flag=-Djava.util.logging.config.file=examples/debug.logging.properties ...
 
 To attach a remote debugger, run the executable with the `--debug=<PORT>` flag. For example:
 
-    bazel build //src/main/java/build/buildfarm:buildfarm-server && \
-    bazel-bin/src/main/java/build/buildfarm/buildfarm-server --debug=5005 \
-        config/server.config
+    bazel run src/main/java/build/buildfarm/buildfarm-server --debug=5005 \
+        $PWD/config/server.config
 
 ## Developer Information
 

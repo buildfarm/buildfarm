@@ -605,7 +605,7 @@ public class MemoryInstance extends AbstractServerInstance {
         QueuedOperation queuedOperation = QueuedOperation.newBuilder()
             .setAction(action)
             .setCommand(command)
-            // .addAllDirectories(directories)
+            .setTree(getCompleteTree(action.getInputRootDigest()))
             .build();
         ByteString queuedOperationBlob = queuedOperation.toByteString();
         Digest queuedOperationDigest = getDigestUtil().compute(queuedOperationBlob);
