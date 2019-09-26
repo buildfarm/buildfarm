@@ -20,7 +20,7 @@ All commandline options override corresponding config settings.
 
 Run via
 
-    bazel run //src/main/java/build/buildfarm/buildfarm-server <configfile> [-p PORT] [--port PORT]
+    bazel run //src/main/java/build/buildfarm:buildfarm-server <configfile> [-p PORT] [--port PORT]
 
 - **`configfile`** has to be in (undocumented) Protocol Buffer text format.
 
@@ -33,7 +33,7 @@ Run via
 
 Run via
 
-    bazel run //src/main/java/build/buildfarm/buildfarm-operationqueue-worker <configfile> [--root ROOT] [--cas_cache_directory CAS_CACHE_DIRECTORY]
+    bazel run //src/main/java/build/buildfarm:buildfarm-operationqueue-worker <configfile> [--root ROOT] [--cas_cache_directory CAS_CACHE_DIRECTORY]
 
 - **`configfile`** has to be in (undocumented) Protocol Buffer text format.
 
