@@ -563,7 +563,6 @@ public class StubInstance implements Instance {
         .build();
     listener.onWaitStart();
     QueueEntry queueEntry = operationQueueBlockingStub.get()
-        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
         .take(request);
     listener.onWaitEnd();
     listener.onEntry(queueEntry);
