@@ -15,6 +15,7 @@
 package build.buildfarm.cas;
 
 import static build.buildfarm.common.grpc.Retrier.NO_RETRIES;
+import static build.buildfarm.common.grpc.TracingMetadataUtils.attachMetadataInterceptor;
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
@@ -25,6 +26,7 @@ import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddr
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageFutureStub;
 import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.ByteStreamHelper;
@@ -55,7 +57,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.UUID;
 
-class GrpcCAS implements ContentAddressableStorage {
+public class GrpcCAS implements ContentAddressableStorage {
   private final String instanceName;
   private final Channel channel;
   private final ByteStreamUploader uploader;
@@ -83,15 +85,6 @@ class GrpcCAS implements ContentAddressableStorage {
             @Override
             public ContentAddressableStorageFutureStub get() {
               return ContentAddressableStorageGrpc.newFutureStub(channel);
-            }
-          });
-
-  private final Supplier<ByteStreamBlockingStub> bsBlockingStub =
-      Suppliers.memoize(
-          new Supplier<ByteStreamBlockingStub>() {
-            @Override
-            public ByteStreamBlockingStub get() {
-              return ByteStreamGrpc.newBlockingStub(channel);
             }
           });
 
@@ -186,17 +179,30 @@ class GrpcCAS implements ContentAddressableStorage {
     }
   }
 
-  @Override
-  public Write getWrite(Digest digest, UUID uuid) {
+  public static Write newWrite(
+      Channel channel,
+      String instanceName,
+      Digest digest,
+      UUID uuid,
+      RequestMetadata requestMetadata) {
     HashCode hash = HashCode.fromString(digest.getHash());
     String resourceName = ByteStreamUploader.uploadResourceName(
         instanceName, uuid, hash, digest.getSizeBytes());
+    Supplier<ByteStreamBlockingStub> bsBlockingStub = Suppliers.memoize(
+        () -> ByteStreamGrpc.newBlockingStub(channel).withInterceptors(attachMetadataInterceptor(requestMetadata)));
+    Supplier<ByteStreamStub> bsStub = Suppliers.memoize(
+        () -> ByteStreamGrpc.newStub(channel).withInterceptors(attachMetadataInterceptor(requestMetadata)));
     return new StubWriteOutputStream(
         bsBlockingStub,
         bsStub,
         resourceName,
         digest.getSizeBytes(),
         /* autoflush=*/ false);
+  }
+
+  @Override
+  public Write getWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata) {
+    return newWrite(channel, instanceName, digest, uuid, requestMetadata);
   }
 
   @Override

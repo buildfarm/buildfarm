@@ -16,7 +16,9 @@ package build.buildfarm.cas;
 
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.ThreadSafety.ThreadSafe;
 import build.buildfarm.common.Write;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -25,7 +27,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.UUID;
 
-public interface ContentAddressableStorage {
+public interface ContentAddressableStorage extends InputStreamFactory {
   /**
    * Blob storage for the CAS. This class should be used at all times when interacting with
    * complete blobs in order to cut down on independent digest computation.
@@ -61,13 +63,26 @@ public interface ContentAddressableStorage {
     }
   }
 
+  public class EntryLimitException extends IOException {
+    private final Digest digest;
+
+    public EntryLimitException(Digest digest) {
+      super(DigestUtil.toString(digest));
+      this.digest = digest;
+    }
+
+    public Digest getDigest() {
+      return digest;
+    }
+  }
+
   /** Indicates presence in the CAS for a single digest. */
   @ThreadSafe
   boolean contains(Digest digest);
 
   /** Indicates presence in the CAS for a sequence of digests. */
   @ThreadSafe
-  Iterable<Digest> findMissingBlobs(Iterable<Digest> digests);
+  Iterable<Digest> findMissingBlobs(Iterable<Digest> digests) throws InterruptedException;
 
   /** Retrieve a value from the CAS. */
   @ThreadSafe
@@ -80,7 +95,7 @@ public interface ContentAddressableStorage {
   InputStream newInput(Digest digest, long offset) throws IOException;
 
   @ThreadSafe
-  Write getWrite(Digest digest, UUID uuid);
+  Write getWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata);
 
   /** Insert a blob into the CAS. */
   @ThreadSafe

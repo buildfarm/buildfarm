@@ -17,28 +17,131 @@ package build.buildfarm.worker;
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.ExecuteResponse;
+import build.buildfarm.common.Poller;
+import build.buildfarm.v1test.QueueEntry;
 import com.google.longrunning.Operation;
 import java.nio.file.Path;
-import java.util.List;
 
 final class OperationContext {
+  final ExecuteResponse.Builder executeResponse;
   final Operation operation;
+  final Poller poller;
   final Path execDir;
-  final ExecuteOperationMetadata metadata;
   final Action action;
   final Command command;
+  final QueueEntry queueEntry;
 
-  OperationContext(
+  private OperationContext(
+      ExecuteResponse.Builder executeResponse,
       Operation operation,
+      Poller poller,
       Path execDir,
-      ExecuteOperationMetadata metadata,
       Action action,
-      Command command) {
+      Command command,
+      QueueEntry queueEntry) {
+    this.executeResponse = executeResponse;
     this.operation = operation;
+    this.poller = poller;
     this.execDir = execDir;
-    this.metadata = metadata;
     this.action = action;
     this.command = command;
+    this.queueEntry = queueEntry;
+  }
+
+  public static class Builder {
+    private ExecuteResponse.Builder executeResponse;
+    private Operation operation;
+    private Poller poller;
+    private Path execDir;
+    private Action action;
+    private Command command;
+    private QueueEntry queueEntry;
+
+    private Builder(
+        ExecuteResponse.Builder executeResponse,
+        Operation operation,
+        Poller poller,
+        Path execDir,
+        Action action,
+        Command command,
+        QueueEntry queueEntry) {
+      this.executeResponse = executeResponse;
+      this.operation = operation;
+      this.poller = poller;
+      this.execDir = execDir;
+      this.action = action;
+      this.command = command;
+      this.queueEntry = queueEntry;
+    }
+
+    public Builder setExecuteResponseBuilder(ExecuteResponse.Builder executeResponse) {
+      this.executeResponse = executeResponse;
+      return this;
+    }
+
+    public Builder setOperation(Operation operation) {
+      this.operation = operation;
+      return this;
+    }
+
+    public Builder setPoller(Poller poller) {
+      this.poller = poller;
+      return this;
+    }
+
+    public Builder setExecDir(Path execDir) {
+      this.execDir = execDir;
+      return this;
+    }
+
+    public Builder setAction(Action action) {
+      this.action = action;
+      return this;
+    }
+
+    public Builder setCommand(Command command) {
+      this.command = command;
+      return this;
+    }
+
+    public Builder setQueueEntry(QueueEntry queueEntry) {
+      this.queueEntry = queueEntry;
+      return this;
+    }
+
+    public OperationContext build() {
+      return new OperationContext(
+          executeResponse,
+          operation,
+          poller,
+          execDir,
+          action,
+          command,
+          queueEntry);
+    }
+  }
+
+  public static Builder newBuilder() {
+    return new Builder(
+        /* executeResponse=*/ ExecuteResponse.newBuilder(),
+        /* operation=*/ null,
+        /* poller=*/ null,
+        /* execDir=*/ null,
+        /* action=*/ null,
+        /* command=*/ null,
+        /* queueEntry=*/ null);
+  }
+
+  public Builder toBuilder() {
+    return new Builder(
+        executeResponse,
+        operation,
+        poller,
+        execDir,
+        action,
+        command,
+        queueEntry);
   }
 }

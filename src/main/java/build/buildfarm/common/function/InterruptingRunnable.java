@@ -16,5 +16,5 @@ package build.buildfarm.common.function;
 
 @FunctionalInterface
 public interface InterruptingRunnable {
-  void run() throws InterruptedException;
+  void runInterruptibly() throws InterruptedException;
 }

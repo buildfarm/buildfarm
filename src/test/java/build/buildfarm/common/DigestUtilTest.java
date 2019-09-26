@@ -77,21 +77,21 @@ public class DigestUtilTest {
 
   @Test(expected = IllegalArgumentException.class)
   public void unrecognizedHashFunctionThrows() {
-    HashFunction.get(DigestFunction.UNRECOGNIZED);
+    HashFunction.get(DigestFunction.Value.UNRECOGNIZED);
   }
 
   @Test
   public void hashFunctionsMatchHashFunctions() {
-    assertThat(HashFunction.get(DigestFunction.MD5)).isEqualTo(HashFunction.MD5);
-    assertThat(HashFunction.get(DigestFunction.SHA1)).isEqualTo(HashFunction.SHA1);
-    assertThat(HashFunction.get(DigestFunction.SHA256)).isEqualTo(HashFunction.SHA256);
+    assertThat(HashFunction.get(DigestFunction.Value.MD5)).isEqualTo(HashFunction.MD5);
+    assertThat(HashFunction.get(DigestFunction.Value.SHA1)).isEqualTo(HashFunction.SHA1);
+    assertThat(HashFunction.get(DigestFunction.Value.SHA256)).isEqualTo(HashFunction.SHA256);
   }
 
   @Test
   public void forHashMatchesName() {
-    assertThat(DigestUtil.forHash("MD5").empty()).isEqualTo(new DigestUtil(HashFunction.get(DigestFunction.MD5)).empty());
-    assertThat(DigestUtil.forHash("SHA1").empty()).isEqualTo(new DigestUtil(HashFunction.get(DigestFunction.SHA1)).empty());
-    assertThat(DigestUtil.forHash("SHA256").empty()).isEqualTo(new DigestUtil(HashFunction.get(DigestFunction.SHA256)).empty());
+    assertThat(DigestUtil.forHash("MD5").empty()).isEqualTo(new DigestUtil(HashFunction.get(DigestFunction.Value.MD5)).empty());
+    assertThat(DigestUtil.forHash("SHA1").empty()).isEqualTo(new DigestUtil(HashFunction.get(DigestFunction.Value.SHA1)).empty());
+    assertThat(DigestUtil.forHash("SHA256").empty()).isEqualTo(new DigestUtil(HashFunction.get(DigestFunction.Value.SHA256)).empty());
   }
 
   @Test

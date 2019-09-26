@@ -14,27 +14,94 @@
 
 package build.buildfarm.worker;
 
+import static build.bazel.remote.execution.v2.ExecutionStage.Value.QUEUED;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 
-import build.bazel.remote.execution.v2.Action;
-import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.buildfarm.common.Poller;
+import build.buildfarm.instance.Instance.MatchListener;
+import build.buildfarm.v1test.ExecuteEntry;
+import build.buildfarm.v1test.QueueEntry;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
 import com.google.longrunning.Operation;
-import com.google.protobuf.ByteString;
-import com.google.protobuf.Duration;
-import com.google.protobuf.InvalidProtocolBufferException;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
+import com.google.protobuf.Any;
+import com.google.protobuf.Timestamp;
+import com.google.protobuf.util.Timestamps;
 import java.util.logging.Logger;
+import javax.annotation.Nullable;
 
 public class MatchStage extends PipelineStage {
   private static final Logger logger = Logger.getLogger(MatchStage.class.getName());
 
   public MatchStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
     super("MatchStage", workerContext, output, error);
+  }
+
+  class MatchOperationListener implements MatchListener {
+    private Stopwatch stopwatch;
+    private long waitStart;
+    private long waitDuration;
+    private long operationNamedAtUSecs;
+    private Poller poller = null;
+    private QueueEntry queueEntry = null;
+    private boolean matched = false;
+
+    public MatchOperationListener(Stopwatch stopwatch) {
+      this.stopwatch = stopwatch;
+      waitDuration = this.stopwatch.elapsed(MICROSECONDS);
+    }
+
+    boolean wasMatched() {
+      return matched;
+    }
+
+    @Override
+    public void onWaitStart() {
+      waitStart = stopwatch.elapsed(MICROSECONDS);
+    }
+
+    @Override
+    public void onWaitEnd() {
+      long elapsedUSecs = stopwatch.elapsed(MICROSECONDS);
+      waitDuration += elapsedUSecs - waitStart;
+      waitStart = elapsedUSecs;
+    }
+
+    @Override
+    public boolean onEntry(@Nullable QueueEntry queueEntry) throws InterruptedException {
+      if (queueEntry == null) {
+        return false;
+      }
+
+      operationNamedAtUSecs = stopwatch.elapsed(MICROSECONDS);
+      Preconditions.checkState(poller == null);
+      Poller poller = workerContext.createPoller("MatchStage", queueEntry, QUEUED);
+      return onOperationPolled(queueEntry, poller);
+    }
+
+    private boolean onOperationPolled(QueueEntry queueEntry, Poller poller) throws InterruptedException {
+      String operationName = queueEntry.getExecuteEntry().getOperationName();
+      logStart(operationName);
+
+      long matchingAtUSecs = stopwatch.elapsed(MICROSECONDS);
+      OperationContext operationContext = match(
+          queueEntry,
+          poller,
+          stopwatch,
+          operationNamedAtUSecs);
+      long matchedInUSecs = stopwatch.elapsed(MICROSECONDS) - matchingAtUSecs;
+      logComplete(operationName, matchedInUSecs, waitDuration, true);
+      operationContext.poller.pause();
+      try {
+        output.put(operationContext);
+      } catch (InterruptedException e) {
+        error.put(operationContext);
+        throw e;
+      }
+      matched = true;
+      return true;
+    }
   }
 
   @Override
@@ -48,77 +115,48 @@ public class MatchStage extends PipelineStage {
     if (!output.claim()) {
       return;
     }
-    long stallUSecs = stopwatch.elapsed(MICROSECONDS);
-    logStart();
-    workerContext.match((operation) -> {
-      if (operation == null) {
+    MatchOperationListener listener = new MatchOperationListener(stopwatch);
+    try {
+      logStart();
+      workerContext.match(listener);
+    } finally {
+      if (!listener.wasMatched()) {
         output.release();
-      } else {
-        logStart(operation.getName());
-        boolean fetched = fetch(operation);
-        long usecs = stopwatch.elapsed(MICROSECONDS);
-        if (!fetched) {
-          output.release();
-          workerContext.requeue(operation);
-        }
-        logComplete(operation.getName(), usecs, stallUSecs, fetched);
       }
-    });
+    }
   }
 
-  private boolean fetch(Operation operation) {
-    ExecuteOperationMetadata metadata;
-    Action action;
-    try {
-      metadata = operation.getMetadata().unpack(ExecuteOperationMetadata.class);
-    } catch (InvalidProtocolBufferException e) {
-      return false;
-    }
+  private OperationContext match(
+      QueueEntry queueEntry,
+      Poller poller,
+      Stopwatch stopwatch,
+      long matchStartAtUSecs) {
+    OperationContext.Builder builder = OperationContext.newBuilder();
+    Timestamp workerStartTimestamp = Timestamps.fromMillis(System.currentTimeMillis());
 
-    ByteString actionBlob = workerContext.getBlob(metadata.getActionDigest());
-    if (actionBlob == null) {
-      return false;
-    }
+    ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
+    // this may be superfluous - we can probably just set the name and action digest
+    Operation operation = Operation.newBuilder()
+        .setName(executeEntry.getOperationName())
+        .setMetadata(Any.pack(ExecuteOperationMetadata.newBuilder()
+            .setActionDigest(executeEntry.getActionDigest())
+            .setStage(QUEUED)
+            .setStdoutStreamName(executeEntry.getStdoutStreamName())
+            .setStderrStreamName(executeEntry.getStderrStreamName())
+            .build()))
+        .build();
 
-    try {
-      action = Action.parseFrom(actionBlob);
-    } catch (InvalidProtocolBufferException e) {
-      return false;
-    }
+    OperationContext operationContext = OperationContext.newBuilder()
+        .setOperation(operation)
+        .setPoller(poller)
+        .setQueueEntry(queueEntry)
+        .build();
 
-    ByteString commandBlob = workerContext.getBlob(action.getCommandDigest());
-    if (commandBlob == null) {
-      return false;
-    }
-
-    Command command;
-    try {
-      command = Command.parseFrom(commandBlob);
-    } catch (InvalidProtocolBufferException e) {
-      return false;
-    }
-
-    if (action.hasTimeout() && workerContext.hasMaximumActionTimeout()) {
-      Duration timeout = action.getTimeout();
-      Duration maximum = workerContext.getMaximumActionTimeout();
-      if (timeout.getSeconds() > maximum.getSeconds() ||
-          (timeout.getSeconds() == maximum.getSeconds() && timeout.getNanos() > maximum.getNanos())) {
-        return false;
-      }
-    }
-    Path execDir = workerContext.getRoot().resolve(operation.getName());
-    try {
-      output.put(new OperationContext(
-          operation,
-          execDir,
-          metadata,
-          action,
-          command));
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      return false;
-    }
-    return true;
+    operationContext.executeResponse.getResultBuilder().getExecutionMetadataBuilder()
+        .setWorker(workerContext.getName())
+        .setQueuedTimestamp(executeEntry.getQueuedTimestamp())
+        .setWorkerStartTimestamp(workerStartTimestamp);
+    return operationContext;
   }
 
   @Override

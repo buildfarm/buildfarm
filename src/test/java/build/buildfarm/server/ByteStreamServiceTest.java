@@ -1,8 +1,23 @@
+// Copyright 2019 The Bazel Authors. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package build.buildfarm.server;
 
 import static build.buildfarm.common.DigestUtil.HashFunction.SHA256;
 import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.AdditionalAnswers.answerVoid;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
@@ -14,8 +29,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import com.google.common.hash.HashCode;
@@ -33,10 +50,10 @@ import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -64,7 +81,7 @@ public class ByteStreamServiceTest {
     // Use a mutable service registry for later registering the service impl for each test case.
     fakeServer =
         InProcessServerBuilder.forName(fakeServerName)
-            .addService(new ByteStreamService(instances))
+            .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, SECONDS))
             .directExecutor()
             .build()
             .start();
@@ -84,7 +101,7 @@ public class ByteStreamServiceTest {
 
     SettableFuture<ByteString> writtenFuture = SettableFuture.create();
     ByteString.Output output = ByteString.newOutput((int) digest.getSizeBytes());
-    OutputStream out = new OutputStream() {
+    FeedbackOutputStream out = new FeedbackOutputStream() {
       @Override
       public void close() {
         if (output.size() == digest.getSizeBytes()) {
@@ -111,6 +128,11 @@ public class ByteStreamServiceTest {
       public void write(int b) throws IOException {
         output.write(b);
       }
+
+      @Override
+      public boolean isReady() {
+        return true;
+      }
     };
 
     Write write = mock(Write.class);
@@ -121,13 +143,13 @@ public class ByteStreamServiceTest {
         return null;
       }
     }).when(write).reset();
-    when(write.getOutput()).thenReturn(out);
+    when(write.getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class))).thenReturn(out);
     doAnswer(invocation -> (long) output.size()).when(write).getCommittedSize();
     doAnswer(answerVoid((Runnable listener, Executor executor) -> writtenFuture.addListener(listener, executor)))
         .when(write).addListener(any(Runnable.class), any(Executor.class));
 
     Instance instance = mock(Instance.class);
-    when(instance.getBlobWrite(digest, uuid)).thenReturn(write);
+    when(instance.getBlobWrite(digest, uuid, RequestMetadata.getDefaultInstance())).thenReturn(write);
 
     HashCode hash = HashCode.fromString(digest.getHash());
     String resourceName = ByteStreamUploader.uploadResourceName(/* instanceName=*/ null, uuid, hash, digest.getSizeBytes());
@@ -154,7 +176,7 @@ public class ByteStreamServiceTest {
         .build());
     requestObserver.onCompleted();
     verify(write, atLeastOnce()).getCommittedSize();
-    verify(write, atLeastOnce()).getOutput();
+    verify(write, atLeastOnce()).getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class));
     verify(write, times(1)).reset();
     verify(write, times(1)).addListener(any(Runnable.class), any(Executor.class));
   }
@@ -167,7 +189,7 @@ public class ByteStreamServiceTest {
 
     SettableFuture<ByteString> writtenFuture = SettableFuture.create();
     ByteString.Output output = ByteString.newOutput((int) digest.getSizeBytes());
-    OutputStream out = new OutputStream() {
+    FeedbackOutputStream out = new FeedbackOutputStream() {
       @Override
       public void close() {
         if (output.size() == digest.getSizeBytes()) {
@@ -184,16 +206,21 @@ public class ByteStreamServiceTest {
       public void write(int b) {
         output.write(b);
       }
+
+      @Override
+      public boolean isReady() {
+        return true;
+      }
     };
 
     Write write = mock(Write.class);
-    when(write.getOutput()).thenReturn(out);
+    when(write.getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class))).thenReturn(out);
     doAnswer(invocation -> (long) output.size()).when(write).getCommittedSize();
     doAnswer(answerVoid((Runnable listener, Executor executor) -> writtenFuture.addListener(listener, executor)))
         .when(write).addListener(any(Runnable.class), any(Executor.class));
 
     Instance instance = mock(Instance.class);
-    when(instance.getBlobWrite(digest, uuid)).thenReturn(write);
+    when(instance.getBlobWrite(digest, uuid, RequestMetadata.getDefaultInstance())).thenReturn(write);
 
     HashCode hash = HashCode.fromString(digest.getHash());
     String resourceName = ByteStreamUploader.uploadResourceName(/* instanceName=*/ null, uuid, hash, digest.getSizeBytes());
@@ -226,7 +253,7 @@ public class ByteStreamServiceTest {
         .build());
     requestObserver.onCompleted();
     verify(write, atLeastOnce()).getCommittedSize();
-    verify(write, atLeastOnce()).getOutput();
+    verify(write, atLeastOnce()).getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class));
     verify(write, times(2)).addListener(any(Runnable.class), any(Executor.class));
   }
 }

@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
 public class Pipeline {
@@ -25,6 +26,8 @@ public class Pipeline {
 
   private final Map<PipelineStage, Thread> stageThreads;
   private final Map<PipelineStage, Integer> stageClosePriorities;
+  private Thread joiningThread = null;
+  private boolean closing = false;
   // FIXME ThreadGroup?
 
   public Pipeline() {
@@ -46,10 +49,30 @@ public class Pipeline {
     }
   }
 
-  public void join() {
+  public void close() throws InterruptedException {
+    synchronized (this) {
+      closing = true;
+      if (joiningThread != null) {
+        joiningThread.interrupt();
+        joiningThread = null;
+      }
+    }
+    join(true);
+  }
+
+  public void join() throws InterruptedException {
+    synchronized (this) {
+      joiningThread = Thread.currentThread();
+    }
+    join(false);
+    synchronized (this) {
+      joiningThread = null;
+    }
+  }
+
+  private void join(boolean closeStage) throws InterruptedException {
     List<PipelineStage> inactiveStages = new ArrayList<>();
-    boolean closeStage = false;
-    boolean wasInterrupted = false;
+    InterruptedException intEx = null;
     try {
       while (!stageThreads.isEmpty()) {
         if (closeStage) {
@@ -75,8 +98,16 @@ public class Pipeline {
           Thread thread = stageThread.getValue();
           try {
             thread.join(closeStage ? 1 : 1000);
-          } catch (InterruptedException ex) {
-            wasInterrupted = true;
+          } catch (InterruptedException e) {
+            if (!closeStage) {
+              synchronized (this) {
+                while (closing && !stageThreads.isEmpty()) {
+                  wait();
+                }
+              }
+              throw e;
+            }
+            intEx = e;
           }
 
           if (!thread.isAlive()) {
@@ -89,14 +120,17 @@ public class Pipeline {
         }
         closeStage = false;
         for (PipelineStage stage : inactiveStages) {
-          stageThreads.remove(stage);
-          closeStage = true;
+          synchronized (this) {
+            stageThreads.remove(stage);
+            closeStage = true;
+            notify();
+          }
         }
         inactiveStages.clear();
       }
     } finally {
-      if (wasInterrupted) {
-        Thread.currentThread().interrupt();
+      if (intEx != null) {
+        throw intEx;
       }
     }
   }

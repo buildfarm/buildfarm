@@ -1,6 +1,23 @@
+// Copyright 2019 The Bazel Authors. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package build.buildfarm.common.grpc;
 
+import static com.google.common.base.Preconditions.checkNotNull;
+
 import build.buildfarm.common.Write;
+import build.buildfarm.common.io.FeedbackOutputStream;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamBlockingStub;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamStub;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
@@ -15,13 +32,16 @@ import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.Status.Code;
 import io.grpc.StatusRuntimeException;
+import io.grpc.stub.ClientCallStreamObserver;
+import io.grpc.stub.ClientResponseObserver;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
+import javax.annotation.concurrent.GuardedBy;
 
-public class StubWriteOutputStream extends OutputStream implements Write {
+public class StubWriteOutputStream extends FeedbackOutputStream implements Write {
   public static final long UNLIMITED_EXPECTED_SIZE = Long.MAX_VALUE;
 
   private static final int CHUNK_SIZE = 16 * 1024;
@@ -68,7 +88,13 @@ public class StubWriteOutputStream extends OutputStream implements Write {
   private boolean sentResourceName = false;
   private int offset = 0;
   private long writtenBytes = 0;
+
+  @GuardedBy("this")
   private StreamObserver<WriteRequest> writeObserver = null;
+
+  private long deadlineAfter = 0;
+  private TimeUnit deadlineAfterUnits = null;
+  private Runnable onReadyHandler = null;
 
   static class WriteCompleteException extends IOException {
   }
@@ -95,13 +121,15 @@ public class StubWriteOutputStream extends OutputStream implements Write {
         initiateWrite();
         flushSome(finishWrite);
       }
-      if (writeObserver != null) {
-        if (finishWrite || getCommittedSize() + offset == expectedSize) {
-          writeObserver.onCompleted();
-        } else {
-          writeObserver.onError(Status.CANCELLED.asException());
+      synchronized (this) {
+        if (writeObserver != null) {
+          if (finishWrite || getCommittedSize() + offset == expectedSize) {
+            writeObserver.onCompleted();
+          } else {
+            writeObserver.onError(Status.CANCELLED.asException());
+          }
+          writeObserver = null;
         }
-        writeObserver = null;
       }
     }
   }
@@ -114,7 +142,9 @@ public class StubWriteOutputStream extends OutputStream implements Write {
     if (!sentResourceName) {
       request.setResourceName(resourceName);
     }
-    writeObserver.onNext(request.build());
+    synchronized (this) {
+      writeObserver.onNext(request.build());
+    }
     wasReset = false;
     writtenBytes += offset;
     offset = 0;
@@ -147,11 +177,22 @@ public class StubWriteOutputStream extends OutputStream implements Write {
     }
   }
 
-  private void initiateWrite() throws IOException {
+  private synchronized void initiateWrite() throws IOException {
     if (writeObserver == null) {
+      checkNotNull(deadlineAfterUnits);
       writeObserver = bsStub.get()
+          .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
           .write(
-              new StreamObserver<WriteResponse>() {
+              new ClientResponseObserver<WriteRequest, WriteResponse>() {
+                @Override
+                public void beforeStart(ClientCallStreamObserver<WriteRequest> requestStream) {
+                  requestStream.setOnReadyHandler(() -> {
+                    if (requestStream.isReady()) {
+                      onReadyHandler.run();
+                    }
+                  });
+                }
+
                 @Override
                 public void onNext(WriteResponse response) {
                   writeFuture.set(response.getCommittedSize());
@@ -164,7 +205,9 @@ public class StubWriteOutputStream extends OutputStream implements Write {
 
                 @Override
                 public void onCompleted() {
-                  writeObserver = null;
+                  synchronized (StubWriteOutputStream.this) {
+                    writeObserver = null;
+                  }
                 }
               });
     }
@@ -209,6 +252,16 @@ public class StubWriteOutputStream extends OutputStream implements Write {
     }
   }
 
+  @Override
+  public synchronized boolean isReady() {
+    if (writeObserver == null) {
+      return false;
+    }
+    ClientCallStreamObserver<WriteRequest> clientCallStreamObserver =
+        (ClientCallStreamObserver<WriteRequest>) writeObserver;
+    return clientCallStreamObserver.isReady();
+  }
+
   // Write methods
 
   @Override
@@ -233,7 +286,10 @@ public class StubWriteOutputStream extends OutputStream implements Write {
   }
 
   @Override
-  public OutputStream getOutput() {
+  public FeedbackOutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+    this.deadlineAfter = deadlineAfter;
+    this.deadlineAfterUnits = deadlineAfterUnits;
+    this.onReadyHandler = onReadyHandler;
     return this;
   }
 

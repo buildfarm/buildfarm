@@ -20,9 +20,9 @@ import static com.google.common.util.concurrent.Futures.immediateFuture;
 
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.Write;
 import build.buildfarm.instance.stub.ByteStreamUploader;
-import build.buildfarm.v1test.BlobWriteKey;
 import build.buildfarm.v1test.ContentAddressableStorageConfig;
 import build.buildfarm.v1test.GrpcCASConfig;
 import com.google.common.cache.Cache;
@@ -51,7 +51,7 @@ public final class ContentAddressableStorages {
     return builder.build();
   }
 
-  private static ContentAddressableStorage createGrpcCAS(GrpcCASConfig config) {
+  public static ContentAddressableStorage createGrpcCAS(GrpcCASConfig config) {
     Channel channel = createChannel(config.getTarget());
     ByteStreamUploader byteStreamUploader
         = new ByteStreamUploader("", channel, null, 300, NO_RETRIES);
@@ -101,7 +101,7 @@ public final class ContentAddressableStorages {
       }
 
       @Override
-      public Write getWrite(Digest digest, UUID uuid) {
+      public Write getWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata) {
         return writes.get(digest, uuid);
       }
 

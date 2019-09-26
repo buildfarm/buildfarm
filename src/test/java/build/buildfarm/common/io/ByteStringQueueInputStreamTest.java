@@ -158,7 +158,7 @@ public class ByteStringQueueInputStreamTest {
   }
 
   @Test(expected = IOException.class)
-  public void readWithExceptionNotFoundThrowsIOExceptionAfterContent() throws IOException {
+  public void readWithExceptionThrowsIOExceptionAfterContent() throws IOException {
     ByteStringQueueInputStream in = new ByteStringQueueInputStream(
         newLinkedBlockingQueue(of(copyFromUtf8("Hello, World"))));
     in.setException(new RuntimeException("failed"));
@@ -170,5 +170,29 @@ public class ByteStringQueueInputStreamTest {
     }
 
     in.read();
+  }
+
+  @Test(expected = IOException.class)
+  public void availableWithExceptionThrowsIOException() throws IOException {
+    ByteStringQueueInputStream in = new ByteStringQueueInputStream(
+        newLinkedBlockingQueue(of()));
+    in.setException(new RuntimeException("failed"));
+    in.available();
+  }
+
+  @Test(expected = IOException.class)
+  public void availableWithExceptionThrowsIOExceptionAfterContent() throws IOException {
+    ByteStringQueueInputStream in = new ByteStringQueueInputStream(
+        newLinkedBlockingQueue(of(copyFromUtf8("Hello, World"))));
+    in.setException(new RuntimeException("failed"));
+    try {
+      in.available();
+
+      byte[] buffer = new byte[32]; // more than enough
+      in.read(buffer);
+    } catch (IOException e) {
+      throw new RuntimeException("unexpected io exception", e);
+    }
+    in.available();
   }
 }

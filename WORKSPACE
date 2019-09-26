@@ -1,20 +1,21 @@
 workspace(name = "build_buildfarm")
 
-load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+load("//3rdparty:workspace.bzl", "maven_dependencies")
+
+maven_dependencies()
+
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_jar")
 
 # Needed for "well-known protos" and @com_google_protobuf//:protoc.
 http_archive(
     name = "com_google_protobuf",
     patch_args = ["-p1"],
     patches = [
-        "//third_party/com_google_protobuf:b6375e03aa.patch",
-        "//third_party/com_google_protobuf:7e1d9e419e.patch",
-        "//third_party/com_google_protobuf:qualified_error_prone_annotations.patch",
+        "//third_party/com_google_protobuf:six.patch",
     ],
-    sha256 = "b50be32ea806bdb948c22595ba0742c75dc2f8799865def414cf27ea5706f2b7",
-    strip_prefix = "protobuf-3.7.0",
-    urls = ["https://github.com/google/protobuf/archive/v3.7.0.zip"],
+    sha256 = "cfcba2df10feec52a84208693937c17a4b5df7775e1635c1e3baffc487b24c9b",
+    strip_prefix = "protobuf-3.9.2",
+    urls = ["https://github.com/google/protobuf/archive/v3.9.2.zip"],
 )
 
 load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
@@ -31,7 +32,10 @@ http_archive(
 
 load("@io_grpc_grpc_java//:repositories.bzl", "grpc_java_repositories")
 
-grpc_java_repositories()
+grpc_java_repositories(
+    omit_com_google_guava = True,
+    omit_com_google_guava_failureaccess = True,
+)
 
 http_archive(
     name = "googleapis",
@@ -45,33 +49,60 @@ http_archive(
 http_archive(
     name = "remote_apis",
     build_file = "@build_buildfarm//:BUILD.remote_apis",
-    sha256 = "6f22ba09356f8dbecb87ba03cacf147939f77fef1c9cfaffb3826691f3686e9b",
-    strip_prefix = "remote-apis-cfe8e540cbb424e3ebc649ddcbc91190f70e23a6",
-    url = "https://github.com/bazelbuild/remote-apis/archive/cfe8e540cbb424e3ebc649ddcbc91190f70e23a6.zip",
+    sha256 = "69c47e26efbfac605e07d9963fdeda9f5ed22a73e692f290a0b6150207207cb5",
+    strip_prefix = "remote-apis-e7282cf0f0e16e7ba84209be5417279e6815bee7",
+    url = "https://github.com/bazelbuild/remote-apis/archive/e7282cf0f0e16e7ba84209be5417279e6815bee7.zip",
 )
 
-load("//3rdparty:workspace.bzl", "maven_dependencies")
+load("@remote_apis//:repository_rules.bzl", "switched_rules_by_language")
 
-maven_dependencies()
+switched_rules_by_language(
+    name = "bazel_remote_apis_imports",
+    java = True,
+)
 
 http_archive(
     name = "bazel_skylib",
-    sha256 = "eb5c57e4c12e68c0c20bc774bfbc60a568e800d025557bc4ea022c6479acc867",
-    strip_prefix = "bazel-skylib-0.6.0",
-    urls = ["https://github.com/bazelbuild/bazel-skylib/archive/0.6.0.tar.gz"],
+    sha256 = "2ea8a5ed2b448baf4a6855d3ce049c4c452a6470b1efd1504fdb7c1c134d220a",
+    strip_prefix = "bazel-skylib-0.8.0",
+    url = "https://github.com/bazelbuild/bazel-skylib/archive/0.8.0.tar.gz",
 )
 
+# Download the rules_docker repository at release v0.10.1
 http_archive(
     name = "io_bazel_rules_docker",
-    sha256 = "aed1c249d4ec8f703edddf35cbe9dfaca0b5f5ea6e4cd9e83e99f3b0d1136c3d",
-    strip_prefix = "rules_docker-0.7.0",
-    urls = ["https://github.com/bazelbuild/rules_docker/archive/v0.7.0.tar.gz"],
+    sha256 = "9ff889216e28c918811b77999257d4ac001c26c1f7c7fb17a79bc28abf74182e",
+    strip_prefix = "rules_docker-0.10.1",
+    urls = ["https://github.com/bazelbuild/rules_docker/releases/download/v0.10.1/rules_docker-v0.10.1.tar.gz"],
 )
+
+load(
+    "@io_bazel_rules_docker//repositories:repositories.bzl",
+    container_repositories = "repositories",
+)
+container_repositories()
+
+load("@io_bazel_rules_docker//repositories:deps.bzl", container_deps = "deps")
+
+container_deps()
 
 load("@io_bazel_rules_docker//container:container.bzl", "container_pull")
 load(
     "@io_bazel_rules_docker//java:image.bzl",
     _java_image_repos = "repositories",
+)
+
+http_jar(
+    name = "jedis",
+    sha256 = "10c844cb3338884da468608f819c11d5c90354b170c3fe445203497000c06ba3",
+    urls =  [
+        "https://github.com/werkt/jedis/releases/download/jedis-3.0.1-8209fd5a88/jedis-3.0.1-8209fd5a88.jar",
+    ],
+)
+
+bind(
+    name = "jar/redis/clients/jedis",
+    actual = "@jedis//jar",
 )
 
 _java_image_repos()

@@ -41,6 +41,9 @@ public class ByteStringQueueInputStream extends InputStream {
     }
     if (input.available() == 0) {
       advance();
+      if (input.available() == 0 && exception != null) {
+        throw new IOException(exception);
+      }
     }
     return input.available();
   }
@@ -80,12 +83,12 @@ public class ByteStringQueueInputStream extends InputStream {
         }
         atInputEndOfFile = true;
         advance();
-        continue; // restart read with EOF indicator
+      } else {
+        atInputEndOfFile = false;
+        len -= readLen;
+        off += readLen;
+        totalLen += readLen;
       }
-      atInputEndOfFile = false;
-      len -= readLen;
-      off += readLen;
-      totalLen += readLen;
     }
     return totalLen;
   }

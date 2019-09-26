@@ -4,24 +4,16 @@ options:
     - id: "mavencentral"
       type: "default"
       url: https://repo.maven.apache.org/maven2/
+    - id: "bintray"
+      url: https://jcenter.bintray.com
   transitivity: runtime_deps
   versionConflictPolicy: highest
 
 dependencies:
-  com.google.code.findbugs:
-    jsr305:
-      lang: java
-      version: "3.0.1"
-
   com.github.pcj:
     google-options:
       lang: java
       version: "1.0.0"
-
-  com.google.guava:
-    guava:
-      lang: java
-      version: "27.0-jre"
 
   com.google.auth:
     google-auth-library-credentials:
@@ -32,6 +24,34 @@ dependencies:
       lang: java
       version: "0.9.1"
 
+  com.google.code.findbugs:
+    jsr305:
+      lang: java
+      version: "3.0.1"
+
+  com.google.errorprone:
+    error_prone_core:
+      lang: java
+      version: "0.92"
+
+    error_prone_annotations:
+      lang: java
+      version: "2.2.0"
+
+  com.google.guava:
+    guava:
+      lang: java
+      version: "27.1-jre"
+
+    failureaccess:
+      lang: java
+      version: "1.0.1"
+
+  com.google.j2objc:
+    j2objc-annotations:
+      lang: java
+      version: "1.1"
+
   com.google.jimfs:
     jimfs:
       lang: java
@@ -40,16 +60,16 @@ dependencies:
   com.google.protobuf:
     protobuf-java:
       lang: java
-      version: "3.6.1"
+      version: "3.9.2"
 
     protobuf-java-util:
       lang: java
-      version: "3.6.1"
+      version: "3.9.2"
 
   com.google.truth:
     truth:
       lang: java
-      version: "0.43"
+      version: "0.44"
 
   io.netty:
     netty:
@@ -78,3 +98,40 @@ dependencies:
     mockito-core:
       lang: java
       version: "2.25.0"
+
+  org.checkerframework:
+    checker-qual:
+      lang: java
+      version: "2.5.2"
+
+  org.apache.commons:
+    commons-pool2:
+      lang: java
+      version: "2.4.3"
+
+  org.slf4j:
+    slf4j-api:
+      lang: java
+      version: "1.7.22"
+
+  com.github.jnr:
+    jnr-constants:
+      lang: java
+      version: "0.9.9"
+
+    jnr-ffi:
+      lang: java
+      version: "2.1.7"
+
+    jffi:
+      lang: java
+      version: "1.2.16"
+
+    jffi:jar:native:
+      lang: java
+      version: "1.2.16"
+
+  com.github.serceman:
+    jnr-fuse:
+      lang: java
+      version: "0.5.1"

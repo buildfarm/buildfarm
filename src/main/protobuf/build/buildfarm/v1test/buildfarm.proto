@@ -6,15 +6,17 @@ import "google/api/annotations.proto";
 import "build/bazel/remote/execution/v2/remote_execution.proto";
 import "google/longrunning/operations.proto";
 import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
 import "google/rpc/status.proto";
 
+option go_package = "buildfarm";
 option java_package = "build.buildfarm.v1test";
 option java_multiple_files = true;
 option java_outer_classname = "OperationQueueProto";
 
 // The OperationQueue API is used internally to communicate with Workers
 service OperationQueue {
-  rpc Take(TakeOperationRequest) returns (google.longrunning.Operation) {
+  rpc Take(TakeOperationRequest) returns (QueueEntry) {
     option (google.api.http) = { get: "/v1test/{instance_name=**}/operation:take" };
   }
 
@@ -47,15 +49,19 @@ message PollOperationRequest {
   string operation_name = 2;
 
   // The current state of the worker
-  build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage stage = 3;
+  build.bazel.remote.execution.v2.ExecutionStage.Value stage = 3;
 }
 
 message BuildFarmServerConfig {
   repeated InstanceConfig instances = 1;
 
-  string default_instance_name = 3; // must be present in instances list or empty
+  string default_instance_name = 2; // must be present in instances list or empty
 
-  int32 port = 2;
+  int32 port = 3;
+
+  string aws_namespace = 4;
+
+  int32 execute_keepalive_after_seconds = 5;
 }
 
 message MemoryCASConfig {
@@ -71,10 +77,31 @@ message GrpcCASConfig {
   string target = 2;
 }
 
+message FilesystemCASConfig {
+  // path to cached files from CAS
+  // if relative, is made relative to root
+  string path = 1;
+
+  // limit for contents of files retained
+  // from CAS in the cache
+  int64 max_size_bytes = 2;
+
+  // limit for contents of a single file retained
+  // from CAS in the cache
+  int64 max_entry_size_bytes = 3;
+}
+
+message FuseCASConfig {
+  // used to identify the backing store
+  string name = 1;
+}
+
 message ContentAddressableStorageConfig {
   oneof type {
     MemoryCASConfig memory = 1;
     GrpcCASConfig grpc = 2;
+    FilesystemCASConfig filesystem = 3;
+    FuseCASConfig fuse = 4;
   }
 }
 
@@ -132,13 +159,270 @@ message MemoryInstanceConfig {
   ActionCacheConfig action_cache_config = 10;
 }
 
+message RedisShardBackplaneConfig {
+  string redis_uri = 1;
+  int32 jedis_pool_max_total = 15;
+  string workers_hash_name = 2;
+  string worker_channel = 25;
+  string action_cache_prefix = 3;
+  int32 action_cache_expire = 4;
+  string action_blacklist_prefix = 28;
+  int32 action_blacklist_expire = 29;
+  string operation_prefix = 5;
+  int32 operation_expire = 6;
+  string pre_queued_operations_list_name = 18;
+  string processing_list_name = 19;
+  string processing_prefix = 20;
+  int32 processing_timeout_millis = 21;
+  string queued_operations_list_name = 7;
+  string dispatching_list_name = 22;
+  string dispatching_prefix = 23;
+  int32 dispatching_timeout_millis = 24;
+  string dispatched_operations_hash_name = 8;
+  string operation_channel_prefix = 9;
+  string cas_prefix = 10;
+  int32 cas_expire = 11;
+  bool subscribe_to_backplane = 26;
+  bool run_failsafe_operation = 27;
+  int32 max_queue_depth = 16;
+  int32 max_pre_queue_depth = 17;
+}
+
+message ShardInstanceConfig {
+  bool run_dispatched_monitor = 1;
+
+  int32 dispatched_monitor_interval_seconds = 2;
+
+  bool run_operation_queuer = 3;
+
+  oneof backplane {
+    RedisShardBackplaneConfig redis_shard_backplane_config = 4;
+  }
+
+  int64 max_blob_size = 5;
+}
+
+message ShardWorkerInstanceConfig {
+  // whether to stream stdout from processes
+  bool stream_stdout = 6;
+
+  // control for process stdout
+  CASInsertionPolicy stdout_cas_policy = 7;
+
+  // whether to stream stderr from processes
+  bool stream_stderr = 8;
+
+  // control for process stdout
+  CASInsertionPolicy stderr_cas_policy = 9;
+
+  // control for process output files
+  CASInsertionPolicy file_cas_policy = 10;
+
+  // page size for getTree request
+  uint32 tree_page_size = 12;
+
+  // default timeout for actions
+  // if a timeout is unspecified for an action, this value
+  // is imposed on it, after which the operation will
+  // be killed
+  google.protobuf.Duration default_action_timeout = 13;
+
+  // maximum selectable timeout
+  // a maximum threshold for an action's specified timeout,
+  // beyond which an action will be rejected for execution
+  google.protobuf.Duration maximum_action_timeout = 14;
+}
+
+message ShardWorkerConfig {
+  ShardWorkerInstanceConfig shard_worker_instance_config = 1;
+
+  int32 port = 2;
+
+  string public_name = 3;
+
+  // base directory for all work being performed
+  string root = 4;
+
+  // the sequence of cas into which expirations cascade
+  repeated ContentAddressableStorageConfig cas = 27;
+
+  // period of poll requests during execution
+  google.protobuf.Duration operation_poll_period = 13;
+
+  // initial platform used to match operations
+  build.bazel.remote.execution.v2.Platform platform = 14;
+
+  // total size of the inline content for
+  // action results
+  int32 inline_content_limit = 15;
+
+  // input fetch width
+  int32 input_fetch_stage_width = 26;
+
+  // execute width
+  int32 execute_stage_width = 16;
+
+  // symlink cas input-only directories
+  bool link_input_directories = 17;
+
+  // selected hash function
+  build.bazel.remote.execution.v2.DigestFunction.Value digest_function = 18;
+
+  // default timeout for actions
+  // if a timeout is unspecified for an action, this value
+  // is imposed on it, after which the operation will
+  // be killed
+  google.protobuf.Duration default_action_timeout = 19;
+
+  // maximum selectable timeout
+  // a maximum threshold for an action's specified timeout,
+  // beyond which an action will be rejected for execution
+  google.protobuf.Duration maximum_action_timeout = 20;
+
+  oneof backplane {
+    RedisShardBackplaneConfig redis_shard_backplane_config = 21;
+  }
+
+  // available execution policies, will be used to match
+  // with an action's platform for selection
+  repeated ExecutionPolicy execution_policies = 25;
+}
+
+message ShardWorker {
+  string endpoint = 1;
+
+  int64 expire_at = 2;
+}
+
+message WorkerChange {
+  message Add {
+  }
+
+  message Remove {
+    string source = 1;
+  }
+
+  string name = 1;
+
+  google.protobuf.Timestamp effectiveAt = 2;
+
+  oneof type {
+    Add add = 3;
+
+    Remove remove = 4;
+  }
+}
+
+message OperationChange {
+  message Reset {
+    google.protobuf.Timestamp expiresAt = 1;
+
+    google.longrunning.Operation operation = 2;
+  }
+
+  message Expire {
+    bool force = 1;
+  }
+
+  google.protobuf.Timestamp effectiveAt = 1;
+
+  string source = 2;
+
+  oneof type {
+    Reset reset = 3;
+
+    Expire expire = 4;
+  }
+}
+
+message DispatchedOperation {
+  QueueEntry queue_entry = 1;
+
+  int64 requeue_at = 2;
+
+  int64 expire_at = 3;
+}
+
+message ProfiledQueuedOperationMetadata {
+  QueuedOperation queued_operation = 1;
+
+  QueuedOperationMetadata queued_operation_metadata = 2;
+
+  google.protobuf.Duration transformed_in = 3;
+
+  google.protobuf.Duration validated_in = 4;
+
+  google.protobuf.Duration uploaded_in = 5;
+}
+
+message ExecuteEntry {
+  string operation_name = 1;
+
+  build.bazel.remote.execution.v2.Digest action_digest = 2;
+
+  bool skip_cache_lookup = 3;
+
+  build.bazel.remote.execution.v2.RequestMetadata request_metadata = 4;
+
+  build.bazel.remote.execution.v2.ExecutionPolicy execution_policy = 5;
+
+  build.bazel.remote.execution.v2.ResultsCachePolicy results_cache_policy = 6;
+
+  string stdout_stream_name = 7;
+
+  string stderr_stream_name = 8;
+
+  google.protobuf.Timestamp queued_timestamp = 9;
+}
+
+message QueueEntry {
+  ExecuteEntry execute_entry = 1;
+
+  build.bazel.remote.execution.v2.Digest queued_operation_digest = 2;
+}
+
+message QueuedOperationMetadata {
+  build.bazel.remote.execution.v2.ExecuteOperationMetadata execute_operation_metadata = 1;
+
+  build.bazel.remote.execution.v2.Digest queued_operation_digest = 2;
+
+  build.bazel.remote.execution.v2.RequestMetadata request_metadata = 3;
+}
+
+message QueuedOperation {
+  build.bazel.remote.execution.v2.Action action = 1;
+
+  build.bazel.remote.execution.v2.Command command = 2;
+
+  build.bazel.remote.execution.v2.Tree tree = 4;
+}
+
+message ExecutingOperationMetadata {
+  build.bazel.remote.execution.v2.ExecuteOperationMetadata execute_operation_metadata = 1;
+
+  build.bazel.remote.execution.v2.RequestMetadata request_metadata = 2;
+
+  int64 started_at = 3;
+
+  string executing_on = 4;
+}
+
+message CompletedOperationMetadata {
+  build.bazel.remote.execution.v2.ExecuteOperationMetadata execute_operation_metadata = 1;
+
+  build.bazel.remote.execution.v2.RequestMetadata request_metadata = 2;
+
+  reserved 3 to 8; // fields now in ExecutedActionMetadata
+}
+
 message InstanceConfig {
   string name = 1;
 
-  build.bazel.remote.execution.v2.DigestFunction digest_function = 2;
+  build.bazel.remote.execution.v2.DigestFunction.Value digest_function = 2;
 
   oneof type {
     MemoryInstanceConfig memory_instance_config = 3;
+    ShardInstanceConfig shard_instance_config = 4;
   }
 }
 
@@ -173,7 +457,7 @@ message ExecutionPolicy {
 }
 
 message WorkerConfig {
-  build.bazel.remote.execution.v2.DigestFunction digest_function = 1;
+  build.bazel.remote.execution.v2.DigestFunction.Value digest_function = 1;
 
   // endpoint for all cas requests
   InstanceEndpoint content_addressable_storage = 2;
@@ -194,6 +478,10 @@ message WorkerConfig {
   // limit for contents of files retained
   // from CAS in the cache
   int64 cas_cache_max_size_bytes = 7;
+
+  // limit for contents of a single file retained
+  // from CAS in the cache
+  int64 cas_cache_max_entry_size_bytes = 24;
 
   // total size of the inline content for
   // action results
@@ -224,6 +512,9 @@ message WorkerConfig {
 
   // initial platform used to match operations
   build.bazel.remote.execution.v2.Platform platform = 17;
+
+  // input fetch width
+  int32 input_fetch_stage_width = 23;
 
   // execute width
   int32 execute_stage_width = 18;

@@ -14,12 +14,17 @@
 
 package build.buildfarm.server;
 
+import static build.buildfarm.instance.Utils.putBlobFuture;
 import static com.google.common.util.concurrent.Futures.addCallback;
+import static com.google.common.util.concurrent.Futures.allAsList;
+import static com.google.common.util.concurrent.Futures.catching;
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
+import static java.lang.String.format;
+import static java.util.concurrent.TimeUnit.MICROSECONDS;
+import static java.util.logging.Level.SEVERE;
 
-import build.buildfarm.instance.Instance;
-import com.google.common.collect.ImmutableList;
 import build.bazel.remote.execution.v2.BatchReadBlobsRequest;
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
@@ -33,38 +38,156 @@ import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
 import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
 import build.bazel.remote.execution.v2.GetTreeRequest;
 import build.bazel.remote.execution.v2.GetTreeResponse;
+import build.bazel.remote.execution.v2.Tree;
+import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.grpc.TracingMetadataUtils;
+import build.buildfarm.instance.Instance;
+import com.google.common.base.Function;
+import com.google.common.base.Stopwatch;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
+import io.grpc.Status.Code;
 import io.grpc.StatusException;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
-import java.util.function.Function;
+import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class ContentAddressableStorageService extends ContentAddressableStorageGrpc.ContentAddressableStorageImplBase {
-  private final Instances instances;
+  private static final Logger logger = Logger.getLogger(ContentAddressableStorageService.class.getName());
 
-  public ContentAddressableStorageService(Instances instances) {
+  private final Instances instances;
+  private final long writeDeadlineAfter;
+  private final TimeUnit writeDeadlineAfterUnits;
+  private final Level requestLogLevel;
+
+  public ContentAddressableStorageService(
+      Instances instances,
+      long writeDeadlineAfter,
+      TimeUnit writeDeadlineAfterUnits,
+      Level requestLogLevel) {
     this.instances = instances;
+    this.writeDeadlineAfter = writeDeadlineAfter;
+    this.writeDeadlineAfterUnits = writeDeadlineAfterUnits;
+    this.requestLogLevel = requestLogLevel;
+  }
+
+  String checkMessage(Digest digest, boolean found) {
+    return format(" (%s, %sfound)", DigestUtil.toString(digest), found ? "" : "not ");
   }
 
   @Override
   public void findMissingBlobs(
       FindMissingBlobsRequest request,
       StreamObserver<FindMissingBlobsResponse> responseObserver) {
-    Instance instance;
     try {
-      instance = instances.get(request.getInstanceName());
-    } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
-      return;
+      instanceFindMissingBlobs(
+          instances.get(request.getInstanceName()),
+          request,
+          responseObserver);
+    } catch (InstanceNotFoundException e) {
+      responseObserver.onError(BuildFarmInstances.toStatusException(e));
     }
+  }
 
-    responseObserver.onNext(FindMissingBlobsResponse.newBuilder()
-        .addAllMissingBlobDigests(
-            instance.findMissingBlobs(request.getBlobDigestsList()))
-        .build());
-    responseObserver.onCompleted();
+  void instanceFindMissingBlobs(
+      Instance instance,
+      FindMissingBlobsRequest request,
+      StreamObserver<FindMissingBlobsResponse> responseObserver) {
+    Stopwatch stopwatch = Stopwatch.createStarted();
+    FindMissingBlobsResponse.Builder builder = FindMissingBlobsResponse.newBuilder();
+    ListenableFuture<FindMissingBlobsResponse.Builder> responseFuture = transform(
+        instance.findMissingBlobs(
+            request.getBlobDigestsList(),
+            directExecutor(),
+            TracingMetadataUtils.fromCurrentContext()),
+        builder::addAllMissingBlobDigests,
+        directExecutor());
+    addCallback(
+        responseFuture,
+        new FutureCallback<FindMissingBlobsResponse.Builder>() {
+          @Override
+          public void onSuccess(FindMissingBlobsResponse.Builder builder) {
+            try {
+              FindMissingBlobsResponse response = builder.build();
+              responseObserver.onNext(response);
+              responseObserver.onCompleted();
+              long elapsedMicros = stopwatch.elapsed(MICROSECONDS);
+              logger.log(
+                  requestLogLevel,
+                  format(
+                      "FindMissingBlobs(%s) for %d blobs in %gms",
+                      instance.getName(),
+                      request.getBlobDigestsList().size(),
+                      elapsedMicros / 1000.0));
+            } catch (Throwable t) {
+              onFailure(t);
+            }
+          }
+
+          @Override
+          public void onFailure(Throwable t) {
+            Status status = Status.fromThrowable(t);
+            if (status.getCode() != Code.CANCELLED) {
+              logger.log(SEVERE, format("findMissingBlobs(%s): %s: %d", instance.getName(), request.getInstanceName(), request.getBlobDigestsCount()), t);
+              responseObserver.onError(t);
+            }
+          }
+        },
+        directExecutor());
+  }
+
+  private static com.google.rpc.Status statusForCode(Code code) {
+    return com.google.rpc.Status.newBuilder()
+        .setCode(code.value())
+        .build();
+  }
+
+  private static ListenableFuture<Response> toResponseFuture(ListenableFuture<Code> codeFuture, Digest digest) {
+    return transform(
+        codeFuture,
+        new Function<Code, Response>() {
+          @Override
+          public Response apply(Code code) {
+            return Response.newBuilder()
+                .setDigest(digest)
+                .setStatus(statusForCode(code))
+                .build();
+          }
+        },
+        directExecutor());
+  }
+
+  private static Iterable<ListenableFuture<Response>> putAllBlobs(
+      Instance instance,
+      Iterable<Request> requests,
+      long writeDeadlineAfter,
+      TimeUnit writeDeadlineAfterUnits) {
+    ImmutableList.Builder<ListenableFuture<Response>> responses = new ImmutableList.Builder<>();
+    for (Request request : requests) {
+      Digest digest = request.getDigest();
+      ListenableFuture<Digest> future = putBlobFuture(
+          instance,
+          digest,
+          request.getData(),
+          writeDeadlineAfter,
+          writeDeadlineAfterUnits,
+          TracingMetadataUtils.fromCurrentContext());
+      responses.add(
+          toResponseFuture(
+              catching(
+                  transform(future, (d) -> Code.OK, directExecutor()),
+                  Throwable.class,
+                  (e) -> Status.fromThrowable(e).getCode(),
+                  directExecutor()),
+              digest));
+    }
+    return responses.build();
   }
 
   @Override
@@ -74,49 +197,69 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
     Instance instance;
     try {
       instance = instances.get(batchRequest.getInstanceName());
-    } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
+    } catch (InstanceNotFoundException e) {
+      responseObserver.onError(BuildFarmInstances.toStatusException(e));
       return;
     }
 
-    ImmutableList.Builder<ByteString> validBlobsBuilder = new ImmutableList.Builder<>();
-    ImmutableList.Builder<Response> responses =
-        new ImmutableList.Builder<>();
-    Function<com.google.rpc.Code, com.google.rpc.Status> statusForCode =
-        (code) -> com.google.rpc.Status.newBuilder()
-            .setCode(code.getNumber())
-            .build();
-    // FIXME do this validation through the instance interface
-    for (Request request : batchRequest.getRequestsList()) {
-      com.google.rpc.Status status;
-      Digest digest = request.getDigest();
-      if (digest.equals(instance.getDigestUtil().compute(request.getData()))) {
-        validBlobsBuilder.add(request.getData());
-        status = statusForCode.apply(com.google.rpc.Code.OK);
-      } else {
-        status = statusForCode.apply(com.google.rpc.Code.INVALID_ARGUMENT);
-      }
-      responses.add(Response.newBuilder()
-          .setDigest(digest)
-          .setStatus(status)
-          .build());
-    }
+    BatchUpdateBlobsResponse.Builder response = BatchUpdateBlobsResponse.newBuilder();
+    ListenableFuture<BatchUpdateBlobsResponse> responseFuture = transform(
+        allAsList(
+            Iterables.transform(
+                putAllBlobs(
+                    instance,
+                    batchRequest.getRequestsList(),
+                    writeDeadlineAfter,
+                    writeDeadlineAfterUnits),
+                (future) -> transform(future, response::addResponses, directExecutor()))),
+        (result) -> response.build(),
+        directExecutor());
 
+    addCallback(
+        responseFuture,
+        new FutureCallback<BatchUpdateBlobsResponse>() {
+          @Override
+          public void onSuccess(BatchUpdateBlobsResponse response) {
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+          }
+
+          @Override
+          public void onFailure(Throwable t) {
+            responseObserver.onError(t);
+          }
+        },
+        directExecutor());
+  }
+
+  private void getInstanceTree(
+      Instance instance,
+      Digest rootDigest,
+      String pageToken,
+      int pageSize,
+      StreamObserver<GetTreeResponse> responseObserver) {
     try {
-      instance.putAllBlobs(validBlobsBuilder.build());
-    } catch (InterruptedException ex) {
-      responseObserver.onError(new StatusException(Status.fromThrowable(ex)));
-      Thread.currentThread().interrupt();
-      return;
-    } catch (IOException ex) {
-      responseObserver.onError(new StatusException(Status.fromThrowable(ex)));
-      return;
-    }
+      do {
+        Tree.Builder builder = Tree.newBuilder();
+        String nextPageToken = instance.getTree(
+            rootDigest, pageSize, pageToken, builder);
+        Tree tree = builder.build();
 
-    responseObserver.onNext(BatchUpdateBlobsResponse.newBuilder()
-        .addAllResponses(responses.build())
-        .build());
-    responseObserver.onCompleted();
+        GetTreeResponse.Builder response = GetTreeResponse.newBuilder()
+            .setNextPageToken(nextPageToken);
+        if (tree.hasRoot()) {
+          response.addDirectories(tree.getRoot());
+        }
+        response.addAllDirectories(tree.getChildrenList());
+        responseObserver.onNext(response.build());
+        pageToken = nextPageToken;
+      } while (!pageToken.isEmpty());
+      responseObserver.onCompleted();
+    } catch (IOException e) {
+      responseObserver.onError(Status.fromThrowable(e).asException());
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
   }
 
   void batchReadBlobs(
@@ -166,35 +309,22 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
     Instance instance;
     try {
       instance = instances.get(request.getInstanceName());
-    } catch (InstanceNotFoundException ex) {
-      responseObserver.onError(BuildFarmInstances.toStatusException(ex));
+    } catch (InstanceNotFoundException e) {
+      responseObserver.onError(BuildFarmInstances.toStatusException(e));
       return;
     }
 
     int pageSize = request.getPageSize();
     if (pageSize < 0) {
-      responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
+      responseObserver.onError(Status.INVALID_ARGUMENT.asException());
       return;
     }
 
-    String pageToken = request.getPageToken();
-    try {
-      do {
-        ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
-        String nextPageToken = instance.getTree(
-            request.getRootDigest(), pageSize, pageToken, directories);
-
-        responseObserver.onNext(GetTreeResponse.newBuilder()
-            .addAllDirectories(directories.build())
-            .setNextPageToken(nextPageToken)
-            .build());
-        pageToken = nextPageToken;
-      } while (!pageToken.isEmpty());
-      responseObserver.onCompleted();
-    } catch (IOException e) {
-      responseObserver.onError(Status.fromThrowable(e).asException());
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    }
+    getInstanceTree(
+        instance,
+        request.getRootDigest(),
+        request.getPageToken(),
+        pageSize,
+        responseObserver);
   }
 }

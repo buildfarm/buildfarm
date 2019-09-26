@@ -1,3 +1,17 @@
+// Copyright 2019 The Bazel Authors. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package build.buildfarm.cas;
 
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
@@ -6,17 +20,17 @@ import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.io.FeedbackOutputStream;
 import com.google.common.hash.HashingOutputStream;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
-class MemoryWriteOutputStream extends OutputStream implements Write {
+class MemoryWriteOutputStream extends FeedbackOutputStream implements Write {
   private final ContentAddressableStorage storage;
   private final Digest digest;
   private final ListenableFuture<ByteString> writtenFuture;
@@ -99,6 +113,11 @@ class MemoryWriteOutputStream extends OutputStream implements Write {
     hashOut.write(b);
   }
 
+  @Override
+  public boolean isReady() {
+    return true;
+  }
+
   boolean checkComplete() {
     return writtenFuture.isDone();
   }
@@ -116,7 +135,7 @@ class MemoryWriteOutputStream extends OutputStream implements Write {
   }
 
   @Override
-  public OutputStream getOutput() {
+  public FeedbackOutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
     return this;
   }
 

@@ -11,14 +11,15 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 package build.buildfarm.server;
 
-class InstanceNotFoundException extends Exception {
-  private static final long serialVersionUID = 1;
+public class InstanceNotFoundException extends Exception {
+  private static final long serialVersionUID = 2288236781501706181L;
 
   public final String instanceName;
 
-  InstanceNotFoundException( String instanceName ) {
+  InstanceNotFoundException(String instanceName) {
     this.instanceName = instanceName;
   }
 }

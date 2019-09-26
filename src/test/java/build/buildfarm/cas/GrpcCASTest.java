@@ -16,6 +16,7 @@ package build.buildfarm.cas;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.truth.Truth.assertThat;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
@@ -24,6 +25,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
@@ -184,12 +186,13 @@ public class GrpcCASTest {
         channel,
         /* uploader=*/ null,
         onExpirations);
-    Write initialWrite = cas.getWrite(digest, uuid);
-    try (OutputStream writeOut = initialWrite.getOutput()) {
+    RequestMetadata requestMetadata = RequestMetadata.getDefaultInstance();
+    Write initialWrite = cas.getWrite(digest, uuid, requestMetadata);
+    try (OutputStream writeOut = initialWrite.getOutput(1, SECONDS, () -> {})) {
       writeContent.substring(0, 4).writeTo(writeOut);
     }
-    Write finalWrite = cas.getWrite(digest, uuid);
-    try (OutputStream writeOut = finalWrite.getOutput()) {
+    Write finalWrite = cas.getWrite(digest, uuid, requestMetadata);
+    try (OutputStream writeOut = finalWrite.getOutput(1, SECONDS, () -> {})) {
       writeContent.substring(4).writeTo(writeOut);
     }
     assertThat(content.get(1, TimeUnit.SECONDS)).isEqualTo(writeContent);

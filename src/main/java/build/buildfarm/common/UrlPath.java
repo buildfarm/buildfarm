@@ -105,6 +105,9 @@ public class UrlPath {
   public static String fromOperationName(String operationName) {
     // {instance_name=**}/operations/{uuid}
     String[] components = operationName.split("/");
+    if (components.length < 2) {
+      return "";
+    }
     return String.join(
         "/", Iterables.limit(
             Arrays.asList(components),
@@ -151,7 +154,7 @@ public class UrlPath {
     } catch (NumberFormatException e) {
       throw new InvalidResourceNameException(resourceName, e.getMessage(), e);
     }
-    if (size <= 0) {
+    if (size < 0) {
       throw new InvalidResourceNameException(
           resourceName,
           String.format("upload size invalid: %d", size));

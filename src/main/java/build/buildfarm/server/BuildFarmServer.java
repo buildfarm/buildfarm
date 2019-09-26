@@ -15,13 +15,19 @@
 package build.buildfarm.server;
 
 import static build.buildfarm.common.IOUtils.formatIOError;
+import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
+import static java.util.logging.Level.FINE;
+import static java.util.logging.Level.SEVERE;
 
+import build.buildfarm.common.grpc.TracingMetadataUtils.ServerHeadersInterceptor;
 import build.buildfarm.v1test.BuildFarmServerConfig;
 import com.google.common.io.ByteStreams;
 import com.google.devtools.common.options.OptionsParser;
 import com.google.protobuf.TextFormat;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
+import io.grpc.ServerInterceptor;
 import io.grpc.util.TransmitStatusRuntimeExceptionInterceptor;
 import java.io.IOException;
 import java.io.InputStream;
@@ -31,7 +37,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
-import java.util.logging.Level;
+import java.util.UUID;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
 
@@ -42,28 +50,42 @@ public class BuildFarmServer {
   public static final Logger logger =
     Logger.getLogger(BuildFarmServer.class.getName());
 
-  private final BuildFarmServerConfig config;
+  private final ScheduledExecutorService keepaliveScheduler = newSingleThreadScheduledExecutor();
   private final Instances instances;
   private final Server server;
+  private boolean stopping = false;
 
-  public BuildFarmServer(BuildFarmServerConfig config) throws ConfigurationException {
-    this(ServerBuilder.forPort(config.getPort()), config);
+  public BuildFarmServer(String session, BuildFarmServerConfig config)
+      throws InterruptedException, ConfigurationException {
+    this(session, ServerBuilder.forPort(config.getPort()), config);
   }
 
-  public BuildFarmServer(ServerBuilder<?> serverBuilder, BuildFarmServerConfig config) throws ConfigurationException {
-    this.config = config;
+  public BuildFarmServer(String session, ServerBuilder<?> serverBuilder, BuildFarmServerConfig config)
+      throws InterruptedException, ConfigurationException {
     String defaultInstanceName = config.getDefaultInstanceName();
-    instances = new BuildFarmInstances(config.getInstancesList(), defaultInstanceName);
+    instances = new BuildFarmInstances(session, config.getInstancesList(), defaultInstanceName, this::stop);
+
+    ServerInterceptor headersInterceptor = new ServerHeadersInterceptor();
     server = serverBuilder
         .addService(new ActionCacheService(instances))
         .addService(new CapabilitiesService(instances))
-        .addService(new ContentAddressableStorageService(instances))
-        .addService(new ByteStreamService(instances))
-        .addService(new ExecutionService(instances))
+        .addService(new ContentAddressableStorageService(
+            instances,
+            /* deadlineAfter=*/ 1, TimeUnit.DAYS,
+            /* requestLogLevel=*/ FINE))
+        .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, TimeUnit.DAYS))
+        .addService(new ExecutionService(
+            instances,
+            config.getExecuteKeepaliveAfterSeconds(),
+            TimeUnit.SECONDS,
+            keepaliveScheduler))
         .addService(new OperationQueueService(instances))
         .addService(new OperationsService(instances))
         .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
+        .intercept(headersInterceptor)
         .build();
+
+    logger.info(String.format("%s initialized", session));
   }
 
   private static BuildFarmServerConfig toBuildFarmServerConfig(Readable input, BuildFarmServerOptions options) throws IOException {
@@ -76,6 +98,7 @@ public class BuildFarmServer {
   }
 
   public void start() throws IOException {
+    instances.start();
     server.start();
     Runtime.getRuntime().addShutdownHook(new Thread() {
       @Override
@@ -88,8 +111,25 @@ public class BuildFarmServer {
   }
 
   public void stop() {
-    if (server != null) {
-      server.shutdown();
+    synchronized (this) {
+      if (stopping) {
+        return;
+      }
+      stopping = true;
+    }
+    try {
+      if (server != null) {
+        server.shutdown();
+      }
+      instances.stop();
+      server.awaitTermination(10, TimeUnit.SECONDS);
+    } catch (InterruptedException e) {
+      if (server != null) {
+        server.shutdownNow();
+      }
+    }
+    if (!shutdownAndAwaitTermination(keepaliveScheduler, 10, TimeUnit.SECONDS)) {
+      logger.warning("could not shut down keepalive scheduler");
     }
   }
 
@@ -114,7 +154,7 @@ public class BuildFarmServer {
     // 170714 08:16:28.552:WT 18 [io.grpc.netty.NettyServerHandler.onStreamError] Stream Error
     // io.netty.handler.codec.http2.Http2Exception$StreamException: Received DATA frame for an
     // unknown stream 11369
-    nettyLogger.setLevel(Level.SEVERE);
+    nettyLogger.setLevel(SEVERE);
 
     OptionsParser parser = OptionsParser.newOptionsParser(BuildFarmServerOptions.class);
     parser.parseAndExitUponError(args);
@@ -125,15 +165,20 @@ public class BuildFarmServer {
     }
 
     Path configPath = Paths.get(residue.get(0));
+    BuildFarmServerOptions options = parser.getOptions(BuildFarmServerOptions.class);
+
+    String session = "buildfarm-server";
+    if (!options.publicName.isEmpty()) {
+      session += "-" + options.publicName;
+    }
+    session += "-" + UUID.randomUUID();
+    BuildFarmServer server;
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
-      BuildFarmServer server =
-          new BuildFarmServer(
-              toBuildFarmServerConfig(
-                  new InputStreamReader(configInputStream),
-                  parser.getOptions(BuildFarmServerOptions.class)));
+      server = new BuildFarmServer(session, toBuildFarmServerConfig(new InputStreamReader(configInputStream), options));
       configInputStream.close();
       server.start();
       server.blockUntilShutdown();
+      server.stop();
       return true;
     } catch (IOException e) {
       System.err.println("error: " + formatIOError(e));

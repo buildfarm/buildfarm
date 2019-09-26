@@ -14,16 +14,16 @@
 
 package build.buildfarm.instance.memory;
 
-import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.CACHE_CHECK;
-import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.COMPLETED;
-import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.EXECUTING;
-import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.QUEUED;
-import static build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage.UNKNOWN;
+import static build.bazel.remote.execution.v2.ExecutionStage.Value.CACHE_CHECK;
+import static build.bazel.remote.execution.v2.ExecutionStage.Value.COMPLETED;
+import static build.bazel.remote.execution.v2.ExecutionStage.Value.EXECUTING;
+import static build.bazel.remote.execution.v2.ExecutionStage.Value.QUEUED;
+import static build.bazel.remote.execution.v2.ExecutionStage.Value.UNKNOWN;
+import static build.buildfarm.common.Actions.invalidActionMessage;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static build.buildfarm.instance.AbstractServerInstance.INVALID_DIGEST;
-import static build.buildfarm.instance.AbstractServerInstance.MISSING_INPUT;
-import static build.buildfarm.instance.AbstractServerInstance.VIOLATION_TYPE_INVALID;
-import static build.buildfarm.instance.AbstractServerInstance.VIOLATION_TYPE_MISSING;
-import static build.buildfarm.instance.AbstractServerInstance.invalidActionMessage;
+import static build.buildfarm.instance.AbstractServerInstance.MISSING_ACTION;
 import static build.buildfarm.instance.memory.MemoryInstance.TIMEOUT_OUT_OF_BOUNDS;
 import static build.buildfarm.cas.ContentAddressableStorages.casMapDecorator;
 import static com.google.common.collect.Multimaps.synchronizedSetMultimap;
@@ -32,7 +32,9 @@ import static com.google.common.truth.Truth.assertThat;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.atLeast;
+import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -40,27 +42,33 @@ import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
+import build.bazel.remote.execution.v2.ExecutionStage;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.Watcher;
 import build.buildfarm.instance.OperationsMap;
+import build.buildfarm.instance.WatchFuture;
 import build.buildfarm.v1test.ActionCacheConfig;
+import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.DelegateCASConfig;
 import build.buildfarm.v1test.MemoryInstanceConfig;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.collect.MultimapBuilder;
 import com.google.common.collect.SetMultimap;
-import build.bazel.remote.execution.v2.Action;
-import build.bazel.remote.execution.v2.ActionResult;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -71,10 +79,11 @@ import com.google.rpc.Code;
 import com.google.rpc.PreconditionFailure;
 import com.google.rpc.PreconditionFailure.Violation;
 import com.google.rpc.Status;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Predicate;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -101,7 +110,7 @@ public class MemoryInstanceTest {
   private MemoryInstance instance;
 
   private OperationsMap outstandingOperations;
-  private SetMultimap<String, Predicate<Operation>> watchers;
+  private SetMultimap<String, WatchFuture> watchers;
   private ExecutorService watcherService;
 
   private Map<Digest, ByteString> storage;
@@ -235,23 +244,22 @@ public class MemoryInstanceTest {
   }
 
   @Test
-  public void missingOperationWatchInvertsWatcher() {
-    Predicate<Operation> watcher = (Predicate<Operation>) mock(Predicate.class);
-    when(watcher.test(eq(null))).thenReturn(true);
-    assertThat(instance.watchOperation(
-        "does-not-exist",
-        watcher)).isFalse();
-    verify(watcher, times(1)).test(eq(null));
-  }
-
-  @Test
-  public void watchWithCompletedSignalsWatching() {
-    Predicate<Operation> watcher = (Predicate<Operation>) mock(Predicate.class);
-    when(watcher.test(eq(null))).thenReturn(false);
-    assertThat(instance.watchOperation(
-        "does-not-exist",
-        watcher)).isTrue();
-    verify(watcher, times(1)).test(eq(null));
+  public void missingOperationIsNotFound() throws InterruptedException {
+    Watcher watcher = mock(Watcher.class);
+    doThrow(io.grpc.Status.NOT_FOUND.asRuntimeException()).when(watcher).observe(eq(null));
+    boolean caughtNotFoundException = false;
+    try {
+      instance.watchOperation(
+          "does-not-exist",
+          watcher).get();
+    } catch (ExecutionException e) {
+      io.grpc.Status status = io.grpc.Status.fromThrowable(e);
+      if (status.getCode() == io.grpc.Status.Code.NOT_FOUND) {
+        caughtNotFoundException = true;
+      }
+    }
+    assertThat(caughtNotFoundException).isTrue();
+    verify(watcher, times(1)).observe(eq(null));
   }
 
   @Test
@@ -261,15 +269,19 @@ public class MemoryInstanceTest {
         .build();
     outstandingOperations.put(operation.getName(), operation);
 
-    Predicate<Operation> watcher = (o) -> true;
-    assertThat(instance.watchOperation(
+    Watcher watcher = mock(Watcher.class);
+    instance.watchOperation(
         operation.getName(),
-        watcher)).isTrue();
-    assertThat(watchers.get(operation.getName())).containsExactly(watcher);
+        watcher);
+    verify(watcher, times(1)).observe(eq(operation));
+    WatchFuture watchFuture = Iterables.getOnlyElement(
+        watchers.get(operation.getName()));
+    watchFuture.observe(operation);
+    verify(watcher, times(2)).observe(eq(operation));
   }
 
   @Test
-  public void watchOpRaceLossInvertsTestOnInitial() throws InterruptedException {
+  public void watchOpRaceLossInvertsTestOnInitial() throws ExecutionException, InterruptedException {
     Operation operation = Operation.newBuilder()
         .setName("my-watched-operation")
         .build();
@@ -278,41 +290,36 @@ public class MemoryInstanceTest {
         .build();
 
     // as a result of the initial verified test, change the operation to done
-    Answer<Boolean> initialAnswer = new Answer<Boolean>() {
+    Answer<Void> initialAnswer = new Answer<Void>() {
       @Override
-      public Boolean answer(InvocationOnMock invocation) throws Throwable {
+      public Void answer(InvocationOnMock invocation) throws Throwable {
         outstandingOperations.put(operation.getName(), doneOperation);
-        return true;
+        return null;
       }
     };
-    Predicate<Operation> watcher = mock(Predicate.class);
-    when(watcher.test(eq(operation))).thenAnswer(initialAnswer);
-    when(watcher.test(eq(doneOperation))).thenReturn(false);
+    Watcher watcher = mock(Watcher.class);
+    doAnswer(initialAnswer).when(watcher).observe(eq(operation));
 
     // set for each verification
     outstandingOperations.put(operation.getName(), operation);
 
-    assertThat(instance.watchOperation(
-        operation.getName(),
-        watcher)).isTrue();
-    verify(watcher, times(1)).test(eq(operation));
-    verify(watcher, times(1)).test(eq(doneOperation));
+    instance.watchOperation(operation.getName(), watcher).get();
+    verify(watcher, times(1)).observe(eq(operation));
+    verify(watcher, times(1)).observe(eq(doneOperation));
+  }
 
-    // reset test
-    outstandingOperations.remove(operation.getName());
+  private class UnwatchFuture extends WatchFuture {
+    private final String operationName;
 
-    Predicate<Operation> unfazedWatcher = (Predicate<Operation>) mock(Predicate.class);
-    when(unfazedWatcher.test(eq(operation))).thenAnswer(initialAnswer);
-    // unfazed watcher is not bothered by the operation's change of done
-    when(unfazedWatcher.test(eq(doneOperation))).thenReturn(true);
+    UnwatchFuture(String operationName, Watcher observer) {
+      super(observer);
+      this.operationName = operationName;
+    }
 
-    // set for each verification
-    outstandingOperations.put(operation.getName(), operation);
-    assertThat(instance.watchOperation(
-        operation.getName(),
-        unfazedWatcher)).isFalse();
-    verify(unfazedWatcher, times(1)).test(eq(operation));
-    verify(unfazedWatcher, times(1)).test(eq(doneOperation));
+    @Override
+    public void unwatch() {
+      watchers.remove(operationName, this);
+    }
   }
 
   @Test
@@ -321,14 +328,13 @@ public class MemoryInstanceTest {
     Operation queuedOperation = createOperation("missing-action-queued-operation", QUEUED);
     outstandingOperations.put(queuedOperation.getName(), queuedOperation);
 
-    Predicate<Operation> watcher = mock(Predicate.class);
-    watchers.put(queuedOperation.getName(), watcher);
-    when(watcher.test(any(Operation.class))).thenReturn(false);
+    Watcher watcher = mock(Watcher.class);
+    watchers.put(queuedOperation.getName(), new UnwatchFuture(queuedOperation.getName(), watcher));
 
-    instance.requeueOperation(queuedOperation);
+    assertThat(instance.requeueOperation(queuedOperation)).isFalse();
 
     ArgumentCaptor<Operation> operationCaptor = ArgumentCaptor.forClass(Operation.class);
-    verify(watcher, times(1)).test(operationCaptor.capture());
+    verify(watcher, times(1)).observe(operationCaptor.capture());
     Operation operation = operationCaptor.getValue();
     assertThat(operation.getName()).isEqualTo(queuedOperation.getName());
   }
@@ -340,60 +346,44 @@ public class MemoryInstanceTest {
 
     Operation queuedOperation = createOperation("my-queued-operation", QUEUED);
     outstandingOperations.put(queuedOperation.getName(), queuedOperation);
-    Predicate<Operation> watcher = mock(Predicate.class);
-    when(watcher.test(any(Operation.class))).thenReturn(false);
-    watchers.put(queuedOperation.getName(), watcher);
+    Watcher watcher = mock(Watcher.class);
+    watchers.put(queuedOperation.getName(), new UnwatchFuture(queuedOperation.getName(), watcher));
 
+    assertThat(instance.requeueOperation(queuedOperation)).isTrue();
     verifyZeroInteractions(watcher);
   }
 
   @Test
-  public void requeueFailureNotifiesWatchers() throws InterruptedException {
+  public void requeueFailureNotifiesWatchers() throws Exception {
     ExecuteOperationMetadata metadata = ExecuteOperationMetadata.newBuilder()
         .setActionDigest(simpleActionDigest)
         .setStage(QUEUED)
         .build();
     Operation queuedOperation = createOperation("missing-action-operation", metadata);
     outstandingOperations.put(queuedOperation.getName(), queuedOperation);
+    Watcher watcher = mock(Watcher.class);
+    ListenableFuture<Void> watchFuture = instance.watchOperation(queuedOperation.getName(), watcher);
+    assertThat(instance.requeueOperation(queuedOperation)).isFalse();
+    watchFuture.get();
+    ArgumentCaptor<Operation> operationCaptor = ArgumentCaptor.forClass(Operation.class);
+    verify(watcher, atLeastOnce()).observe(operationCaptor.capture());
+    List<Operation> operations = operationCaptor.getAllValues();
+    Operation erroredOperation = operations.get(operations.size() - 1);
+    assertThat(erroredOperation.getDone()).isTrue();
+    CompletedOperationMetadata completedMetadata = erroredOperation.getMetadata().unpack(CompletedOperationMetadata.class);
+    assertThat(completedMetadata.getExecuteOperationMetadata().getStage()).isEqualTo(COMPLETED);
     ExecuteResponse executeResponse = ExecuteResponse.newBuilder()
-        .setStatus(com.google.rpc.Status.newBuilder()
+        .setStatus(Status.newBuilder()
             .setCode(Code.FAILED_PRECONDITION.getNumber())
             .setMessage(invalidActionMessage(simpleActionDigest))
             .addDetails(Any.pack(PreconditionFailure.newBuilder()
                 .addViolations(Violation.newBuilder()
                     .setType(VIOLATION_TYPE_MISSING)
-                    .setSubject(MISSING_INPUT)
-                    .setDescription("Action " + DigestUtil.toString(simpleActionDigest)))
+                    .setSubject("blobs/" + DigestUtil.toString(simpleActionDigest))
+                    .setDescription(MISSING_ACTION))
                 .build())))
         .build();
-    Operation erroredOperation = queuedOperation.toBuilder()
-        .setDone(true)
-        .setMetadata(Any.pack(metadata.toBuilder()
-            .setStage(COMPLETED)
-            .build()))
-        .setResponse(Any.pack(executeResponse))
-        .build();
-    Predicate<Operation> watcher = mock(Predicate.class);
-    when(watcher.test(eq(queuedOperation))).thenReturn(true);
-    when(watcher.test(eq(erroredOperation))).thenReturn(false);
-    assertThat(instance.watchOperation(queuedOperation.getName(), watcher)).isTrue();
-    assertThat(instance.requeueOperation(queuedOperation)).isFalse();
-
-    boolean done = false;
-    int waits = 0;
-    while (!done) {
-      assertThat(waits < 10).isTrue();
-      MICROSECONDS.sleep(10);
-      waits++;
-      synchronized (watchers) {
-        if (!watchers.containsKey(queuedOperation.getName())) {
-          done = true;
-        }
-      }
-    }
-
-    verify(watcher, times(1)).test(eq(queuedOperation));
-    verify(watcher, times(1)).test(eq(erroredOperation));
+    assertThat(erroredOperation.getResponse().unpack(ExecuteResponse.class)).isEqualTo(executeResponse);
   }
 
   private Operation createOperation(String name, ExecuteOperationMetadata metadata) {
@@ -403,7 +393,7 @@ public class MemoryInstanceTest {
         .build();
   }
 
-  private Operation createOperation(String name, Stage stage) {
+  private Operation createOperation(String name, ExecutionStage.Value stage) {
     return createOperation(
         name,
         ExecuteOperationMetadata.newBuilder()
@@ -412,7 +402,7 @@ public class MemoryInstanceTest {
             .build());
   }
 
-  private boolean putNovelOperation(Stage stage) throws InterruptedException {
+  private boolean putNovelOperation(ExecutionStage.Value stage) throws InterruptedException {
     storage.put(simpleActionDigest, simpleAction.toByteString());
     storage.put(simpleCommandDigest, simpleCommand.toByteString());
     return instance.putOperation(createOperation("does-not-exist", stage));
@@ -470,27 +460,28 @@ public class MemoryInstanceTest {
     Digest actionDigestWithExcessiveTimeout = createAction(Action.newBuilder()
         .setTimeout(timeout));
 
-    Predicate watcher = mock(Predicate.class);
+    Watcher watcher = mock(Watcher.class);
     IllegalStateException timeoutInvalid = null;
     instance.execute(
         actionDigestWithExcessiveTimeout,
         /* skipCacheLookup=*/ true,
         ExecutionPolicy.getDefaultInstance(),
         ResultsCachePolicy.getDefaultInstance(),
+        RequestMetadata.getDefaultInstance(),
         watcher);
     ArgumentCaptor<Operation> watchCaptor = ArgumentCaptor.forClass(Operation.class);
-    verify(watcher, times(1)).test(watchCaptor.capture());
+    verify(watcher, times(1)).observe(watchCaptor.capture());
     Operation watchOperation = watchCaptor.getValue();
     assertThat(watchOperation.getResponse().is(ExecuteResponse.class)).isTrue();
-    com.google.rpc.Status status = watchOperation.getResponse().unpack(ExecuteResponse.class).getStatus();
+    Status status = watchOperation.getResponse().unpack(ExecuteResponse.class).getStatus();
     assertThat(status.getCode()).isEqualTo(Code.FAILED_PRECONDITION.getNumber());
     assertThat(status.getDetailsCount()).isEqualTo(1);
     assertThat(status.getDetails(0).is(PreconditionFailure.class)).isTrue();
     PreconditionFailure preconditionFailure = status.getDetails(0).unpack(PreconditionFailure.class);
     assertThat(preconditionFailure.getViolationsList()).contains(Violation.newBuilder()
         .setType(VIOLATION_TYPE_INVALID)
-        .setSubject(TIMEOUT_OUT_OF_BOUNDS)
-        .setDescription(Durations.toString(timeout) + " > " + Durations.toString(MAXIMUM_ACTION_TIMEOUT))
+        .setSubject(Durations.toString(timeout) + " > " + Durations.toString(MAXIMUM_ACTION_TIMEOUT))
+        .setDescription(TIMEOUT_OUT_OF_BOUNDS)
         .build());
   }
 
@@ -500,15 +491,15 @@ public class MemoryInstanceTest {
     Digest actionDigestWithExcessiveTimeout = createAction(Action.newBuilder()
         .setTimeout(MAXIMUM_ACTION_TIMEOUT));
 
-    Predicate watcher = mock(Predicate.class);
-    when(watcher.test(any(Operation.class))).thenReturn(true);
+    Watcher watcher = mock(Watcher.class);
     instance.execute(
         actionDigestWithExcessiveTimeout,
         /* skipCacheLookup=*/ true,
         ExecutionPolicy.getDefaultInstance(),
         ResultsCachePolicy.getDefaultInstance(),
+        RequestMetadata.getDefaultInstance(),
         watcher);
-    verify(watcher, atLeast(1)).test(any(Operation.class));
+    verify(watcher, atLeastOnce()).observe(any(Operation.class));
   }
 
   @Test
@@ -517,7 +508,7 @@ public class MemoryInstanceTest {
         .setName("test-operation")
         .setMetadata(Any.pack(
             ExecuteOperationMetadata.newBuilder()
-                .setStage(Stage.EXECUTING)
+                .setStage(EXECUTING)
                 .build()))
         .build();
 
@@ -525,6 +516,6 @@ public class MemoryInstanceTest {
 
     assertThat(instance.pollOperation(
         operation.getName(),
-        Stage.EXECUTING)).isFalse();
+        EXECUTING)).isFalse();
   }
 }

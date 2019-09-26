@@ -14,23 +14,43 @@
 
 package build.buildfarm.worker;
 
-import com.google.common.collect.Iterables;
-import java.util.HashSet;
+import static java.util.logging.Level.SEVERE;
+
+import com.google.common.collect.Sets;
+import java.io.IOException;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.logging.Logger;
 
-public class ExecuteActionStage extends PipelineStage {
-  public static final Logger logger = Logger.getLogger(ExecuteActionStage.class.getName());
+public class ExecuteActionStage extends SuperscalarPipelineStage {
+  private static final Logger logger = Logger.getLogger(ExecuteActionStage.class.getName());
 
-  private final Set<Thread> executors;
-  private BlockingQueue<OperationContext> queue;
+  private final Set<Thread> executors = Sets.newHashSet();
+  private BlockingQueue<OperationContext> queue = new ArrayBlockingQueue<>(1);
 
   public ExecuteActionStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
-    super("ExecuteActionStage", workerContext, output, error);
-    queue = new ArrayBlockingQueue<>(1);
-    executors = new HashSet<>();
+    super(
+        "ExecuteActionStage",
+        workerContext,
+        output,
+        createDestroyExecDirStage(workerContext, error),
+        workerContext.getExecuteStageWidth());
+  }
+
+  static PipelineStage createDestroyExecDirStage(WorkerContext workerContext, PipelineStage nextStage) {
+    return new PipelineStage.NullStage(workerContext, nextStage) {
+      @Override
+      public void put(OperationContext operationContext) throws InterruptedException {
+        try {
+          workerContext.destroyExecDir(operationContext.execDir);
+        } catch (IOException e) {
+          logger.log(SEVERE, "error while destroying action root " + operationContext.execDir, e);
+        } finally {
+          output.put(operationContext);
+        }
+      }
+    };
   }
 
   @Override
@@ -39,60 +59,37 @@ public class ExecuteActionStage extends PipelineStage {
   }
 
   @Override
+  public OperationContext take() throws InterruptedException {
+    return takeOrDrain(queue);
+  }
+
+  @Override
   public void put(OperationContext operationContext) throws InterruptedException {
     queue.put(operationContext);
   }
 
-  @Override
-  public OperationContext take() throws InterruptedException {
-    return queue.take();
-  }
-
-  @Override
-  public synchronized boolean claim() throws InterruptedException {
-    if (isClosed()) {
-      return false;
-    }
-
-    while (executors.size() >= workerContext.getExecuteStageWidth()) {
-      wait();
-    }
-    return true;
-  }
-
-  public synchronized int removeAndNotify() {
+  synchronized int removeAndRelease(String operationName) {
     if (!executors.remove(Thread.currentThread())) {
-      throw new IllegalStateException("tried to remove unknown executor thread");
+      throw new IllegalStateException("tried to remove unknown executor thread for " + operationName);
     }
-    this.notify();
+    releaseClaim(operationName);
     return executors.size();
   }
 
-  private String getUsage(int size) {
-    return String.format("%s/%d", size, workerContext.getExecuteStageWidth());
-  }
-
-  private void logComplete(int size) {
-    logger.fine(String.format("%s: %s", name, getUsage(size)));
-  }
-
-  @Override
-  public void release() {
-    removeAndNotify();
-  }
-
   public void releaseExecutor(String operationName, long usecs, long stallUSecs, int exitCode) {
-    int size = removeAndNotify();
+    int size = removeAndRelease(operationName);
     logComplete(
         operationName,
         usecs,
         stallUSecs,
-        String.format("exit code: %d, %d/%d", exitCode, size, workerContext.getExecuteStageWidth()));
+        String.format("exit code: %d, %s", exitCode, getUsage(size)));
   }
 
   @Override
-  protected boolean isClaimed() {
-    return Iterables.any(executors, (executor) -> executor.isAlive());
+  protected synchronized void interruptAll() {
+    for (Thread executor : executors) {
+      executor.interrupt();
+    }
   }
 
   @Override
@@ -100,13 +97,10 @@ public class ExecuteActionStage extends PipelineStage {
     OperationContext operationContext = take();
     Thread executor = new Thread(new Executor(workerContext, operationContext, this));
 
-    int size;
-    synchronized(this) {
+    synchronized (this) {
       executors.add(executor);
-      size = executors.size();
+      logStart(operationContext.operation.getName(), getUsage(executors.size()));
+      executor.start();
     }
-    logStart(operationContext.operation.getName(), getUsage(size));
-
-    executor.start();
   }
 }

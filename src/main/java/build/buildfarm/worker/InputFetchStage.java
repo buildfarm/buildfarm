@@ -14,23 +14,27 @@
 
 package build.buildfarm.worker;
 
-import static java.util.logging.Level.WARNING;
-
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
-import java.io.File;
+import com.google.common.collect.Sets;
 import java.io.IOException;
-import java.util.concurrent.BlockingQueue;
+import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
-public class InputFetchStage extends PipelineStage {
+public class InputFetchStage extends SuperscalarPipelineStage {
   private static final Logger logger = Logger.getLogger(InputFetchStage.class.getName());
 
-  private final BlockingQueue<OperationContext> queue;
+  private final Set<Thread> fetchers = Sets.newHashSet();
+  private final BlockingQueue<OperationContext> queue = new ArrayBlockingQueue<>(1);
 
   public InputFetchStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
-    super("InputFetchStage", workerContext, output, error);
-    queue = new ArrayBlockingQueue<>(1);
+    super(
+        "InputFetchStage",
+        workerContext,
+        output,
+        error,
+        workerContext.getInputFetchStageWidth());
   }
 
   @Override
@@ -40,7 +44,7 @@ public class InputFetchStage extends PipelineStage {
 
   @Override
   public OperationContext take() throws InterruptedException {
-    return queue.take();
+    return takeOrDrain(queue);
   }
 
   @Override
@@ -48,23 +52,41 @@ public class InputFetchStage extends PipelineStage {
     queue.put(operationContext);
   }
 
-  @Override
-  protected OperationContext tick(OperationContext operationContext) throws InterruptedException {
-    Poller poller = workerContext.createPoller(
-        "InputFetchStage",
-        operationContext.operation.getName(),
-        ExecuteOperationMetadata.Stage.QUEUED);
-
-    boolean success = true;
-    try {
-      workerContext.createActionRoot(operationContext.execDir, operationContext.action, operationContext.command);
-    } catch (IOException e) {
-      logger.log(WARNING, "could not create action root", e);
-      success = false;
+  synchronized int removeAndRelease(String operationName) {
+    if (!fetchers.remove(Thread.currentThread())) {
+      throw new IllegalStateException("tried to remove unknown fetcher thread");
     }
+    releaseClaim(operationName);
+    return fetchers.size();
+  }
 
-    poller.stop();
+  public void releaseInputFetcher(String operationName, long usecs, long stallUSecs, boolean success) {
+    int size = removeAndRelease(operationName);
+    logComplete(
+        operationName,
+        usecs,
+        stallUSecs,
+        String.format("%s, %s", success ? "Success" : "Failure", getUsage(size)));
+  }
 
-    return success ? operationContext : null;
+  @Override
+  protected synchronized void interruptAll() {
+    for (Thread fetcher : fetchers) {
+      fetcher.interrupt();
+    }
+  }
+
+  @Override
+  protected void iterate() throws InterruptedException {
+    OperationContext operationContext = take();
+    Thread fetcher = new Thread(new InputFetcher(workerContext, operationContext, this));
+
+    synchronized (this) {
+      fetchers.add(fetcher);
+      logStart(
+          operationContext.queueEntry.getExecuteEntry().getOperationName(),
+          getUsage(fetchers.size()));
+      fetcher.start();
+    }
   }
 }

@@ -34,11 +34,11 @@ public class MemoryCASTest {
   public void expireShouldCallOnExpiration() throws InterruptedException {
     ContentAddressableStorage storage = new MemoryCAS(10);
 
-    DigestUtil sha1DigestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
+    DigestUtil digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
     Runnable mockOnExpiration = mock(Runnable.class);
-    storage.put(new Blob(ByteString.copyFromUtf8("stdout"), sha1DigestUtil), mockOnExpiration);
+    storage.put(new Blob(ByteString.copyFromUtf8("stdout"), digestUtil), mockOnExpiration);
     verify(mockOnExpiration, never()).run();
-    storage.put(new Blob(ByteString.copyFromUtf8("stderr"), sha1DigestUtil));
+    storage.put(new Blob(ByteString.copyFromUtf8("stderr"), digestUtil));
     verify(mockOnExpiration, times(1)).run();
   }
 
@@ -46,12 +46,12 @@ public class MemoryCASTest {
   public void expireShouldOccurAtLimitExactly() throws InterruptedException {
     ContentAddressableStorage storage = new MemoryCAS(11);
 
-    DigestUtil sha1DigestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
+    DigestUtil digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
     Runnable mockOnExpiration = mock(Runnable.class);
-    storage.put(new Blob(ByteString.copyFromUtf8("stdin"), sha1DigestUtil), mockOnExpiration);
-    storage.put(new Blob(ByteString.copyFromUtf8("stdout"), sha1DigestUtil), mockOnExpiration);
+    storage.put(new Blob(ByteString.copyFromUtf8("stdin"), digestUtil), mockOnExpiration);
+    storage.put(new Blob(ByteString.copyFromUtf8("stdout"), digestUtil), mockOnExpiration);
     verify(mockOnExpiration, never()).run();
-    storage.put(new Blob(ByteString.copyFromUtf8("a"), sha1DigestUtil));
+    storage.put(new Blob(ByteString.copyFromUtf8("a"), digestUtil));
     verify(mockOnExpiration, times(1)).run();
   }
 
@@ -59,12 +59,28 @@ public class MemoryCASTest {
   public void duplicateEntryRegistersMultipleOnExpiration() throws InterruptedException {
     ContentAddressableStorage storage = new MemoryCAS(10);
 
-    DigestUtil sha1DigestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
+    DigestUtil digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
     Runnable mockOnExpiration = mock(Runnable.class);
-    storage.put(new Blob(ByteString.copyFromUtf8("stdout"), sha1DigestUtil), mockOnExpiration);
-    storage.put(new Blob(ByteString.copyFromUtf8("stdout"), sha1DigestUtil), mockOnExpiration);
+    storage.put(new Blob(ByteString.copyFromUtf8("stdout"), digestUtil), mockOnExpiration);
+    storage.put(new Blob(ByteString.copyFromUtf8("stdout"), digestUtil), mockOnExpiration);
     verify(mockOnExpiration, never()).run();
-    storage.put(new Blob(ByteString.copyFromUtf8("stderr"), sha1DigestUtil));
+    storage.put(new Blob(ByteString.copyFromUtf8("stderr"), digestUtil));
     verify(mockOnExpiration, times(2)).run();
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void emptyPutThrowsIllegalArgumentException() throws InterruptedException {
+    ContentAddressableStorage storage = new MemoryCAS(10);
+
+    DigestUtil digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
+    storage.put(new Blob(ByteString.EMPTY, digestUtil));
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void emptyGetThrowsIllegalArgumentException() {
+    ContentAddressableStorage storage = new MemoryCAS(10);
+
+    DigestUtil digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
+    storage.get(digestUtil.compute(ByteString.EMPTY));
   }
 }

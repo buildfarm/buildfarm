@@ -16,69 +16,92 @@ package build.buildfarm.instance;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
+import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
 import build.bazel.remote.execution.v2.Digest;
-import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata.Stage;
+import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ServerCapabilities;
+import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
-import build.buildfarm.common.function.InterruptingPredicate;
+import build.buildfarm.v1test.QueueEntry;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
+import io.grpc.protobuf.StatusProto;
+import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.List;
 import java.util.UUID;
-import java.util.function.Predicate;
+import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 
 public interface Instance {
   String getName();
 
   DigestUtil getDigestUtil();
 
+  void start();
+  void stop() throws InterruptedException;
+
   ActionResult getActionResult(ActionKey actionKey);
   void putActionResult(ActionKey actionKey, ActionResult actionResult) throws InterruptedException;
 
-  Iterable<Digest> findMissingBlobs(Iterable<Digest> digests);
-  boolean containsBlob(Digest digest);
-
-  Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs)
-      throws IOException, IllegalArgumentException, InterruptedException;
+  ListenableFuture<Iterable<Digest>> findMissingBlobs(
+      Iterable<Digest> digests,
+      Executor executor,
+      RequestMetadata requestMetadata);
+  boolean containsBlob(Digest digest, RequestMetadata requestMetadata);
 
   String getBlobName(Digest blobDigest);
-  InputStream newBlobInput(Digest digest, long offset) throws IOException;
-  Write getBlobWrite(Digest digest, UUID uuid);
-  ByteString getBlob(Digest blobDigest);
+  void getBlob(
+      Digest blobDigest,
+      long offset,
+      long limit,
+      StreamObserver<ByteString> blobObserver);
+  InputStream newBlobInput(
+      Digest digest,
+      long offset,
+      long deadlineAfter,
+      TimeUnit deadlineAfterUnits,
+      RequestMetadata requestMetadata) throws IOException;
   ListenableFuture<Iterable<Response>> getAllBlobsFuture(Iterable<Digest> digests);
-  ByteString getBlob(Digest blobDigest, long offset, long limit);
-  Digest putBlob(ByteString blob)
-      throws IOException, IllegalArgumentException, InterruptedException;
-  String getTree(
-      Digest rootDigest,
-      int pageSize,
-      String pageToken,
-      ImmutableList.Builder<Directory> directories)
+  String getTree(Digest rootDigest, int pageSize, String pageToken, Tree.Builder tree)
       throws IOException, InterruptedException;
 
-  Write getOperationStreamWrite(String name);
-  InputStream newOperationStreamInput(String name, long offset) throws IOException;
+  Write getBlobWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata);
+  Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs, RequestMetadata requestMetadata)
+      throws IOException, IllegalArgumentException, InterruptedException;
 
-  void execute(
+  Write getOperationStreamWrite(String name);
+  InputStream newOperationStreamInput(
+      String name,
+      long offset,
+      long deadlineAfter,
+      TimeUnit deadlineAfterUnits,
+      RequestMetadata requestMetadata) throws IOException;
+
+  ListenableFuture<Void> execute(
       Digest actionDigest,
       boolean skipCacheLookup,
       ExecutionPolicy executionPolicy,
       ResultsCachePolicy resultsCachePolicy,
-      Predicate<Operation> onOperation) throws InterruptedException;
-  void match(Platform platform, InterruptingPredicate<Operation> onMatch) throws InterruptedException;
+      RequestMetadata requestMetadata,
+      Watcher operationObserver) throws InterruptedException;
+  void match(Platform platform, MatchListener listener) throws InterruptedException;
   boolean putOperation(Operation operation) throws InterruptedException;
   boolean putAndValidateOperation(Operation operation) throws InterruptedException;
-  boolean pollOperation(String operationName, Stage stage);
+  boolean pollOperation(String operationName, ExecutionStage.Value stage);
   // returns nextPageToken suitable for list restart
   String listOperations(
       int pageSize,
@@ -89,14 +112,32 @@ public interface Instance {
   void cancelOperation(String name) throws InterruptedException;
   void deleteOperation(String name);
 
-  // returns true if the operation will be handled in all cases through the
-  // watcher.
-  // The watcher returns true to indicate it is still able to process updates,
-  // and returns false when it is complete and no longer wants updates
-  // The watcher must not be tested again after it has returned false.
-  boolean watchOperation(
+  ListenableFuture<Void> watchOperation(
       String operationName,
-      Predicate<Operation> watcher);
+      Watcher watcher);
 
   ServerCapabilities getCapabilities();
+
+  interface MatchListener {
+    // start/end pair called for each wait period
+    void onWaitStart();
+
+    void onWaitEnd();
+
+    // returns false if this listener will not handle this match
+    boolean onEntry(@Nullable QueueEntry queueEntry) throws InterruptedException;
+  }
+
+  public static class PutAllBlobsException extends RuntimeException {
+    private final List<BatchUpdateBlobsResponse.Response> failedResponses = Lists.newArrayList();
+
+    public void addFailedResponse(BatchUpdateBlobsResponse.Response response) {
+      failedResponses.add(response);
+      addSuppressed(StatusProto.toStatusException(response.getStatus()));
+    }
+
+    public List<BatchUpdateBlobsResponse.Response> getFailedResponses() {
+      return ImmutableList.copyOf(failedResponses);
+    }
+  }
 }

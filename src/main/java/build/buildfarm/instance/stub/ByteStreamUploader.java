@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 package build.buildfarm.instance.stub;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -23,6 +24,10 @@ import static java.util.Collections.singletonMap;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
+import build.bazel.remote.execution.v2.Digest;
+import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.grpc.Retrier;
+import build.buildfarm.common.grpc.RetryException;
 import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamFutureStub;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
@@ -46,7 +51,7 @@ import io.grpc.ClientCall;
 import io.grpc.Metadata;
 import io.grpc.Status;
 import io.grpc.Status.Code;
-import io.grpc.StatusException;
+import io.grpc.StatusRuntimeException;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;

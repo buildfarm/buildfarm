@@ -14,6 +14,9 @@
 
 package build.buildfarm.server;
 
+import static build.bazel.remote.execution.v2.ExecutionStage.Value.COMPLETED;
+import static build.bazel.remote.execution.v2.ExecutionStage.Value.EXECUTING;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.fail;
 
@@ -51,6 +54,7 @@ import build.buildfarm.v1test.MemoryCASConfig;
 import build.buildfarm.v1test.MemoryInstanceConfig;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.PollOperationRequest;
+import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.TakeOperationRequest;
 import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
@@ -71,6 +75,8 @@ import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.Durations;
 import com.google.rpc.Code;
+import com.google.rpc.PreconditionFailure;
+import com.google.rpc.PreconditionFailure.Violation;
 import io.grpc.ManagedChannel;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
@@ -121,10 +127,11 @@ public class BuildFarmServerTest {
         BuildFarmServerConfig.newBuilder().setPort(0);
     configBuilder.addInstancesBuilder()
         .setName(INSTANCE_NAME)
-        .setDigestFunction(DigestFunction.SHA256)
+        .setDigestFunction(DigestFunction.Value.SHA256)
         .setMemoryInstanceConfig(memoryInstanceConfig);
 
     server = new BuildFarmServer(
+        "test",
         InProcessServerBuilder.forName(uniqueServerName).directExecutor(),
         configBuilder.build());
     server.start();
@@ -255,11 +262,7 @@ public class BuildFarmServerTest {
         OperationsGrpc.newBlockingStub(inProcessChannel);
 
     // should be available with cancelled state
-    GetOperationRequest getRequest = GetOperationRequest.newBuilder()
-        .setName(operation.getName())
-        .build();
-
-    Operation preCancelOperation = operationsStub.getOperation(getRequest);
+    Operation preCancelOperation = getOperation(operation.getName());
 
     assertThat(preCancelOperation.getDone()).isFalse();
 
@@ -269,7 +272,7 @@ public class BuildFarmServerTest {
 
     operationsStub.cancelOperation(cancelRequest);
 
-    Operation cancelledOperation = operationsStub.getOperation(getRequest);
+    Operation cancelledOperation = getOperation(operation.getName());
 
     assertThat(cancelledOperation.getDone()).isTrue();
     assertThat(cancelledOperation.getResultCase()).isEqualTo(Operation.ResultCase.RESPONSE);
@@ -291,16 +294,19 @@ public class BuildFarmServerTest {
     OperationQueueGrpc.OperationQueueBlockingStub operationQueueStub =
         OperationQueueGrpc.newBlockingStub(inProcessChannel);
 
-    Operation givenOperation = operationQueueStub.take(takeRequest);
+    QueueEntry givenEntry = operationQueueStub.take(takeRequest);
+    String givenOperationName = givenEntry.getExecuteEntry().getOperationName();
 
-    assertThat(givenOperation.getName()).isEqualTo(operation.getName());
+    assertThat(givenOperationName).isEqualTo(operation.getName());
+
+    Operation givenOperation = getOperation(givenOperationName);
 
     // move the operation into EXECUTING stage
     ExecuteOperationMetadata executingMetadata =
       givenOperation.getMetadata().unpack(ExecuteOperationMetadata.class);
 
     executingMetadata = executingMetadata.toBuilder()
-        .setStage(ExecuteOperationMetadata.Stage.EXECUTING)
+        .setStage(EXECUTING)
         .build();
 
     Operation executingOperation = givenOperation.toBuilder()
@@ -313,7 +319,7 @@ public class BuildFarmServerTest {
     assertThat(operationQueueStub
         .poll(PollOperationRequest.newBuilder()
             .setOperationName(executingOperation.getName())
-            .setStage(ExecuteOperationMetadata.Stage.EXECUTING)
+            .setStage(EXECUTING)
             .build())
         .getCode()).isEqualTo(Code.OK.getNumber());
 
@@ -327,10 +333,46 @@ public class BuildFarmServerTest {
     // poll should fail
     assertThat(operationQueueStub
         .poll(PollOperationRequest.newBuilder()
-            .setStage(ExecuteOperationMetadata.Stage.EXECUTING)
+            .setStage(EXECUTING)
             .setOperationName(executingOperation.getName())
             .build())
         .getCode()).isEqualTo(Code.UNAVAILABLE.getNumber());
+  }
+
+  private Operation getOperation(String name) {
+    GetOperationRequest getRequest = GetOperationRequest.newBuilder()
+        .setName(name)
+        .build();
+
+    OperationsGrpc.OperationsBlockingStub operationsStub =
+        OperationsGrpc.newBlockingStub(inProcessChannel);
+
+    return operationsStub.getOperation(getRequest);
+  }
+
+  @Test
+  public void actionWithExcessiveTimeoutFailsValidation()
+      throws IOException, InterruptedException, InvalidProtocolBufferException {
+    Digest actionDigestWithExcessiveTimeout = createAction(Action.newBuilder()
+        .setTimeout(Duration.newBuilder().setSeconds(9000)));
+
+    Operation failedOperation = executeAction(actionDigestWithExcessiveTimeout);
+    assertThat(failedOperation.getDone()).isTrue();
+    assertThat(
+        failedOperation
+            .getMetadata()
+            .unpack(ExecuteOperationMetadata.class).getStage())
+        .isEqualTo(COMPLETED);
+    ExecuteResponse executeResponse = failedOperation.getResponse().unpack(ExecuteResponse.class);
+    com.google.rpc.Status status = executeResponse.getStatus();
+    assertThat(status.getCode())
+        .isEqualTo(Code.FAILED_PRECONDITION.getNumber());
+    assertThat(status.getDetailsCount()).isEqualTo(1);
+    PreconditionFailure preconditionFailure = status
+        .getDetailsList().get(0).unpack(PreconditionFailure.class);
+    assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
+    Violation violation = preconditionFailure.getViolationsList().get(0);
+    assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
   }
 
   private Digest createSimpleAction() throws IOException, InterruptedException {

@@ -33,12 +33,12 @@ import build.buildfarm.common.TreeIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
+import com.google.protobuf.InvalidProtocolBufferException;
 import io.grpc.Metadata;
 import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.StreamObserver;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
@@ -132,23 +132,27 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
     TokenizableIterator<DirectoryEntry> iter =
         new TreeIterator(
             (digest) -> {
-              ByteArrayOutputStream stream = new ByteArrayOutputStream((int) digest.getSizeBytes());
-              try {
-                return transform(
-                    catching(
-                        simpleBlobStore.get(digest.getHash(), stream),
-                        Throwable.class,
-                        (e) -> false,
-                        directExecutor()),
-                    (success) -> (success ? ByteString.copyFrom(stream.toByteArray()) : null),
-                    directExecutor()).get();
-              } catch (ExecutionException e) {
-                return null; // should not happen due to catching
-              } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return null;
-              }
-            }, rootDigest, pageToken);
+              ByteString.Output stream = ByteString.newOutput((int) digest.getSizeBytes());
+              return transform(
+                  catching(
+                      simpleBlobStore.get(digest.getHash(), stream),
+                      Throwable.class,
+                      (e) -> false,
+                      directExecutor()),
+                  (success) -> {
+                    if (success) {
+                      try {
+                        return Directory.parseFrom(stream.toByteString());
+                      } catch (InvalidProtocolBufferException e) {
+                        // ignore
+                      }
+                    }
+                    return null;
+                  },
+                  directExecutor());
+            },
+            rootDigest,
+            pageToken);
 
     while (iter.hasNext() && pageSize != 0) {
       Directory directory = iter.next().getDirectory();
@@ -170,7 +174,7 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
       StreamObserver<GetTreeResponse> responseObserver) {
     int pageSize = request.getPageSize();
     if (pageSize < 0) {
-      responseObserver.onError(new StatusException(Status.INVALID_ARGUMENT));
+      responseObserver.onError(Status.INVALID_ARGUMENT.asException());
       return;
     }
     ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();

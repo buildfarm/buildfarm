@@ -19,12 +19,14 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyZeroInteractions;
 
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.Write;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -41,7 +43,7 @@ public class MemoryWriteOutputStreamTest {
     Digest digest = DIGEST_UTIL.compute(content);
     SettableFuture<ByteString> writtenFuture = SettableFuture.create();
     Write write = new MemoryWriteOutputStream(cas, digest, writtenFuture);
-    content.substring(0, 6).writeTo(write.getOutput());
+    content.substring(0, 6).writeTo(write.getOutput(1, TimeUnit.SECONDS, () -> {}));
     writtenFuture.set(content);
     assertThat(write.isComplete()).isTrue();
     assertThat(write.getCommittedSize()).isEqualTo(digest.getSizeBytes());

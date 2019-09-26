@@ -14,15 +14,11 @@
 
 package build.buildfarm.worker;
 
+import build.buildfarm.common.function.InterruptingConsumer;
 import com.google.longrunning.Operation;
 
 public class PutOperationStage extends PipelineStage.NullStage {
   private final InterruptingConsumer<Operation> onPut;
-
-  @FunctionalInterface
-  public interface InterruptingConsumer<T> {
-    void accept(T t) throws InterruptedException;
-  }
 
   public PutOperationStage(InterruptingConsumer<Operation> onPut) {
     this.onPut = onPut;
@@ -30,6 +26,6 @@ public class PutOperationStage extends PipelineStage.NullStage {
 
   @Override
   public void put(OperationContext operationContext) throws InterruptedException {
-    onPut.accept(operationContext.operation);
+    onPut.acceptInterruptibly(operationContext.operation);
   }
 }

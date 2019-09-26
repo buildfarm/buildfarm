@@ -14,25 +14,25 @@
 
 package build.buildfarm.instance.memory;
 
-import com.google.protobuf.ByteString;
+import build.buildfarm.common.io.FeedbackOutputStream;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
+import com.google.protobuf.ByteString;
 import java.io.InputStream;
-import java.io.OutputStream;
 
 class ByteStringStreamSource {
-  private final Runnable onClose;
-  private final OutputStream outputStream;
+  private final FeedbackOutputStream outputStream;
   private final SettableFuture<Void> closedFuture = SettableFuture.create();
-
   private final Object bufferSync;
+
   private ByteString buffer;
   private boolean closed;
 
-  public ByteStringStreamSource(Runnable onClose) {
-    this.onClose = onClose;
+  public ByteStringStreamSource() {
     buffer = ByteString.EMPTY;
-    outputStream = new OutputStream() {
+    bufferSync = new Object();
+    closed = false;
+    outputStream = new FeedbackOutputStream() {
       @Override
       public void write(int b) {
         byte[] buf = new byte[1];
@@ -56,27 +56,35 @@ class ByteStringStreamSource {
       @Override
       public void close() {
         synchronized (bufferSync) {
-          closed = true;
-          bufferSync.notifyAll();
-          closedFuture.set(null);
+          if (!closed) {
+            closed = true;
+            bufferSync.notifyAll();
+            closedFuture.set(null);
+          }
         }
-        onClose.run();
+      }
+
+      @Override
+      public boolean isReady() {
+        return true;
       }
     };
-    bufferSync = new Object();
-    closed = false;
   }
 
   public boolean isClosed() {
-    return closed;
+    synchronized (bufferSync) {
+      return closed;
+    }
   }
 
-  public OutputStream getOutputStream() {
+  public FeedbackOutputStream getOutput() {
     return outputStream;
   }
 
   public long getCommittedSize() {
-    return buffer.size();
+    synchronized (bufferSync) {
+      return buffer.size();
+    }
   }
 
   public ListenableFuture<Void> getClosedFuture() {
@@ -108,7 +116,7 @@ class ByteStringStreamSource {
             while (!closed && availableUnsynchronized() == 0) {
               bufferSync.wait();
             }
-          } catch(InterruptedException ex) {
+          } catch(InterruptedException e) {
             Thread.currentThread().interrupt();
           }
           n = Math.min(availableUnsynchronized(), n);
@@ -148,7 +156,7 @@ class ByteStringStreamSource {
           }
           offset += len;
           return len;
-        } catch(InterruptedException ex) {
+        } catch(InterruptedException e) {
           Thread.currentThread().interrupt();
           return -1;
         }

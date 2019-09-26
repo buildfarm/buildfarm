@@ -15,25 +15,25 @@
 package build.buildfarm.instance;
 
 import static com.google.common.truth.Truth.assertThat;
-
-import static com.google.common.truth.Truth.assertThat;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.instance.AbstractServerInstance.ACTION_INPUT_ROOT_DIRECTORY_PATH;
 import static build.buildfarm.instance.AbstractServerInstance.DIRECTORY_NOT_SORTED;
 import static build.buildfarm.instance.AbstractServerInstance.DUPLICATE_DIRENT;
 import static build.buildfarm.instance.AbstractServerInstance.OUTPUT_DIRECTORY_IS_OUTPUT_ANCESTOR;
 import static build.buildfarm.instance.AbstractServerInstance.OUTPUT_FILE_IS_OUTPUT_ANCESTOR;
-import static build.buildfarm.instance.AbstractServerInstance.VIOLATION_TYPE_INVALID;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.Platform;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
+import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.function.InterruptingPredicate;
 import com.google.common.collect.ImmutableList;
@@ -41,13 +41,13 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import com.google.rpc.PreconditionFailure;
 import com.google.rpc.PreconditionFailure.Violation;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.Stack;
-import java.util.function.Predicate;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -55,7 +55,7 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class AbstractServerInstanceTest {
-  private final static Logger logger = Logger.getLogger(AbstractServerInstanceTest.class.getName());
+  private static final Logger logger = Logger.getLogger(AbstractServerInstanceTest.class.getName());
 
   private static final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
 
@@ -67,7 +67,8 @@ public class AbstractServerInstanceTest {
           /* contentAddressableStorage=*/ null,
           /* actionCache=*/ null,
           /* outstandingOperations=*/ null,
-          /* completedOperations=*/ null);
+          /* completedOperations=*/ null,
+          /* activeBlobWrites=*/ null);
     }
 
     @Override
@@ -87,7 +88,7 @@ public class AbstractServerInstanceTest {
 
     @Override
     protected TokenizableIterator<DirectoryEntry> createTreeIterator(
-        Digest rootDigest, String pageToken) {
+        String reason, Digest rootDigest, String pageToken) {
       throw new UnsupportedOperationException();
     }
 
@@ -127,19 +128,24 @@ public class AbstractServerInstanceTest {
     }
 
     @Override
-    public boolean watchOperation(
+    public ListenableFuture<Void> watchOperation(
         String operationName,
-        Predicate<Operation> watcher) {
+        Watcher watcher) {
       throw new UnsupportedOperationException();
     }
 
     @Override
-    public void match(Platform platform, InterruptingPredicate<Operation> onMatch) {
+    public void match(Platform platform, MatchListener listener) {
       throw new UnsupportedOperationException();
     }
 
     @Override
-    public InputStream newOperationStreamInput(String name, long offset) {
+    public InputStream newOperationStreamInput(
+        String name,
+        long offset,
+        long deadlineAfter,
+        TimeUnit deadlineAfterUnits,
+        RequestMetadata requestMetadata) {
       throw new UnsupportedOperationException();
     }
 
@@ -163,10 +169,10 @@ public class AbstractServerInstanceTest {
                     FileNode.newBuilder().setName("foo").build(),
                     FileNode.newBuilder().setName("foo").build()))
             .build(),
-        /* path=*/ new Stack<>(),
+        /* pathDigests=*/ new Stack<>(),
         /* visited=*/ Sets.newHashSet(),
         /* directoriesIndex=*/ Maps.newHashMap(),
-        /* inputDigests=*/ ImmutableSet.builder(),
+        /* inputFiles=*/ ImmutableSet.builder(),
         /* inputDirectories=*/ ImmutableSet.builder(),
         /* inputDigests=*/ ImmutableSet.builder(),
         preconditionFailure);
@@ -174,8 +180,8 @@ public class AbstractServerInstanceTest {
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
     Violation violation = preconditionFailure.getViolationsList().get(0);
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
-    assertThat(violation.getSubject()).isEqualTo(DUPLICATE_DIRENT);
-    assertThat(violation.getDescription()).isEqualTo("/: foo");
+    assertThat(violation.getSubject()).isEqualTo("/: foo");
+    assertThat(violation.getDescription()).isEqualTo(DUPLICATE_DIRENT);
   }
 
   @Test
@@ -192,10 +198,10 @@ public class AbstractServerInstanceTest {
                     FileNode.newBuilder().setName("foo").build(),
                     FileNode.newBuilder().setName("bar").build()))
             .build(),
-        /* path=*/ new Stack<>(),
+        /* pathDigests=*/ new Stack<>(),
         /* visited=*/ Sets.newHashSet(),
         /* directoriesIndex=*/ Maps.newHashMap(),
-        /* inputDigests=*/ ImmutableSet.builder(),
+        /* inputFiles=*/ ImmutableSet.builder(),
         /* inputDirectories=*/ ImmutableSet.builder(),
         /* inputDigests=*/ ImmutableSet.builder(),
         preconditionFailure);
@@ -203,8 +209,8 @@ public class AbstractServerInstanceTest {
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
     Violation violation = preconditionFailure.getViolationsList().get(0);
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
-    assertThat(violation.getSubject()).isEqualTo(DIRECTORY_NOT_SORTED);
-    assertThat(violation.getDescription()).isEqualTo("/: foo > bar");
+    assertThat(violation.getSubject()).isEqualTo("/: foo > bar");
+    assertThat(violation.getDescription()).isEqualTo(DIRECTORY_NOT_SORTED);
   }
 
   @Test
@@ -241,8 +247,8 @@ public class AbstractServerInstanceTest {
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
     Violation violation = preconditionFailure.getViolationsList().get(0);
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
-    assertThat(violation.getSubject()).isEqualTo(DUPLICATE_DIRENT);
-    assertThat(violation.getDescription()).isEqualTo("/: foo");
+    assertThat(violation.getSubject()).isEqualTo("/: foo");
+    assertThat(violation.getDescription()).isEqualTo(DUPLICATE_DIRENT);
   }
 
   @Test
@@ -278,8 +284,8 @@ public class AbstractServerInstanceTest {
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
     Violation violation = preconditionFailure.getViolationsList().get(0);
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
-    assertThat(violation.getSubject()).isEqualTo(DIRECTORY_NOT_SORTED);
-    assertThat(violation.getDescription()).isEqualTo("/: foo > bar");
+    assertThat(violation.getSubject()).isEqualTo("/: foo > bar");
+    assertThat(violation.getDescription()).isEqualTo(DIRECTORY_NOT_SORTED);
   }
 
   @Test
@@ -297,8 +303,8 @@ public class AbstractServerInstanceTest {
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
     Violation violation = preconditionFailure.getViolationsList().get(0);
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
-    assertThat(violation.getSubject()).isEqualTo(OUTPUT_DIRECTORY_IS_OUTPUT_ANCESTOR);
-    assertThat(violation.getDescription()).isEqualTo("foo");
+    assertThat(violation.getSubject()).isEqualTo("foo");
+    assertThat(violation.getDescription()).isEqualTo(OUTPUT_DIRECTORY_IS_OUTPUT_ANCESTOR);
   }
 
   @Test
@@ -316,8 +322,8 @@ public class AbstractServerInstanceTest {
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
     Violation violation = preconditionFailure.getViolationsList().get(0);
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
-    assertThat(violation.getSubject()).isEqualTo(OUTPUT_DIRECTORY_IS_OUTPUT_ANCESTOR);
-    assertThat(violation.getDescription()).isEqualTo("foo");
+    assertThat(violation.getSubject()).isEqualTo("foo");
+    assertThat(violation.getDescription()).isEqualTo(OUTPUT_DIRECTORY_IS_OUTPUT_ANCESTOR);
   }
 
   @Test
@@ -335,7 +341,7 @@ public class AbstractServerInstanceTest {
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
     Violation violation = preconditionFailure.getViolationsList().get(0);
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
-    assertThat(violation.getSubject()).isEqualTo(OUTPUT_FILE_IS_OUTPUT_ANCESTOR);
-    assertThat(violation.getDescription()).isEqualTo("foo");
+    assertThat(violation.getSubject()).isEqualTo("foo");
+    assertThat(violation.getDescription()).isEqualTo(OUTPUT_FILE_IS_OUTPUT_ANCESTOR);
   }
 }

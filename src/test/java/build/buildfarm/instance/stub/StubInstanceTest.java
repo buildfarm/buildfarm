@@ -17,47 +17,63 @@ package build.buildfarm.instance.stub;
 import static build.buildfarm.common.grpc.Retrier.NO_RETRIES;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyZeroInteractions;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionCacheGrpc.ActionCacheImplBase;
 import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
+import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
+import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse.Response;
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageImplBase;
+import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
 import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
-import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.GetActionResultRequest;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.UpdateActionResultRequest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.ByteStreamServiceWriter;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamImplBase;
+import com.google.bytestream.ByteStreamProto.ReadRequest;
+import com.google.bytestream.ByteStreamProto.ReadResponse;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusResponse;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
+import com.google.common.io.ByteStreams;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Empty;
 import io.grpc.Server;
 import io.grpc.Status;
+import io.grpc.Status.Code;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
 import io.grpc.stub.StreamObserver;
 import io.grpc.util.MutableHandlerRegistry;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.concurrent.ExecutionException;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -86,6 +102,13 @@ public class StubInstanceTest {
     fakeServer.awaitTermination();
   }
 
+  private Instance newStubInstance(String instanceName) {
+    return new StubInstance(
+        instanceName,
+        DIGEST_UTIL,
+        InProcessChannelBuilder.forName(fakeServerName).directExecutor().build());
+  }
+
   @Test
   public void reflectsNameAndDigestUtil() {
     String test1Name = "test1";
@@ -94,10 +117,7 @@ public class StubInstanceTest {
     Instance test1Instance = new StubInstance(
         test1Name,
         test1DigestUtil,
-        /* channel=*/ null,
-        /* uploader=*/ null,
-        NO_RETRIES,
-        /* retryScheduler=*/ null);
+        /* channel=*/ null);
     assertThat(test1Instance.getName()).isEqualTo(test1Name);
     assertThat(test1Instance.getDigestUtil().compute(test1Blob))
         .isEqualTo(test1DigestUtil.compute(test1Blob));
@@ -109,25 +129,30 @@ public class StubInstanceTest {
     Instance test2Instance = new StubInstance(
         test2Name,
         test2DigestUtil,
-        /* channel=*/ null,
-        /* uploader=*/ null,
-        NO_RETRIES,
-        /* retryScheduler=*/ null);
+        /* channel=*/ null);
     assertThat(test2Instance.getName()).isEqualTo(test2Name);
     assertThat(test2Instance.getDigestUtil().compute(test2Blob))
         .isEqualTo(test2DigestUtil.compute(test2Blob));
   }
 
   @Test
-  public void getActionResultReturnsNull() {
-    Instance instance = new StubInstance(
-        "test",
-        DIGEST_UTIL,
-        /* channel=*/ null,
-        /* uploader=*/ null,
-        NO_RETRIES,
-        /* retryScheduler=*/ null);
-    assertThat(instance.getActionResult(DIGEST_UTIL.computeActionKey(Action.getDefaultInstance()))).isNull();
+  public void getActionResultReturnsNullForNotFound() throws InterruptedException {
+    AtomicReference<GetActionResultRequest> reference = new AtomicReference<>();
+    serviceRegistry.addService(
+        new ActionCacheImplBase() {
+          @Override
+          public void getActionResult(GetActionResultRequest request, StreamObserver<ActionResult> responseObserver) {
+            reference.set(request);
+            responseObserver.onError(Status.NOT_FOUND.asException());
+          }
+        });
+    Instance instance = newStubInstance("test");
+    ActionKey actionKey = DIGEST_UTIL.computeActionKey(Action.getDefaultInstance());
+    assertThat(instance.getActionResult(actionKey)).isNull();
+    GetActionResultRequest request = reference.get();
+    assertThat(request.getInstanceName()).isEqualTo(instance.getName());
+    assertThat(request.getActionDigest()).isEqualTo(actionKey.getDigest());
+    instance.stop();
   }
 
   @Test
@@ -143,13 +168,7 @@ public class StubInstanceTest {
           }
         });
     String instanceName = "putActionResult-test";
-    Instance instance = new StubInstance(
-        instanceName,
-        DIGEST_UTIL,
-        InProcessChannelBuilder.forName(fakeServerName).directExecutor().build(),
-        /* uploader=*/ null,
-        NO_RETRIES,
-        /* retryScheduler=*/ null);
+    Instance instance = newStubInstance(instanceName);
     ActionKey actionKey = DigestUtil.asActionKey(Digest.newBuilder()
         .setHash("action-digest")
         .setSizeBytes(1)
@@ -160,10 +179,12 @@ public class StubInstanceTest {
     assertThat(request.getInstanceName()).isEqualTo(instanceName);
     assertThat(request.getActionDigest()).isEqualTo(actionKey.getDigest());
     assertThat(request.getActionResult()).isEqualTo(actionResult);
+    instance.stop();
   }
 
   @Test
-  public void findMissingBlobsCallsFindMissingBlobs() {
+  public void findMissingBlobsCallsFindMissingBlobs()
+      throws ExecutionException, InterruptedException {
     AtomicReference<FindMissingBlobsRequest> reference = new AtomicReference<>();
     serviceRegistry.addService(
         new ContentAddressableStorageImplBase() {
@@ -174,63 +195,103 @@ public class StubInstanceTest {
             responseObserver.onCompleted();
           }
         });
-    String instanceName = "findMissingBlobs-test";
-    Instance instance = new StubInstance(
-        instanceName,
-        DIGEST_UTIL,
-        InProcessChannelBuilder.forName(fakeServerName).directExecutor().build(),
-        /* uploader=*/ null,
-        NO_RETRIES,
-        /* retryScheduler=*/ null);
+    Instance instance = newStubInstance("findMissingBlobs-test");
     Iterable<Digest> digests = ImmutableList.of(
         Digest.newBuilder().setHash("present").setSizeBytes(1).build());
-    assertThat(instance.findMissingBlobs(digests)).isEmpty();
+    assertThat(instance.findMissingBlobs(digests, newDirectExecutorService(), RequestMetadata.getDefaultInstance()).get()).isEmpty();
+    instance.stop();
+  }
+
+  @Test
+  public void outputStreamWrites() throws IOException, InterruptedException {
+    AtomicReference<ByteString> writtenContent = new AtomicReference<>();
+    serviceRegistry.addService(
+        new ByteStreamImplBase() {
+          ByteString content = ByteString.EMPTY;
+          boolean finished = false;
+
+          public void queryWriteStatus(QueryWriteStatusRequest request, StreamObserver<QueryWriteStatusResponse> responseObserver) {
+            responseObserver.onNext(QueryWriteStatusResponse.newBuilder()
+                .setCommittedSize(content.size())
+                .setComplete(finished)
+                .build());
+            responseObserver.onCompleted();
+          }
+
+          @Override
+          public StreamObserver<WriteRequest> write(StreamObserver<WriteResponse> responseObserver) {
+            return new StreamObserver<WriteRequest>() {
+              @Override
+              public void onNext(WriteRequest request) {
+                checkState(!finished);
+                if (request.getData().size() != 0) {
+                  checkState(request.getWriteOffset() == content.size());
+                  content = content.concat(request.getData());
+                }
+                finished = request.getFinishWrite();
+                if (finished) {
+                  writtenContent.set(content);
+                  responseObserver.onNext(WriteResponse.newBuilder()
+                      .setCommittedSize(content.size())
+                      .build());
+                }
+              }
+
+              @Override
+              public void onError(Throwable t) {
+                t.printStackTrace();
+              }
+
+              @Override
+              public void onCompleted() {
+                responseObserver.onCompleted();
+              }
+            };
+          }
+        });
+    Instance instance = newStubInstance("outputStream-test");
+    String resourceName = "output-stream-test";
+    ByteString content = ByteString.copyFromUtf8("test-content");
+    Write operationStreamWrite = instance.getOperationStreamWrite(resourceName);
+    try (OutputStream out = operationStreamWrite.getOutput(1, SECONDS, () -> {})) {
+      content.writeTo(out);
+    }
+    assertThat(writtenContent.get()).isEqualTo(content);
+    instance.stop();
   }
 
   @Test
   public void putAllBlobsUploadsBlobs() throws IOException, InterruptedException {
     String instanceName = "putAllBlobs-test";
-    ByteStreamUploader uploader = mock(ByteStreamUploader.class);
-    Instance instance = new StubInstance(
-        instanceName,
-        DIGEST_UTIL,
-        /* channel=*/ null,
-        uploader,
-        NO_RETRIES,
-        /* retryScheduler=*/ null);
+    serviceRegistry.addService(
+        new ContentAddressableStorageImplBase() {
+          @Override
+          public void batchUpdateBlobs(
+              BatchUpdateBlobsRequest batchRequest,
+              StreamObserver<BatchUpdateBlobsResponse> responseObserver) {
+            checkState(batchRequest.getInstanceName().equals(instanceName));
+            responseObserver.onNext(BatchUpdateBlobsResponse.newBuilder()
+                .addAllResponses(
+                    Iterables.transform(
+                        batchRequest.getRequestsList(),
+                        request -> Response.newBuilder().setDigest(request.getDigest()).build()))
+                .build());
+            responseObserver.onCompleted();
+          }
+        });
+    Instance instance = newStubInstance("putAllBlobs-test");
     ByteString first = ByteString.copyFromUtf8("first");
     ByteString last = ByteString.copyFromUtf8("last");
     ImmutableList<ByteString> blobs = ImmutableList.of(first, last);
     ImmutableList<Digest> digests = ImmutableList.of(
         DIGEST_UTIL.compute(first),
         DIGEST_UTIL.compute(last));
-    assertThat(instance.putAllBlobs(blobs)).isEqualTo(digests);
-    verify(uploader, times(1)).uploadBlobs(any(Map.class));
+    assertThat(instance.putAllBlobs(blobs, RequestMetadata.getDefaultInstance())).containsAllIn(digests);
   }
 
   @Test
-  public void outputStreamWrites() throws Exception {
-    String resourceName = "output-stream-test";
-    SettableFuture<ByteString> finishedContent = SettableFuture.create();
-    serviceRegistry.addService(
-        new ByteStreamServiceWriter(resourceName, finishedContent));
-    String instanceName = "outputStream-test";
-    Instance instance = new StubInstance(
-        instanceName,
-        DIGEST_UTIL,
-        InProcessChannelBuilder.forName(fakeServerName).directExecutor().build(),
-        /* uploader=*/ null,
-        NO_RETRIES,
-        /* retryScheduler=*/ null);
-    ByteString content = ByteString.copyFromUtf8("test-content");
-    try (OutputStream out = instance.getOperationStreamWrite(resourceName).getOutput()) {
-      out.write(content.toByteArray());
-    }
-    assertThat(finishedContent.get(1, TimeUnit.SECONDS)).isEqualTo(content);
-  }
-
-  @Test
-  public void completedWriteBeforeCloseThrowsOnNextInteraction() throws IOException {
+  public void completedWriteBeforeCloseThrowsOnNextInteraction()
+      throws IOException, InterruptedException {
     String resourceName = "early-completed-output-stream-test";
     AtomicReference<ByteString> writtenContent = new AtomicReference<>();
     serviceRegistry.addService(
@@ -280,24 +341,114 @@ public class StubInstanceTest {
             }
           }
         });
-    String instanceName = "early-completed-outputStream-test";
-    Instance instance = new StubInstance(
-        instanceName,
-        DIGEST_UTIL,
-        InProcessChannelBuilder.forName(fakeServerName).directExecutor().build(),
-        /* uploader=*/ null,
-        NO_RETRIES,
-        /* retryScheduler=*/ null);
+    Instance instance = newStubInstance("early-completed-outputStream-test");
     ByteString content = ByteString.copyFromUtf8("test-content");
     boolean writeThrewException = false;
-    try (OutputStream out = instance.getOperationStreamWrite(resourceName).getOutput()) {
-      out.write(content.toByteArray());
+    Write operationStreamWrite = instance.getOperationStreamWrite(resourceName);
+    try (OutputStream out = operationStreamWrite.getOutput(1, SECONDS, () -> {})) {
+      content.writeTo(out);
       try {
-        out.write(content.toByteArray()); // should throw
+        content.writeTo(out);
       } catch (Exception e) {
         writeThrewException = true;
       }
     }
     assertThat(writeThrewException).isTrue();
+    instance.stop();
+  }
+
+  @Test
+  public void inputStreamThrowsNonDeadlineExceededCausal()
+      throws IOException, InterruptedException {
+    serviceRegistry.addService(
+        new ByteStreamImplBase() {
+          @Override
+          public void read(
+              ReadRequest request,
+              StreamObserver<ReadResponse> responseObserver) {
+            responseObserver.onError(Status.UNAVAILABLE.asException());
+          }
+        });
+    OutputStream out = mock(OutputStream.class);
+    IOException ioException = null;
+    Instance instance = newStubInstance("input-stream-non-deadline-exceeded");
+    Digest unavailableDigest = Digest.newBuilder()
+        .setHash("unavailable-blob-name")
+        .setSizeBytes(1)
+        .build();
+    try (InputStream in = instance.newBlobInput(unavailableDigest, 0, 1, SECONDS, RequestMetadata.getDefaultInstance())) {
+      ByteStreams.copy(in, out);
+    } catch (IOException e) {
+      ioException = e;
+    }
+    assertThat(ioException).isNotNull();
+    Status status = Status.fromThrowable(ioException);
+    assertThat(status.getCode()).isEqualTo(Code.UNAVAILABLE);
+    verifyZeroInteractions(out);
+    instance.stop();
+  }
+
+  @Test
+  public void inputStreamRetriesOnDeadlineExceededWithProgress() throws IOException, InterruptedException {
+    ByteString content = ByteString.copyFromUtf8("1");
+    serviceRegistry.addService(
+        new ByteStreamImplBase() {
+          boolean first = true;
+
+          @Override
+          public void read(ReadRequest request, StreamObserver<ReadResponse> responseObserver) {
+            if (first && request.getReadOffset() == 0) {
+              first = false;
+              responseObserver.onNext(ReadResponse.newBuilder()
+                  .setData(content)
+                  .build());
+              responseObserver.onError(Status.DEADLINE_EXCEEDED.asException());
+            } else if (request.getReadOffset() == 1) {
+              responseObserver.onCompleted();
+            } else {
+              // all others fail with unimplemented
+              responseObserver.onError(Status.UNIMPLEMENTED.asException());
+            }
+          }
+        });
+    Instance instance = newStubInstance("input-stream-stalled");
+    ByteArrayOutputStream out = new ByteArrayOutputStream();
+    Digest delayedDigest = Digest.newBuilder()
+        .setHash("delayed-blob-name")
+        .setSizeBytes(1)
+        .build();
+    try (InputStream in = instance.newBlobInput(delayedDigest, 0, 1, SECONDS, RequestMetadata.getDefaultInstance())) {
+      ByteStreams.copy(in, out);
+    }
+    assertThat(ByteString.copyFrom(out.toByteArray())).isEqualTo(content);
+    instance.stop();
+  }
+
+  @Test
+  public void inputStreamThrowsOnDeadlineExceededWithoutProgress() throws IOException, InterruptedException {
+    serviceRegistry.addService(
+        new ByteStreamImplBase() {
+          @Override
+          public void read(ReadRequest request, StreamObserver<ReadResponse> responseObserver) {
+            responseObserver.onError(Status.DEADLINE_EXCEEDED.asException());
+          }
+        });
+    OutputStream out = mock(OutputStream.class);
+    IOException ioException = null;
+    Instance instance = newStubInstance("input-stream-deadline-exceeded");
+    Digest timeoutDigest = Digest.newBuilder()
+        .setHash("timeout-blob-name")
+        .setSizeBytes(1)
+        .build();
+    try (InputStream in = instance.newBlobInput(timeoutDigest, 0, 1, SECONDS, RequestMetadata.getDefaultInstance())) {
+      ByteStreams.copy(in, out);
+    } catch (IOException e) {
+      ioException = e;
+    }
+    assertThat(ioException).isNotNull();
+    Status status = Status.fromThrowable(ioException);
+    assertThat(status.getCode()).isEqualTo(Code.DEADLINE_EXCEEDED);
+    verifyZeroInteractions(out);
+    instance.stop();
   }
 }

@@ -14,7 +14,6 @@
 
 package build.buildfarm.cas;
 
-import static com.google.common.util.concurrent.Futures.addCallback;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
 import build.bazel.remote.execution.v2.Digest;
@@ -33,7 +32,7 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
-class Writes {
+public class Writes {
   private final ContentAddressableStorage storage;
   private final Cache<BlobWriteKey, Write> blobWrites = CacheBuilder.newBuilder()
       .expireAfterWrite(10, TimeUnit.MINUTES)

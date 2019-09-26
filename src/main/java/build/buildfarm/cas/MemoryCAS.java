@@ -15,10 +15,12 @@
 package build.buildfarm.cas;
 
 import static com.google.common.util.concurrent.Futures.immediateFuture;
+import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Write;
 import com.google.common.cache.Cache;
@@ -32,17 +34,18 @@ import com.google.rpc.Status;
 import io.grpc.protobuf.StatusProto;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.NoSuchFileException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.logging.Logger;
 import javax.annotation.concurrent.GuardedBy;
 
-class MemoryCAS implements ContentAddressableStorage {
+public class MemoryCAS implements ContentAddressableStorage {
   private static final Logger logger = Logger.getLogger(MemoryCAS.class.getName());
 
   static final Status OK = Status.newBuilder()
@@ -53,51 +56,76 @@ class MemoryCAS implements ContentAddressableStorage {
       .setCode(Code.NOT_FOUND.getNumber())
       .build();
 
-  private final Writes writes = new Writes(this);
   private final long maxSizeInBytes;
+  private final Consumer<Digest> onPut;
 
   @GuardedBy("this")
   private final Map<Digest, Entry> storage;
 
   @GuardedBy("this")
-  private final Entry header;
+  private final Entry header = new SentinelEntry();
 
   @GuardedBy("this")
   private long sizeInBytes;
 
+  private final ContentAddressableStorage delegate;
+  private final Writes writes = new Writes(this);
+
   public MemoryCAS(long maxSizeInBytes) {
+    this(maxSizeInBytes, (digest) -> {}, /* delegate=*/ null);
+  }
+
+  public MemoryCAS(long maxSizeInBytes, Consumer<Digest> onPut, ContentAddressableStorage delegate) {
     this.maxSizeInBytes = maxSizeInBytes;
+    this.onPut = onPut;
+    this.delegate = delegate;
     sizeInBytes = 0;
-    header = new SentinelEntry();
     header.before = header.after = header;
     storage = Maps.newHashMap();
   }
 
   @Override
   public synchronized boolean contains(Digest digest) {
-    return get(digest) != null;
+    return get(digest) != null || (delegate != null && delegate.contains(digest));
   }
 
   @Override
-  public synchronized Iterable<Digest> findMissingBlobs(Iterable<Digest> digests) {
-    ImmutableList.Builder<Digest> missing = ImmutableList.builder();
-    // incur access use of the digest
-    for (Digest digest : digests) {
-      if (digest.getSizeBytes() != 0 && !contains(digest)) {
-        missing.add(digest);
+  public Iterable<Digest> findMissingBlobs(Iterable<Digest> digests) throws InterruptedException {
+    ImmutableList.Builder<Digest> builder = ImmutableList.builder();
+    synchronized(this) {
+      // incur access use of the digest
+      for (Digest digest : digests) {
+        if (digest.getSizeBytes() != 0 && !contains(digest)) {
+          builder.add(digest);
+        }
       }
     }
-    return missing.build();
+    ImmutableList<Digest> missing = builder.build();
+    if (delegate != null && !missing.isEmpty()) {
+      return delegate.findMissingBlobs(missing);
+    }
+    return missing;
   }
 
   @Override
   public synchronized InputStream newInput(Digest digest, long offset) throws IOException {
-    Entry e = storage.get(digest);
-    if (e == null) {
-      throw new NoSuchFileException(digest.getHash());
+    // implicit int bounds compare against size bytes
+    if (offset < 0 || offset > digest.getSizeBytes()) {
+      throw new IndexOutOfBoundsException(
+          String.format(
+              "%d is out of bounds for blob %s",
+              offset,
+              DigestUtil.toString(digest)));
     }
-    e.recordAccess(header);
-    InputStream in = e.value.getData().newInput();
+    Blob blob = get(digest);
+    if (blob == null) {
+      if (delegate != null) {
+        // FIXME change this to a read-through input stream
+        return delegate.newInput(digest, offset);
+      }
+      throw new NoSuchFileException(DigestUtil.toString(digest));
+    }
+    InputStream in = blob.getData().newInput();
     in.skip(offset);
     return in;
   }
@@ -165,6 +193,9 @@ class MemoryCAS implements ContentAddressableStorage {
 
     Entry e = storage.get(digest);
     if (e == null) {
+      if (delegate != null) {
+        return delegate.get(digest);
+      }
       return null;
     }
     e.recordAccess(header);
@@ -183,7 +214,7 @@ class MemoryCAS implements ContentAddressableStorage {
   }
 
   @Override
-  public Write getWrite(Digest digest, UUID uuid) {
+  public Write getWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata) {
     return writes.get(digest, uuid);
   }
 
@@ -241,6 +272,15 @@ class MemoryCAS implements ContentAddressableStorage {
 
   @GuardedBy("this")
   private void expireEntry(Entry e) {
+    logger.info("MemoryLRUCAS: expiring " + DigestUtil.toString(e.key));
+    if (delegate != null) {
+      Write write = delegate.getWrite(e.key, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
+      try (OutputStream out = write.getOutput(1, MINUTES, () -> {})) {
+        e.value.getData().writeTo(out);
+      } catch (IOException ioEx) {
+        logger.log(SEVERE, String.format("error delegating %s", DigestUtil.toString(e.key)), ioEx);
+      }
+    }
     storage.remove(e.key);
     e.expire();
     sizeInBytes -= e.value.size();
@@ -300,6 +340,11 @@ class MemoryCAS implements ContentAddressableStorage {
   }
 
   class SentinelEntry extends Entry {
+    SentinelEntry() {
+      super();
+      before = after = this;
+    }
+
     @Override
     public void addOnExpiration(Runnable onExpiration) {
       throw new UnsupportedOperationException("cannot add expiration to sentinal");

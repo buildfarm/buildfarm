@@ -11,18 +11,23 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 package build.buildfarm.common;
 
+import build.bazel.remote.execution.v2.Action;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.DigestFunction;
+import build.bazel.remote.execution.v2.Directory;
+import build.bazel.remote.execution.v2.Tree;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Sets;
 import com.google.common.hash.Funnels;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.Hasher;
 import com.google.common.hash.Hashing;
 import com.google.common.hash.HashingOutputStream;
 import com.google.common.io.ByteSource;
-import build.bazel.remote.execution.v2.Action;
-import build.bazel.remote.execution.v2.Digest;
-import build.bazel.remote.execution.v2.DigestFunction;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Message;
 import java.io.ByteArrayOutputStream;
@@ -31,6 +36,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
+import java.util.Set;
 
 /** Utility methods to work with {@link Digest}. */
 public class DigestUtil {
@@ -51,17 +58,17 @@ public class DigestUtil {
       empty = this.hash.newHasher().hash();
     }
 
-    public DigestFunction getDigestFunction() {
+    public DigestFunction.Value getDigestFunction() {
       if (this == SHA256) {
-        return DigestFunction.SHA256;
+        return DigestFunction.Value.SHA256;
       }
       if (this == SHA1) {
-        return DigestFunction.SHA1;
+        return DigestFunction.Value.SHA1;
       }
       if (this == MD5) {
-        return DigestFunction.MD5;
+        return DigestFunction.Value.MD5;
       }
-      return DigestFunction.UNKNOWN;
+      return DigestFunction.Value.UNKNOWN;
     }
 
     public static HashFunction forHash(String hexDigest) {
@@ -77,7 +84,7 @@ public class DigestUtil {
       throw new IllegalArgumentException("hash type unrecognized: " + hexDigest);
     }
 
-    public static HashFunction get(DigestFunction digestFunction) {
+    public static HashFunction get(DigestFunction.Value digestFunction) {
       switch(digestFunction) {
       default:
       case UNRECOGNIZED:
@@ -136,8 +143,8 @@ public class DigestUtil {
   private final Digest empty;
 
   public static DigestUtil forHash(String hashName) {
-    DigestFunction digestFunction = DigestFunction.valueOf(
-        DigestFunction.getDescriptor().findValueByName(hashName));
+    DigestFunction.Value digestFunction = DigestFunction.Value.valueOf(
+        DigestFunction.Value.getDescriptor().findValueByName(hashName));
     HashFunction hashFunction = HashFunction.get(digestFunction);
     return new DigestUtil(hashFunction);
   }
@@ -147,7 +154,7 @@ public class DigestUtil {
     empty = buildDigest(hashFn.empty().toString(), 0);
   }
 
-  public DigestFunction getDigestFunction() {
+  public DigestFunction.Value getDigestFunction() {
     return hashFn.getDigestFunction();
   }
 
@@ -202,7 +209,6 @@ public class DigestUtil {
 
   /**
    * Assumes that the given Digest is a valid digest of an Action, and creates an ActionKey wrapper.
-   * This should not be called on the client side!
    */
   public static ActionKey asActionKey(Digest digest) {
     return new ActionKey(digest);
@@ -228,11 +234,26 @@ public class DigestUtil {
     String[] components = digest.split("/");
     return Digest.newBuilder()
         .setHash(components[0])
-        .setSizeBytes(Integer.parseInt(components[1]))
+        .setSizeBytes(Long.parseLong(components[1]))
         .build();
   }
 
   public static DigestUtil forDigest(Digest digest) {
     return new DigestUtil(HashFunction.forHash(digest.getHash()));
+  }
+
+  public Map<Digest, Directory> createDirectoriesIndex(Tree tree) {
+    Set<Digest> directoryDigests = Sets.newHashSet();
+    ImmutableMap.Builder<Digest, Directory> directoriesIndex = ImmutableMap.builder();
+    directoriesIndex.put(compute(tree.getRoot()), tree.getRoot());
+    for (Directory directory : tree.getChildrenList()) {
+      Digest directoryDigest = compute(directory);
+      if (!directoryDigests.add(directoryDigest)) {
+        continue;
+      }
+      directoriesIndex.put(directoryDigest, directory);
+    }
+
+    return directoriesIndex.build();
   }
 }

@@ -19,6 +19,7 @@ import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.UrlPath;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.memory.MemoryInstance;
+import build.buildfarm.instance.shard.ShardInstance;
 import build.buildfarm.v1test.InstanceConfig;
 import io.grpc.Status;
 import io.grpc.StatusException;
@@ -29,17 +30,18 @@ import java.util.Map;
 import javax.naming.ConfigurationException;
 
 public class BuildFarmInstances implements Instances {
-  public static StatusException toStatusException(InstanceNotFoundException ex) {
-    String errorMessage = String.format("Instance %s not known to Service", ex.instanceName);
-    return new StatusException(Status.NOT_FOUND.withDescription(errorMessage));
+  public static StatusException toStatusException(InstanceNotFoundException e) {
+    String errorMessage = String.format("Instance %s not known to Service", e.instanceName);
+    return Status.NOT_FOUND.withDescription(errorMessage).asException();
   }
 
   private final Map<String, Instance> instances;
   private final Instance defaultInstance;
 
-  public BuildFarmInstances(List<InstanceConfig> instanceConfigs, String defaultInstanceName) throws ConfigurationException {
+  public BuildFarmInstances(String session, List<InstanceConfig> instanceConfigs, String defaultInstanceName, Runnable onStop)
+      throws InterruptedException, ConfigurationException {
     instances = new HashMap<String, Instance>();
-    createInstances(instanceConfigs);
+    createInstances(session, instanceConfigs, onStop);
     if (!defaultInstanceName.isEmpty()) {
       if (!instances.containsKey(defaultInstanceName)) {
         throw new ConfigurationException(defaultInstanceName + " not specified in instance configs.");
@@ -111,7 +113,8 @@ public class BuildFarmInstances implements Instances {
     }
   }
 
-  private void createInstances(List<InstanceConfig> instanceConfigs) throws ConfigurationException {
+  private void createInstances(String session, List<InstanceConfig> instanceConfigs, Runnable onStop)
+      throws InterruptedException, ConfigurationException {
     for (InstanceConfig instanceConfig : instanceConfigs) {
       String name = instanceConfig.getName();
       HashFunction hashFunction = getValidHashFunction(instanceConfig);
@@ -126,7 +129,28 @@ public class BuildFarmInstances implements Instances {
               digestUtil,
               instanceConfig.getMemoryInstanceConfig()));
           break;
+        case SHARD_INSTANCE_CONFIG:
+          instances.put(name, new ShardInstance(
+              name,
+              session + "-" + name,
+              digestUtil,
+              instanceConfig.getShardInstanceConfig(), onStop));
+          break;
       }
+    }
+  }
+
+  @Override
+  public void start() {
+    for (Instance instance : instances.values()) {
+      instance.start();
+    }
+  }
+
+  @Override
+  public void stop() throws InterruptedException {
+    for (Instance instance : instances.values()) {
+      instance.stop();
     }
   }
 }

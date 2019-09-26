@@ -16,5 +16,5 @@ package build.buildfarm.common.function;
 
 @FunctionalInterface
 public interface InterruptingPredicate<T> {
-  boolean test(T t) throws InterruptedException;
+  boolean testInterruptibly(T t) throws InterruptedException;
 }

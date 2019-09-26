@@ -100,7 +100,7 @@ class DelegateCASMap<K,V extends Message> {
         return null;
       }
       return parser.parseFrom(blob.getData());
-    } catch (InvalidProtocolBufferException ex) {
+    } catch (InvalidProtocolBufferException e) {
       return null;
     }
   }

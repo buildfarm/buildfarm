@@ -1,3 +1,17 @@
+// Copyright 2019 The Bazel Authors. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package build.buildfarm.server;
 
 import static build.buildfarm.common.UrlPath.detectResourceOperation;
@@ -10,10 +24,12 @@ import static io.grpc.Status.INVALID_ARGUMENT;
 import static java.lang.String.format;
 import static java.util.logging.Level.FINER;
 import static java.util.logging.Level.SEVERE;
+import static java.util.logging.Level.WARNING;
 
 import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.common.UrlPath.InvalidResourceNameException;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.Instance;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
@@ -23,14 +39,17 @@ import io.grpc.Context.CancellableContext;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
 
 class WriteStreamObserver implements StreamObserver<WriteRequest> {
-  private static final Logger logger = Logger.getLogger(ByteStreamService.class.getName());
+  private static final Logger logger = Logger.getLogger(WriteStreamObserver.class.getName());
 
   private final Instances instances;
+  private final long deadlineAfter;
+  private final TimeUnit deadlineAfterUnits;
+  private final Runnable requestNext;
   private final StreamObserver<WriteResponse> responseObserver;
   private final CancellableContext withCancellation;
 
@@ -39,11 +58,18 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private String name = null;
   private Write write = null;
   private Instance instance = null;
+  private final AtomicBoolean wasReady = new AtomicBoolean(false);
 
   WriteStreamObserver(
       Instances instances,
+      long deadlineAfter,
+      TimeUnit deadlineAfterUnits,
+      Runnable requestNext,
       StreamObserver<WriteResponse> responseObserver) {
     this.instances = instances;
+    this.deadlineAfter = deadlineAfter;
+    this.deadlineAfterUnits = deadlineAfterUnits;
+    this.requestNext = requestNext;
     this.responseObserver = responseObserver;
     withCancellation = Context.current().withCancellation();
   }
@@ -54,7 +80,12 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
       try {
         onUncommittedNext(request);
       } catch (RuntimeException e) {
-        responseObserver.onError(Status.fromThrowable(e).asException());
+        Status status = Status.fromThrowable(e);
+        logger.log(
+            status.getCode() == Status.Code.CANCELLED ? FINER : SEVERE,
+            "error writing " + (name == null ? request.getResourceName() : name),
+            e);
+        responseObserver.onError(status.asException());
       }
     }
   }
@@ -87,11 +118,14 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
     }
   }
 
-  synchronized void commit() {
+  void commit() {
+    committed = true;
+    commitSynchronized();
+  }
+
+  synchronized void commitSynchronized() {
     checkNotNull(name);
     checkNotNull(write);
-
-    committed = true;
 
     if (Context.current().isCancelled()) {
       logger.finest(format("skipped delivering committed_size to %s for cancelled context", name));
@@ -99,7 +133,12 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
       try {
         commitActive(write.getCommittedSize());
       } catch (RuntimeException e) {
-        responseObserver.onError(Status.fromThrowable(e).asException());
+        Status status = Status.fromThrowable(e);
+        logger.log(
+            status.getCode() == Status.Code.CANCELLED ? FINER : SEVERE,
+            "error committing " + name,
+            e);
+        responseObserver.onError(status.asException());
       }
     }
   }
@@ -145,7 +184,8 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
         }
       } catch (InstanceNotFoundException e) {
         responseObserver.onError(BuildFarmInstances.toStatusException(e));
-      } catch (InvalidResourceNameException e) {
+      } catch (InvalidResourceNameException|RuntimeException e) {
+        logger.log(WARNING, format("write: %s", request), e);
         responseObserver.onError(Status.fromThrowable(e).asException());
       }
     }
@@ -217,13 +257,43 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private void writeData(ByteString data) {
     try {
       data.writeTo(getOutput());
+      requestNextIfReady();
     } catch (IOException e) {
-      responseObserver.onError(Status.fromThrowable(e).asException());
+      if (!committed) {
+        logger.log(SEVERE, "error writing data for " + name, e);
+        responseObserver.onError(Status.fromThrowable(e).asException());
+      }
+      // shouldn't we be erroring the stream at this point if !committed?
     }
   }
 
-  private OutputStream getOutput() throws IOException {
-    return write.getOutput();
+  private void onNewlyReadyRequestNext() {
+    if (wasReady.compareAndSet(false, true)) {
+      requestNext.run();
+    }
+  }
+
+  private void requestNextIfReady(FeedbackOutputStream out) {
+    if (out.isReady()) {
+      requestNext.run();
+    } else {
+      wasReady.set(false);
+    }
+  }
+
+  private void requestNextIfReady() {
+    try {
+      requestNextIfReady(getOutput());
+    } catch (IOException e) {
+      if (!committed) {
+        logger.log(SEVERE, "error getting output stream for " + name, e);
+        responseObserver.onError(Status.fromThrowable(e).asException());
+      }
+    }
+  }
+
+  private FeedbackOutputStream getOutput() throws IOException {
+    return write.getOutput(deadlineAfter, deadlineAfterUnits, this::onNewlyReadyRequestNext);
   }
 
   @Override

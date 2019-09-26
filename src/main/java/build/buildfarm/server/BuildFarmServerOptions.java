@@ -37,4 +37,12 @@ public class BuildFarmServerOptions extends OptionsBase {
       defaultValue = "-1"
   )
   public int port;
+
+  @Option(
+      name = "public_name",
+      abbrev = 'n',
+      help = "Name of this server.",
+      defaultValue = ""
+  )
+  public String publicName;
 }

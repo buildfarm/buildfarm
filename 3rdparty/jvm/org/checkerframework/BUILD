@@ -11,7 +11,7 @@ java_library(
 java_library(
     name = "checker_qual",
     visibility = [
-        "//3rdparty/jvm:__subpackages__",
+        "//visibility:public",
     ],
     exports = [
         "//external:jar/org/checkerframework/checker_qual",

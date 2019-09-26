@@ -1,0 +1,13 @@
+diff --git a/protobuf_deps.bzl b/protobuf_deps.bzl
+index 57509ee27..daa94d94c 100644
+--- a/protobuf_deps.bzl
++++ b/protobuf_deps.bzl
+@@ -17,7 +17,7 @@ def protobuf_deps():
+     if not native.existing_rule("six"):
+         http_archive(
+             name = "six",
+-            build_file = "@//:six.BUILD",
++            build_file = "@com_google_protobuf//:six.BUILD",
+             sha256 = "105f8d68616f8248e24bf0e9372ef04d3cc10104f1980f54d57b2ce73a5ad56a",
+             urls = ["https://pypi.python.org/packages/source/s/six/six-1.10.0.tar.gz#md5=34eed507548117b2ab523ab14b2f8b55"],
+         )

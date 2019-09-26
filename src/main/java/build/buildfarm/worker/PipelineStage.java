@@ -23,11 +23,13 @@ public abstract class PipelineStage implements Runnable {
   protected final String name;
   protected final WorkerContext workerContext;
   protected final PipelineStage output;
-  private final PipelineStage error;
+  protected final PipelineStage error;
 
   private PipelineStage input = null;
   protected boolean claimed = false;
   private boolean closed = false;
+  private Thread tickThread = null;
+  private boolean tickCancelledFlag = false;
 
   PipelineStage(String name, WorkerContext workerContext, PipelineStage output, PipelineStage error) {
     this.name = name;
@@ -51,10 +53,26 @@ public abstract class PipelineStage implements Runnable {
     try {
       runInterruptible();
     } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
+      // ignore
     } finally {
       close();
     }
+  }
+
+  protected void cancelTick() {
+    // if we are not in a tick, this has no effect
+    // if we are in a tick, set the cancel flag, interrupt the tick thread
+    Thread cancelTickThread = tickThread;
+    if (cancelTickThread != null) {
+      tickCancelledFlag = true;
+      cancelTickThread.interrupt();
+    }
+  }
+
+  private boolean tickCancelled() {
+    boolean isTickCancelled = tickCancelledFlag;
+    tickCancelledFlag = false;
+    return isTickCancelled;
   }
 
   protected void iterate() throws InterruptedException {
@@ -66,14 +84,33 @@ public abstract class PipelineStage implements Runnable {
       operationContext = take();
       logStart(operationContext.operation.getName());
       stopwatch.start();
-      nextOperationContext = tick(operationContext);
-      long tickUSecs = stopwatch.elapsed(MICROSECONDS);
-      if (nextOperationContext != null && output.claim()) {
+      boolean valid = false;
+      tickThread = Thread.currentThread();
+      try {
+        nextOperationContext = tick(operationContext);
+        long tickUSecs = stopwatch.elapsed(MICROSECONDS);
+        valid = nextOperationContext != null && output.claim();
+        stallUSecs = stopwatch.elapsed(MICROSECONDS) - tickUSecs;
+        // ensure that we clear interrupted if we were supposed to cancel tick
+        if (Thread.interrupted() && !tickCancelled()) {
+          throw new InterruptedException();
+        }
+        tickThread = null;
+      } catch (InterruptedException e) {
+        boolean isTickCancelled = tickCancelled();
+        tickThread = null;
+        if (valid) {
+          output.release();
+        }
+        if (!isTickCancelled) {
+          throw e;
+        }
+      }
+      if (valid) {
         output.put(nextOperationContext);
       } else {
         error.put(operationContext);
       }
-      stallUSecs = stopwatch.elapsed(MICROSECONDS) - tickUSecs;
     } finally {
       release();
     }
@@ -95,7 +132,7 @@ public abstract class PipelineStage implements Runnable {
   }
 
   protected void logStart(String operationName, String message) {
-    getLogger().fine(String.format("%s: %s", logIterateId(operationName), message));
+    getLogger().info(String.format("%s: %s", logIterateId(operationName), message));
   }
 
   protected void logComplete(String operationName, long usecs, long stallUSecs, boolean success) {
@@ -103,8 +140,8 @@ public abstract class PipelineStage implements Runnable {
   }
 
   protected void logComplete(String operationName, long usecs, long stallUSecs, String status) {
-    getLogger().fine(String.format(
-        "%s: %gms (%gms stalled) %s",
+    getLogger().info(String.format(
+        "%s: %g ms (%g ms stalled) %s",
         logIterateId(operationName),
         usecs / 1000.0f,
         stallUSecs / 1000.0f,
@@ -122,6 +159,7 @@ public abstract class PipelineStage implements Runnable {
       wait();
     }
     if (closed) {
+      notify(); // no further notify would be called, we must signal
       return false;
     }
     claimed = true;
@@ -159,7 +197,11 @@ public abstract class PipelineStage implements Runnable {
 
   public static class NullStage extends PipelineStage {
     public NullStage() {
-      super("NullStage", null, null, null);
+      this(/* workerContext=*/ null, /* output=*/ null);
+    }
+
+    public NullStage(WorkerContext workerContext, PipelineStage output) {
+      super("NullStage", workerContext, output, null);
     }
 
     @Override
@@ -171,7 +213,7 @@ public abstract class PipelineStage implements Runnable {
     @Override
     public OperationContext take() { throw new UnsupportedOperationException(); }
     @Override
-    public void put(OperationContext operation) throws InterruptedException { }
+    public void put(OperationContext operationContext) throws InterruptedException { }
     @Override
     public void setInput(PipelineStage input) { }
     @Override

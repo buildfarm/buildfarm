@@ -14,25 +14,28 @@
 
 package build.buildfarm.common;
 
-import static com.google.common.io.ByteStreams.nullOutputStream;
+import static com.google.common.base.Preconditions.checkNotNull;
 
+import build.buildfarm.common.io.FeedbackOutputStream;
+import com.google.common.util.concurrent.SettableFuture;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 
 public interface Write {
   long getCommittedSize();
 
   boolean isComplete();
 
-  OutputStream getOutput() throws IOException;
+  FeedbackOutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) throws IOException;
 
   void reset();
 
   /** add a callback to be invoked when blob has been completed */
   void addListener(Runnable onCompleted, Executor executor);
 
-  public class CompleteWrite implements Write {
+  public static class CompleteWrite implements Write {
     private final long committedSize;
 
     public CompleteWrite(long committedSize) {
@@ -50,8 +53,29 @@ public interface Write {
     }
 
     @Override
-    public OutputStream getOutput() {
-      return nullOutputStream();
+    public FeedbackOutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+      return new FeedbackOutputStream() {
+        /** Discards the specified byte. */
+        @Override
+        public void write(int b) {}
+
+        /** Discards the specified byte array. */
+        @Override
+        public void write(byte[] b) {
+          checkNotNull(b);
+        }
+
+        /** Discards the specified byte array. */
+        @Override
+        public void write(byte[] b, int off, int len) {
+          checkNotNull(b);
+        }
+
+        @Override
+        public boolean isReady() {
+          return false;
+        }
+      };
     }
 
     @Override
@@ -61,6 +85,62 @@ public interface Write {
     @Override
     public void addListener(Runnable onCompleted, Executor executor) {
       executor.execute(onCompleted);
+    }
+  }
+
+  public class NullWrite extends FeedbackOutputStream implements Write {
+    private final SettableFuture<Long> committedFuture = SettableFuture.create();
+    private long committedSize = 0;
+
+    @Override
+    public void write(int b) {
+      committedSize++;
+    }
+
+    @Override
+    public void write(byte[] b, int off, int len) {
+      committedSize += len;
+    }
+
+    @Override
+    public void close() {
+      committedFuture.set(committedSize);
+    }
+
+    @Override
+    public boolean isReady() {
+      return true;
+    }
+
+    // Write methods
+
+    @Override
+    public void reset() {
+      // hopefully we are not closed...
+      committedSize = 0;
+    }
+
+    @Override
+    public long getCommittedSize() {
+      return committedSize;
+    }
+
+    @Override
+    public boolean isComplete() {
+      return committedFuture.isDone();
+    }
+
+    @Override
+    public FeedbackOutputStream getOutput(
+        long deadlineAfter,
+        TimeUnit deadlineAfterUnits,
+        Runnable onReadyHandler) throws IOException {
+      return this;
+    }
+
+    @Override
+    public void addListener(Runnable runnable, Executor executor) {
+      committedFuture.addListener(runnable, executor);
     }
   }
 }

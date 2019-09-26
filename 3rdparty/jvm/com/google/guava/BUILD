@@ -1,7 +1,7 @@
 java_library(
     name = "failureaccess",
     visibility = [
-        "//3rdparty/jvm:__subpackages__",
+        "//visibility:public",
     ],
     exports = [
         "//external:jar/com/google/guava/failureaccess",

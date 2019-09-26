@@ -16,5 +16,5 @@ package build.buildfarm.common.function;
 
 @FunctionalInterface
 public interface InterruptingConsumer<T> {
-  void accept(T t) throws InterruptedException;
+  void acceptInterruptibly(T t) throws InterruptedException;
 }
