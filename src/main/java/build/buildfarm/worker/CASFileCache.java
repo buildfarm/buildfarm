@@ -108,6 +108,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.locks.Condition;
@@ -128,6 +129,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private final LockMap locks = new LockMap();
   private final Consumer<Digest> onPut;
   private final Consumer<Iterable<Digest>> onExpire;
+  private final Executor accessRecorder;
   private final ExecutorService expireService;
   @Nullable private final ContentAddressableStorage delegate;
   private final LoadingCache<BlobWriteKey, Write> writes = CacheBuilder.newBuilder()
@@ -157,7 +159,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         @Override
         public SettableFuture<Long> load(Digest digest) {
           SettableFuture<Long> future = SettableFuture.create();
-          if (containsLocal(digest)) {
+          if (containsLocal(digest, (key) -> {})) {
             future.set(digest.getSizeBytes());
           }
           return future;
@@ -196,13 +198,15 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       long maxSizeInBytes,
       long maxEntrySizeInBytes,
       DigestUtil digestUtil,
-      ExecutorService expireService) {
+      ExecutorService expireService,
+      Executor accessRecorder) {
     this(
         root,
         maxSizeInBytes,
         maxEntrySizeInBytes,
         digestUtil,
         expireService,
+        accessRecorder,
         /* storage=*/ Maps.newConcurrentMap(),
         /* onPut=*/ (digest) -> {},
         /* onExpire=*/ (digests) -> {},
@@ -215,6 +219,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       long maxEntrySizeInBytes,
       DigestUtil digestUtil,
       ExecutorService expireService,
+      Executor accessRecorder,
       ConcurrentMap<Path, Entry> storage,
       Consumer<Digest> onPut,
       Consumer<Iterable<Digest>> onExpire,
@@ -224,6 +229,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     this.maxEntrySizeInBytes = maxEntrySizeInBytes;
     this.digestUtil = digestUtil;
     this.expireService = expireService;
+    this.accessRecorder = accessRecorder;
     this.storage = storage;
     this.onPut = onPut;
     this.onExpire = onExpire;
@@ -331,37 +337,30 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         (digest, isExecutable) -> new FileEntryKey(getKey(digest, isExecutable), isExecutable, digest));
   }
 
-  private boolean contains(Digest digest, boolean isExecutable) {
+  private boolean contains(Digest digest, boolean isExecutable, Consumer<Path> onContains) {
     Path key = getKey(digest, isExecutable);
     if (!storage.containsKey(key)) {
       return false;
     }
-    synchronized (this) {
-      // refetch to ensure that it has not been removed
-      // this seems soooo jank, but prevents us from waiting on sync when we know we
-      // don't have an entry
+    onContains.accept(key);
+    return true;
+  }
+
+  private void accessed(Iterable<Path> keys) {
+    /* could also bucket these */
+    try {
+      accessRecorder.execute(() -> recordAccess(keys));
+    } catch (RejectedExecutionException e) {
+      logger.log(SEVERE, format("could not record access for %d keys", Iterables.size(keys)), e);
+    }
+  }
+
+  private synchronized void recordAccess(Iterable<Path> keys) {
+    for (Path key : keys) {
       Entry e = storage.get(key);
-      if (e == null) {
-        return false;
-      }
-      boolean exists = entryExists(e);
-      if (exists) {
+      if (e != null) {
         e.recordAccess(header);
-      } else {
-        Entry removedEntry = storage.remove(key);
-        if (removedEntry == e) {
-          try {
-            unlinkEntry(removedEntry);
-          } catch (IOException unlinkEx) {
-            logger.log(SEVERE, "error unlinking non-existent entry " + key, unlinkEx);
-          }
-        } else if (removedEntry != null) {
-          logger.severe(format("nonexistent entry %s did not match removed entry, restoring it", key));
-          storage.put(key, removedEntry);
-          // but we still return that the digest is not contained
-        }
       }
-      return exists;
     }
   }
 
@@ -377,18 +376,23 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return false;
   }
 
-  boolean containsLocal(Digest digest) {
+  boolean containsLocal(Digest digest, Consumer<Path> onContains) {
     /* maybe swap the order here if we're higher in ratio on one side */
-    return contains(digest, false) || contains(digest, true);
+    return contains(digest, false, onContains) || contains(digest, true, onContains);
   }
 
   @Override
   public Iterable<Digest> findMissingBlobs(Iterable<Digest> digests) throws InterruptedException {
     ImmutableList.Builder<Digest> builder = ImmutableList.builder();
+    ImmutableList.Builder<Path> found = ImmutableList.builder();
     for (Digest digest : digests) {
-      if (!containsLocal(digest)) {
+      if (!containsLocal(digest, found::add)) {
         builder.add(digest);
       }
+    }
+    List<Path> foundDigests = found.build();
+    if (!foundDigests.isEmpty()) {
+      accessed(foundDigests);
     }
     ImmutableList<Digest> missingDigests = builder.build();
     if (delegate != null && !missingDigests.isEmpty()) {
@@ -399,7 +403,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   @Override
   public boolean contains(Digest digest) {
-    return containsLocal(digest) || (delegate != null && delegate.contains(digest));
+    return containsLocal(digest, (key) -> accessed(ImmutableList.of(key))) || (delegate != null && delegate.contains(digest));
   }
 
   @Override
@@ -446,9 +450,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           }
           continue;
         }
-        synchronized (this) {
-          e.recordAccess(header);
-        }
+        accessed(ImmutableList.of(key));
         return input;
       }
       isExecutable = !isExecutable;
@@ -848,7 +850,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
       @Override
       public synchronized boolean isComplete() {
-        return getFuture().isDone() || (out == null && containsLocal(key.getDigest()));
+        return getFuture().isDone() || (out == null && containsLocal(key.getDigest(), (key) -> {}));
       }
 
       public ListenableFuture<Long> getFuture() {

@@ -23,6 +23,7 @@ import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 
@@ -36,6 +37,7 @@ class ShardCASFileCache extends CASFileCache {
       long maxEntrySizeInBytes,
       DigestUtil digestUtil,
       ExecutorService expireService,
+      Executor accessRecorder,
       Consumer<Digest> onPut,
       Consumer<Iterable<Digest>> onExpire,
       ContentAddressableStorage delegate) {
@@ -45,6 +47,7 @@ class ShardCASFileCache extends CASFileCache {
         maxEntrySizeInBytes,
         digestUtil,
         expireService,
+        accessRecorder,
         /* storage=*/ Maps.newConcurrentMap(),
         onPut,
         onExpire,

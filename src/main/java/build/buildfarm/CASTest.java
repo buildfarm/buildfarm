@@ -14,6 +14,7 @@
 
 package build.buildfarm;
 
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 
 import build.bazel.remote.execution.v2.Digest;
@@ -24,6 +25,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 
 class CASTest {
@@ -32,8 +34,9 @@ class CASTest {
         Path root,
         long maxSizeInBytes,
         DigestUtil digestUtil,
-        ExecutorService expireService) {
-      super(root, maxSizeInBytes, maxSizeInBytes, digestUtil, expireService);
+        ExecutorService expireService,
+        Executor accessRecorder) {
+      super(root, maxSizeInBytes, maxSizeInBytes, digestUtil, expireService, accessRecorder);
     }
 
     @Override
@@ -48,7 +51,8 @@ class CASTest {
         root,
         /* maxSizeInBytes=*/ 100l * 1024 * 1024 * 1024,
         new DigestUtil(HashFunction.SHA1),
-        /* expireService=*/ newDirectExecutorService());
+        /* expireService=*/ newDirectExecutorService(),
+        /* accessRecorder=*/ directExecutor());
     fileCache.start(newDirectExecutorService());
     System.out.println("Done with start, ready to roll...");
   }

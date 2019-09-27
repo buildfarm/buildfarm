@@ -21,6 +21,7 @@ import build.buildfarm.worker.CASFileCache;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 
@@ -33,8 +34,9 @@ class InjectedCASFileCache extends CASFileCache {
       long maxSizeInBytes,
       long maxEntrySizeInBytes,
       DigestUtil digestUtil,
-      ExecutorService expireService) {
-    super(root, maxSizeInBytes, maxEntrySizeInBytes, digestUtil, expireService);
+      ExecutorService expireService,
+      Executor accessRecorder) {
+    super(root, maxSizeInBytes, maxEntrySizeInBytes, digestUtil, expireService, accessRecorder);
     this.inputStreamFactory = inputStreamFactory;
   }
 

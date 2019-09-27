@@ -115,7 +115,7 @@ class CASFileCacheTest {
   }
 
   @Before
-  public void setUp() throws IOException {
+  public void setUp() throws IOException, InterruptedException {
     MockitoAnnotations.initMocks(this);
     when(delegate.getWrite(any(Digest.class), any(UUID.class), any(RequestMetadata.class))).thenReturn(new NullWrite());
     when(delegate.newInput(any(Digest.class), any(Long.class))).thenThrow(new NoSuchFileException("null sink delegate"));
@@ -129,6 +129,7 @@ class CASFileCacheTest {
         /* maxEntrySizeInBytes=*/ 1024,
         DIGEST_UTIL,
         expireService,
+        /* accessRecorder=*/ directExecutor(),
         storage,
         onPut,
         onExpire,
@@ -145,7 +146,7 @@ class CASFileCacheTest {
   }
 
   @After
-  public void tearDown() {
+  public void tearDown() throws InterruptedException {
     if (!shutdownAndAwaitTermination(putService, 1, SECONDS)) {
       throw new RuntimeException("could not shut down put service");
     }
@@ -171,7 +172,8 @@ class CASFileCacheTest {
         /* maxSizeInBytes=*/ 1024,
         /* maxEntrySizeInBytes=*/ 1024,
         DIGEST_UTIL,
-        /* expireService=*/ newDirectExecutorService()) {
+        /* expireService=*/ newDirectExecutorService(),
+        /* accessRecorder=*/ directExecutor()) {
       @Override
       protected InputStream newExternalInput(Digest digest, long offset) throws IOException, InterruptedException {
         return mockInputStreamFactory.newInput(digest, offset);
@@ -502,7 +504,7 @@ class CASFileCacheTest {
   }
 
   @Test
-  public void containsRemovesNonexistentEntry() throws IOException, InterruptedException {
+  public void readRemovesNonexistentEntry() throws IOException, InterruptedException {
     ByteString content = ByteString.copyFromUtf8("Hello, World");
     Blob blob = new Blob(content, DIGEST_UTIL);
 
@@ -512,7 +514,12 @@ class CASFileCacheTest {
     Files.delete(path);
     // update entry with expired deadline
     storage.get(path).existsDeadline = Deadline.after(0, SECONDS);
-    assertThat(fileCache.contains(blob.getDigest())).isFalse();
+
+    try (InputStream in = fileCache.newInput(blob.getDigest(), /* offset=*/ 0)) {
+      fail("should not get here");
+    } catch (NoSuchFileException e) {
+      // success
+    }
     assertThat(storage.containsKey(path)).isFalse();
   }
 

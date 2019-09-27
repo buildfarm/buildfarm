@@ -73,6 +73,7 @@ class CFCExecFileSystem implements ExecFileSystem {
   private final Map<Path, Iterable<Digest>> rootInputDirectories = new ConcurrentHashMap<>();
   private final ExecutorService fetchService = newWorkStealingPool(128);
   private final ExecutorService removeDirectoryService;
+  private final ExecutorService accessRecorder;
   private final long deadlineAfter;
   private final TimeUnit deadlineAfterUnits;
 
@@ -81,12 +82,14 @@ class CFCExecFileSystem implements ExecFileSystem {
       CASFileCache fileCache,
       boolean linkInputDirectories,
       ExecutorService removeDirectoryService,
+      ExecutorService accessRecorder,
       long deadlineAfter,
       TimeUnit deadlineAfterUnits) {
     this.root = root;
     this.fileCache = fileCache;
     this.linkInputDirectories = linkInputDirectories;
     this.removeDirectoryService = removeDirectoryService;
+    this.accessRecorder = accessRecorder;
     this.deadlineAfter = deadlineAfter;
     this.deadlineAfterUnits = deadlineAfterUnits;
   }
@@ -125,6 +128,9 @@ class CFCExecFileSystem implements ExecFileSystem {
     }
     if (!shutdownAndAwaitTermination(removeDirectoryService, 1, MINUTES)) {
       logger.severe("could not terminate removeDirectoryService");
+    }
+    if (!shutdownAndAwaitTermination(accessRecorder, 1, MINUTES)) {
+      logger.severe("could not terminate accessRecorder");
     }
   }
 
