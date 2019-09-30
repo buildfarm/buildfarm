@@ -20,8 +20,9 @@ import static build.buildfarm.worker.CASFileCache.getInterruptiblyOrIOException;
 import static build.buildfarm.worker.Utils.removeDirectory;
 import static com.google.common.collect.Maps.uniqueIndex;
 import static com.google.common.util.concurrent.Futures.allAsList;
-import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
+import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
 import static java.lang.String.format;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
@@ -236,7 +237,8 @@ public class Worker {
         config.getCasCacheMaxSizeBytes(),
         config.getCasCacheMaxEntrySizeBytes(),
         casInstance.getDigestUtil(),
-        newDirectExecutorService());
+        newDirectExecutorService(),
+        directExecutor());
   }
 
   private void fetchInputs(

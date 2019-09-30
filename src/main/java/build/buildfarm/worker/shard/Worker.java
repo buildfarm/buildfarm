@@ -17,6 +17,7 @@ package build.buildfarm.worker.shard;
 import static build.buildfarm.cas.ContentAddressableStorages.createGrpcCAS;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.concurrent.Executors.newFixedThreadPool;
+import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.FINER;
@@ -74,6 +75,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
@@ -163,6 +165,7 @@ public class Worker {
         newFixedThreadPool(
             /* nThreads=*/ 32,
             new ThreadFactoryBuilder().setNameFormat("remove-directory-pool-%d").build());
+    ExecutorService accessRecorder = newSingleThreadExecutor();
 
     InputStreamFactory remoteInputStreamFactory =
         new RemoteInputStreamFactory(
@@ -172,10 +175,11 @@ public class Worker {
             workerStubs,
             (worker, t, context) -> {});
     ContentAddressableStorage storage = createStorages(
-        remoteInputStreamFactory, removeDirectoryService, config.getCasList());
+        remoteInputStreamFactory, removeDirectoryService, accessRecorder, config.getCasList());
     execFileSystem = createExecFileSystem(
         remoteInputStreamFactory,
         removeDirectoryService,
+        accessRecorder,
         storage);
 
     instance = new ShardWorkerInstance(
@@ -267,10 +271,11 @@ public class Worker {
   private ExecFileSystem createExecFileSystem(
       InputStreamFactory remoteInputStreamFactory,
       ExecutorService removeDirectoryService,
+      ExecutorService accessRecorder,
       ContentAddressableStorage storage) {
     checkState(storage != null, "no exec fs cas specified");
     if (storage instanceof CASFileCache) {
-      return createCFCExecFileSystem(removeDirectoryService, (CASFileCache) storage);
+      return createCFCExecFileSystem(removeDirectoryService, accessRecorder, (CASFileCache) storage);
     } else {
       // FIXME not the only fuse backing capacity...
       return createFuseExecFileSystem(remoteInputStreamFactory, storage);
@@ -280,6 +285,7 @@ public class Worker {
   private ContentAddressableStorage createStorage(
       InputStreamFactory remoteInputStreamFactory,
       ExecutorService removeDirectoryService,
+      Executor accessRecorder,
       ContentAddressableStorageConfig config,
       ContentAddressableStorage delegate) throws ConfigurationException {
     switch (config.getTypeCase()) {
@@ -301,6 +307,7 @@ public class Worker {
             fsCASConfig.getMaxEntrySizeBytes(),
             digestUtil,
             removeDirectoryService,
+            accessRecorder,
             this::onStoragePut,
             delegate == null ? this::onStorageExpire : (digests) -> {},
             delegate);
@@ -310,24 +317,29 @@ public class Worker {
   private ContentAddressableStorage createStorages(
       InputStreamFactory remoteInputStreamFactory,
       ExecutorService removeDirectoryService,
+      Executor accessRecorder,
       List<ContentAddressableStorageConfig> configs) throws ConfigurationException {
     ImmutableList.Builder<ContentAddressableStorage> storages = ImmutableList.builder();
     // must construct delegates first
     ContentAddressableStorage storage = null, delegate = null;
     for (ContentAddressableStorageConfig config : Lists.reverse(configs)) {
-      storage = createStorage(remoteInputStreamFactory, removeDirectoryService, config, delegate);
+      storage = createStorage(remoteInputStreamFactory, removeDirectoryService, accessRecorder, config, delegate);
       storages.add(storage);
       delegate = storage;
     }
     return storage;
   }
 
-  private ExecFileSystem createCFCExecFileSystem(ExecutorService removeDirectoryService, CASFileCache fileCache) {
+  private ExecFileSystem createCFCExecFileSystem(
+      ExecutorService removeDirectoryService,
+      ExecutorService accessRecorder,
+      CASFileCache fileCache) {
     return new CFCExecFileSystem(
         root,
         fileCache,
         config.getLinkInputDirectories(),
         removeDirectoryService,
+        accessRecorder,
         /* deadlineAfter=*/ 1, /* deadlineAfterUnits=*/ DAYS);
   }
 
