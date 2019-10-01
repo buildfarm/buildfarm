@@ -694,23 +694,26 @@ public class RedisShardBackplane implements ShardBackplane {
     }
   }
 
+  private boolean removeWorkerAndPublish(JedisCluster jedis, String name, String changeJson) {
+    if (jedis.hdel(config.getWorkersHashName(), name) == 1) {
+      jedis.publish(config.getWorkerChannel(), changeJson);
+      return true;
+    }
+    return false;
+  }
+
   @Override
-  public boolean removeWorker(String workerName) throws IOException {
+  public boolean removeWorker(String name, String reason) throws IOException {
     WorkerChange workerChange = WorkerChange.newBuilder()
-        .setName(workerName)
+        .setName(name)
         .setRemove(WorkerChange.Remove.newBuilder()
             .setSource(source)
+            .setReason(reason)
             .build())
         .build();
     String workerChangeJson = JsonFormat.printer().print(workerChange);
-    return subscriber.removeWorker(workerName) &&
-        withBackplaneException((jedis) -> {
-          if (jedis.hdel(config.getWorkersHashName(), workerName) == 1) {
-            jedis.publish(config.getWorkerChannel(), workerChangeJson);
-            return true;
-          }
-          return false;
-        });
+    return subscriber.removeWorker(name) &&
+        withBackplaneException((jedis) -> removeWorkerAndPublish(jedis, name, workerChangeJson));
   }
 
   @Override
@@ -731,34 +734,57 @@ public class RedisShardBackplane implements ShardBackplane {
     return workerSet;
   }
 
+  private void removeInvalidWorkers(JedisCluster jedis, long testedAt, List<ShardWorker> workers) {
+    if (!workers.isEmpty()) {
+      for (ShardWorker worker : workers) {
+        String name = worker.getEndpoint();
+        String reason = format("registration expired at %d, tested at %d", worker.getExpireAt(), testedAt);
+        WorkerChange workerChange = WorkerChange.newBuilder()
+            .setEffectiveAt(toTimestamp(Instant.now()))
+            .setName(name)
+            .setRemove(WorkerChange.Remove.newBuilder()
+                .setSource(source)
+                .setReason(reason)
+                .build())
+            .build();
+        try {
+          String workerChangeJson = JsonFormat.printer().print(workerChange);
+          removeWorkerAndPublish(jedis, name, workerChangeJson);
+        } catch (InvalidProtocolBufferException e) {
+          logger.error("error printing workerChange", e);
+        }
+      }
+    }
+  }
+
   private Set<String> fetchAndExpireWorkers(JedisCluster jedis, long now) {
     Set<String> workers = Sets.newConcurrentHashSet();
-    ImmutableList.Builder<String> invalidWorkers = ImmutableList.builder();
+    ImmutableList.Builder<ShardWorker> invalidWorkers = ImmutableList.builder();
     for (Map.Entry<String, String> entry : jedis.hgetAll(config.getWorkersHashName()).entrySet()) {
       String json = entry.getValue();
       String name = entry.getKey();
       try {
         if (json == null) {
-          invalidWorkers.add(name);
+          invalidWorkers.add(ShardWorker.newBuilder()
+              .setEndpoint(name)
+              .build());
         } else {
           ShardWorker.Builder builder = ShardWorker.newBuilder();
           JsonFormat.parser().merge(json, builder);
           ShardWorker worker = builder.build();
           if (worker.getExpireAt() <= now) {
-            invalidWorkers.add(name);
+            invalidWorkers.add(worker);
           } else {
             workers.add(worker.getEndpoint());
           }
         }
       } catch (InvalidProtocolBufferException e) {
-        invalidWorkers.add(name);
+        invalidWorkers.add(ShardWorker.newBuilder()
+            .setEndpoint(name)
+            .build());
       }
     }
-    JedisClusterPipeline p = jedis.pipelined();
-    for (String invalidWorker : invalidWorkers.build()) {
-      p.hdel(config.getWorkersHashName(), invalidWorker);
-    }
-    p.sync();
+    removeInvalidWorkers(jedis, now, invalidWorkers.build());
     return workers;
   }
 

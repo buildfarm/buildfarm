@@ -1059,7 +1059,7 @@ public class ShardInstance extends AbstractServerInstance {
 
   private void removeMalfunctioningWorker(String worker, Throwable t, String context) {
     try {
-      if (backplane.removeWorker(worker)) {
+      if (backplane.removeWorker(worker, format("%s: %s", context, t.getMessage()))) {
         logger.log(WARNING, format("Removed worker '%s' during(%s) due to exception", worker, context), t);
       }
     } catch (IOException e) {

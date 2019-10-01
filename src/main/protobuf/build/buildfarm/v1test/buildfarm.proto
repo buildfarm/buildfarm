@@ -300,6 +300,8 @@ message WorkerChange {
 
   message Remove {
     string source = 1;
+
+    string reason = 2;
   }
 
   string name = 1;

@@ -26,6 +26,7 @@ import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.OperationChange;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.RedisShardBackplaneConfig;
+import build.buildfarm.v1test.WorkerChange;
 import com.google.common.collect.ImmutableMap;
 import com.google.longrunning.Operation;
 import com.google.protobuf.util.JsonFormat;
@@ -43,7 +44,6 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import redis.clients.jedis.JedisCluster;
-import redis.clients.jedis.JedisClusterPipeline;
 import redis.clients.jedis.exceptions.JedisConnectionException;
 
 @RunWith(JUnit4.class)
@@ -126,12 +126,12 @@ public class RedisShardBackplaneTest {
   public void workersWithInvalidProtobufAreRemoved() throws IOException {
     RedisShardBackplaneConfig config = RedisShardBackplaneConfig.newBuilder()
         .setWorkersHashName("Workers")
+        .setWorkerChannel("WorkerChannel")
         .build();
     JedisCluster jedisCluster = mock(JedisCluster.class);
     when(mockJedisClusterFactory.get()).thenReturn(jedisCluster);
     when(jedisCluster.hgetAll(config.getWorkersHashName())).thenReturn(ImmutableMap.of("foo", "foo"));
-    JedisClusterPipeline pipeline = mock(JedisClusterPipeline.class);
-    when(jedisCluster.pipelined()).thenReturn(pipeline);
+    when(jedisCluster.hdel(config.getWorkersHashName(), "foo")).thenReturn(1l);
     backplane = new RedisShardBackplane(
         config,
         "invalid-protobuf-worker-removed-test",
@@ -143,9 +143,15 @@ public class RedisShardBackplaneTest {
     backplane.start();
 
     assertThat(backplane.getWorkers()).isEmpty();
-    verify(jedisCluster, times(1)).pipelined();
-    verify(pipeline, times(1)).hdel(config.getWorkersHashName(), "foo");
-    verify(pipeline, times(1)).sync();
+    verify(jedisCluster, times(1)).hdel(config.getWorkersHashName(), "foo");
+    ArgumentCaptor<String> changeCaptor = ArgumentCaptor.forClass(String.class);
+    verify(jedisCluster, times(1)).publish(eq(config.getWorkerChannel()), changeCaptor.capture());
+    String json = changeCaptor.getValue();
+    WorkerChange.Builder builder = WorkerChange.newBuilder();
+    JsonFormat.parser().merge(json, builder);
+    WorkerChange workerChange = builder.build();
+    assertThat(workerChange.getName()).isEqualTo("foo");
+    assertThat(workerChange.getTypeCase()).isEqualTo(WorkerChange.TypeCase.REMOVE);
   }
 
   void verifyChangePublished(JedisCluster jedis, String opName) throws IOException {

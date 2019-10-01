@@ -407,7 +407,7 @@ public class Worker {
 
   private void removeWorker(String name) {
     try {
-      backplane.removeWorker(name);
+      backplane.removeWorker(name, "removing self prior to initialization");
     } catch (IOException e) {
       Status status = Status.fromThrowable(e);
       if (status.getCode() != Code.UNAVAILABLE && status.getCode() != Code.DEADLINE_EXCEEDED) {

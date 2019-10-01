@@ -88,7 +88,7 @@ public interface ShardBackplane {
    * was not a member of the set.
    */
   @ThreadSafe
-  boolean removeWorker(String workerName) throws IOException;
+  boolean removeWorker(String workerName, String reason) throws IOException;
 
   /**
    * Returns a set of the names of all active workers.
