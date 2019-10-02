@@ -1352,6 +1352,13 @@ public class ShardInstance extends AbstractServerInstance {
     try {
       String operationName = createOperationName(UUID.randomUUID().toString());
 
+      logger.info(
+          format(
+              "ExecutionSuccess: %s -> %s: %s",
+              requestMetadata.getToolInvocationId(),
+              operationName,
+              DigestUtil.toString(actionDigest)));
+
       if (!skipCacheLookup && recentCacheServedExecutions.getIfPresent(requestMetadata) != null) {
         logger.fine(format("Operation %s will have skip_cache_lookup = true due to retry", operationName));
         skipCacheLookup = true;

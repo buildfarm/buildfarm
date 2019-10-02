@@ -751,7 +751,7 @@ public class RedisShardBackplane implements ShardBackplane {
           String workerChangeJson = JsonFormat.printer().print(workerChange);
           removeWorkerAndPublish(jedis, name, workerChangeJson);
         } catch (InvalidProtocolBufferException e) {
-          logger.error("error printing workerChange", e);
+          logger.log(SEVERE, "error printing workerChange", e);
         }
       }
     }
