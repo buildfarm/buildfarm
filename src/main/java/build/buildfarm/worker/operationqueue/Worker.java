@@ -139,7 +139,7 @@ public class Worker {
   private static ManagedChannel createChannel(String target) {
     NettyChannelBuilder builder =
         NettyChannelBuilder.forTarget(target)
-            .negotiationType(NegotiationType.PLAINTEXT);
+            .negotiationType(NegotiationType.TLS);
     return builder.build();
   }
 
