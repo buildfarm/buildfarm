@@ -35,6 +35,7 @@ import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -51,6 +52,7 @@ public class BuildFarmServer {
     Logger.getLogger(BuildFarmServer.class.getName());
 
   private final ScheduledExecutorService keepaliveScheduler = newSingleThreadScheduledExecutor();
+  private final ActionCacheRequestCounter actionCacheRequestCounter;
   private final Instances instances;
   private final Server server;
   private boolean stopping = false;
@@ -65,9 +67,11 @@ public class BuildFarmServer {
     String defaultInstanceName = config.getDefaultInstanceName();
     instances = new BuildFarmInstances(session, config.getInstancesList(), defaultInstanceName, this::stop);
 
+    actionCacheRequestCounter = new ActionCacheRequestCounter(ActionCacheService.logger, Duration.ofSeconds(10));
+
     ServerInterceptor headersInterceptor = new ServerHeadersInterceptor();
     server = serverBuilder
-        .addService(new ActionCacheService(instances))
+        .addService(new ActionCacheService(instances, actionCacheRequestCounter::increment))
         .addService(new CapabilitiesService(instances))
         .addService(new ContentAddressableStorageService(
             instances,
@@ -98,6 +102,7 @@ public class BuildFarmServer {
   }
 
   public void start() throws IOException {
+    actionCacheRequestCounter.start();
     instances.start();
     server.start();
     Runtime.getRuntime().addShutdownHook(new Thread() {
@@ -130,6 +135,9 @@ public class BuildFarmServer {
     }
     if (!shutdownAndAwaitTermination(keepaliveScheduler, 10, TimeUnit.SECONDS)) {
       logger.warning("could not shut down keepalive scheduler");
+    }
+    if (!actionCacheRequestCounter.stop()) {
+      logger.warning("count not shut down action cache request counter");
     }
   }
 
