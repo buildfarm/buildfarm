@@ -83,6 +83,8 @@ import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ProfiledQueuedOperationMetadata;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Stopwatch;
+import com.google.common.base.Throwables;
+import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -169,6 +171,7 @@ public class ShardInstance extends AbstractServerInstance {
   private final Cache<Digest, Action> actionCache = CacheBuilder.newBuilder()
       .maximumSize(64 * 1024)
       .build();
+  private final LoadingCache<ActionKey, ActionResult> actionResultCache;
   private final com.google.common.cache.Cache<RequestMetadata, Boolean> recentCacheServedExecutions =
       com.google.common.cache.CacheBuilder.newBuilder()
           .maximumSize(64 * 1024)
@@ -191,7 +194,7 @@ public class ShardInstance extends AbstractServerInstance {
     this(
         name,
         digestUtil,
-        getBackplane(config, identifier),
+        createBackplane(config, identifier),
         config.getRunDispatchedMonitor(),
         config.getDispatchedMonitorIntervalSeconds(),
         config.getRunOperationQueuer(),
@@ -200,7 +203,7 @@ public class ShardInstance extends AbstractServerInstance {
         WorkerStubs.create(digestUtil));
   }
 
-  private static ShardBackplane getBackplane(ShardInstanceConfig config, String identifier)
+  private static ShardBackplane createBackplane(ShardInstanceConfig config, String identifier)
       throws ConfigurationException {
     ShardInstanceConfig.BackplaneCase backplaneCase = config.getBackplaneCase();
     switch (backplaneCase) {
@@ -216,6 +219,21 @@ public class ShardInstance extends AbstractServerInstance {
             /* isPrequeued=*/ ShardInstance::isUnknown,
             /* isExecuting=*/ or(ShardInstance::isExecuting, ShardInstance::isQueued));
     }
+  }
+
+  private LoadingCache<ActionKey, ActionResult> createActionResultCache(ShardBackplane backplane) {
+    return com.google.common.cache.CacheBuilder.newBuilder()
+        .maximumSize(1024 * 1024)
+        .build(new CacheLoader<ActionKey, ActionResult>() {
+          @Override
+          public ActionResult load(ActionKey actionKey) {
+            try {
+              return backplane.getActionResult(actionKey);
+            } catch (IOException e) {
+              throw Status.fromThrowable(e).asRuntimeException();
+            }
+          }
+        });
   }
 
   public ShardInstance(
@@ -234,6 +252,7 @@ public class ShardInstance extends AbstractServerInstance {
     this.workerStubs = workerStubs;
     this.onStop = onStop;
     this.maxBlobSize = maxBlobSize;
+    this.actionResultCache = createActionResultCache(backplane);
     backplane.setOnUnsubscribe(this::stop);
 
     remoteInputStreamFactory = new RemoteInputStreamFactory(backplane, rand, workerStubs, this::removeMalfunctioningWorker);
@@ -415,9 +434,13 @@ public class ShardInstance extends AbstractServerInstance {
   @Override
   public ActionResult getActionResult(ActionKey actionKey) {
     try {
-      return backplane.getActionResult(actionKey);
-    } catch (IOException e) {
-      throw Status.fromThrowable(e).asRuntimeException();
+      return actionResultCache.get(actionKey);
+    } catch (CacheLoader.InvalidCacheLoadException e) {
+      return null;
+    } catch (ExecutionException e) {
+      Throwable cause = e.getCause();
+      Throwables.throwIfUnchecked(cause);
+      throw new UncheckedExecutionException(cause);
     }
   }
 
@@ -1359,9 +1382,12 @@ public class ShardInstance extends AbstractServerInstance {
               operationName,
               DigestUtil.toString(actionDigest)));
 
-      if (!skipCacheLookup && recentCacheServedExecutions.getIfPresent(requestMetadata) != null) {
-        logger.fine(format("Operation %s will have skip_cache_lookup = true due to retry", operationName));
-        skipCacheLookup = true;
+      if (!skipCacheLookup) {
+        actionResultCache.invalidate(DigestUtil.asActionKey(actionDigest));
+        if (recentCacheServedExecutions.getIfPresent(requestMetadata) != null) {
+          logger.fine(format("Operation %s will have skip_cache_lookup = true due to retry", operationName));
+          skipCacheLookup = true;
+        }
       }
 
       String stdoutStreamName = operationName + "/streams/stdout";
