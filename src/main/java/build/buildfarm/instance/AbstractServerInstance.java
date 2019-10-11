@@ -247,7 +247,7 @@ public abstract class AbstractServerInstance implements Instance {
     return contentAddressableStorage.getAllFuture(digests);
   }
 
-  ByteString getBlob(Digest blobDigest) throws InterruptedException {
+  protected ByteString getBlob(Digest blobDigest) throws InterruptedException {
     return getBlob(blobDigest, 0, 0);
   }
 
@@ -1142,13 +1142,21 @@ public abstract class AbstractServerInstance implements Instance {
     return null;
   }
 
-  protected Action expectAction(Operation operation) throws InterruptedException {
+  protected @Nullable Digest expectActionDigest(Operation operation) {
+    ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
+    if (metadata == null) {
+      return null;
+    }
+    return metadata.getActionDigest();
+  }
+
+  protected @Nullable Action expectAction(Operation operation) throws InterruptedException {
     try {
-      ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
-      if (metadata == null) {
+      Digest actionDigest = expectActionDigest(operation);
+      if (actionDigest == null) {
         return null;
       }
-      ByteString actionBlob = getBlob(metadata.getActionDigest());
+      ByteString actionBlob = getBlob(expectActionDigest(operation));
       if (actionBlob != null) {
         return Action.parseFrom(actionBlob);
       }
