@@ -140,6 +140,22 @@ java_library(
 )
 
 java_library(
+    name = "grpc_services",
+    visibility = [
+        "//visibility:public",
+    ],
+    exports = [
+        "//external:jar/io/grpc/grpc_services",
+    ],
+    runtime_deps = [
+        ":grpc_core",
+        ":grpc_protobuf",
+        ":grpc_stub",
+        "//3rdparty/jvm/com/google/protobuf:protobuf_java_util",
+    ],
+)
+
+java_library(
     name = "grpc_stub",
     visibility = [
         "//visibility:public",

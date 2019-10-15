@@ -86,7 +86,7 @@ dependencies:
 
     grpc:
       lang: java
-      modules: [ "api", "auth", "core", "context", "netty", "stub", "protobuf" ]
+      modules: [ "api", "auth", "core", "context", "netty", "stub", "protobuf", "services" ]
       version: "1.23.0"
 
   junit:
