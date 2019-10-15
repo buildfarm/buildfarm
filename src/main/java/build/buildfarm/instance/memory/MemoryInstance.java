@@ -14,7 +14,9 @@
 
 package build.buildfarm.instance.memory;
 
+import static build.buildfarm.common.Actions.invalidActionMessage;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static build.buildfarm.instance.Utils.putBlob;
 import static com.google.common.collect.Multimaps.synchronizedSetMultimap;
 import static com.google.common.util.concurrent.Futures.addCallback;
@@ -28,6 +30,7 @@ import static java.util.Collections.synchronizedSortedMap;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.SEVERE;
+import static java.util.logging.Level.WARNING;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
@@ -437,6 +440,55 @@ public class MemoryInstance extends AbstractServerInstance {
     return true;
   }
 
+  private Action getActionForTimeoutMonitor(Operation operation, com.google.rpc.Status.Builder status) throws InterruptedException {
+    Digest actionDigest = expectActionDigest(operation);
+    if (actionDigest == null) {
+      logger.warning(format("Could not determine Action Digest for operation %s", operation.getName()));
+      String message = String.format(
+          "Could not determine Action Digest from Operation %s",
+          operation.getName());
+      status
+          .setCode(com.google.rpc.Code.INTERNAL.getNumber())
+          .setMessage(message);
+      return null;
+    }
+    ByteString actionBlob = getBlob(actionDigest);
+    if (actionBlob == null) {
+      logger.warning(
+          format(
+              "Action %s for operation %s went missing, cannot initiate execution monitoring",
+              DigestUtil.toString(actionDigest),
+              operation.getName()));
+      PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
+      preconditionFailure.addViolationsBuilder()
+          .setType(VIOLATION_TYPE_MISSING)
+          .setSubject("blobs/" + DigestUtil.toString(actionDigest))
+          .setDescription(MISSING_ACTION);
+      status
+          .setCode(com.google.rpc.Code.FAILED_PRECONDITION.getNumber())
+          .setMessage(invalidActionMessage(actionDigest))
+          .addDetails(Any.pack(preconditionFailure.build()))
+          .build();
+      return null;
+    }
+    try {
+      return Action.parseFrom(actionBlob);
+    } catch (InvalidProtocolBufferException e) {
+      logger.log(WARNING, format("Could not parse Action %s for Operation %s", DigestUtil.toString(actionDigest), operation.getName()), e);
+      PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
+      preconditionFailure.addViolationsBuilder()
+          .setType(VIOLATION_TYPE_INVALID)
+          .setSubject(INVALID_ACTION)
+          .setDescription("Action " + DigestUtil.toString(actionDigest));
+      status
+          .setCode(com.google.rpc.Code.FAILED_PRECONDITION.getNumber())
+          .setMessage(invalidActionMessage(actionDigest))
+          .addDetails(Any.pack(preconditionFailure.build()))
+          .build();
+      return null;
+    }
+  }
+
   @Override
   public boolean putOperation(Operation operation) throws InterruptedException {
     if (!super.putOperation(operation)) {
@@ -475,9 +527,17 @@ public class MemoryInstance extends AbstractServerInstance {
       // Create a delayed fuse timed out failure
       // This is in effect if the worker does not respond
       // within a configured delay with operation action timeout results
-      Action action = expectAction(operation);
+      com.google.rpc.Status.Builder status = com.google.rpc.Status.newBuilder();
+      Action action = getActionForTimeoutMonitor(operation, status);
       if (action == null) {
-        // cannot determine action timeout, action content does not exist
+        // prevent further activity of this operation, since it can not
+        // transition to execution without independent provision of action blob
+        // or reconfiguration of operation metadata
+        // force an immediate error completion of the operation
+        errorOperation(
+            operation,
+            RequestMetadata.getDefaultInstance(),
+            status.build());
         return false;
       }
       Duration actionTimeout = null;
