@@ -189,6 +189,8 @@ java_library(
         "//3rdparty/jvm/io/grpc:grpc_stub",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "@io_grpc_grpc_java//services:health",
+        "@io_grpc_grpc_proto//:health_java_proto",
         "@googleapis//:google_bytestream_bytestream_java_grpc",
         "@googleapis//:google_bytestream_bytestream_java_proto",
         "@googleapis//:google_longrunning_operations_java_grpc",
