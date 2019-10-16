@@ -103,11 +103,6 @@ class Executor implements Runnable {
           String.format(
               "Executor::run(%s): could not transition to EXECUTING",
               operation.getName()));
-      try {
-        workerContext.destroyExecDir(operationContext.execDir);
-      } catch (IOException e) {
-        logger.log(SEVERE, "error while destroying " + operationContext.execDir, e);
-      }
       owner.error().put(operationContext);
       return 0;
     }
