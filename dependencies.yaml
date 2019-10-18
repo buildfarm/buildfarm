@@ -60,11 +60,11 @@ dependencies:
   com.google.protobuf:
     protobuf-java:
       lang: java
-      version: "3.9.2"
+      version: "3.10.0"
 
     protobuf-java-util:
       lang: java
-      version: "3.9.2"
+      version: "3.10.0"
 
   com.google.truth:
     truth:
@@ -82,12 +82,12 @@ dependencies:
   io.grpc:
     grpc-all:
       lang: java
-      version: "1.23.0"
+      version: "1.24.0"
 
     grpc:
       lang: java
       modules: [ "api", "auth", "core", "context", "netty", "stub", "protobuf", "testing" ]
-      version: "1.23.0"
+      version: "1.24.0"
 
   junit:
     junit:
