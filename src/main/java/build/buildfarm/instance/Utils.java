@@ -84,13 +84,15 @@ public class Utils {
               .asRuntimeException());
     }
     Write write = instance.getBlobWrite(digest, UUID.randomUUID(), requestMetadata);
+    // indicate that we know this write is novel
+    write.reset();
     SettableFuture<Digest> future = SettableFuture.create();
     write.addListener(
         () -> future.set(digest),
         directExecutor());
     try (OutputStream out = write.getOutput(writeDeadlineAfter, writeDeadlineAfterUnits, () -> {})) {
       data.writeTo(out);
-    } catch (IOException e) {
+    } catch (Exception e) {
       future.setException(e);
     }
     return future;
