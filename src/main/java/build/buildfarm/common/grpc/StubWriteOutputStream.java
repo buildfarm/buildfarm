@@ -78,7 +78,8 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
             return response;
           } catch (StatusRuntimeException e) {
             Status status = Status.fromThrowable(e);
-            if (status.getCode() == Code.UNIMPLEMENTED) {
+            if (status.getCode() == Code.UNIMPLEMENTED ||
+                status.getCode() == Code.NOT_FOUND) {
               return resetResponse;
             }
             throw e;
