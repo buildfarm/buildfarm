@@ -71,9 +71,9 @@ http_archive(
 # Download the rules_docker repository at release v0.10.1
 http_archive(
     name = "io_bazel_rules_docker",
-    sha256 = "9ff889216e28c918811b77999257d4ac001c26c1f7c7fb17a79bc28abf74182e",
-    strip_prefix = "rules_docker-0.10.1",
-    urls = ["https://github.com/bazelbuild/rules_docker/releases/download/v0.10.1/rules_docker-v0.10.1.tar.gz"],
+    sha256 = "413bb1ec0895a8d3249a01edf24b82fd06af3c8633c9fb833a0cb1d4b234d46d",
+    strip_prefix = "rules_docker-0.12.0",
+    urls = ["https://github.com/bazelbuild/rules_docker/archive/v0.12.0.tar.gz"],
 )
 
 load(
