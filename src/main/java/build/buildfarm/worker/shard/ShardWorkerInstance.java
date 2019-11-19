@@ -128,7 +128,8 @@ public class ShardWorkerInstance extends AbstractServerInstance {
       Digest blobDigest,
       long offset,
       long limit,
-      StreamObserver<ByteString> blobObserver) {
+      StreamObserver<ByteString> blobObserver,
+      RequestMetadata requestMetadata) {
     try (InputStream input = inputStreamFactory.newInput(blobDigest, offset)) {
       getBlob(input, blobDigest.getSizeBytes() - offset, limit, blobObserver);
     } catch (IOException e) {

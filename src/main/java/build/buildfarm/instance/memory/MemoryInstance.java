@@ -20,6 +20,7 @@ import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static build.buildfarm.instance.Utils.putBlob;
 import static com.google.common.collect.Multimaps.synchronizedSetMultimap;
 import static com.google.common.util.concurrent.Futures.addCallback;
+import static com.google.common.util.concurrent.Futures.catching;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
@@ -112,6 +113,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
+import javax.annotation.Nullable;
 
 public class MemoryInstance extends AbstractServerInstance {
   private static final Logger logger = Logger.getLogger(MemoryInstance.class.getName());
@@ -492,6 +494,14 @@ public class MemoryInstance extends AbstractServerInstance {
     }
   }
 
+  private @Nullable Digest expectActionDigest(Operation operation) {
+    ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
+    if (metadata == null) {
+      return null;
+    }
+    return metadata.getActionDigest();
+  }
+
   @Override
   public boolean putOperation(Operation operation) throws InterruptedException {
     if (!super.putOperation(operation)) {
@@ -606,10 +616,18 @@ public class MemoryInstance extends AbstractServerInstance {
     ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
     Preconditions.checkState(metadata != null, "metadata not found");
 
-    Action action = getUnchecked(expect(metadata.getActionDigest(), Action.parser(), newDirectExecutorService()));
+    Action action = getUnchecked(expect(
+        metadata.getActionDigest(),
+        Action.parser(),
+        newDirectExecutorService(),
+        RequestMetadata.getDefaultInstance()));
     Preconditions.checkState(action != null, "action not found");
 
-    Command command = getUnchecked(expect(action.getCommandDigest(), Command.parser(), newDirectExecutorService()));
+    Command command = getUnchecked(expect(
+        action.getCommandDigest(),
+        Command.parser(),
+        newDirectExecutorService(),
+        RequestMetadata.getDefaultInstance()));
     Preconditions.checkState(command != null, "command not found");
 
     Tree tree = getCompleteTree(action.getInputRootDigest());
@@ -667,10 +685,18 @@ public class MemoryInstance extends AbstractServerInstance {
       ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
       Preconditions.checkState(metadata != null, "metadata not found");
 
-      Action action = getUnchecked(expect(metadata.getActionDigest(), Action.parser(), newDirectExecutorService()));
+      Action action = getUnchecked(expect(
+          metadata.getActionDigest(),
+          Action.parser(),
+          newDirectExecutorService(),
+          RequestMetadata.getDefaultInstance()));
       Preconditions.checkState(action != null, "action not found");
 
-      Command command = getUnchecked(expect(action.getCommandDigest(), Command.parser(), newDirectExecutorService()));
+      Command command = getUnchecked(expect(
+          action.getCommandDigest(),
+          Command.parser(),
+          newDirectExecutorService(),
+          RequestMetadata.getDefaultInstance()));
       Preconditions.checkState(command != null, "command not found");
 
       String operationName = operation.getName();
@@ -804,7 +830,20 @@ public class MemoryInstance extends AbstractServerInstance {
   protected TokenizableIterator<DirectoryEntry> createTreeIterator(
       String reason, Digest rootDigest, String pageToken) {
     ExecutorService service = newDirectExecutorService();
-    return new TreeIterator((digest) -> expect(digest, Directory.parser(), service), rootDigest, pageToken);
+    return new TreeIterator(
+        (digest) -> catching(
+          expect(digest, Directory.parser(), service, RequestMetadata.getDefaultInstance()),
+          Exception.class,
+          (e) -> {
+            Status status = Status.fromThrowable(e);
+            if (status.getCode() != Code.NOT_FOUND) {
+              logger.log(SEVERE, "error fetching directory", e);
+            }
+            return null;
+          },
+          service),
+        rootDigest,
+        pageToken);
   }
 
   @Override

@@ -280,30 +280,39 @@ public abstract class AbstractServerInstance implements Instance {
         (int) offset, (int) (endIndex > blob.size() ? blob.size() : endIndex));
   }
 
-  protected ListenableFuture<ByteString> getBlobFuture(Digest blobDigest) {
-    return getBlobFuture(blobDigest, /* offset=*/ 0, /* limit=*/ 0);
+  protected ListenableFuture<ByteString> getBlobFuture(Digest blobDigest, RequestMetadata requestMetadata) {
+    return getBlobFuture(blobDigest, /* offset=*/ 0, /* limit=*/ 0, requestMetadata);
   }
 
-  protected ListenableFuture<ByteString> getBlobFuture(Digest blobDigest, long offset, long limit) {
+  protected ListenableFuture<ByteString> getBlobFuture(
+      Digest blobDigest,
+      long offset,
+      long limit,
+      RequestMetadata requestMetadata) {
     SettableFuture<ByteString> future = SettableFuture.create();
-    getBlob(blobDigest, offset, limit, new StreamObserver<ByteString>() {
-      ByteString content = ByteString.EMPTY;
+    getBlob(
+        blobDigest,
+        offset,
+        limit,
+        new StreamObserver<ByteString>() {
+          ByteString content = ByteString.EMPTY;
 
-      @Override
-      public void onNext(ByteString chunk) {
-        content = content.concat(chunk);
-      }
+          @Override
+          public void onNext(ByteString chunk) {
+            content = content.concat(chunk);
+          }
 
-      @Override
-      public void onCompleted() {
-        future.set(content);
-      }
+          @Override
+          public void onCompleted() {
+            future.set(content);
+          }
 
-      @Override
-      public void onError(Throwable t) {
-        future.setException(t);
-      }
-    });
+          @Override
+          public void onError(Throwable t) {
+            future.setException(t);
+          }
+        },
+        requestMetadata);
     return future;
   }
 
@@ -312,7 +321,8 @@ public abstract class AbstractServerInstance implements Instance {
       Digest blobDigest,
       long offset,
       long limit,
-      StreamObserver<ByteString> blobObserver) {
+      StreamObserver<ByteString> blobObserver,
+      RequestMetadata requestMetadata) {
     try {
       ByteString blob = getBlob(blobDigest, offset, limit);
       if (blob == null) {
@@ -638,7 +648,8 @@ public abstract class AbstractServerInstance implements Instance {
   protected ListenableFuture<Tree> getTreeFuture(
       String reason,
       Digest inputRoot,
-      ExecutorService service) {
+      ExecutorService service,
+      RequestMetadata requestMetadata) {
     return listeningDecorator(service).submit(() -> {
       Tree.Builder tree = Tree.newBuilder();
 
@@ -772,8 +783,8 @@ public abstract class AbstractServerInstance implements Instance {
     ImmutableSet.Builder<Digest> inputDigestsBuilder = ImmutableSet.builder();
     validateAction(
         action,
-        getUnchecked(expect(action.getCommandDigest(), Command.parser(), service)),
-        getUnchecked(getTreeFuture(operationName, action.getInputRootDigest(), service)),
+        getUnchecked(expect(action.getCommandDigest(), Command.parser(), service, requestMetadata)),
+        getUnchecked(getTreeFuture(operationName, action.getInputRootDigest(), service, requestMetadata)),
         inputDigestsBuilder,
         preconditionFailure);
     validateInputs(
@@ -1142,38 +1153,15 @@ public abstract class AbstractServerInstance implements Instance {
     return null;
   }
 
-  protected @Nullable Digest expectActionDigest(Operation operation) {
-    ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
-    if (metadata == null) {
-      return null;
-    }
-    return metadata.getActionDigest();
-  }
-
-  protected @Nullable Action expectAction(Operation operation) throws InterruptedException {
-    try {
-      Digest actionDigest = expectActionDigest(operation);
-      if (actionDigest == null) {
-        return null;
-      }
-      ByteString actionBlob = getBlob(expectActionDigest(operation));
-      if (actionBlob != null) {
-        return Action.parseFrom(actionBlob);
-      }
-    } catch (IOException e) {
-      Status status = Status.fromThrowable(e);
-      if (status.getCode() != io.grpc.Status.Code.NOT_FOUND) {
-        getLogger().log(SEVERE, "error retrieving action", e);
-      }
-    }
-    return null;
-  }
-
-  protected <T> ListenableFuture<T> expect(Digest digest, Parser<T> parser, Executor executor) {
+  protected <T> ListenableFuture<T> expect(
+      Digest digest,
+      Parser<T> parser,
+      Executor executor,
+      RequestMetadata requestMetadata) {
     // FIXME find a way to make this a transform
     SettableFuture<T> future = SettableFuture.create();
     Futures.addCallback(
-        getBlobFuture(digest),
+        getBlobFuture(digest, requestMetadata),
         new FutureCallback<ByteString>() {
           @Override
           public void onSuccess(ByteString blob) {

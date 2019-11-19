@@ -216,7 +216,7 @@ public class ShardInstanceTest {
         }
         return null;
       }
-    }).when(mockWorkerInstance).getBlob(eq(actionDigest), eq(0l), eq(0l), any(StreamObserver.class));
+    }).when(mockWorkerInstance).getBlob(eq(actionDigest), eq(0l), eq(0l), any(StreamObserver.class), any(RequestMetadata.class));
     when(mockBackplane.getBlobLocationSet(eq(actionDigest))).thenReturn(provideAction ? workers : ImmutableSet.of());
     when(mockWorkerInstance.findMissingBlobs(eq(ImmutableList.of(actionDigest)), any(Executor.class), any(RequestMetadata.class)))
         .thenReturn(immediateFuture(ImmutableList.of()));
@@ -662,7 +662,7 @@ public class ShardInstanceTest {
         blobObserver.onCompleted();
         return null;
       }
-    }).when(mockWorkerInstance).getBlob(eq(digest), eq(0l), eq(0l), any(StreamObserver.class));
+    }).when(mockWorkerInstance).getBlob(eq(digest), eq(0l), eq(0l), any(StreamObserver.class), any(RequestMetadata.class));
   }
 
   @Test

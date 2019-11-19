@@ -417,9 +417,11 @@ public class StubInstance implements Instance {
       Digest blobDigest,
       long offset,
       long limit,
-      StreamObserver<ByteString> blobObserver) {
+      StreamObserver<ByteString> blobObserver,
+      RequestMetadata requestMetadata) {
     throwIfStopped();
     deadlined(bsStub)
+        .withInterceptors(attachMetadataInterceptor(requestMetadata))
         .read(
             ReadRequest.newBuilder()
                 .setResourceName(getBlobName(blobDigest))

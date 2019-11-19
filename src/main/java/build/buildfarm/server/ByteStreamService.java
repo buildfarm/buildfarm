@@ -207,34 +207,41 @@ public class ByteStreamService extends ByteStreamImplBase {
     };
   }
 
+  StreamObserver<ByteString> newChunkObserver(StreamObserver<ReadResponse> responseObserver) {
+    return new StreamObserver<ByteString>() {
+      @Override
+      public void onNext(ByteString data) {
+        responseObserver.onNext(ReadResponse.newBuilder()
+            .setData(data)
+            .build());
+      }
+
+      @Override
+      public void onError(Throwable t) {
+        responseObserver.onError(t);
+      }
+
+      @Override
+      public void onCompleted() {
+        responseObserver.onCompleted();
+      }
+    };
+  }
+
   void readLimitedBlob(
       Instance instance,
       Digest digest,
       long offset,
       long limit,
       StreamObserver<ReadResponse> responseObserver) {
-    try {
-      InputStream in = instance.newBlobInput(
-          digest,
-          offset,
-          deadlineAfter,
-          deadlineAfterUnits,
-          TracingMetadataUtils.fromCurrentContext());
-      ServerCallStreamObserver<ReadResponse> target =
-          (ServerCallStreamObserver<ReadResponse>) responseObserver;
-      target.setOnCancelHandler(() -> {
-        try {
-          in.close();
-        } catch (IOException e) {
-          logger.log(SEVERE, "error closing stream", e);
-        }
-      });
-      readFrom(in, limit, onErrorLogReadObserver(DigestUtil.toString(digest), offset, target));
-    } catch (NoSuchFileException e) {
-      responseObserver.onError(NOT_FOUND.asException());
-    } catch (IOException e) {
-      responseObserver.onError(Status.fromThrowable(e).asException());
-    }
+    CallStreamObserver<ReadResponse> target =
+        (CallStreamObserver<ReadResponse>) responseObserver;
+    instance.getBlob(
+        digest,
+        offset,
+        limit,
+        newChunkObserver(onErrorLogReadObserver(DigestUtil.toString(digest), offset, target)),
+        TracingMetadataUtils.fromCurrentContext());
   }
 
   void readBlob(

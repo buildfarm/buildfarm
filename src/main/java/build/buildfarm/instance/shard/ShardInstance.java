@@ -29,7 +29,6 @@ import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.Futures.transformAsync;
-import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static java.lang.String.format;
@@ -605,7 +604,8 @@ public class ShardInstance extends AbstractServerInstance {
       Deque<String> workers,
       long offset,
       long limit,
-      StreamObserver<ByteString> blobObserver) {
+      StreamObserver<ByteString> blobObserver,
+      RequestMetadata requestMetadata) {
     String worker = workers.removeFirst();
     workerStub(worker).getBlob(
         blobDigest,
@@ -655,7 +655,8 @@ public class ShardInstance extends AbstractServerInstance {
                     workers,
                     offset + received,
                     nextLimit,
-                    blobObserver);
+                    blobObserver,
+                    requestMetadata);
               }
             }
           }
@@ -664,7 +665,8 @@ public class ShardInstance extends AbstractServerInstance {
           public void onCompleted() {
             blobObserver.onCompleted();
           }
-        });
+        },
+        requestMetadata);
   }
 
   @Override
@@ -672,7 +674,8 @@ public class ShardInstance extends AbstractServerInstance {
       Digest blobDigest,
       long offset,
       long limit,
-      StreamObserver<ByteString> blobObserver) {
+      StreamObserver<ByteString> blobObserver,
+      RequestMetadata requestMetadata) {
     List<String> workersList;
     Set<String> workerSet;
     Set<String> locationSet;
@@ -691,7 +694,7 @@ public class ShardInstance extends AbstractServerInstance {
     if (emptyWorkerList) {
       logger.info(format("worker list was initially empty for %s, attempting to correct", DigestUtil.toString(blobDigest)));
       populatedWorkerListFuture = transform(
-          correctMissingBlob(backplane, workerSet, locationSet, this::workerStub, blobDigest, newDirectExecutorService(), RequestMetadata.getDefaultInstance()),
+          correctMissingBlob(backplane, workerSet, locationSet, this::workerStub, blobDigest, directExecutor(), RequestMetadata.getDefaultInstance()),
           (foundOnWorkers) -> {
             logger.info(format("worker list was corrected for %s to be %s", DigestUtil.toString(blobDigest), foundOnWorkers.toString()));
             Iterables.addAll(workersList, foundOnWorkers);
@@ -746,7 +749,8 @@ public class ShardInstance extends AbstractServerInstance {
                           workers,
                           offset,
                           limit,
-                          checkedChunkObserver));
+                          checkedChunkObserver,
+                          requestMetadata));
                 }
 
                 @Override
@@ -776,7 +780,8 @@ public class ShardInstance extends AbstractServerInstance {
                     workers,
                     offset,
                     limit,
-                    chunkObserver));
+                    chunkObserver,
+                    requestMetadata));
           }
 
           @Override
@@ -893,8 +898,8 @@ public class ShardInstance extends AbstractServerInstance {
       String reason, Digest rootDigest, String pageToken) {
     return new TreeIterator(
         (directoryBlobDigest) -> catching(
-            expectDirectory(reason, directoryBlobDigest, newDirectExecutorService()),
-            Throwable.class,
+            expectDirectory(reason, directoryBlobDigest, directExecutor(), RequestMetadata.getDefaultInstance()),
+            Exception.class,
             (t) -> {
               logger.log(
                   SEVERE,
@@ -940,7 +945,8 @@ public class ShardInstance extends AbstractServerInstance {
   protected ListenableFuture<Tree> getTreeFuture(
       String reason,
       Digest inputRoot,
-      ExecutorService service) {
+      ExecutorService service,
+      RequestMetadata requestMetadata) {
     SettableFuture<Void> future = SettableFuture.create();
     Tree.Builder tree = Tree.newBuilder();
     Set<Digest> digests = Sets.newConcurrentHashSet();
@@ -971,7 +977,7 @@ public class ShardInstance extends AbstractServerInstance {
         Digest nextDigest = remaining.poll();
         if (!future.isDone() && nextDigest != null) {
           ctx.run(() -> addCallback(
-              expectDirectory(reason, nextDigest, service), this, service));
+              expectDirectory(reason, nextDigest, service, requestMetadata), this, service));
           return true;
         }
         return false;
@@ -979,25 +985,6 @@ public class ShardInstance extends AbstractServerInstance {
     };
     callback.next();
     return transform(future, (result) -> tree.build(), service);
-  }
-
-  @Override
-  protected Action expectAction(Operation operation) throws InterruptedException {
-    if (operation.getMetadata().is(QueuedOperationMetadata.class)) {
-      try {
-        QueuedOperationMetadata metadata = operation.getMetadata()
-            .unpack(QueuedOperationMetadata.class);
-        QueuedOperation queuedOperation = getUnchecked(
-            expect(metadata.getQueuedOperationDigest(), QueuedOperation.parser(), directExecutor()));
-        if (queuedOperation.hasAction()) {
-          return queuedOperation.getAction();
-        }
-      } catch (InvalidProtocolBufferException e) {
-        logger.log(SEVERE, "invalid queued operation format", e);
-        return null;
-      }
-    }
-    return super.expectAction(operation);
   }
 
   private static <V> ListenableFuture<V> notFoundNull(ListenableFuture<V> value) {
@@ -1014,11 +1001,11 @@ public class ShardInstance extends AbstractServerInstance {
         directExecutor());
   }
 
-  ListenableFuture<Directory> expectDirectory(String reason, Digest directoryBlobDigest, Executor executor) {
+  ListenableFuture<Directory> expectDirectory(String reason, Digest directoryBlobDigest, Executor executor, RequestMetadata requestMetadata) {
     if (directoryBlobDigest.getSizeBytes() == 0) {
       return immediateFuture(Directory.getDefaultInstance());
     }
-    Supplier<ListenableFuture<Directory>> fetcher = () -> notFoundNull(expect(directoryBlobDigest, Directory.parser(), executor));
+    Supplier<ListenableFuture<Directory>> fetcher = () -> notFoundNull(expect(directoryBlobDigest, Directory.parser(), executor, requestMetadata));
     // is there a better interface to use for the cache with these nice futures?
     return catching(
       directoryCache.get(directoryBlobDigest, new Callable<ListenableFuture<? extends Directory>>() {
@@ -1038,11 +1025,11 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @Override
-  protected <T> ListenableFuture<T> expect(Digest digest, Parser<T> parser, Executor executor) {
+  protected <T> ListenableFuture<T> expect(Digest digest, Parser<T> parser, Executor executor, RequestMetadata requestMetadata) {
     Context.CancellableContext withDeadline = Context.current().withDeadlineAfter(60, SECONDS, contextDeadlineScheduler);
     Context previousContext = withDeadline.attach();
     try {
-      ListenableFuture<T> future = super.expect(digest, parser, executor);
+      ListenableFuture<T> future = super.expect(digest, parser, executor, requestMetadata);
       future.addListener(() -> {
         withDeadline.cancel(null);
       }, directExecutor());
@@ -1052,8 +1039,8 @@ public class ShardInstance extends AbstractServerInstance {
     }
   }
 
-  ListenableFuture<Command> expectCommand(Digest commandBlobDigest, Executor executor) {
-    Supplier<ListenableFuture<Command>> fetcher = () -> notFoundNull(expect(commandBlobDigest, Command.parser(), executor));
+  ListenableFuture<Command> expectCommand(Digest commandBlobDigest, Executor executor, RequestMetadata requestMetadata) {
+    Supplier<ListenableFuture<Command>> fetcher = () -> notFoundNull(expect(commandBlobDigest, Command.parser(), executor, requestMetadata));
     return catching(
         commandCache.get(commandBlobDigest, new Callable<ListenableFuture<? extends Command>>() {
           @Override
@@ -1066,8 +1053,8 @@ public class ShardInstance extends AbstractServerInstance {
         directExecutor());
   }
 
-  ListenableFuture<Action> expectAction(Digest actionBlobDigest, Executor executor) {
-    Supplier<ListenableFuture<Action>> fetcher = () -> notFoundNull(expect(actionBlobDigest, Action.parser(), executor));
+  ListenableFuture<Action> expectAction(Digest actionBlobDigest, Executor executor, RequestMetadata requestMetadata) {
+    Supplier<ListenableFuture<Action>> fetcher = () -> notFoundNull(expect(actionBlobDigest, Action.parser(), executor, requestMetadata));
     return catching(
         actionCache.get(actionBlobDigest, new Callable<ListenableFuture<? extends Action>>() {
           @Override
@@ -1108,7 +1095,10 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   private ListenableFuture<QueuedOperation> buildQueuedOperation(
-      String operationName, Action action, ExecutorService service) {
+      String operationName,
+      Action action,
+      ExecutorService service,
+      RequestMetadata requestMetadata) {
     QueuedOperation.Builder queuedOperationBuilder = QueuedOperation.newBuilder()
         .setAction(action);
     return transformQueuedOperation(
@@ -1117,7 +1107,8 @@ public class ShardInstance extends AbstractServerInstance {
         action.getCommandDigest(),
         action.getInputRootDigest(),
         queuedOperationBuilder,
-        service);
+        service,
+        requestMetadata);
   }
 
   private QueuedOperationMetadata buildQueuedOperationMetadata(
@@ -1138,11 +1129,12 @@ public class ShardInstance extends AbstractServerInstance {
       Digest commandDigest,
       Digest inputRootDigest,
       QueuedOperation.Builder queuedOperationBuilder,
-      ExecutorService service) {
+      ExecutorService service,
+      RequestMetadata requestMetadata) {
     return transform(
         allAsList(
             transform(
-                expectCommand(commandDigest, service),
+                expectCommand(commandDigest, service, requestMetadata),
                 (command) -> {
                   logger.info(format("transformQueuedOperation(%s): fetched command", operationName));
                   if (command != null) {
@@ -1152,7 +1144,7 @@ public class ShardInstance extends AbstractServerInstance {
                 },
                 service),
             transform(
-                getTreeFuture(operationName, inputRootDigest, service),
+                getTreeFuture(operationName, inputRootDigest, service, requestMetadata),
                 queuedOperationBuilder::setTree,
                 service)),
         (result) -> queuedOperationBuilder.setAction(action).build(),
@@ -1217,14 +1209,15 @@ public class ShardInstance extends AbstractServerInstance {
   private ListenableFuture<QueuedOperation> buildQueuedOperation(
       String operationName,
       Digest actionDigest,
-      ExecutorService service) {
+      ExecutorService service,
+      RequestMetadata requestMetadata) {
     return transformAsync(
-        expectAction(actionDigest, service),
+        expectAction(actionDigest, service, requestMetadata),
         (action) -> {
           if (action == null) {
             return immediateFuture(QueuedOperation.getDefaultInstance());
           }
-          return buildQueuedOperation(operationName, action, service);
+          return buildQueuedOperation(operationName, action, service, requestMetadata);
         },
         service);
   }
@@ -1236,13 +1229,14 @@ public class ShardInstance extends AbstractServerInstance {
     ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
     String operationName = executeEntry.getOperationName();
     checkState(operationName.equals(operation.getName()));
+    RequestMetadata requestMetadata = executeEntry.getRequestMetadata();
     ListenableFuture<QueuedOperation> fetchQueuedOperationFuture =
-        expect(queueEntry.getQueuedOperationDigest(), QueuedOperation.parser(), operationTransformService);
+        expect(queueEntry.getQueuedOperationDigest(), QueuedOperation.parser(), operationTransformService, requestMetadata);
     Digest actionDigest = executeEntry.getActionDigest();
     ListenableFuture<QueuedOperation> queuedOperationFuture = catchingAsync(
         fetchQueuedOperationFuture,
         Throwable.class,
-        (e) -> buildQueuedOperation(operation.getName(), actionDigest, operationTransformService),
+        (e) -> buildQueuedOperation(operation.getName(), actionDigest, operationTransformService, requestMetadata),
         directExecutor());
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
     ListenableFuture<QueuedOperation> validatedFuture = transformAsync(
@@ -1253,8 +1247,8 @@ public class ShardInstance extends AbstractServerInstance {
               actionDigest,
               queuedOperation,
               preconditionFailure,
-              newDirectExecutorService(),
-              executeEntry.getRequestMetadata());
+              directExecutor(),
+              requestMetadata);
           return immediateFuture(queuedOperation);
         },
         operationTransformService);
@@ -1274,7 +1268,7 @@ public class ShardInstance extends AbstractServerInstance {
                           .setStderrStreamName(executeEntry.getStderrStreamName())
                           .setStage(ExecutionStage.Value.QUEUED))
                       .setQueuedOperationDigest(queueEntry.getQueuedOperationDigest())
-                      .setRequestMetadata(executeEntry.getRequestMetadata())
+                      .setRequestMetadata(requestMetadata)
                       .build();
                   return new QueuedOperationResult(queueEntry, metadata);
                 },
@@ -1311,7 +1305,7 @@ public class ShardInstance extends AbstractServerInstance {
             }
             logFailedStatus(actionDigest, status);
             SettableFuture<Void> errorFuture = SettableFuture.create();
-            errorOperationFuture(operation, executeEntry.getRequestMetadata(), status, errorFuture);
+            errorOperationFuture(operation, requestMetadata, status, errorFuture);
             errorFuture.addListener(
                 () -> requeuedFuture.set(null),
                 operationTransformService);
@@ -1628,9 +1622,10 @@ public class ShardInstance extends AbstractServerInstance {
             getName(),
             operation.getName(),
             actionDigest.getHash()));
+    RequestMetadata requestMetadata = executeEntry.getRequestMetadata();
     ListenableFuture<Action> actionFuture = catchingAsync(
         transformAsync(
-            expectAction(actionDigest, operationTransformService),
+            expectAction(actionDigest, operationTransformService, requestMetadata),
             (action) -> {
               if (action == null) {
                 throw Status.NOT_FOUND.asException();
@@ -1670,12 +1665,13 @@ public class ShardInstance extends AbstractServerInstance {
                   action.getCommandDigest(),
                   action.getInputRootDigest(),
                   queuedOperationBuilder,
-                  operationTransformService),
+                  operationTransformService,
+                  requestMetadata),
               (queuedOperation) -> ProfiledQueuedOperationMetadata.newBuilder()
                   .setQueuedOperation(queuedOperation)
                   .setQueuedOperationMetadata(buildQueuedOperationMetadata(
                       metadata,
-                      executeEntry.getRequestMetadata(),
+                      requestMetadata,
                       queuedOperation))
                   .setTransformedIn(Durations.fromMicros(transformStopwatch.elapsed(MICROSECONDS))),
               operationTransformService);
@@ -1713,7 +1709,7 @@ public class ShardInstance extends AbstractServerInstance {
                   .getQueuedOperationDigest();
           long startUploadUSecs = stopwatch.elapsed(MICROSECONDS);
           return transform(
-              writeBlobFuture(queuedOperationDigest, queuedOperationBlob, executeEntry.getRequestMetadata()),
+              writeBlobFuture(queuedOperationDigest, queuedOperationBlob, requestMetadata),
               (committedSize) -> profiledQueuedMetadata
                   .setUploadedIn(Durations.fromMicros(stopwatch.elapsed(MICROSECONDS) - startUploadUSecs))
                   .build(),
@@ -1771,7 +1767,7 @@ public class ShardInstance extends AbstractServerInstance {
               status = asExecutionStatus(t);
             }
             logFailedStatus(actionDigest, status);
-            errorOperationFuture(operation, executeEntry.getRequestMetadata(), status, queueFuture);
+            errorOperationFuture(operation, requestMetadata, status, queueFuture);
           }
         },
         operationTransformService);

@@ -68,7 +68,8 @@ public interface Instance {
       Digest blobDigest,
       long offset,
       long limit,
-      StreamObserver<ByteString> blobObserver);
+      StreamObserver<ByteString> blobObserver,
+      RequestMetadata requestMetadata);
   InputStream newBlobInput(
       Digest digest,
       long offset,
