@@ -31,8 +31,10 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.UrlPath.InvalidResourceNameException;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
-import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.common.io.FeedbackOutputStream;
+import build.buildfarm.common.grpc.DelegateServerCallStreamObserver;
+import build.buildfarm.common.grpc.TracingMetadataUtils;
+import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
 import build.buildfarm.instance.Instance;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamImplBase;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
@@ -165,44 +167,35 @@ public class ByteStreamService extends ByteStreamImplBase {
     target.setOnReadyHandler(new ReadFromOnReadyHandler());
   }
 
-  <T> CallStreamObserver<T> onErrorLogReadObserver(String name, long offset, CallStreamObserver<T> delegate) {
-    return new CallStreamObserver<T>() {
-      @Override
-      public void disableAutoInboundFlowControl() {
-        delegate.disableAutoInboundFlowControl();
-      }
+  ServerCallStreamObserver<ReadResponse> onErrorLogReadObserver(
+      String name,
+      long offset,
+      ServerCallStreamObserver<ReadResponse> delegate) {
+    return new UniformDelegateServerCallStreamObserver<ReadResponse>(delegate) {
+      long responseCount = 0;
+      long responseBytes = 0;
 
       @Override
-      public boolean isReady() {
-        return delegate.isReady();
-      }
-
-      @Override
-      public void request(int count) {
-        delegate.request(count);
-      }
-
-      @Override
-      public void setMessageCompression(boolean enable) {
-        delegate.setMessageCompression(enable);
-      }
-
-      @Override
-      public void setOnReadyHandler(Runnable onReadyHandler) {
-        delegate.setOnReadyHandler(onReadyHandler);
-      }
-
-      @Override
-      public void onNext(T response) {
+      public void onNext(ReadResponse response) {
         delegate.onNext(response);
+        responseCount++;
+        responseBytes += response.getData().size();
       }
 
       @Override
       public void onError(Throwable t) {
         Status status = Status.fromThrowable(t);
-        Level level = status.getCode() == Code.NOT_FOUND ? WARNING : SEVERE;
         if (status.getCode() != Code.NOT_FOUND) {
-          logger.log(level, format("error reading %s at offset %d", name, offset), t);
+          Level level = SEVERE;
+          if (responseCount > 0 &&
+              status.getCode() == Code.DEADLINE_EXCEEDED || status.getCode() == Code.CANCELLED) {
+            level = WARNING;
+          }
+          String message = format("error reading %s at offset %d", name, offset);
+          if (responseCount > 0) {
+            message += format(" after %d responses and %d bytes of content", responseCount, responseBytes);
+          }
+          logger.log(level, message, t);
         }
         delegate.onError(t);
       }
@@ -214,8 +207,8 @@ public class ByteStreamService extends ByteStreamImplBase {
     };
   }
 
-  StreamObserver<ByteString> newChunkObserver(StreamObserver<ReadResponse> responseObserver) {
-    return new StreamObserver<ByteString>() {
+  ServerCallStreamObserver<ByteString> newChunkObserver(ServerCallStreamObserver<ReadResponse> responseObserver) {
+    return new DelegateServerCallStreamObserver<ByteString, ReadResponse>(responseObserver) {
       @Override
       public void onNext(ByteString data) {
         responseObserver.onNext(ReadResponse.newBuilder()
@@ -241,14 +234,21 @@ public class ByteStreamService extends ByteStreamImplBase {
       long offset,
       long limit,
       StreamObserver<ReadResponse> responseObserver) {
-    CallStreamObserver<ReadResponse> target =
-        (CallStreamObserver<ReadResponse>) responseObserver;
-    instance.getBlob(
-        digest,
-        offset,
-        limit,
-        newChunkObserver(onErrorLogReadObserver(DigestUtil.toString(digest), offset, target)),
-        TracingMetadataUtils.fromCurrentContext());
+    ServerCallStreamObserver<ReadResponse> target =
+        onErrorLogReadObserver(
+            format("%s(%s)", DigestUtil.toString(digest), instance.getName()),
+            offset,
+            (ServerCallStreamObserver<ReadResponse>) responseObserver);
+    try {
+      instance.getBlob(
+          digest,
+          offset,
+          limit,
+          newChunkObserver(target),
+          TracingMetadataUtils.fromCurrentContext());
+    } catch (Exception e) {
+      target.onError(e);
+    }
   }
 
   void readBlob(
@@ -257,13 +257,12 @@ public class ByteStreamService extends ByteStreamImplBase {
       long offset,
       long limit,
       StreamObserver<ReadResponse> responseObserver) {
-    if (offset == digest.getSizeBytes()) {
+    long available = digest.getSizeBytes() - offset;
+    if (available == 0) {
       responseObserver.onCompleted();
-    } else if (offset > digest.getSizeBytes()) {
-      logger.finer(format("offset %d is out of range of %s", offset, DigestUtil.toString(digest)));
+    } else if (available < 0) {
       responseObserver.onError(OUT_OF_RANGE.asException());
     } else {
-      long available = digest.getSizeBytes() - offset;
       if (limit == 0) {
         limit = available;
       } else {

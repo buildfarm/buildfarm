@@ -72,6 +72,7 @@ import build.buildfarm.common.cache.Cache;
 import build.buildfarm.common.cache.CacheBuilder;
 import build.buildfarm.common.cache.CacheLoader.InvalidCacheLoadException;
 import build.buildfarm.common.grpc.RetryException;
+import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
 import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.ByteStreamUploader;
@@ -118,7 +119,7 @@ import io.grpc.StatusRuntimeException;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.protobuf.StatusProto;
-import io.grpc.stub.StreamObserver;
+import io.grpc.stub.ServerCallStreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -605,15 +606,15 @@ public class ShardInstance extends AbstractServerInstance {
       Digest blobDigest,
       Deque<String> workers,
       long offset,
-      long limit,
-      StreamObserver<ByteString> blobObserver,
+      long count,
+      ServerCallStreamObserver<ByteString> blobObserver,
       RequestMetadata requestMetadata) {
     String worker = workers.removeFirst();
     workerStub(worker).getBlob(
         blobDigest,
         offset,
-        limit,
-        new StreamObserver<ByteString>() {
+        count,
+        new UniformDelegateServerCallStreamObserver<ByteString>(blobObserver) {
           long received = 0;
 
           @Override
@@ -641,24 +642,23 @@ public class ShardInstance extends AbstractServerInstance {
             if (workers.isEmpty()) {
               blobObserver.onError(Status.NOT_FOUND.asException());
             } else {
-              long nextLimit;
-              if (limit == 0) {
-                nextLimit = 0;
-              } else {
-                checkState(limit >= received);
-                nextLimit = limit - received;
-              }
-              if (nextLimit == 0 && limit != 0) {
+              checkState(count >= received);
+              long nextCount = count - received;
+              if (nextCount == 0) {
                 // be gracious and terminate the blobObserver here
                 onCompleted();
               } else {
-                fetchBlobFromWorker(
-                    blobDigest,
-                    workers,
-                    offset + received,
-                    nextLimit,
-                    blobObserver,
-                    requestMetadata);
+                try {
+                  fetchBlobFromWorker(
+                      blobDigest,
+                      workers,
+                      offset + received,
+                      nextCount,
+                      blobObserver,
+                      requestMetadata);
+                } catch (Exception e) {
+                  blobObserver.onError(e);
+                }
               }
             }
           }
@@ -675,8 +675,8 @@ public class ShardInstance extends AbstractServerInstance {
   public void getBlob(
       Digest blobDigest,
       long offset,
-      long limit,
-      StreamObserver<ByteString> blobObserver,
+      long count,
+      ServerCallStreamObserver<ByteString> blobObserver,
       RequestMetadata requestMetadata) {
     List<String> workersList;
     Set<String> workerSet;
@@ -708,7 +708,8 @@ public class ShardInstance extends AbstractServerInstance {
     }
 
     Context ctx = Context.current();
-    StreamObserver<ByteString> chunkObserver = new StreamObserver<ByteString>() {
+    ServerCallStreamObserver<ByteString> chunkObserver =
+        new UniformDelegateServerCallStreamObserver<ByteString>(blobObserver) {
       boolean triedCheck = emptyWorkerList;
 
       @Override
@@ -739,7 +740,7 @@ public class ShardInstance extends AbstractServerInstance {
                 return workersList;
               },
               directExecutor());
-          final StreamObserver<ByteString> checkedChunkObserver = this;
+          final ServerCallStreamObserver<ByteString> checkedChunkObserver = this;
           addCallback(
               workersListFuture,
               new WorkersCallback(rand) {
@@ -750,7 +751,7 @@ public class ShardInstance extends AbstractServerInstance {
                           blobDigest,
                           workers,
                           offset,
-                          limit,
+                          count,
                           checkedChunkObserver,
                           requestMetadata));
                 }
@@ -781,7 +782,7 @@ public class ShardInstance extends AbstractServerInstance {
                     blobDigest,
                     workers,
                     offset,
-                    limit,
+                    count,
                     chunkObserver,
                     requestMetadata));
           }

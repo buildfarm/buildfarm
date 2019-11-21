@@ -104,6 +104,9 @@ import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.AbstractStub;
+import io.grpc.stub.ClientCallStreamObserver;
+import io.grpc.stub.ClientResponseObserver;
+import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
@@ -113,6 +116,7 @@ import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
 
@@ -417,10 +421,10 @@ public class StubInstance implements Instance {
       Digest blobDigest,
       long offset,
       long limit,
-      StreamObserver<ByteString> blobObserver,
+      ServerCallStreamObserver<ByteString> blobObserver,
       RequestMetadata requestMetadata) {
     throwIfStopped();
-    deadlined(bsStub)
+    bsStub.get()
         .withInterceptors(attachMetadataInterceptor(requestMetadata))
         .read(
             ReadRequest.newBuilder()
@@ -428,19 +432,61 @@ public class StubInstance implements Instance {
                 .setReadOffset(offset)
                 .setReadLimit(limit)
                 .build(),
-            new StreamObserver<ReadResponse>() {
+            new ClientResponseObserver<ReadRequest, ReadResponse>() {
+              ClientCallStreamObserver<ReadRequest> requestStream;
+              // Guard against spurious onReady() calls caused by a race between onNext() and onReady(). If the transport
+              // toggles isReady() from false to true while onNext() is executing, but before onNext() checks isReady(),
+              // request(1) would be called twice - once by onNext() and once by the onReady() scheduled during onNext()'s
+              // execution.
+              AtomicBoolean wasReady = new AtomicBoolean(false);
+              // We must not attempt to call request(1) on the stub until the call has been started.
+              AtomicBoolean wasStarted = new AtomicBoolean(false);
+              // Indicator for request completion, so that callbacks throw or are ignored
+              AtomicBoolean wasCompleted = new AtomicBoolean(false);
+
+              @Override
+              public void beforeStart(final ClientCallStreamObserver<ReadRequest> requestStream) {
+                this.requestStream = requestStream;
+
+                requestStream.disableAutoInboundFlowControl();
+
+                blobObserver.setOnCancelHandler(() -> {
+                  if (!wasCompleted.get()) {
+                    requestStream.onError(Status.CANCELLED.asException());
+                  }
+                });
+                blobObserver.setOnReadyHandler(this::onReady);
+              }
+
+              void onReady() {
+                if (wasCompleted.get()) {
+                  throw Status.CANCELLED.withDescription("request was completed").asRuntimeException();
+                }
+                if (wasStarted.get() && blobObserver.isReady() && wasReady.compareAndSet(false, true)) {
+                  requestStream.request(1);
+                }
+              }
+
               @Override
               public void onNext(ReadResponse response) {
                 blobObserver.onNext(response.getData());
+                if (blobObserver.isReady()) {
+                  requestStream.request(1);
+                } else {
+                  wasReady.set(false);
+                }
+                wasStarted.set(true);
               }
 
               @Override
               public void onCompleted() {
+                wasCompleted.set(true);
                 blobObserver.onCompleted();
               }
 
               @Override
               public void onError(Throwable t) {
+                wasCompleted.set(true);
                 blobObserver.onError(t);
               }
             });

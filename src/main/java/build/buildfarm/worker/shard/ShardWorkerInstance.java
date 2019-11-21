@@ -42,6 +42,7 @@ import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ShardWorkerInstanceConfig;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
@@ -49,6 +50,8 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.grpc.Status;
 import io.grpc.Status.Code;
+import io.grpc.StatusRuntimeException;
+import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
@@ -104,34 +107,65 @@ public class ShardWorkerInstance extends AbstractServerInstance {
     throw new UnsupportedOperationException();
   }
 
-  private void getBlob(InputStream input, long remaining, long limit, StreamObserver<ByteString> blobObserver) {
-    try {
-      if (limit == 0 || limit > remaining) {
-        limit = remaining;
-      }
-      // slice up into 1M chunks
-      long chunkSize = Math.min(1024 * 1024, limit);
+  private void getBlob(InputStream input, long count, ServerCallStreamObserver<ByteString> blobObserver) {
+    blobObserver.setOnReadyHandler(new Runnable() {
+      long remainingBytes = count;
+      long chunkSize = Math.min(128 * 1024, remainingBytes);
       byte[] chunk = new byte[(int) chunkSize];
-      while (limit > 0) {
-        int n = input.read(chunk);
-        blobObserver.onNext(ByteString.copyFrom(chunk, 0, n));
-        limit -= n;
+
+      @Override
+      public void run() {
+        try {
+          while (remainingBytes > 0 && blobObserver.isReady()) {
+            int n = input.read(chunk);
+            if (n < 0) {
+              throw new IOException("read beyond file limit with " + remainingBytes + " remaining");
+            }
+            if (n != 0) {
+              blobObserver.onNext(ByteString.copyFrom(chunk, 0, n));
+              remainingBytes -= n;
+            }
+          }
+          if (remainingBytes <= 0) {
+            input.close();
+            blobObserver.onCompleted();
+          }
+        } catch (IOException e) {
+          try {
+            input.close();
+          } catch (IOException closeEx) {
+            e.addSuppressed(e);
+          }
+          blobObserver.onError(e);
+        } catch (StatusRuntimeException e) {
+          try {
+            input.close();
+          } catch (IOException closeEx) {
+            logger.log(SEVERE, "error closing stream after status exception", closeEx);
+          }
+        }
       }
-      blobObserver.onCompleted();
-    } catch (IOException e) {
-      blobObserver.onError(e);
-    }
+    });
   }
 
   @Override
   public void getBlob(
       Digest blobDigest,
       long offset,
-      long limit,
-      StreamObserver<ByteString> blobObserver,
+      long count,
+      ServerCallStreamObserver<ByteString> blobObserver,
       RequestMetadata requestMetadata) {
-    try (InputStream input = inputStreamFactory.newInput(blobDigest, offset)) {
-      getBlob(input, blobDigest.getSizeBytes() - offset, limit, blobObserver);
+    Preconditions.checkState(count != 0);
+    try {
+      InputStream input = inputStreamFactory.newInput(blobDigest, offset);
+      blobObserver.setOnCancelHandler(() -> {
+        try {
+          input.close();
+        } catch (IOException e) {
+          logger.log(SEVERE, String.format("error closing stream for %s after cancellation", DigestUtil.toString(blobDigest)), e);
+        }
+      });
+      getBlob(input, count, blobObserver);
     } catch (IOException e) {
       blobObserver.onError(Status.NOT_FOUND.withCause(e).asException());
       try {

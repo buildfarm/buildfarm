@@ -86,7 +86,6 @@ import io.grpc.Context;
 import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.stub.ServerCallStreamObserver;
-import io.grpc.stub.StreamObserver;
 import io.grpc.protobuf.StatusProto;
 import java.io.IOException;
 import java.io.InputStream;
@@ -246,13 +245,13 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   protected ByteString getBlob(Digest blobDigest) throws InterruptedException {
-    return getBlob(blobDigest, 0, 0);
+    return getBlob(blobDigest, /* offset=*/ 0, /* count=*/ blobDigest.getSizeBytes());
   }
 
-  ByteString getBlob(Digest blobDigest, long offset, long limit)
+  ByteString getBlob(Digest blobDigest, long offset, long count)
       throws IndexOutOfBoundsException, InterruptedException {
     if (blobDigest.getSizeBytes() == 0) {
-      if (offset == 0 && limit >= 0) {
+      if (offset == 0 && count >= 0) {
         return ByteString.EMPTY;
       } else {
         throw new IndexOutOfBoundsException();
@@ -268,32 +267,67 @@ public abstract class AbstractServerInstance implements Instance {
     if (offset < 0
         || (blob.isEmpty() && offset > 0)
         || (!blob.isEmpty() && offset >= blob.size())
-        || limit < 0) {
+        || count < 0) {
       throw new IndexOutOfBoundsException();
     }
 
-    long endIndex = offset + (limit > 0 ? limit : (blob.size() - offset));
+    long endIndex = offset + count;
 
     return blob.getData().substring(
         (int) offset, (int) (endIndex > blob.size() ? blob.size() : endIndex));
   }
 
   protected ListenableFuture<ByteString> getBlobFuture(Digest blobDigest, RequestMetadata requestMetadata) {
-    return getBlobFuture(blobDigest, /* offset=*/ 0, /* limit=*/ 0, requestMetadata);
+    return getBlobFuture(blobDigest, /* offset=*/ 0, /* count=*/ blobDigest.getSizeBytes(), requestMetadata);
   }
 
   protected ListenableFuture<ByteString> getBlobFuture(
       Digest blobDigest,
       long offset,
-      long limit,
+      long count,
       RequestMetadata requestMetadata) {
     SettableFuture<ByteString> future = SettableFuture.create();
     getBlob(
         blobDigest,
         offset,
-        limit,
-        new StreamObserver<ByteString>() {
+        count,
+        new ServerCallStreamObserver<ByteString>() {
           ByteString content = ByteString.EMPTY;
+
+          @Override
+          public boolean isCancelled() {
+            return false;
+          }
+
+          @Override
+          public void setCompression(String compression) {
+          }
+
+          @Override
+          public void setOnCancelHandler(Runnable onCancelHandler) {
+          }
+
+          @Override
+          public void disableAutoInboundFlowControl() {
+          }
+
+          @Override
+          public boolean isReady() {
+            return true;
+          }
+
+          @Override
+          public void request(int count) {
+          }
+
+          @Override
+          public void setMessageCompression(boolean enable) {
+          }
+
+          @Override
+          public void setOnReadyHandler(Runnable onReadyHandler) {
+            onReadyHandler.run();
+          }
 
           @Override
           public void onNext(ByteString chunk) {
@@ -318,11 +352,11 @@ public abstract class AbstractServerInstance implements Instance {
   public void getBlob(
       Digest blobDigest,
       long offset,
-      long limit,
-      StreamObserver<ByteString> blobObserver,
+      long count,
+      ServerCallStreamObserver<ByteString> blobObserver,
       RequestMetadata requestMetadata) {
     try {
-      ByteString blob = getBlob(blobDigest, offset, limit);
+      ByteString blob = getBlob(blobDigest, offset, count);
       if (blob == null) {
         blobObserver.onError(Status.NOT_FOUND.asException());
       } else {
