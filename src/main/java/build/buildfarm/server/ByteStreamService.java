@@ -24,6 +24,7 @@ import static io.grpc.Status.OUT_OF_RANGE;
 import static io.grpc.Status.UNAVAILABLE;
 import static java.lang.String.format;
 import static java.util.logging.Level.SEVERE;
+import static java.util.logging.Level.WARNING;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
@@ -44,6 +45,7 @@ import com.google.protobuf.ByteString;
 import io.grpc.Context;
 import io.grpc.Context.CancellableContext;
 import io.grpc.Status;
+import io.grpc.Status.Code;
 import io.grpc.stub.CallStreamObserver;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
@@ -53,6 +55,7 @@ import java.nio.file.NoSuchFileException;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class ByteStreamService extends ByteStreamImplBase {
@@ -196,7 +199,11 @@ public class ByteStreamService extends ByteStreamImplBase {
 
       @Override
       public void onError(Throwable t) {
-        logger.log(SEVERE, format("error reading %s at offset %d", name, offset), t);
+        Status status = Status.fromThrowable(t);
+        Level level = status.getCode() == Code.NOT_FOUND ? WARNING : SEVERE;
+        if (status.getCode() != Code.NOT_FOUND) {
+          logger.log(level, format("error reading %s at offset %d", name, offset), t);
+        }
         delegate.onError(t);
       }
 
