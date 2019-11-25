@@ -1358,6 +1358,16 @@ public class ShardInstance extends AbstractServerInstance {
         operationTransformService);
   }
 
+  Watcher newActionResultWatcher(ActionKey actionKey, Watcher watcher) {
+    return (operation) -> {
+      ActionResult actionResult = getCacheableActionResult(operation);
+      if (actionResult != null) {
+        actionResultCache.put(actionKey, actionResult);
+      }
+      watcher.observe(operation);
+    };
+  }
+
   @Override
   public ListenableFuture<Void> execute(
       Digest actionDigest,
@@ -1376,8 +1386,8 @@ public class ShardInstance extends AbstractServerInstance {
               operationName,
               DigestUtil.toString(actionDigest)));
 
+      actionResultCache.invalidate(DigestUtil.asActionKey(actionDigest));
       if (!skipCacheLookup) {
-        actionResultCache.invalidate(DigestUtil.asActionKey(actionDigest));
         if (recentCacheServedExecutions.getIfPresent(requestMetadata) != null) {
           logger.fine(format("Operation %s will have skip_cache_lookup = true due to retry", operationName));
           skipCacheLookup = true;
@@ -1420,7 +1430,10 @@ public class ShardInstance extends AbstractServerInstance {
         return immediateFuture(null);
       }
       backplane.prequeue(executeEntry, operation);
-      return watchOperation(operation, watcher, /* initial=*/ false);
+      return watchOperation(
+          operation,
+          newActionResultWatcher(DigestUtil.asActionKey(actionDigest), watcher),
+          /* initial=*/ false);
     } catch (IOException e) {
       return immediateFailedFuture(e);
     }

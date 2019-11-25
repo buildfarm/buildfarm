@@ -1207,6 +1207,14 @@ public abstract class AbstractServerInstance implements Instance {
         expectExecuteResponse(operation).getStatus().getCode() == Code.CANCELLED.getNumber();
   }
 
+  protected static ExecuteResponse getExecuteResponse(Operation operation) {
+    if (operation.getDone() &&
+        operation.getResultCase() == Operation.ResultCase.RESPONSE) {
+      return expectExecuteResponse(operation);
+    }
+    return null;
+  }
+
   private static ExecuteResponse expectExecuteResponse(Operation operation) {
     try {
       return operation.getResponse().unpack(ExecuteResponse.class);
@@ -1225,6 +1233,19 @@ public abstract class AbstractServerInstance implements Instance {
 
   protected static boolean isComplete(Operation operation) {
     return isStage(operation, ExecutionStage.Value.COMPLETED);
+  }
+
+  protected static ActionResult getCacheableActionResult(Operation operation) {
+    ExecuteResponse executeResponse = getExecuteResponse(operation);
+    if (executeResponse != null &&
+        !executeResponse.getCachedResult() &&
+        executeResponse.getStatus().getCode() == Code.OK.getNumber()) {
+      ActionResult result = executeResponse.getResult();
+      if (result.getExitCode() == 0) {
+        return result;
+      }
+    }
+    return null;
   }
 
   protected abstract boolean matchOperation(Operation operation) throws InterruptedException;
