@@ -19,25 +19,18 @@ import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.transformAsync;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 
-import build.bazel.remote.execution.v2.Digest;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.common.function.InterruptingPredicate;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.PollOperationRequest;
 import build.buildfarm.v1test.QueueEntry;
-import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.TakeOperationRequest;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
+import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
-import com.google.protobuf.Any;
-import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.rpc.Code;
 import io.grpc.Status;
-import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import java.util.concurrent.ExecutionException;
@@ -78,6 +71,12 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
     @Override
     public boolean onEntry(QueueEntry queueEntry) throws InterruptedException {
       return onMatch.testInterruptibly(queueEntry);
+    }
+
+    @Override
+    public void onError(Throwable t) {
+      Throwables.throwIfUnchecked(t);
+      throw new RuntimeException(t);
     }
   }
 

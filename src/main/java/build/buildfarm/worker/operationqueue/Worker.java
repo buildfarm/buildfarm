@@ -190,19 +190,21 @@ public class Worker {
     return newStubInstance(
         instanceEndpoint.getInstanceName(),
         createChannel(instanceEndpoint.getTarget()),
-        digestUtil);
+        digestUtil,
+        instanceEndpoint.getDeadlineAfterSeconds());
   }
 
   private static Instance newStubInstance(
       String name,
       ManagedChannel channel,
-      DigestUtil digestUtil) {
+      DigestUtil digestUtil,
+      long deadlineAfterSeconds) {
     return new StubInstance(
         name,
         /* identifier=*/ "",
         digestUtil,
         channel,
-        60 /* FIXME CONFIG */, SECONDS,
+        deadlineAfterSeconds, SECONDS,
         retrier, retryScheduler);
   }
 
@@ -223,7 +225,7 @@ public class Worker {
     InstanceEndpoint casEndpoint = config.getContentAddressableStorage();
     ManagedChannel casChannel = createChannel(casEndpoint.getTarget());
     uploader = createStubUploader(casEndpoint.getInstanceName(), casChannel, retrier);
-    casInstance = newStubInstance(casEndpoint.getInstanceName(), casChannel, digestUtil);
+    casInstance = newStubInstance(casEndpoint.getInstanceName(), casChannel, digestUtil, casEndpoint.getDeadlineAfterSeconds());
     acInstance = newStubInstance(config.getActionCache(), digestUtil);
     operationQueueInstance = newStubInstance(config.getOperationQueue(), digestUtil);
     InputStreamFactory inputStreamFactory = new InputStreamFactory() {
@@ -511,6 +513,12 @@ public class Worker {
                   .build());
             }
             return success;
+          }
+
+          @Override
+          public void onError(Throwable t) {
+            Throwables.throwIfUnchecked(t);
+            throw new RuntimeException(t);
           }
         };
         while (!dedupMatchListener.getMatched()) {

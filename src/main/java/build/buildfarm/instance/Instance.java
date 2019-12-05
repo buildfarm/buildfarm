@@ -126,6 +126,8 @@ public interface Instance {
 
     // returns false if this listener will not handle this match
     boolean onEntry(@Nullable QueueEntry queueEntry) throws InterruptedException;
+
+    void onError(Throwable t);
   }
 
   public static class PutAllBlobsException extends RuntimeException {

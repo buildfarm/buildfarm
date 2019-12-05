@@ -24,6 +24,7 @@ import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Stopwatch;
+import com.google.common.base.Throwables;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.Timestamp;
@@ -78,6 +79,12 @@ public class MatchStage extends PipelineStage {
       Preconditions.checkState(poller == null);
       Poller poller = workerContext.createPoller("MatchStage", queueEntry, QUEUED);
       return onOperationPolled(queueEntry, poller);
+    }
+
+    @Override
+    public void onError(Throwable t) {
+      Throwables.throwIfUnchecked(t);
+      throw new RuntimeException(t);
     }
 
     private boolean onOperationPolled(QueueEntry queueEntry, Poller poller) throws InterruptedException {

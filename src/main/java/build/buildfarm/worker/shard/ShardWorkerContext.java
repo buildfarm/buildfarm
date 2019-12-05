@@ -291,6 +291,12 @@ class ShardWorkerContext implements WorkerContext {
         }
         return success;
       }
+
+      @Override
+      public void onError(Throwable t) {
+        Throwables.throwIfUnchecked(t);
+        throw new RuntimeException(t);
+      }
     };
     while (!dedupMatchListener.getMatched()) {
       try {

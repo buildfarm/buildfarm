@@ -103,6 +103,7 @@ import io.grpc.ManagedChannel;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.protobuf.StatusProto;
+import io.grpc.stub.AbstractStub;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
@@ -218,15 +219,6 @@ public class StubInstance implements Instance {
             }
           });
 
-  private final Supplier<ContentAddressableStorageFutureStub> contentAddressableStorageFutureStub =
-      Suppliers.memoize(
-          new Supplier<ContentAddressableStorageFutureStub>() {
-            @Override
-            public ContentAddressableStorageFutureStub get() {
-              return ContentAddressableStorageGrpc.newFutureStub(channel);
-            }
-          });
-
   private final Supplier<ByteStreamBlockingStub> bsBlockingStub =
       Suppliers.memoize(
           new Supplier<ByteStreamBlockingStub>() {
@@ -236,10 +228,14 @@ public class StubInstance implements Instance {
             }
           });
 
-  private ByteStreamStub newBSStub() {
-    return ByteStreamGrpc.newStub(channel)
-        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits);
-  }
+  private final Supplier<ByteStreamStub> bsStub =
+      Suppliers.memoize(
+          new Supplier<ByteStreamStub>() {
+            @Override
+            public ByteStreamStub get() {
+              return ByteStreamGrpc.newStub(channel);
+            }
+          });
 
   private final Supplier<OperationsBlockingStub> operationsBlockingStub =
       Suppliers.memoize(
@@ -258,6 +254,14 @@ public class StubInstance implements Instance {
               return OperationQueueGrpc.newBlockingStub(channel);
             }
           });
+
+  private <T extends AbstractStub<T>> T deadlined(Supplier<T> getter) {
+    T stub = getter.get();
+    if (deadlineAfter > 0) {
+      stub = stub.withDeadlineAfter(deadlineAfter, deadlineAfterUnits);
+    }
+    return stub;
+  }
 
   @Override
   public String getName() {
@@ -292,8 +296,7 @@ public class StubInstance implements Instance {
   public ActionResult getActionResult(ActionKey actionKey) {
     throwIfStopped();
     try {
-      return actionCacheBlockingStub.get()
-          .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
+      return deadlined(actionCacheBlockingStub)
           .getActionResult(GetActionResultRequest.newBuilder()
               .setInstanceName(getName())
               .setActionDigest(actionKey.getDigest())
@@ -310,8 +313,7 @@ public class StubInstance implements Instance {
   public void putActionResult(ActionKey actionKey, ActionResult actionResult) {
     throwIfStopped();
     // should we be checking the ActionResult return value?
-    actionCacheBlockingStub.get()
-        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
+    deadlined(actionCacheBlockingStub)
         .updateActionResult(UpdateActionResultRequest.newBuilder()
             .setInstanceName(getName())
             .setActionDigest(actionKey.getDigest())
@@ -330,8 +332,7 @@ public class StubInstance implements Instance {
       throw new IllegalStateException("FINDMISSINGBLOBS IS TOO LARGE");
     }
     return transform(
-        contentAddressableStorageFutureStub.get()
-            .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
+        deadlined(casFutureStub)
             .withInterceptors(attachMetadataInterceptor(requestMetadata))
             .findMissingBlobs(request),
         (response) -> response.getMissingBlobDigestsList(),
@@ -354,9 +355,8 @@ public class StubInstance implements Instance {
         .setInstanceName(getName())
         .addAllRequests(requests.build())
         .build();
-    BatchUpdateBlobsResponse batchResponse = casBlockingStub.get()
+    BatchUpdateBlobsResponse batchResponse = deadlined(casBlockingStub)
         .withInterceptors(attachMetadataInterceptor(requestMetadata))
-        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
         .batchUpdateBlobs(batchRequest);
     PutAllBlobsException exception = null;
     for (BatchUpdateBlobsResponse.Response response : batchResponse.getResponsesList()) {
@@ -397,9 +397,8 @@ public class StubInstance implements Instance {
     return ByteStreamHelper.newInput(
         resourceName,
         offset,
-        Suppliers.memoize(() -> ByteStreamGrpc.newStub(channel)
-            .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
-            .withInterceptors(attachMetadataInterceptor(requestMetadata))),
+        () -> deadlined(bsStub)
+            .withInterceptors(attachMetadataInterceptor(requestMetadata)),
         retrier::newBackoff,
         retrier::isRetriable,
         retryService);
@@ -420,7 +419,7 @@ public class StubInstance implements Instance {
       long limit,
       StreamObserver<ByteString> blobObserver) {
     throwIfStopped();
-    newBSStub()
+    deadlined(bsStub)
         .read(
             ReadRequest.newBuilder()
                 .setResourceName(getBlobName(blobDigest))
@@ -459,7 +458,7 @@ public class StubInstance implements Instance {
   public ListenableFuture<Iterable<Response>> getAllBlobsFuture(
       Iterable<Digest> digests) {
     return transform(
-        casFutureStub.get()
+        deadlined(casFutureStub)
             .batchReadBlobs(BatchReadBlobsRequest.newBuilder()
                 .setInstanceName(getName())
                 .addAllDigests(digests)
@@ -486,7 +485,7 @@ public class StubInstance implements Instance {
 
   Write getWrite(String resourceName, long expectedSize, boolean autoflush, RequestMetadata requestMetadata) {
     return new StubWriteOutputStream(
-        () -> bsBlockingStub.get()
+        () -> deadlined(bsBlockingStub)
             .withInterceptors(attachMetadataInterceptor(requestMetadata)),
         Suppliers.memoize(
             () -> ByteStreamGrpc.newStub(channel)
@@ -517,8 +516,7 @@ public class StubInstance implements Instance {
       String pageToken,
       Tree.Builder tree) {
     throwIfStopped();
-    Iterator<GetTreeResponse> replies = casBlockingStub.get()
-        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
+    Iterator<GetTreeResponse> replies = deadlined(casBlockingStub)
         .getTree(GetTreeRequest.newBuilder()
             .setInstanceName(getName())
             .setRootDigest(rootDigest)
@@ -561,19 +559,29 @@ public class StubInstance implements Instance {
         .setInstanceName(getName())
         .setPlatform(platform)
         .build();
-    listener.onWaitStart();
-    QueueEntry queueEntry = operationQueueBlockingStub.get()
-        .take(request);
-    listener.onWaitEnd();
-    listener.onEntry(queueEntry);
+    for (;;) {
+      listener.onWaitStart();
+      try {
+        QueueEntry queueEntry = deadlined(operationQueueBlockingStub)
+            .take(request);
+        listener.onWaitEnd();
+        listener.onEntry(queueEntry);
+      } catch (Exception e) {
+        listener.onWaitEnd();
+        Status status = Status.fromThrowable(e);
+        if (status.getCode() != Status.Code.DEADLINE_EXCEEDED) {
+          listener.onError(e);
+          return;
+        }
+        // ignore DEADLINE_EXCEEDED to prevent long running request behavior
+      }
+    }
   }
 
   @Override
   public boolean putOperation(Operation operation) {
     throwIfStopped();
-    return operationQueueBlockingStub
-        .get()
-        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
+    return deadlined(operationQueueBlockingStub)
         .put(operation)
         .getCode() == Code.OK.getNumber();
   }
@@ -588,9 +596,7 @@ public class StubInstance implements Instance {
       String operationName,
       ExecutionStage.Value stage) {
     throwIfStopped();
-    return operationQueueBlockingStub
-        .get()
-        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
+    return deadlined(operationQueueBlockingStub)
         .poll(PollOperationRequest.newBuilder()
             .setOperationName(operationName)
             .setStage(stage)
@@ -633,14 +639,13 @@ public class StubInstance implements Instance {
       ImmutableList.Builder<Operation> operations) {
     throwIfStopped();
     ListOperationsResponse response =
-        operationsBlockingStub.get()
-            .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
+        deadlined(operationsBlockingStub)
             .listOperations(ListOperationsRequest.newBuilder()
-            .setName(getName() + "/operations")
-            .setPageSize(pageSize)
-            .setPageToken(pageToken)
-            .setFilter(filter)
-            .build());
+                .setName(getName() + "/operations")
+                .setPageSize(pageSize)
+                .setPageToken(pageToken)
+                .setFilter(filter)
+                .build());
     operations.addAll(response.getOperationsList());
     return response.getNextPageToken();
   }
@@ -648,8 +653,7 @@ public class StubInstance implements Instance {
   @Override
   public Operation getOperation(String operationName) {
     throwIfStopped();
-    return operationsBlockingStub.get()
-        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
+    return deadlined(operationsBlockingStub)
         .getOperation(GetOperationRequest.newBuilder()
             .setName(operationName)
             .build());
@@ -658,8 +662,7 @@ public class StubInstance implements Instance {
   @Override
   public void deleteOperation(String operationName) {
     throwIfStopped();
-    operationsBlockingStub.get()
-        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
+    deadlined(operationsBlockingStub)
         .deleteOperation(DeleteOperationRequest.newBuilder()
             .setName(operationName)
             .build());
@@ -668,8 +671,7 @@ public class StubInstance implements Instance {
   @Override
   public void cancelOperation(String operationName) {
     throwIfStopped();
-    operationsBlockingStub.get()
-        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
+    deadlined(operationsBlockingStub)
         .cancelOperation(CancelOperationRequest.newBuilder()
             .setName(operationName)
             .build());
@@ -678,8 +680,7 @@ public class StubInstance implements Instance {
   @Override
   public ServerCapabilities getCapabilities() {
     throwIfStopped();
-    return capsBlockingStub.get()
-        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
+    return deadlined(capsBlockingStub)
         .getCapabilities(GetCapabilitiesRequest.newBuilder()
             .setInstanceName(getName())
             .build());
