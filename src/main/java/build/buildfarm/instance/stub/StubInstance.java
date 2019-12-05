@@ -559,19 +559,24 @@ public class StubInstance implements Instance {
         .setInstanceName(getName())
         .setPlatform(platform)
         .build();
-    for (;;) {
+    boolean complete = false;
+    while (!complete) {
       listener.onWaitStart();
       try {
-        QueueEntry queueEntry = deadlined(operationQueueBlockingStub)
-            .take(request);
-        listener.onWaitEnd();
+        QueueEntry queueEntry;
+        try {
+          queueEntry = deadlined(operationQueueBlockingStub)
+              .take(request);
+        } finally {
+          listener.onWaitEnd();
+        }
         listener.onEntry(queueEntry);
+        complete = true;
       } catch (Exception e) {
-        listener.onWaitEnd();
         Status status = Status.fromThrowable(e);
         if (status.getCode() != Status.Code.DEADLINE_EXCEEDED) {
           listener.onError(e);
-          return;
+          complete = true;
         }
         // ignore DEADLINE_EXCEEDED to prevent long running request behavior
       }
