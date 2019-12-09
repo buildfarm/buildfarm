@@ -297,6 +297,11 @@ class ShardWorkerContext implements WorkerContext {
         Throwables.throwIfUnchecked(t);
         throw new RuntimeException(t);
       }
+
+      @Override
+      public void setOnCancelHandler(Runnable onCancelHandler) {
+        listener.setOnCancelHandler(onCancelHandler);
+      }
     };
     while (!dedupMatchListener.getMatched()) {
       try {

@@ -128,6 +128,9 @@ public interface Instance {
     boolean onEntry(@Nullable QueueEntry queueEntry) throws InterruptedException;
 
     void onError(Throwable t);
+
+    // method that should be called when this match is cancelled and no longer valid
+    void setOnCancelHandler(Runnable onCancelHandler);
   }
 
   public static class PutAllBlobsException extends RuntimeException {

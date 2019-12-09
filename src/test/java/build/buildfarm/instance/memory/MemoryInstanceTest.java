@@ -51,12 +51,14 @@ import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.ExecutionStage;
+import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Watcher;
+import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.instance.OperationsMap;
 import build.buildfarm.instance.WatchFuture;
 import build.buildfarm.v1test.ActionCacheConfig;
@@ -65,6 +67,7 @@ import build.buildfarm.v1test.DelegateCASConfig;
 import build.buildfarm.v1test.MemoryInstanceConfig;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.MultimapBuilder;
 import com.google.common.collect.SetMultimap;
@@ -114,6 +117,7 @@ public class MemoryInstanceTest {
   private ExecutorService watcherService;
 
   private Map<Digest, ByteString> storage;
+  private List<MemoryInstance.Worker> workers;
 
   @Before
   public void setUp() throws Exception {
@@ -139,6 +143,7 @@ public class MemoryInstanceTest {
         .build();
 
     storage = Maps.newHashMap();
+    workers = Lists.newArrayList();
     instance = new MemoryInstance(
         "memory",
         DIGEST_UTIL,
@@ -146,7 +151,8 @@ public class MemoryInstanceTest {
         casMapDecorator(storage),
         watchers,
         watcherService,
-        outstandingOperations);
+        outstandingOperations,
+        workers);
   }
 
   @After
@@ -517,5 +523,17 @@ public class MemoryInstanceTest {
     assertThat(instance.pollOperation(
         operation.getName(),
         EXECUTING)).isFalse();
+  }
+
+  @Test
+  public void matchCancelRemovesFromWorkers() throws InterruptedException {
+    MatchListener listener = mock(MatchListener.class);
+    instance.match(
+        Platform.getDefaultInstance(),
+        listener);
+    ArgumentCaptor<Runnable> onCancelHandlerCaptor = ArgumentCaptor.forClass(Runnable.class);
+    verify(listener, times(1)).setOnCancelHandler(onCancelHandlerCaptor.capture());
+    onCancelHandlerCaptor.getValue().run();
+    assertThat(workers).isEmpty();
   }
 }

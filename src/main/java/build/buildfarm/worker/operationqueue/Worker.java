@@ -520,6 +520,11 @@ public class Worker {
             Throwables.throwIfUnchecked(t);
             throw new RuntimeException(t);
           }
+
+          @Override
+          public void setOnCancelHandler(Runnable onCancelHandler) {
+            listener.setOnCancelHandler(onCancelHandler);
+          }
         };
         while (!dedupMatchListener.getMatched()) {
           operationQueueInstance.match(config.getPlatform(), dedupMatchListener);
