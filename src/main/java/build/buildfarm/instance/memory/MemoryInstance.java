@@ -686,6 +686,8 @@ public class MemoryInstance extends AbstractServerInstance {
           matched = true;
           if (listener.onEntry(queueEntry)) {
             onDispatched(operation);
+          } else {
+            enqueueOperation(operation);
           }
         } catch (StatusException|IOException e) {
           logger.log(SEVERE, format("could not emplace queued operation: %s", operationName), e);
