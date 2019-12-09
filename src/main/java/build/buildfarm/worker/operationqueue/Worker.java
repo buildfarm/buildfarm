@@ -759,10 +759,10 @@ public class Worker {
 
     Pipeline pipeline = new Pipeline();
     // pipeline.add(errorStage, 0);
-    pipeline.add(matchStage, 1);
-    pipeline.add(inputFetchStage, 2);
-    pipeline.add(executeActionStage, 3);
-    pipeline.add(reportResultStage, 4);
+    pipeline.add(matchStage, 4);
+    pipeline.add(inputFetchStage, 3);
+    pipeline.add(executeActionStage, 2);
+    pipeline.add(reportResultStage, 1);
     pipeline.start();
     pipeline.join(); // uninterruptable
     if (Thread.interrupted()) {
