@@ -77,6 +77,7 @@ import build.buildfarm.worker.UploadManifest;
 import build.buildfarm.worker.WorkerContext;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -729,7 +730,20 @@ public class Worker {
 
       @Override
       public void putActionResult(ActionKey actionKey, ActionResult actionResult) throws InterruptedException {
-        acInstance.putActionResult(actionKey, actionResult);
+        try {
+          retrier.execute(
+            () -> {
+              acInstance.putActionResult(actionKey, actionResult);
+              return null;
+            });
+        } catch (IOException e) {
+          Throwable cause = e.getCause();
+          if (cause == null) {
+            throw new RuntimeException(e);
+          }
+          Throwables.throwIfUnchecked(cause);
+          throw new RuntimeException(cause);
+        }
       }
     };
 
