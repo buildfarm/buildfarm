@@ -440,6 +440,9 @@ message InstanceEndpoint {
 
   // instance to be used
   string instance_name = 2;
+
+  // deadline for requests in seconds
+  int32 deadline_after_seconds = 3;
 }
 
 message ExecutionWrapper {

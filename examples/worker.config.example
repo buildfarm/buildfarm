@@ -11,6 +11,9 @@ operation_queue: {
   # the instance domain that this worker will execute work in
   # all requests will be tagged with this instance name
   instance_name: "default_memory_instance"
+
+  # the deadline in seconds for requests (default or <= 0 is unlimited)
+  deadline_after_seconds: 60
 }
 
 # the endpoint used for cas interactions
@@ -20,6 +23,9 @@ content_addressable_storage: {
   # the instance domain that this worker will make resource requests in
   # all requests will be tagged with this instance name
   instance_name: "default_memory_instance"
+
+  # the deadline in seconds for requests (default or <= 0 is unlimited)
+  deadline_after_seconds: 60
 }
 
 # the endpoint used for action cache interactions
@@ -29,6 +35,9 @@ action_cache: {
   # the instance domain that this worker will make resource requests in
   # all requests will be tagged with this instance name
   instance_name: "default_memory_instance"
+
+  # the deadline in seconds for requests (default or <= 0 is unlimited)
+  deadline_after_seconds: 60
 }
 
 # all content for the operations will be stored under this path

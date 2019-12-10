@@ -140,13 +140,13 @@ public class MemoryInstance extends AbstractServerInstance {
         }
       });
   private final List<Operation> queuedOperations = Lists.newArrayList();
-  private final List<Worker> workers = Lists.newArrayList();
+  private final List<Worker> workers;
   private final Map<String, Watchdog> requeuers = Maps.newConcurrentMap();
   private final Map<String, Watchdog> operationTimeoutDelays = Maps.newConcurrentMap();
   private final OperationsMap outstandingOperations;
   private final Executor watcherExecutor;
 
-  private static final class Worker {
+  static final class Worker {
     private final Platform platform;
     private final MatchListener listener;
 
@@ -206,7 +206,8 @@ public class MemoryInstance extends AbstractServerInstance {
                 .hashSetValues(/* expectedValuesPerKey=*/ 1)
                 .build()),
         /* watcherExecutor=*/ newCachedThreadPool(),
-        new OutstandingOperations());
+        new OutstandingOperations(),
+        /* workers=*/ Lists.newArrayList());
   }
 
   @VisibleForTesting
@@ -217,7 +218,8 @@ public class MemoryInstance extends AbstractServerInstance {
       ContentAddressableStorage contentAddressableStorage,
       SetMultimap<String, WatchFuture> watchers,
       Executor watcherExecutor,
-      OperationsMap outstandingOperations) {
+      OperationsMap outstandingOperations,
+      List<Worker> workers) {
     super(
         name,
         digestUtil,
@@ -230,6 +232,7 @@ public class MemoryInstance extends AbstractServerInstance {
     this.watchers = watchers;
     this.outstandingOperations = outstandingOperations;
     this.watcherExecutor = watcherExecutor;
+    this.workers = workers;
   }
 
   private static ActionCache createActionCache(ActionCacheConfig config, ContentAddressableStorage cas, DigestUtil digestUtil) {
@@ -586,6 +589,18 @@ public class MemoryInstance extends AbstractServerInstance {
     return tree.build();
   }
 
+  // removes any instance of an existing listener in the workers list
+  private void removeWorker(MatchListener listener) {
+    synchronized (workers) {
+      Iterator<Worker> iter = workers.iterator();
+      while (iter.hasNext()) {
+        if (iter.next().getListener() == listener) {
+          iter.remove();
+        }
+      }
+    }
+  }
+
   @Override
   protected boolean matchOperation(Operation operation) throws InterruptedException {
     ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
@@ -701,6 +716,7 @@ public class MemoryInstance extends AbstractServerInstance {
     }
     if (!matched) {
       synchronized(workers) {
+        listener.setOnCancelHandler(() -> removeWorker(listener));
         listener.onWaitStart();
         workers.add(new Worker(platform, listener));
       }
