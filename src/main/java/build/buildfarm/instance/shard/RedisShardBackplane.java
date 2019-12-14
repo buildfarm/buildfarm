@@ -1241,6 +1241,17 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   @Override
+  public void rejectOperation(QueueEntry queueEntry) throws IOException {
+    String operationName = queueEntry.getExecuteEntry().getOperationName();
+    String queueEntryJson = JsonFormat.printer().print(queueEntry);
+    withVoidBackplaneException((jedis) -> {
+      if (jedis.hdel(config.getDispatchedOperationsHashName(), operationName) == 1) {
+        jedis.rpush(config.getQueuedOperationsListName(), queueEntryJson);
+      }
+    });
+  }
+
+  @Override
   public boolean pollOperation(QueueEntry queueEntry, ExecutionStage.Value stage, long requeueAt) throws IOException {
     String operationName = queueEntry.getExecuteEntry().getOperationName();
     DispatchedOperation o = DispatchedOperation.newBuilder()

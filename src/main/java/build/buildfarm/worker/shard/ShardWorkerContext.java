@@ -15,6 +15,7 @@
 package build.buildfarm.worker.shard;
 
 import static build.buildfarm.common.Actions.checkPreconditionFailure;
+import static build.buildfarm.common.Actions.satisfiesRequirements;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static com.google.common.collect.Maps.uniqueIndex;
@@ -252,8 +253,11 @@ class ShardWorkerContext implements WorkerContext {
       // unavailable backplane will propagate a null queueEntry
     }
     listener.onWaitEnd();
-    // FIXME platform match
-    listener.onEntry(queueEntry);
+    if (queueEntry == null || satisfiesRequirements(platform, queueEntry.getPlatform())) {
+      listener.onEntry(queueEntry);
+    } else {
+      backplane.rejectOperation(queueEntry);
+    }
     if (Thread.interrupted()) {
       throw new InterruptedException();
     }

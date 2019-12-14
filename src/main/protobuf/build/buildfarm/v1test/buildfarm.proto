@@ -381,6 +381,8 @@ message QueueEntry {
   ExecuteEntry execute_entry = 1;
 
   build.bazel.remote.execution.v2.Digest queued_operation_digest = 2;
+
+  build.bazel.remote.execution.v2.Platform platform = 3;
 }
 
 message QueuedOperationMetadata {

@@ -92,4 +92,22 @@ public final class Actions {
     }
     return true; // if *all* > 0 violations have type MISSING
   }
+
+  public static boolean satisfiesRequirements(Platform provider, Platform requirements) {
+    // string compare only
+    // no duplicate names
+    ImmutableMap.Builder<String, String> provisionsBuilder =
+        new ImmutableMap.Builder<String, String>();
+    for (Platform.Property property : provider.getPropertiesList()) {
+      provisionsBuilder.put(property.getName(), property.getValue());
+    }
+    Map<String, String> provisions = provisionsBuilder.build();
+    for (Platform.Property property : requirements.getPropertiesList()) {
+      if (!provisions.containsKey(property.getName()) ||
+          !provisions.get(property.getName()).equals(property.getValue())) {
+        return false;
+      }
+    }
+    return true;
+  }
 }

@@ -1184,6 +1184,7 @@ public class ShardInstance extends AbstractServerInstance {
     QueueEntry entry = QueueEntry.newBuilder()
         .setExecuteEntry(executeEntry)
         .setQueuedOperationDigest(queuedOperationDigest)
+        .setPlatform(queuedOperation.getCommand().getPlatform())
         .build();
     return transform(
         writeBlobFuture(queuedOperationDigest, queuedOperationBlob, executeEntry.getRequestMetadata()),
@@ -1362,9 +1363,11 @@ public class ShardInstance extends AbstractServerInstance {
 
   Watcher newActionResultWatcher(ActionKey actionKey, Watcher watcher) {
     return (operation) -> {
-      ActionResult actionResult = getCacheableActionResult(operation);
-      if (actionResult != null) {
-        actionResultCache.put(actionKey, actionResult);
+      if (operation != null) {
+        ActionResult actionResult = getCacheableActionResult(operation);
+        if (actionResult != null) {
+          actionResultCache.put(actionKey, actionResult);
+        }
       }
       watcher.observe(operation);
     };
@@ -1730,6 +1733,7 @@ public class ShardInstance extends AbstractServerInstance {
             QueueEntry queueEntry = QueueEntry.newBuilder()
                 .setExecuteEntry(executeEntry)
                 .setQueuedOperationDigest(queuedOperationMetadata.getQueuedOperationDigest())
+                .setPlatform(profiledQueuedMetadata.getQueuedOperation().getCommand().getPlatform())
                 .build();
             try {
               ensureCanQueue(stopwatch);

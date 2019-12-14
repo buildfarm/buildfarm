@@ -241,6 +241,13 @@ public interface ShardBackplane {
   QueueEntry dispatchOperation() throws IOException, InterruptedException;
 
   /**
+   * Pushes an operation onto the head of the list of queued operations after
+   * a rejection which does not require revalidation
+   */
+  @ThreadSafe
+  void rejectOperation(QueueEntry queueEntry) throws IOException;
+
+  /**
    * Updates the backplane to indicate that the operation is being
    * queued and should not be considered immediately lost
    */

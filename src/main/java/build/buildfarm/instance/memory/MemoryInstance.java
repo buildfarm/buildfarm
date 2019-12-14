@@ -15,6 +15,7 @@
 package build.buildfarm.instance.memory;
 
 import static build.buildfarm.common.Actions.invalidActionMessage;
+import static build.buildfarm.common.Actions.satisfiesRequirements;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static build.buildfarm.instance.Utils.putBlob;
@@ -652,7 +653,7 @@ public class MemoryInstance extends AbstractServerInstance {
     synchronized (workers) {
       while (!dispatched && !workers.isEmpty()) {
         Worker worker = workers.remove(0);
-        if (!satisfiesRequirements(worker.getPlatform(), command)) {
+        if (!satisfiesRequirements(worker.getPlatform(), command.getPlatform())) {
           rejectedWorkers.add(worker);
         } else {
           QueueEntry queueEntry = QueueEntry.newBuilder()
@@ -663,6 +664,7 @@ public class MemoryInstance extends AbstractServerInstance {
                   .setStdoutStreamName(metadata.getStdoutStreamName())
                   .setStderrStreamName(metadata.getStderrStreamName()))
               .setQueuedOperationDigest(queuedOperationDigest)
+              .setPlatform(command.getPlatform())
               .build();
           dispatched = worker.getListener().onEntry(queueEntry);
           if (dispatched) {
@@ -702,7 +704,7 @@ public class MemoryInstance extends AbstractServerInstance {
       String operationName = operation.getName();
       if (command == null) {
         cancelOperation(operationName);
-      } else if (satisfiesRequirements(platform, command)) {
+      } else if (satisfiesRequirements(platform, command.getPlatform())) {
         QueuedOperation queuedOperation = QueuedOperation.newBuilder()
             .setAction(action)
             .setCommand(command)
@@ -722,6 +724,7 @@ public class MemoryInstance extends AbstractServerInstance {
                   .setStdoutStreamName(metadata.getStdoutStreamName())
                   .setStderrStreamName(metadata.getStderrStreamName()))
               .setQueuedOperationDigest(queuedOperationDigest)
+              .setPlatform(command.getPlatform())
               .build();
 
           matched = true;
@@ -754,24 +757,6 @@ public class MemoryInstance extends AbstractServerInstance {
     synchronized (queuedOperations) {
       matchSynchronized(platform, listener);
     }
-  }
-
-  private boolean satisfiesRequirements(Platform platform, Command command) throws InterruptedException {
-    // string compare only
-    // no duplicate names
-    ImmutableMap.Builder<String, String> provisionsBuilder =
-        new ImmutableMap.Builder<String, String>();
-    for (Platform.Property property : platform.getPropertiesList()) {
-      provisionsBuilder.put(property.getName(), property.getValue());
-    }
-    Map<String, String> provisions = provisionsBuilder.build();
-    for (Platform.Property property : command.getPlatform().getPropertiesList()) {
-      if (!provisions.containsKey(property.getName()) ||
-          !provisions.get(property.getName()).equals(property.getValue())) {
-        return false;
-      }
-    }
-    return true;
   }
 
   @Override
