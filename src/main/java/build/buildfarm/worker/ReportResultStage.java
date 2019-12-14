@@ -16,7 +16,8 @@ package build.buildfarm.worker;
 
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.COMPLETED;
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.EXECUTING;
-import static build.buildfarm.common.Actions.invalidActionMessage;
+import static build.buildfarm.common.Actions.asExecutionStatus;
+import static build.buildfarm.common.Actions.isRetriable;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.SEVERE;
@@ -24,7 +25,6 @@ import static java.util.logging.Level.SEVERE;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteResponse;
-import build.buildfarm.cas.ContentAddressableStorage.EntryLimitException;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
@@ -34,9 +34,10 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.Timestamps;
 import com.google.rpc.Code;
-import com.google.rpc.PreconditionFailure;
 import com.google.rpc.Status;
 import io.grpc.Deadline;
+import io.grpc.StatusException;
+import io.grpc.protobuf.StatusProto;
 import java.io.IOException;
 import java.nio.channels.ClosedByInterruptException;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -97,26 +98,24 @@ public class ReportResultStage extends PipelineStage {
     boolean blacklist = false;
     try {
       workerContext.uploadOutputs(
+          operationContext.queueEntry.getExecuteEntry().getActionDigest(),
           resultBuilder,
           operationContext.execDir,
           operationContext.command.getOutputFilesList(),
           operationContext.command.getOutputDirectoriesList());
-    } catch (EntryLimitException e) {
+    } catch (StatusException e) {
       if (operationContext.executeResponse.build().getStatus().getCode() == Code.OK.getNumber()) {
-        // if the status was already a failure, let them get to this failure on their own
-        PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
-        preconditionFailure.addViolationsBuilder()
-            .setType(VIOLATION_TYPE_MISSING)
-            .setSubject("blobs/" + DigestUtil.toString(e.getDigest()))
-            .setDescription("An output could not be uploaded because it exceeded the maximum size of an entry");
-        Status status = Status.newBuilder()
-            .setCode(Code.FAILED_PRECONDITION.getNumber())
-            .setMessage(invalidActionMessage(operationContext.queueEntry.getExecuteEntry().getActionDigest()))
-            .addDetails(Any.pack(preconditionFailure.build()))
-            .build();
+        // something about the outputs was malformed - fail the operation with this status if not already failing
+        Status status = StatusProto.fromThrowable(e);
+        if (status == null) {
+          logger.log(SEVERE, "no rpc status from exception for " + operationName, e);
+          status = asExecutionStatus(e);
+        }
         operationContext.executeResponse.setStatus(status);
+        if (isRetriable(status)) {
+          blacklist = true;
+        }
       }
-      blacklist = true;
     } catch (InterruptedException|ClosedByInterruptException e) {
       // cancellation here should not be logged
       return null;
@@ -142,7 +141,9 @@ public class ReportResultStage extends PipelineStage {
 
     ExecuteResponse executeResponse = operationContext.executeResponse.build();
 
-    if (blacklist || (!operationContext.action.getDoNotCache() && executeResponse.getResult().getExitCode() == 0)) {
+    if (blacklist || (!operationContext.action.getDoNotCache()
+          && executeResponse.getStatus().getCode() == Code.OK.getNumber()
+          && executeResponse.getResult().getExitCode() == 0)) {
       try {
         if (blacklist) {
           workerContext.blacklistAction(metadata.getActionDigest().getHash());

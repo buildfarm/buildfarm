@@ -15,14 +15,13 @@
 package build.buildfarm.instance;
 
 import static build.buildfarm.common.Actions.invalidActionMessage;
+import static build.buildfarm.common.Actions.checkPreconditionFailure;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static build.buildfarm.instance.Utils.putBlob;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.transform;
-import static com.google.common.util.concurrent.Futures.transformAsync;
-import static com.google.common.util.concurrent.Futures.allAsList;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
@@ -68,7 +67,6 @@ import build.buildfarm.common.Write;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
@@ -86,13 +84,13 @@ import com.google.rpc.PreconditionFailure;
 import com.google.rpc.PreconditionFailure.Violation;
 import io.grpc.Context;
 import io.grpc.Status;
-import io.grpc.stub.StreamObserver;
 import io.grpc.StatusException;
+import io.grpc.stub.ServerCallStreamObserver;
+import io.grpc.stub.StreamObserver;
 import io.grpc.protobuf.StatusProto;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
@@ -792,19 +790,6 @@ public abstract class AbstractServerInstance implements Instance {
         preconditionFailure,
         service,
         requestMetadata);
-  }
-
-  protected static void checkPreconditionFailure(
-      Digest actionDigest,
-      PreconditionFailure preconditionFailure)
-      throws StatusException {
-    if (preconditionFailure.getViolationsCount() != 0) {
-      throw StatusProto.toStatusException(com.google.rpc.Status.newBuilder()
-          .setCode(Code.FAILED_PRECONDITION.getNumber())
-          .setMessage(invalidActionMessage(actionDigest))
-          .addDetails(Any.pack(preconditionFailure))
-          .build());
-    }
   }
 
   protected void validateQueuedOperation(

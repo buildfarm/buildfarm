@@ -14,6 +14,8 @@
 
 package build.buildfarm.instance.shard;
 
+import static build.buildfarm.common.Actions.asExecutionStatus;
+import static build.buildfarm.common.Actions.checkPreconditionFailure;
 import static build.buildfarm.common.Actions.invalidActionMessage;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static build.buildfarm.instance.shard.Util.SHARD_IS_RETRIABLE;
@@ -1596,22 +1598,6 @@ public class ShardInstance extends AbstractServerInstance {
           return transformAndQueue(executeEntry, poller, operation, stopwatch);
         },
         operationTransformService);
-  }
-
-  private com.google.rpc.Status asExecutionStatus(Throwable t) {
-    com.google.rpc.Status.Builder status = com.google.rpc.Status.newBuilder();
-    Status grpcStatus = Status.fromThrowable(t);
-    switch (grpcStatus.getCode()) {
-    case DEADLINE_EXCEEDED:
-      // translate timeouts to retriable errors here, rather than
-      // indications that the execution timed out
-      status.setCode(com.google.rpc.Code.UNAVAILABLE.getNumber());
-      break;
-    default:
-      status.setCode(grpcStatus.getCode().value());
-      break;
-    }
-    return status.build();
   }
 
   private ListenableFuture<Void> transformAndQueue(

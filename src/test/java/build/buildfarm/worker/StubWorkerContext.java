@@ -63,7 +63,7 @@ class StubWorkerContext implements WorkerContext {
   @Override public QueuedOperation getQueuedOperation(QueueEntry queueEntry) { throw new UnsupportedOperationException(); }
   @Override public Path createExecDir(String operationName, Tree tree, Action action, Command command) { throw new UnsupportedOperationException(); }
   @Override public void destroyExecDir(Path execDir) { throw new UnsupportedOperationException(); }
-  @Override public void uploadOutputs(ActionResult.Builder resultBuilder, Path actionRoot, Iterable<String> outputFiles, Iterable<String> outputDirs) { throw new UnsupportedOperationException(); }
+  @Override public void uploadOutputs(Digest actionDigest, ActionResult.Builder resultBuilder, Path actionRoot, Iterable<String> outputFiles, Iterable<String> outputDirs) { throw new UnsupportedOperationException(); }
   @Override public boolean putOperation(Operation operation, Action action) { throw new UnsupportedOperationException(); }
   @Override public Write getOperationStreamWrite(String name) { throw new UnsupportedOperationException(); }
   @Override public void blacklistAction(String actionId) { throw new UnsupportedOperationException(); }

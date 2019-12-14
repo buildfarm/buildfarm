@@ -17,6 +17,7 @@ package build.buildfarm.worker;
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Tree;
@@ -33,6 +34,7 @@ import build.buildfarm.v1test.QueuedOperation;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Duration;
 import io.grpc.Deadline;
+import io.grpc.StatusException;
 import java.io.IOException;
 import java.nio.file.Path;
 
@@ -60,7 +62,7 @@ public interface WorkerContext {
   QueuedOperation getQueuedOperation(QueueEntry queueEntry) throws IOException, InterruptedException;
   Path createExecDir(String operationName, Tree tree, Action action, Command command) throws IOException, InterruptedException;
   void destroyExecDir(Path execDir) throws IOException, InterruptedException;
-  void uploadOutputs(ActionResult.Builder resultBuilder, Path actionRoot, Iterable<String> outputFiles, Iterable<String> outputDirs) throws IOException, InterruptedException;
+  void uploadOutputs(Digest actionDigest, ActionResult.Builder resultBuilder, Path actionRoot, Iterable<String> outputFiles, Iterable<String> outputDirs) throws IOException, InterruptedException, StatusException;
   boolean putOperation(Operation operation, Action Action) throws IOException, InterruptedException;
   void blacklistAction(String actionId) throws IOException, InterruptedException;
   void putActionResult(ActionKey actionKey, ActionResult actionResult) throws IOException, InterruptedException;

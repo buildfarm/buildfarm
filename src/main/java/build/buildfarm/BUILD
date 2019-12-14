@@ -17,9 +17,13 @@ java_library(
         "//3rdparty/jvm/com/google/guava:failureaccess",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java_util",
+        "//3rdparty/jvm/io/grpc:grpc_api",
         "//3rdparty/jvm/io/grpc:grpc_context",
+        "//3rdparty/jvm/io/grpc:grpc_protobuf",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_longrunning_operations_java_proto",
+        "@googleapis//:google_rpc_code_java_proto",
+        "@googleapis//:google_rpc_error_details_java_proto",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )
@@ -282,6 +286,7 @@ java_library(
         "//3rdparty/jvm/io/grpc:grpc_protobuf",
         "//3rdparty/jvm/io/grpc:grpc_stub",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "@googleapis//:google_rpc_error_details_java_proto",
     ],
 )
 

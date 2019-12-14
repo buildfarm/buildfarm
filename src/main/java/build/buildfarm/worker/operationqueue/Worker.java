@@ -613,6 +613,7 @@ public class Worker {
 
       @Override
       public void uploadOutputs(
+          Digest actionDigest,
           ActionResult.Builder resultBuilder,
           Path actionRoot,
           Iterable<String> outputFiles,
