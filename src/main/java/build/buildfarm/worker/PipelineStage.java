@@ -25,7 +25,6 @@ public abstract class PipelineStage implements Runnable {
   protected final PipelineStage output;
   protected final PipelineStage error;
 
-  private PipelineStage input = null;
   protected boolean claimed = false;
   private boolean closed = false;
   private Thread tickThread = null;
@@ -36,10 +35,6 @@ public abstract class PipelineStage implements Runnable {
     this.workerContext = workerContext;
     this.output = output;
     this.error = error;
-  }
-
-  public void setInput(PipelineStage input) {
-    this.input = input;
   }
 
   private void runInterruptible() throws InterruptedException {
@@ -214,8 +209,6 @@ public abstract class PipelineStage implements Runnable {
     public OperationContext take() { throw new UnsupportedOperationException(); }
     @Override
     public void put(OperationContext operationContext) throws InterruptedException { }
-    @Override
-    public void setInput(PipelineStage input) { }
     @Override
     public void run() { }
     @Override

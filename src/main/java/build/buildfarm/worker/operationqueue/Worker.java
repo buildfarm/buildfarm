@@ -765,11 +765,8 @@ public class Worker {
     PipelineStage errorStage = completeStage; /* new ErrorStage(); */
     PipelineStage reportResultStage = new ReportResultStage(context, completeStage, errorStage);
     PipelineStage executeActionStage = new ExecuteActionStage(context, reportResultStage, errorStage);
-    reportResultStage.setInput(executeActionStage);
     PipelineStage inputFetchStage = new InputFetchStage(context, executeActionStage, new PutOperationStage(context::requeue));
-    executeActionStage.setInput(inputFetchStage);
     PipelineStage matchStage = new MatchStage(context, inputFetchStage, errorStage);
-    inputFetchStage.setInput(matchStage);
 
     Pipeline pipeline = new Pipeline();
     // pipeline.add(errorStage, 0);

@@ -68,10 +68,6 @@ public class ReportResultStage extends PipelineStage {
     queue.put(operationContext);
   }
 
-  private DigestUtil getDigestUtil() {
-    return workerContext.getDigestUtil();
-  }
-
   @Override
   protected OperationContext tick(OperationContext operationContext) throws InterruptedException {
     workerContext.resumePoller(

@@ -191,9 +191,4 @@ public class MatchStage extends PipelineStage {
   public void put(OperationContext operation) {
     throw new UnsupportedOperationException();
   }
-
-  @Override
-  public void setInput(PipelineStage input) {
-    throw new UnsupportedOperationException();
-  }
 }
