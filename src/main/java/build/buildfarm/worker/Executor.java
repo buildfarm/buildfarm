@@ -311,6 +311,7 @@ class Executor implements Runnable {
       logger.log(SEVERE, "error starting process for " + operationName, e);
       // again, should we do something else here??
       resultBuilder.setExitCode(INCOMPLETE_EXIT_CODE);
+      resultBuilder.setStderrRaw(ByteString.copyFromUtf8(e.getMessage()));
       return Code.INVALID_ARGUMENT;
     }
 
