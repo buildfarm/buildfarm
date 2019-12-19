@@ -31,6 +31,14 @@ public class BuildFarmServerOptions extends OptionsBase {
   public boolean help;
 
   @Option(
+      name = "pid_file",
+      abbrev = 'P',
+      help = "File for writing the process id for this server when it is fully started.",
+      defaultValue = "null"
+    )
+  public String pidFile;
+
+  @Option(
       name = "port",
       abbrev = 'p',
       help = "Port to use.",

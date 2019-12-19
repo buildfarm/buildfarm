@@ -101,6 +101,9 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
@@ -127,6 +130,7 @@ public class Worker {
   private final Instance operationQueueInstance;
   private final ByteStreamUploader uploader;
   private final WorkerConfig config;
+  private final @Nullable String pidFile;
   private final Path root;
   private final CASFileCache fileCache;
   private final Map<Path, Iterable<Path>> rootInputFiles = new ConcurrentHashMap<>();
@@ -208,12 +212,13 @@ public class Worker {
         retrier, retryScheduler);
   }
 
-  public Worker(WorkerConfig config) throws ConfigurationException {
-    this(config, FileSystems.getDefault());
+  public Worker(WorkerConfig config, @Nullable String pidFile) throws ConfigurationException {
+    this(config, FileSystems.getDefault(), pidFile);
   }
 
-  public Worker(WorkerConfig config, FileSystem fileSystem) throws ConfigurationException {
+  public Worker(WorkerConfig config, FileSystem fileSystem, @Nullable String pidFile) throws ConfigurationException {
     this.config = config;
+    this.pidFile = pidFile;
 
     /* configuration validation */
     root = getValidRoot(config, fileSystem);
@@ -407,7 +412,33 @@ public class Worker {
     return platform.build();
   }
 
-  public void start() throws InterruptedException {
+  private void createPidFile() throws IOException {
+    if (this.pidFile == null) {
+      return;
+    }
+
+    final Path pidFile = Paths.get(this.pidFile);
+    try (Writer writer =
+        new OutputStreamWriter(Files.newOutputStream(pidFile), StandardCharsets.UTF_8)) {
+      writer.write(Long.toString(ProcessHandle.current().pid()));
+      writer.write("\n");
+    }
+
+    Runtime.getRuntime()
+        .addShutdownHook(
+            new Thread() {
+              @Override
+              public void run() {
+                try {
+                  Files.delete(pidFile);
+                } catch (IOException e) {
+                  System.err.println("Cannot remove pid file: " + pidFile);
+                }
+              }
+            });
+  }
+
+  public void start() throws IOException, InterruptedException {
     try {
       Files.createDirectories(root);
       fileCache.start();
@@ -777,6 +808,7 @@ public class Worker {
     pipeline.add(executeActionStage, 2);
     pipeline.add(reportResultStage, 1);
     pipeline.start();
+    createPidFile();
     pipeline.join(); // uninterruptable
     if (Thread.interrupted()) {
       throw new InterruptedException();
@@ -819,7 +851,10 @@ public class Worker {
     }
     Path configPath = Paths.get(residue.get(0));
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
-      Worker worker = new Worker(toWorkerConfig(new InputStreamReader(configInputStream), parser.getOptions(WorkerOptions.class)));
+      WorkerOptions options = parser.getOptions(WorkerOptions.class);
+      Worker worker = new Worker(
+          toWorkerConfig(new InputStreamReader(configInputStream), options),
+          options.pidFile);
       configInputStream.close();
       worker.start();
       return true;

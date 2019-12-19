@@ -31,6 +31,14 @@ public class WorkerOptions extends OptionsBase {
   public boolean help;
 
   @Option(
+      name = "pid_file",
+      abbrev = 'P',
+      help = "File for writing the process id for this worker when it is fully started.",
+      defaultValue = "null"
+    )
+  public String pidFile;
+
+  @Option(
       name = "root",
       help = "Root base directory for all work being performed.",
       defaultValue = ""

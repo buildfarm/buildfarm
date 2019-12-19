@@ -32,6 +32,9 @@ import io.grpc.util.TransmitStatusRuntimeExceptionInterceptor;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -145,6 +148,27 @@ public class BuildFarmServer {
                                               OptionsParser.HelpVerbosity.LONG));
   }
 
+  private static void createPidFile(String pidFileName) throws IOException {
+    final Path pidFile = Paths.get(pidFileName);
+    try (Writer writer =
+        new OutputStreamWriter(Files.newOutputStream(pidFile), StandardCharsets.UTF_8)) {
+      writer.write(Long.toString(ProcessHandle.current().pid()));
+      writer.write("\n");
+    }
+
+    Runtime.getRuntime()
+        .addShutdownHook(
+            new Thread() {
+              @Override
+              public void run() {
+                try {
+                  Files.delete(pidFile);
+                } catch (IOException e) {
+                  System.err.println("Cannot remove pid file: " + pidFile);
+                }
+              }
+            });
+  }
   /**
    * returns success or failure
    */
@@ -177,6 +201,9 @@ public class BuildFarmServer {
       server = new BuildFarmServer(session, toBuildFarmServerConfig(new InputStreamReader(configInputStream), options));
       configInputStream.close();
       server.start();
+      if (options.pidFile != null) {
+        createPidFile(options.pidFile);
+      }
       server.blockUntilShutdown();
       server.stop();
       return true;
