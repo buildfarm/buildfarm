@@ -26,13 +26,15 @@ public class WorkerTest {
   public void missingWorkerRoot() throws ConfigurationException {
     new Worker(WorkerConfig.newBuilder()
         .setCasCacheDirectory("/cache")
-        .build());
+        .build(),
+        /* pidFile=*/ null);
   }
 
   @Test(expected = ConfigurationException.class)
   public void missingCasCacheDirectory() throws ConfigurationException {
     new Worker(WorkerConfig.newBuilder()
         .setRoot("/")
-        .build());
+        .build(),
+        /* pidFile=*/ null);
   }
 }
