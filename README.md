@@ -22,7 +22,7 @@ Run via
 
 - **`configfile`** has to be in Protocol Buffer text format, corresponding to a [BuildFarmServerConfig](https://github.com/bazelbuild/bazel-buildfarm/blob/master/src/main/protobuf/build/buildfarm/v1test/buildfarm.proto#L55) definition.
 
-  For an example, see the [examples](examples) directory, which contains the working example [examples/worker.config.example](config).
+  For an example, see the [examples](examples) directory, which contains the working example [examples/server.config.example](examples/server.config.example).
   For format details see [here](https://stackoverflow.com/questions/18873924/what-does-the-protobuf-text-format-look-like). Protocol Buffer structure at [src/main/protobuf/build/buildfarm/v1test/buildfarm.proto](src/main/protobuf/build/buildfarm/v1test/buildfarm.proto)
 
 - **`PORT`** to expose service endpoints on
@@ -35,7 +35,7 @@ Run via
 
 - **`configfile`** has to be in Protocol Buffer text format, corresponding to a [WorkerConfig](https://github.com/bazelbuild/bazel-buildfarm/blob/master/src/main/protobuf/build/buildfarm/v1test/buildfarm.proto#L459) definition.
 
-  For an example, see the [examples](examples) directory, which contains the working example [examples/server.config.example](config).
+  For an example, see the [examples](examples) directory, which contains the working example [examples/worker.config.example](examples/worker.config.example).
   For format details see [here](https://stackoverflow.com/questions/18873924/what-does-the-protobuf-text-format-look-like). Protocol Buffer structure at [src/main/protobuf/build/buildfarm/v1test/buildfarm.proto](src/main/protobuf/build/buildfarm/v1test/buildfarm.proto)
 
 - **`ROOT`** base directory path for all work being performed.
