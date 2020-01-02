@@ -1254,6 +1254,14 @@ public abstract class AbstractServerInstance implements Instance {
     return isStage(operation, ExecutionStage.Value.COMPLETED);
   }
 
+  protected boolean wasCompletelyExecuted(Operation operation) {
+    ExecuteResponse executeResponse = getExecuteResponse(operation);
+    if (executeResponse != null && !executeResponse.getCachedResult()) {
+      return true;
+    }
+    return false;
+  }
+
   protected static ActionResult getCacheableActionResult(Operation operation) {
     ExecuteResponse executeResponse = getExecuteResponse(operation);
     if (executeResponse != null &&

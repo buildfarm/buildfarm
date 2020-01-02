@@ -1366,14 +1366,34 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   Watcher newActionResultWatcher(ActionKey actionKey, Watcher watcher) {
-    return (operation) -> {
-      if (operation != null) {
-        ActionResult actionResult = getCacheableActionResult(operation);
-        if (actionResult != null) {
-          actionResultCache.put(actionKey, actionResult);
+    return new Watcher() {
+      boolean writeThrough = true; // default case for action, default here
+
+      @Override
+      public void observe(Operation operation) {
+        if (operation != null) {
+          if (writeThrough) {
+            ActionResult actionResult = getCacheableActionResult(operation);
+            if (actionResult != null) {
+              actionResultCache.put(actionKey, actionResult);
+            } else if (wasCompletelyExecuted(operation)) {
+              // we want to avoid presenting any results for an action which
+              // was not completely executed
+              actionResultCache.invalidate(actionKey);
+            }
+          }
+        }
+        if (operation.getMetadata().is(Action.class)) {
+          // post-action validation sequence, do not propagate to watcher
+          try {
+            writeThrough = !operation.getMetadata().unpack(Action.class).getDoNotCache();
+          } catch (InvalidProtocolBufferException e) {
+            // unlikely
+          }
+        } else {
+          watcher.observe(operation);
         }
       }
-      watcher.observe(operation);
     };
   }
 
@@ -1635,6 +1655,14 @@ public class ShardInstance extends AbstractServerInstance {
             (action) -> {
               if (action == null) {
                 throw Status.NOT_FOUND.asException();
+              } else if (action.getDoNotCache()) {
+                // invalidate our action cache result as well as watcher owner
+                actionResultCache.invalidate(DigestUtil.asActionKey(actionDigest));
+                backplane.putOperation(
+                    operation.toBuilder()
+                        .setMetadata(Any.pack(action))
+                        .build(),
+                    metadata.getStage());
               }
               return immediateFuture(action);
             },
