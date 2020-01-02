@@ -642,22 +642,25 @@ public class ShardInstance extends AbstractServerInstance {
             if (workers.isEmpty()) {
               blobObserver.onError(Status.NOT_FOUND.asException());
             } else {
-              checkState(count >= received);
-              long nextCount = count - received;
-              if (nextCount == 0) {
-                // be gracious and terminate the blobObserver here
-                onCompleted();
+              if (count < received) {
+                blobObserver.onError(new IllegalArgumentException(format("count (%d) < received (%d)", count, received)));
               } else {
-                try {
-                  fetchBlobFromWorker(
-                      blobDigest,
-                      workers,
-                      offset + received,
-                      nextCount,
-                      blobObserver,
-                      requestMetadata);
-                } catch (Exception e) {
-                  blobObserver.onError(e);
+                long nextCount = count - received;
+                if (nextCount == 0) {
+                  // be gracious and terminate the blobObserver here
+                  onCompleted();
+                } else {
+                  try {
+                    fetchBlobFromWorker(
+                        blobDigest,
+                        workers,
+                        offset + received,
+                        nextCount,
+                        blobObserver,
+                        requestMetadata);
+                  } catch (Exception e) {
+                    blobObserver.onError(e);
+                  }
                 }
               }
             }
