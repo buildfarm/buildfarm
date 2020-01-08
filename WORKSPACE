@@ -33,10 +33,12 @@ http_archive(
 # The API that we implement.
 http_archive(
     name = "remote_apis",
+    patches = ["@build_buildfarm//third_party/remote-apis:remote-apis.patch"],
+    patch_args = ["-p1"],
     build_file = "@build_buildfarm//:BUILD.remote_apis",
-    sha256 = "69c47e26efbfac605e07d9963fdeda9f5ed22a73e692f290a0b6150207207cb5",
-    strip_prefix = "remote-apis-e7282cf0f0e16e7ba84209be5417279e6815bee7",
-    url = "https://github.com/bazelbuild/remote-apis/archive/e7282cf0f0e16e7ba84209be5417279e6815bee7.zip",
+    sha256 = "21ad15be502ef529ca07fdda56d25d6678647b954d41f08a040241ea5e43dce1",
+    strip_prefix = "remote-apis-b5123b1bb2853393c7b9aa43236db924d7e32d61",
+    url = "https://github.com/bazelbuild/remote-apis/archive/b5123b1bb2853393c7b9aa43236db924d7e32d61.zip",
 )
 
 http_archive(
@@ -57,7 +59,7 @@ http_archive(
 http_jar(
     name = "jedis",
     sha256 = "10c844cb3338884da468608f819c11d5c90354b170c3fe445203497000c06ba3",
-    urls =  [
+    urls = [
         "https://github.com/werkt/jedis/releases/download/jedis-3.0.1-8209fd5a88/jedis-3.0.1-8209fd5a88.jar",
     ],
 )
@@ -88,6 +90,7 @@ load(
     "@io_bazel_rules_docker//repositories:repositories.bzl",
     container_repositories = "repositories",
 )
+
 container_repositories()
 
 load("@io_bazel_rules_docker//repositories:deps.bzl", container_deps = "deps")
