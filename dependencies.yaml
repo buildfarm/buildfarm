@@ -82,12 +82,12 @@ dependencies:
   io.grpc:
     grpc-all:
       lang: java
-      version: "1.24.0"
+      version: "1.26.0"
 
     grpc:
       lang: java
       modules: [ "api", "auth", "core", "context", "netty", "stub", "protobuf", "testing" ]
-      version: "1.24.0"
+      version: "1.26.0"
 
   junit:
     junit:
