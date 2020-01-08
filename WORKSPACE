@@ -17,9 +17,9 @@ protobuf_deps()
 # Needed for @grpc_java//compiler:grpc_java_plugin.
 http_archive(
     name = "io_grpc_grpc_java",
-    sha256 = "e4ee8402e2ae493bc7deb099fd7f94092294fc79eb9dcd8d5c1cc6f5db1192b9",
-    strip_prefix = "grpc-java-1.24.0",
-    urls = ["https://github.com/grpc/grpc-java/archive/v1.24.0.zip"],
+    sha256 = "11f2930cf31c964406e8a7e530272a263fbc39c5f8d21410b2b927b656f4d9be",
+    strip_prefix = "grpc-java-1.26.0",
+    urls = ["https://github.com/grpc/grpc-java/archive/v1.26.0.zip"],
 )
 
 http_archive(
