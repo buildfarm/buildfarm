@@ -63,7 +63,7 @@ import java.util.logging.Logger;
 public class ByteStreamService extends ByteStreamImplBase {
   private static final Logger logger = Logger.getLogger(ByteStreamService.class.getName());
 
-  private static int CHUNK_SIZE = 64 * 1024;
+  static int CHUNK_SIZE = 64 * 1024;
 
   private final long deadlineAfter;
   private final TimeUnit deadlineAfterUnits;
@@ -211,9 +211,19 @@ public class ByteStreamService extends ByteStreamImplBase {
     return new DelegateServerCallStreamObserver<ByteString, ReadResponse>(responseObserver) {
       @Override
       public void onNext(ByteString data) {
-        responseObserver.onNext(ReadResponse.newBuilder()
-            .setData(data)
-            .build());
+        while (!data.isEmpty()) {
+          ByteString slice;
+          if (data.size() > CHUNK_SIZE) {
+            slice = data.substring(0, CHUNK_SIZE);
+            data = data.substring(CHUNK_SIZE);
+          } else {
+            slice = data;
+            data = ByteString.EMPTY;
+          }
+          responseObserver.onNext(ReadResponse.newBuilder()
+              .setData(slice)
+              .build());
+        }
       }
 
       @Override
