@@ -144,8 +144,8 @@ public class MemoryInstance extends AbstractServerInstance {
       });
   private final List<Operation> queuedOperations = Lists.newArrayList();
   private final List<Worker> workers;
-  private final Map<String, Watchdog> requeuers = Maps.newConcurrentMap();
-  private final Map<String, Watchdog> operationTimeoutDelays = Maps.newConcurrentMap();
+  private final Map<String, Watchdog> requeuers;
+  private final Map<String, Watchdog> operationTimeoutDelays;
   private final OperationsMap outstandingOperations;
   private final Executor watcherExecutor;
 
@@ -210,7 +210,9 @@ public class MemoryInstance extends AbstractServerInstance {
                 .build()),
         /* watcherExecutor=*/ newCachedThreadPool(),
         new OutstandingOperations(),
-        /* workers=*/ Lists.newArrayList());
+        /* workers=*/ Lists.newArrayList(),
+        /* requeuers=*/ Maps.newConcurrentMap(),
+        /* operationTimeoutDelays=*/ Maps.newConcurrentMap());
   }
 
   @VisibleForTesting
@@ -222,7 +224,9 @@ public class MemoryInstance extends AbstractServerInstance {
       SetMultimap<String, WatchFuture> watchers,
       Executor watcherExecutor,
       OperationsMap outstandingOperations,
-      List<Worker> workers) {
+      List<Worker> workers,
+      Map<String, Watchdog> requeuers,
+      Map<String, Watchdog> operationTimeoutDelays) {
     super(
         name,
         digestUtil,
@@ -236,6 +240,8 @@ public class MemoryInstance extends AbstractServerInstance {
     this.outstandingOperations = outstandingOperations;
     this.watcherExecutor = watcherExecutor;
     this.workers = workers;
+    this.requeuers = requeuers;
+    this.operationTimeoutDelays = operationTimeoutDelays;
   }
 
   private static ActionCache createActionCache(ActionCacheConfig config, ContentAddressableStorage cas, DigestUtil digestUtil) {
@@ -505,10 +511,23 @@ public class MemoryInstance extends AbstractServerInstance {
 
   @Override
   public boolean putOperation(Operation operation) throws InterruptedException {
+    String operationName = operation.getName();
+    if (isQueued(operation)) {
+      // destroy any monitors for this queued operation
+      // any race should be resolved in a failure to requeue
+      Watchdog requeuer = requeuers.remove(operationName);
+      if (requeuer != null) {
+        requeuer.stop();
+      }
+      Watchdog operationTimeoutDelay =
+          operationTimeoutDelays.remove(operationName);
+      if (operationTimeoutDelay != null) {
+        operationTimeoutDelay.stop();
+      }
+    }
     if (!super.putOperation(operation)) {
       return false;
     }
-    String operationName = operation.getName();
     if (operation.getDone()) {
       // destroy requeue timer
       Watchdog requeuer = requeuers.remove(operationName);
@@ -568,6 +587,7 @@ public class MemoryInstance extends AbstractServerInstance {
             .build();
         // this is an overuse of Watchdog, we will never pet it
         Watchdog operationTimeoutDelay = new Watchdog(timeout, () -> {
+          operationTimeoutDelays.remove(operationName);
           try {
             expireOperation(operation);
           } catch (InterruptedException e) {
@@ -582,12 +602,14 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   private void onDispatched(Operation operation) {
+    final String operationName = operation.getName();
     Duration timeout = config.getOperationPollTimeout();
     Watchdog requeuer = new Watchdog(timeout, () -> {
-      logger.info("REQUEUEING " + operation.getName());
+      logger.info("REQUEUEING " + operationName);
+      requeuers.remove(operationName);
       requeueOperation(operation);
     });
-    requeuers.put(operation.getName(), requeuer);
+    requeuers.put(operationName, requeuer);
     new Thread(requeuer).start();
   }
 

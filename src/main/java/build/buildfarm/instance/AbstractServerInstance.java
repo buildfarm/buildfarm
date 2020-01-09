@@ -1242,7 +1242,7 @@ public abstract class AbstractServerInstance implements Instance {
     }
   }
 
-  protected static boolean isQueued(Operation operation) {
+  public static boolean isQueued(Operation operation) {
     return isStage(operation, ExecutionStage.Value.QUEUED);
   }
 
