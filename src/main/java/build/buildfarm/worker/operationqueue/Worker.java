@@ -445,9 +445,9 @@ public class Worker {
           ExecutionStage.Value stage,
           Runnable onFailure,
           Deadline deadline) {
+        String operationName = queueEntry.getExecuteEntry().getOperationName();
         poller.resume(
             () -> {
-              String operationName = queueEntry.getExecuteEntry().getOperationName();
               boolean success = operationQueueInstance.pollOperation(operationName, stage);
               logger.info(format("%s: poller: Completed Poll for %s: %s", name, operationName, success ? "OK" : "Failed"));
               if (!success) {
@@ -455,7 +455,10 @@ public class Worker {
               }
               return success;
             },
-            onFailure,
+            () -> {
+              logger.info(format("%s: poller: Deadline expired for %s", name, operationName));
+              onFailure.run();
+            },
             deadline);
       }
 
