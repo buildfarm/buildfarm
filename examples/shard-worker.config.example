@@ -1,0 +1,202 @@
+# the listening port of the shard-worker grpc server
+port: 8981
+
+# the host:port of this grpc server, required to be accessible
+# by all shard cluster servers
+public_name: "localhost:8981"
+
+# the digest function for this worker, required
+# to match out of band between the client and server
+# since resource names must be determined on the client
+# for a valid upload
+digest_function: SHA256
+
+# all content for the operations will be stored under this path
+root: "/tmp/worker"
+
+# total size in bytes of inline content for action results
+# output files, stdout, and stderr content, in that order
+# will be inlined if their cumulative size does not exceed this limit.
+inline_content_limit: 1048567 # 1024 * 1024
+
+# the period between poll operations at any stage
+operation_poll_period: {
+  seconds: 1
+  nanos: 0
+}
+
+# key/value set of definining capabilities of this worker
+# all execute requests must match perfectly with workers which
+# provide capabilities
+# so an action with a required platform: { arch: "x86_64" } must
+# match with a worker with at least { arch: "x86_64" } here
+platform: {
+  # commented out here for illustrative purposes, a default empty
+  # 'platform' is a sufficient starting point without specifying
+  # any platform requirements on the actions' side
+  ###
+  # property: {
+  #   name: "key_name"
+  #   value: "value_string"
+  # }
+}
+
+# the worker CAS configuration
+cas: {
+  # present a filesystem CAS, required to host an exec root
+  # the first filesystem CAS in the configuration will be used
+  # as the storage for an exec filesystem for an operation
+  filesystem: {
+    # the local cache location relative to the 'root', or absolute
+    path: "cache"
+
+    # limit for contents of files retained
+    # from CAS in the cache
+    max_size_bytes: 2147483648 # 2 * 1024 * 1024 * 1024
+
+    # limit for content size of files retained
+    # from CAS in the cache
+    max_entry_size_bytes: 2147483648 # 2 * 1024 * 1024 * 1024
+  }
+}
+
+# the number of concurrently available slots in the execute phase
+execute_stage_width: 1
+
+# the number of concurrently available slots in the input fetch phase
+input_fetch_stage_width: 1
+
+# Use an input directory creation strategy which creates a single
+# directory tree at the highest level of the input tree containing
+# no output paths of any kind, and symlinks that directory into an
+# action's execroot, potentially saving large amounts of time
+# spent manufacturing the same read-only input hierarchy over
+# multiple actions' executions.
+link_input_directories: true
+
+# an imposed action-key-invariant timeout used in the unspecified timeout case
+default_action_timeout: {
+  seconds: 600
+  nanos: 0
+}
+
+# a limit on the action timeout specified in the action, above which
+# the operation will report a failed result immediately
+maximum_action_timeout: {
+  seconds: 3600
+  nanos: 0
+}
+
+# prefix command executions with this path
+#execution_policies: {
+#  name: "test"
+#  wrapper: {
+#    path: "/path/to/execution/wrapper"
+#  }
+#}
+
+# A backplane specification hosted with redis cluster
+# Fields omitted are expected defaults, and are unused or undesirable on the workers
+redis_shard_backplane_config: {
+  # The URI of the redis cluster endpoint. This must
+  # be a single URI, regardless of the layout of the cluster
+  redis_uri: "redis://localhost:6379"
+
+  # The size of the redis connection pool
+  jedis_pool_max_total: 4000
+
+  # The redis key used to store a hash of registered Workers
+  # to their registration expiration time. After a worker's
+  # registration has expired, they are no longer considered
+  # as shards of the CAS
+  workers_hash_name: "Workers"
+
+  # A redis pubsub channel key where changes to the cluster
+  # membership are announced
+  worker_channel: "WorkerChannel"
+
+  # A redis key prefix for all ActionCache entries, suffixed
+  # with the action's key and mapping to an ActionResult
+  action_cache_prefix: "ActionCache"
+
+  # The ttl maintained for ActionCache entries. This is not
+  # refreshed on getActionResult hit
+  action_cache_expire: 2419200 # 4 weeks
+
+  # A redis key prefix for all blacklisted actions, suffixed
+  # with the action's key hash. An action which is blacklisted
+  # should be rejected for all requests where it is identified via
+  # its RequestMetadata
+  # To meet API standards, a request which matches this condition
+  # receives a transient UNAVAILABLE response, which, in bazel's
+  # case, can induce a fallback to non-remote recovery, rather
+  # than a catastrophic failure.
+  action_blacklist_prefix: "ActionBlacklist"
+
+  # The ttl maintained for action_blacklist entries.
+  action_blacklist_expire: 3600 # 1 hour
+
+  # A redis key prefix for all Operations, suffixed with the
+  # operation's name and mapping to an Operation which reflects
+  # the cluster perceived state of that Operation
+  operation_prefix: "Operation"
+
+  # The ttl maintained for all Operations, updated on each
+  # modification
+  operation_expire: 604800 # 1 week
+
+  # The redis key used to store a list of QueueEntrys
+  # awaiting execution by workers. These are queued
+  # by an operation_queuer agent, and dequeued by a worker.
+  # Redis keyspace manipulation is used here to support multi-
+  # key commands.
+  # The string contained within {} must match that of
+  # dispatching_list_name.
+  queued_operations_list_name: "{Execution}:QueuedOperations"
+
+  # The redis key of a list used to ensure reliable processing of
+  # ready-to-run queue entries together with operation watch
+  # monitoring.
+  # The string contained within {} must match that of
+  # queued_operations_list_name.
+  dispatching_list_name: "{Execution}:DispatchingOperations"
+
+  # A redis key prefix for operations which are being dequeued
+  # from the ready-to-run queue. The key is suffixed with the
+  # operation name and contains the expiration time in epoch
+  # milliseconds after which the operation is considered lost.
+  dispatching_prefix: "Dispatching"
+
+  # The delay in milliseconds used to populate dispathing operation
+  # entries
+  dispatching_timeout_millis: 10000
+
+  # The redis key of a hash of operation names to the worker
+  # lease for its execution. Entries in this hash are monitored
+  # by the dispatched_monitor for expiration, and the worker
+  # is expected to extend a lease in a timely fashion to indicate
+  # continued handling of an operation.
+  dispatched_operations_hash_name: "DispatchedOperations"
+
+  # A redis pubsub channel prefix suffixed by an operation name
+  # where updates and keepalives are transmitted as it makes its
+  # way through the various processing elements of the cluster.
+  operation_channel_prefix: "OperationChannel"
+
+  # A redis key prefix suffixed with a blob digest that maps to a
+  # set of workers which advertise that blob's availability.
+  # This set must be intersected with the set of active worker
+  # leases to be considered meaningful.
+  cas_prefix: "ContentAddressableStorage"
+
+  # The ttl maintained for cas entries. This is not refreshed on
+  # any read access of the blob.
+  cas_expire: 604800 # 1 week
+
+  # Enable an agent in the backplane client which subscribes
+  # to worker_channel and operation_channel events. If this is
+  # disabled, the responsiveness of watchers is reduced and the
+  # CAS is reduced.
+  # When in doubt, leave this enabled.
+  subscribe_to_backplane: true
+}

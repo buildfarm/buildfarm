@@ -112,6 +112,14 @@ execute_stage_width: 1
 # the number of concurrently available slots in the input fetch phase
 input_fetch_stage_width: 1
 
+# Use an input directory creation strategy which creates a single
+# directory tree at the highest level of the input tree containing
+# no output paths of any kind, and symlinks that directory into an
+# action's execroot, potentially saving large amounts of time
+# spent manufacturing the same read-only input hierarchy over
+# multiple actions' executions.
+link_input_directories: true
+
 # an imposed action-key-invariant timeout used in the unspecified timeout case
 default_action_timeout: {
   seconds: 600
