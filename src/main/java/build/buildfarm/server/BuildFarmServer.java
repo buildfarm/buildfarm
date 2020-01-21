@@ -28,6 +28,8 @@ import com.google.protobuf.TextFormat;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.ServerInterceptor;
+import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
+import io.grpc.services.HealthStatusManager;
 import io.grpc.util.TransmitStatusRuntimeExceptionInterceptor;
 import java.io.IOException;
 import java.io.InputStream;
@@ -54,6 +56,7 @@ public class BuildFarmServer {
   private final ScheduledExecutorService keepaliveScheduler = newSingleThreadScheduledExecutor();
   private final ActionCacheRequestCounter actionCacheRequestCounter;
   private final Instances instances;
+  private final HealthStatusManager healthStatusManager;
   private final Server server;
   private boolean stopping = false;
 
@@ -67,10 +70,12 @@ public class BuildFarmServer {
     String defaultInstanceName = config.getDefaultInstanceName();
     instances = new BuildFarmInstances(session, config.getInstancesList(), defaultInstanceName, this::stop);
 
+    healthStatusManager = new HealthStatusManager();
     actionCacheRequestCounter = new ActionCacheRequestCounter(ActionCacheService.logger, Duration.ofSeconds(10));
 
     ServerInterceptor headersInterceptor = new ServerHeadersInterceptor();
     server = serverBuilder
+        .addService(healthStatusManager.getHealthService())
         .addService(new ActionCacheService(instances, actionCacheRequestCounter::increment))
         .addService(new CapabilitiesService(instances))
         .addService(new ContentAddressableStorageService(
@@ -105,6 +110,7 @@ public class BuildFarmServer {
     actionCacheRequestCounter.start();
     instances.start();
     server.start();
+    healthStatusManager.setStatus(HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
     Runtime.getRuntime().addShutdownHook(new Thread() {
       @Override
       public void run() {
@@ -122,6 +128,7 @@ public class BuildFarmServer {
       }
       stopping = true;
     }
+    healthStatusManager.setStatus(HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.NOT_SERVING);
     try {
       if (server != null) {
         server.shutdown();
