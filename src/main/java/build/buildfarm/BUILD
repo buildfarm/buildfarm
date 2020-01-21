@@ -399,7 +399,7 @@ container_image(
     name = "buildfarm-operationqueue-worker.container",
     base = "@java_base//image",
     cmd = [
-        "buildfarm-worker_deploy.jar",
+        "buildfarm-operationqueue-worker_deploy.jar",
         "/config/worker.config",
     ],
     # leverage the implicit target of the buildfarm-server to get a fat jar.
