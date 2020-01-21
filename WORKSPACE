@@ -10,13 +10,11 @@ http_archive(
     urls = ["https://github.com/protocolbuffers/protobuf/archive/v3.10.0.zip"],
 )
 
-load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
-
-protobuf_deps()
-
 # Needed for @grpc_java//compiler:grpc_java_plugin.
 http_archive(
     name = "io_grpc_grpc_java",
+    patch_args = ["-p1"],
+    patches = ["//third_party/io_grpc_grpc_java:7461ef983d.patch"],
     sha256 = "11f2930cf31c964406e8a7e530272a263fbc39c5f8d21410b2b927b656f4d9be",
     strip_prefix = "grpc-java-1.26.0",
     urls = ["https://github.com/grpc/grpc-java/archive/v1.26.0.zip"],
@@ -33,29 +31,22 @@ http_archive(
 # The API that we implement.
 http_archive(
     name = "remote_apis",
-    patches = ["@build_buildfarm//third_party/remote-apis:remote-apis.patch"],
-    patch_args = ["-p1"],
     build_file = "@build_buildfarm//:BUILD.remote_apis",
+    patch_args = ["-p1"],
+    patches = ["@build_buildfarm//third_party/remote-apis:remote-apis.patch"],
     sha256 = "21ad15be502ef529ca07fdda56d25d6678647b954d41f08a040241ea5e43dce1",
     strip_prefix = "remote-apis-b5123b1bb2853393c7b9aa43236db924d7e32d61",
     url = "https://github.com/bazelbuild/remote-apis/archive/b5123b1bb2853393c7b9aa43236db924d7e32d61.zip",
 )
 
-http_archive(
-    name = "bazel_skylib",
-    sha256 = "2ea8a5ed2b448baf4a6855d3ce049c4c452a6470b1efd1504fdb7c1c134d220a",
-    strip_prefix = "bazel-skylib-0.8.0",
-    url = "https://github.com/bazelbuild/bazel-skylib/archive/0.8.0.tar.gz",
-)
-
-# Download the rules_docker repository at release v0.10.1
+# Download the rules_docker repository at release v0.14.1
 http_archive(
     name = "io_bazel_rules_docker",
-    patches = ["@build_buildfarm//third_party/rules_docker:rules_docker.patch"],
     patch_args = ["-p1"],
-    sha256 = "df13123c44b4a4ff2c2f337b906763879d94871d16411bf82dcfeba892b58607",
-    strip_prefix = "rules_docker-0.13.0",
-    urls = ["https://github.com/bazelbuild/rules_docker/archive/v0.13.0.tar.gz"],
+    patches = ["@build_buildfarm//third_party/rules_docker:rules_docker.patch"],
+    sha256 = "dc97fccceacd4c6be14e800b2a00693d5e8d07f69ee187babfd04a80a9f8e250",
+    strip_prefix = "rules_docker-0.14.1",
+    urls = ["https://github.com/bazelbuild/rules_docker/archive/v0.14.1.tar.gz"],
 )
 
 http_jar(
@@ -69,17 +60,6 @@ http_jar(
 load("//3rdparty:workspace.bzl", "maven_dependencies")
 
 maven_dependencies()
-
-load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
-
-protobuf_deps()
-
-load("@io_grpc_grpc_java//:repositories.bzl", "grpc_java_repositories")
-
-grpc_java_repositories(
-    omit_com_google_guava = True,
-    omit_com_google_guava_failureaccess = True,
-)
 
 load("@remote_apis//:repository_rules.bzl", "switched_rules_by_language")
 
@@ -113,6 +93,17 @@ container_pull(
     registry = "gcr.io",
     repository = "distroless/java",
 )
+
+load("@io_grpc_grpc_java//:repositories.bzl", "grpc_java_repositories")
+
+grpc_java_repositories(
+    omit_com_google_guava = True,
+    omit_com_google_guava_failureaccess = True,
+)
+
+load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
+
+protobuf_deps()
 
 bind(
     name = "jar/redis/clients/jedis",
