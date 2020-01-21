@@ -300,6 +300,8 @@ message WorkerChange {
 
   message Remove {
     string source = 1;
+
+    string reason = 2;
   }
 
   string name = 1;
@@ -379,6 +381,8 @@ message QueueEntry {
   ExecuteEntry execute_entry = 1;
 
   build.bazel.remote.execution.v2.Digest queued_operation_digest = 2;
+
+  build.bazel.remote.execution.v2.Platform platform = 3;
 }
 
 message QueuedOperationMetadata {
@@ -440,6 +444,9 @@ message InstanceEndpoint {
 
   // instance to be used
   string instance_name = 2;
+
+  // deadline for requests in seconds
+  int32 deadline_after_seconds = 3;
 }
 
 message ExecutionWrapper {

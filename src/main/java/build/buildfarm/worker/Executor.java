@@ -56,6 +56,8 @@ class Executor implements Runnable {
   private static final int INCOMPLETE_EXIT_CODE = -1;
   private static final Logger logger = Logger.getLogger(Executor.class.getName());
 
+  private static final Object execLock = new Object();
+
   private final WorkerContext workerContext;
   private final OperationContext operationContext;
   private final ExecuteActionStage owner;
@@ -103,11 +105,6 @@ class Executor implements Runnable {
           String.format(
               "Executor::run(%s): could not transition to EXECUTING",
               operation.getName()));
-      try {
-        workerContext.destroyExecDir(operationContext.execDir);
-      } catch (IOException e) {
-        logger.log(SEVERE, "error while destroying " + operationContext.execDir, e);
-      }
       owner.error().put(operationContext);
       return 0;
     }
@@ -308,14 +305,25 @@ class Executor implements Runnable {
     long startNanoTime = System.nanoTime();
     Process process;
     try {
-      synchronized (this) {
+      synchronized (execLock) {
         process = processBuilder.start();
       }
       process.getOutputStream().close();
-    } catch(IOException e) {
+    } catch (IOException e) {
       logger.log(SEVERE, "error starting process for " + operationName, e);
       // again, should we do something else here??
       resultBuilder.setExitCode(INCOMPLETE_EXIT_CODE);
+      // The openjdk IOException for an exec failure here includes the working
+      // directory of the execution. Drop it and reconstruct without it if we
+      // can get the cause.
+      Throwable t = e.getCause();
+      String message;
+      if (t != null) {
+        message = "Cannot run program \"" + processBuilder.command().get(0) + "\": " + t.getMessage();
+      } else {
+        message = e.getMessage();
+      }
+      resultBuilder.setStderrRaw(ByteString.copyFromUtf8(message));
       return Code.INVALID_ARGUMENT;
     }
 

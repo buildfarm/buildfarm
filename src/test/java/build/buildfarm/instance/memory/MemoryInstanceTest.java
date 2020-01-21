@@ -51,20 +51,25 @@ import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.ExecutionStage;
+import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.Watchdog;
 import build.buildfarm.common.Watcher;
+import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.instance.OperationsMap;
 import build.buildfarm.instance.WatchFuture;
 import build.buildfarm.v1test.ActionCacheConfig;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.DelegateCASConfig;
 import build.buildfarm.v1test.MemoryInstanceConfig;
+import build.buildfarm.v1test.QueueEntry;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.MultimapBuilder;
 import com.google.common.collect.SetMultimap;
@@ -114,6 +119,9 @@ public class MemoryInstanceTest {
   private ExecutorService watcherService;
 
   private Map<Digest, ByteString> storage;
+  private List<MemoryInstance.Worker> workers;
+  private Map<String, Watchdog> requeuers;
+  private Map<String, Watchdog> operationTimeoutDelays;
 
   @Before
   public void setUp() throws Exception {
@@ -139,6 +147,9 @@ public class MemoryInstanceTest {
         .build();
 
     storage = Maps.newHashMap();
+    workers = Lists.newArrayList();
+    requeuers = Maps.newHashMap();
+    operationTimeoutDelays = Maps.newHashMap();
     instance = new MemoryInstance(
         "memory",
         DIGEST_UTIL,
@@ -146,7 +157,10 @@ public class MemoryInstanceTest {
         casMapDecorator(storage),
         watchers,
         watcherService,
-        outstandingOperations);
+        outstandingOperations,
+        workers,
+        requeuers,
+        operationTimeoutDelays);
   }
 
   @After
@@ -517,5 +531,45 @@ public class MemoryInstanceTest {
     assertThat(instance.pollOperation(
         operation.getName(),
         EXECUTING)).isFalse();
+  }
+
+  @Test
+  public void matchCancelRemovesFromWorkers() throws InterruptedException {
+    MatchListener listener = mock(MatchListener.class);
+    instance.match(
+        Platform.getDefaultInstance(),
+        listener);
+    ArgumentCaptor<Runnable> onCancelHandlerCaptor = ArgumentCaptor.forClass(Runnable.class);
+    verify(listener, times(1)).setOnCancelHandler(onCancelHandlerCaptor.capture());
+    onCancelHandlerCaptor.getValue().run();
+    assertThat(workers).isEmpty();
+  }
+
+  @Test
+  public void requeueRemovesRequeuers() throws InterruptedException {
+    Digest actionDigest = createAction(Action.newBuilder());
+    instance.execute(
+        actionDigest,
+        /* skipCacheLookup=*/ true,
+        ExecutionPolicy.getDefaultInstance(),
+        ResultsCachePolicy.getDefaultInstance(),
+        RequestMetadata.getDefaultInstance(),
+        (operation) -> {});
+    MatchListener listener = mock(MatchListener.class);
+    when(listener.onEntry(any(QueueEntry.class))).thenReturn(true);
+    instance.match(
+        Platform.getDefaultInstance(),
+        listener);
+    ArgumentCaptor<QueueEntry> queueEntryCaptor = ArgumentCaptor.forClass(QueueEntry.class);
+    verify(listener, times(1)).onEntry(queueEntryCaptor.capture());
+    QueueEntry queueEntry = queueEntryCaptor.getValue();
+    assertThat(queueEntry).isNotNull();
+    String operationName = queueEntry.getExecuteEntry().getOperationName();
+    assertThat(requeuers).isNotEmpty();
+    Operation queuedOperation = outstandingOperations.get(operationName);
+    assertThat(instance.isQueued(queuedOperation)).isTrue();
+    instance.putOperation(queuedOperation); // requeue
+    assertThat(requeuers).isEmpty();
+    assertThat(outstandingOperations.get(operationName)).isEqualTo(queuedOperation);
   }
 }

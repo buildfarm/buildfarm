@@ -14,8 +14,6 @@
 
 package build.buildfarm.server;
 
-import static java.lang.String.format;
-
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance;
 import build.bazel.remote.execution.v2.ActionCacheGrpc;
@@ -29,12 +27,14 @@ import io.grpc.stub.StreamObserver;
 import java.util.logging.Logger;
 
 public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
-  private static final Logger logger = Logger.getLogger(ActionCacheService.class.getName());
+  static final Logger logger = Logger.getLogger(ActionCacheService.class.getName());
 
   private final Instances instances;
+  private final Runnable onRequest;
 
-  public ActionCacheService(Instances instances) {
+  public ActionCacheService(Instances instances, Runnable onRequest) {
     this.instances = instances;
+    this.onRequest = onRequest;
   }
 
   @Override
@@ -55,7 +55,7 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
       if (actionResult == null) {
         responseObserver.onError(Status.NOT_FOUND.asException());
       } else {
-        logger.finer(format("GetActionResult for ActionKey %s", DigestUtil.toString(request.getActionDigest())));
+        onRequest.run();
         responseObserver.onNext(actionResult);
         responseObserver.onCompleted();
       }

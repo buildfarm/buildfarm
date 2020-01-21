@@ -223,11 +223,8 @@ public class Worker {
     PipelineStage errorStage = completeStage; /* new ErrorStage(); */
     PipelineStage reportResultStage = new ReportResultStage(context, completeStage, errorStage);
     PipelineStage executeActionStage = new ExecuteActionStage(context, reportResultStage, errorStage);
-    reportResultStage.setInput(executeActionStage);
     PipelineStage inputFetchStage = new InputFetchStage(context, executeActionStage, new PutOperationStage(context::requeue));
-    executeActionStage.setInput(inputFetchStage);
     PipelineStage matchStage = new MatchStage(context, inputFetchStage, errorStage);
-    inputFetchStage.setInput(matchStage);
 
     pipeline = new Pipeline();
     // pipeline.add(errorStage, 0);
@@ -407,7 +404,7 @@ public class Worker {
 
   private void removeWorker(String name) {
     try {
-      backplane.removeWorker(name);
+      backplane.removeWorker(name, "removing self prior to initialization");
     } catch (IOException e) {
       Status status = Status.fromThrowable(e);
       if (status.getCode() != Code.UNAVAILABLE && status.getCode() != Code.DEADLINE_EXCEEDED) {

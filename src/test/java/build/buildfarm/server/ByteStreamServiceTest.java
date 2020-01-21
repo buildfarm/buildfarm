@@ -15,6 +15,7 @@
 package build.buildfarm.server;
 
 import static build.buildfarm.common.DigestUtil.HashFunction.SHA256;
+import static build.buildfarm.server.ByteStreamService.CHUNK_SIZE;
 import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.AdditionalAnswers.answerVoid;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -35,11 +36,15 @@ import build.buildfarm.common.Write;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.ByteStreamUploader;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
 import com.google.common.hash.HashCode;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamStub;
+import com.google.bytestream.ByteStreamProto.ReadRequest;
+import com.google.bytestream.ByteStreamProto.ReadResponse;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
 import com.google.protobuf.ByteString;
@@ -48,8 +53,10 @@ import io.grpc.Server;
 import io.grpc.Status;
 import io.grpc.inprocess.InProcessChannelBuilder;
 import io.grpc.inprocess.InProcessServerBuilder;
+import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
@@ -59,6 +66,7 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.invocation.InvocationOnMock;
@@ -255,5 +263,93 @@ public class ByteStreamServiceTest {
     verify(write, atLeastOnce()).getCommittedSize();
     verify(write, atLeastOnce()).getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class));
     verify(write, times(2)).addListener(any(Runnable.class), any(Executor.class));
+  }
+
+  class CountingReadObserver implements StreamObserver<ReadResponse> {
+    private final List<Integer> sizes = Lists.newArrayList();
+    private final ByteString.Output sink = ByteString.newOutput();
+    private boolean completed = false;
+
+    @Override
+    public void onNext(ReadResponse response) {
+      ByteString data = response.getData();
+      try {
+        data.writeTo(sink);
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+      sizes.add(data.size());
+    }
+
+    @Override
+    public void onCompleted() {
+      completed = true;
+    }
+
+    @Override
+    public void onError(Throwable t) {
+      t.printStackTrace();
+    }
+
+    List<Integer> getSizesList() {
+      return sizes;
+    }
+
+    boolean isCompleted() {
+      return completed;
+    }
+
+    ByteString getData() {
+      return sink.toByteString();
+    }
+  }
+
+  @Test
+  public void readSlicesLargeChunksFromInstance() throws Exception {
+    // pick a large chunk size
+    long size = CHUNK_SIZE * 10 + CHUNK_SIZE - 47;
+    ByteString content;
+    try (ByteString.Output out = ByteString.newOutput(ByteStreamService.CHUNK_SIZE * 10 + ByteStreamService.CHUNK_SIZE - 47)) {
+      for (long i = 0; i < size; i++) {
+        out.write((int) (i & 0xff));
+      }
+      content = out.toByteString();
+    }
+    Digest digest = DIGEST_UTIL.compute(content);
+    String resourceName = "blobs/" + DigestUtil.toString(digest);
+    ReadRequest request = ReadRequest.newBuilder()
+        .setResourceName(resourceName)
+        .build();
+
+    Instance instance = mock(Instance.class);
+    when(instances.getFromBlob(eq(resourceName))).thenReturn(instance);
+    doAnswer(answerVoid((blobDigest, offset, limit, chunkObserver, metadata) -> {})).when(instance).getBlob(
+        eq(digest),
+        eq(request.getReadOffset()),
+        eq((long) content.size()),
+        any(ServerCallStreamObserver.class),
+        eq(RequestMetadata.getDefaultInstance()));
+    Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
+    ByteStreamStub service = ByteStreamGrpc.newStub(channel);
+    CountingReadObserver readObserver = new CountingReadObserver();
+    service.read(request, readObserver);
+    ArgumentCaptor<ServerCallStreamObserver<ByteString>> observerCaptor = ArgumentCaptor.forClass(ServerCallStreamObserver.class);
+    verify(instance, times(1)).getBlob(
+        eq(digest),
+        eq(request.getReadOffset()),
+        eq((long) content.size()),
+        observerCaptor.capture(),
+        eq(RequestMetadata.getDefaultInstance()));
+
+    StreamObserver<ByteString> responseObserver = observerCaptor.getValue();
+    // supply entire content
+    responseObserver.onNext(content);
+    responseObserver.onCompleted();
+
+    assertThat(readObserver.isCompleted()).isTrue();
+    assertThat(readObserver.getData()).isEqualTo(content);
+    List<Integer> sizes = readObserver.getSizesList();
+    assertThat(sizes.size()).isEqualTo(11); // 10 + 1 incomplete chunk
+    assertThat(Iterables.filter(sizes, (responseSize) -> responseSize > CHUNK_SIZE)).isEmpty();
   }
 }

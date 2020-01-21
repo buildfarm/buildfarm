@@ -14,6 +14,10 @@
 
 package build.buildfarm.worker.shard;
 
+import static build.buildfarm.common.Actions.checkPreconditionFailure;
+import static build.buildfarm.common.Actions.satisfiesRequirements;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static com.google.common.collect.Maps.uniqueIndex;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.lang.String.format;
@@ -34,6 +38,7 @@ import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
+import build.buildfarm.cas.ContentAddressableStorage.EntryLimitException;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.InputStreamFactory;
@@ -63,9 +68,11 @@ import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.rpc.PreconditionFailure;
 import io.grpc.Deadline;
 import io.grpc.Status;
 import io.grpc.Status.Code;
+import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -246,8 +253,11 @@ class ShardWorkerContext implements WorkerContext {
       // unavailable backplane will propagate a null queueEntry
     }
     listener.onWaitEnd();
-    // FIXME platform match
-    listener.onEntry(queueEntry);
+    if (queueEntry == null || satisfiesRequirements(platform, queueEntry.getPlatform())) {
+      listener.onEntry(queueEntry);
+    } else {
+      backplane.rejectOperation(queueEntry);
+    }
     if (Thread.interrupted()) {
       throw new InterruptedException();
     }
@@ -290,6 +300,17 @@ class ShardWorkerContext implements WorkerContext {
           requeue(operationName);
         }
         return success;
+      }
+
+      @Override
+      public void onError(Throwable t) {
+        Throwables.throwIfUnchecked(t);
+        throw new RuntimeException(t);
+      }
+
+      @Override
+      public void setOnCancelHandler(Runnable onCancelHandler) {
+        listener.setOnCancelHandler(onCancelHandler);
       }
     };
     while (!dedupMatchListener.getMatched()) {
@@ -458,15 +479,26 @@ class ShardWorkerContext implements WorkerContext {
 
   @Override
   public void uploadOutputs(
+      Digest actionDigest,
       ActionResult.Builder resultBuilder,
       Path actionRoot,
       Iterable<String> outputFiles,
       Iterable<String> outputDirs)
-      throws IOException, InterruptedException {
+      throws IOException, InterruptedException, StatusException {
+    PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
     for (String outputFile : outputFiles) {
       Path outputPath = actionRoot.resolve(outputFile);
       if (!Files.exists(outputPath)) {
-        logInfo("ReportResultStage: " + outputPath + " does not exist...");
+        logInfo("ReportResultStage: " + outputFile + " does not exist...");
+        continue;
+      }
+
+      if (Files.isDirectory(outputPath)) {
+        logInfo("ReportResultStage: " + outputFile + " is a directory");
+        preconditionFailure.addViolationsBuilder()
+            .setType(VIOLATION_TYPE_INVALID)
+            .setSubject(outputFile)
+            .setDescription("An output file was a directory");
         continue;
       }
 
@@ -485,13 +517,29 @@ class ShardWorkerContext implements WorkerContext {
           .setPath(outputFile)
           .setDigest(digest)
           .setIsExecutable(Files.isExecutable(outputPath));
-      insertFile(digest, outputPath);
+      try {
+        insertFile(digest, outputPath);
+      } catch (EntryLimitException e) {
+        preconditionFailure.addViolationsBuilder()
+            .setType(VIOLATION_TYPE_MISSING)
+            .setSubject("blobs/" + DigestUtil.toString(digest))
+            .setDescription("An output could not be uploaded because it exceeded the maximum size of an entry");
+      }
     }
 
     for (String outputDir : outputDirs) {
       Path outputDirPath = actionRoot.resolve(outputDir);
       if (!Files.exists(outputDirPath)) {
         logInfo("ReportResultStage: " + outputDir + " does not exist...");
+        continue;
+      }
+
+      if (!Files.isDirectory(outputDirPath)) {
+        logInfo("ReportResultStage: " + outputDir + " is not a directory...");
+        preconditionFailure.addViolationsBuilder()
+            .setType(VIOLATION_TYPE_INVALID)
+            .setSubject(outputDir)
+            .setDescription("An output directory was not a directory");
         continue;
       }
 
@@ -522,6 +570,11 @@ class ShardWorkerContext implements WorkerContext {
             insertFile(digest, file);
           } catch (InterruptedException e) {
             throw new IOException(e);
+          } catch (EntryLimitException e) {
+            preconditionFailure.addViolationsBuilder()
+                .setType(VIOLATION_TYPE_MISSING)
+                .setSubject("blobs/" + DigestUtil.toString(digest))
+                .setDescription("An output could not be uploaded because it exceeded the maximum size of an entry");
           }
           return FileVisitResult.CONTINUE;
         }
@@ -557,6 +610,7 @@ class ShardWorkerContext implements WorkerContext {
           .setPath(outputDir)
           .setTreeDigest(treeDigest);
     }
+    checkPreconditionFailure(actionDigest, preconditionFailure.build());
 
     /* put together our outputs and update the result */
     updateActionResultStdOutputs(resultBuilder);

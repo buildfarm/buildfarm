@@ -84,6 +84,7 @@ import com.google.rpc.PreconditionFailure.Violation;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.protobuf.StatusProto;
+import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.List;
@@ -216,7 +217,7 @@ public class ShardInstanceTest {
         }
         return null;
       }
-    }).when(mockWorkerInstance).getBlob(eq(actionDigest), eq(0l), eq(0l), any(StreamObserver.class));
+    }).when(mockWorkerInstance).getBlob(eq(actionDigest), eq(0l), eq(actionDigest.getSizeBytes()), any(ServerCallStreamObserver.class), any(RequestMetadata.class));
     when(mockBackplane.getBlobLocationSet(eq(actionDigest))).thenReturn(provideAction ? workers : ImmutableSet.of());
     when(mockWorkerInstance.findMissingBlobs(eq(ImmutableList.of(actionDigest)), any(Executor.class), any(RequestMetadata.class)))
         .thenReturn(immediateFuture(ImmutableList.of()));
@@ -662,7 +663,7 @@ public class ShardInstanceTest {
         blobObserver.onCompleted();
         return null;
       }
-    }).when(mockWorkerInstance).getBlob(eq(digest), eq(0l), eq(0l), any(StreamObserver.class));
+    }).when(mockWorkerInstance).getBlob(eq(digest), eq(0l), eq(digest.getSizeBytes()), any(ServerCallStreamObserver.class), any(RequestMetadata.class));
   }
 
   @Test

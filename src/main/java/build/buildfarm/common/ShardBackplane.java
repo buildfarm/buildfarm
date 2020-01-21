@@ -88,7 +88,7 @@ public interface ShardBackplane {
    * was not a member of the set.
    */
   @ThreadSafe
-  boolean removeWorker(String workerName) throws IOException;
+  boolean removeWorker(String workerName, String reason) throws IOException;
 
   /**
    * Returns a set of the names of all active workers.
@@ -239,6 +239,13 @@ public interface ShardBackplane {
    */
   @ThreadSafe
   QueueEntry dispatchOperation() throws IOException, InterruptedException;
+
+  /**
+   * Pushes an operation onto the head of the list of queued operations after
+   * a rejection which does not require revalidation
+   */
+  @ThreadSafe
+  void rejectOperation(QueueEntry queueEntry) throws IOException;
 
   /**
    * Updates the backplane to indicate that the operation is being

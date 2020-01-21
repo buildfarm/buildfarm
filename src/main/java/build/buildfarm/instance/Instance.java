@@ -36,7 +36,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import io.grpc.protobuf.StatusProto;
-import io.grpc.stub.StreamObserver;
+import io.grpc.stub.ServerCallStreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -67,8 +67,9 @@ public interface Instance {
   void getBlob(
       Digest blobDigest,
       long offset,
-      long limit,
-      StreamObserver<ByteString> blobObserver);
+      long count,
+      ServerCallStreamObserver<ByteString> blobObserver,
+      RequestMetadata requestMetadata);
   InputStream newBlobInput(
       Digest digest,
       long offset,
@@ -126,6 +127,11 @@ public interface Instance {
 
     // returns false if this listener will not handle this match
     boolean onEntry(@Nullable QueueEntry queueEntry) throws InterruptedException;
+
+    void onError(Throwable t);
+
+    // method that should be called when this match is cancelled and no longer valid
+    void setOnCancelHandler(Runnable onCancelHandler);
   }
 
   public static class PutAllBlobsException extends RuntimeException {

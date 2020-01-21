@@ -40,8 +40,16 @@ java_test(
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "//3rdparty/jvm/com/google/truth",
+        "//3rdparty/jvm/io/grpc:grpc_api",
+        "//3rdparty/jvm/io/grpc:grpc_core",
+        "//3rdparty/jvm/io/grpc:grpc_stub",
+        "//3rdparty/jvm/io/grpc:grpc_testing",
+        "//3rdparty/jvm/org/mockito:mockito_core",
         "//src/main/java/build/buildfarm:common",
+        "//src/main/java/build/buildfarm:common-grpc",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "@googleapis//:google_bytestream_bytestream_java_grpc",
+        "@googleapis//:google_bytestream_bytestream_java_proto",
     ],
 )
 
@@ -97,7 +105,10 @@ config_setting(
 java_test(
     name = "worker-tests",
     size = "small",
-    srcs = glob(["worker/*.java"], exclude = ["worker/FuseCASTest.java"]) + select({
+    srcs = glob(
+        ["worker/*.java"],
+        exclude = ["worker/FuseCASTest.java"],
+    ) + select({
         "//conditions:default": [],
         ":fuse": ["worker/FuseCASTest.java"],
     }),
@@ -111,8 +122,10 @@ java_test(
         "//3rdparty/jvm/com/google/jimfs",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "//3rdparty/jvm/com/google/truth",
+        "//3rdparty/jvm/io/grpc:grpc_api",
         "//3rdparty/jvm/io/grpc:grpc_context",
         "//3rdparty/jvm/io/grpc:grpc_core",
+        "//3rdparty/jvm/io/grpc:grpc_protobuf",
         "//3rdparty/jvm/org/mockito:mockito_core",
         "//src/main/java/build/buildfarm:cas",
         "//src/main/java/build/buildfarm:common",
@@ -120,6 +133,7 @@ java_test(
         "//src/main/java/build/buildfarm:stub-instance",
         "//src/main/java/build/buildfarm:worker",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "@googleapis//:google_rpc_code_java_proto",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )
@@ -212,6 +226,8 @@ java_test(
     test_class = "build.buildfarm.AllTests",
     deps = [
         ":test_runner",
+        "//3rdparty/jvm/com/google/guava",
+        "//3rdparty/jvm/com/google/jimfs",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
         "//3rdparty/jvm/com/google/truth",
         "//3rdparty/jvm/io/grpc:grpc_api",

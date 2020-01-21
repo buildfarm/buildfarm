@@ -24,7 +24,6 @@ import static java.util.logging.Level.WARNING;
 import build.bazel.remote.execution.v2.ExecuteRequest;
 import build.bazel.remote.execution.v2.ExecutionGrpc;
 import build.bazel.remote.execution.v2.WaitExecutionRequest;
-import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.instance.Instance;
@@ -58,10 +57,6 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
     this.keepaliveAfter = keepaliveAfter;
     this.keepaliveUnit = keepaliveUnit;
     this.keepaliveScheduler = keepaliveScheduler;
-  }
-
-  private void logExecute(String instanceName, ExecuteRequest request) {
-    logger.info(format("ExecutionSuccess: %s: %s", instanceName, DigestUtil.toString(request.getActionDigest())));
   }
 
   private void withCancellation(
@@ -160,7 +155,8 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
     }
   }
 
-  KeepaliveWatcher createWatcher(ServerCallStreamObserver<Operation> serverCallStreamObserver) {
+  KeepaliveWatcher createWatcher(
+      ServerCallStreamObserver<Operation> serverCallStreamObserver) {
     return new KeepaliveWatcher(serverCallStreamObserver) {
       @Override
       void deliver(Operation operation) {
@@ -200,8 +196,6 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
       responseObserver.onError(BuildFarmInstances.toStatusException(e));
       return;
     }
-
-    logExecute(instance.getName(), request);
 
     ServerCallStreamObserver<Operation> serverCallStreamObserver =
         (ServerCallStreamObserver<Operation>) responseObserver;

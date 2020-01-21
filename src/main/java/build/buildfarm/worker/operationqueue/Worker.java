@@ -77,6 +77,7 @@ import build.buildfarm.worker.UploadManifest;
 import build.buildfarm.worker.WorkerContext;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -189,19 +190,21 @@ public class Worker {
     return newStubInstance(
         instanceEndpoint.getInstanceName(),
         createChannel(instanceEndpoint.getTarget()),
-        digestUtil);
+        digestUtil,
+        instanceEndpoint.getDeadlineAfterSeconds());
   }
 
   private static Instance newStubInstance(
       String name,
       ManagedChannel channel,
-      DigestUtil digestUtil) {
+      DigestUtil digestUtil,
+      long deadlineAfterSeconds) {
     return new StubInstance(
         name,
         /* identifier=*/ "",
         digestUtil,
         channel,
-        60 /* FIXME CONFIG */, SECONDS,
+        deadlineAfterSeconds, SECONDS,
         retrier, retryScheduler);
   }
 
@@ -222,7 +225,7 @@ public class Worker {
     InstanceEndpoint casEndpoint = config.getContentAddressableStorage();
     ManagedChannel casChannel = createChannel(casEndpoint.getTarget());
     uploader = createStubUploader(casEndpoint.getInstanceName(), casChannel, retrier);
-    casInstance = newStubInstance(casEndpoint.getInstanceName(), casChannel, digestUtil);
+    casInstance = newStubInstance(casEndpoint.getInstanceName(), casChannel, digestUtil, casEndpoint.getDeadlineAfterSeconds());
     acInstance = newStubInstance(config.getActionCache(), digestUtil);
     operationQueueInstance = newStubInstance(config.getOperationQueue(), digestUtil);
     InputStreamFactory inputStreamFactory = new InputStreamFactory() {
@@ -442,9 +445,9 @@ public class Worker {
           ExecutionStage.Value stage,
           Runnable onFailure,
           Deadline deadline) {
+        String operationName = queueEntry.getExecuteEntry().getOperationName();
         poller.resume(
             () -> {
-              String operationName = queueEntry.getExecuteEntry().getOperationName();
               boolean success = operationQueueInstance.pollOperation(operationName, stage);
               logger.info(format("%s: poller: Completed Poll for %s: %s", name, operationName, success ? "OK" : "Failed"));
               if (!success) {
@@ -452,7 +455,10 @@ public class Worker {
               }
               return success;
             },
-            onFailure,
+            () -> {
+              logger.info(format("%s: poller: Deadline expired for %s", name, operationName));
+              onFailure.run();
+            },
             deadline);
       }
 
@@ -510,6 +516,17 @@ public class Worker {
                   .build());
             }
             return success;
+          }
+
+          @Override
+          public void onError(Throwable t) {
+            Throwables.throwIfUnchecked(t);
+            throw new RuntimeException(t);
+          }
+
+          @Override
+          public void setOnCancelHandler(Runnable onCancelHandler) {
+            listener.setOnCancelHandler(onCancelHandler);
           }
         };
         while (!dedupMatchListener.getMatched()) {
@@ -599,6 +616,7 @@ public class Worker {
 
       @Override
       public void uploadOutputs(
+          Digest actionDigest,
           ActionResult.Builder resultBuilder,
           Path actionRoot,
           Iterable<String> outputFiles,
@@ -729,7 +747,20 @@ public class Worker {
 
       @Override
       public void putActionResult(ActionKey actionKey, ActionResult actionResult) throws InterruptedException {
-        acInstance.putActionResult(actionKey, actionResult);
+        try {
+          retrier.execute(
+            () -> {
+              acInstance.putActionResult(actionKey, actionResult);
+              return null;
+            });
+        } catch (IOException e) {
+          Throwable cause = e.getCause();
+          if (cause == null) {
+            throw new RuntimeException(e);
+          }
+          Throwables.throwIfUnchecked(cause);
+          throw new RuntimeException(cause);
+        }
       }
     };
 
@@ -737,18 +768,15 @@ public class Worker {
     PipelineStage errorStage = completeStage; /* new ErrorStage(); */
     PipelineStage reportResultStage = new ReportResultStage(context, completeStage, errorStage);
     PipelineStage executeActionStage = new ExecuteActionStage(context, reportResultStage, errorStage);
-    reportResultStage.setInput(executeActionStage);
     PipelineStage inputFetchStage = new InputFetchStage(context, executeActionStage, new PutOperationStage(context::requeue));
-    executeActionStage.setInput(inputFetchStage);
     PipelineStage matchStage = new MatchStage(context, inputFetchStage, errorStage);
-    inputFetchStage.setInput(matchStage);
 
     Pipeline pipeline = new Pipeline();
     // pipeline.add(errorStage, 0);
-    pipeline.add(matchStage, 1);
-    pipeline.add(inputFetchStage, 2);
-    pipeline.add(executeActionStage, 3);
-    pipeline.add(reportResultStage, 4);
+    pipeline.add(matchStage, 4);
+    pipeline.add(inputFetchStage, 3);
+    pipeline.add(executeActionStage, 2);
+    pipeline.add(reportResultStage, 1);
     pipeline.start();
     pipeline.join(); // uninterruptable
     if (Thread.interrupted()) {

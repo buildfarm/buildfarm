@@ -15,14 +15,13 @@
 package build.buildfarm.instance;
 
 import static build.buildfarm.common.Actions.invalidActionMessage;
+import static build.buildfarm.common.Actions.checkPreconditionFailure;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static build.buildfarm.instance.Utils.putBlob;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.transform;
-import static com.google.common.util.concurrent.Futures.transformAsync;
-import static com.google.common.util.concurrent.Futures.allAsList;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
@@ -68,7 +67,6 @@ import build.buildfarm.common.Write;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
@@ -86,13 +84,12 @@ import com.google.rpc.PreconditionFailure;
 import com.google.rpc.PreconditionFailure.Violation;
 import io.grpc.Context;
 import io.grpc.Status;
-import io.grpc.stub.StreamObserver;
 import io.grpc.StatusException;
+import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.protobuf.StatusProto;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
@@ -247,14 +244,14 @@ public abstract class AbstractServerInstance implements Instance {
     return contentAddressableStorage.getAllFuture(digests);
   }
 
-  ByteString getBlob(Digest blobDigest) throws InterruptedException {
-    return getBlob(blobDigest, 0, 0);
+  protected ByteString getBlob(Digest blobDigest) throws InterruptedException {
+    return getBlob(blobDigest, /* offset=*/ 0, /* count=*/ blobDigest.getSizeBytes());
   }
 
-  ByteString getBlob(Digest blobDigest, long offset, long limit)
+  ByteString getBlob(Digest blobDigest, long offset, long count)
       throws IndexOutOfBoundsException, InterruptedException {
     if (blobDigest.getSizeBytes() == 0) {
-      if (offset == 0 && limit >= 0) {
+      if (offset == 0 && count >= 0) {
         return ByteString.EMPTY;
       } else {
         throw new IndexOutOfBoundsException();
@@ -270,40 +267,84 @@ public abstract class AbstractServerInstance implements Instance {
     if (offset < 0
         || (blob.isEmpty() && offset > 0)
         || (!blob.isEmpty() && offset >= blob.size())
-        || limit < 0) {
+        || count < 0) {
       throw new IndexOutOfBoundsException();
     }
 
-    long endIndex = offset + (limit > 0 ? limit : (blob.size() - offset));
+    long endIndex = offset + count;
 
     return blob.getData().substring(
         (int) offset, (int) (endIndex > blob.size() ? blob.size() : endIndex));
   }
 
-  protected ListenableFuture<ByteString> getBlobFuture(Digest blobDigest) {
-    return getBlobFuture(blobDigest, /* offset=*/ 0, /* limit=*/ 0);
+  protected ListenableFuture<ByteString> getBlobFuture(Digest blobDigest, RequestMetadata requestMetadata) {
+    return getBlobFuture(blobDigest, /* offset=*/ 0, /* count=*/ blobDigest.getSizeBytes(), requestMetadata);
   }
 
-  protected ListenableFuture<ByteString> getBlobFuture(Digest blobDigest, long offset, long limit) {
+  protected ListenableFuture<ByteString> getBlobFuture(
+      Digest blobDigest,
+      long offset,
+      long count,
+      RequestMetadata requestMetadata) {
     SettableFuture<ByteString> future = SettableFuture.create();
-    getBlob(blobDigest, offset, limit, new StreamObserver<ByteString>() {
-      ByteString content = ByteString.EMPTY;
+    getBlob(
+        blobDigest,
+        offset,
+        count,
+        new ServerCallStreamObserver<ByteString>() {
+          ByteString content = ByteString.EMPTY;
 
-      @Override
-      public void onNext(ByteString chunk) {
-        content = content.concat(chunk);
-      }
+          @Override
+          public boolean isCancelled() {
+            return false;
+          }
 
-      @Override
-      public void onCompleted() {
-        future.set(content);
-      }
+          @Override
+          public void setCompression(String compression) {
+          }
 
-      @Override
-      public void onError(Throwable t) {
-        future.setException(t);
-      }
-    });
+          @Override
+          public void setOnCancelHandler(Runnable onCancelHandler) {
+          }
+
+          @Override
+          public void disableAutoInboundFlowControl() {
+          }
+
+          @Override
+          public boolean isReady() {
+            return true;
+          }
+
+          @Override
+          public void request(int count) {
+          }
+
+          @Override
+          public void setMessageCompression(boolean enable) {
+          }
+
+          @Override
+          public void setOnReadyHandler(Runnable onReadyHandler) {
+            onReadyHandler.run();
+          }
+
+          @Override
+          public void onNext(ByteString chunk) {
+            content = content.concat(chunk);
+          }
+
+          @Override
+          public void onCompleted() {
+            future.set(content);
+          }
+
+          @Override
+          public void onError(Throwable t) {
+            future.setException(t);
+          }
+        },
+        requestMetadata);
     return future;
   }
 
@@ -311,10 +352,11 @@ public abstract class AbstractServerInstance implements Instance {
   public void getBlob(
       Digest blobDigest,
       long offset,
-      long limit,
-      StreamObserver<ByteString> blobObserver) {
+      long count,
+      ServerCallStreamObserver<ByteString> blobObserver,
+      RequestMetadata requestMetadata) {
     try {
-      ByteString blob = getBlob(blobDigest, offset, limit);
+      ByteString blob = getBlob(blobDigest, offset, count);
       if (blob == null) {
         blobObserver.onError(Status.NOT_FOUND.asException());
       } else {
@@ -638,7 +680,8 @@ public abstract class AbstractServerInstance implements Instance {
   protected ListenableFuture<Tree> getTreeFuture(
       String reason,
       Digest inputRoot,
-      ExecutorService service) {
+      ExecutorService service,
+      RequestMetadata requestMetadata) {
     return listeningDecorator(service).submit(() -> {
       Tree.Builder tree = Tree.newBuilder();
 
@@ -772,8 +815,8 @@ public abstract class AbstractServerInstance implements Instance {
     ImmutableSet.Builder<Digest> inputDigestsBuilder = ImmutableSet.builder();
     validateAction(
         action,
-        getUnchecked(expect(action.getCommandDigest(), Command.parser(), service)),
-        getUnchecked(getTreeFuture(operationName, action.getInputRootDigest(), service)),
+        getUnchecked(expect(action.getCommandDigest(), Command.parser(), service, requestMetadata)),
+        getUnchecked(getTreeFuture(operationName, action.getInputRootDigest(), service, requestMetadata)),
         inputDigestsBuilder,
         preconditionFailure);
     validateInputs(
@@ -781,19 +824,6 @@ public abstract class AbstractServerInstance implements Instance {
         preconditionFailure,
         service,
         requestMetadata);
-  }
-
-  protected static void checkPreconditionFailure(
-      Digest actionDigest,
-      PreconditionFailure preconditionFailure)
-      throws StatusException {
-    if (preconditionFailure.getViolationsCount() != 0) {
-      throw StatusProto.toStatusException(com.google.rpc.Status.newBuilder()
-          .setCode(Code.FAILED_PRECONDITION.getNumber())
-          .setMessage(invalidActionMessage(actionDigest))
-          .addDetails(Any.pack(preconditionFailure))
-          .build());
-    }
   }
 
   protected void validateQueuedOperation(
@@ -1142,30 +1172,15 @@ public abstract class AbstractServerInstance implements Instance {
     return null;
   }
 
-  protected Action expectAction(Operation operation) throws InterruptedException {
-    try {
-      ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
-      if (metadata == null) {
-        return null;
-      }
-      ByteString actionBlob = getBlob(metadata.getActionDigest());
-      if (actionBlob != null) {
-        return Action.parseFrom(actionBlob);
-      }
-    } catch (IOException e) {
-      Status status = Status.fromThrowable(e);
-      if (status.getCode() != io.grpc.Status.Code.NOT_FOUND) {
-        getLogger().log(SEVERE, "error retrieving action", e);
-      }
-    }
-    return null;
-  }
-
-  protected <T> ListenableFuture<T> expect(Digest digest, Parser<T> parser, Executor executor) {
+  protected <T> ListenableFuture<T> expect(
+      Digest digest,
+      Parser<T> parser,
+      Executor executor,
+      RequestMetadata requestMetadata) {
     // FIXME find a way to make this a transform
     SettableFuture<T> future = SettableFuture.create();
     Futures.addCallback(
-        getBlobFuture(digest),
+        getBlobFuture(digest, requestMetadata),
         new FutureCallback<ByteString>() {
           @Override
           public void onSuccess(ByteString blob) {
@@ -1211,6 +1226,14 @@ public abstract class AbstractServerInstance implements Instance {
         expectExecuteResponse(operation).getStatus().getCode() == Code.CANCELLED.getNumber();
   }
 
+  protected static ExecuteResponse getExecuteResponse(Operation operation) {
+    if (operation.getDone() &&
+        operation.getResultCase() == Operation.ResultCase.RESPONSE) {
+      return expectExecuteResponse(operation);
+    }
+    return null;
+  }
+
   private static ExecuteResponse expectExecuteResponse(Operation operation) {
     try {
       return operation.getResponse().unpack(ExecuteResponse.class);
@@ -1219,7 +1242,7 @@ public abstract class AbstractServerInstance implements Instance {
     }
   }
 
-  protected static boolean isQueued(Operation operation) {
+  public static boolean isQueued(Operation operation) {
     return isStage(operation, ExecutionStage.Value.QUEUED);
   }
 
@@ -1229,6 +1252,27 @@ public abstract class AbstractServerInstance implements Instance {
 
   protected static boolean isComplete(Operation operation) {
     return isStage(operation, ExecutionStage.Value.COMPLETED);
+  }
+
+  protected boolean wasCompletelyExecuted(Operation operation) {
+    ExecuteResponse executeResponse = getExecuteResponse(operation);
+    if (executeResponse != null && !executeResponse.getCachedResult()) {
+      return true;
+    }
+    return false;
+  }
+
+  protected static ActionResult getCacheableActionResult(Operation operation) {
+    ExecuteResponse executeResponse = getExecuteResponse(operation);
+    if (executeResponse != null &&
+        !executeResponse.getCachedResult() &&
+        executeResponse.getStatus().getCode() == Code.OK.getNumber()) {
+      ActionResult result = executeResponse.getResult();
+      if (result.getExitCode() == 0) {
+        return result;
+      }
+    }
+    return null;
   }
 
   protected abstract boolean matchOperation(Operation operation) throws InterruptedException;

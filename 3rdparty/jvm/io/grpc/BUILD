@@ -171,7 +171,7 @@ java_library(
 java_library(
     name = "grpc_testing",
     visibility = [
-        "//3rdparty/jvm:__subpackages__",
+        "//visibility:public",
     ],
     exports = [
         "//external:jar/io/grpc/grpc_testing",

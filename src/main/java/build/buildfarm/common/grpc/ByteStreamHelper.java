@@ -27,9 +27,9 @@ import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import java.io.InputStream;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
@@ -49,7 +49,7 @@ public final class ByteStreamHelper {
         .setResourceName(resourceName)
         .setReadOffset(offset)
         .build();
-    BlockingQueue<ByteString> queue = new LinkedBlockingQueue<ByteString>();
+    BlockingQueue<ByteString> queue = new ArrayBlockingQueue<>(1);
     ByteStringQueueInputStream inputStream = new ByteStringQueueInputStream(queue);
     StreamObserver<ReadResponse> responseObserver = new StreamObserver<ReadResponse>() {
       long requestOffset = offset;
