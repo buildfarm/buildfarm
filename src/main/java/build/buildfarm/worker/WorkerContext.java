@@ -43,8 +43,6 @@ public interface WorkerContext {
   Poller createPoller(String name, QueueEntry queueEntry, ExecutionStage.Value stage);
   void resumePoller(Poller poller, String name, QueueEntry queueEntry, ExecutionStage.Value stage, Runnable onFailure, Deadline deadline);
   void match(MatchListener listener) throws InterruptedException;
-  void requeue(Operation operation) throws InterruptedException;
-  void deactivate(String operationName);
   void logInfo(String msg);
   CASInsertionPolicy getFileCasPolicy();
   CASInsertionPolicy getStdoutCasPolicy();

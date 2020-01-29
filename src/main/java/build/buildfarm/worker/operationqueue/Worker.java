@@ -37,9 +37,7 @@ import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecutionStage;
-import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.common.DigestUtil;
@@ -56,12 +54,10 @@ import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Chunker;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.CASInsertionPolicy;
-import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.InstanceEndpoint;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
-import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.WorkerConfig;
 import build.buildfarm.worker.CASFileCache;
 import build.buildfarm.worker.ExecuteActionStage;
@@ -72,7 +68,6 @@ import build.buildfarm.worker.Pipeline;
 import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.ReportResultStage;
-import build.buildfarm.worker.RetryingMatchListener;
 import build.buildfarm.worker.UploadManifest;
 import build.buildfarm.worker.WorkerContext;
 import com.google.common.annotations.VisibleForTesting;
@@ -87,7 +82,6 @@ import com.google.common.hash.HashCode;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.devtools.common.options.OptionsParser;
 import com.google.longrunning.Operation;
-import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -113,10 +107,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
-import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
 
 public class Worker {
@@ -135,7 +127,6 @@ public class Worker {
   private static final ListeningScheduledExecutorService retryScheduler =
       listeningDecorator(newSingleThreadScheduledExecutor());
   private static final Retrier retrier = createStubRetrier();
-  private final Set<String> activeOperations = new ConcurrentSkipListSet<>();
 
   private static ManagedChannel createChannel(String target) {
     NettyChannelBuilder builder =
@@ -397,16 +388,6 @@ public class Worker {
         uploader);
   }
 
-  public Platform getPlatform() {
-    Platform.Builder platform = config.getPlatform().toBuilder();
-    for (ExecutionPolicy policy : config.getExecutionPoliciesList()) {
-      platform.addPropertiesBuilder()
-        .setName("execution-policy")
-        .setValue(policy.getName());
-    }
-    return platform.build();
-  }
-
   public void start() throws InterruptedException {
     try {
       Files.createDirectories(root);
@@ -415,6 +396,11 @@ public class Worker {
       logger.log(SEVERE, "error starting file cache", e);
       return;
     }
+
+    OperationQueueClient oq = new OperationQueueClient(
+        operationQueueInstance,
+        config.getPlatform(),
+        config.getExecutionPoliciesList());
 
     WorkerContext context = new WorkerContext() {
       Map<String, ExecutionPolicy> policies = uniqueIndex(
@@ -448,7 +434,7 @@ public class Worker {
         String operationName = queueEntry.getExecuteEntry().getOperationName();
         poller.resume(
             () -> {
-              boolean success = operationQueueInstance.pollOperation(operationName, stage);
+              boolean success = oq.poll(operationName, stage);
               logger.info(format("%s: poller: Completed Poll for %s: %s", name, operationName, success ? "OK" : "Failed"));
               if (!success) {
                 onFailure.run();
@@ -469,89 +455,7 @@ public class Worker {
 
       @Override
       public void match(MatchListener listener) throws InterruptedException {
-        RetryingMatchListener dedupMatchListener = new RetryingMatchListener() {
-          boolean matched = false;
-
-          @Override
-          public boolean getMatched() {
-            return matched;
-          }
-
-          @Override
-          public void onWaitStart() {
-            listener.onWaitStart();
-          }
-
-          @Override
-          public void onWaitEnd() {
-            listener.onWaitEnd();
-          }
-
-          @Override
-          public boolean onEntry(@Nullable QueueEntry queueEntry) throws InterruptedException {
-            if (queueEntry == null) {
-              matched = true;
-              return listener.onEntry(null);
-            }
-            ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
-            String operationName = executeEntry.getOperationName();
-            if (activeOperations.contains(operationName)) {
-              logger.severe("WorkerContext::match: WARNING matched duplicate operation " + operationName);
-              return false;
-            }
-            matched = true;
-            activeOperations.add(operationName);
-            boolean success = listener.onEntry(queueEntry);
-            if (!success) {
-              requeue(Operation.newBuilder()
-                  .setName(operationName)
-                  .setMetadata(Any.pack(QueuedOperationMetadata.newBuilder()
-                      .setExecuteOperationMetadata(ExecuteOperationMetadata.newBuilder()
-                          .setActionDigest(executeEntry.getActionDigest())
-                          .setStdoutStreamName(executeEntry.getStdoutStreamName())
-                          .setStderrStreamName(executeEntry.getStderrStreamName())
-                          .setStage(ExecutionStage.Value.QUEUED))
-                      .setQueuedOperationDigest(queueEntry.getQueuedOperationDigest())
-                      .build()))
-                  .build());
-            }
-            return success;
-          }
-
-          @Override
-          public void onError(Throwable t) {
-            Throwables.throwIfUnchecked(t);
-            throw new RuntimeException(t);
-          }
-
-          @Override
-          public void setOnCancelHandler(Runnable onCancelHandler) {
-            listener.setOnCancelHandler(onCancelHandler);
-          }
-        };
-        while (!dedupMatchListener.getMatched()) {
-          operationQueueInstance.match(config.getPlatform(), dedupMatchListener);
-        }
-      }
-
-      @Override
-      public void requeue(Operation operation) throws InterruptedException {
-        try {
-          deactivate(operation.getName());
-          ExecuteOperationMetadata metadata =
-              operation.getMetadata().unpack(ExecuteOperationMetadata.class);
-
-          ExecuteOperationMetadata executingMetadata = metadata.toBuilder()
-              .setStage(ExecutionStage.Value.QUEUED)
-              .build();
-
-          operation = operation.toBuilder()
-              .setMetadata(Any.pack(executingMetadata))
-              .build();
-          operationQueueInstance.putOperation(operation);
-        } catch (InvalidProtocolBufferException e) {
-          logger.log(SEVERE, "error unpacking execute operation metadata for " + operation.getName(), e);
-        }
+        oq.match(listener);
       }
 
       @Override
@@ -725,19 +629,14 @@ public class Worker {
       }
 
       @Override
-      public void deactivate(String operationName) {
-        activeOperations.remove(operationName);
-      }
-
-      @Override
       public boolean putOperation(Operation operation, Action action) throws InterruptedException {
-        return operationQueueInstance.putOperation(operation);
+        return oq.put(operation);
       }
 
       // doesn't belong in CAS or AC, must be in OQ
       @Override
       public Write getOperationStreamWrite(String name) {
-        return operationQueueInstance.getOperationStreamWrite(name);
+        return oq.getStreamWrite(name);
       }
 
       @Override
@@ -764,11 +663,11 @@ public class Worker {
       }
     };
 
-    PipelineStage completeStage = new PutOperationStage((operation) -> context.deactivate(operation.getName()));
+    PipelineStage completeStage = new PutOperationStage((operation) -> oq.deactivate(operation.getName()));
     PipelineStage errorStage = completeStage; /* new ErrorStage(); */
     PipelineStage reportResultStage = new ReportResultStage(context, completeStage, errorStage);
     PipelineStage executeActionStage = new ExecuteActionStage(context, reportResultStage, errorStage);
-    PipelineStage inputFetchStage = new InputFetchStage(context, executeActionStage, new PutOperationStage(context::requeue));
+    PipelineStage inputFetchStage = new InputFetchStage(context, executeActionStage, new PutOperationStage(oq::requeue));
     PipelineStage matchStage = new MatchStage(context, inputFetchStage, errorStage);
 
     Pipeline pipeline = new Pipeline();

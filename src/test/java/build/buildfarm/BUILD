@@ -204,6 +204,7 @@ java_test(
     test_class = "build.buildfarm.AllTests",
     deps = [
         ":test_runner",
+        "//3rdparty/jvm/com/google/code/findbugs:jsr305",
         "//3rdparty/jvm/com/google/guava",
         "//3rdparty/jvm/com/google/jimfs",
         "//3rdparty/jvm/com/google/protobuf:protobuf_java",
@@ -212,6 +213,7 @@ java_test(
         "//3rdparty/jvm/io/grpc:grpc_core",
         "//3rdparty/jvm/org/mockito:mockito_core",
         "//src/main/java/build/buildfarm:common",
+        "//src/main/java/build/buildfarm:instance",
         "//src/main/java/build/buildfarm:operationqueue-worker",
         "//src/main/java/build/buildfarm:stub-instance",
         "//src/main/java/build/buildfarm:worker",

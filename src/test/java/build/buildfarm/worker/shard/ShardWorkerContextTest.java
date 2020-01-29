@@ -15,16 +15,23 @@
 package build.buildfarm.worker.shard;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Platform;
+import build.bazel.remote.execution.v2.Platform.Property;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.instance.Instance.MatchListener;
+import build.buildfarm.v1test.ExecutionPolicy;
+import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.worker.WorkerContext;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -68,7 +75,13 @@ public class ShardWorkerContextTest {
         null);
   }
 
-  WorkerContext createTestContext(Platform platform) {
+  WorkerContext createTestContext() {
+    return createTestContext(
+        Platform.getDefaultInstance(),
+        /* policies=*/ ImmutableList.of());
+  }
+
+  WorkerContext createTestContext(Platform platform, Iterable<ExecutionPolicy> policies) {
     return new ShardWorkerContext(
         "test",
         platform,
@@ -80,7 +93,7 @@ public class ShardWorkerContextTest {
         backplane,
         execFileSystem,
         inputStreamFactory,
-        /* policies=*/ ImmutableList.of(),
+        policies,
         instance,
         /* deadlineAfter=*/ 0,
         /* deadlineAfterUnits=*/ SECONDS,
@@ -91,12 +104,35 @@ public class ShardWorkerContextTest {
   @Test(expected = StatusException.class)
   public void outputFileIsDirectoryThrowsStatusExceptionOnUpload() throws Exception {
     Files.createDirectories(root.resolve("output"));
-    WorkerContext context = createTestContext(Platform.getDefaultInstance());
+    WorkerContext context = createTestContext();
     context.uploadOutputs(
         Digest.getDefaultInstance(),
         ActionResult.newBuilder(),
         root,
         ImmutableList.of("output"),
         ImmutableList.of());
+  }
+
+  @Test
+  public void queueEntryWithExecutionPolicyPlatformMatches() throws Exception {
+    WorkerContext context = createTestContext(
+        Platform.getDefaultInstance(),
+        ImmutableList.of(ExecutionPolicy.newBuilder().setName("foo").build()));
+    Platform matchPlatform = Platform.newBuilder()
+        .addProperties(
+            Property.newBuilder()
+                .setName("execution-policy")
+                .setValue("foo")
+                .build())
+        .build();
+    QueueEntry queueEntry = QueueEntry.newBuilder()
+        .setPlatform(matchPlatform)
+        .build();
+    when(backplane.dispatchOperation())
+        .thenReturn(queueEntry)
+        .thenReturn(null); // provide a match completion in failure case
+    MatchListener listener = mock(MatchListener.class);
+    context.match(listener);
+    verify(listener, times(1)).onEntry(queueEntry);
   }
 }

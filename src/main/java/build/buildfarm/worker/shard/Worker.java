@@ -199,7 +199,7 @@ public class Worker {
         .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, DAYS))
         .build();
 
-    WorkerContext context = new ShardWorkerContext(
+    ShardWorkerContext context = new ShardWorkerContext(
         config.getPublicName(),
         config.getPlatform(),
         config.getOperationPollPeriod(),

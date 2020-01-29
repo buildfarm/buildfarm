@@ -92,7 +92,7 @@ platform: {
   # 'platform' is a sufficient starting point without specifying
   # any platform requirements on the actions' side
   ###
-  # property: {
+  # properties: {
   #   name: "key_name"
   #   value: "value_string"
   # }
@@ -133,6 +133,8 @@ maximum_action_timeout: {
   nanos: 0
 }
 
+# execution policies are automatically added to the advertised
+# platform for a worker
 # prefix command executions with this path
 #execution_policies: {
 #  name: "test"

@@ -97,7 +97,7 @@ class ShardWorkerContext implements WorkerContext {
   private static final Logger logger = Logger.getLogger(ShardWorkerContext.class.getName());
 
   private final String name;
-  private final Platform platform;
+  private final Platform matchPlatform;
   private final Duration operationPollPeriod;
   private final OperationPoller operationPoller;
   private final int inlineContentLimit;
@@ -114,6 +114,19 @@ class ShardWorkerContext implements WorkerContext {
   private final Duration maximumActionTimeout;
   private final Map<String, QueueEntry> activeOperations = Maps.newConcurrentMap();
   
+  static Platform getMatchPlatform(Platform platform, Iterable<ExecutionPolicy> policyNames) {
+    Platform.Builder builder = platform.toBuilder();
+    for (ExecutionPolicy policy : policyNames) {
+      String name = policy.getName();
+      if (!name.isEmpty()) {
+        builder.addPropertiesBuilder()
+            .setName("execution-policy")
+            .setValue(name);
+      }
+    }
+    return builder.build();
+  }
+
   ShardWorkerContext(
       String name,
       Platform platform,
@@ -132,7 +145,7 @@ class ShardWorkerContext implements WorkerContext {
       Duration defaultActionTimeout,
       Duration maximumActionTimeout) {
     this.name = name;
-    this.platform = platform;
+    this.matchPlatform = getMatchPlatform(platform, policies);
     this.operationPollPeriod = operationPollPeriod;
     this.operationPoller = operationPoller;
     this.inlineContentLimit = inlineContentLimit;
@@ -239,7 +252,7 @@ class ShardWorkerContext implements WorkerContext {
     }
   }
 
-  private void matchInterruptible(Platform platform, MatchListener listener)
+  private void matchInterruptible(MatchListener listener)
       throws IOException, InterruptedException {
     listener.onWaitStart();
     QueueEntry queueEntry = null;
@@ -253,7 +266,7 @@ class ShardWorkerContext implements WorkerContext {
       // unavailable backplane will propagate a null queueEntry
     }
     listener.onWaitEnd();
-    if (queueEntry == null || satisfiesRequirements(platform, queueEntry.getPlatform())) {
+    if (queueEntry == null || satisfiesRequirements(matchPlatform, queueEntry.getPlatform())) {
       listener.onEntry(queueEntry);
     } else {
       backplane.rejectOperation(queueEntry);
@@ -315,7 +328,7 @@ class ShardWorkerContext implements WorkerContext {
     };
     while (!dedupMatchListener.getMatched()) {
       try {
-        matchInterruptible(platform, dedupMatchListener);
+        matchInterruptible(dedupMatchListener);
       } catch (IOException e) {
         throw Status.fromThrowable(e).asRuntimeException();
       }
@@ -359,13 +372,11 @@ class ShardWorkerContext implements WorkerContext {
     }
   }
 
-  @Override
-  public void requeue(Operation operation) {
+  void requeue(Operation operation) {
     requeue(operation.getName());
   }
 
-  @Override
-  public void deactivate(String operationName) {
+  void deactivate(String operationName) {
     activeOperations.remove(operationName);
   }
 
