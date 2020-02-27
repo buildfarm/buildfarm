@@ -94,6 +94,20 @@ container_pull(
     repository = "distroless/java",
 )
 
+container_pull(
+    name = "openjdk-8-slim",
+    digest = "sha256:f3866dd8be6d27d0e09ed483cf0ffb3b3c21e76ccd766b3a4b629a43cae9c94c",
+    registry = "index.docker.io",
+    repository = "library/openjdk",
+)
+
+container_pull(
+    name = "bazel-builder",
+    digest = "sha256:568e8e8db87165f0e2cfb30f952d359beaa1247631dfe2f227d995077e9fb84d",
+    registry = "reg.prod.wgtwo.com",
+    repository = "infra/bazel-builder",
+)
+
 load("@io_grpc_grpc_java//:repositories.bzl", "grpc_java_repositories")
 
 grpc_java_repositories(

@@ -216,9 +216,13 @@ java_binary(
 
 container_image(
     name = "server.container",
-    base = "@java_base//image",
+    base = "@bazel-builder//image",
     cmd = [
-        "buildfarm-server_deploy.jar",
+        "java",
+        "-jar",
+        "-Xms1G",
+        "-Xmx4G",
+        "/buildfarm-server_deploy.jar",
         "/config/server.config",
         "--port",
         "8980",
@@ -398,9 +402,13 @@ java_binary(
 
 container_image(
     name = "buildfarm-operationqueue-worker.container",
-    base = "@java_base//image",
+    base = "@bazel-builder//image",
     cmd = [
-        "buildfarm-operationqueue-worker_deploy.jar",
+        "java",
+        "-jar",
+        "-Xms2G",
+        "-Xmx10G",
+        "/buildfarm-operationqueue-worker_deploy.jar",
         "/config/worker.config",
     ],
     # leverage the implicit target of the buildfarm-server to get a fat jar.
