@@ -299,6 +299,20 @@ java_binary(
     ],
 )
 
+container_image(
+    name = "buildfarm-shard-worker.container",
+    base = "@java_base//image",
+    # leverage the implicit target of the buildfarm-shard-worker to get a fat jar.
+    # this is simply a workaround for the fact that we have so many dependencies,
+    # so we'd want some wrappy script. This seemed more straightforward.
+    # https://docs.bazel.build/versions/master/be/java.html#java_binary_implicit_outputs
+    files = [
+        ":buildfarm-shard-worker_deploy.jar",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+
 java_library(
     name = "worker",
     srcs = glob(["worker/*.java"]),
