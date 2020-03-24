@@ -1,5 +1,5 @@
 load("@rules_java//java:defs.bzl", "java_binary", "java_library")
-load("@io_bazel_rules_docker//container:container.bzl", "container_image")
+load("@io_bazel_rules_docker//container:container.bzl", "container_image", "container_push")
 
 package(
     default_visibility = ["//src:__subpackages__"],
@@ -239,6 +239,16 @@ container_image(
     visibility = ["//visibility:public"],
 )
 
+container_push(
+    name = "server.push",
+    format = "Docker",
+    image = ":server.container",
+    registry = "reg.prod.wgtwo.com",
+    repository = "infra/bazel-buildfarm-server",
+    tag = "dev-{VOLATILE_BUILD_SCM_HASH_SHORT}",
+    tags = ["auto-deploy"],
+)
+
 java_library(
     name = "stub-instance",
     srcs = glob(["instance/stub/*.java"]),
@@ -424,6 +434,17 @@ container_image(
     visibility = ["//visibility:public"],
 )
 
+container_push(
+    name = "buildfarm-operationqueue-worker.push",
+    format = "Docker",
+    image = ":buildfarm-operationqueue-worker.container",
+    registry = "reg.prod.wgtwo.com",
+    repository = "infra/buildfarm-operationqueue-worker",
+    tag = "dev-{VOLATILE_BUILD_SCM_HASH_SHORT}",
+    tags = ["auto-deploy"],
+
+)
+
 container_image(
     name = "buildfarm-shard-worker.container",
     base = "@bazel-builder//image",
@@ -444,6 +465,17 @@ container_image(
     ],
     stamp = True,
     visibility = ["//visibility:public"],
+)
+
+container_push(
+    name = "buildfarm-shard-worker.push",
+    format = "Docker",
+    image = ":buildfarm-shard-worker.container",
+    registry = "reg.prod.wgtwo.com",
+    repository = "infra/buildfarm-shard-worker",
+    tag = "dev-{VOLATILE_BUILD_SCM_HASH_SHORT}",
+    tags = ["auto-deploy"],
+
 )
 
 java_binary(

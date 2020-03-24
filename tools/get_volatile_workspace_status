@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+echo "VOLATILE_BUILD_SCM_HASH_SHORT $(git rev-parse --short HEAD)"

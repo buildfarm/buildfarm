@@ -103,7 +103,7 @@ container_pull(
 
 container_pull(
     name = "bazel-builder",
-    digest = "sha256:568e8e8db87165f0e2cfb30f952d359beaa1247631dfe2f227d995077e9fb84d",
+    digest = "sha256:67dfb50fe2f9116765c675cd2c92b8366add2e5a4298b4867c7bd978c4993fcd",
     registry = "reg.prod.wgtwo.com",
     repository = "infra/bazel-builder",
 )

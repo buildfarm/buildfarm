@@ -1,1 +1,2 @@
 build:fuse --define=fuse=true
+build --workspace_status_command=tools/get_volatile_workspace_status --stamp
