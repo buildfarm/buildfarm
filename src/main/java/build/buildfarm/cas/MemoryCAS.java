@@ -224,18 +224,24 @@ public class MemoryCAS implements ContentAddressableStorage {
   }
 
   @Override
-  public synchronized void put(Blob blob, Runnable onExpiration) {
+  public void put(Blob blob, Runnable onExpiration) {
     if (blob.getDigest().getSizeBytes() == 0) {
       throw new IllegalArgumentException("Cannot put empty blob");
     }
 
+    if (add(blob, onExpiration)) {
+      writes.getFuture(blob.getDigest()).set(blob.getData());
+    }
+  }
+
+  private synchronized boolean add(Blob blob, Runnable onExpiration) {
     Entry e = storage.get(blob.getDigest());
     if (e != null) {
       if (onExpiration != null) {
         e.addOnExpiration(onExpiration);
       }
       e.recordAccess(header);
-      return;
+      return false;
     }
 
     sizeInBytes += blob.size();
@@ -258,7 +264,7 @@ public class MemoryCAS implements ContentAddressableStorage {
 
     storage.put(blob.getDigest(), header.before);
 
-    writes.getFuture(blob.getDigest()).set(blob.getData());
+    return true;
   }
 
   @GuardedBy("this")
