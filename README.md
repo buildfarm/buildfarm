@@ -4,11 +4,10 @@
 
 This repository hosts the [Bazel](https://bazel.build) remote caching and execution system.
 
-This project is just getting started; background information on the status of caching and remote execution in bazel can be
+Background information on the status of caching and remote execution in bazel can be
 found in the [bazel documentation](https://docs.bazel.build/versions/master/remote-caching.html).
 
-Read the [meeting notes](https://docs.google.com/document/d/1EtQMTn-7sKFMTxIMlb0oDGpvGCMAuzphVcfx58GWuEM/edit).
-Get involved by joining the general api discussion on the [remote execution apis mailing list](https://groups.google.com/forum/#!forum/remote-execution-apis).
+File issues here for bugs or feature requests, and ask questions via build team [slack](https://join.slack.com/t/buildteamworld/shared_invite/zt-4zy8f5j5-KwiJuBoAAUorB_mdQHwF7Q) in the #buildfarm channel.
 
 ## Usage
 
@@ -48,7 +47,7 @@ To use the example configured buildfarm with bazel (version 1.0 or higher), you 
 
 ```
 $ cat .bazelrc
-build --spawn_strategy=remote --genrule_strategy=remote --strategy=Javac=remote --strategy=Closure=remote --remote_executor=grpc://localhost:8980
+build --remote_executor=grpc://localhost:8980
 ```
 
 Then run your build as you would normally do.
