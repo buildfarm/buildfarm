@@ -96,6 +96,19 @@ public class GrpcActionCacheTest {
   }
 
   @Test
+  public void getNotFoundIsNull() {
+    Digest actionDigest = DIGEST_UTIL.compute(ByteString.copyFromUtf8("not-found"));
+    serviceRegistry.addService(
+        new ActionCacheImplBase() {
+          @Override
+          public void getActionResult(GetActionResultRequest request, StreamObserver<ActionResult> responseObserver) {
+            responseObserver.onError(Status.NOT_FOUND.asException());
+          }
+        });
+    assertThat(ac.get(DigestUtil.asActionKey(actionDigest))).isNull();
+  }
+
+  @Test
   public void putUpdatesResult() throws InterruptedException {
     ActionResult result = ActionResult.newBuilder()
         .setStdoutRaw(ByteString.copyFromUtf8("out"))
