@@ -23,6 +23,9 @@ import build.bazel.remote.execution.v2.ActionCacheGrpc.ActionCacheBlockingStub;
 import build.bazel.remote.execution.v2.GetActionResultRequest;
 import build.bazel.remote.execution.v2.UpdateActionResultRequest;
 import io.grpc.Channel;
+import io.grpc.Status;
+import io.grpc.Status.Code;
+import io.grpc.StatusRuntimeException;
 
 public class GrpcActionCache implements ActionCache {
   private final String instanceName;
@@ -44,10 +47,18 @@ public class GrpcActionCache implements ActionCache {
 
   @Override
   public ActionResult get(ActionKey actionKey) {
-    return actionCacheBlockingStub.get().getActionResult(GetActionResultRequest.newBuilder()
-        .setInstanceName(instanceName)
-        .setActionDigest(actionKey.getDigest())
-        .build());
+    try {
+      return actionCacheBlockingStub.get().getActionResult(GetActionResultRequest.newBuilder()
+          .setInstanceName(instanceName)
+          .setActionDigest(actionKey.getDigest())
+          .build());
+    } catch (StatusRuntimeException e) {
+      Status status = Status.fromThrowable(e);
+      if (status.getCode() == Code.NOT_FOUND) {
+        return null;
+      }
+      throw e;
+    }
   }
 
   @Override
