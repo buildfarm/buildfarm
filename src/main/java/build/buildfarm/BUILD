@@ -312,7 +312,6 @@ container_image(
     visibility = ["//visibility:public"],
 )
 
-
 java_library(
     name = "worker",
     srcs = glob(["worker/*.java"]),
