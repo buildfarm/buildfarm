@@ -29,8 +29,9 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.Timestamps;
-import java.util.logging.Logger;
 import javax.annotation.Nullable;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class MatchStage extends PipelineStage {
   private static final Logger logger = Logger.getLogger(MatchStage.class.getName());
@@ -40,16 +41,17 @@ public class MatchStage extends PipelineStage {
   }
 
   class MatchOperationListener implements MatchListener {
+    private OperationContext operationContext;
     private Stopwatch stopwatch;
     private long waitStart;
     private long waitDuration;
-    private long operationNamedAtUSecs;
     private Poller poller = null;
     private QueueEntry queueEntry = null;
     private boolean matched = false;
     private Runnable onCancelHandler = null; // never called, only blocking stub used
 
-    public MatchOperationListener(Stopwatch stopwatch) {
+    public MatchOperationListener(OperationContext operationContext, Stopwatch stopwatch) {
+      this.operationContext = operationContext;
       this.stopwatch = stopwatch;
       waitDuration = this.stopwatch.elapsed(MICROSECONDS);
     }
@@ -76,10 +78,14 @@ public class MatchStage extends PipelineStage {
         return false;
       }
 
-      operationNamedAtUSecs = stopwatch.elapsed(MICROSECONDS);
       Preconditions.checkState(poller == null);
-      Poller poller = workerContext.createPoller("MatchStage", queueEntry, QUEUED);
-      return onOperationPolled(queueEntry, poller);
+      operationContext =
+          operationContext
+              .toBuilder()
+              .setQueueEntry(queueEntry)
+              .setPoller(workerContext.createPoller("MatchStage", queueEntry, QUEUED))
+              .build();
+      return onOperationPolled();
     }
 
     @Override
@@ -93,23 +99,19 @@ public class MatchStage extends PipelineStage {
       this.onCancelHandler = onCancelHandler;
     }
 
-    private boolean onOperationPolled(QueueEntry queueEntry, Poller poller) throws InterruptedException {
-      String operationName = queueEntry.getExecuteEntry().getOperationName();
+    private boolean onOperationPolled() throws InterruptedException {
+      String operationName = operationContext.queueEntry.getExecuteEntry().getOperationName();
       logStart(operationName);
 
       long matchingAtUSecs = stopwatch.elapsed(MICROSECONDS);
-      OperationContext operationContext = match(
-          queueEntry,
-          poller,
-          stopwatch,
-          operationNamedAtUSecs);
+      OperationContext matchedOperationContext = match(operationContext);
       long matchedInUSecs = stopwatch.elapsed(MICROSECONDS) - matchingAtUSecs;
       logComplete(operationName, matchedInUSecs, waitDuration, true);
-      operationContext.poller.pause();
+      matchedOperationContext.poller.pause();
       try {
-        output.put(operationContext);
+        output.put(matchedOperationContext);
       } catch (InterruptedException e) {
-        error.put(operationContext);
+        error.put(matchedOperationContext);
         throw e;
       }
       matched = true;
@@ -125,10 +127,11 @@ public class MatchStage extends PipelineStage {
   @Override
   protected void iterate() throws InterruptedException {
     Stopwatch stopwatch = Stopwatch.createStarted();
-    if (!output.claim()) {
+    OperationContext operationContext = OperationContext.newBuilder().build();
+    if (!output.claim(operationContext)) {
       return;
     }
-    MatchOperationListener listener = new MatchOperationListener(stopwatch);
+    MatchOperationListener listener = new MatchOperationListener(operationContext, stopwatch);
     try {
       logStart();
       workerContext.match(listener);
@@ -139,37 +142,35 @@ public class MatchStage extends PipelineStage {
     }
   }
 
-  private OperationContext match(
-      QueueEntry queueEntry,
-      Poller poller,
-      Stopwatch stopwatch,
-      long matchStartAtUSecs) {
-    OperationContext.Builder builder = OperationContext.newBuilder();
+  private OperationContext match(OperationContext operationContext) {
     Timestamp workerStartTimestamp = Timestamps.fromMillis(System.currentTimeMillis());
 
-    ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
+    ExecuteEntry executeEntry = operationContext.queueEntry.getExecuteEntry();
     // this may be superfluous - we can probably just set the name and action digest
-    Operation operation = Operation.newBuilder()
-        .setName(executeEntry.getOperationName())
-        .setMetadata(Any.pack(ExecuteOperationMetadata.newBuilder()
-            .setActionDigest(executeEntry.getActionDigest())
-            .setStage(QUEUED)
-            .setStdoutStreamName(executeEntry.getStdoutStreamName())
-            .setStderrStreamName(executeEntry.getStderrStreamName())
-            .build()))
-        .build();
+    Operation operation =
+        Operation.newBuilder()
+            .setName(executeEntry.getOperationName())
+            .setMetadata(
+                Any.pack(
+                    ExecuteOperationMetadata.newBuilder()
+                        .setActionDigest(executeEntry.getActionDigest())
+                        .setStage(QUEUED)
+                        .setStdoutStreamName(executeEntry.getStdoutStreamName())
+                        .setStderrStreamName(executeEntry.getStderrStreamName())
+                        .build()))
+            .build();
 
-    OperationContext operationContext = OperationContext.newBuilder()
-        .setOperation(operation)
-        .setPoller(poller)
-        .setQueueEntry(queueEntry)
-        .build();
+    OperationContext matchedOperationContext =
+        operationContext.toBuilder().setOperation(operation).build();
 
-    operationContext.executeResponse.getResultBuilder().getExecutionMetadataBuilder()
+    matchedOperationContext
+        .executeResponse
+        .getResultBuilder()
+        .getExecutionMetadataBuilder()
         .setWorker(workerContext.getName())
         .setQueuedTimestamp(executeEntry.getQueuedTimestamp())
         .setWorkerStartTimestamp(workerStartTimestamp);
-    return operationContext;
+    return matchedOperationContext;
   }
 
   @Override
@@ -178,7 +179,7 @@ public class MatchStage extends PipelineStage {
   }
 
   @Override
-  public boolean claim() {
+  public boolean claim(OperationContext operationContext) {
     throw new UnsupportedOperationException();
   }
 

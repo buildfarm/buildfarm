@@ -17,12 +17,11 @@ package build.buildfarm.server;
 import static build.buildfarm.common.IOUtils.formatIOError;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
-import static java.util.logging.Level.FINE;
 import static java.util.logging.Level.SEVERE;
 
+import build.buildfarm.common.LoggingMain;
 import build.buildfarm.common.grpc.TracingMetadataUtils.ServerHeadersInterceptor;
 import build.buildfarm.v1test.BuildFarmServerConfig;
-import com.google.common.io.ByteStreams;
 import com.google.devtools.common.options.OptionsParser;
 import com.google.protobuf.TextFormat;
 import io.grpc.Server;
@@ -43,15 +42,19 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Logger;
+import java.util.function.Consumer;
 import javax.naming.ConfigurationException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
-public class BuildFarmServer {
+public class BuildFarmServer extends LoggingMain {
   // We need to keep references to the root and netty loggers to prevent them from being garbage
   // collected, which would cause us to loose their configuration.
-  private static final Logger nettyLogger = Logger.getLogger("io.grpc.netty");
-  public static final Logger logger =
-    Logger.getLogger(BuildFarmServer.class.getName());
+  private static final java.util.logging.Logger nettyLogger =
+      java.util.logging.Logger.getLogger("io.grpc.netty");
+  private static final java.util.logging.Logger grpcLogger =
+      java.util.logging.Logger.getLogger(Server.class.getName());
+  private static final Logger logger = Logger.getLogger(BuildFarmServer.class.getName());
 
   private final ScheduledExecutorService keepaliveScheduler = newSingleThreadScheduledExecutor();
   private final ActionCacheRequestCounter actionCacheRequestCounter;
@@ -65,43 +68,50 @@ public class BuildFarmServer {
     this(session, ServerBuilder.forPort(config.getPort()), config);
   }
 
-  public BuildFarmServer(String session, ServerBuilder<?> serverBuilder, BuildFarmServerConfig config)
+  public BuildFarmServer(
+      String session, ServerBuilder<?> serverBuilder, BuildFarmServerConfig config)
       throws InterruptedException, ConfigurationException {
+    super("BuildFarmServer");
     String defaultInstanceName = config.getDefaultInstanceName();
-    instances = new BuildFarmInstances(session, config.getInstancesList(), defaultInstanceName, this::stop);
+    instances =
+        new BuildFarmInstances(session, config.getInstancesList(), defaultInstanceName, this::stop);
 
     healthStatusManager = new HealthStatusManager();
-    actionCacheRequestCounter = new ActionCacheRequestCounter(ActionCacheService.logger, Duration.ofSeconds(10));
+    actionCacheRequestCounter =
+        new ActionCacheRequestCounter(ActionCacheService.logger, Duration.ofSeconds(10));
 
     ServerInterceptor headersInterceptor = new ServerHeadersInterceptor();
-    server = serverBuilder
-        .addService(healthStatusManager.getHealthService())
-        .addService(new ActionCacheService(instances, actionCacheRequestCounter::increment))
-        .addService(new CapabilitiesService(instances))
-        .addService(new ContentAddressableStorageService(
-            instances,
-            /* deadlineAfter=*/ 1, TimeUnit.DAYS,
-            /* requestLogLevel=*/ FINE))
-        .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, TimeUnit.DAYS))
-        .addService(new ExecutionService(
-            instances,
-            config.getExecuteKeepaliveAfterSeconds(),
-            TimeUnit.SECONDS,
-            keepaliveScheduler))
-        .addService(new OperationQueueService(instances))
-        .addService(new OperationsService(instances))
-        .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
-        .intercept(headersInterceptor)
-        .build();
 
-    logger.info(String.format("%s initialized", session));
+    server =
+        serverBuilder
+            .addService(healthStatusManager.getHealthService())
+            .addService(new ActionCacheService(instances, actionCacheRequestCounter::increment))
+            .addService(new CapabilitiesService(instances))
+            .addService(
+                new ContentAddressableStorageService(
+                    instances, /* deadlineAfter=*/ 1, TimeUnit.DAYS, /* requestLogLevel=*/ Level.INFO))
+            .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, TimeUnit.DAYS))
+            .addService(
+                new ExecutionService(
+                    instances,
+                    config.getExecuteKeepaliveAfterSeconds(),
+                    TimeUnit.SECONDS,
+                    keepaliveScheduler))
+            .addService(new OperationQueueService(instances))
+            .addService(new OperationsService(instances))
+            .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
+            .intercept(headersInterceptor)
+            .build();
+
+    logger.log(Level.INFO, String.format("%s initialized", session));
   }
 
-  private static BuildFarmServerConfig toBuildFarmServerConfig(Readable input, BuildFarmServerOptions options) throws IOException {
+  private static BuildFarmServerConfig toBuildFarmServerConfig(
+      Readable input, BuildFarmServerOptions options) throws IOException {
     BuildFarmServerConfig.Builder builder = BuildFarmServerConfig.newBuilder();
     TextFormat.merge(input, builder);
     if (options.port > 0) {
-        builder.setPort(options.port);
+      builder.setPort(options.port);
     }
     return builder.build();
   }
@@ -110,15 +120,15 @@ public class BuildFarmServer {
     actionCacheRequestCounter.start();
     instances.start();
     server.start();
-    healthStatusManager.setStatus(HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
-    Runtime.getRuntime().addShutdownHook(new Thread() {
-      @Override
-      public void run() {
-        logger.info("*** shutting down gRPC server since JVM is shutting down");
-        BuildFarmServer.this.stop();
-        logger.info("*** server shut down");
-      }
-    });
+    healthStatusManager.setStatus(
+        HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
+  }
+
+  @Override
+  protected void onShutdown() {
+    System.err.println("*** shutting down gRPC server since JVM is shutting down");
+    stop();
+    System.err.println("*** server shut down");
   }
 
   public void stop() {
@@ -128,7 +138,8 @@ public class BuildFarmServer {
       }
       stopping = true;
     }
-    healthStatusManager.setStatus(HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.NOT_SERVING);
+    healthStatusManager.setStatus(
+        HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.NOT_SERVING);
     try {
       if (server != null) {
         server.shutdown();
@@ -141,10 +152,10 @@ public class BuildFarmServer {
       }
     }
     if (!shutdownAndAwaitTermination(keepaliveScheduler, 10, TimeUnit.SECONDS)) {
-      logger.warning("could not shut down keepalive scheduler");
+      logger.log(Level.WARNING, "could not shut down keepalive scheduler");
     }
     if (!actionCacheRequestCounter.stop()) {
-      logger.warning("count not shut down action cache request counter");
+      logger.log(Level.WARNING, "count not shut down action cache request counter");
     }
   }
 
@@ -155,14 +166,13 @@ public class BuildFarmServer {
   }
 
   private static void printUsage(OptionsParser parser) {
-    System.out.println("Usage: CONFIG_PATH");
-    System.out.println(parser.describeOptions(Collections.<String, String>emptyMap(),
-                                              OptionsParser.HelpVerbosity.LONG));
+    logger.log(Level.INFO, "Usage: CONFIG_PATH");
+    logger.log(Level.INFO,
+        parser.describeOptions(
+            Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
   }
 
-  /**
-   * returns success or failure
-   */
+  /** returns success or failure */
   static boolean serverMain(String[] args) {
     // Only log severe log messages from Netty. Otherwise it logs warnings that look like this:
     //
@@ -189,7 +199,9 @@ public class BuildFarmServer {
     session += "-" + UUID.randomUUID();
     BuildFarmServer server;
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
-      server = new BuildFarmServer(session, toBuildFarmServerConfig(new InputStreamReader(configInputStream), options));
+      server =
+          new BuildFarmServer(
+              session, toBuildFarmServerConfig(new InputStreamReader(configInputStream), options));
       configInputStream.close();
       server.start();
       server.blockUntilShutdown();

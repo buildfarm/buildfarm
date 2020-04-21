@@ -26,8 +26,7 @@ public class DigestMismatchException extends IOException {
     super(
         String.format(
             "computed digest %s does not match expected %s",
-            DigestUtil.toString(actual),
-            DigestUtil.toString(expected)));
+            DigestUtil.toString(actual), DigestUtil.toString(expected)));
     this.actual = actual;
     this.expected = expected;
   }

@@ -28,11 +28,12 @@ class EmptyInputStreamFactory implements InputStreamFactory {
   }
 
   @Override
-  public InputStream newInput(Digest blobDigest, long offset) throws IOException, InterruptedException {
+  public InputStream newInput(Digest blobDigest, long offset)
+      throws IOException, InterruptedException {
     if (blobDigest.getSizeBytes() == 0) {
       return ByteString.EMPTY.newInput();
     }
 
     return delegate.newInput(blobDigest, offset);
   }
-};
+}

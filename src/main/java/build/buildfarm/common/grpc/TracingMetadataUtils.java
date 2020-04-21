@@ -24,8 +24,8 @@ import io.grpc.ServerCall;
 import io.grpc.ServerCall.Listener;
 import io.grpc.ServerCallHandler;
 import io.grpc.ServerInterceptor;
-import io.grpc.stub.MetadataUtils;
 import io.grpc.protobuf.ProtoUtils;
+import io.grpc.stub.MetadataUtils;
 import javax.annotation.Nullable;
 
 /** Utility functions to handle Metadata for remote Grpc calls. */
@@ -40,9 +40,7 @@ public class TracingMetadataUtils {
   public static final Metadata.Key<RequestMetadata> METADATA_KEY =
       ProtoUtils.keyForProto(RequestMetadata.getDefaultInstance());
 
-  /**
-   * Fetches a {@link RequestMetadata} defined on the current context, or the default instance.
-   */
+  /** Fetches a {@link RequestMetadata} defined on the current context, or the default instance. */
   public static RequestMetadata fromCurrentContext() {
     RequestMetadata metadata = CONTEXT_KEY.get();
     if (metadata == null) {

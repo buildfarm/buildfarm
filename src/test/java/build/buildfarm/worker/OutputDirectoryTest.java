@@ -25,9 +25,9 @@ import org.junit.runners.JUnit4;
 public class OutputDirectoryTest {
   @Test
   public void outputDirectoryParsesOutputFiles() {
-    OutputDirectory outputDirectory = OutputDirectory.parse(
-        ImmutableList.<String>of("foo", "bar/baz"),
-        ImmutableList.<String>of());
+    OutputDirectory outputDirectory =
+        OutputDirectory.parse(
+            ImmutableList.<String>of("foo", "bar/baz"), ImmutableList.<String>of());
 
     assertThat(outputDirectory.getChild("foo")).isNull();
     assertThat(outputDirectory.getChild("bar").isLeaf()).isTrue();
@@ -35,9 +35,9 @@ public class OutputDirectoryTest {
 
   @Test
   public void outputDirectoryParsesOutputDirs() {
-    OutputDirectory outputDirectory = OutputDirectory.parse(
-        ImmutableList.<String>of(),
-        ImmutableList.<String>of("bar/baz", "foo"));
+    OutputDirectory outputDirectory =
+        OutputDirectory.parse(
+            ImmutableList.<String>of(), ImmutableList.<String>of("bar/baz", "foo"));
 
     assertThat(outputDirectory.getChild("foo").isLeaf()).isFalse();
     assertThat(outputDirectory.getChild("bar").getChild("baz").isLeaf()).isFalse();
@@ -48,9 +48,9 @@ public class OutputDirectoryTest {
   public void pathologicalSortingWithSubdirs() {
     // induce a list that would be mismatched sorted if the directory base were compared
     // against subdirectories
-    OutputDirectory outputDirectory = OutputDirectory.parse(
-        ImmutableList.<String>of("a/file"),
-        ImmutableList.<String>of("a+b", "a/b/c"));
+    OutputDirectory outputDirectory =
+        OutputDirectory.parse(
+            ImmutableList.<String>of("a/file"), ImmutableList.<String>of("a+b", "a/b/c"));
 
     assertThat(outputDirectory.getChild("a").isLeaf()).isFalse();
     assertThat(outputDirectory.getChild("a+b").isLeaf()).isFalse();
@@ -61,18 +61,17 @@ public class OutputDirectoryTest {
   @Test
   public void peerOutputFilesReduceToOneOutputDir() {
     // create two references to output directory 'bar'
-    OutputDirectory outputDirectory = OutputDirectory.parse(
-        ImmutableList.<String>of("bar/baz", "bar/foo"),
-        ImmutableList.<String>of());
+    OutputDirectory outputDirectory =
+        OutputDirectory.parse(
+            ImmutableList.<String>of("bar/baz", "bar/foo"), ImmutableList.<String>of());
 
     assertThat(outputDirectory.getChild("bar").isLeaf()).isTrue();
   }
 
   @Test
   public void recursiveOutputDirectoryIsRecursive() {
-    OutputDirectory outputDirectory = OutputDirectory.parse(
-        ImmutableList.<String>of(),
-        ImmutableList.<String>of("foo"));
+    OutputDirectory outputDirectory =
+        OutputDirectory.parse(ImmutableList.<String>of(), ImmutableList.<String>of("foo"));
 
     assertThat(outputDirectory.getChild("foo").isLeaf()).isFalse();
     assertThat(outputDirectory.getChild("foo").getChild("bar").isLeaf()).isFalse();
@@ -82,18 +81,16 @@ public class OutputDirectoryTest {
 
   @Test
   public void emptyDirectoryIsRecursive() {
-    OutputDirectory outputDirectory = OutputDirectory.parse(
-        ImmutableList.<String>of(),
-        ImmutableList.<String>of(""));
+    OutputDirectory outputDirectory =
+        OutputDirectory.parse(ImmutableList.<String>of(), ImmutableList.<String>of(""));
 
     assertThat(outputDirectory.isLeaf()).isFalse();
     assertThat(outputDirectory.getChild("foo").isLeaf()).isFalse();
   }
 
-  @Test(expected=IllegalArgumentException.class)
+  @Test(expected = IllegalArgumentException.class)
   public void duplicateDirectorySeparatorIsInvalid() {
-    OutputDirectory outputDirectory = OutputDirectory.parse(
-        ImmutableList.<String>of(),
-        ImmutableList.<String>of("a//b"));
+    OutputDirectory outputDirectory =
+        OutputDirectory.parse(ImmutableList.<String>of(), ImmutableList.<String>of("a//b"));
   }
 }

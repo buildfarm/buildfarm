@@ -28,8 +28,7 @@ class FutureWriteResponseObserver implements StreamObserver<WriteResponse> {
   }
 
   @Override
-  public void onCompleted() {
-  }
+  public void onCompleted() {}
 
   @Override
   public void onError(Throwable t) {

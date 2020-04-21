@@ -46,9 +46,6 @@ public class Watchdog implements Runnable {
         if (!stopped) {
           runnable.runInterruptibly();
         }
-        if (Thread.interrupted()) {
-          throw new InterruptedException();
-        }
         done = true;
         this.notify();
       }

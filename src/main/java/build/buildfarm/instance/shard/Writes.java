@@ -23,6 +23,7 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
 import build.buildfarm.common.io.FeedbackOutputStream;
+import build.buildfarm.instance.ExcessiveWriteSizeException;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.BlobWriteKey;
 import com.google.common.cache.CacheBuilder;
@@ -74,7 +75,9 @@ class Writes {
     }
 
     @Override
-    public FeedbackOutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) throws IOException {
+    public FeedbackOutputStream getOutput(
+        long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler)
+        throws IOException {
       try {
         return delegate.getOutput(deadlineAfter, deadlineAfterUnits, onReadyHandler);
       } catch (Exception e) {
@@ -101,35 +104,30 @@ class Writes {
   }
 
   Writes(Supplier<Instance> instanceSupplier) {
-    this(
-        instanceSupplier,
-        /* writeExpiresAfter=*/ 1,
-        /* writeExpiresUnit=*/ TimeUnit.HOURS);
+    this(instanceSupplier, /* writeExpiresAfter=*/ 1, /* writeExpiresUnit=*/ TimeUnit.HOURS);
   }
 
-  Writes(
-      Supplier<Instance> instanceSupplier,
-      long writeExpiresAfter,
-      TimeUnit writeExpiresUnit) {
+  Writes(Supplier<Instance> instanceSupplier, long writeExpiresAfter, TimeUnit writeExpiresUnit) {
     this.instanceSupplier = instanceSupplier;
-    blobWriteInstances = CacheBuilder.newBuilder()
-        .expireAfterWrite(writeExpiresAfter, writeExpiresUnit)
-        .build(new CacheLoader<BlobWriteKey, Instance>() {
-          @Override
-          public Instance load(BlobWriteKey key) {
-            return instanceSupplier.get();
-          }
-        });
+    blobWriteInstances =
+        CacheBuilder.newBuilder()
+            .expireAfterWrite(writeExpiresAfter, writeExpiresUnit)
+            .build(
+                new CacheLoader<BlobWriteKey, Instance>() {
+                  @Override
+                  public Instance load(BlobWriteKey key) {
+                    return instanceSupplier.get();
+                  }
+                });
   }
 
-  public Write get(Digest digest, UUID uuid, RequestMetadata requestMetadata) {
+  public Write get(Digest digest, UUID uuid, RequestMetadata requestMetadata)
+      throws ExcessiveWriteSizeException {
     if (digest.getSizeBytes() == 0) {
       return new CompleteWrite(0);
     }
-    BlobWriteKey key = BlobWriteKey.newBuilder()
-        .setDigest(digest)
-        .setIdentifier(uuid.toString())
-        .build();
+    BlobWriteKey key =
+        BlobWriteKey.newBuilder().setDigest(digest).setIdentifier(uuid.toString()).build();
     try {
       return new InvalidatingWrite(
           blobWriteInstances.get(key).getBlobWrite(digest, uuid, requestMetadata),

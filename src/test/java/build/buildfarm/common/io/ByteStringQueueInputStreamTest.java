@@ -14,16 +14,15 @@
 
 package build.buildfarm.common.io;
 
-import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.collect.ImmutableList.of;
 import static com.google.common.collect.Queues.newLinkedBlockingQueue;
-import static com.google.protobuf.ByteString.copyFromUtf8;
+import static com.google.common.truth.Truth.assertThat;
 import static com.google.protobuf.ByteString.EMPTY;
+import static com.google.protobuf.ByteString.copyFromUtf8;
 
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.io.InputStream;
-import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -31,7 +30,8 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class ByteStringQueueInputStreamTest {
   private ByteStringQueueInputStream newInput(Iterable<ByteString> elements) {
-    ByteStringQueueInputStream in = new ByteStringQueueInputStream(newLinkedBlockingQueue(elements));
+    ByteStringQueueInputStream in =
+        new ByteStringQueueInputStream(newLinkedBlockingQueue(elements));
     in.setCompleted();
     return in;
   }
@@ -111,9 +111,7 @@ public class ByteStringQueueInputStreamTest {
     expected[4] = 42;
     expected[5] = 42;
 
-    InputStream in = newInput(of(
-        ByteString.copyFrom(data1),
-        ByteString.copyFrom(data2)));
+    InputStream in = newInput(of(ByteString.copyFrom(data1), ByteString.copyFrom(data2)));
     assertThat(in.read(buffer, 2, 2)).isEqualTo(2);
     assertThat(ByteString.copyFrom(buffer)).isEqualTo(ByteString.copyFrom(expected));
     assertThat(in.read()).isEqualTo(3);
@@ -159,8 +157,8 @@ public class ByteStringQueueInputStreamTest {
 
   @Test(expected = IOException.class)
   public void readWithExceptionThrowsIOExceptionAfterContent() throws IOException {
-    ByteStringQueueInputStream in = new ByteStringQueueInputStream(
-        newLinkedBlockingQueue(of(copyFromUtf8("Hello, World"))));
+    ByteStringQueueInputStream in =
+        new ByteStringQueueInputStream(newLinkedBlockingQueue(of(copyFromUtf8("Hello, World"))));
     in.setException(new RuntimeException("failed"));
     byte[] buffer = new byte[32]; // more than enough
     try {
@@ -174,16 +172,15 @@ public class ByteStringQueueInputStreamTest {
 
   @Test(expected = IOException.class)
   public void availableWithExceptionThrowsIOException() throws IOException {
-    ByteStringQueueInputStream in = new ByteStringQueueInputStream(
-        newLinkedBlockingQueue(of()));
+    ByteStringQueueInputStream in = new ByteStringQueueInputStream(newLinkedBlockingQueue(of()));
     in.setException(new RuntimeException("failed"));
     in.available();
   }
 
   @Test(expected = IOException.class)
   public void availableWithExceptionThrowsIOExceptionAfterContent() throws IOException {
-    ByteStringQueueInputStream in = new ByteStringQueueInputStream(
-        newLinkedBlockingQueue(of(copyFromUtf8("Hello, World"))));
+    ByteStringQueueInputStream in =
+        new ByteStringQueueInputStream(newLinkedBlockingQueue(of(copyFromUtf8("Hello, World"))));
     in.setException(new RuntimeException("failed"));
     try {
       in.available();

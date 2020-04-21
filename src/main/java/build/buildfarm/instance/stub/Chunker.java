@@ -34,10 +34,10 @@ import java.util.function.Supplier;
 /**
  * Splits a data source into one or more {@link Chunk}s of at most {@code chunkSize} bytes.
  *
- * <p>After a data source has been fully consumed, that is until {@link #hasNext()} returns
- * {@code false}, the chunker closes the underlying data source (i.e. file) itself. However, in
- * case of error or when a data source does not get fully consumed, a user must call
- * {@link #reset()} manually.
+ * <p>After a data source has been fully consumed, that is until {@link #hasNext()} returns {@code
+ * false}, the chunker closes the underlying data source (i.e. file) itself. However, in case of
+ * error or when a data source does not get fully consumed, a user must call {@link #reset()}
+ * manually.
  */
 public final class Chunker {
 
@@ -81,8 +81,7 @@ public final class Chunker {
         return false;
       }
       Chunk other = (Chunk) o;
-      return other.offset == offset
-          && other.data.equals(data);
+      return other.offset == offset && other.data.equals(data);
     }
 
     @Override
@@ -200,8 +199,7 @@ public final class Chunker {
     try {
       ByteStreams.readFully(data, chunkCache, 0, bytesToRead);
     } catch (EOFException e) {
-      throw new IllegalStateException("Reached EOF, but expected "
-          + bytesToRead + " bytes.", e);
+      throw new IllegalStateException("Reached EOF, but expected " + bytesToRead + " bytes.", e);
     }
     offset += bytesToRead;
 

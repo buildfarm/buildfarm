@@ -25,6 +25,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import java.time.Duration;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 class ActionCacheRequestCounter {
@@ -53,19 +54,20 @@ class ActionCacheRequestCounter {
   private void logRequests() {
     long requestCount = counter.getAndSet(0l);
     if (requestCount > 0) {
-      logger.info(String.format("GetActionResult %d Requests", requestCount));
+      logger.log(Level.INFO, String.format("GetActionResult %d Requests", requestCount));
     }
     schedule();
   }
 
   private void schedule() {
-    ListenableFuture<Void> logFuture = scheduleAsync(
-        () -> {
-          logRequests();
-          return immediateFuture(null);
-        },
-        delay.toMillis(),
-        MILLISECONDS,
-        service);
+    ListenableFuture<Void> logFuture =
+        scheduleAsync(
+            () -> {
+              logRequests();
+              return immediateFuture(null);
+            },
+            delay.toMillis(),
+            MILLISECONDS,
+            service);
   }
 }

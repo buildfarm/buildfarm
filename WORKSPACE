@@ -2,6 +2,16 @@ workspace(name = "build_buildfarm")
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file", "http_jar")
 
+RULES_JVM_EXTERNAL_TAG = "3.0"
+RULES_JVM_EXTERNAL_SHA = "62133c125bf4109dfd9d2af64830208356ce4ef8b165a6ef15bbff7460b35c3a"
+
+http_archive(
+    name = "rules_jvm_external",
+    strip_prefix = "rules_jvm_external-%s" % RULES_JVM_EXTERNAL_TAG,
+    sha256 = RULES_JVM_EXTERNAL_SHA,
+    url = "https://github.com/bazelbuild/rules_jvm_external/archive/%s.zip" % RULES_JVM_EXTERNAL_TAG,
+)
+
 # Needed for "well-known protos" and @com_google_protobuf//:protoc.
 http_archive(
     name = "com_google_protobuf",
@@ -43,7 +53,9 @@ http_archive(
 http_archive(
     name = "io_bazel_rules_docker",
     patch_args = ["-p1"],
-    patches = ["@build_buildfarm//third_party/rules_docker:rules_docker.patch"],
+    patches = [
+        "@build_buildfarm//third_party/rules_docker:rules_docker.patch",
+    ],
     sha256 = "dc97fccceacd4c6be14e800b2a00693d5e8d07f69ee187babfd04a80a9f8e250",
     strip_prefix = "rules_docker-0.14.1",
     urls = ["https://github.com/bazelbuild/rules_docker/archive/v0.14.1.tar.gz"],
@@ -51,15 +63,80 @@ http_archive(
 
 http_jar(
     name = "jedis",
-    sha256 = "10c844cb3338884da468608f819c11d5c90354b170c3fe445203497000c06ba3",
+    sha256 = "7a1eed5f5ae31881f0fd61b685adde3d20ec15a4abda304686c436293e3076ff",
     urls = [
-        "https://github.com/werkt/jedis/releases/download/jedis-3.0.1-8209fd5a88/jedis-3.0.1-8209fd5a88.jar",
+        "https://github.com/werkt/jedis/releases/download/jedis-3.2.0-3e25324dbe/jedis-3.2.0-3e25324dbe.jar",
     ],
 )
 
-load("//3rdparty:workspace.bzl", "maven_dependencies")
+load("@rules_jvm_external//:defs.bzl", "maven_install")
 
-maven_dependencies()
+IO_NETTY_MODULES = [
+    "buffer",
+    "codec",
+    "codec-http",
+    "codec-http2",
+    "codec-socks",
+    "common",
+    "handler",
+    "handler-proxy",
+    "resolver",
+    "transport",
+    "transport-native-epoll",
+    "transport-native-kqueue",
+    "transport-native-unix-common",
+]
+
+IO_GRPC_MODULES = [
+    "api",
+    "auth",
+    "core",
+    "context",
+    "netty",
+    "stub",
+    "protobuf",
+    "testing",
+    "services",
+]
+
+maven_install(
+    artifacts = [
+        "com.github.jnr:jnr-constants:0.9.9",
+        "com.github.jnr:jnr-ffi:2.1.7",
+        "com.github.jnr:jffi:1.2.16",
+        "com.github.jnr:jffi:jar:native:1.2.16",
+        "com.github.jnr:jnr-posix:3.0.53",
+        "com.github.pcj:google-options:1.0.0",
+        "com.github.serceman:jnr-fuse:0.5.1",
+        "com.google.auth:google-auth-library-credentials:0.9.1",
+        "com.google.auth:google-auth-library-oauth2-http:0.9.1",
+        "com.google.code.findbugs:jsr305:3.0.1",
+        "com.google.errorprone:error_prone_core:0.92",
+        "com.google.errorprone:error_prone_annotations:2.2.0",
+        "com.google.guava:guava:28.2-jre",
+        "com.google.guava:failureaccess:1.0.1",
+        "com.google.j2objc:j2objc-annotations:1.1",
+        "com.google.jimfs:jimfs:1.1",
+        "com.google.protobuf:protobuf-java:3.10.0",
+        "com.google.protobuf:protobuf-java-util:3.10.0",
+        "com.google.truth:truth:0.44",
+    ] + ["io.netty:netty-%s:4.1.38.Final" % module for module in IO_NETTY_MODULES]
+      + ["io.grpc:grpc-%s:1.26.0" % module for module in IO_GRPC_MODULES]
+      + [
+        "junit:junit:4.12",
+        "org.apache.commons:commons-pool2:2.4.3",
+        "org.checkerframework:checker-qual:2.5.2",
+        "org.mockito:mockito-core:2.25.0",
+        "org.openjdk.jmh:jmh-core:1.23",
+        "org.openjdk.jmh:jmh-generator-annprocess:1.23",
+        "org.slf4j:slf4j-api:1.7.22",
+        "org.threeten:threetenbp:1.3.3",
+    ],
+    repositories = [
+        "https://repo.maven.apache.org/maven2",
+        "https://jcenter.bintray.com",
+    ],
+)
 
 load("@remote_apis//:repository_rules.bzl", "switched_rules_by_language")
 
@@ -84,16 +161,6 @@ load(
     "@io_bazel_rules_docker//java:image.bzl",
     _java_image_repos = "repositories",
 )
-
-_java_image_repos()
-
-container_pull(
-    name = "java_base",
-    digest = "sha256:8c1769cb253bdecc257470f7fba05446a55b70805fa686f227a11655a90dfe9e",
-    registry = "gcr.io",
-    repository = "distroless/java",
-)
-
 load("@io_grpc_grpc_java//:repositories.bzl", "grpc_java_repositories")
 
 grpc_java_repositories(
@@ -109,3 +176,20 @@ bind(
     name = "jar/redis/clients/jedis",
     actual = "@jedis//jar",
 )
+
+_java_image_repos()
+
+container_pull(
+    name = "java_base",
+    digest = "sha256:8c1769cb253bdecc257470f7fba05446a55b70805fa686f227a11655a90dfe9e",
+    registry = "gcr.io",
+    repository = "distroless/java",
+)
+
+load("@io_grpc_grpc_java//:repositories.bzl", "grpc_java_repositories")
+
+grpc_java_repositories()
+
+load("@com_google_protobuf//:protobuf_deps.bzl", "protobuf_deps")
+
+protobuf_deps()

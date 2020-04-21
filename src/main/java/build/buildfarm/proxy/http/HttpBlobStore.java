@@ -125,42 +125,57 @@ public final class HttpBlobStore implements SimpleBlobStore {
   @GuardedBy("credentialsLock")
   private long lastRefreshTime;
 
-  public static HttpBlobStore create(URI uri, int timeoutMillis,
-      int remoteMaxConnections, @Nullable final Credentials creds)
+  public static HttpBlobStore create(
+      URI uri, int timeoutMillis, int remoteMaxConnections, @Nullable final Credentials creds)
       throws URISyntaxException, SSLException {
     return new HttpBlobStore(
         NioEventLoopGroup::new,
         NioSocketChannel.class,
-        uri, timeoutMillis, remoteMaxConnections, creds,
+        uri,
+        timeoutMillis,
+        remoteMaxConnections,
+        creds,
         null);
   }
 
   public static HttpBlobStore create(
       DomainSocketAddress domainSocketAddress,
-      URI uri, int timeoutMillis, int remoteMaxConnections, @Nullable final Credentials creds)
+      URI uri,
+      int timeoutMillis,
+      int remoteMaxConnections,
+      @Nullable final Credentials creds)
       throws ConfigurationException, URISyntaxException, SSLException {
 
-      if (KQueue.isAvailable()) {
-        return new HttpBlobStore(
-            KQueueEventLoopGroup::new,
-            KQueueDomainSocketChannel.class,
-            uri, timeoutMillis, remoteMaxConnections, creds,
-            domainSocketAddress);
-      } else if (Epoll.isAvailable()) {
-        return new HttpBlobStore(
-            EpollEventLoopGroup::new,
-            EpollDomainSocketChannel.class,
-            uri, timeoutMillis, remoteMaxConnections, creds,
-            domainSocketAddress);
-      } else {
-        throw new ConfigurationException("Unix domain sockets are unsupported on this platform");
-      }
+    if (KQueue.isAvailable()) {
+      return new HttpBlobStore(
+          KQueueEventLoopGroup::new,
+          KQueueDomainSocketChannel.class,
+          uri,
+          timeoutMillis,
+          remoteMaxConnections,
+          creds,
+          domainSocketAddress);
+    } else if (Epoll.isAvailable()) {
+      return new HttpBlobStore(
+          EpollEventLoopGroup::new,
+          EpollDomainSocketChannel.class,
+          uri,
+          timeoutMillis,
+          remoteMaxConnections,
+          creds,
+          domainSocketAddress);
+    } else {
+      throw new ConfigurationException("Unix domain sockets are unsupported on this platform");
+    }
   }
 
   private HttpBlobStore(
       Function<Integer, EventLoopGroup> newEventLoopGroup,
       Class<? extends Channel> channelClass,
-      URI uri, int timeoutMillis, int remoteMaxConnections, @Nullable final Credentials creds,
+      URI uri,
+      int timeoutMillis,
+      int remoteMaxConnections,
+      @Nullable final Credentials creds,
       @Nullable SocketAddress socketAddress)
       throws URISyntaxException, SSLException {
     useTls = uri.getScheme().equals("https");

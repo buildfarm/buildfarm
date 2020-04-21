@@ -14,23 +14,24 @@
 
 package build.buildfarm.instance.shard;
 
-import static java.util.logging.Level.INFO;
-
 import build.buildfarm.common.function.InterruptingRunnable;
+import build.buildfarm.common.redis.RedisClient;
+import io.grpc.Status;
 import java.io.IOException;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisPubSub;
 import redis.clients.jedis.exceptions.JedisConnectionException;
 
 class RedisShardSubscription implements Runnable {
-  private final static Logger logger = Logger.getLogger(RedisShardSubscription.class.getName());
+  private static final Logger logger = Logger.getLogger(RedisShardSubscription.class.getName());
 
   @FunctionalInterface
   interface IOSupplier<T> {
@@ -41,7 +42,7 @@ class RedisShardSubscription implements Runnable {
   private final InterruptingRunnable onUnsubscribe;
   private final Consumer<JedisCluster> onReset;
   private final Supplier<List<String>> subscriptions;
-  private final IOSupplier<JedisCluster> jedisFactory;
+  private final RedisClient client;
   private final AtomicBoolean stopped = new AtomicBoolean(false);
 
   RedisShardSubscription(
@@ -49,45 +50,38 @@ class RedisShardSubscription implements Runnable {
       InterruptingRunnable onUnsubscribe,
       Consumer<JedisCluster> onReset,
       Supplier<List<String>> subscriptions,
-      IOSupplier<JedisCluster> jedisFactory) {
+      RedisClient client) {
     this.subscriber = subscriber;
     this.onUnsubscribe = onUnsubscribe;
     this.onReset = onReset;
     this.subscriptions = subscriptions;
-    this.jedisFactory = jedisFactory;
+    this.client = client;
   }
 
   public JedisPubSub getSubscriber() {
     return subscriber;
   }
 
-  private void subscribe(JedisCluster jedis, boolean isReset) throws IOException {
-    try {
-      if (isReset) {
-        onReset.accept(jedis);
-      }
-      jedis.subscribe(subscriber, subscriptions.get().toArray(new String[0]));
-    } catch (JedisConnectionException e) {
-      Throwable cause = e.getCause();
-      if (cause instanceof IOException) {
-        throw (IOException) cause;
-      }
-      throw e;
+  private void subscribe(JedisCluster jedis, boolean isReset) {
+    if (isReset) {
+      onReset.accept(jedis);
     }
+    jedis.subscribe(subscriber, subscriptions.get().toArray(new String[0]));
   }
 
   private void iterate(boolean isReset) throws IOException {
-    try (JedisCluster jedis = jedisFactory.get()) {
-      subscribe(jedis, isReset);
-    } catch (SocketTimeoutException e) {
-      // ignore
-    } catch (SocketException e) {
-      if (!e.getMessage().equals("Connection reset")) {
-        throw e;
-      }
-    } catch (JedisConnectionException e) {
-      if (!e.getMessage().equals("Unexpected end of stream.")) {
-        throw e;
+    try {
+      client.run(jedis -> subscribe(jedis, isReset));
+    } catch (IOException e) {
+      Status status = Status.fromThrowable(e);
+      switch (status.getCode()) {
+        case DEADLINE_EXCEEDED:
+        case UNAVAILABLE:
+          logger.log(Level.WARNING, "failed to subscribe", e);
+          /* ignore */
+          break;
+        default:
+          throw e;
       }
     }
   }
@@ -96,7 +90,7 @@ class RedisShardSubscription implements Runnable {
     boolean first = true;
     while (!stopped.get()) {
       if (!first) {
-        logger.warning("unexpected subscribe return, reconnecting...");
+        logger.log(Level.SEVERE, "unexpected subscribe return, reconnecting...");
       }
       iterate(!first);
       first = false;
@@ -114,7 +108,7 @@ class RedisShardSubscription implements Runnable {
     try {
       mainLoop();
     } catch (Exception e) {
-      logger.log(INFO, "RedisShardSubscription: Calling onUnsubscribe...", e);
+      logger.log(Level.SEVERE, "RedisShardSubscription: Calling onUnsubscribe...", e);
       try {
         onUnsubscribe.runInterruptibly();
       } catch (InterruptedException intEx) {

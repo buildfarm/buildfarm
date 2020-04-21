@@ -35,22 +35,23 @@ public class FailoverInputStreamFactoryTest {
   public void DigestInPrimaryIsNotDelegated() throws IOException, InterruptedException {
     ByteString content = ByteString.copyFromUtf8("Hello, World");
     Digest contentDigest = DIGEST_UTIL.compute(content);
-    FailoverInputStreamFactory failoverFactory = new FailoverInputStreamFactory(
-        /* primary=*/ new InputStreamFactory() {
-          @Override
-          public InputStream newInput(Digest digest, long offset) throws IOException {
-            if (digest.equals(contentDigest)) {
-              return content.newInput();
-            }
-            throw new NoSuchFileException(DigestUtil.toString(digest));
-          }
-        },
-        /* failover=*/ new InputStreamFactory() {
-          @Override
-          public InputStream newInput(Digest digest, long offset) throws IOException {
-            throw new IOException("invalid");
-          }
-        });
+    FailoverInputStreamFactory failoverFactory =
+        new FailoverInputStreamFactory(
+            /* primary=*/ new InputStreamFactory() {
+              @Override
+              public InputStream newInput(Digest digest, long offset) throws IOException {
+                if (digest.equals(contentDigest)) {
+                  return content.newInput();
+                }
+                throw new NoSuchFileException(DigestUtil.toString(digest));
+              }
+            },
+            /* failover=*/ new InputStreamFactory() {
+              @Override
+              public InputStream newInput(Digest digest, long offset) throws IOException {
+                throw new IOException("invalid");
+              }
+            });
     InputStream in = failoverFactory.newInput(contentDigest, /* offset=*/ 0);
     assertThat(ByteString.readFrom(in)).isEqualTo(content);
   }
@@ -59,22 +60,23 @@ public class FailoverInputStreamFactoryTest {
   public void missingDigestIsDelegated() throws IOException, InterruptedException {
     ByteString content = ByteString.copyFromUtf8("Hello, World");
     Digest contentDigest = DIGEST_UTIL.compute(content);
-    FailoverInputStreamFactory failoverFactory = new FailoverInputStreamFactory(
-        /* primary=*/ new InputStreamFactory() {
-          @Override
-          public InputStream newInput(Digest digest, long offset) throws IOException {
-            throw new NoSuchFileException(DigestUtil.toString(digest));
-          }
-        },
-        /* failover=*/ new InputStreamFactory() {
-          @Override
-          public InputStream newInput(Digest digest, long offset) throws IOException {
-            if (digest.equals(contentDigest)) {
-              return content.newInput();
-            }
-            throw new IOException("invalid");
-          }
-        });
+    FailoverInputStreamFactory failoverFactory =
+        new FailoverInputStreamFactory(
+            /* primary=*/ new InputStreamFactory() {
+              @Override
+              public InputStream newInput(Digest digest, long offset) throws IOException {
+                throw new NoSuchFileException(DigestUtil.toString(digest));
+              }
+            },
+            /* failover=*/ new InputStreamFactory() {
+              @Override
+              public InputStream newInput(Digest digest, long offset) throws IOException {
+                if (digest.equals(contentDigest)) {
+                  return content.newInput();
+                }
+                throw new IOException("invalid");
+              }
+            });
     InputStream in = failoverFactory.newInput(contentDigest, /* offset=*/ 0);
     assertThat(ByteString.readFrom(in)).isEqualTo(content);
   }

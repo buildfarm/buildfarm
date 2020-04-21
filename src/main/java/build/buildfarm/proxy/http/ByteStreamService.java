@@ -15,10 +15,9 @@
 package build.buildfarm.proxy.http;
 
 import static build.buildfarm.common.UrlPath.detectResourceOperation;
-import static build.buildfarm.common.UrlPath.parseUploadBlobDigest;
 import static build.buildfarm.common.UrlPath.parseBlobDigest;
+import static build.buildfarm.common.UrlPath.parseUploadBlobDigest;
 import static com.google.common.util.concurrent.Futures.addCallback;
-import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
@@ -55,12 +54,10 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
   }
 
   private ListenableFuture<Boolean> getBlob(
-      Digest blobDigest,
-      long offset,
-      long limit,
-      OutputStream out) {
+      Digest blobDigest, long offset, long limit, OutputStream out) {
     int size = (int) blobDigest.getSizeBytes();
-    if (offset < 0 || size < 0
+    if (offset < 0
+        || size < 0
         || (size == 0 && offset > 0)
         || (size > 0 && offset >= size)
         || limit < 0) {
@@ -69,33 +66,26 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
 
     return simpleBlobStore.get(
         blobDigest.getHash(),
-        new SkipLimitOutputStream(
-            out, offset, limit <= 0 ? size - offset : limit));
+        new SkipLimitOutputStream(out, offset, limit <= 0 ? size - offset : limit));
   }
 
-  private void readBlob(
-      ReadRequest request,
-      StreamObserver<ReadResponse> responseObserver)
+  private void readBlob(ReadRequest request, StreamObserver<ReadResponse> responseObserver)
       throws IOException, InterruptedException, InvalidResourceNameException {
     String resourceName = request.getResourceName();
 
     Digest digest = parseBlobDigest(resourceName);
 
-    OutputStream responseOut = new ChunkOutputStream(DEFAULT_CHUNK_SIZE) {
-      @Override
-      public void onChunk(byte[] b, int off, int len) {
-        responseObserver.onNext(ReadResponse.newBuilder()
-            .setData(ByteString.copyFrom(b, off, len))
-            .build());
-      }
-    };
+    OutputStream responseOut =
+        new ChunkOutputStream(DEFAULT_CHUNK_SIZE) {
+          @Override
+          public void onChunk(byte[] b, int off, int len) {
+            responseObserver.onNext(
+                ReadResponse.newBuilder().setData(ByteString.copyFrom(b, off, len)).build());
+          }
+        };
 
     addCallback(
-        getBlob(
-            digest,
-            request.getReadOffset(),
-            request.getReadLimit(),
-            responseOut),
+        getBlob(digest, request.getReadOffset(), request.getReadLimit(), responseOut),
         new FutureCallback<Boolean>() {
           private void onError(Status status) {
             responseObserver.onError(status.asException());
@@ -129,9 +119,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
   }
 
   @Override
-  public void read(
-      ReadRequest request,
-      StreamObserver<ReadResponse> responseObserver) {
+  public void read(ReadRequest request, StreamObserver<ReadResponse> responseObserver) {
     String resourceName = request.getResourceName();
 
     long readLimit = request.getReadLimit();
@@ -144,17 +132,15 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
     try {
       ResourceOperation resourceOperation = detectResourceOperation(resourceName);
       switch (resourceOperation) {
-      case Blob:
-        readBlob(request, responseObserver);
-        break;
-      default:
-        throw new InvalidResourceNameException(resourceName, "Unsupported service");
+        case Blob:
+          readBlob(request, responseObserver);
+          break;
+        default:
+          throw new InvalidResourceNameException(resourceName, "Unsupported service");
       }
-    } catch (IllegalArgumentException|InvalidResourceNameException e) {
+    } catch (IllegalArgumentException | InvalidResourceNameException e) {
       String description = e.getLocalizedMessage();
-      responseObserver.onError(Status.INVALID_ARGUMENT
-          .withDescription(description)
-          .asException());
+      responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(description).asException());
     } catch (IOException e) {
       responseObserver.onError(Status.fromThrowable(e).asException());
     } catch (InterruptedException e) {
@@ -188,18 +174,17 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
 
     ResourceOperation resourceOperation = detectResourceOperation(resourceName);
     switch (resourceOperation) {
-    case UploadBlob:
-      return findBlobWrite(resourceName);
-    case OperationStream:
-    default:
-      throw Status.INVALID_ARGUMENT.asRuntimeException();
+      case UploadBlob:
+        return findBlobWrite(resourceName);
+      case OperationStream:
+      default:
+        throw Status.INVALID_ARGUMENT.asRuntimeException();
     }
   }
 
   @Override
   public void queryWriteStatus(
-      QueryWriteStatusRequest request,
-      StreamObserver<QueryWriteStatusResponse> responseObserver) {
+      QueryWriteStatusRequest request, StreamObserver<QueryWriteStatusResponse> responseObserver) {
     String resourceName = request.getResourceName();
 
     Write write;
@@ -207,9 +192,7 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
       write = findWrite(resourceName);
     } catch (InvalidResourceNameException e) {
       String description = e.getLocalizedMessage();
-      responseObserver.onError(Status.INVALID_ARGUMENT
-          .withDescription(description)
-          .asException());
+      responseObserver.onError(Status.INVALID_ARGUMENT.withDescription(description).asException());
       return;
     } catch (IOException e) {
       responseObserver.onError(Status.fromThrowable(e).asException());
@@ -220,28 +203,31 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
     }
 
     if (write != null) {
-      responseObserver.onNext(QueryWriteStatusResponse.newBuilder()
-          .setCommittedSize(write.getCommittedSize())
-          .setComplete(write.getComplete())
-          .build());
+      responseObserver.onNext(
+          QueryWriteStatusResponse.newBuilder()
+              .setCommittedSize(write.getCommittedSize())
+              .setComplete(write.getComplete())
+              .build());
       responseObserver.onCompleted();
     } else {
       responseObserver.onError(Status.NOT_FOUND.asException());
     }
   }
 
-  private WriteObserver createWriteObserver(String resourceName) throws InvalidResourceNameException {
+  private WriteObserver createWriteObserver(String resourceName)
+      throws InvalidResourceNameException {
     ResourceOperation resourceOperation = detectResourceOperation(resourceName);
     switch (resourceOperation) {
-    case UploadBlob:
-      return new BlobWriteObserver(resourceName, simpleBlobStore);
-    case OperationStream:
-    default:
-      throw Status.INVALID_ARGUMENT.asRuntimeException();
+      case UploadBlob:
+        return new BlobWriteObserver(resourceName, simpleBlobStore);
+      case OperationStream:
+      default:
+        throw Status.INVALID_ARGUMENT.asRuntimeException();
     }
   }
 
-  private WriteObserver getOrCreateWriteObserver(String resourceName) throws InvalidResourceNameException {
+  private WriteObserver getOrCreateWriteObserver(String resourceName)
+      throws InvalidResourceNameException {
     WriteObserver writeObserver = writeObservers.get(resourceName);
     if (writeObserver == null) {
       writeObserver = createWriteObserver(resourceName);
@@ -251,18 +237,19 @@ public class ByteStreamService extends ByteStreamGrpc.ByteStreamImplBase {
   }
 
   @Override
-  public StreamObserver<WriteRequest> write(
-      StreamObserver<WriteResponse> responseObserver) {
-    return new WriteStreamObserver(responseObserver, new WriteObserverSource() {
-      @Override
-      public WriteObserver get(String resourceName) throws InvalidResourceNameException {
-        return getOrCreateWriteObserver(resourceName);
-      }
+  public StreamObserver<WriteRequest> write(StreamObserver<WriteResponse> responseObserver) {
+    return new WriteStreamObserver(
+        responseObserver,
+        new WriteObserverSource() {
+          @Override
+          public WriteObserver get(String resourceName) throws InvalidResourceNameException {
+            return getOrCreateWriteObserver(resourceName);
+          }
 
-      @Override
-      public WriteObserver remove(String resourceName) {
-        return writeObservers.remove(resourceName);
-      }
-    });
+          @Override
+          public WriteObserver remove(String resourceName) {
+            return writeObservers.remove(resourceName);
+          }
+        });
   }
 }

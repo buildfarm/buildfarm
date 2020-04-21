@@ -27,6 +27,14 @@ service OperationQueue {
   rpc Poll(PollOperationRequest) returns (google.rpc.Status) {
     option (google.api.http) = { get: "/v1test/{instance_name=**}/operation:poll" };
   }
+
+  rpc Status(OperationsStatusRequest) returns (OperationsStatus) {
+    option (google.api.http) = { get: "/v1test/{instance_name=**}/operation:status" };
+  }
+}
+
+message OperationsStatusRequest {
+  string instance_name = 1;
 }
 
 message TakeOperationRequest {
@@ -252,6 +260,9 @@ message ShardWorkerConfig {
   // initial platform used to match operations
   build.bazel.remote.execution.v2.Platform platform = 14;
 
+  // default platform to populate matched commands
+  build.bazel.remote.execution.v2.Platform default_platform = 28;
+
   // total size of the inline content for
   // action results
   int32 inline_content_limit = 15;
@@ -286,6 +297,15 @@ message ShardWorkerConfig {
   // available execution policies, will be used to match
   // with an action's platform for selection
   repeated ExecutionPolicy execution_policies = 25;
+
+  // support any execution limiting, whether global or specified
+  bool limit_execution = 31;
+
+  // limit the available cores to execute_stage_width for unmetered execution if set
+  bool limit_global_execution = 29;
+
+  // only allow test executions to be multicore (min-cores > 1), limiting both to 1 if not a test
+  bool only_multicore_tests = 30;
 }
 
 message ShardWorker {
@@ -341,8 +361,6 @@ message DispatchedOperation {
   QueueEntry queue_entry = 1;
 
   int64 requeue_at = 2;
-
-  int64 expire_at = 3;
 }
 
 message ProfiledQueuedOperationMetadata {
@@ -385,6 +403,20 @@ message QueueEntry {
   build.bazel.remote.execution.v2.Platform platform = 3;
 }
 
+message QueueStatus {
+  int64 size = 1;
+
+  repeated int64 internal_sizes = 2;
+}
+
+message OperationsStatus {
+  QueueStatus prequeue = 1;
+
+  QueueStatus operation_queue = 2;
+
+  int64 dispatched_size = 3;
+}
+
 message QueuedOperationMetadata {
   build.bazel.remote.execution.v2.ExecuteOperationMetadata execute_operation_metadata = 1;
 
@@ -393,12 +425,25 @@ message QueuedOperationMetadata {
   build.bazel.remote.execution.v2.RequestMetadata request_metadata = 3;
 }
 
+// A `Tree` contains all the
+// [Directory][build.bazel.remote.execution.v2.Directory] protos in a
+// single directory Merkle tree, compressed into one message, with a map
+// to index the directories.
+message Tree {
+  // The digest of the root directory in the tree.
+  build.bazel.remote.execution.v2.Digest rootDigest = 1;
+
+  map<string, build.bazel.remote.execution.v2.Directory> directories = 2;
+}
+
 message QueuedOperation {
   build.bazel.remote.execution.v2.Action action = 1;
 
   build.bazel.remote.execution.v2.Command command = 2;
 
-  build.bazel.remote.execution.v2.Tree tree = 4;
+  build.bazel.remote.execution.v2.Tree legacy_tree = 4;
+
+  Tree tree = 5;
 }
 
 message ExecutingOperationMetadata {
@@ -417,6 +462,18 @@ message CompletedOperationMetadata {
   build.bazel.remote.execution.v2.RequestMetadata request_metadata = 2;
 
   reserved 3 to 8; // fields now in ExecutedActionMetadata
+}
+
+message OperationRequestMetadata {
+  string operation_name = 1;
+
+  bool done = 2;
+
+  build.bazel.remote.execution.v2.RequestMetadata request_metadata = 3;
+
+  build.bazel.remote.execution.v2.ExecuteOperationMetadata execute_operation_metadata = 4;
+
+  build.bazel.remote.execution.v2.ExecuteResponse execute_response = 5;
 }
 
 message InstanceConfig {
@@ -451,6 +508,8 @@ message InstanceEndpoint {
 
 message ExecutionWrapper {
   string path = 1;
+
+  repeated string arguments = 2;
 }
 
 // selectable controls for executions

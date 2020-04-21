@@ -20,5 +20,6 @@ import java.io.IOException;
 
 @FunctionalInterface
 interface OperationPoller {
-  boolean poll(QueueEntry queueEntry, ExecutionStage.Value stage, long requeueAt) throws IOException;
+  boolean poll(QueueEntry queueEntry, ExecutionStage.Value stage, long requeueAt)
+      throws IOException;
 }

@@ -18,6 +18,9 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
+import build.buildfarm.common.cache.AbstractCache.SimpleStatsCounter;
+import build.buildfarm.common.cache.AbstractCache.StatsCounter;
+import build.buildfarm.common.cache.LocalCache.Strength;
 import com.google.common.annotations.GwtCompatible;
 import com.google.common.annotations.GwtIncompatible;
 import com.google.common.base.Ascii;
@@ -26,9 +29,6 @@ import com.google.common.base.MoreObjects;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.base.Ticker;
-import build.buildfarm.common.cache.AbstractCache.SimpleStatsCounter;
-import build.buildfarm.common.cache.AbstractCache.StatsCounter;
-import build.buildfarm.common.cache.LocalCache.Strength;
 import com.google.errorprone.annotations.CheckReturnValue;
 import com.google.j2objc.annotations.J2ObjCIncompatible;
 import java.lang.ref.SoftReference;
@@ -56,7 +56,6 @@ import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
  *   <li>notification of evicted (or otherwise removed) entries
  *   <li>accumulation of cache access statistics
  * </ul>
- *
  *
  * <p>These features are all optional; caches can be created using all or none of them. By default
  * cache instances created by {@code CacheBuilder} will not perform any type of eviction.

@@ -24,18 +24,11 @@ import org.junit.runners.JUnit4;
 public class WorkerTest {
   @Test(expected = ConfigurationException.class)
   public void missingWorkerRoot() throws ConfigurationException {
-    new Worker(
-        "test",
-        ShardWorkerConfig.newBuilder()
-            .build());
+    new Worker("test", ShardWorkerConfig.newBuilder().build());
   }
 
   @Test(expected = ConfigurationException.class)
   public void missingCasCacheDirectory() throws ConfigurationException {
-    new Worker(
-        "test",
-        ShardWorkerConfig.newBuilder()
-            .setRoot("/")
-            .build());
+    new Worker("test", ShardWorkerConfig.newBuilder().setRoot("/").build());
   }
 }

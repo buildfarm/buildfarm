@@ -80,16 +80,8 @@ To attach a remote debugger, run the executable with the `--debug=<PORT>` flag. 
 ### Third-party Dependencies
 
 Most third-party dependencies (e.g. protobuf, gRPC, ...) are managed automatically via
-[bazel-deps](https://github.com/johnynek/bazel-deps). After changing the `dependencies.yaml` file,
-just run this to regenerate the 3rdparty folder:
+[rules_jvm_external](https://github.com/bazelbuild/rules_jvm_external). These dependencies are enumerated in
+the WORKSPACE with a `maven_install` `artifacts` parameter.
 
-```bash
-git clone https://github.com/johnynek/bazel-deps.git ../bazel-deps
-cd ../bazel-deps
-bazel build //src/scala/com/github/johnynek/bazel_deps:parseproject_deploy.jar
-cd ../bazel-buildfarm
-../bazel-deps/gen_maven_deps.sh generate -r `pwd` -s 3rdparty/workspace.bzl -d dependencies.yaml
-```
-
-Things that aren't supported by bazel-deps are being imported as manually managed remote repos via
+Things that aren't supported by `rules_jvm_external` are being imported as manually managed remote repos via
 the `WORKSPACE` file.

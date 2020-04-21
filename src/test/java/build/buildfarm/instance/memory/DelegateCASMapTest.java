@@ -30,8 +30,7 @@ import org.mockito.MockitoAnnotations;
 
 @RunWith(JUnit4.class)
 public class DelegateCASMapTest {
-  @Mock
-  private ContentAddressableStorage storage;
+  @Mock private ContentAddressableStorage storage;
 
   private final DigestUtil digestUtil = new DigestUtil(HashFunction.SHA256);
 

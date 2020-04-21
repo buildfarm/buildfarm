@@ -18,10 +18,12 @@ import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 import build.buildfarm.common.Write;
+import com.google.common.base.Preconditions;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 
 public class ByteStringWriteReader implements Runnable {
   private final InputStream input;
@@ -30,9 +32,13 @@ public class ByteStringWriteReader implements Runnable {
   private boolean completed;
   private IOException exception = null;
 
-  public ByteStringWriteReader(InputStream input, Write write) {
+  private final int dataLimit;
+
+  public ByteStringWriteReader(InputStream input, Write write, int dataLimit) {
     this.input = input;
     this.write = write;
+    this.dataLimit = dataLimit;
+    Preconditions.checkState(dataLimit > 0);
     completed = false;
   }
 
@@ -45,16 +51,31 @@ public class ByteStringWriteReader implements Runnable {
     try (OutputStream writeOut = write.getOutput(1, SECONDS, () -> {})) {
       while (!isComplete() && (len = input.read(buffer)) != -1) {
         if (len != 0) {
-          data.write(buffer, 0, len);
+          int dataLen = len;
+          int size = data.size();
+          if (size < dataLimit) {
+            if (size + dataLen > dataLimit) {
+              dataLen = dataLimit - size;
+            }
+            data.write(buffer, 0, len);
+            if (size + dataLen > dataLimit) {
+              new OutputStreamWriter(data).write("\nOutput truncated after exceeding limit.\n");
+            }
+          }
           writeOut.write(buffer, 0, len);
         }
       }
-    } catch(IOException e) {
-      exception = e;
+    } catch (IOException e) {
+      // ignore asynchronous stream closure, this fulfills our objective
+      // openjdk throws with the following copy when the process stderr/out
+      // streams are asynchronously closed on process termination.
+      if (!e.getMessage().equals("Stream closed")) {
+        exception = e;
+      }
     } finally {
       try {
         input.close();
-      } catch(IOException e) {
+      } catch (IOException e) {
         if (exception == null) {
           exception = e;
         } else {

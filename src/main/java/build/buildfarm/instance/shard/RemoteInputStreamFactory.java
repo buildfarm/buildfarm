@@ -20,18 +20,14 @@ import static com.google.common.util.concurrent.Futures.addCallback;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
-import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
-import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.ShardBackplane;
-import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.ShardInstance.WorkersCallback;
 import com.google.common.base.Throwables;
@@ -45,9 +41,9 @@ import com.google.common.util.concurrent.UncheckedExecutionException;
 import io.grpc.Status;
 import io.grpc.Status.Code;
 import io.grpc.StatusRuntimeException;
-import java.nio.file.NoSuchFileException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.NoSuchFileException;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
@@ -55,6 +51,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
 
@@ -96,7 +93,7 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
     try {
       return workerStubs.get(worker);
     } catch (ExecutionException e) {
-      logger.log(SEVERE, "error getting worker stub for " + worker, e);
+      logger.log(Level.SEVERE, String.format("error getting worker stub for %s", worker), e);
       throw new IllegalStateException("stub instance creation must not fail");
     }
   }
@@ -107,12 +104,15 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
       long offset,
       long deadlineAfter,
       TimeUnit deadlineAfterUnits,
-      RequestMetadata requestMetadata) throws IOException, InterruptedException {
+      RequestMetadata requestMetadata)
+      throws IOException, InterruptedException {
     String worker = workers.removeFirst();
     try {
       Instance instance = workerStub(worker);
 
-      InputStream input = instance.newBlobInput(blobDigest, offset, deadlineAfter, deadlineAfterUnits, requestMetadata);
+      InputStream input =
+          instance.newBlobInput(
+              blobDigest, offset, deadlineAfter, deadlineAfterUnits, requestMetadata);
       // ensure that if the blob cannot be fetched, that we throw here
       input.available();
       if (Thread.interrupted()) {
@@ -139,7 +139,8 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
   }
 
   @Override
-  public InputStream newInput(Digest blobDigest, long offset) throws IOException, InterruptedException {
+  public InputStream newInput(Digest blobDigest, long offset)
+      throws IOException, InterruptedException {
     return newInput(blobDigest, offset, 60, SECONDS, RequestMetadata.getDefaultInstance());
   }
 
@@ -158,10 +159,12 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
         remoteWorkers = workers;
       } else {
         synchronized (workers) {
-          remoteWorkers = Sets.difference(workers, ImmutableSet.<String>of(publicName)).immutableCopy();
+          remoteWorkers =
+              Sets.difference(workers, ImmutableSet.of(publicName)).immutableCopy();
         }
       }
-      locationSet = Sets.newHashSet(Sets.intersection(backplane.getBlobLocationSet(blobDigest), workers));
+      locationSet =
+          Sets.newHashSet(Sets.intersection(backplane.getBlobLocationSet(blobDigest), workers));
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }
@@ -173,13 +176,21 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
     boolean emptyWorkerList = workersList.isEmpty();
     final ListenableFuture<List<String>> populatedWorkerListFuture;
     if (emptyWorkerList) {
-      populatedWorkerListFuture = transform(
-          correctMissingBlob(backplane, remoteWorkers, locationSet, this::workerStub, blobDigest, newDirectExecutorService(), requestMetadata),
-          (foundOnWorkers) -> {
-            Iterables.addAll(workersList, foundOnWorkers);
-            return workersList;
-          },
-          directExecutor());
+      populatedWorkerListFuture =
+          transform(
+              correctMissingBlob(
+                  backplane,
+                  remoteWorkers,
+                  locationSet,
+                  this::workerStub,
+                  blobDigest,
+                  newDirectExecutorService(),
+                  requestMetadata),
+              (foundOnWorkers) -> {
+                Iterables.addAll(workersList, foundOnWorkers);
+                return workersList;
+              },
+              directExecutor());
     } else {
       populatedWorkerListFuture = immediateFuture(workersList);
     }
@@ -195,7 +206,14 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
             boolean complete = false;
             while (!complete && !workers.isEmpty()) {
               try {
-                inputStreamFuture.set(fetchBlobFromRemoteWorker(blobDigest, workers, offset, deadlineAfter, deadlineAfterUnits, requestMetadata));
+                inputStreamFuture.set(
+                    fetchBlobFromRemoteWorker(
+                        blobDigest,
+                        workers,
+                        offset,
+                        deadlineAfter,
+                        deadlineAfterUnits,
+                        requestMetadata));
                 complete = true;
               } catch (IOException e) {
                 if (workers.isEmpty()) {
@@ -204,15 +222,23 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
                     return;
                   }
                   triedCheck = true;
-    
+
                   workersList.clear();
-                  ListenableFuture<List<String>> checkedWorkerListFuture = transform(
-                      correctMissingBlob(backplane, remoteWorkers, locationSet, RemoteInputStreamFactory.this::workerStub, blobDigest, newDirectExecutorService(), requestMetadata),
-                      (foundOnWorkers) -> {
-                        Iterables.addAll(workersList, foundOnWorkers);
-                        return workersList;
-                      },
-                      directExecutor());
+                  ListenableFuture<List<String>> checkedWorkerListFuture =
+                      transform(
+                          correctMissingBlob(
+                              backplane,
+                              remoteWorkers,
+                              locationSet,
+                              RemoteInputStreamFactory.this::workerStub,
+                              blobDigest,
+                              newDirectExecutorService(),
+                              requestMetadata),
+                          (foundOnWorkers) -> {
+                            Iterables.addAll(workersList, foundOnWorkers);
+                            return workersList;
+                          },
+                          directExecutor());
                   addCallback(checkedWorkerListFuture, this, directExecutor());
                   complete = true;
                 }
@@ -227,7 +253,8 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
           public void onFailure(Throwable t) {
             Status status = Status.fromThrowable(t);
             if (status.getCode() == Code.NOT_FOUND) {
-              inputStreamFuture.setException(new NoSuchFileException(DigestUtil.toString(blobDigest)));
+              inputStreamFuture.setException(
+                  new NoSuchFileException(DigestUtil.toString(blobDigest)));
             } else {
               inputStreamFuture.setException(t);
             }

@@ -21,13 +21,12 @@ import static java.util.concurrent.TimeUnit.MICROSECONDS;
 
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
+import java.io.IOException;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.atomic.AtomicInteger;
 
 @RunWith(JUnit4.class)
 public class RingBufferInputStreamTest {
@@ -53,10 +52,12 @@ public class RingBufferInputStreamTest {
     AtomicInteger counter = new AtomicInteger();
 
     RingBufferInputStream buffer = new RingBufferInputStream(1);
-    ListenableFuture<Integer> readFuture = service.submit(() -> {
-      counter.getAndIncrement();
-      return buffer.read();
-    });
+    ListenableFuture<Integer> readFuture =
+        service.submit(
+            () -> {
+              counter.getAndIncrement();
+              return buffer.read();
+            });
     byte[] content = new byte[1];
     content[0] = 42;
     while (counter.get() != 1) {
@@ -78,11 +79,13 @@ public class RingBufferInputStreamTest {
     byte[] content = new byte[1];
     content[0] = 42;
     buffer.write(content); // buffer is now full
-    ListenableFuture<Void> writeFuture = service.submit(() -> {
-      counter.getAndIncrement();
-      buffer.write(content);
-      return null;
-    });
+    ListenableFuture<Void> writeFuture =
+        service.submit(
+            () -> {
+              counter.getAndIncrement();
+              buffer.write(content);
+              return null;
+            });
     while (counter.get() != 1) {
       MICROSECONDS.sleep(10);
     }
@@ -99,10 +102,12 @@ public class RingBufferInputStreamTest {
     AtomicInteger counter = new AtomicInteger();
 
     RingBufferInputStream buffer = new RingBufferInputStream(1);
-    ListenableFuture<Integer> readFuture = service.submit(() -> {
-      counter.getAndIncrement();
-      return buffer.read();
-    });
+    ListenableFuture<Integer> readFuture =
+        service.submit(
+            () -> {
+              counter.getAndIncrement();
+              return buffer.read();
+            });
     while (counter.get() != 1) {
       MICROSECONDS.sleep(10);
     }

@@ -20,19 +20,14 @@ import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static build.buildfarm.instance.Utils.putBlob;
 import static com.google.common.collect.Multimaps.synchronizedSetMultimap;
-import static com.google.common.util.concurrent.Futures.addCallback;
-import static com.google.common.util.concurrent.Futures.catching;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
-import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static java.lang.String.format;
 import static java.util.Collections.synchronizedSortedMap;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static java.util.logging.Level.SEVERE;
-import static java.util.logging.Level.WARNING;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
@@ -43,7 +38,6 @@ import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
-import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.ac.ActionCache;
 import build.buildfarm.ac.GrpcActionCache;
 import build.buildfarm.cas.ContentAddressableStorage;
@@ -58,32 +52,37 @@ import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.AbstractServerInstance;
+import build.buildfarm.instance.ExcessiveWriteSizeException;
 import build.buildfarm.instance.OperationsMap;
 import build.buildfarm.instance.WatchFuture;
+import build.buildfarm.instance.WorkerQueue;
+import build.buildfarm.instance.WorkerQueueConfigurations;
+import build.buildfarm.instance.WorkerQueues;
 import build.buildfarm.v1test.ActionCacheConfig;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.GrpcACConfig;
 import build.buildfarm.v1test.MemoryInstanceConfig;
 import build.buildfarm.v1test.OperationIteratorToken;
-import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueueEntry;
+import build.buildfarm.v1test.QueuedOperation;
+import build.buildfarm.v1test.OperationsStatus;
+import build.buildfarm.v1test.Tree;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.MultimapBuilder;
 import com.google.common.collect.SetMultimap;
 import com.google.common.io.BaseEncoding;
-import com.google.common.util.concurrent.AbstractFuture;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.longrunning.Operation;
@@ -94,14 +93,13 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.Durations;
 import com.google.rpc.PreconditionFailure;
 import io.grpc.Channel;
-import io.grpc.netty.NegotiationType;
-import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.Status;
 import io.grpc.Status.Code;
 import io.grpc.StatusException;
-import java.io.InputStream;
+import io.grpc.netty.NegotiationType;
+import io.grpc.netty.NettyChannelBuilder;
 import java.io.IOException;
-import java.util.ArrayList;
+import java.io.InputStream;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -113,8 +111,9 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Logger;
 import javax.annotation.Nullable;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class MemoryInstance extends AbstractServerInstance {
   private static final Logger logger = Logger.getLogger(MemoryInstance.class.getName());
@@ -124,52 +123,46 @@ public class MemoryInstance extends AbstractServerInstance {
 
   private final MemoryInstanceConfig config;
   private final SetMultimap<String, WatchFuture> watchers;
-  private final LoadingCache<String, ByteStringStreamSource> streams = CacheBuilder.newBuilder()
-      .expireAfterWrite(1, TimeUnit.HOURS)
-      .removalListener(new RemovalListener<String, ByteStringStreamSource>() {
-        @Override
-        public void onRemoval(RemovalNotification<String, ByteStringStreamSource> notification) {
-          try {
-            notification.getValue().getOutput().close();
-          } catch (IOException e) {
-            logger.log(SEVERE, "error closing stream source " + notification.getKey(), e);
-          }
-        }
-      })
-      .build(new CacheLoader<String, ByteStringStreamSource>() {
-        @Override
-        public ByteStringStreamSource load(String name) {
-          return newStreamSource(name);
-        }
-      });
-  private final List<Operation> queuedOperations = Lists.newArrayList();
-  private final List<Worker> workers;
+  private final LoadingCache<String, ByteStringStreamSource> streams =
+      CacheBuilder.newBuilder()
+          .expireAfterWrite(1, TimeUnit.HOURS)
+          .removalListener(
+              new RemovalListener<String, ByteStringStreamSource>() {
+                @Override
+                public void onRemoval(
+                    RemovalNotification<String, ByteStringStreamSource> notification) {
+                  try {
+                    notification.getValue().getOutput().close();
+                  } catch (IOException e) {
+                    logger.log(Level.SEVERE, format("error closing stream source %s", notification.getKey()), e);
+                  }
+                }
+              })
+          .build(
+              new CacheLoader<String, ByteStringStreamSource>() {
+                @Override
+                public ByteStringStreamSource load(String name) {
+                  return newStreamSource(name);
+                }
+              });
+
+  private final WorkerQueues queuedOperations = WorkerQueueConfigurations.gpuAndFallback();
+
   private final Map<String, Watchdog> requeuers;
   private final Map<String, Watchdog> operationTimeoutDelays;
   private final OperationsMap outstandingOperations;
   private final Executor watcherExecutor;
 
-  static final class Worker {
-    private final Platform platform;
-    private final MatchListener listener;
-
-    Worker(Platform platform, MatchListener listener) {
-      this.platform = platform;
-      this.listener = listener;
+  static SetMultimap<String, String> createProvisions(Platform platform) {
+    ImmutableSetMultimap.Builder<String, String> provisions = ImmutableSetMultimap.builder();
+    for (Platform.Property property : platform.getPropertiesList()) {
+      provisions.put(property.getName(), property.getValue());
     }
-
-    Platform getPlatform() {
-      return platform;
-    }
-
-    MatchListener getListener() {
-      return listener;
-    }
+    return provisions.build();
   }
 
   static class OutstandingOperations implements OperationsMap {
-    private final Map<String, Operation> map =
-        synchronizedSortedMap(new TreeMap<>());
+    private final Map<String, Operation> map = synchronizedSortedMap(new TreeMap<>());
 
     @Override
     public Operation remove(String name) {
@@ -204,10 +197,7 @@ public class MemoryInstance extends AbstractServerInstance {
         config,
         ContentAddressableStorages.create(config.getCasConfig()),
         /* watchers=*/ synchronizedSetMultimap(
-            MultimapBuilder
-                .hashKeys()
-                .hashSetValues(/* expectedValuesPerKey=*/ 1)
-                .build()),
+            MultimapBuilder.hashKeys().hashSetValues(/* expectedValuesPerKey=*/ 1).build()),
         /* watcherExecutor=*/ newCachedThreadPool(),
         new OutstandingOperations(),
         /* workers=*/ Lists.newArrayList(),
@@ -231,7 +221,8 @@ public class MemoryInstance extends AbstractServerInstance {
         name,
         digestUtil,
         contentAddressableStorage,
-        MemoryInstance.createActionCache(config.getActionCacheConfig(), contentAddressableStorage, digestUtil),
+        MemoryInstance.createActionCache(
+            config.getActionCacheConfig(), contentAddressableStorage, digestUtil),
         outstandingOperations,
         MemoryInstance.createCompletedOperationMap(contentAddressableStorage, digestUtil),
         /*activeBlobWrites=*/ new ConcurrentHashMap<Digest, ByteString>());
@@ -239,12 +230,15 @@ public class MemoryInstance extends AbstractServerInstance {
     this.watchers = watchers;
     this.outstandingOperations = outstandingOperations;
     this.watcherExecutor = watcherExecutor;
-    this.workers = workers;
     this.requeuers = requeuers;
     this.operationTimeoutDelays = operationTimeoutDelays;
+
+    // a default configuration for a GPU/fallback configuration
+    queuedOperations.AddWorkers("Other",workers);
   }
 
-  private static ActionCache createActionCache(ActionCacheConfig config, ContentAddressableStorage cas, DigestUtil digestUtil) {
+  private static ActionCache createActionCache(
+      ActionCacheConfig config, ContentAddressableStorage cas, DigestUtil digestUtil) {
     switch (config.getTypeCase()) {
       default:
       case TYPE_NOT_SET:
@@ -258,8 +252,7 @@ public class MemoryInstance extends AbstractServerInstance {
 
   private static Channel createChannel(String target) {
     NettyChannelBuilder builder =
-        NettyChannelBuilder.forTarget(target)
-            .negotiationType(NegotiationType.PLAINTEXT);
+        NettyChannelBuilder.forTarget(target).negotiationType(NegotiationType.PLAINTEXT);
     return builder.build();
   }
 
@@ -268,7 +261,8 @@ public class MemoryInstance extends AbstractServerInstance {
     return new GrpcActionCache(config.getInstanceName(), channel);
   }
 
-  private static ActionCache createDelegateCASActionCache(ContentAddressableStorage cas, DigestUtil digestUtil) {
+  private static ActionCache createDelegateCASActionCache(
+      ContentAddressableStorage cas, DigestUtil digestUtil) {
     return new ActionCache() {
       DelegateCASMap<ActionKey, ActionResult> map =
           new DelegateCASMap<>(cas, ActionResult.parser(), digestUtil);
@@ -285,7 +279,8 @@ public class MemoryInstance extends AbstractServerInstance {
     };
   }
 
-  private static OperationsMap createCompletedOperationMap(ContentAddressableStorage cas, DigestUtil digestUtil) {
+  private static OperationsMap createCompletedOperationMap(
+      ContentAddressableStorage cas, DigestUtil digestUtil) {
     return new OperationsMap() {
       DelegateCASMap<String, Operation> map =
           new DelegateCASMap<>(cas, Operation.parser(), digestUtil);
@@ -319,9 +314,7 @@ public class MemoryInstance extends AbstractServerInstance {
 
   ByteStringStreamSource newStreamSource(String name) {
     ByteStringStreamSource source = new ByteStringStreamSource();
-    source.getClosedFuture().addListener(
-        () -> streams.invalidate(name),
-        directExecutor());
+    source.getClosedFuture().addListener(() -> streams.invalidate(name), directExecutor());
     return source;
   }
 
@@ -349,9 +342,7 @@ public class MemoryInstance extends AbstractServerInstance {
 
       @Override
       public FeedbackOutputStream getOutput(
-          long deadlineAfter,
-          TimeUnit deadlineAfterUnits,
-          Runnable onReadyHandler) {
+          long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
         return getStreamSource(name).getOutput();
       }
 
@@ -373,7 +364,8 @@ public class MemoryInstance extends AbstractServerInstance {
       long offset,
       long deadlineAfter,
       TimeUnit deadlineAfterUnits,
-      RequestMetadata requestMetadata) throws IOException {
+      RequestMetadata requestMetadata)
+      throws IOException {
     InputStream in = getStreamSource(name).openStream();
     in.skip(offset);
     return in;
@@ -381,9 +373,11 @@ public class MemoryInstance extends AbstractServerInstance {
 
   @Override
   protected void enqueueOperation(Operation operation) {
-    synchronized (queuedOperations) {
-      Preconditions.checkState(!Iterables.any(queuedOperations, (queuedOperation) -> queuedOperation.getName().equals(operation.getName())));
-      queuedOperations.add(operation);
+
+    try {
+      queuedOperations.enqueueOperation(operation, getOperationProvisions(operation));
+    } catch (InterruptedException e) {
+      logger.log(Level.SEVERE, format("failed to enqueueOperation: %s", operation), e);
     }
   }
 
@@ -403,9 +397,8 @@ public class MemoryInstance extends AbstractServerInstance {
   protected Operation createOperation(ActionKey actionKey) {
     String name = createOperationName(UUID.randomUUID().toString());
 
-    ExecuteOperationMetadata metadata = ExecuteOperationMetadata.newBuilder()
-        .setActionDigest(actionKey.getDigest())
-        .build();
+    ExecuteOperationMetadata metadata =
+        ExecuteOperationMetadata.newBuilder().setActionDigest(actionKey.getDigest()).build();
 
     return Operation.newBuilder()
         .setName(name)
@@ -424,9 +417,11 @@ public class MemoryInstance extends AbstractServerInstance {
     if (action.hasTimeout() && config.hasMaximumActionTimeout()) {
       Duration timeout = action.getTimeout();
       Duration maximum = config.getMaximumActionTimeout();
-      if (timeout.getSeconds() > maximum.getSeconds() ||
-          (timeout.getSeconds() == maximum.getSeconds() && timeout.getNanos() > maximum.getNanos())) {
-        preconditionFailure.addViolationsBuilder()
+      if (timeout.getSeconds() > maximum.getSeconds()
+          || (timeout.getSeconds() == maximum.getSeconds()
+              && timeout.getNanos() > maximum.getNanos())) {
+        preconditionFailure
+            .addViolationsBuilder()
             .setType(VIOLATION_TYPE_INVALID)
             .setSubject(Durations.toString(timeout) + " > " + Durations.toString(maximum))
             .setDescription(TIMEOUT_OUT_OF_BOUNDS);
@@ -437,9 +432,7 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  public boolean pollOperation(
-      String operationName,
-      ExecutionStage.Value stage) {
+  public boolean pollOperation(String operationName, ExecutionStage.Value stage) {
     if (!super.pollOperation(operationName, stage)) {
       return false;
     }
@@ -452,27 +445,45 @@ public class MemoryInstance extends AbstractServerInstance {
     return true;
   }
 
-  private Action getActionForTimeoutMonitor(Operation operation, com.google.rpc.Status.Builder status) throws InterruptedException {
+  protected Action expectAction(Operation operation) throws InterruptedException {
+    try {
+      ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
+      if (metadata == null) {
+        return null;
+      }
+      ByteString actionBlob = getBlob(metadata.getActionDigest());
+      if (actionBlob != null) {
+        return Action.parseFrom(actionBlob);
+      }
+    } catch (IOException e) {
+      Status status = Status.fromThrowable(e);
+      if (status.getCode() != io.grpc.Status.Code.NOT_FOUND) {
+        logger.log(Level.SEVERE, "error retrieving action", e);
+      }
+    }
+    return null;
+  }
+
+  private Action getActionForTimeoutMonitor(
+      Operation operation, com.google.rpc.Status.Builder status) throws InterruptedException {
     Digest actionDigest = expectActionDigest(operation);
     if (actionDigest == null) {
-      logger.warning(format("Could not determine Action Digest for operation %s", operation.getName()));
-      String message = String.format(
-          "Could not determine Action Digest from Operation %s",
-          operation.getName());
-      status
-          .setCode(com.google.rpc.Code.INTERNAL.getNumber())
-          .setMessage(message);
+      logger.log(Level.WARNING,
+          format("Could not determine Action Digest for operation %s", operation.getName()));
+      String message =
+          String.format("Could not determine Action Digest from Operation %s", operation.getName());
+      status.setCode(com.google.rpc.Code.INTERNAL.getNumber()).setMessage(message);
       return null;
     }
     ByteString actionBlob = getBlob(actionDigest);
     if (actionBlob == null) {
-      logger.warning(
+      logger.log(Level.WARNING,
           format(
               "Action %s for operation %s went missing, cannot initiate execution monitoring",
-              DigestUtil.toString(actionDigest),
-              operation.getName()));
+              DigestUtil.toString(actionDigest), operation.getName()));
       PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
-      preconditionFailure.addViolationsBuilder()
+      preconditionFailure
+          .addViolationsBuilder()
           .setType(VIOLATION_TYPE_MISSING)
           .setSubject("blobs/" + DigestUtil.toString(actionDigest))
           .setDescription(MISSING_ACTION);
@@ -486,9 +497,14 @@ public class MemoryInstance extends AbstractServerInstance {
     try {
       return Action.parseFrom(actionBlob);
     } catch (InvalidProtocolBufferException e) {
-      logger.log(WARNING, format("Could not parse Action %s for Operation %s", DigestUtil.toString(actionDigest), operation.getName()), e);
+      logger.log(Level.WARNING,
+          format(
+              "Could not parse Action %s for Operation %s",
+              DigestUtil.toString(actionDigest), operation.getName()),
+          e);
       PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
-      preconditionFailure.addViolationsBuilder()
+      preconditionFailure
+          .addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
           .setSubject(INVALID_ACTION)
           .setDescription("Action " + DigestUtil.toString(actionDigest));
@@ -519,8 +535,7 @@ public class MemoryInstance extends AbstractServerInstance {
       if (requeuer != null) {
         requeuer.stop();
       }
-      Watchdog operationTimeoutDelay =
-          operationTimeoutDelays.remove(operationName);
+      Watchdog operationTimeoutDelay = operationTimeoutDelays.remove(operationName);
       if (operationTimeoutDelay != null) {
         operationTimeoutDelay.stop();
       }
@@ -535,8 +550,7 @@ public class MemoryInstance extends AbstractServerInstance {
         requeuer.stop();
       }
       // destroy action timed out failure
-      Watchdog operationTimeoutDelay =
-          operationTimeoutDelays.remove(operationName);
+      Watchdog operationTimeoutDelay = operationTimeoutDelays.remove(operationName);
       if (operationTimeoutDelay != null) {
         operationTimeoutDelay.stop();
       }
@@ -547,7 +561,7 @@ public class MemoryInstance extends AbstractServerInstance {
       } else if (isComplete(operation)) {
         operationStatus = "completed";
       }
-      logger.info(format("Operation %s was %s", operationName, operationStatus));
+      logger.log(Level.INFO, format("Operation %s was %s", operationName, operationStatus));
     } else if (isExecuting(operation)) {
       Watchdog requeuer = requeuers.get(operationName);
       if (requeuer == null) {
@@ -567,10 +581,7 @@ public class MemoryInstance extends AbstractServerInstance {
         // transition to execution without independent provision of action blob
         // or reconfiguration of operation metadata
         // force an immediate error completion of the operation
-        errorOperation(
-            operation,
-            RequestMetadata.getDefaultInstance(),
-            status.build());
+        errorOperation(operation, RequestMetadata.getDefaultInstance(), status.build());
         return false;
       }
       Duration actionTimeout = null;
@@ -581,19 +592,23 @@ public class MemoryInstance extends AbstractServerInstance {
       }
       if (actionTimeout != null) {
         Duration delay = config.getOperationCompletedDelay();
-        Duration timeout = Duration.newBuilder()
-            .setSeconds(actionTimeout.getSeconds() + delay.getSeconds())
-            .setNanos(actionTimeout.getNanos() + delay.getNanos())
-            .build();
+        Duration timeout =
+            Duration.newBuilder()
+                .setSeconds(actionTimeout.getSeconds() + delay.getSeconds())
+                .setNanos(actionTimeout.getNanos() + delay.getNanos())
+                .build();
         // this is an overuse of Watchdog, we will never pet it
-        Watchdog operationTimeoutDelay = new Watchdog(timeout, () -> {
-          operationTimeoutDelays.remove(operationName);
-          try {
-            expireOperation(operation);
-          } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-          }
-        });
+        Watchdog operationTimeoutDelay =
+            new Watchdog(
+                timeout,
+                () -> {
+                  operationTimeoutDelays.remove(operationName);
+                  try {
+                    expireOperation(operation);
+                  } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                  }
+                });
         operationTimeoutDelays.put(operationName, operationTimeoutDelay);
         new Thread(operationTimeoutDelay).start();
       }
@@ -604,12 +619,15 @@ public class MemoryInstance extends AbstractServerInstance {
   private void onDispatched(Operation operation) {
     final String operationName = operation.getName();
     Duration timeout = config.getOperationPollTimeout();
-    Watchdog requeuer = new Watchdog(timeout, () -> {
-      logger.info("REQUEUEING " + operationName);
-      requeuers.remove(operationName);
-      requeueOperation(operation);
-    });
-    requeuers.put(operationName, requeuer);
+    Watchdog requeuer =
+        new Watchdog(
+            timeout,
+            () -> {
+              logger.log(Level.INFO, format("REQUEUEING %s", operation.getName()));
+              requeuers.remove(operationName);
+              requeueOperation(operation);
+            });
+    requeuers.put(operation.getName(), requeuer);
     new Thread(requeuer).start();
   }
 
@@ -622,132 +640,172 @@ public class MemoryInstance extends AbstractServerInstance {
     return tree.build();
   }
 
-  // removes any instance of an existing listener in the workers list
-  private void removeWorker(MatchListener listener) {
-    synchronized (workers) {
-      Iterator<Worker> iter = workers.iterator();
-      while (iter.hasNext()) {
-        if (iter.next().getListener() == listener) {
-          iter.remove();
-        }
-      }
-    }
-  }
-
   @Override
   protected boolean matchOperation(Operation operation) throws InterruptedException {
     ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
     Preconditions.checkState(metadata != null, "metadata not found");
 
-    Action action = getUnchecked(expect(
-        metadata.getActionDigest(),
-        Action.parser(),
-        newDirectExecutorService(),
-        RequestMetadata.getDefaultInstance()));
+    Action action =
+        getUnchecked(
+            expect(
+                metadata.getActionDigest(),
+                Action.parser(),
+                newDirectExecutorService(),
+                RequestMetadata.getDefaultInstance()));
     Preconditions.checkState(action != null, "action not found");
 
-    Command command = getUnchecked(expect(
-        action.getCommandDigest(),
-        Command.parser(),
-        newDirectExecutorService(),
-        RequestMetadata.getDefaultInstance()));
+    Command command =
+        getUnchecked(
+            expect(
+                action.getCommandDigest(),
+                Command.parser(),
+                newDirectExecutorService(),
+                RequestMetadata.getDefaultInstance()));
     Preconditions.checkState(command != null, "command not found");
 
     Tree tree = getCompleteTree(action.getInputRootDigest());
 
-    QueuedOperation queuedOperation = QueuedOperation.newBuilder()
-        .setAction(action)
-        .setCommand(command)
-        .setTree(tree)
-        .build();
+    QueuedOperation queuedOperation =
+        QueuedOperation.newBuilder().setAction(action).setCommand(command).setTree(tree).build();
     ByteString queuedOperationBlob = queuedOperation.toByteString();
     Digest queuedOperationDigest = getDigestUtil().compute(queuedOperationBlob);
     String operationName = operation.getName();
     try {
-      putBlob(this, queuedOperationDigest, queuedOperationBlob, 60, SECONDS, RequestMetadata.getDefaultInstance());
-    } catch (StatusException|IOException e) {
-      logger.log(SEVERE, format("could not emplace queued operation: %s", operationName), e);
+      putBlob(
+          this,
+          queuedOperationDigest,
+          queuedOperationBlob,
+          60,
+          SECONDS,
+          RequestMetadata.getDefaultInstance());
+    } catch (StatusException | IOException | ExcessiveWriteSizeException e) {
+      logger.log(Level.SEVERE, format("could not emplace queued operation: %s", operationName), e);
       return false;
     }
 
     ImmutableList.Builder<Worker> rejectedWorkers = new ImmutableList.Builder<>();
     boolean dispatched = false;
-    synchronized (workers) {
-      while (!dispatched && !workers.isEmpty()) {
-        Worker worker = workers.remove(0);
-        if (!satisfiesRequirements(worker.getPlatform(), command.getPlatform())) {
+    WorkerQueue queue =
+        queuedOperations.MatchEligibleQueue(createProvisions(command.getPlatform()));
+    synchronized (queue.workers) {
+      while (!dispatched && !queue.workers.isEmpty()) {
+        Worker worker = queue.workers.remove(0);
+        if (!satisfiesRequirements(worker.getProvisions(), command.getPlatform())) {
           rejectedWorkers.add(worker);
         } else {
-          QueueEntry queueEntry = QueueEntry.newBuilder()
-              // FIXME find a way to get this properly populated...
-              .setExecuteEntry(ExecuteEntry.newBuilder()
-                  .setOperationName(operationName)
-                  .setActionDigest(metadata.getActionDigest())
-                  .setStdoutStreamName(metadata.getStdoutStreamName())
-                  .setStderrStreamName(metadata.getStderrStreamName()))
-              .setQueuedOperationDigest(queuedOperationDigest)
-              .setPlatform(command.getPlatform())
-              .build();
+          QueueEntry queueEntry =
+              QueueEntry.newBuilder()
+                  // FIXME find a way to get this properly populated...
+                  .setExecuteEntry(
+                      ExecuteEntry.newBuilder()
+                          .setOperationName(operationName)
+                          .setActionDigest(metadata.getActionDigest())
+                          .setStdoutStreamName(metadata.getStdoutStreamName())
+                          .setStderrStreamName(metadata.getStderrStreamName()))
+                  .setQueuedOperationDigest(queuedOperationDigest)
+                  .setPlatform(command.getPlatform())
+                  .build();
           dispatched = worker.getListener().onEntry(queueEntry);
           if (dispatched) {
             onDispatched(operation);
           }
         }
       }
-      Iterables.addAll(workers, rejectedWorkers.build());
+      Iterables.addAll(queue.workers, rejectedWorkers.build());
     }
     return dispatched;
   }
 
-  private void matchSynchronized(
-      Platform platform,
-      MatchListener listener) throws InterruptedException {
+  private SetMultimap<String, String> getOperationProvisions(Operation operation)
+      throws InterruptedException {
+
+    ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
+    Preconditions.checkState(metadata != null, "metadata not found");
+
+    Action action =
+        getUnchecked(
+            expect(
+                metadata.getActionDigest(),
+                Action.parser(),
+                newDirectExecutorService(),
+                RequestMetadata.getDefaultInstance()));
+    Preconditions.checkState(action != null, "action not found");
+
+    Command command =
+        getUnchecked(
+            expect(
+                action.getCommandDigest(),
+                Command.parser(),
+                newDirectExecutorService(),
+                RequestMetadata.getDefaultInstance()));
+    Preconditions.checkState(command != null, "command not found");
+
+    return createProvisions(command.getPlatform());
+  }
+
+  private void matchSynchronized(Platform platform, MatchListener listener)
+      throws InterruptedException {
     ImmutableList.Builder<Operation> rejectedOperations = ImmutableList.builder();
     boolean matched = false;
-    while (!matched && !queuedOperations.isEmpty()) {
-      Operation operation = queuedOperations.remove(0);
+    SetMultimap<String, String> provisions = createProvisions(platform);
+    WorkerQueue queue = queuedOperations.MatchEligibleQueue(provisions);
+    while (!matched && !queue.operations.isEmpty()) {
+      Operation operation = queue.operations.remove(0);
       ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
       Preconditions.checkState(metadata != null, "metadata not found");
 
-      Action action = getUnchecked(expect(
-          metadata.getActionDigest(),
-          Action.parser(),
-          newDirectExecutorService(),
-          RequestMetadata.getDefaultInstance()));
+      Action action =
+          getUnchecked(
+              expect(
+                  metadata.getActionDigest(),
+                  Action.parser(),
+                  newDirectExecutorService(),
+                  RequestMetadata.getDefaultInstance()));
       Preconditions.checkState(action != null, "action not found");
 
-      Command command = getUnchecked(expect(
-          action.getCommandDigest(),
-          Command.parser(),
-          newDirectExecutorService(),
-          RequestMetadata.getDefaultInstance()));
+      Command command =
+          getUnchecked(
+              expect(
+                  action.getCommandDigest(),
+                  Command.parser(),
+                  newDirectExecutorService(),
+                  RequestMetadata.getDefaultInstance()));
       Preconditions.checkState(command != null, "command not found");
 
       String operationName = operation.getName();
       if (command == null) {
         cancelOperation(operationName);
-      } else if (satisfiesRequirements(platform, command.getPlatform())) {
-        QueuedOperation queuedOperation = QueuedOperation.newBuilder()
-            .setAction(action)
-            .setCommand(command)
-            .setTree(getCompleteTree(action.getInputRootDigest()))
-            .build();
+      } else if (satisfiesRequirements(provisions, command.getPlatform())) {
+        QueuedOperation queuedOperation =
+            QueuedOperation.newBuilder()
+                .setAction(action)
+                .setCommand(command)
+                .setTree(getCompleteTree(action.getInputRootDigest()))
+                .build();
         ByteString queuedOperationBlob = queuedOperation.toByteString();
         Digest queuedOperationDigest = getDigestUtil().compute(queuedOperationBlob);
         // maybe do this elsewhere
         try {
-          putBlob(this, queuedOperationDigest, queuedOperationBlob, 60, SECONDS, RequestMetadata.getDefaultInstance());
+          putBlob(
+              this,
+              queuedOperationDigest,
+              queuedOperationBlob,
+              60,
+              SECONDS,
+              RequestMetadata.getDefaultInstance());
 
-          QueueEntry queueEntry = QueueEntry.newBuilder()
-              // FIXME find a way to get this properly populated...
-              .setExecuteEntry(ExecuteEntry.newBuilder()
-                  .setOperationName(operationName)
-                  .setActionDigest(metadata.getActionDigest())
-                  .setStdoutStreamName(metadata.getStdoutStreamName())
-                  .setStderrStreamName(metadata.getStderrStreamName()))
-              .setQueuedOperationDigest(queuedOperationDigest)
-              .setPlatform(command.getPlatform())
-              .build();
+          QueueEntry queueEntry =
+              QueueEntry.newBuilder()
+                  // FIXME find a way to get this properly populated...
+                  .setExecuteEntry(
+                      ExecuteEntry.newBuilder()
+                          .setOperationName(operationName)
+                          .setActionDigest(metadata.getActionDigest())
+                          .setStdoutStreamName(metadata.getStdoutStreamName())
+                          .setStderrStreamName(metadata.getStderrStreamName()))
+                  .setQueuedOperationDigest(queuedOperationDigest)
+                  .setPlatform(command.getPlatform())
+                  .build();
 
           matched = true;
           if (listener.onEntry(queueEntry)) {
@@ -755,8 +813,8 @@ public class MemoryInstance extends AbstractServerInstance {
           } else {
             enqueueOperation(operation);
           }
-        } catch (StatusException|IOException e) {
-          logger.log(SEVERE, format("could not emplace queued operation: %s", operationName), e);
+        } catch (StatusException | IOException | ExcessiveWriteSizeException e) {
+          logger.log(Level.SEVERE, format("could not emplace queued operation: %s", operationName), e);
         }
       } else {
         rejectedOperations.add(operation);
@@ -766,25 +824,29 @@ public class MemoryInstance extends AbstractServerInstance {
       requeueOperation(operation);
     }
     if (!matched) {
-      synchronized(workers) {
-        listener.setOnCancelHandler(() -> removeWorker(listener));
+      synchronized (queue.workers) {
+        listener.setOnCancelHandler(() -> queuedOperations.removeWorker(listener));
         listener.onWaitStart();
-        workers.add(new Worker(platform, listener));
+        queuedOperations.AddWorker(provisions, listener);
       }
     }
   }
 
   @Override
   public void match(Platform platform, MatchListener listener) throws InterruptedException {
-    synchronized (queuedOperations) {
+    WorkerQueue queue = queuedOperations.MatchEligibleQueue(createProvisions(platform));
+    synchronized (queue.operations) {
       matchSynchronized(platform, listener);
     }
   }
+  
+  @Override
+  public OperationsStatus operationsStatus() {
+    throw new UnsupportedOperationException();
+  }
 
   @Override
-  public ListenableFuture<Void> watchOperation(
-      String operationName,
-      Watcher watcher) {
+  public ListenableFuture<Void> watchOperation(String operationName, Watcher watcher) {
     Operation operation = getOperation(operationName);
     try {
       watcher.observe(operation);
@@ -794,14 +856,15 @@ public class MemoryInstance extends AbstractServerInstance {
     if (operation == null || operation.getDone()) {
       return immediateFuture(null);
     }
-    WatchFuture watchFuture = new WatchFuture(watcher) {
-      @Override
-      protected void unwatch() {
-        synchronized (watchers) {
-          watchers.remove(operationName, this);
-        }
-      }
-    };
+    WatchFuture watchFuture =
+        new WatchFuture(watcher) {
+          @Override
+          protected void unwatch() {
+            synchronized (watchers) {
+              watchers.remove(operationName, this);
+            }
+          }
+        };
     synchronized (watchers) {
       watchers.put(operationName, watchFuture);
     }
@@ -838,30 +901,33 @@ public class MemoryInstance extends AbstractServerInstance {
       String reason, Digest rootDigest, String pageToken) {
     ExecutorService service = newDirectExecutorService();
     return new TreeIterator(
-        (digest) -> catching(
-          expect(digest, Directory.parser(), service, RequestMetadata.getDefaultInstance()),
-          Exception.class,
-          (e) -> {
+        (digest) -> {
+          try {
+            return expect(digest, Directory.parser(), service, RequestMetadata.getDefaultInstance())
+                .get();
+          } catch (ExecutionException e) {
+            // should we have a special exception for our not found blob?
             Status status = Status.fromThrowable(e);
             if (status.getCode() != Code.NOT_FOUND) {
-              logger.log(SEVERE, "error fetching directory", e);
+              logger.log(Level.SEVERE, "error fetching directory", e);
             }
             return null;
-          },
-          service),
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return null;
+          }
+        },
         rootDigest,
         pageToken);
   }
 
   @Override
-  protected TokenizableIterator<Operation> createOperationsIterator(
-      String pageToken) {
+  protected TokenizableIterator<Operation> createOperationsIterator(String pageToken) {
     Iterator<Operation> iter = outstandingOperations.iterator();
     final OperationIteratorToken token;
     if (!pageToken.isEmpty()) {
       try {
-        token = OperationIteratorToken.parseFrom(
-            BaseEncoding.base64().decode(pageToken));
+        token = OperationIteratorToken.parseFrom(BaseEncoding.base64().decode(pageToken));
       } catch (InvalidProtocolBufferException e) {
         throw new IllegalArgumentException();
       }
@@ -883,9 +949,8 @@ public class MemoryInstance extends AbstractServerInstance {
       @Override
       public Operation next() {
         Operation operation = iter.next();
-        nextToken = OperationIteratorToken.newBuilder()
-            .setOperationName(operation.getName())
-            .build();
+        nextToken =
+            OperationIteratorToken.newBuilder().setOperationName(operation.getName()).build();
         return operation;
       }
 
@@ -901,9 +966,7 @@ public class MemoryInstance extends AbstractServerInstance {
 
   @Override
   protected Object operationLock(String name) {
-    /**
-     * simple instance-wide locking on the completed operations
-     */
+    /** simple instance-wide locking on the completed operations */
     return completedOperations;
   }
 

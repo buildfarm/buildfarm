@@ -17,14 +17,13 @@ package build.buildfarm.server;
 import static build.buildfarm.common.DigestUtil.HashFunction.SHA256;
 import static build.buildfarm.server.ByteStreamService.CHUNK_SIZE;
 import static com.google.common.truth.Truth.assertThat;
-import static org.mockito.AdditionalAnswers.answerVoid;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.mockito.AdditionalAnswers.answerVoid;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -36,17 +35,16 @@ import build.buildfarm.common.Write;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.ByteStreamUploader;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
-import com.google.common.hash.HashCode;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.SettableFuture;
 import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamStub;
 import com.google.bytestream.ByteStreamProto.ReadRequest;
 import com.google.bytestream.ByteStreamProto.ReadResponse;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+import com.google.common.hash.HashCode;
+import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
 import io.grpc.Channel;
 import io.grpc.Server;
@@ -58,7 +56,6 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import org.junit.After;
@@ -79,8 +76,7 @@ public class ByteStreamServiceTest {
   private Server fakeServer;
   private String fakeServerName;
 
-  @Mock
-  private Instances instances;
+  @Mock private Instances instances;
 
   @Before
   public void setUp() throws Exception {
@@ -109,58 +105,70 @@ public class ByteStreamServiceTest {
 
     SettableFuture<ByteString> writtenFuture = SettableFuture.create();
     ByteString.Output output = ByteString.newOutput((int) digest.getSizeBytes());
-    FeedbackOutputStream out = new FeedbackOutputStream() {
-      @Override
-      public void close() {
-        if (output.size() == digest.getSizeBytes()) {
-          writtenFuture.set(output.toByteString());
-        }
-      }
+    FeedbackOutputStream out =
+        new FeedbackOutputStream() {
+          @Override
+          public void close() {
+            if (output.size() == digest.getSizeBytes()) {
+              writtenFuture.set(output.toByteString());
+            }
+          }
 
-      @Override
-      public void flush() throws IOException {
-        output.flush();
-      }
+          @Override
+          public void flush() throws IOException {
+            output.flush();
+          }
 
-      @Override
-      public void write(byte[] b) throws IOException {
-        output.write(b);
-      }
+          @Override
+          public void write(byte[] b) throws IOException {
+            output.write(b);
+          }
 
-      @Override
-      public void write(byte[] b, int off, int len) throws IOException {
-        output.write(b, off, len);
-      }
+          @Override
+          public void write(byte[] b, int off, int len) throws IOException {
+            output.write(b, off, len);
+          }
 
-      @Override
-      public void write(int b) throws IOException {
-        output.write(b);
-      }
+          @Override
+          public void write(int b) throws IOException {
+            output.write(b);
+          }
 
-      @Override
-      public boolean isReady() {
-        return true;
-      }
-    };
+          @Override
+          public boolean isReady() {
+            return true;
+          }
+        };
 
     Write write = mock(Write.class);
-    doAnswer(new Answer<Void>() {
-      @Override
-      public Void answer(InvocationOnMock invocation) {
-        output.reset();
-        return null;
-      }
-    }).when(write).reset();
-    when(write.getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class))).thenReturn(out);
+    doAnswer(
+            new Answer<Void>() {
+              @Override
+              public Void answer(InvocationOnMock invocation) {
+                output.reset();
+                return null;
+              }
+            })
+        .when(write)
+        .reset();
+    when(write.getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class)))
+        .thenReturn(out);
     doAnswer(invocation -> (long) output.size()).when(write).getCommittedSize();
-    doAnswer(answerVoid((Runnable listener, Executor executor) -> writtenFuture.addListener(listener, executor)))
-        .when(write).addListener(any(Runnable.class), any(Executor.class));
+    doAnswer(
+            answerVoid(
+                (Runnable listener, Executor executor) ->
+                    writtenFuture.addListener(listener, executor)))
+        .when(write)
+        .addListener(any(Runnable.class), any(Executor.class));
 
     Instance instance = mock(Instance.class);
-    when(instance.getBlobWrite(digest, uuid, RequestMetadata.getDefaultInstance())).thenReturn(write);
+    when(instance.getBlobWrite(digest, uuid, RequestMetadata.getDefaultInstance()))
+        .thenReturn(write);
 
     HashCode hash = HashCode.fromString(digest.getHash());
-    String resourceName = ByteStreamUploader.uploadResourceName(/* instanceName=*/ null, uuid, hash, digest.getSizeBytes());
+    String resourceName =
+        ByteStreamUploader.uploadResourceName(
+            /* instanceName=*/ null, uuid, hash, digest.getSizeBytes());
     when(instances.getFromUploadBlob(eq(resourceName))).thenReturn(instance);
 
     Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
@@ -169,22 +177,20 @@ public class ByteStreamServiceTest {
     StreamObserver<WriteRequest> requestObserver = service.write(futureResponder);
 
     ByteString shortContent = content.substring(0, 6);
-    requestObserver.onNext(WriteRequest.newBuilder()
-        .setWriteOffset(0)
-        .setResourceName(resourceName)
-        .setData(shortContent)
-        .build());
-    requestObserver.onNext(WriteRequest.newBuilder()
-        .setWriteOffset(0)
-        .setData(content)
-        .setFinishWrite(true)
-        .build());
-    assertThat(futureResponder.get()).isEqualTo(WriteResponse.newBuilder()
-        .setCommittedSize(content.size())
-        .build());
+    requestObserver.onNext(
+        WriteRequest.newBuilder()
+            .setWriteOffset(0)
+            .setResourceName(resourceName)
+            .setData(shortContent)
+            .build());
+    requestObserver.onNext(
+        WriteRequest.newBuilder().setWriteOffset(0).setData(content).setFinishWrite(true).build());
+    assertThat(futureResponder.get())
+        .isEqualTo(WriteResponse.newBuilder().setCommittedSize(content.size()).build());
     requestObserver.onCompleted();
     verify(write, atLeastOnce()).getCommittedSize();
-    verify(write, atLeastOnce()).getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class));
+    verify(write, atLeastOnce())
+        .getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class));
     verify(write, times(1)).reset();
     verify(write, times(1)).addListener(any(Runnable.class), any(Executor.class));
   }
@@ -197,41 +203,50 @@ public class ByteStreamServiceTest {
 
     SettableFuture<ByteString> writtenFuture = SettableFuture.create();
     ByteString.Output output = ByteString.newOutput((int) digest.getSizeBytes());
-    FeedbackOutputStream out = new FeedbackOutputStream() {
-      @Override
-      public void close() {
-        if (output.size() == digest.getSizeBytes()) {
-          writtenFuture.set(output.toByteString());
-        }
-      }
+    FeedbackOutputStream out =
+        new FeedbackOutputStream() {
+          @Override
+          public void close() {
+            if (output.size() == digest.getSizeBytes()) {
+              writtenFuture.set(output.toByteString());
+            }
+          }
 
-      @Override
-      public void write(byte[] b, int off, int len) {
-        output.write(b, off, len);
-      }
+          @Override
+          public void write(byte[] b, int off, int len) {
+            output.write(b, off, len);
+          }
 
-      @Override
-      public void write(int b) {
-        output.write(b);
-      }
+          @Override
+          public void write(int b) {
+            output.write(b);
+          }
 
-      @Override
-      public boolean isReady() {
-        return true;
-      }
-    };
+          @Override
+          public boolean isReady() {
+            return true;
+          }
+        };
 
     Write write = mock(Write.class);
-    when(write.getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class))).thenReturn(out);
+    when(write.getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class)))
+        .thenReturn(out);
     doAnswer(invocation -> (long) output.size()).when(write).getCommittedSize();
-    doAnswer(answerVoid((Runnable listener, Executor executor) -> writtenFuture.addListener(listener, executor)))
-        .when(write).addListener(any(Runnable.class), any(Executor.class));
+    doAnswer(
+            answerVoid(
+                (Runnable listener, Executor executor) ->
+                    writtenFuture.addListener(listener, executor)))
+        .when(write)
+        .addListener(any(Runnable.class), any(Executor.class));
 
     Instance instance = mock(Instance.class);
-    when(instance.getBlobWrite(digest, uuid, RequestMetadata.getDefaultInstance())).thenReturn(write);
+    when(instance.getBlobWrite(digest, uuid, RequestMetadata.getDefaultInstance()))
+        .thenReturn(write);
 
     HashCode hash = HashCode.fromString(digest.getHash());
-    String resourceName = ByteStreamUploader.uploadResourceName(/* instanceName=*/ null, uuid, hash, digest.getSizeBytes());
+    String resourceName =
+        ByteStreamUploader.uploadResourceName(
+            /* instanceName=*/ null, uuid, hash, digest.getSizeBytes());
     when(instances.getFromUploadBlob(eq(resourceName))).thenReturn(instance);
 
     Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
@@ -240,28 +255,30 @@ public class ByteStreamServiceTest {
     FutureWriteResponseObserver futureResponder = new FutureWriteResponseObserver();
     StreamObserver<WriteRequest> requestObserver = service.write(futureResponder);
     ByteString shortContent = content.substring(0, 6);
-    requestObserver.onNext(WriteRequest.newBuilder()
-        .setWriteOffset(0)
-        .setResourceName(resourceName)
-        .setData(shortContent)
-        .build());
+    requestObserver.onNext(
+        WriteRequest.newBuilder()
+            .setWriteOffset(0)
+            .setResourceName(resourceName)
+            .setData(shortContent)
+            .build());
     requestObserver.onError(Status.CANCELLED.asException());
     assertThat(futureResponder.isDone()).isTrue(); // should be done
 
     futureResponder = new FutureWriteResponseObserver();
     requestObserver = service.write(futureResponder);
-    requestObserver.onNext(WriteRequest.newBuilder()
-        .setWriteOffset(6)
-        .setResourceName(resourceName)
-        .setData(content.substring(6))
-        .setFinishWrite(true)
-        .build());
-    assertThat(futureResponder.get()).isEqualTo(WriteResponse.newBuilder()
-        .setCommittedSize(content.size())
-        .build());
+    requestObserver.onNext(
+        WriteRequest.newBuilder()
+            .setWriteOffset(6)
+            .setResourceName(resourceName)
+            .setData(content.substring(6))
+            .setFinishWrite(true)
+            .build());
+    assertThat(futureResponder.get())
+        .isEqualTo(WriteResponse.newBuilder().setCommittedSize(content.size()).build());
     requestObserver.onCompleted();
     verify(write, atLeastOnce()).getCommittedSize();
-    verify(write, atLeastOnce()).getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class));
+    verify(write, atLeastOnce())
+        .getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class));
     verify(write, times(2)).addListener(any(Runnable.class), any(Executor.class));
   }
 
@@ -309,7 +326,9 @@ public class ByteStreamServiceTest {
     // pick a large chunk size
     long size = CHUNK_SIZE * 10 + CHUNK_SIZE - 47;
     ByteString content;
-    try (ByteString.Output out = ByteString.newOutput(ByteStreamService.CHUNK_SIZE * 10 + ByteStreamService.CHUNK_SIZE - 47)) {
+    try (ByteString.Output out =
+        ByteString.newOutput(
+            ByteStreamService.CHUNK_SIZE * 10 + ByteStreamService.CHUNK_SIZE - 47)) {
       for (long i = 0; i < size; i++) {
         out.write((int) (i & 0xff));
       }
@@ -317,29 +336,31 @@ public class ByteStreamServiceTest {
     }
     Digest digest = DIGEST_UTIL.compute(content);
     String resourceName = "blobs/" + DigestUtil.toString(digest);
-    ReadRequest request = ReadRequest.newBuilder()
-        .setResourceName(resourceName)
-        .build();
+    ReadRequest request = ReadRequest.newBuilder().setResourceName(resourceName).build();
 
     Instance instance = mock(Instance.class);
     when(instances.getFromBlob(eq(resourceName))).thenReturn(instance);
-    doAnswer(answerVoid((blobDigest, offset, limit, chunkObserver, metadata) -> {})).when(instance).getBlob(
-        eq(digest),
-        eq(request.getReadOffset()),
-        eq((long) content.size()),
-        any(ServerCallStreamObserver.class),
-        eq(RequestMetadata.getDefaultInstance()));
+    doAnswer(answerVoid((blobDigest, offset, limit, chunkObserver, metadata) -> {}))
+        .when(instance)
+        .getBlob(
+            eq(digest),
+            eq(request.getReadOffset()),
+            eq((long) content.size()),
+            any(ServerCallStreamObserver.class),
+            eq(RequestMetadata.getDefaultInstance()));
     Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
     ByteStreamStub service = ByteStreamGrpc.newStub(channel);
     CountingReadObserver readObserver = new CountingReadObserver();
     service.read(request, readObserver);
-    ArgumentCaptor<ServerCallStreamObserver<ByteString>> observerCaptor = ArgumentCaptor.forClass(ServerCallStreamObserver.class);
-    verify(instance, times(1)).getBlob(
-        eq(digest),
-        eq(request.getReadOffset()),
-        eq((long) content.size()),
-        observerCaptor.capture(),
-        eq(RequestMetadata.getDefaultInstance()));
+    ArgumentCaptor<ServerCallStreamObserver<ByteString>> observerCaptor =
+        ArgumentCaptor.forClass(ServerCallStreamObserver.class);
+    verify(instance, times(1))
+        .getBlob(
+            eq(digest),
+            eq(request.getReadOffset()),
+            eq((long) content.size()),
+            observerCaptor.capture(),
+            eq(RequestMetadata.getDefaultInstance()));
 
     StreamObserver<ByteString> responseObserver = observerCaptor.getValue();
     // supply entire content

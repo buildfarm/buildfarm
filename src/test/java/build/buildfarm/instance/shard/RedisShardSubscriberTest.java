@@ -22,8 +22,8 @@ import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static redis.clients.jedis.Protocol.Keyword.SUBSCRIBE;
 import static redis.clients.jedis.Protocol.Keyword.UNSUBSCRIBE;
 
@@ -32,9 +32,8 @@ import build.buildfarm.v1test.OperationChange;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.ListMultimap;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Multimaps;
 import com.google.common.collect.MultimapBuilder;
+import com.google.common.collect.Multimaps;
 import com.google.common.collect.Sets;
 import com.google.longrunning.Operation;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -87,7 +86,8 @@ public class RedisShardSubscriberTest {
     public void subscribe(String... channels) {
       for (String channel : channels) {
         if (subscriptions.add(channel)) {
-          pendingReplies.add(ImmutableList.of(SUBSCRIBE.raw, channel.getBytes(), (long) subscriptions.size()));
+          pendingReplies.add(
+              ImmutableList.of(SUBSCRIBE.raw, channel.getBytes(), (long) subscriptions.size()));
         } else {
           throw new IllegalStateException("subscribe to already subscribed channel: " + channel);
         }
@@ -107,7 +107,8 @@ public class RedisShardSubscriberTest {
     public void unsubscribe(String... channels) {
       for (String channel : channels) {
         if (subscriptions.remove(channel)) {
-          pendingReplies.add(ImmutableList.of(UNSUBSCRIBE.raw, channel.getBytes(), (long) subscriptions.size()));
+          pendingReplies.add(
+              ImmutableList.of(UNSUBSCRIBE.raw, channel.getBytes(), (long) subscriptions.size()));
         } else {
           throw new IllegalStateException("unsubscribe from unknown channel: " + channel);
         }
@@ -121,8 +122,7 @@ public class RedisShardSubscriberTest {
   };
 
   RedisShardSubscriber createSubscriber(
-      ListMultimap<String, TimedWatchFuture> watchers,
-      Executor executor) {
+      ListMultimap<String, TimedWatchFuture> watchers, Executor executor) {
     return new RedisShardSubscriber(watchers, /* workers=*/ null, "worker-channel", executor);
   }
 
@@ -147,7 +147,8 @@ public class RedisShardSubscriberTest {
     String novelChannel = "novel-channel";
     TimedWatcher novelWatcher = new UnobservableWatcher();
     operationSubscriber.watch(novelChannel, novelWatcher);
-    assertThat(Iterables.getOnlyElement(watchers.get(novelChannel)).getWatcher()).isEqualTo(novelWatcher);
+    assertThat(Iterables.getOnlyElement(watchers.get(novelChannel)).getWatcher())
+        .isEqualTo(novelWatcher);
     String[] channels = new String[1];
     channels[0] = novelChannel;
     assertThat(testClient.getSubscriptions()).contains(novelChannel);
@@ -187,17 +188,20 @@ public class RedisShardSubscriberTest {
 
     String expiredChannel = "channel-with-expired-watcher";
     watchers.put(expiredChannel, new LidlessTimedWatchFuture(expiredWatcher));
-    assertThat(operationSubscriber.expiredWatchedOperationChannels(now)).containsExactly(expiredChannel);
+    assertThat(operationSubscriber.expiredWatchedOperationChannels(now))
+        .containsExactly(expiredChannel);
 
     String mixedChannel = "channel-with-some-expired-watchers";
     watchers.put(mixedChannel, new LidlessTimedWatchFuture(unexpiredWatcher));
     watchers.put(mixedChannel, new LidlessTimedWatchFuture(expiredWatcher));
     watchers.put(mixedChannel, new LidlessTimedWatchFuture(expiredWatcher));
     watchers.put(mixedChannel, new LidlessTimedWatchFuture(unexpiredWatcher));
-    assertThat(operationSubscriber.expiredWatchedOperationChannels(now)).containsExactly(expiredChannel, mixedChannel);
+    assertThat(operationSubscriber.expiredWatchedOperationChannels(now))
+        .containsExactly(expiredChannel, mixedChannel);
 
     watchers.removeAll(expiredChannel);
-    assertThat(operationSubscriber.expiredWatchedOperationChannels(now)).containsExactly(mixedChannel);
+    assertThat(operationSubscriber.expiredWatchedOperationChannels(now))
+        .containsExactly(mixedChannel);
 
     watchers.removeAll(mixedChannel);
     assertThat(operationSubscriber.expiredWatchedOperationChannels(now)).isEmpty();
@@ -217,7 +221,8 @@ public class RedisShardSubscriberTest {
   }
 
   @Test
-  public void doneResetOperationIsObservedAndUnsubscribed() throws InterruptedException, InvalidProtocolBufferException {
+  public void doneResetOperationIsObservedAndUnsubscribed()
+      throws InterruptedException, InvalidProtocolBufferException {
     ListMultimap<String, TimedWatchFuture> watchers =
         Multimaps.<String, TimedWatchFuture>synchronizedListMultimap(
             MultimapBuilder.linkedHashKeys().arrayListValues().build());
@@ -232,24 +237,25 @@ public class RedisShardSubscriberTest {
 
     String doneMessageChannel = "done-message-channel";
     AtomicBoolean observed = new AtomicBoolean(false);
-    TimedWatcher doneMessageWatcher = new TimedWatcher(Instant.now()) {
-      @Override
-      public void observe(Operation operation) {
-        if (operation.getDone()) {
-          observed.set(true);
-        }
-      }
-    };
+    TimedWatcher doneMessageWatcher =
+        new TimedWatcher(Instant.now()) {
+          @Override
+          public void observe(Operation operation) {
+            if (operation.getDone()) {
+              observed.set(true);
+            }
+          }
+        };
     operationSubscriber.watch(doneMessageChannel, doneMessageWatcher);
     operationSubscriber.onMessage(
         doneMessageChannel,
-        printOperationChange(OperationChange.newBuilder()
-            .setReset(OperationChange.Reset.newBuilder()
-                .setOperation(Operation.newBuilder()
-                    .setDone(true)
-                    .build())
-                .build())
-            .build()));
+        printOperationChange(
+            OperationChange.newBuilder()
+                .setReset(
+                    OperationChange.Reset.newBuilder()
+                        .setOperation(Operation.newBuilder().setDone(true).build())
+                        .build())
+                .build()));
     assertThat(observed.get()).isTrue();
     assertThat(testClient.getSubscriptions()).doesNotContain(doneMessageChannel);
     operationSubscriber.unsubscribe();
@@ -283,22 +289,22 @@ public class RedisShardSubscriberTest {
     RedisShardSubscriber operationSubscriber = createSubscriber(watchers, directExecutor());
 
     String expireChannel = "expire-channel";
-    TimedWatchFuture watchFuture = new TimedWatchFuture(expiredWatcher) {
-      @Override
-      public void unwatch() {
-        operationSubscriber.unwatch(expireChannel, this);
-      }
-    };
+    TimedWatchFuture watchFuture =
+        new TimedWatchFuture(expiredWatcher) {
+          @Override
+          public void unwatch() {
+            operationSubscriber.unwatch(expireChannel, this);
+          }
+        };
     watchers.put(expireChannel, watchFuture);
 
     operationSubscriber.onMessage(
         expireChannel,
-        printOperationChange(OperationChange.newBuilder()
-            .setEffectiveAt(toTimestamp(Instant.now()))
-            .setExpire(OperationChange.Expire.newBuilder()
-                .setForce(false)
-                .build())
-            .build()));
+        printOperationChange(
+            OperationChange.newBuilder()
+                .setEffectiveAt(toTimestamp(Instant.now()))
+                .setExpire(OperationChange.Expire.newBuilder().setForce(false).build())
+                .build()));
     verify(expiredWatcher, times(1)).observe(null);
     assertThat(watchers.get(expireChannel)).isEmpty();
   }
@@ -310,8 +316,7 @@ public class RedisShardSubscriberTest {
     RedisShardSubscriber operationSubscriber = createSubscriber(watchers, directExecutor());
 
     operationSubscriber.onOperationChange(
-        "unset-type-operation",
-        OperationChange.getDefaultInstance());
+        "unset-type-operation", OperationChange.getDefaultInstance());
   }
 
   @Test

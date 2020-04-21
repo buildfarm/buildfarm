@@ -16,7 +16,6 @@ package build.buildfarm.proxy.http;
 
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
-import static com.google.common.util.concurrent.Futures.transform;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.eq;
@@ -38,9 +37,9 @@ import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
+import io.grpc.CallOptions;
 import io.grpc.Channel;
 import io.grpc.ClientCall;
-import io.grpc.CallOptions;
 import io.grpc.Metadata;
 import io.grpc.Server;
 import io.grpc.Status;
@@ -54,9 +53,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.atomic.AtomicInteger;
-import org.junit.Before;
 import org.junit.After;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -71,8 +69,7 @@ public class ByteStreamServiceTest {
   private Server fakeServer;
   private String fakeServerName;
 
-  @Mock
-  private SimpleBlobStore simpleBlobStore;
+  @Mock private SimpleBlobStore simpleBlobStore;
 
   @Before
   public void setUp() throws IOException {
@@ -93,29 +90,23 @@ public class ByteStreamServiceTest {
   }
 
   static String createBlobUploadResourceName(String id, Digest digest) {
-    return createBlobUploadResourceName(
-        /* instanceName=*/ "", id, digest);
+    return createBlobUploadResourceName(/* instanceName=*/ "", id, digest);
   }
 
-  static String createBlobUploadResourceName(
-      String instanceName, String id, Digest digest) {
+  static String createBlobUploadResourceName(String instanceName, String id, Digest digest) {
     return String.format(
         "%suploads/%s/blobs/%s",
-        instanceName.isEmpty() ? "" : (instanceName + "/"),
-        id,
-        DigestUtil.toString(digest));
+        instanceName.isEmpty() ? "" : (instanceName + "/"), id, DigestUtil.toString(digest));
   }
 
   private String createBlobDownloadResourceName(Digest digest) {
     return createBlobDownloadResourceName(/* instanceName=*/ "", digest);
   }
 
-  private String createBlobDownloadResourceName(
-      String instanceName, Digest digest) {
+  private String createBlobDownloadResourceName(String instanceName, Digest digest) {
     return String.format(
         "%sblobs/%s",
-        instanceName.isEmpty() ? "" : (instanceName + "/"),
-        DigestUtil.toString(digest));
+        instanceName.isEmpty() ? "" : (instanceName + "/"), DigestUtil.toString(digest));
   }
 
   @Test
@@ -130,9 +121,8 @@ public class ByteStreamServiceTest {
 
     StatusRuntimeException notFoundException = null;
     try {
-      service.queryWriteStatus(QueryWriteStatusRequest.newBuilder()
-          .setResourceName(resourceName)
-          .build());
+      service.queryWriteStatus(
+          QueryWriteStatusRequest.newBuilder().setResourceName(resourceName).build());
     } catch (StatusRuntimeException e) {
       assertThat(Status.fromThrowable(e).getCode()).isEqualTo(Code.NOT_FOUND);
       notFoundException = e;
@@ -151,13 +141,15 @@ public class ByteStreamServiceTest {
 
     Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
     ByteStreamBlockingStub service = ByteStreamGrpc.newBlockingStub(channel);
-    QueryWriteStatusResponse response = service.queryWriteStatus(QueryWriteStatusRequest.newBuilder()
-        .setResourceName(resourceName)
-        .build());
-    assertThat(response).isEqualTo(QueryWriteStatusResponse.newBuilder()
-        .setCommittedSize(digest.getSizeBytes())
-        .setComplete(true)
-        .build());
+    QueryWriteStatusResponse response =
+        service.queryWriteStatus(
+            QueryWriteStatusRequest.newBuilder().setResourceName(resourceName).build());
+    assertThat(response)
+        .isEqualTo(
+            QueryWriteStatusResponse.newBuilder()
+                .setCommittedSize(digest.getSizeBytes())
+                .setComplete(true)
+                .build());
     verify(simpleBlobStore, times(1)).containsKey(eq(digest.getHash()));
   }
 
@@ -171,38 +163,38 @@ public class ByteStreamServiceTest {
     Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
     ClientCall<WriteRequest, WriteResponse> call =
         channel.newCall(ByteStreamGrpc.getWriteMethod(), CallOptions.DEFAULT);
-    ClientCall.Listener<WriteResponse> callListener = new ClientCall.Listener<WriteResponse>() {
-      boolean complete = false;
-      boolean callHalfClosed = false;
+    ClientCall.Listener<WriteResponse> callListener =
+        new ClientCall.Listener<WriteResponse>() {
+          boolean complete = false;
+          boolean callHalfClosed = false;
 
-      @Override
-      public void onReady() {
-        while (call.isReady()) {
-          if (complete) {
-            if (!callHalfClosed) {
-              call.halfClose();
-              callHalfClosed = true;
+          @Override
+          public void onReady() {
+            while (call.isReady()) {
+              if (complete) {
+                if (!callHalfClosed) {
+                  call.halfClose();
+                  callHalfClosed = true;
+                }
+                return;
+              }
+
+              call.sendMessage(
+                  WriteRequest.newBuilder()
+                      .setResourceName(resourceName)
+                      .setData(helloWorld)
+                      .setFinishWrite(true)
+                      .build());
+              complete = true;
             }
-            return;
           }
-
-          call.sendMessage(WriteRequest.newBuilder()
-              .setResourceName(resourceName)
-              .setData(helloWorld)
-              .setFinishWrite(true)
-              .build());
-          complete = true;
-        }
-      }
-    };
+        };
 
     call.start(callListener, new Metadata());
     call.request(1);
 
-    verify(simpleBlobStore, times(1)).put(
-        eq(digest.getHash()),
-        eq(digest.getSizeBytes()),
-        any(InputStream.class));
+    verify(simpleBlobStore, times(1))
+        .put(eq(digest.getHash()), eq(digest.getSizeBytes()), any(InputStream.class));
   }
 
   @Test
@@ -216,79 +208,79 @@ public class ByteStreamServiceTest {
     ClientCall<WriteRequest, WriteResponse> initialCall =
         channel.newCall(ByteStreamGrpc.getWriteMethod(), CallOptions.DEFAULT);
     ByteString initialData = helloWorld.substring(0, 6);
-    ClientCall.Listener<WriteResponse> initialCallListener = new ClientCall.Listener<WriteResponse>() {
-      boolean complete = false;
-      boolean callHalfClosed = false;
+    ClientCall.Listener<WriteResponse> initialCallListener =
+        new ClientCall.Listener<WriteResponse>() {
+          boolean complete = false;
+          boolean callHalfClosed = false;
 
-      @Override
-      public void onReady() {
-        while (initialCall.isReady()) {
-          if (complete) {
-            if (!callHalfClosed) {
-              initialCall.halfClose();
-              callHalfClosed = true;
+          @Override
+          public void onReady() {
+            while (initialCall.isReady()) {
+              if (complete) {
+                if (!callHalfClosed) {
+                  initialCall.halfClose();
+                  callHalfClosed = true;
+                }
+                return;
+              }
+
+              initialCall.sendMessage(
+                  WriteRequest.newBuilder()
+                      .setResourceName(resourceName)
+                      .setData(initialData)
+                      .build());
+              complete = true;
             }
-            return;
           }
-
-          initialCall.sendMessage(WriteRequest.newBuilder()
-              .setResourceName(resourceName)
-              .setData(initialData)
-              .build());
-          complete = true;
-        }
-      }
-    };
+        };
 
     initialCall.start(initialCallListener, new Metadata());
     initialCall.request(1);
 
     ByteStreamBlockingStub service = ByteStreamGrpc.newBlockingStub(channel);
-    QueryWriteStatusResponse response = service.queryWriteStatus(
-        QueryWriteStatusRequest.newBuilder()
-            .setResourceName(resourceName)
-            .build());
+    QueryWriteStatusResponse response =
+        service.queryWriteStatus(
+            QueryWriteStatusRequest.newBuilder().setResourceName(resourceName).build());
     assertThat(response.getCommittedSize()).isEqualTo(initialData.size());
     assertThat(response.getComplete()).isFalse();
 
     ClientCall<WriteRequest, WriteResponse> finishCall =
         channel.newCall(ByteStreamGrpc.getWriteMethod(), CallOptions.DEFAULT);
-    ClientCall.Listener<WriteResponse> finishCallListener = new ClientCall.Listener<WriteResponse>() {
-      boolean complete = false;
-      boolean callHalfClosed = false;
+    ClientCall.Listener<WriteResponse> finishCallListener =
+        new ClientCall.Listener<WriteResponse>() {
+          boolean complete = false;
+          boolean callHalfClosed = false;
 
-      @Override
-      public void onReady() {
-        while (finishCall.isReady()) {
-          if (complete) {
-            if (!callHalfClosed) {
-              finishCall.halfClose();
-              callHalfClosed = true;
+          @Override
+          public void onReady() {
+            while (finishCall.isReady()) {
+              if (complete) {
+                if (!callHalfClosed) {
+                  finishCall.halfClose();
+                  callHalfClosed = true;
+                }
+                return;
+              }
+
+              finishCall.sendMessage(
+                  WriteRequest.newBuilder()
+                      .setResourceName(resourceName)
+                      .setWriteOffset(initialData.size())
+                      .setData(helloWorld.substring(initialData.size()))
+                      .setFinishWrite(true)
+                      .build());
+              complete = true;
             }
-            return;
           }
-
-          finishCall.sendMessage(WriteRequest.newBuilder()
-              .setResourceName(resourceName)
-              .setWriteOffset(initialData.size())
-              .setData(helloWorld.substring(initialData.size()))
-              .setFinishWrite(true)
-              .build());
-          complete = true;
-        }
-      }
-    };
+        };
 
     finishCall.start(finishCallListener, new Metadata());
     finishCall.request(1);
 
-    ArgumentCaptor<InputStream> inputStreamCaptor =
-        ArgumentCaptor.forClass(InputStream.class);
+    ArgumentCaptor<InputStream> inputStreamCaptor = ArgumentCaptor.forClass(InputStream.class);
 
-    verify(simpleBlobStore, times(1)).put(
-        eq(digest.getHash()),
-        eq(digest.getSizeBytes()),
-        inputStreamCaptor.capture());
+    verify(simpleBlobStore, times(1))
+        .put(eq(digest.getHash()), eq(digest.getSizeBytes()), inputStreamCaptor.capture());
     InputStream inputStream = inputStreamCaptor.getValue();
     assertThat(inputStream.available()).isEqualTo(helloWorld.size());
     byte[] data = new byte[helloWorld.size()];
@@ -306,9 +298,8 @@ public class ByteStreamServiceTest {
 
     when(simpleBlobStore.get(eq(digest.getHash()), any(OutputStream.class)))
         .thenReturn(immediateFuture(false));
-    ReadRequest request = ReadRequest.newBuilder()
-        .setResourceName(createBlobDownloadResourceName(digest))
-        .build();
+    ReadRequest request =
+        ReadRequest.newBuilder().setResourceName(createBlobDownloadResourceName(digest)).build();
     StatusRuntimeException notFoundException = null;
     try {
       if (service.read(request).hasNext()) {
@@ -333,13 +324,13 @@ public class ByteStreamServiceTest {
     SettableFuture<Boolean> getComplete = SettableFuture.create();
     when(simpleBlobStore.get(eq(digest.getHash()), any(OutputStream.class)))
         .thenReturn(getComplete);
-    ArgumentCaptor<OutputStream> outputStreamCaptor =
-        ArgumentCaptor.forClass(OutputStream.class);
+    ArgumentCaptor<OutputStream> outputStreamCaptor = ArgumentCaptor.forClass(OutputStream.class);
 
-    ReadRequest request = ReadRequest.newBuilder()
-        .setResourceName(createBlobDownloadResourceName(digest))
-        .setReadOffset(6)
-        .build();
+    ReadRequest request =
+        ReadRequest.newBuilder()
+            .setResourceName(createBlobDownloadResourceName(digest))
+            .setReadOffset(6)
+            .build();
     SettableFuture<ByteString> readComplete = SettableFuture.create();
     service.read(
         request,
@@ -362,9 +353,7 @@ public class ByteStreamServiceTest {
           }
         });
 
-    verify(simpleBlobStore, times(1)).get(
-        eq(digest.getHash()),
-        outputStreamCaptor.capture());
+    verify(simpleBlobStore, times(1)).get(eq(digest.getHash()), outputStreamCaptor.capture());
     try (OutputStream outputStream = outputStreamCaptor.getValue()) {
       outputStream.write(helloWorld.toByteArray());
       getComplete.set(true);

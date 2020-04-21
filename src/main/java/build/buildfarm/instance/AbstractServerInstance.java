@@ -14,7 +14,7 @@
 
 package build.buildfarm.instance;
 
-import static build.buildfarm.common.Actions.invalidActionMessage;
+import static build.buildfarm.common.Actions.asExecutionStatus;
 import static build.buildfarm.common.Actions.checkPreconditionFailure;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
@@ -23,20 +23,17 @@ import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
-import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
+import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static java.lang.String.format;
-import static java.util.logging.Level.SEVERE;
-import static java.util.logging.Level.WARNING;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 import build.bazel.remote.execution.v2.Action;
-import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.ActionCacheUpdateCapabilities;
+import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
 import build.bazel.remote.execution.v2.CacheCapabilities;
-import build.bazel.remote.execution.v2.SymlinkAbsolutePathStrategy;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
@@ -47,14 +44,11 @@ import build.bazel.remote.execution.v2.ExecutionCapabilities;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.FileNode;
+import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ServerCapabilities;
-import build.bazel.remote.execution.v2.Tree;
-import build.buildfarm.v1test.CompletedOperationMetadata;
-import build.buildfarm.v1test.ExecutingOperationMetadata;
-import build.buildfarm.v1test.QueuedOperation;
-import build.buildfarm.v1test.QueuedOperationMetadata;
+import build.bazel.remote.execution.v2.SymlinkAbsolutePathStrategy;
 import build.buildfarm.ac.ActionCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
@@ -64,8 +58,12 @@ import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
+import build.buildfarm.v1test.CompletedOperationMetadata;
+import build.buildfarm.v1test.ExecutingOperationMetadata;
+import build.buildfarm.v1test.QueuedOperation;
+import build.buildfarm.v1test.QueuedOperationMetadata;
+import build.buildfarm.v1test.Tree;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -85,8 +83,8 @@ import com.google.rpc.PreconditionFailure.Violation;
 import io.grpc.Context;
 import io.grpc.Status;
 import io.grpc.StatusException;
-import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.protobuf.StatusProto;
+import io.grpc.stub.ServerCallStreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashSet;
@@ -98,8 +96,10 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Logger;
+import java.util.function.Consumer;
 import javax.annotation.Nullable;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public abstract class AbstractServerInstance implements Instance {
   private static final Logger logger = Logger.getLogger(AbstractServerInstance.class.getName());
@@ -151,6 +151,8 @@ public abstract class AbstractServerInstance implements Instance {
 
   public static final String INVALID_COMMAND = "The `Command` of the `Action` was invalid.";
 
+  public static final String INVALID_PLATFORM = "The `Platform` of the `Command` was invalid.";
+
   private static final String INVALID_FILE_NAME =
       "One of the input `PathNode`s has an invalid name, such as a name containing a `/` character"
           + " or another character which cannot be used in a file's name on the filesystem of the"
@@ -189,10 +191,10 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public void start() { }
+  public void start() {}
 
   @Override
-  public void stop() throws InterruptedException { }
+  public void stop() throws InterruptedException {}
 
   @Override
   public String getName() {
@@ -205,12 +207,13 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public ActionResult getActionResult(ActionKey actionKey) {
-    return actionCache.get(actionKey);
+  public ListenableFuture<ActionResult> getActionResult(ActionKey actionKey, RequestMetadata requestMetadata) {
+    return immediateFuture(actionCache.get(actionKey));
   }
 
   @Override
-  public void putActionResult(ActionKey actionKey, ActionResult actionResult) throws InterruptedException {
+  public void putActionResult(ActionKey actionKey, ActionResult actionResult)
+      throws InterruptedException {
     if (actionResult.getExitCode() == 0) {
       actionCache.put(actionKey, actionResult);
     }
@@ -218,10 +221,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public String getBlobName(Digest blobDigest) {
-    return String.format(
-        "%s/blobs/%s",
-        getName(),
-        DigestUtil.toString(blobDigest));
+    return format("%s/blobs/%s", getName(), DigestUtil.toString(blobDigest));
   }
 
   @Override
@@ -230,12 +230,14 @@ public abstract class AbstractServerInstance implements Instance {
       long offset,
       long deadlineAfter,
       TimeUnit deadlineAfterUnits,
-      RequestMetadata requestMetadata) throws IOException {
+      RequestMetadata requestMetadata)
+      throws IOException {
     return contentAddressableStorage.newInput(digest, offset);
   }
 
   @Override
-  public Write getBlobWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata) {
+  public Write getBlobWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata)
+      throws ExcessiveWriteSizeException {
     return contentAddressableStorage.getWrite(digest, uuid, requestMetadata);
   }
 
@@ -273,19 +275,18 @@ public abstract class AbstractServerInstance implements Instance {
 
     long endIndex = offset + count;
 
-    return blob.getData().substring(
-        (int) offset, (int) (endIndex > blob.size() ? blob.size() : endIndex));
-  }
-
-  protected ListenableFuture<ByteString> getBlobFuture(Digest blobDigest, RequestMetadata requestMetadata) {
-    return getBlobFuture(blobDigest, /* offset=*/ 0, /* count=*/ blobDigest.getSizeBytes(), requestMetadata);
+    return blob.getData()
+        .substring((int) offset, (int) (endIndex > blob.size() ? blob.size() : endIndex));
   }
 
   protected ListenableFuture<ByteString> getBlobFuture(
-      Digest blobDigest,
-      long offset,
-      long count,
-      RequestMetadata requestMetadata) {
+      Digest blobDigest, RequestMetadata requestMetadata) {
+    return getBlobFuture(
+        blobDigest, /* offset=*/ 0, /* count=*/ blobDigest.getSizeBytes(), requestMetadata);
+  }
+
+  protected ListenableFuture<ByteString> getBlobFuture(
+      Digest blobDigest, long offset, long count, RequestMetadata requestMetadata) {
     SettableFuture<ByteString> future = SettableFuture.create();
     getBlob(
         blobDigest,
@@ -300,16 +301,13 @@ public abstract class AbstractServerInstance implements Instance {
           }
 
           @Override
-          public void setCompression(String compression) {
-          }
+          public void setCompression(String compression) {}
 
           @Override
-          public void setOnCancelHandler(Runnable onCancelHandler) {
-          }
+          public void setOnCancelHandler(Runnable onCancelHandler) {}
 
           @Override
-          public void disableAutoInboundFlowControl() {
-          }
+          public void disableAutoInboundFlowControl() {}
 
           @Override
           public boolean isReady() {
@@ -317,12 +315,10 @@ public abstract class AbstractServerInstance implements Instance {
           }
 
           @Override
-          public void request(int count) {
-          }
+          public void request(int count) {}
 
           @Override
-          public void setMessageCompression(boolean enable) {
-          }
+          public void setMessageCompression(boolean enable) {}
 
           @Override
           public void setOnReadyHandler(Runnable onReadyHandler) {
@@ -375,9 +371,8 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs, RequestMetadata requestMetadata)
-      throws IOException, InterruptedException {
-    ImmutableList.Builder<Digest> blobDigestsBuilder =
-        new ImmutableList.Builder<Digest>();
+      throws ExcessiveWriteSizeException, IOException, InterruptedException {
+    ImmutableList.Builder<Digest> blobDigestsBuilder = new ImmutableList.Builder<Digest>();
     PutAllBlobsException exception = null;
     for (ByteString blob : blobs) {
       Digest digest = digestUtil.compute(blob);
@@ -389,9 +384,10 @@ public abstract class AbstractServerInstance implements Instance {
         }
         com.google.rpc.Status status = StatusProto.fromThrowable(e);
         if (status == null) {
-          status = com.google.rpc.Status.newBuilder()
-              .setCode(Status.fromThrowable(e).getCode().value())
-              .build();
+          status =
+              com.google.rpc.Status.newBuilder()
+                  .setCode(Status.fromThrowable(e).getCode().value())
+                  .build();
         }
         exception.addFailedResponse(
             BatchUpdateBlobsResponse.Response.newBuilder()
@@ -408,18 +404,16 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public ListenableFuture<Iterable<Digest>> findMissingBlobs(
-      Iterable<Digest> digests,
-      Executor executor,
-      RequestMetadata requestMetadata) {
+      Iterable<Digest> digests, Executor executor, RequestMetadata requestMetadata) {
     Thread findingThread = Thread.currentThread();
-    Context.CancellationListener cancellationListener = (context) -> {
-      findingThread.interrupt();
-    };
-    Context.current().addListener(
-        cancellationListener,
-        directExecutor());
+    Context.CancellationListener cancellationListener =
+        (context) -> {
+          findingThread.interrupt();
+        };
+    Context.current().addListener(cancellationListener, directExecutor());
     try {
-      ListenableFuture<Iterable<Digest>> future = immediateFuture(contentAddressableStorage.findMissingBlobs(digests));
+      ListenableFuture<Iterable<Digest>> future =
+          immediateFuture(contentAddressableStorage.findMissingBlobs(digests));
       Context.current().removeListener(cancellationListener);
       return future;
     } catch (InterruptedException e) {
@@ -428,6 +422,7 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   protected abstract int getTreeDefaultPageSize();
+
   protected abstract int getTreeMaxPageSize();
 
   protected abstract TokenizableIterator<DirectoryEntry> createTreeIterator(
@@ -435,6 +430,8 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public String getTree(Digest rootDigest, int pageSize, String pageToken, Tree.Builder tree) {
+    tree.setRootDigest(rootDigest);
+
     if (pageSize == 0) {
       pageSize = getTreeDefaultPageSize();
     }
@@ -442,8 +439,7 @@ public abstract class AbstractServerInstance implements Instance {
       pageSize = getTreeMaxPageSize();
     }
 
-    TokenizableIterator<DirectoryEntry> iter =
-        createTreeIterator("getTree", rootDigest, pageToken);
+    TokenizableIterator<DirectoryEntry> iter = createTreeIterator("getTree", rootDigest, pageToken);
 
     while (iter.hasNext() && pageSize != 0) {
       DirectoryEntry entry = iter.next();
@@ -451,11 +447,7 @@ public abstract class AbstractServerInstance implements Instance {
       // If part of the tree is missing from the CAS, the server will return the
       // portion present and omit the rest.
       if (directory != null) {
-        if (entry.getDigest().equals(rootDigest)) {
-          tree.setRoot(directory);
-        } else {
-          tree.addChildren(directory);
-        }
+        tree.putDirectories(entry.getDigest().getHash(), directory);
         if (pageSize > 0) {
           pageSize--;
         }
@@ -479,13 +471,15 @@ public abstract class AbstractServerInstance implements Instance {
     for (String string : strings) {
       int direction = lastString.compareTo(string);
       if (direction == 0) {
-        preconditionFailure.addViolationsBuilder()
+        preconditionFailure
+            .addViolationsBuilder()
             .setType(VIOLATION_TYPE_INVALID)
             .setSubject(string)
             .setDescription(duplicateViolationMessage);
       }
       if (direction > 0) {
-        preconditionFailure.addViolationsBuilder()
+        preconditionFailure
+            .addViolationsBuilder()
             .setType(VIOLATION_TYPE_INVALID)
             .setSubject(lastString + " > " + string)
             .setDescription(unsortedViolationMessage);
@@ -494,13 +488,9 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   private static void filesUniqueAndSortedPrecondition(
-      Iterable<String> files,
-      PreconditionFailure.Builder preconditionFailure) {
+      Iterable<String> files, PreconditionFailure.Builder preconditionFailure) {
     stringsUniqueAndSortedPrecondition(
-        files,
-        DUPLICATE_DIRENT,
-        DIRECTORY_NOT_SORTED,
-        preconditionFailure);
+        files, DUPLICATE_DIRENT, DIRECTORY_NOT_SORTED, preconditionFailure);
   }
 
   private static void environmentVariablesUniqueAndSortedPrecondition(
@@ -508,8 +498,7 @@ public abstract class AbstractServerInstance implements Instance {
       PreconditionFailure.Builder preconditionFailure) {
     stringsUniqueAndSortedPrecondition(
         Iterables.transform(
-            environmentVariables,
-            environmentVariable -> environmentVariable.getName()),
+            environmentVariables, environmentVariable -> environmentVariable.getName()),
         DUPLICATE_ENVIRONMENT_VARIABLE,
         ENVIRONMENT_VARIABLES_NOT_SORTED,
         preconditionFailure);
@@ -519,27 +508,26 @@ public abstract class AbstractServerInstance implements Instance {
       String directoryPath,
       Directory directory,
       Map<Digest, Directory> directoriesIndex,
-      ImmutableSet.Builder<String> inputFiles,
-      ImmutableSet.Builder<String> inputDirectories) {
+      Consumer<String> onInputFile,
+      Consumer<String> onInputDirectory) {
     for (FileNode fileNode : directory.getFilesList()) {
       String fileName = fileNode.getName();
       String filePath = directoryPath.isEmpty() ? fileName : (directoryPath + "/" + fileName);
-      inputFiles.add(filePath);
+      onInputFile.accept(filePath);
     }
     for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
       String directoryName = directoryNode.getName();
 
       Digest directoryDigest = directoryNode.getDigest();
-      String subDirectoryPath = directoryPath.isEmpty()
-          ? directoryName
-          : (directoryPath + "/" + directoryName);
-      inputDirectories.add(subDirectoryPath);
+      String subDirectoryPath =
+          directoryPath.isEmpty() ? directoryName : (directoryPath + "/" + directoryName);
+      onInputDirectory.accept(subDirectoryPath);
       enumerateActionInputDirectory(
           subDirectoryPath,
           directoriesIndex.get(directoryDigest),
           directoriesIndex,
-          inputFiles,
-          inputDirectories);
+          onInputFile,
+          onInputDirectory);
     }
   }
 
@@ -550,9 +538,9 @@ public abstract class AbstractServerInstance implements Instance {
       Stack<Digest> pathDigests,
       Set<Digest> visited,
       Map<Digest, Directory> directoriesIndex,
-      ImmutableSet.Builder<String> inputFiles,
-      ImmutableSet.Builder<String> inputDirectories,
-      ImmutableSet.Builder<Digest> inputDigests,
+      Consumer<String> onInputFile,
+      Consumer<String> onInputDirectory,
+      Consumer<Digest> onInputDigest,
       PreconditionFailure.Builder preconditionFailure) {
     Set<String> entryNames = new HashSet<>();
 
@@ -560,12 +548,14 @@ public abstract class AbstractServerInstance implements Instance {
     for (FileNode fileNode : directory.getFilesList()) {
       String fileName = fileNode.getName();
       if (entryNames.contains(fileName)) {
-        preconditionFailure.addViolationsBuilder()
+        preconditionFailure
+            .addViolationsBuilder()
             .setType(VIOLATION_TYPE_INVALID)
             .setSubject("/" + directoryPath + ": " + fileName)
             .setDescription(DUPLICATE_DIRENT);
       } else if (lastFileName.compareTo(fileName) > 0) {
-        preconditionFailure.addViolationsBuilder()
+        preconditionFailure
+            .addViolationsBuilder()
             .setType(VIOLATION_TYPE_INVALID)
             .setSubject("/" + directoryPath + ": " + lastFileName + " > " + fileName)
             .setDescription(DIRECTORY_NOT_SORTED);
@@ -578,21 +568,23 @@ public abstract class AbstractServerInstance implements Instance {
       lastFileName = fileName;
       entryNames.add(fileName);
 
-      inputDigests.add(fileNode.getDigest());
+      onInputDigest.accept(fileNode.getDigest());
       String filePath = directoryPath.isEmpty() ? fileName : (directoryPath + "/" + fileName);
-      inputFiles.add(filePath);
+      onInputFile.accept(filePath);
     }
     String lastDirectoryName = "";
     for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
       String directoryName = directoryNode.getName();
 
       if (entryNames.contains(directoryName)) {
-        preconditionFailure.addViolationsBuilder()
+        preconditionFailure
+            .addViolationsBuilder()
             .setType(VIOLATION_TYPE_INVALID)
             .setSubject("/" + directoryPath + ": " + directoryName)
             .setDescription(DUPLICATE_DIRENT);
       } else if (lastDirectoryName.compareTo(directoryName) > 0) {
-        preconditionFailure.addViolationsBuilder()
+        preconditionFailure
+            .addViolationsBuilder()
             .setType(VIOLATION_TYPE_INVALID)
             .setSubject("/" + directoryPath + ": " + lastDirectoryName + " > " + directoryName)
             .setDescription(DIRECTORY_NOT_SORTED);
@@ -607,15 +599,15 @@ public abstract class AbstractServerInstance implements Instance {
 
       Digest directoryDigest = directoryNode.getDigest();
       if (pathDigests.contains(directoryDigest)) {
-        preconditionFailure.addViolationsBuilder()
+        preconditionFailure
+            .addViolationsBuilder()
             .setType(VIOLATION_TYPE_INVALID)
             .setSubject(DIRECTORY_CYCLE_DETECTED)
             .setDescription("/" + directoryPath + ": " + directoryName);
       } else {
-        String subDirectoryPath = directoryPath.isEmpty()
-            ? directoryName
-            : (directoryPath + "/" + directoryName);
-        inputDirectories.add(subDirectoryPath);
+        String subDirectoryPath =
+            directoryPath.isEmpty() ? directoryName : (directoryPath + "/" + directoryName);
+        onInputDirectory.accept(subDirectoryPath);
         if (!visited.contains(directoryDigest)) {
           validateActionInputDirectoryDigest(
               subDirectoryPath,
@@ -623,17 +615,17 @@ public abstract class AbstractServerInstance implements Instance {
               pathDigests,
               visited,
               directoriesIndex,
-              inputFiles,
-              inputDirectories,
-              inputDigests,
+              onInputFile,
+              onInputDirectory,
+              onInputDigest,
               preconditionFailure);
         } else {
           enumerateActionInputDirectory(
               subDirectoryPath,
               directoriesIndex.get(directoryDigest),
               directoriesIndex,
-              inputFiles,
-              inputDirectories);
+              onInputFile,
+              onInputDirectory);
         }
       }
     }
@@ -645,9 +637,9 @@ public abstract class AbstractServerInstance implements Instance {
       Stack<Digest> pathDigests,
       Set<Digest> visited,
       Map<Digest, Directory> directoriesIndex,
-      ImmutableSet.Builder<String> inputFiles,
-      ImmutableSet.Builder<String> inputDirectories,
-      ImmutableSet.Builder<Digest> inputDigests,
+      Consumer<String> onInputFile,
+      Consumer<String> onInputDirectory,
+      Consumer<Digest> onInputDigest,
       PreconditionFailure.Builder preconditionFailure) {
     pathDigests.push(directoryDigest);
     final Directory directory;
@@ -657,7 +649,8 @@ public abstract class AbstractServerInstance implements Instance {
       directory = directoriesIndex.get(directoryDigest);
     }
     if (directory == null) {
-      preconditionFailure.addViolationsBuilder()
+      preconditionFailure
+          .addViolationsBuilder()
           .setType(VIOLATION_TYPE_MISSING)
           .setSubject("blobs/" + DigestUtil.toString(directoryDigest))
           .setDescription("The directory `/" + directoryPath + "` was not found in the CAS.");
@@ -668,9 +661,9 @@ public abstract class AbstractServerInstance implements Instance {
           pathDigests,
           visited,
           directoriesIndex,
-          inputFiles,
-          inputDirectories,
-          inputDigests,
+          onInputFile,
+          onInputDirectory,
+          onInputDigest,
           preconditionFailure);
     }
     pathDigests.pop();
@@ -678,57 +671,62 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   protected ListenableFuture<Tree> getTreeFuture(
-      String reason,
-      Digest inputRoot,
-      ExecutorService service,
-      RequestMetadata requestMetadata) {
-    return listeningDecorator(service).submit(() -> {
-      Tree.Builder tree = Tree.newBuilder();
+      String reason, Digest inputRoot, ExecutorService service, RequestMetadata requestMetadata) {
+    return listeningDecorator(service)
+        .submit(
+            () -> {
+              Tree.Builder tree = Tree.newBuilder()
+                  .setRootDigest(inputRoot);
 
-      TokenizableIterator<DirectoryEntry> iterator = createTreeIterator(reason, inputRoot, /* pageToken=*/ "");
-      while (iterator.hasNext()) {
-        DirectoryEntry entry = iterator.next();
-        Directory directory = entry.getDirectory();
-        if (directory != null) {
-          if (entry.getDigest().equals(inputRoot)) {
-            tree.setRoot(directory);
-          } else {
-            tree.addChildren(directory);
-          }
-        }
-      }
+              TokenizableIterator<DirectoryEntry> iterator =
+                  createTreeIterator(reason, inputRoot, /* pageToken=*/ "");
+              while (iterator.hasNext()) {
+                DirectoryEntry entry = iterator.next();
+                Directory directory = entry.getDirectory();
+                if (directory != null) {
+                  tree.putDirectories(entry.getDigest().getHash(), directory);
+                }
+              }
 
-      return tree.build();
-    });
+              return tree.build();
+            });
   }
 
   private void validateInputs(
       Iterable<Digest> inputDigests,
       PreconditionFailure.Builder preconditionFailure,
       Executor executor,
-      RequestMetadata requestMetadata) throws StatusException, InterruptedException {
-    ListenableFuture<Void> result = transform(
-        findMissingBlobs(inputDigests, executor, requestMetadata),
-        (missingBlobDigests) -> {
-          preconditionFailure.addAllViolations(
-              Iterables.transform(
-                  missingBlobDigests,
-                  (digest) -> Violation.newBuilder()
-                      .setType(VIOLATION_TYPE_MISSING)
-                      .setSubject("blobs/" + DigestUtil.toString(digest))
-                      .setDescription(MISSING_INPUT)
-                      .build()));
-          return null;
-        },
-        executor);
+      RequestMetadata requestMetadata)
+      throws StatusException, InterruptedException {
+    ListenableFuture<Void> result =
+        transform(
+            findMissingBlobs(inputDigests, executor, requestMetadata),
+            (missingBlobDigests) -> {
+              preconditionFailure.addAllViolations(
+                  Iterables.transform(
+                      missingBlobDigests,
+                      (digest) ->
+                          Violation.newBuilder()
+                              .setType(VIOLATION_TYPE_MISSING)
+                              .setSubject("blobs/" + DigestUtil.toString(digest))
+                              .setDescription(MISSING_INPUT)
+                              .build()));
+              return null;
+            },
+            executor);
     try {
       result.get();
     } catch (ExecutionException e) {
-      com.google.rpc.Status status = StatusProto.fromThrowable(e);
+      Throwable cause = e.getCause();
+      com.google.rpc.Status status = StatusProto.fromThrowable(cause);
       if (status == null) {
-        getLogger().log(SEVERE, "no rpc status from exception", e.getCause());
+        getLogger().log(Level.SEVERE, "no rpc status from exception", cause);
+        status = asExecutionStatus(cause);
+      } else if (Code.forNumber(status.getCode()) == Code.DEADLINE_EXCEEDED) {
+        logger.log(Level.WARNING, "an rpc status was thrown with DEADLINE_EXCEEDED, discarding it", cause);
         status = com.google.rpc.Status.newBuilder()
-            .setCode(Status.fromThrowable(e).getCode().value())
+            .setCode(com.google.rpc.Code.UNAVAILABLE.getNumber())
+            .setMessage("SUPPRESSED DEADLINE_EXCEEDED: " + cause.getMessage())
             .build();
       }
       throw StatusProto.toStatusException(status);
@@ -748,43 +746,42 @@ public abstract class AbstractServerInstance implements Instance {
       QueuedOperation queuedOperation,
       PreconditionFailure.Builder preconditionFailure,
       Executor executor,
-      RequestMetadata requestMetadata) throws StatusException, InterruptedException {
+      RequestMetadata requestMetadata)
+      throws StatusException, InterruptedException {
     final ListenableFuture<Void> validatedFuture;
     if (!queuedOperation.hasAction()) {
-      preconditionFailure.addViolationsBuilder()
+      preconditionFailure
+          .addViolationsBuilder()
           .setType(VIOLATION_TYPE_MISSING)
           .setSubject("blobs/" + DigestUtil.toString(actionDigest))
           .setDescription(MISSING_ACTION);
-      validatedFuture = Futures.<Void>immediateFuture(null);
+      validatedFuture = Futures.immediateFuture(null);
     } else {
       ImmutableSet.Builder<Digest> inputDigestsBuilder = ImmutableSet.builder();
       validateAction(
           queuedOperation.getAction(),
           queuedOperation.hasCommand() ? queuedOperation.getCommand() : null,
-          queuedOperation.getTree(),
-          inputDigestsBuilder,
+          DigestUtil.proxyDirectoriesIndex(queuedOperation.getTree().getDirectories()),
+          inputDigestsBuilder::add,
           preconditionFailure);
-      validateInputs(
-          inputDigestsBuilder.build(),
-          preconditionFailure,
-          executor,
-          requestMetadata);
+      validateInputs(inputDigestsBuilder.build(), preconditionFailure, executor, requestMetadata);
     }
     checkPreconditionFailure(actionDigest, preconditionFailure.build());
     return queuedOperation;
   }
 
-  private Action validateActionDigest(String operationName, Digest actionDigest, RequestMetadata requestMetadata)
+  private Action validateActionDigest(
+      String operationName, Digest actionDigest, RequestMetadata requestMetadata)
       throws StatusException, InterruptedException {
     Action action = null;
-    PreconditionFailure.Builder preconditionFailure =
-        PreconditionFailure.newBuilder();
+    PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
     ByteString actionBlob = null;
     if (actionDigest.getSizeBytes() != 0) {
       actionBlob = getBlob(actionDigest);
     }
     if (actionBlob == null) {
-      preconditionFailure.addViolationsBuilder()
+      preconditionFailure
+          .addViolationsBuilder()
           .setType(VIOLATION_TYPE_MISSING)
           .setSubject("blobs/" + DigestUtil.toString(actionDigest))
           .setDescription(MISSING_ACTION);
@@ -792,7 +789,8 @@ public abstract class AbstractServerInstance implements Instance {
       try {
         action = Action.parseFrom(actionBlob);
       } catch (InvalidProtocolBufferException e) {
-        preconditionFailure.addViolationsBuilder()
+        preconditionFailure
+            .addViolationsBuilder()
             .setType(VIOLATION_TYPE_INVALID)
             .setSubject(INVALID_ACTION)
             .setDescription("Action " + DigestUtil.toString(actionDigest));
@@ -813,48 +811,48 @@ public abstract class AbstractServerInstance implements Instance {
       throws InterruptedException, StatusException {
     ExecutorService service = newDirectExecutorService();
     ImmutableSet.Builder<Digest> inputDigestsBuilder = ImmutableSet.builder();
+    Tree tree = getUnchecked(
+        getTreeFuture(operationName, action.getInputRootDigest(), service, requestMetadata));
     validateAction(
         action,
         getUnchecked(expect(action.getCommandDigest(), Command.parser(), service, requestMetadata)),
-        getUnchecked(getTreeFuture(operationName, action.getInputRootDigest(), service, requestMetadata)),
-        inputDigestsBuilder,
+        DigestUtil.proxyDirectoriesIndex(tree.getDirectories()),
+        inputDigestsBuilder::add,
         preconditionFailure);
-    validateInputs(
-        inputDigestsBuilder.build(),
-        preconditionFailure,
-        service,
-        requestMetadata);
+    validateInputs(inputDigestsBuilder.build(), preconditionFailure, service, requestMetadata);
   }
 
-  protected void validateQueuedOperation(
-      Digest actionDigest,
-      QueuedOperation queuedOperation)
+  protected void validateQueuedOperation(Digest actionDigest, QueuedOperation queuedOperation)
       throws StatusException {
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
-    Action action = queuedOperation.getAction();
     validateAction(
-        action,
+        queuedOperation.getAction(),
         queuedOperation.hasCommand() ? queuedOperation.getCommand() : null,
-        queuedOperation.getTree(),
-        ImmutableSet.builder(),
+        DigestUtil.proxyDirectoriesIndex(queuedOperation.getTree().getDirectories()),
+        digest -> {},
         preconditionFailure);
     checkPreconditionFailure(actionDigest, preconditionFailure.build());
   }
 
+  protected void validatePlatform(
+      Platform platform, PreconditionFailure.Builder preconditionFailure) {
+    /* no default platform validation */
+  }
+
   @VisibleForTesting
-  static void validateCommand(
+  void validateCommand(
       Command command,
       Digest inputRootDigest,
       Set<String> inputFiles,
       Set<String> inputDirectories,
       Map<Digest, Directory> directoriesIndex,
       PreconditionFailure.Builder preconditionFailure) {
+    validatePlatform(command.getPlatform(), preconditionFailure);
+
     // FIXME should input/output collisions (through directories) be another
     // invalid action?
-    filesUniqueAndSortedPrecondition(
-        command.getOutputFilesList(), preconditionFailure);
-    filesUniqueAndSortedPrecondition(
-        command.getOutputDirectoriesList(), preconditionFailure);
+    filesUniqueAndSortedPrecondition(command.getOutputFilesList(), preconditionFailure);
+    filesUniqueAndSortedPrecondition(command.getOutputDirectoriesList(), preconditionFailure);
 
     validateOutputs(
         inputFiles,
@@ -866,7 +864,8 @@ public abstract class AbstractServerInstance implements Instance {
     environmentVariablesUniqueAndSortedPrecondition(
         command.getEnvironmentVariablesList(), preconditionFailure);
     if (command.getArgumentsList().isEmpty()) {
-      preconditionFailure.addViolationsBuilder()
+      preconditionFailure
+          .addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
           .setSubject(INVALID_COMMAND)
           .setDescription("argument list is empty");
@@ -906,10 +905,9 @@ public abstract class AbstractServerInstance implements Instance {
   private void validateAction(
       Action action,
       @Nullable Command command,
-      Tree tree,
-      ImmutableSet.Builder<Digest> inputDigests,
+      Map<Digest, Directory> directoriesIndex,
+      Consumer<Digest> onInputDigest,
       PreconditionFailure.Builder preconditionFailure) {
-    Map<Digest, Directory> directoriesIndex = digestUtil.createDirectoriesIndex(tree);
     ImmutableSet.Builder<String> inputDirectoriesBuilder = ImmutableSet.builder();
     ImmutableSet.Builder<String> inputFilesBuilder = ImmutableSet.builder();
 
@@ -920,13 +918,14 @@ public abstract class AbstractServerInstance implements Instance {
         new Stack<>(),
         new HashSet<>(),
         directoriesIndex,
-        inputFilesBuilder,
-        inputDirectoriesBuilder,
-        inputDigests,
+        inputFilesBuilder::add,
+        inputDirectoriesBuilder::add,
+        onInputDigest,
         preconditionFailure);
 
     if (command == null) {
-      preconditionFailure.addViolationsBuilder()
+      preconditionFailure
+          .addViolationsBuilder()
           .setType(VIOLATION_TYPE_MISSING)
           .setSubject("blobs/" + DigestUtil.toString(action.getCommandDigest()))
           .setDescription(MISSING_COMMAND);
@@ -950,7 +949,8 @@ public abstract class AbstractServerInstance implements Instance {
       PreconditionFailure.Builder preconditionFailure) {
     Set<String> outputFilesAndDirectories = Sets.intersection(outputFiles, outputDirectories);
     if (!outputFilesAndDirectories.isEmpty()) {
-      preconditionFailure.addViolationsBuilder()
+      preconditionFailure
+          .addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
           .setSubject(OUTPUT_FILE_DIRECTORY_COLLISION)
           .setDescription(outputFilesAndDirectories.toString());
@@ -958,10 +958,12 @@ public abstract class AbstractServerInstance implements Instance {
 
     Set<String> parentsOfOutputs = new HashSet<>();
 
-    // An output file cannot be a parent of another output file, be a child of a listed output directory, or have the same path as any of the listed output directories.
+    // An output file cannot be a parent of another output file, be a child of a listed output
+    // directory, or have the same path as any of the listed output directories.
     for (String outputFile : outputFiles) {
       if (inputDirectories.contains(outputFile)) {
-        preconditionFailure.addViolationsBuilder()
+        preconditionFailure
+            .addViolationsBuilder()
             .setType(VIOLATION_TYPE_INVALID)
             .setSubject(OUTPUT_FILE_IS_INPUT_DIRECTORY)
             .setDescription(outputFile);
@@ -979,10 +981,12 @@ public abstract class AbstractServerInstance implements Instance {
       }
     }
 
-    // An output directory cannot be a parent of another output directory, be a parent of a listed output file, or have the same path as any of the listed output files.
+    // An output directory cannot be a parent of another output directory, be a parent of a listed
+    // output file, or have the same path as any of the listed output files.
     for (String outputDir : outputDirectories) {
       if (inputFiles.contains(outputDir)) {
-        preconditionFailure.addViolationsBuilder()
+        preconditionFailure
+            .addViolationsBuilder()
             .setType(VIOLATION_TYPE_INVALID)
             .setSubject(outputDir)
             .setDescription(OUTPUT_DIRECTORY_IS_INPUT_FILE);
@@ -1001,14 +1005,16 @@ public abstract class AbstractServerInstance implements Instance {
     }
     Set<String> outputFileAncestors = Sets.intersection(outputFiles, parentsOfOutputs);
     for (String outputFileAncestor : outputFileAncestors) {
-      preconditionFailure.addViolationsBuilder()
+      preconditionFailure
+          .addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
           .setSubject(outputFileAncestor)
           .setDescription(OUTPUT_FILE_IS_OUTPUT_ANCESTOR);
     }
     Set<String> outputDirectoryAncestors = Sets.intersection(outputDirectories, parentsOfOutputs);
     for (String outputDirectoryAncestor : outputDirectoryAncestors) {
-      preconditionFailure.addViolationsBuilder()
+      preconditionFailure
+          .addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
           .setSubject(outputDirectoryAncestor)
           .setDescription(OUTPUT_DIRECTORY_IS_OUTPUT_ANCESTOR);
@@ -1016,11 +1022,12 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   protected void logFailedStatus(Digest actionDigest, com.google.rpc.Status status) {
-    String message = String.format(
-        "%s: %s: %s\n",
-        DigestUtil.toString(actionDigest),
-        Code.forNumber(status.getCode()),
-        status.getMessage());
+    String message =
+        format(
+            "%s: %s: %s\n",
+            DigestUtil.toString(actionDigest),
+            Code.forNumber(status.getCode()),
+            status.getMessage());
     for (Any detail : status.getDetailsList()) {
       if (detail.is(PreconditionFailure.class)) {
         message += "  PreconditionFailure:\n";
@@ -1028,11 +1035,10 @@ public abstract class AbstractServerInstance implements Instance {
         try {
           preconditionFailure = detail.unpack(PreconditionFailure.class);
           for (Violation violation : preconditionFailure.getViolationsList()) {
-            message += String.format(
-                "    Violation: %s %s: %s\n",
-                violation.getType(),
-                violation.getSubject(),
-                violation.getDescription());
+            message +=
+                format(
+                    "    Violation: %s %s: %s\n",
+                    violation.getType(), violation.getSubject(), violation.getDescription());
           }
         } catch (InvalidProtocolBufferException e) {
           message += "  " + e.getMessage();
@@ -1052,28 +1058,31 @@ public abstract class AbstractServerInstance implements Instance {
       ExecutionPolicy executionPolicy,
       ResultsCachePolicy resultsCachePolicy,
       RequestMetadata requestMetadata,
-      Watcher watcher) throws InterruptedException {
+      Watcher watcher)
+      throws InterruptedException {
     Action action;
     try {
       action = validateActionDigest("execute", actionDigest, requestMetadata);
     } catch (StatusException e) {
       com.google.rpc.Status status = StatusProto.fromThrowable(e);
       if (status == null) {
-        getLogger().log(SEVERE, "no rpc status from exception", e);
-        status = com.google.rpc.Status.newBuilder()
-            .setCode(Status.fromThrowable(e).getCode().value())
-            .build();
+        getLogger().log(Level.SEVERE, "no rpc status from exception", e);
+        status =
+            com.google.rpc.Status.newBuilder()
+                .setCode(Status.fromThrowable(e).getCode().value())
+                .build();
       }
       logFailedStatus(actionDigest, status);
-      Operation operation = Operation.newBuilder()
-          .setDone(true)
-          .setMetadata(Any.pack(ExecuteOperationMetadata.newBuilder()
-              .setStage(ExecutionStage.Value.COMPLETED)
-              .build()))
-          .setResponse(Any.pack(ExecuteResponse.newBuilder()
-              .setStatus(status)
-              .build()))
-          .build();
+      Operation operation =
+          Operation.newBuilder()
+              .setDone(true)
+              .setMetadata(
+                  Any.pack(
+                      ExecuteOperationMetadata.newBuilder()
+                          .setStage(ExecutionStage.Value.COMPLETED)
+                          .build()))
+              .setResponse(Any.pack(ExecuteResponse.newBuilder().setStatus(status).build()))
+              .build();
       try {
         watcher.observe(operation);
       } catch (Throwable t) {
@@ -1085,62 +1094,79 @@ public abstract class AbstractServerInstance implements Instance {
     ActionKey actionKey = DigestUtil.asActionKey(actionDigest);
     Operation operation = createOperation(actionKey);
 
-    getLogger().info(System.nanoTime() + ": Operation " + operation.getName() + " was created");
+    getLogger().info("Operation " + operation.getName() + " was created");
 
-    getLogger().info(
-        String.format(
-            "%s::execute(%s): %s",
-            getName(),
-            DigestUtil.toString(actionDigest),
-            operation.getName()));
+    getLogger()
+        .info(
+            format(
+                "%s::execute(%s): %s",
+                getName(), DigestUtil.toString(actionDigest), operation.getName()));
 
     putOperation(operation);
 
     ListenableFuture<Void> watchFuture = watchOperation(operation.getName(), watcher);
 
-    ExecuteOperationMetadata metadata =
-        expectExecuteOperationMetadata(operation);
+    ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
 
     Operation.Builder operationBuilder = operation.toBuilder();
-    ActionResult actionResult = null;
-    if (!skipCacheLookup) {
-      metadata = metadata.toBuilder()
-          .setStage(ExecutionStage.Value.CACHE_CHECK)
-          .build();
-      putOperation(operationBuilder
-          .setMetadata(Any.pack(metadata))
-          .build());
-      actionResult = getActionResult(actionKey);
-    }
-
-    if (actionResult != null) {
-      metadata = metadata.toBuilder()
-          .setStage(ExecutionStage.Value.COMPLETED)
-          .build();
-      operationBuilder
-          .setDone(true)
-          .setResponse(Any.pack(ExecuteResponse.newBuilder()
-              .setResult(actionResult)
-              .setStatus(com.google.rpc.Status.newBuilder()
-                  .setCode(Code.OK.getNumber())
-                  .build())
-              .setCachedResult(true)
-              .build()));
+    final ListenableFuture<ActionResult> actionResultFuture;
+    final ExecuteOperationMetadata cacheCheckMetadata;
+    if (skipCacheLookup) {
+      cacheCheckMetadata = metadata.toBuilder().setStage(ExecutionStage.Value.CACHE_CHECK).build();
+      putOperation(operationBuilder.setMetadata(Any.pack(metadata)).build());
+      actionResultFuture = getActionResult(actionKey, requestMetadata);
     } else {
-      metadata = metadata.toBuilder()
-          .setStage(ExecutionStage.Value.QUEUED)
-          .build();
+      actionResultFuture = immediateFuture(null);
+      cacheCheckMetadata = metadata;
     }
 
-    operation = operationBuilder
-        .setMetadata(Any.pack(metadata))
-        .build();
-    /* TODO record file count/size for matching purposes? */
+    Futures.addCallback(
+        actionResultFuture,
+        new FutureCallback<ActionResult>() {
+          void onCompleted(@Nullable ActionResult actionResult) {
+            final ExecuteOperationMetadata nextMetadata;
+            if (actionResult == null) {
+              nextMetadata = cacheCheckMetadata.toBuilder().setStage(ExecutionStage.Value.QUEUED).build();
+            } else {
+              nextMetadata = cacheCheckMetadata.toBuilder().setStage(ExecutionStage.Value.COMPLETED).build();
+              operationBuilder
+                  .setDone(true)
+                  .setResponse(
+                      Any.pack(
+                          ExecuteResponse.newBuilder()
+                              .setResult(actionResult)
+                              .setStatus(
+                                  com.google.rpc.Status.newBuilder().setCode(Code.OK.getNumber()).build())
+                              .setCachedResult(true)
+                              .build()));
+            }
 
-    if (!operation.getDone()) {
-      updateOperationWatchers(operation); // updates watchers initially for queued stage
-    }
-    putOperation(operation);
+            Operation nextOperation = operationBuilder.setMetadata(Any.pack(nextMetadata)).build();
+            /* TODO record file count/size for matching purposes? */
+
+            try {
+              if (!nextOperation.getDone()) {
+                updateOperationWatchers(nextOperation); // updates watchers initially for queued stage
+              }
+              putOperation(nextOperation);
+            } catch (InterruptedException e) {
+              // ignore
+            }
+          }
+
+          @Override
+          public void onSuccess(ActionResult actionResult) {
+            onCompleted(actionResult);
+          }
+
+          @Override
+          public void onFailure(Throwable t) {
+            logger.log(Level.WARNING, format("action cache check of %s failed", DigestUtil.toString(actionDigest)), t);
+            onCompleted(null);
+          }
+        },
+        directExecutor());
+
     return watchFuture;
   }
 
@@ -1149,29 +1175,31 @@ public abstract class AbstractServerInstance implements Instance {
       try {
         return metadata.unpack(QueuedOperationMetadata.class);
       } catch (InvalidProtocolBufferException e) {
-        logger.log(SEVERE, format("invalid executing operation metadata %s", name), e);
+        logger.log(Level.SEVERE, format("invalid executing operation metadata %s", name), e);
       }
     }
     return null;
   }
 
-  protected static ExecutingOperationMetadata maybeExecutingOperationMetadata(String name, Any metadata) {
+  protected static ExecutingOperationMetadata maybeExecutingOperationMetadata(
+      String name, Any metadata) {
     if (metadata.is(ExecutingOperationMetadata.class)) {
       try {
         return metadata.unpack(ExecutingOperationMetadata.class);
       } catch (InvalidProtocolBufferException e) {
-        logger.log(SEVERE, format("invalid executing operation metadata %s", name), e);
+        logger.log(Level.SEVERE, format("invalid executing operation metadata %s", name), e);
       }
     }
     return null;
   }
 
-  protected static CompletedOperationMetadata maybeCompletedOperationMetadata(String name, Any metadata) {
+  protected static CompletedOperationMetadata maybeCompletedOperationMetadata(
+      String name, Any metadata) {
     if (metadata.is(CompletedOperationMetadata.class)) {
       try {
         return metadata.unpack(CompletedOperationMetadata.class);
       } catch (InvalidProtocolBufferException e) {
-        logger.log(SEVERE, format("invalid completed operation metadata %s", name), e);
+        logger.log(Level.SEVERE, format("invalid completed operation metadata %s", name), e);
       }
     }
     return null;
@@ -1184,46 +1212,46 @@ public abstract class AbstractServerInstance implements Instance {
     if (queuedOperationMetadata != null) {
       return queuedOperationMetadata.getRequestMetadata();
     }
-    ExecutingOperationMetadata executingOperationMetadata = maybeExecutingOperationMetadata(name, metadata);
+    ExecutingOperationMetadata executingOperationMetadata =
+        maybeExecutingOperationMetadata(name, metadata);
     if (executingOperationMetadata != null) {
       return executingOperationMetadata.getRequestMetadata();
     }
-    CompletedOperationMetadata completedOperationMetadata = maybeCompletedOperationMetadata(name, metadata);
+    CompletedOperationMetadata completedOperationMetadata =
+        maybeCompletedOperationMetadata(name, metadata);
     if (completedOperationMetadata != null) {
       return completedOperationMetadata.getRequestMetadata();
     }
     return RequestMetadata.getDefaultInstance();
   }
 
-  protected static ExecuteOperationMetadata expectExecuteOperationMetadata(
-      Operation operation) {
+  protected static ExecuteOperationMetadata expectExecuteOperationMetadata(Operation operation) {
     String name = operation.getName();
     Any metadata = operation.getMetadata();
     QueuedOperationMetadata queuedOperationMetadata = maybeQueuedOperationMetadata(name, metadata);
     if (queuedOperationMetadata != null) {
       return queuedOperationMetadata.getExecuteOperationMetadata();
     }
-    ExecutingOperationMetadata executingOperationMetadata = maybeExecutingOperationMetadata(name, metadata);
+    ExecutingOperationMetadata executingOperationMetadata =
+        maybeExecutingOperationMetadata(name, metadata);
     if (executingOperationMetadata != null) {
       return executingOperationMetadata.getExecuteOperationMetadata();
     }
-    CompletedOperationMetadata completedOperationMetadata = maybeCompletedOperationMetadata(name, metadata);
+    CompletedOperationMetadata completedOperationMetadata =
+        maybeCompletedOperationMetadata(name, metadata);
     if (completedOperationMetadata != null) {
       return completedOperationMetadata.getExecuteOperationMetadata();
     }
     try {
       return operation.getMetadata().unpack(ExecuteOperationMetadata.class);
     } catch (InvalidProtocolBufferException e) {
-      logger.log(SEVERE, format("invalid execute operation metadata %s", operation.getName()), e);
+      logger.log(Level.SEVERE, format("invalid execute operation metadata %s", operation.getName()), e);
     }
     return null;
   }
 
   protected <T> ListenableFuture<T> expect(
-      Digest digest,
-      Parser<T> parser,
-      Executor executor,
-      RequestMetadata requestMetadata) {
+      Digest digest, Parser<T> parser, Executor executor, RequestMetadata requestMetadata) {
     // FIXME find a way to make this a transform
     SettableFuture<T> future = SettableFuture.create();
     Futures.addCallback(
@@ -1234,14 +1262,14 @@ public abstract class AbstractServerInstance implements Instance {
             try {
               future.set(parser.parseFrom(blob));
             } catch (InvalidProtocolBufferException e) {
-              logger.log(WARNING, format("expect parse for %s failed", DigestUtil.toString(digest)), e);
+              logger.log(Level.WARNING, format("expect parse for %s failed", DigestUtil.toString(digest)), e);
               future.setException(e);
             }
           }
 
           @Override
           public void onFailure(Throwable t) {
-            logger.log(WARNING, format("expect for %s failed", DigestUtil.toString(digest)), t);
+            logger.log(Level.WARNING, format("expect for %s failed", DigestUtil.toString(digest)), t);
             future.setException(t);
           }
         },
@@ -1250,15 +1278,14 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   protected static boolean isErrored(Operation operation) {
-    return operation.getDone() &&
-        operation.getResultCase() == Operation.ResultCase.RESPONSE &&
-        operation.getResponse().is(ExecuteResponse.class) &&
-        expectExecuteResponse(operation).getStatus().getCode() != Code.OK.getNumber();
+    return operation.getDone()
+        && operation.getResultCase() == Operation.ResultCase.RESPONSE
+        && operation.getResponse().is(ExecuteResponse.class)
+        && expectExecuteResponse(operation).getStatus().getCode() != Code.OK.getNumber();
   }
 
   private static boolean isStage(Operation operation, ExecutionStage.Value stage) {
-    ExecuteOperationMetadata metadata
-        = expectExecuteOperationMetadata(operation);
+    ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
     return metadata != null && metadata.getStage() == stage;
   }
 
@@ -1267,15 +1294,14 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   protected boolean isCancelled(Operation operation) {
-    return operation.getDone() &&
-        operation.getResultCase() == Operation.ResultCase.RESPONSE &&
-        operation.getResponse().is(ExecuteResponse.class) &&
-        expectExecuteResponse(operation).getStatus().getCode() == Code.CANCELLED.getNumber();
+    return operation.getDone()
+        && operation.getResultCase() == Operation.ResultCase.RESPONSE
+        && operation.getResponse().is(ExecuteResponse.class)
+        && expectExecuteResponse(operation).getStatus().getCode() == Code.CANCELLED.getNumber();
   }
 
   protected static ExecuteResponse getExecuteResponse(Operation operation) {
-    if (operation.getDone() &&
-        operation.getResultCase() == Operation.ResultCase.RESPONSE) {
+    if (operation.getDone() && operation.getResultCase() == Operation.ResultCase.RESPONSE) {
       return expectExecuteResponse(operation);
     }
     return null;
@@ -1303,17 +1329,14 @@ public abstract class AbstractServerInstance implements Instance {
 
   protected boolean wasCompletelyExecuted(Operation operation) {
     ExecuteResponse executeResponse = getExecuteResponse(operation);
-    if (executeResponse != null && !executeResponse.getCachedResult()) {
-      return true;
-    }
-    return false;
+    return executeResponse != null && !executeResponse.getCachedResult();
   }
 
   protected static ActionResult getCacheableActionResult(Operation operation) {
     ExecuteResponse executeResponse = getExecuteResponse(operation);
-    if (executeResponse != null &&
-        !executeResponse.getCachedResult() &&
-        executeResponse.getStatus().getCode() == Code.OK.getNumber()) {
+    if (executeResponse != null
+        && !executeResponse.getCachedResult()
+        && executeResponse.getStatus().getCode() == Code.OK.getNumber()) {
       ActionResult result = executeResponse.getResult();
       if (result.getExitCode() == 0) {
         return result;
@@ -1323,6 +1346,7 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   protected abstract boolean matchOperation(Operation operation) throws InterruptedException;
+
   protected abstract void enqueueOperation(Operation operation);
 
   @Override
@@ -1331,13 +1355,12 @@ public abstract class AbstractServerInstance implements Instance {
     if (isCancelled(operation)) {
       if (outstandingOperations.remove(name) == null) {
         throw new IllegalStateException(
-            String.format("Operation %s was not in outstandingOperations", name));
+            format("Operation %s was not in outstandingOperations", name));
       }
       updateOperationWatchers(operation);
       return true;
     }
-    if (isExecuting(operation) &&
-        !outstandingOperations.contains(name)) {
+    if (isExecuting(operation) && !outstandingOperations.contains(name)) {
       return false;
     }
     if (isQueued(operation)) {
@@ -1352,9 +1375,9 @@ public abstract class AbstractServerInstance implements Instance {
 
   /**
    * per-operation lock factory/indexer method
-   * <p>
-   * the lock retrieved for an operation will guard against races
-   * during transfers/retrievals/removals
+   *
+   * <p>the lock retrieved for an operation will guard against races during
+   * transfers/retrievals/removals
    */
   protected abstract Object operationLock(String operationName);
 
@@ -1381,17 +1404,17 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   protected abstract int getListOperationsDefaultPageSize();
+
   protected abstract int getListOperationsMaxPageSize();
+
   protected abstract TokenizableIterator<Operation> createOperationsIterator(String pageToken);
 
   @Override
   public String listOperations(
-      int pageSize, String pageToken, String filter,
-      ImmutableList.Builder<Operation> operations) {
+      int pageSize, String pageToken, String filter, ImmutableList.Builder<Operation> operations) {
     if (pageSize == 0) {
       pageSize = getListOperationsDefaultPageSize();
-    } else if (getListOperationsMaxPageSize() > 0 &&
-        pageSize > getListOperationsMaxPageSize()) {
+    } else if (getListOperationsMaxPageSize() > 0 && pageSize > getListOperationsMaxPageSize()) {
       pageSize = getListOperationsMaxPageSize();
     }
 
@@ -1412,8 +1435,7 @@ public abstract class AbstractServerInstance implements Instance {
   public void deleteOperation(String name) {
     synchronized (operationLock(name)) {
       Operation deletedOperation = completedOperations.remove(name);
-      if (deletedOperation == null &&
-          outstandingOperations.contains(name)) {
+      if (deletedOperation == null && outstandingOperations.contains(name)) {
         throw new IllegalStateException();
       }
     }
@@ -1423,18 +1445,17 @@ public abstract class AbstractServerInstance implements Instance {
   public void cancelOperation(String name) throws InterruptedException {
     Operation operation = getOperation(name);
     if (operation == null) {
-      operation = Operation.newBuilder()
-          .setName(name)
-          .setMetadata(Any.pack(ExecuteOperationMetadata.getDefaultInstance()))
-          .build();
+      operation =
+          Operation.newBuilder()
+              .setName(name)
+              .setMetadata(Any.pack(ExecuteOperationMetadata.getDefaultInstance()))
+              .build();
     }
     RequestMetadata requestMetadata = expectRequestMetadata(operation);
     errorOperation(
         operation,
         requestMetadata,
-        com.google.rpc.Status.newBuilder()
-            .setCode(Code.CANCELLED.getNumber())
-            .build());
+        com.google.rpc.Status.newBuilder().setCode(Code.CANCELLED.getNumber()).build());
   }
 
   @Override
@@ -1452,9 +1473,7 @@ public abstract class AbstractServerInstance implements Instance {
     RequestMetadata requestMetadata = expectRequestMetadata(operation);
     if (metadata == null) {
       // ensure that watchers are notified
-      String message = String.format(
-          "Operation %s does not contain ExecuteOperationMetadata",
-          name);
+      String message = format("Operation %s does not contain ExecuteOperationMetadata", name);
       errorOperation(
           operation,
           requestMetadata,
@@ -1467,9 +1486,7 @@ public abstract class AbstractServerInstance implements Instance {
 
     if (metadata.getStage() != ExecutionStage.Value.QUEUED) {
       // ensure that watchers are notified
-      String message = String.format(
-          "Operation %s stage is not QUEUED",
-          name);
+      String message = format("Operation %s stage is not QUEUED", name);
       errorOperation(
           operation,
           requestMetadata,
@@ -1485,30 +1502,29 @@ public abstract class AbstractServerInstance implements Instance {
     } catch (StatusException e) {
       com.google.rpc.Status status = StatusProto.fromThrowable(e);
       if (status == null) {
-        getLogger().log(SEVERE, "no rpc status from exception", e);
-        status = com.google.rpc.Status.newBuilder()
-            .setCode(Status.fromThrowable(e).getCode().value())
-            .build();
+        getLogger().log(Level.SEVERE, "no rpc status from exception", e);
+        status =
+            com.google.rpc.Status.newBuilder()
+                .setCode(Status.fromThrowable(e).getCode().value())
+                .build();
       }
       logFailedStatus(actionDigest, status);
       errorOperation(operation, requestMetadata, status);
       return false;
     }
 
-    getLogger().info(
-        String.format(
-            "%s::requeueOperation(%s): %s",
-            getName(),
-            DigestUtil.toString(actionDigest),
-            name));
+    getLogger()
+        .info(
+            format(
+                "%s::requeueOperation(%s): %s",
+                getName(), DigestUtil.toString(actionDigest), name));
 
     return putOperation(operation);
   }
 
   protected void errorOperation(
-      Operation operation,
-      RequestMetadata requestMetadata,
-      com.google.rpc.Status status) throws InterruptedException {
+      Operation operation, RequestMetadata requestMetadata, com.google.rpc.Status status)
+      throws InterruptedException {
     if (operation.getDone()) {
       throw new IllegalStateException("Trying to error already completed operation [" + name + "]");
     }
@@ -1516,44 +1532,48 @@ public abstract class AbstractServerInstance implements Instance {
     if (metadata == null) {
       metadata = ExecuteOperationMetadata.getDefaultInstance();
     }
-    CompletedOperationMetadata completedMetadata = CompletedOperationMetadata.newBuilder()
-        .setExecuteOperationMetadata(metadata.toBuilder()
-            .setStage(ExecutionStage.Value.COMPLETED)
-            .build())
-        .setRequestMetadata(requestMetadata)
-        .build();
-    putOperation(operation.toBuilder()
-        .setDone(true)
-        .setMetadata(Any.pack(completedMetadata))
-        .setResponse(Any.pack(ExecuteResponse.newBuilder()
-            .setStatus(status)
-            .build()))
-        .build());
+    CompletedOperationMetadata completedMetadata =
+        CompletedOperationMetadata.newBuilder()
+            .setExecuteOperationMetadata(
+                metadata.toBuilder().setStage(ExecutionStage.Value.COMPLETED).build())
+            .setRequestMetadata(requestMetadata)
+            .build();
+    putOperation(
+        operation
+            .toBuilder()
+            .setDone(true)
+            .setMetadata(Any.pack(completedMetadata))
+            .setResponse(Any.pack(ExecuteResponse.newBuilder().setStatus(status).build()))
+            .build());
   }
 
   protected void expireOperation(Operation operation) throws InterruptedException {
-    ActionResult actionResult = ActionResult.newBuilder()
-        .setExitCode(-1)
-        .setStderrRaw(ByteString.copyFromUtf8(
-            "[BUILDFARM]: Action timed out with no response from worker"))
-        .build();
-    ExecuteResponse executeResponse = ExecuteResponse.newBuilder()
-        .setResult(actionResult)
-        .setStatus(com.google.rpc.Status.newBuilder()
-            .setCode(Code.DEADLINE_EXCEEDED.getNumber()))
-        .build();
+    ActionResult actionResult =
+        ActionResult.newBuilder()
+            .setExitCode(-1)
+            .setStderrRaw(
+                ByteString.copyFromUtf8(
+                    "[BUILDFARM]: Action timed out with no response from worker"))
+            .build();
+    ExecuteResponse executeResponse =
+        ExecuteResponse.newBuilder()
+            .setResult(actionResult)
+            .setStatus(
+                com.google.rpc.Status.newBuilder().setCode(Code.DEADLINE_EXCEEDED.getNumber()))
+            .build();
     ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
     if (metadata == null) {
-      throw new IllegalStateException("Operation " + operation.getName() + " did not contain valid metadata");
+      throw new IllegalStateException(
+          "Operation " + operation.getName() + " did not contain valid metadata");
     }
-    metadata = metadata.toBuilder()
-        .setStage(ExecutionStage.Value.COMPLETED)
-        .build();
-    putOperation(operation.toBuilder()
-        .setDone(true)
-        .setMetadata(Any.pack(metadata))
-        .setResponse(Any.pack(executeResponse))
-        .build());
+    metadata = metadata.toBuilder().setStage(ExecutionStage.Value.COMPLETED).build();
+    putOperation(
+        operation
+            .toBuilder()
+            .setDone(true)
+            .setMetadata(Any.pack(metadata))
+            .setResponse(Any.pack(executeResponse))
+            .build());
   }
 
   @Override
@@ -1573,17 +1593,14 @@ public abstract class AbstractServerInstance implements Instance {
       return false;
     }
     // stage limitation to {QUEUED, EXECUTING} above is required
-    if (metadata.getStage() != stage) {
-      return false;
-    }
-    return true;
+    return metadata.getStage() == stage;
   }
 
   protected CacheCapabilities getCacheCapabilities() {
     return CacheCapabilities.newBuilder()
         .addDigestFunction(digestUtil.getDigestFunction())
-        .setActionCacheUpdateCapabilities(ActionCacheUpdateCapabilities.newBuilder()
-            .setUpdateEnabled(true))
+        .setActionCacheUpdateCapabilities(
+            ActionCacheUpdateCapabilities.newBuilder().setUpdateEnabled(true))
         .setMaxBatchTotalSizeBytes(4 * 1024 * 1024)
         .setSymlinkAbsolutePathStrategy(SymlinkAbsolutePathStrategy.Value.DISALLOWED)
         .build();
@@ -1604,5 +1621,5 @@ public abstract class AbstractServerInstance implements Instance {
         .build();
   }
 
-  abstract protected Logger getLogger();
+  protected abstract Logger getLogger();
 }

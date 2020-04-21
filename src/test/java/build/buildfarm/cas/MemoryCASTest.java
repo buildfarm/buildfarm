@@ -14,7 +14,6 @@
 
 package build.buildfarm.cas;
 
-import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -22,7 +21,6 @@ import static org.mockito.Mockito.verify;
 
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
-import build.bazel.remote.execution.v2.Digest;
 import com.google.protobuf.ByteString;
 import org.junit.Test;
 import org.junit.runner.RunWith;

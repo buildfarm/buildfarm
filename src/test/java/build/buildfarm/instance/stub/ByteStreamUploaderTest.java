@@ -55,40 +55,36 @@ public class ByteStreamUploaderTest {
     fakeServer.awaitTermination();
   }
 
-  @Test(expected=IOException.class)
-  public void uploadBlobPropagatesIOExceptionFromIncompleteUpload() throws IOException, InterruptedException {
+  @Test(expected = IOException.class)
+  public void uploadBlobPropagatesIOExceptionFromIncompleteUpload()
+      throws IOException, InterruptedException {
     serviceRegistry.addService(
         new ByteStreamImplBase() {
           @Override
-          public StreamObserver<WriteRequest> write(StreamObserver<WriteResponse> responseObserver) {
-            responseObserver.onNext(WriteResponse.newBuilder()
-                .setCommittedSize(1)
-                .build());
+          public StreamObserver<WriteRequest> write(
+              StreamObserver<WriteResponse> responseObserver) {
+            responseObserver.onNext(WriteResponse.newBuilder().setCommittedSize(1).build());
             responseObserver.onCompleted();
             return new StreamObserver<WriteRequest>() {
               @Override
-              public void onNext(WriteRequest request) {
-              }
+              public void onNext(WriteRequest request) {}
 
               @Override
-              public void onError(Throwable t) {
-              }
+              public void onError(Throwable t) {}
 
               @Override
-              public void onCompleted() {
-              }
+              public void onCompleted() {}
             };
           }
         });
-    ByteStreamUploader uploader = new ByteStreamUploader(
-        /* instanceName=*/ null,
-        InProcessChannelBuilder.forName(fakeServerName).directExecutor().build(),
-        /* callCredentials=*/ null,
-        /* callTimeoutSecs=*/ 1,
-        NO_RETRIES);
-    Chunker chunker = Chunker.builder()
-        .setInput(ByteString.copyFromUtf8("Hello, World!"))
-        .build();
+    ByteStreamUploader uploader =
+        new ByteStreamUploader(
+            /* instanceName=*/ null,
+            InProcessChannelBuilder.forName(fakeServerName).directExecutor().build(),
+            /* callCredentials=*/ null,
+            /* callTimeoutSecs=*/ 1,
+            NO_RETRIES);
+    Chunker chunker = Chunker.builder().setInput(ByteString.copyFromUtf8("Hello, World!")).build();
     uploader.uploadBlob(HashCode.fromInt(42), chunker);
   }
 }
