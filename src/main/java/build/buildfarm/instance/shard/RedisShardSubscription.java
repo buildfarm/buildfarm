@@ -21,16 +21,16 @@ import java.io.IOException;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisPubSub;
 import redis.clients.jedis.exceptions.JedisConnectionException;
 
 class RedisShardSubscription implements Runnable {
-  private final static Logger logger = Logger.getLogger(RedisShardSubscription.class.getName());
+  private static final Logger logger = Logger.getLogger(RedisShardSubscription.class.getName());
 
   @FunctionalInterface
   interface IOSupplier<T> {

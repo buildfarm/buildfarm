@@ -21,7 +21,6 @@ import static org.mockito.Mockito.when;
 
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -35,14 +34,15 @@ public class ExecuteActionStageTest {
     when(context.getExecuteStageWidth()).thenReturn(1);
     PipelineStage error = mock(PipelineStage.class);
 
-    QueueEntry errorEntry = QueueEntry.newBuilder()
-        .setExecuteEntry(ExecuteEntry.newBuilder()
-            .setOperationName("error"))
-        .build();
-    OperationContext errorContext = OperationContext.newBuilder()
-        .setQueueEntry(errorEntry)
-        .setExecDir(Paths.get("error-operation-path"))
-        .build();
+    QueueEntry errorEntry =
+        QueueEntry.newBuilder()
+            .setExecuteEntry(ExecuteEntry.newBuilder().setOperationName("error"))
+            .build();
+    OperationContext errorContext =
+        OperationContext.newBuilder()
+            .setQueueEntry(errorEntry)
+            .setExecDir(Paths.get("error-operation-path"))
+            .build();
 
     PipelineStage executeActionStage = new ExecuteActionStage(context, /* output=*/ null, error);
     executeActionStage.error().put(errorContext);

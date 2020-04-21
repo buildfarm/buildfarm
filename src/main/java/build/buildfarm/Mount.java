@@ -33,13 +33,11 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 class Mount {
   private static ManagedChannel createChannel(String target) {
     NettyChannelBuilder builder =
-        NettyChannelBuilder.forTarget(target)
-            .negotiationType(NegotiationType.PLAINTEXT);
+        NettyChannelBuilder.forTarget(target).negotiationType(NegotiationType.PLAINTEXT);
     return builder.build();
   }
 
@@ -52,33 +50,37 @@ class Mount {
 
     Path cwd = Paths.get(".");
 
-    FuseCAS fuse = new FuseCAS(cwd.resolve(args[3]), new InputStreamFactory() {
-      Map<Digest, ByteString> cache = new HashMap<>();
+    FuseCAS fuse =
+        new FuseCAS(
+            cwd.resolve(args[3]),
+            new InputStreamFactory() {
+              Map<Digest, ByteString> cache = new HashMap<>();
 
-      public synchronized InputStream newInput(Digest blobDigest, long offset) {
-        if (cache.containsKey(blobDigest)) {
-          return cache.get(blobDigest).substring((int) offset).newInput();
-        }
-        try {
-          ByteString value = getBlob(instance, blobDigest, RequestMetadata.getDefaultInstance());
-          if (offset == 0) {
-            cache.put(blobDigest, value);
-          }
-          return value.newInput();
-        } catch (IOException e) {
-          return null;
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          return null;
-        }
-      }
-    });
-    
+              public synchronized InputStream newInput(Digest blobDigest, long offset) {
+                if (cache.containsKey(blobDigest)) {
+                  return cache.get(blobDigest).substring((int) offset).newInput();
+                }
+                try {
+                  ByteString value =
+                      getBlob(instance, blobDigest, RequestMetadata.getDefaultInstance());
+                  if (offset == 0) {
+                    cache.put(blobDigest, value);
+                  }
+                  return value.newInput();
+                } catch (IOException e) {
+                  return null;
+                } catch (InterruptedException e) {
+                  Thread.currentThread().interrupt();
+                  return null;
+                }
+              }
+            });
+
     // FIXME make bettar
     fuse.createInputRoot(args[5], DigestUtil.parseDigest(args[4]));
 
     try {
-      for (;;) {
+      for (; ; ) {
         Thread.currentThread().sleep(1000);
       }
     } catch (InterruptedException e) {

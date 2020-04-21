@@ -14,11 +14,9 @@
 
 package build.buildfarm.proxy.http;
 
-import static build.buildfarm.common.UrlPath.detectResourceOperation;
 import static com.google.common.base.Preconditions.checkState;
 
 import build.buildfarm.common.UrlPath.InvalidResourceNameException;
-import build.buildfarm.common.UrlPath.ResourceOperation;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
 import io.grpc.stub.StreamObserver;
@@ -30,8 +28,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private WriteObserver write = null;
 
   WriteStreamObserver(
-      StreamObserver<WriteResponse> responseObserver,
-      WriteObserverSource writeObserverSource) {
+      StreamObserver<WriteResponse> responseObserver, WriteObserverSource writeObserverSource) {
     this.writeObserverSource = writeObserverSource;
     this.responseObserver = responseObserver;
   }
@@ -42,9 +39,8 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
     }
     write.onNext(request);
     if (request.getFinishWrite()) {
-      responseObserver.onNext(WriteResponse.newBuilder()
-          .setCommittedSize(write.getCommittedSize())
-          .build());
+      responseObserver.onNext(
+          WriteResponse.newBuilder().setCommittedSize(write.getCommittedSize()).build());
     }
   }
 
@@ -54,8 +50,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
         request.getFinishWrite() || request.getData().size() != 0,
         String.format(
             "write onNext supplied with empty WriteRequest for %s at %d",
-            request.getResourceName(),
-            request.getWriteOffset()));
+            request.getResourceName(), request.getWriteOffset()));
     if (request.getData().size() != 0) {
       try {
         writeOnNext(request);

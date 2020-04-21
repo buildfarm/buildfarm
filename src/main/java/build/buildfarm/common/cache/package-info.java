@@ -18,8 +18,8 @@
  * <p>The core interface used to represent caches is {@link build.buildfarm.common.cache.Cache}.
  * In-memory caches can be configured and created using {@link
  * build.buildfarm.common.cache.CacheBuilder}, with cache entries being loaded by {@link
- * build.buildfarm.common.cache.CacheLoader}. Statistics about cache performance are exposed using {@link
- * build.buildfarm.common.cache.CacheStats}.
+ * build.buildfarm.common.cache.CacheLoader}. Statistics about cache performance are exposed using
+ * {@link build.buildfarm.common.cache.CacheStats}.
  *
  * <p>See the Guava User Guide article on <a
  * href="https://github.com/google/guava/wiki/CachesExplained">caches</a>.

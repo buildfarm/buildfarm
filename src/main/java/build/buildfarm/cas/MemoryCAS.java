@@ -23,8 +23,6 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Write;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -48,13 +46,9 @@ import javax.annotation.concurrent.GuardedBy;
 public class MemoryCAS implements ContentAddressableStorage {
   private static final Logger logger = Logger.getLogger(MemoryCAS.class.getName());
 
-  static final Status OK = Status.newBuilder()
-      .setCode(Code.OK.getNumber())
-      .build();
+  static final Status OK = Status.newBuilder().setCode(Code.OK.getNumber()).build();
 
-  static final Status NOT_FOUND = Status.newBuilder()
-      .setCode(Code.NOT_FOUND.getNumber())
-      .build();
+  static final Status NOT_FOUND = Status.newBuilder().setCode(Code.NOT_FOUND.getNumber()).build();
 
   private final long maxSizeInBytes;
   private final Consumer<Digest> onPut;
@@ -75,7 +69,8 @@ public class MemoryCAS implements ContentAddressableStorage {
     this(maxSizeInBytes, (digest) -> {}, /* delegate=*/ null);
   }
 
-  public MemoryCAS(long maxSizeInBytes, Consumer<Digest> onPut, ContentAddressableStorage delegate) {
+  public MemoryCAS(
+      long maxSizeInBytes, Consumer<Digest> onPut, ContentAddressableStorage delegate) {
     this.maxSizeInBytes = maxSizeInBytes;
     this.onPut = onPut;
     this.delegate = delegate;
@@ -92,7 +87,7 @@ public class MemoryCAS implements ContentAddressableStorage {
   @Override
   public Iterable<Digest> findMissingBlobs(Iterable<Digest> digests) throws InterruptedException {
     ImmutableList.Builder<Digest> builder = ImmutableList.builder();
-    synchronized(this) {
+    synchronized (this) {
       // incur access use of the digest
       for (Digest digest : digests) {
         if (digest.getSizeBytes() != 0 && !contains(digest)) {
@@ -112,10 +107,7 @@ public class MemoryCAS implements ContentAddressableStorage {
     // implicit int bounds compare against size bytes
     if (offset < 0 || offset > digest.getSizeBytes()) {
       throw new IndexOutOfBoundsException(
-          String.format(
-              "%d is out of bounds for blob %s",
-              offset,
-              DigestUtil.toString(digest)));
+          String.format("%d is out of bounds for blob %s", offset, DigestUtil.toString(digest)));
     }
     Blob blob = get(digest);
     if (blob == null) {
@@ -136,20 +128,20 @@ public class MemoryCAS implements ContentAddressableStorage {
   }
 
   synchronized Iterable<Response> getAll(Iterable<Digest> digests) {
-    return getAll(digests, (digest) -> {
-      Blob blob = get(digest);
-      if (blob == null) {
-        return null;
-      }
-      return blob.getData();
-    });
+    return getAll(
+        digests,
+        (digest) -> {
+          Blob blob = get(digest);
+          if (blob == null) {
+            return null;
+          }
+          return blob.getData();
+        });
   }
 
   public static Iterable<Response> getAll(
-      Iterable<Digest> digests,
-      Function<Digest, ByteString> blobGetter) {
-    ImmutableList.Builder<Response> responses =
-        ImmutableList.builder();
+      Iterable<Digest> digests, Function<Digest, ByteString> blobGetter) {
+    ImmutableList.Builder<Response> responses = ImmutableList.builder();
     for (Digest digest : digests) {
       responses.add(getResponse(digest, blobGetter));
     }
@@ -159,24 +151,20 @@ public class MemoryCAS implements ContentAddressableStorage {
   private static Status statusFromThrowable(Throwable t) {
     Status status = StatusProto.fromThrowable(t);
     if (status == null) {
-      status = Status.newBuilder()
-          .setCode(io.grpc.Status.fromThrowable(t).getCode().value())
-          .build();
+      status =
+          Status.newBuilder().setCode(io.grpc.Status.fromThrowable(t).getCode().value()).build();
     }
     return status;
   }
 
   public static Response getResponse(Digest digest, Function<Digest, ByteString> blobGetter) {
-    Response.Builder response = Response.newBuilder()
-        .setDigest(digest);
+    Response.Builder response = Response.newBuilder().setDigest(digest);
     try {
       ByteString blob = blobGetter.apply(digest);
       if (blob == null) {
         response.setStatus(NOT_FOUND);
       } else {
-        response
-            .setData(blob)
-            .setStatus(OK);
+        response.setData(blob).setStatus(OK);
       }
     } catch (Throwable t) {
       logger.log(SEVERE, "error getting " + DigestUtil.toString(digest), t);
@@ -254,10 +242,7 @@ public class MemoryCAS implements ContentAddressableStorage {
       logger.warning(
           String.format(
               "Out of nodes to remove, sizeInBytes = %d, maxSizeInBytes = %d, storage = %d, list = %d",
-              sizeInBytes,
-              maxSizeInBytes,
-              storage.size(),
-              size()));
+              sizeInBytes, maxSizeInBytes, storage.size(), size()));
     }
 
     createEntry(blob, onExpiration);
@@ -280,7 +265,8 @@ public class MemoryCAS implements ContentAddressableStorage {
   private void expireEntry(Entry e) {
     logger.info("MemoryLRUCAS: expiring " + DigestUtil.toString(e.key));
     if (delegate != null) {
-      Write write = delegate.getWrite(e.key, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
+      Write write =
+          delegate.getWrite(e.key, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
       try (OutputStream out = write.getOutput(1, MINUTES, () -> {})) {
         e.value.getData().writeTo(out);
       } catch (IOException ioEx) {

@@ -20,10 +20,10 @@ import build.buildfarm.common.Write;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamBlockingStub;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamStub;
-import com.google.bytestream.ByteStreamProto.WriteRequest;
-import com.google.bytestream.ByteStreamProto.WriteResponse;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusResponse;
+import com.google.bytestream.ByteStreamProto.WriteRequest;
+import com.google.bytestream.ByteStreamProto.WriteResponse;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.util.concurrent.SettableFuture;
@@ -47,10 +47,7 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   private static final int CHUNK_SIZE = 16 * 1024;
 
   private static final QueryWriteStatusResponse resetResponse =
-      QueryWriteStatusResponse.newBuilder()
-          .setCommittedSize(0)
-          .setComplete(false)
-          .build();
+      QueryWriteStatusResponse.newBuilder().setCommittedSize(0).setComplete(false).build();
 
   private final Supplier<ByteStreamBlockingStub> bsBlockingStub;
   private final Supplier<ByteStreamStub> bsStub;
@@ -60,32 +57,35 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   private final boolean autoflush;
   private final byte buf[];
   private boolean wasReset = false;
-  private final Supplier<QueryWriteStatusResponse> writeStatus = Suppliers.memoize(
-      new Supplier() {
-        @Override
-        public QueryWriteStatusResponse get() {
-          if (wasReset) {
-            return resetResponse;
-          }
-          try {
-            QueryWriteStatusResponse response = bsBlockingStub.get()
-                .queryWriteStatus(QueryWriteStatusRequest.newBuilder()
-                    .setResourceName(resourceName)
-                    .build());
-            if (response.getComplete()) {
-              writeFuture.set(response.getCommittedSize());
+  private final Supplier<QueryWriteStatusResponse> writeStatus =
+      Suppliers.memoize(
+          new Supplier() {
+            @Override
+            public QueryWriteStatusResponse get() {
+              if (wasReset) {
+                return resetResponse;
+              }
+              try {
+                QueryWriteStatusResponse response =
+                    bsBlockingStub
+                        .get()
+                        .queryWriteStatus(
+                            QueryWriteStatusRequest.newBuilder()
+                                .setResourceName(resourceName)
+                                .build());
+                if (response.getComplete()) {
+                  writeFuture.set(response.getCommittedSize());
+                }
+                return response;
+              } catch (StatusRuntimeException e) {
+                Status status = Status.fromThrowable(e);
+                if (status.getCode() == Code.UNIMPLEMENTED || status.getCode() == Code.NOT_FOUND) {
+                  return resetResponse;
+                }
+                throw e;
+              }
             }
-            return response;
-          } catch (StatusRuntimeException e) {
-            Status status = Status.fromThrowable(e);
-            if (status.getCode() == Code.UNIMPLEMENTED ||
-                status.getCode() == Code.NOT_FOUND) {
-              return resetResponse;
-            }
-            throw e;
-          }
-        }
-      });
+          });
   private boolean sentResourceName = false;
   private int offset = 0;
   private long writtenBytes = 0;
@@ -97,8 +97,7 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   private TimeUnit deadlineAfterUnits = null;
   private Runnable onReadyHandler = null;
 
-  static class WriteCompleteException extends IOException {
-  }
+  static class WriteCompleteException extends IOException {}
 
   public StubWriteOutputStream(
       Supplier<ByteStreamBlockingStub> bsBlockingStub,
@@ -136,10 +135,11 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   }
 
   private void flushSome(boolean finishWrite) {
-    WriteRequest.Builder request = WriteRequest.newBuilder()
-        .setWriteOffset(getCommittedSize())
-        .setData(ByteString.copyFrom(buf, 0, offset))
-        .setFinishWrite(finishWrite);
+    WriteRequest.Builder request =
+        WriteRequest.newBuilder()
+            .setWriteOffset(getCommittedSize())
+            .setData(ByteString.copyFrom(buf, 0, offset))
+            .setFinishWrite(finishWrite);
     if (!sentResourceName) {
       request.setResourceName(resourceName);
     }
@@ -181,36 +181,39 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   private synchronized void initiateWrite() throws IOException {
     if (writeObserver == null) {
       checkNotNull(deadlineAfterUnits);
-      writeObserver = bsStub.get()
-          .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
-          .write(
-              new ClientResponseObserver<WriteRequest, WriteResponse>() {
-                @Override
-                public void beforeStart(ClientCallStreamObserver<WriteRequest> requestStream) {
-                  requestStream.setOnReadyHandler(() -> {
-                    if (requestStream.isReady()) {
-                      onReadyHandler.run();
+      writeObserver =
+          bsStub
+              .get()
+              .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
+              .write(
+                  new ClientResponseObserver<WriteRequest, WriteResponse>() {
+                    @Override
+                    public void beforeStart(ClientCallStreamObserver<WriteRequest> requestStream) {
+                      requestStream.setOnReadyHandler(
+                          () -> {
+                            if (requestStream.isReady()) {
+                              onReadyHandler.run();
+                            }
+                          });
+                    }
+
+                    @Override
+                    public void onNext(WriteResponse response) {
+                      writeFuture.set(response.getCommittedSize());
+                    }
+
+                    @Override
+                    public void onError(Throwable t) {
+                      writeFuture.setException(t);
+                    }
+
+                    @Override
+                    public void onCompleted() {
+                      synchronized (StubWriteOutputStream.this) {
+                        writeObserver = null;
+                      }
                     }
                   });
-                }
-
-                @Override
-                public void onNext(WriteResponse response) {
-                  writeFuture.set(response.getCommittedSize());
-                }
-
-                @Override
-                public void onError(Throwable t) {
-                  writeFuture.setException(t);
-                }
-
-                @Override
-                public void onCompleted() {
-                  synchronized (StubWriteOutputStream.this) {
-                    writeObserver = null;
-                  }
-                }
-              });
     }
   }
 
@@ -287,7 +290,8 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   }
 
   @Override
-  public FeedbackOutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+  public FeedbackOutputStream getOutput(
+      long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
     this.deadlineAfter = deadlineAfter;
     this.deadlineAfterUnits = deadlineAfterUnits;
     this.onReadyHandler = onReadyHandler;

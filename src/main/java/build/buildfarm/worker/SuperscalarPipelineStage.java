@@ -86,7 +86,12 @@ abstract class SuperscalarPipelineStage extends PipelineStage {
       claims.take();
     } catch (InterruptedException e) {
       catastrophic = true;
-      getLogger().severe(name + ": could not release claim on " + operationName + ", aborting drain to avoid deadlock");
+      getLogger()
+          .severe(
+              name
+                  + ": could not release claim on "
+                  + operationName
+                  + ", aborting drain to avoid deadlock");
       close();
     } finally {
       notify();

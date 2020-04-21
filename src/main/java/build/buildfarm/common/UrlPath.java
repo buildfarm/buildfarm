@@ -14,8 +14,8 @@
 
 package build.buildfarm.common;
 
-import com.google.common.collect.Iterables;
 import build.bazel.remote.execution.v2.Digest;
+import com.google.common.collect.Iterables;
 import java.util.Arrays;
 import java.util.UUID;
 
@@ -40,10 +40,7 @@ public class UrlPath {
 
     @Override
     public String getMessage() {
-      return String.format(
-          "%s: %s",
-          resourceName,
-          super.getMessage());
+      return String.format("%s: %s", resourceName, super.getMessage());
     }
   }
 
@@ -53,6 +50,7 @@ public class UrlPath {
     OperationStream(4);
 
     private final int minComponentLength;
+
     private ResourceOperation(int minComponentLength) {
       this.minComponentLength = minComponentLength;
     }
@@ -65,11 +63,14 @@ public class UrlPath {
     String[] components = resourceName.split("/");
 
     // Keep following checks ordered by descending minComponentLength
-    if (components.length >= ResourceOperation.UploadBlob.minComponentLength && isUploadBlob(components)) {
+    if (components.length >= ResourceOperation.UploadBlob.minComponentLength
+        && isUploadBlob(components)) {
       return ResourceOperation.UploadBlob;
-    } else if (components.length >= ResourceOperation.OperationStream.minComponentLength && isOperationStream(components)) {
+    } else if (components.length >= ResourceOperation.OperationStream.minComponentLength
+        && isOperationStream(components)) {
       return ResourceOperation.OperationStream;
-    } else if (components.length >= ResourceOperation.Blob.minComponentLength && isBlob(components)) {
+    } else if (components.length >= ResourceOperation.Blob.minComponentLength
+        && isBlob(components)) {
       return ResourceOperation.Blob;
     }
 
@@ -83,23 +84,20 @@ public class UrlPath {
 
   private static boolean isUploadBlob(String[] components) {
     // {instance_name=**}/uploads/{uuid}/blobs/{hash}/{size}
-    return components[components.length - 3].equals("blobs") &&
-      components[components.length - 5].equals("uploads");
+    return components[components.length - 3].equals("blobs")
+        && components[components.length - 5].equals("uploads");
   }
 
   private static boolean isOperationStream(String[] components) {
     // {instance_name=**}/operations/{uuid}/streams/{stream}
-    return components[components.length - 2].equals("streams") &&
-        components[components.length - 4].equals("operations");
+    return components[components.length - 2].equals("streams")
+        && components[components.length - 4].equals("operations");
   }
 
   public static String fromOperationsCollectionName(String operationsCollectionName) {
     // {instance_name=**}/operations
     String[] components = operationsCollectionName.split("/");
-    return String.join(
-        "/", Iterables.limit(
-            Arrays.asList(components),
-            components.length - 1));
+    return String.join("/", Iterables.limit(Arrays.asList(components), components.length - 1));
   }
 
   public static String fromOperationName(String operationName) {
@@ -108,41 +106,28 @@ public class UrlPath {
     if (components.length < 2) {
       return "";
     }
-    return String.join(
-        "/", Iterables.limit(
-            Arrays.asList(components),
-            components.length - 2));
+    return String.join("/", Iterables.limit(Arrays.asList(components), components.length - 2));
   }
 
   public static String fromOperationStream(String operationStream) {
     // {instance_name=**}/operations/{uuid}/streams/{stream}
     String[] components = operationStream.split("/");
-    return String.join(
-        "/", Iterables.limit(
-            Arrays.asList(components),
-            components.length - 4));
+    return String.join("/", Iterables.limit(Arrays.asList(components), components.length - 4));
   }
 
   public static String fromBlobName(String blobName) {
     // {instance_name=**}/blobs/{hash}/{size}
     String[] components = blobName.split("/");
-    return String.join(
-        "/", Iterables.limit(
-            Arrays.asList(components),
-            components.length - 3));
+    return String.join("/", Iterables.limit(Arrays.asList(components), components.length - 3));
   }
 
   public static String fromUploadBlobName(String uploadBlobName) {
     // {instance_name=**}/uploads/{uuid}/blobs/{hash}/{size}
     String[] components = uploadBlobName.split("/");
-    return String.join(
-        "/", Iterables.limit(
-            Arrays.asList(components),
-            components.length - 5));
+    return String.join("/", Iterables.limit(Arrays.asList(components), components.length - 5));
   }
 
-  public static Digest parseBlobDigest(String resourceName)
-      throws InvalidResourceNameException {
+  public static Digest parseBlobDigest(String resourceName) throws InvalidResourceNameException {
     String[] components = resourceName.split("/");
     if (components.length < 2) {
       throw new InvalidResourceNameException(resourceName, "invalid blob name");
@@ -156,13 +141,9 @@ public class UrlPath {
     }
     if (size < 0) {
       throw new InvalidResourceNameException(
-          resourceName,
-          String.format("upload size invalid: %d", size));
+          resourceName, String.format("upload size invalid: %d", size));
     }
-    return Digest.newBuilder()
-        .setHash(hash)
-        .setSizeBytes(size)
-        .build();
+    return Digest.newBuilder().setHash(hash).setSizeBytes(size).build();
   }
 
   // FIXME all upload parsing tools need to accomodate for the following
@@ -172,8 +153,7 @@ public class UrlPath {
   // (or other metadata) for a client to use if it is storing URLs, as in
   // `{instance}/uploads/{uuid}/blobs/{hash}/{size}/foo/bar/baz.cc`. Anything
   // after the `size` is ignored.
-  public static UUID parseUploadBlobUUID(String resourceName)
-      throws InvalidResourceNameException {
+  public static UUID parseUploadBlobUUID(String resourceName) throws InvalidResourceNameException {
     // ... `uuid` is a version 4 UUID generated by the client
     String[] components = resourceName.split("/");
     try {
@@ -195,13 +175,9 @@ public class UrlPath {
     }
     if (size < 0) {
       throw new InvalidResourceNameException(
-          resourceName,
-          String.format("upload size invalid: %d", size));
+          resourceName, String.format("upload size invalid: %d", size));
     }
-    return Digest.newBuilder()
-        .setHash(hash)
-        .setSizeBytes(size)
-        .build();
+    return Digest.newBuilder().setHash(hash).setSizeBytes(size).build();
   }
 
   public static String parseOperationStream(String resourceName)
@@ -210,7 +186,7 @@ public class UrlPath {
     if (components.length <= 4) {
       throw new InvalidResourceNameException(resourceName, "invalid operation stream name");
     }
-    return String.join("/", Arrays.asList(components).subList(components.length - 4, components.length));
+    return String.join(
+        "/", Arrays.asList(components).subList(components.length - 4, components.length));
   }
 }
-

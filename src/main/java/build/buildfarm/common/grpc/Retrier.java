@@ -164,12 +164,12 @@ public class Retrier {
   public static final Predicate<Status> REDIS_IS_RETRIABLE =
       st -> {
         switch (st.getCode()) {
-        case CANCELLED:
-          return !Thread.currentThread().isInterrupted();
-        case DEADLINE_EXCEEDED:
-          return true;
-        default:
-          return false;
+          case CANCELLED:
+            return !Thread.currentThread().isInterrupted();
+          case DEADLINE_EXCEEDED:
+            return true;
+          default:
+            return false;
         }
       };
 
@@ -181,9 +181,7 @@ public class Retrier {
   private final Predicate<Status> isRetriable;
   private final ListeningScheduledExecutorService retryScheduler;
 
-  public Retrier(
-      Supplier<Backoff> backoffSupplier,
-      Predicate<Status> isRetriable) {
+  public Retrier(Supplier<Backoff> backoffSupplier, Predicate<Status> isRetriable) {
     this(backoffSupplier, isRetriable, /* retryScheduler=*/ null);
   }
 
@@ -196,9 +194,7 @@ public class Retrier {
     this.retryScheduler = retryScheduler;
   }
 
-  /**
-   * Returns {@code true} if the {@link Status} is retriable.
-   */
+  /** Returns {@code true} if the {@link Status} is retriable. */
   public boolean isRetriable(Status s) {
     return isRetriable.apply(s);
   }
@@ -220,7 +216,7 @@ public class Retrier {
       } catch (PassThroughException e) {
         throw (StatusRuntimeException) e.getCause();
       } catch (RetryException e) {
-        throw e;  // Nested retries are always pass-through.
+        throw e; // Nested retries are always pass-through.
       } catch (StatusException | StatusRuntimeException e) {
         Status st = Status.fromThrowable(e);
         long delay = backoff.nextDelayMillis();

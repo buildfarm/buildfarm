@@ -15,35 +15,28 @@
 package build.buildfarm.instance.stub;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Throwables.propagateIfInstanceOf;
 import static com.google.common.base.Throwables.throwIfUnchecked;
 import static java.lang.String.format;
 import static java.util.Collections.singletonMap;
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
-import build.bazel.remote.execution.v2.Digest;
-import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.grpc.Retrier;
-import build.buildfarm.common.grpc.RetryException;
+import build.buildfarm.common.grpc.Retrier.ProgressiveBackoff;
 import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamFutureStub;
+import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
-import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.hash.HashCode;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.SettableFuture;
-import build.buildfarm.common.grpc.Retrier;
-import build.buildfarm.common.grpc.Retrier.ProgressiveBackoff;
 import io.grpc.CallCredentials;
 import io.grpc.CallOptions;
 import io.grpc.Channel;
@@ -51,7 +44,6 @@ import io.grpc.ClientCall;
 import io.grpc.Metadata;
 import io.grpc.Status;
 import io.grpc.Status.Code;
-import io.grpc.StatusRuntimeException;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
@@ -116,9 +108,8 @@ public class ByteStreamUploader {
   }
 
   /**
-   * Uploads a BLOB, as provided by the {@link Chunker}, to the remote {@code
-   * ByteStream} service. The call blocks until the upload is complete, or throws an {@link
-   * Exception} in case of error.
+   * Uploads a BLOB, as provided by the {@link Chunker}, to the remote {@code ByteStream} service.
+   * The call blocks until the upload is complete, or throws an {@link Exception} in case of error.
    *
    * <p>Uploads are retried according to the specified {@link Retrier}. Retrying is transparent to
    * the user of this API.
@@ -128,8 +119,7 @@ public class ByteStreamUploader {
    *
    * @throws IOException when the upload failed due to content issues
    */
-  public void uploadBlob(HashCode hash, Chunker chunker)
-      throws IOException, InterruptedException {
+  public void uploadBlob(HashCode hash, Chunker chunker) throws IOException, InterruptedException {
     uploadBlobs(singletonMap(hash, chunker));
   }
 
@@ -217,7 +207,8 @@ public class ByteStreamUploader {
     }
   }
 
-  public static String uploadResourceName(String instanceName, UUID uuid, HashCode hash, long size) {
+  public static String uploadResourceName(
+      String instanceName, UUID uuid, HashCode hash, long size) {
     String resourceName = format("uploads/%s/blobs/%s/%d", uuid, hash, size);
     if (!Strings.isNullOrEmpty(instanceName)) {
       resourceName = instanceName + "/" + resourceName;
@@ -278,16 +269,14 @@ public class ByteStreamUploader {
       AtomicLong committedOffset = new AtomicLong(0);
       return Futures.transformAsync(
           retrier.executeAsync(
-              () -> callAndQueryOnFailure(committedOffset, progressiveBackoff),
-              progressiveBackoff),
+              () -> callAndQueryOnFailure(committedOffset, progressiveBackoff), progressiveBackoff),
           (result) -> {
             long committedSize = committedOffset.get();
             long expected = chunker.getSize();
             if (committedSize != expected) {
-              String message = format(
-                  "write incomplete: committed_size %d for %d total",
-                  committedSize,
-                  expected);
+              String message =
+                  format(
+                      "write incomplete: committed_size %d for %d total", committedSize, expected);
               return Futures.immediateFailedFuture(new IOException(message));
             }
             return Futures.immediateFuture(null);
@@ -302,8 +291,7 @@ public class ByteStreamUploader {
     }
 
     private ListenableFuture<Void> callAndQueryOnFailure(
-        AtomicLong committedOffset,
-        ProgressiveBackoff progressiveBackoff) {
+        AtomicLong committedOffset, ProgressiveBackoff progressiveBackoff) {
       return Futures.catchingAsync(
           call(committedOffset),
           Exception.class,
@@ -311,7 +299,8 @@ public class ByteStreamUploader {
           MoreExecutors.directExecutor());
     }
 
-    private ListenableFuture<Void> guardQueryWithSuppression(Exception e, AtomicLong committedOffset, ProgressiveBackoff progressiveBackoff) {
+    private ListenableFuture<Void> guardQueryWithSuppression(
+        Exception e, AtomicLong committedOffset, ProgressiveBackoff progressiveBackoff) {
       // we are destined to return this, avoid recreating it
       ListenableFuture<Void> exceptionFuture = Futures.immediateFailedFuture(e);
 
@@ -322,32 +311,30 @@ public class ByteStreamUploader {
         return exceptionFuture;
       }
 
-      ListenableFuture<Void> suppressedQueryFuture = Futures.catchingAsync(
-          query(committedOffset, progressiveBackoff),
-          Throwable.class,
-          (t) -> {
-            // if the query threw an exception, add it to the suppressions
-            // for the destined exception
-            e.addSuppressed(t);
-            return exceptionFuture;
-          },
-          MoreExecutors.directExecutor());
+      ListenableFuture<Void> suppressedQueryFuture =
+          Futures.catchingAsync(
+              query(committedOffset, progressiveBackoff),
+              Throwable.class,
+              (t) -> {
+                // if the query threw an exception, add it to the suppressions
+                // for the destined exception
+                e.addSuppressed(t);
+                return exceptionFuture;
+              },
+              MoreExecutors.directExecutor());
       return Futures.transformAsync(
-          suppressedQueryFuture,
-          (result) -> exceptionFuture,
-          MoreExecutors.directExecutor());
+          suppressedQueryFuture, (result) -> exceptionFuture, MoreExecutors.directExecutor());
     }
 
     private ListenableFuture<Void> query(
-        AtomicLong committedOffset,
-        ProgressiveBackoff progressiveBackoff) {
-      ListenableFuture<Long> committedSizeFuture = Futures.transform(
-          bsFutureStub().queryWriteStatus(
-              QueryWriteStatusRequest.newBuilder()
-                  .setResourceName(resourceName)
-                  .build()),
-          (response) -> response.getCommittedSize(),
-          MoreExecutors.directExecutor());
+        AtomicLong committedOffset, ProgressiveBackoff progressiveBackoff) {
+      ListenableFuture<Long> committedSizeFuture =
+          Futures.transform(
+              bsFutureStub()
+                  .queryWriteStatus(
+                      QueryWriteStatusRequest.newBuilder().setResourceName(resourceName).build()),
+              (response) -> response.getCommittedSize(),
+              MoreExecutors.directExecutor());
       return Futures.transformAsync(
           committedSizeFuture,
           (committedSize) -> {

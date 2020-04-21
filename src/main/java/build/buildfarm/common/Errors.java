@@ -19,6 +19,5 @@ public final class Errors {
 
   public static final String VIOLATION_TYPE_INVALID = "INVALID";
 
-  private Errors() {
-  }
+  private Errors() {}
 }

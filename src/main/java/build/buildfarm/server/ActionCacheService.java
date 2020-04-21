@@ -14,12 +14,12 @@
 
 package build.buildfarm.server;
 
-import build.buildfarm.common.DigestUtil;
-import build.buildfarm.instance.Instance;
 import build.bazel.remote.execution.v2.ActionCacheGrpc;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.GetActionResultRequest;
 import build.bazel.remote.execution.v2.UpdateActionResultRequest;
+import build.buildfarm.common.DigestUtil;
+import build.buildfarm.instance.Instance;
 import io.grpc.Status;
 import io.grpc.Status.Code;
 import io.grpc.StatusRuntimeException;
@@ -39,8 +39,7 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
 
   @Override
   public void getActionResult(
-      GetActionResultRequest request,
-      StreamObserver<ActionResult> responseObserver) {
+      GetActionResultRequest request, StreamObserver<ActionResult> responseObserver) {
     Instance instance;
     try {
       instance = instances.get(request.getInstanceName());
@@ -50,8 +49,8 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
     }
 
     try {
-      ActionResult actionResult = instance.getActionResult(
-          DigestUtil.asActionKey(request.getActionDigest()));
+      ActionResult actionResult =
+          instance.getActionResult(DigestUtil.asActionKey(request.getActionDigest()));
       if (actionResult == null) {
         responseObserver.onError(Status.NOT_FOUND.asException());
       } else {
@@ -69,8 +68,7 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
 
   @Override
   public void updateActionResult(
-      UpdateActionResultRequest request,
-      StreamObserver<ActionResult> responseObserver) {
+      UpdateActionResultRequest request, StreamObserver<ActionResult> responseObserver) {
     Instance instance;
     try {
       instance = instances.get(request.getInstanceName());
@@ -81,9 +79,7 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
 
     ActionResult actionResult = request.getActionResult();
     try {
-      instance.putActionResult(
-          DigestUtil.asActionKey(request.getActionDigest()),
-          actionResult);
+      instance.putActionResult(DigestUtil.asActionKey(request.getActionDigest()), actionResult);
 
       responseObserver.onNext(actionResult);
       responseObserver.onCompleted();

@@ -14,18 +14,16 @@
 
 package build.buildfarm.worker.shard;
 
-import static com.google.common.util.concurrent.Futures.transform;
-import static com.google.common.util.concurrent.Futures.allAsList;
 import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
-import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.ExecutionStage;
-import build.bazel.remote.execution.v2.ResultsCachePolicy;
+import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
@@ -52,7 +50,6 @@ import io.grpc.Status;
 import io.grpc.Status.Code;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.ServerCallStreamObserver;
-import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.concurrent.TimeUnit;
@@ -72,7 +69,8 @@ public class ShardWorkerInstance extends AbstractServerInstance {
       ShardBackplane backplane,
       ContentAddressableStorage contentAddressableStorage,
       InputStreamFactory inputStreamFactory,
-      ShardWorkerInstanceConfig config) throws ConfigurationException {
+      ShardWorkerInstanceConfig config)
+      throws ConfigurationException {
     super(name, digestUtil, contentAddressableStorage, null, null, null, null);
     this.config = config;
     this.backplane = backplane;
@@ -94,58 +92,67 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  protected TokenizableIterator<Operation> createOperationsIterator(String pageToken) { throw new UnsupportedOperationException(); }
+  protected TokenizableIterator<Operation> createOperationsIterator(String pageToken) {
+    throw new UnsupportedOperationException();
+  }
 
   @Override
-  protected int getListOperationsDefaultPageSize() { return 1024; }
+  protected int getListOperationsDefaultPageSize() {
+    return 1024;
+  }
 
   @Override
-  protected int getListOperationsMaxPageSize() { return 1024; }
+  protected int getListOperationsMaxPageSize() {
+    return 1024;
+  }
 
   @Override
   public String getBlobName(Digest blobDigest) {
     throw new UnsupportedOperationException();
   }
 
-  private void getBlob(InputStream input, long count, ServerCallStreamObserver<ByteString> blobObserver) {
-    blobObserver.setOnReadyHandler(new Runnable() {
-      long remainingBytes = count;
-      long chunkSize = Math.min(128 * 1024, remainingBytes);
-      byte[] chunk = new byte[(int) chunkSize];
+  private void getBlob(
+      InputStream input, long count, ServerCallStreamObserver<ByteString> blobObserver) {
+    blobObserver.setOnReadyHandler(
+        new Runnable() {
+          long remainingBytes = count;
+          long chunkSize = Math.min(128 * 1024, remainingBytes);
+          byte[] chunk = new byte[(int) chunkSize];
 
-      @Override
-      public void run() {
-        try {
-          while (remainingBytes > 0 && blobObserver.isReady()) {
-            int n = input.read(chunk);
-            if (n < 0) {
-              throw new IOException("read beyond file limit with " + remainingBytes + " remaining");
+          @Override
+          public void run() {
+            try {
+              while (remainingBytes > 0 && blobObserver.isReady()) {
+                int n = input.read(chunk);
+                if (n < 0) {
+                  throw new IOException(
+                      "read beyond file limit with " + remainingBytes + " remaining");
+                }
+                if (n != 0) {
+                  blobObserver.onNext(ByteString.copyFrom(chunk, 0, n));
+                  remainingBytes -= n;
+                }
+              }
+              if (remainingBytes <= 0) {
+                input.close();
+                blobObserver.onCompleted();
+              }
+            } catch (IOException e) {
+              try {
+                input.close();
+              } catch (IOException closeEx) {
+                e.addSuppressed(e);
+              }
+              blobObserver.onError(e);
+            } catch (StatusRuntimeException e) {
+              try {
+                input.close();
+              } catch (IOException closeEx) {
+                logger.log(SEVERE, "error closing stream after status exception", closeEx);
+              }
             }
-            if (n != 0) {
-              blobObserver.onNext(ByteString.copyFrom(chunk, 0, n));
-              remainingBytes -= n;
-            }
           }
-          if (remainingBytes <= 0) {
-            input.close();
-            blobObserver.onCompleted();
-          }
-        } catch (IOException e) {
-          try {
-            input.close();
-          } catch (IOException closeEx) {
-            e.addSuppressed(e);
-          }
-          blobObserver.onError(e);
-        } catch (StatusRuntimeException e) {
-          try {
-            input.close();
-          } catch (IOException closeEx) {
-            logger.log(SEVERE, "error closing stream after status exception", closeEx);
-          }
-        }
-      }
-    });
+        });
   }
 
   @Override
@@ -158,20 +165,29 @@ public class ShardWorkerInstance extends AbstractServerInstance {
     Preconditions.checkState(count != 0);
     try {
       InputStream input = inputStreamFactory.newInput(blobDigest, offset);
-      blobObserver.setOnCancelHandler(() -> {
-        try {
-          input.close();
-        } catch (IOException e) {
-          logger.log(SEVERE, String.format("error closing stream for %s after cancellation", DigestUtil.toString(blobDigest)), e);
-        }
-      });
+      blobObserver.setOnCancelHandler(
+          () -> {
+            try {
+              input.close();
+            } catch (IOException e) {
+              logger.log(
+                  SEVERE,
+                  String.format(
+                      "error closing stream for %s after cancellation",
+                      DigestUtil.toString(blobDigest)),
+                  e);
+            }
+          });
       getBlob(input, count, blobObserver);
     } catch (IOException e) {
       blobObserver.onError(Status.NOT_FOUND.withCause(e).asException());
       try {
         backplane.removeBlobLocation(blobDigest, getName());
       } catch (IOException backplaneException) {
-        logger.log(SEVERE, "error removing blob location for " + DigestUtil.toString(blobDigest), backplaneException);
+        logger.log(
+            SEVERE,
+            "error removing blob location for " + DigestUtil.toString(blobDigest),
+            backplaneException);
       }
     } catch (InterruptedException e) {
       blobObserver.onError(Status.CANCELLED.withCause(e).asException());
@@ -200,17 +216,18 @@ public class ShardWorkerInstance extends AbstractServerInstance {
 
   @Override
   public ListenableFuture<Void> execute(
-      Digest actionDigest, 
-      boolean skipCacheLookup, 
-      ExecutionPolicy executionPolicy, 
-      ResultsCachePolicy resultsCachePolicy, 
+      Digest actionDigest,
+      boolean skipCacheLookup,
+      ExecutionPolicy executionPolicy,
+      ResultsCachePolicy resultsCachePolicy,
       RequestMetadata requestMetadata,
       Watcher watcher) {
     throw new UnsupportedOperationException();
   }
 
   @VisibleForTesting
-  public QueueEntry dispatchOperation(MatchListener listener) throws IOException, InterruptedException {
+  public QueueEntry dispatchOperation(MatchListener listener)
+      throws IOException, InterruptedException {
     while (!backplane.isStopped()) {
       listener.onWaitStart();
       try {
@@ -226,8 +243,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
       }
       listener.onWaitEnd();
     }
-    throw new IOException(
-        Status.UNAVAILABLE.withDescription("backplane is stopped").asException());
+    throw new IOException(Status.UNAVAILABLE.withDescription("backplane is stopped").asException());
   }
 
   @Override
@@ -238,7 +254,8 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   @Override
   public boolean putOperation(Operation operation) {
     try {
-      return backplane.putOperation(operation, expectExecuteOperationMetadata(operation).getStage());
+      return backplane.putOperation(
+          operation, expectExecuteOperationMetadata(operation).getStage());
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }
@@ -250,22 +267,34 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  protected boolean matchOperation(Operation operation) { throw new UnsupportedOperationException(); }
+  protected boolean matchOperation(Operation operation) {
+    throw new UnsupportedOperationException();
+  }
 
   @Override
-  protected void enqueueOperation(Operation operation) { throw new UnsupportedOperationException(); }
+  protected void enqueueOperation(Operation operation) {
+    throw new UnsupportedOperationException();
+  }
 
   @Override
-  protected Object operationLock(String operationName) { throw new UnsupportedOperationException(); }
+  protected Object operationLock(String operationName) {
+    throw new UnsupportedOperationException();
+  }
 
   @Override
-  protected Operation createOperation(ActionKey actionKey) { throw new UnsupportedOperationException(); }
+  protected Operation createOperation(ActionKey actionKey) {
+    throw new UnsupportedOperationException();
+  }
 
   @Override
-  protected int getTreeDefaultPageSize() { return 1024; }
+  protected int getTreeDefaultPageSize() {
+    return 1024;
+  }
 
   @Override
-  protected int getTreeMaxPageSize() { return 1024; }
+  protected int getTreeMaxPageSize() {
+    return 1024;
+  }
 
   @Override
   public Operation getOperation(String name) {
@@ -293,33 +322,42 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  public ListenableFuture<Void> watchOperation(
-      String operationName,
-      Watcher watcher) {
+  public ListenableFuture<Void> watchOperation(String operationName, Watcher watcher) {
     throw new UnsupportedOperationException();
   }
 
-  protected static ExecuteOperationMetadata expectExecuteOperationMetadata(
-      Operation operation) {
+  protected static ExecuteOperationMetadata expectExecuteOperationMetadata(Operation operation) {
     if (operation.getMetadata().is(QueuedOperationMetadata.class)) {
       try {
-        return operation.getMetadata().unpack(QueuedOperationMetadata.class).getExecuteOperationMetadata();
-      } catch(InvalidProtocolBufferException e) {
-        logger.log(SEVERE, "error unpacking queued operation metadata from " + operation.getName(), e);
+        return operation
+            .getMetadata()
+            .unpack(QueuedOperationMetadata.class)
+            .getExecuteOperationMetadata();
+      } catch (InvalidProtocolBufferException e) {
+        logger.log(
+            SEVERE, "error unpacking queued operation metadata from " + operation.getName(), e);
         return null;
       }
     } else if (operation.getMetadata().is(ExecutingOperationMetadata.class)) {
       try {
-        return operation.getMetadata().unpack(ExecutingOperationMetadata.class).getExecuteOperationMetadata();
-      } catch(InvalidProtocolBufferException e) {
-        logger.log(SEVERE, "error unpacking executing operation metadata from " + operation.getName(), e);
+        return operation
+            .getMetadata()
+            .unpack(ExecutingOperationMetadata.class)
+            .getExecuteOperationMetadata();
+      } catch (InvalidProtocolBufferException e) {
+        logger.log(
+            SEVERE, "error unpacking executing operation metadata from " + operation.getName(), e);
         return null;
       }
     } else if (operation.getMetadata().is(CompletedOperationMetadata.class)) {
       try {
-        return operation.getMetadata().unpack(CompletedOperationMetadata.class).getExecuteOperationMetadata();
-      } catch(InvalidProtocolBufferException e) {
-        logger.log(SEVERE, "error unpacking completed operation metadata from " + operation.getName(), e);
+        return operation
+            .getMetadata()
+            .unpack(CompletedOperationMetadata.class)
+            .getExecuteOperationMetadata();
+      } catch (InvalidProtocolBufferException e) {
+        logger.log(
+            SEVERE, "error unpacking completed operation metadata from " + operation.getName(), e);
         return null;
       }
     } else {
@@ -328,16 +366,19 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   public Operation stripOperation(Operation operation) {
-    return operation.toBuilder()
+    return operation
+        .toBuilder()
         .setMetadata(Any.pack(expectExecuteOperationMetadata(operation)))
         .build();
   }
 
   public Operation stripQueuedOperation(Operation operation) {
     if (operation.getMetadata().is(QueuedOperationMetadata.class)) {
-      operation = operation.toBuilder()
-          .setMetadata(Any.pack(expectExecuteOperationMetadata(operation)))
-          .build();
+      operation =
+          operation
+              .toBuilder()
+              .setMetadata(Any.pack(expectExecuteOperationMetadata(operation)))
+              .build();
     }
     return operation;
   }

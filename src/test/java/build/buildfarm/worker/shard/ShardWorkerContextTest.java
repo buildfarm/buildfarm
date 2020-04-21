@@ -54,31 +54,23 @@ public class ShardWorkerContextTest {
 
   private Path root;
 
-  @Mock
-  private ShardBackplane backplane;
+  @Mock private ShardBackplane backplane;
 
-  @Mock
-  private ExecFileSystem execFileSystem;
+  @Mock private ExecFileSystem execFileSystem;
 
-  @Mock
-  private InputStreamFactory inputStreamFactory;
+  @Mock private InputStreamFactory inputStreamFactory;
 
-  @Mock
-  private Instance instance;
+  @Mock private Instance instance;
 
   @Before
   public void setUp() throws Exception {
     MockitoAnnotations.initMocks(this);
     when(instance.getDigestUtil()).thenReturn(DIGEST_UTIL);
-    root = Iterables.getFirst(
-        Jimfs.newFileSystem(Configuration.unix()).getRootDirectories(),
-        null);
+    root = Iterables.getFirst(Jimfs.newFileSystem(Configuration.unix()).getRootDirectories(), null);
   }
 
   WorkerContext createTestContext() {
-    return createTestContext(
-        Platform.getDefaultInstance(),
-        /* policies=*/ ImmutableList.of());
+    return createTestContext(Platform.getDefaultInstance(), /* policies=*/ ImmutableList.of());
   }
 
   WorkerContext createTestContext(Platform platform, Iterable<ExecutionPolicy> policies) {
@@ -86,7 +78,9 @@ public class ShardWorkerContextTest {
         "test",
         platform,
         /* operationPollPeriod=*/ Duration.getDefaultInstance(),
-        /* operationPoller=*/ (queueEntry, stage, requeueAt) -> { return false; },
+        /* operationPoller=*/ (queueEntry, stage, requeueAt) -> {
+          return false;
+        },
         /* inlineContentLimit=*/ 0,
         /* inputFetchStageWidth=*/ 0,
         /* executeStageWidth=*/ 0,
@@ -115,19 +109,16 @@ public class ShardWorkerContextTest {
 
   @Test
   public void queueEntryWithExecutionPolicyPlatformMatches() throws Exception {
-    WorkerContext context = createTestContext(
-        Platform.getDefaultInstance(),
-        ImmutableList.of(ExecutionPolicy.newBuilder().setName("foo").build()));
-    Platform matchPlatform = Platform.newBuilder()
-        .addProperties(
-            Property.newBuilder()
-                .setName("execution-policy")
-                .setValue("foo")
-                .build())
-        .build();
-    QueueEntry queueEntry = QueueEntry.newBuilder()
-        .setPlatform(matchPlatform)
-        .build();
+    WorkerContext context =
+        createTestContext(
+            Platform.getDefaultInstance(),
+            ImmutableList.of(ExecutionPolicy.newBuilder().setName("foo").build()));
+    Platform matchPlatform =
+        Platform.newBuilder()
+            .addProperties(
+                Property.newBuilder().setName("execution-policy").setValue("foo").build())
+            .build();
+    QueueEntry queueEntry = QueueEntry.newBuilder().setPlatform(matchPlatform).build();
     when(backplane.dispatchOperation())
         .thenReturn(queueEntry)
         .thenReturn(null); // provide a match completion in failure case

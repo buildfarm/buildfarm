@@ -108,8 +108,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
             parseUploadBlobUUID(resourceName));
       case OperationStream:
         return ByteStreamService.getOperationStreamWrite(
-            instances.getFromOperationStream(resourceName),
-            resourceName);
+            instances.getFromOperationStream(resourceName), resourceName);
       case Blob:
       default:
         throw INVALID_ARGUMENT
@@ -144,15 +143,11 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   }
 
   void commitActive(long committedSize) {
-    WriteResponse response = WriteResponse.newBuilder()
-        .setCommittedSize(committedSize)
-        .build();
+    WriteResponse response = WriteResponse.newBuilder().setCommittedSize(committedSize).build();
 
     try {
       logger.finest(format("delivering committed_size for %s of %d", name, committedSize));
-      responseObserver.onNext(WriteResponse.newBuilder()
-          .setCommittedSize(committedSize)
-          .build());
+      responseObserver.onNext(WriteResponse.newBuilder().setCommittedSize(committedSize).build());
       responseObserver.onCompleted();
     } catch (Exception e) {
       logger.log(SEVERE, format("error delivering committed_size to %s", name), e);
@@ -162,9 +157,8 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private void initialize(WriteRequest request) {
     String resourceName = request.getResourceName();
     if (resourceName.isEmpty()) {
-      responseObserver.onError(INVALID_ARGUMENT
-          .withDescription("resource_name is empty")
-          .asException());
+      responseObserver.onError(
+          INVALID_ARGUMENT.withDescription("resource_name is empty").asException());
     } else {
       name = resourceName;
       try {
@@ -172,19 +166,15 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
         logger.finest(
             format(
                 "registering callback for %s: committed_size = %d, complete = %s",
-                resourceName,
-                write.getCommittedSize(),
-                write.isComplete()));
-        write.addListener(
-            this::commit,
-            withCancellation.fixedContextExecutor(directExecutor()));
+                resourceName, write.getCommittedSize(), write.isComplete()));
+        write.addListener(this::commit, withCancellation.fixedContextExecutor(directExecutor()));
         if (!write.isComplete()) {
           initialized = true;
           handleRequest(request);
         }
       } catch (InstanceNotFoundException e) {
         responseObserver.onError(BuildFarmInstances.toStatusException(e));
-      } catch (InvalidResourceNameException|RuntimeException e) {
+      } catch (InvalidResourceNameException | RuntimeException e) {
         logger.log(WARNING, format("write: %s", request), e);
         responseObserver.onError(Status.fromThrowable(e).asException());
       }
@@ -197,17 +187,10 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
       resourceName = name;
     }
     handleWrite(
-        resourceName,
-        request.getWriteOffset(),
-        request.getData(),
-        request.getFinishWrite());
+        resourceName, request.getWriteOffset(), request.getData(), request.getFinishWrite());
   }
 
-  private void handleWrite(
-      String resourceName,
-      long offset,
-      ByteString data,
-      boolean finishWrite) {
+  private void handleWrite(String resourceName, long offset, ByteString data, boolean finishWrite) {
     long committedSize = write.getCommittedSize();
     if (offset != 0 && offset != committedSize) {
       // we are synchronized here for delivery, but not for asynchronous completion
@@ -215,14 +198,20 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
       // offset mismatch, perform nothing further and release sync to allow the
       // callback to complete the write
       if (!write.isComplete()) {
-        responseObserver.onError(INVALID_ARGUMENT
-            .withDescription(format("offset %d does not match committed size %d", offset, committedSize))
-            .asException());
+        responseObserver.onError(
+            INVALID_ARGUMENT
+                .withDescription(
+                    format("offset %d does not match committed size %d", offset, committedSize))
+                .asException());
       }
     } else if (!resourceName.equals(name)) {
-      responseObserver.onError(INVALID_ARGUMENT
-          .withDescription(format("request resource_name %s does not match previous resource_name %s", resourceName, name))
-          .asException());
+      responseObserver.onError(
+          INVALID_ARGUMENT
+              .withDescription(
+                  format(
+                      "request resource_name %s does not match previous resource_name %s",
+                      resourceName, name))
+              .asException());
     } else {
       if (offset == 0 && offset != committedSize) {
         write.reset();
@@ -230,7 +219,8 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
 
       logger.finest(
           format(
-              "writing %d to %s at %d%s", data.size(), name, offset, finishWrite ? " with finish_write" : ""));
+              "writing %d to %s at %d%s",
+              data.size(), name, offset, finishWrite ? " with finish_write" : ""));
       if (!data.isEmpty()) {
         writeData(data);
       }
@@ -245,9 +235,8 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
     try {
       getOutput().close();
     } catch (DigestMismatchException e) {
-      responseObserver.onError(Status.INVALID_ARGUMENT
-          .withDescription(e.getMessage())
-          .asException());
+      responseObserver.onError(
+          Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asException());
     } catch (IOException e) {
       logger.log(SEVERE, "error closing stream for " + name, e);
       responseObserver.onError(Status.fromThrowable(e).asException());

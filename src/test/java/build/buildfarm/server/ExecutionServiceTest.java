@@ -16,13 +16,12 @@ package build.buildfarm.server;
 
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
-import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-import build.buildfarm.instance.Instance;
 import build.buildfarm.server.ExecutionService.KeepaliveWatcher;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
@@ -46,15 +45,16 @@ public class ExecutionServiceTest {
   @Test
   public void keepaliveIsCancelledWithContext() throws Exception {
     ScheduledExecutorService keepaliveScheduler = newSingleThreadScheduledExecutor();
-    ExecutionService service = new ExecutionService(
-        instances,
-        /* keepaliveAfter=*/ 1,
-        /* keepaliveUnit=*/ SECONDS, // far enough in the future that we'll get scheduled and cancelled without executing
-        keepaliveScheduler);
+    ExecutionService service =
+        new ExecutionService(
+            instances,
+            /* keepaliveAfter=*/ 1,
+            /* keepaliveUnit=*/ SECONDS, // far enough in the future that we'll get scheduled and
+                                         // cancelled without executing
+            keepaliveScheduler);
     ServerCallStreamObserver<Operation> response = mock(ServerCallStreamObserver.class);
-    Operation operation = Operation.newBuilder()
-        .setName("immediately-cancelled-watch-operation")
-        .build();
+    Operation operation =
+        Operation.newBuilder().setName("immediately-cancelled-watch-operation").build();
     KeepaliveWatcher watcher = service.createWatcher(response);
     watcher.observe(operation);
     ListenableFuture<?> future = watcher.getFuture();

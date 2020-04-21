@@ -16,10 +16,7 @@ package build.buildfarm.worker.operationqueue;
 
 import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.eq;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 
 import build.bazel.remote.execution.v2.ActionResult;
@@ -32,9 +29,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Chunker;
 import build.buildfarm.v1test.CASInsertionPolicy;
-import build.buildfarm.worker.PipelineStage.NullStage;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.hash.HashCode;
 import com.google.common.jimfs.Configuration;
@@ -47,11 +42,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import javax.naming.ConfigurationException;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 
 public class UploadOutputsTest {
   private static final DigestUtil DIGEST_UTIL = new DigestUtil(DigestUtil.HashFunction.SHA256);
@@ -62,13 +57,10 @@ public class UploadOutputsTest {
   private Path root;
   private ActionResult.Builder resultBuilder;
 
-  @Mock
-  private ByteStreamUploader mockUploader;
+  @Mock private ByteStreamUploader mockUploader;
 
   protected UploadOutputsTest(Configuration config) {
-    this.config = config.toBuilder()
-        .setAttributeViews("posix")
-        .build();
+    this.config = config.toBuilder().setAttributeViews("posix").build();
   }
 
   @Before
@@ -86,25 +78,20 @@ public class UploadOutputsTest {
       throws IOException, StatusException, InterruptedException {
     Files.createDirectory(root.resolve("foo"));
     // maybe make some files...
-    uploadOutputs(
-        ImmutableList.<String>of(),
-        ImmutableList.<String>of("foo"));
-    Tree emptyTree = Tree.newBuilder()
-        .setRoot(Directory.getDefaultInstance())
-        .build();
+    uploadOutputs(ImmutableList.<String>of(), ImmutableList.<String>of("foo"));
+    Tree emptyTree = Tree.newBuilder().setRoot(Directory.getDefaultInstance()).build();
     ByteString emptyTreeBlob = emptyTree.toByteString();
-    ArgumentCaptor<Map<HashCode, Chunker>> uploadCaptor =
-        ArgumentCaptor.forClass(Map.class);
-    verify(mockUploader)
-        .uploadBlobs(uploadCaptor.capture());
+    ArgumentCaptor<Map<HashCode, Chunker>> uploadCaptor = ArgumentCaptor.forClass(Map.class);
+    verify(mockUploader).uploadBlobs(uploadCaptor.capture());
     Map<HashCode, Chunker> upload = uploadCaptor.getValue();
     Chunker chunker = upload.get(DIGEST_UTIL.computeHash(emptyTreeBlob));
     assertThat(chunker.next().getData()).isEqualTo(emptyTreeBlob);
-    assertThat(resultBuilder.getOutputDirectoriesList()).containsExactly(
-        OutputDirectory.newBuilder()
-            .setPath("foo")
-            .setTreeDigest(DIGEST_UTIL.compute(emptyTree))
-            .build());
+    assertThat(resultBuilder.getOutputDirectoriesList())
+        .containsExactly(
+            OutputDirectory.newBuilder()
+                .setPath("foo")
+                .setTreeDigest(DIGEST_UTIL.compute(emptyTree))
+                .build());
   }
 
   @Test
@@ -115,33 +102,33 @@ public class UploadOutputsTest {
     Path file = topdir.resolve("bar");
     Files.createFile(file);
     // maybe make some files...
-    uploadOutputs(
-        ImmutableList.<String>of(),
-        ImmutableList.<String>of("foo"));
-    Tree tree = Tree.newBuilder()
-        .setRoot(Directory.newBuilder()
-            .addFiles(FileNode.newBuilder()
-                .setName("bar")
-                .setDigest(DIGEST_UTIL.empty())
-                .setIsExecutable(Files.isExecutable(file))
-                .build())
-            .build())
-        .build();
+    uploadOutputs(ImmutableList.<String>of(), ImmutableList.<String>of("foo"));
+    Tree tree =
+        Tree.newBuilder()
+            .setRoot(
+                Directory.newBuilder()
+                    .addFiles(
+                        FileNode.newBuilder()
+                            .setName("bar")
+                            .setDigest(DIGEST_UTIL.empty())
+                            .setIsExecutable(Files.isExecutable(file))
+                            .build())
+                    .build())
+            .build();
     ByteString treeBlob = tree.toByteString();
-    ArgumentCaptor<Map<HashCode, Chunker>> uploadCaptor =
-        ArgumentCaptor.forClass(Map.class);
-    verify(mockUploader)
-        .uploadBlobs(uploadCaptor.capture());
+    ArgumentCaptor<Map<HashCode, Chunker>> uploadCaptor = ArgumentCaptor.forClass(Map.class);
+    verify(mockUploader).uploadBlobs(uploadCaptor.capture());
     Map<HashCode, Chunker> upload = uploadCaptor.getValue();
     Chunker emptyChunker = upload.get(DIGEST_UTIL.computeHash(ByteString.EMPTY));
     assertThat(emptyChunker.next().getData()).isEqualTo(ByteString.EMPTY);
     Chunker treeChunker = upload.get(DIGEST_UTIL.computeHash(treeBlob));
     assertThat(treeChunker.next().getData()).isEqualTo(treeBlob);
-    assertThat(resultBuilder.getOutputDirectoriesList()).containsExactly(
-        OutputDirectory.newBuilder()
-            .setPath("foo")
-            .setTreeDigest(DIGEST_UTIL.compute(tree))
-            .build());
+    assertThat(resultBuilder.getOutputDirectoriesList())
+        .containsExactly(
+            OutputDirectory.newBuilder()
+                .setPath("foo")
+                .setTreeDigest(DIGEST_UTIL.compute(tree))
+                .build());
   }
 
   @Test
@@ -154,58 +141,54 @@ public class UploadOutputsTest {
     Path file = subdir.resolve("baz");
     Files.createFile(file);
     // maybe make some files...
-    uploadOutputs(
-        ImmutableList.<String>of(),
-        ImmutableList.<String>of("foo"));
-    Directory subDirectory = Directory.newBuilder()
-        .addFiles(FileNode.newBuilder()
-            .setName("baz")
-            .setDigest(DIGEST_UTIL.empty())
-            .setIsExecutable(Files.isExecutable(file))
-            .build())
-        .build();
-    Tree tree = Tree.newBuilder()
-        .setRoot(Directory.newBuilder()
-            .addDirectories(DirectoryNode.newBuilder()
-                .setName("bar")
-                .setDigest(DIGEST_UTIL.compute(subDirectory))
-                .build())
-            .build())
-        .addChildren(subDirectory)
-        .build();
+    uploadOutputs(ImmutableList.<String>of(), ImmutableList.<String>of("foo"));
+    Directory subDirectory =
+        Directory.newBuilder()
+            .addFiles(
+                FileNode.newBuilder()
+                    .setName("baz")
+                    .setDigest(DIGEST_UTIL.empty())
+                    .setIsExecutable(Files.isExecutable(file))
+                    .build())
+            .build();
+    Tree tree =
+        Tree.newBuilder()
+            .setRoot(
+                Directory.newBuilder()
+                    .addDirectories(
+                        DirectoryNode.newBuilder()
+                            .setName("bar")
+                            .setDigest(DIGEST_UTIL.compute(subDirectory))
+                            .build())
+                    .build())
+            .addChildren(subDirectory)
+            .build();
     ByteString treeBlob = tree.toByteString();
-    ArgumentCaptor<Map<HashCode, Chunker>> uploadCaptor =
-        ArgumentCaptor.forClass(Map.class);
-    verify(mockUploader)
-        .uploadBlobs(uploadCaptor.capture());
+    ArgumentCaptor<Map<HashCode, Chunker>> uploadCaptor = ArgumentCaptor.forClass(Map.class);
+    verify(mockUploader).uploadBlobs(uploadCaptor.capture());
     Map<HashCode, Chunker> upload = uploadCaptor.getValue();
     Chunker emptyChunker = upload.get(DIGEST_UTIL.computeHash(ByteString.EMPTY));
     assertThat(emptyChunker.next().getData()).isEqualTo(ByteString.EMPTY);
     Chunker treeChunker = upload.get(DIGEST_UTIL.computeHash(treeBlob));
     assertThat(treeChunker.next().getData()).isEqualTo(treeBlob);
-    assertThat(resultBuilder.getOutputDirectoriesList()).containsExactly(
-        OutputDirectory.newBuilder()
-            .setPath("foo")
-            .setTreeDigest(DIGEST_UTIL.compute(tree))
-            .build());
+    assertThat(resultBuilder.getOutputDirectoriesList())
+        .containsExactly(
+            OutputDirectory.newBuilder()
+                .setPath("foo")
+                .setTreeDigest(DIGEST_UTIL.compute(tree))
+                .build());
   }
 
   @Test
   public void uploadOutputsIgnoresMissingOutputDirectories()
       throws IOException, StatusException, InterruptedException {
-    uploadOutputs(
-        ImmutableList.<String>of(),
-        ImmutableList.<String>of("foo"));
-    Tree emptyTree = Tree.newBuilder()
-        .setRoot(Directory.getDefaultInstance())
-        .build();
-    verify(mockUploader, never())
-        .uploadBlobs(any());
+    uploadOutputs(ImmutableList.<String>of(), ImmutableList.<String>of("foo"));
+    Tree emptyTree = Tree.newBuilder().setRoot(Directory.getDefaultInstance()).build();
+    verify(mockUploader, never()).uploadBlobs(any());
   }
 
-  private void uploadOutputs(
-      Iterable<String> files,
-      Iterable<String> directories) throws IOException, InterruptedException {
+  private void uploadOutputs(Iterable<String> files, Iterable<String> directories)
+      throws IOException, InterruptedException {
     Worker.uploadOutputs(
         resultBuilder,
         DIGEST_UTIL,
@@ -219,21 +202,17 @@ public class UploadOutputsTest {
         CASInsertionPolicy.ALWAYS_INSERT);
   }
 
-  @Test(expected=IllegalStateException.class)
+  @Test(expected = IllegalStateException.class)
   public void uploadOutputsThrowsIllegalStateExceptionWhenOutputFileIsDirectory()
       throws IOException, InterruptedException {
     Files.createDirectory(root.resolve("foo"));
-    uploadOutputs(
-        ImmutableList.<String>of("foo"),
-        ImmutableList.<String>of());
+    uploadOutputs(ImmutableList.<String>of("foo"), ImmutableList.<String>of());
   }
 
-  @Test(expected=IllegalStateException.class)
+  @Test(expected = IllegalStateException.class)
   public void uploadOutputsThrowsIllegalStateExceptionWhenOutputDirectoryIsFile()
       throws IOException, InterruptedException {
     Files.createFile(root.resolve("foo"));
-    uploadOutputs(
-        ImmutableList.<String>of(),
-        ImmutableList.<String>of("foo"));
+    uploadOutputs(ImmutableList.<String>of(), ImmutableList.<String>of("foo"));
   }
 }

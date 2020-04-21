@@ -53,13 +53,11 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.jimfs.Configuration;
 import com.google.common.jimfs.Jimfs;
-import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
-import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.protobuf.ByteString;
 import io.grpc.Deadline;
-import java.io.InputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.channels.ClosedChannelException;
 import java.nio.charset.StandardCharsets;
@@ -67,7 +65,6 @@ import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -97,14 +94,11 @@ class CASFileCacheTest {
   private Map<Digest, ByteString> blobs;
   private ExecutorService putService;
 
-  @Mock
-  private Consumer<Digest> onPut;
+  @Mock private Consumer<Digest> onPut;
 
-  @Mock
-  private Consumer<Iterable<Digest>> onExpire;
+  @Mock private Consumer<Iterable<Digest>> onExpire;
 
-  @Mock
-  private ContentAddressableStorage delegate;
+  @Mock private ContentAddressableStorage delegate;
 
   private ExecutorService expireService;
 
@@ -117,32 +111,35 @@ class CASFileCacheTest {
   @Before
   public void setUp() throws IOException, InterruptedException {
     MockitoAnnotations.initMocks(this);
-    when(delegate.getWrite(any(Digest.class), any(UUID.class), any(RequestMetadata.class))).thenReturn(new NullWrite());
-    when(delegate.newInput(any(Digest.class), any(Long.class))).thenThrow(new NoSuchFileException("null sink delegate"));
+    when(delegate.getWrite(any(Digest.class), any(UUID.class), any(RequestMetadata.class)))
+        .thenReturn(new NullWrite());
+    when(delegate.newInput(any(Digest.class), any(Long.class)))
+        .thenThrow(new NoSuchFileException("null sink delegate"));
     blobs = Maps.newHashMap();
     putService = newSingleThreadExecutor();
     storage = Maps.newConcurrentMap();
     expireService = newSingleThreadExecutor();
-    fileCache = new CASFileCache(
-        root,
-        /* maxSizeInBytes=*/ 1024,
-        /* maxEntrySizeInBytes=*/ 1024,
-        DIGEST_UTIL,
-        expireService,
-        /* accessRecorder=*/ directExecutor(),
-        storage,
-        onPut,
-        onExpire,
-        delegate) {
-      @Override
-      protected InputStream newExternalInput(Digest digest, long offset) throws IOException {
-        ByteString content = blobs.get(digest);
-        if (content == null) {
-          return fileCache.newTransparentInput(digest, offset);
-        }
-        return content.substring((int) offset).newInput();
-      }
-    };
+    fileCache =
+        new CASFileCache(
+            root,
+            /* maxSizeInBytes=*/ 1024,
+            /* maxEntrySizeInBytes=*/ 1024,
+            DIGEST_UTIL,
+            expireService,
+            /* accessRecorder=*/ directExecutor(),
+            storage,
+            onPut,
+            onExpire,
+            delegate) {
+          @Override
+          protected InputStream newExternalInput(Digest digest, long offset) throws IOException {
+            ByteString content = blobs.get(digest);
+            if (content == null) {
+              return fileCache.newTransparentInput(digest, offset);
+            }
+            return content.substring((int) offset).newInput();
+          }
+        };
   }
 
   @After
@@ -167,18 +164,20 @@ class CASFileCacheTest {
   @Test(expected = IllegalStateException.class)
   public void putEmptyFileThrowsIllegalStateException() throws IOException, InterruptedException {
     InputStreamFactory mockInputStreamFactory = mock(InputStreamFactory.class);
-    CASFileCache fileCache = new CASFileCache(
-        root,
-        /* maxSizeInBytes=*/ 1024,
-        /* maxEntrySizeInBytes=*/ 1024,
-        DIGEST_UTIL,
-        /* expireService=*/ newDirectExecutorService(),
-        /* accessRecorder=*/ directExecutor()) {
-      @Override
-      protected InputStream newExternalInput(Digest digest, long offset) throws IOException, InterruptedException {
-        return mockInputStreamFactory.newInput(digest, offset);
-      }
-    };
+    CASFileCache fileCache =
+        new CASFileCache(
+            root,
+            /* maxSizeInBytes=*/ 1024,
+            /* maxEntrySizeInBytes=*/ 1024,
+            DIGEST_UTIL,
+            /* expireService=*/ newDirectExecutorService(),
+            /* accessRecorder=*/ directExecutor()) {
+          @Override
+          protected InputStream newExternalInput(Digest digest, long offset)
+              throws IOException, InterruptedException {
+            return mockInputStreamFactory.newInput(digest, offset);
+          }
+        };
 
     ByteString blob = ByteString.copyFromUtf8("");
     Digest blobDigest = DIGEST_UTIL.compute(blob);
@@ -208,22 +207,20 @@ class CASFileCacheTest {
     blobs.put(fileDigest, file);
     Directory subDirectory = Directory.getDefaultInstance();
     Digest subdirDigest = DIGEST_UTIL.compute(subDirectory);
-    Directory directory = Directory.newBuilder()
-        .addFiles(FileNode.newBuilder()
-            .setName("file")
-            .setDigest(fileDigest)
-            .build())
-        .addDirectories(DirectoryNode.newBuilder()
-            .setName("subdir")
-            .setDigest(subdirDigest)
-            .build())
-        .build();
+    Directory directory =
+        Directory.newBuilder()
+            .addFiles(FileNode.newBuilder().setName("file").setDigest(fileDigest).build())
+            .addDirectories(
+                DirectoryNode.newBuilder().setName("subdir").setDigest(subdirDigest).build())
+            .build();
     Digest dirDigest = DIGEST_UTIL.compute(directory);
-    Map<Digest, Directory> directoriesIndex = ImmutableMap.of(
-        dirDigest, directory,
-        subdirDigest, subDirectory);
-    Path dirPath = getInterruptiblyOrIOException(
-        fileCache.putDirectory(dirDigest, directoriesIndex, putService));
+    Map<Digest, Directory> directoriesIndex =
+        ImmutableMap.of(
+            dirDigest, directory,
+            subdirDigest, subDirectory);
+    Path dirPath =
+        getInterruptiblyOrIOException(
+            fileCache.putDirectory(dirDigest, directoriesIndex, putService));
     assertThat(Files.isDirectory(dirPath)).isTrue();
     assertThat(Files.exists(dirPath.resolve("file"))).isTrue();
     assertThat(Files.isDirectory(dirPath.resolve("subdir"))).isTrue();
@@ -236,27 +233,21 @@ class CASFileCacheTest {
     // omitting blobs.put to incur IOException
     Directory subDirectory = Directory.getDefaultInstance();
     Digest subdirDigest = DIGEST_UTIL.compute(subDirectory);
-    Directory directory = Directory.newBuilder()
-        .addFiles(FileNode.newBuilder()
-            .setName("file")
-            .setDigest(fileDigest)
-            .build())
-        .addDirectories(DirectoryNode.newBuilder()
-            .setName("subdir")
-            .setDigest(subdirDigest)
-            .build())
-        .build();
+    Directory directory =
+        Directory.newBuilder()
+            .addFiles(FileNode.newBuilder().setName("file").setDigest(fileDigest).build())
+            .addDirectories(
+                DirectoryNode.newBuilder().setName("subdir").setDigest(subdirDigest).build())
+            .build();
     Digest dirDigest = DIGEST_UTIL.compute(directory);
-    Map<Digest, Directory> directoriesIndex = ImmutableMap.of(
-        dirDigest, directory,
-        subdirDigest, subDirectory);
+    Map<Digest, Directory> directoriesIndex =
+        ImmutableMap.of(
+            dirDigest, directory,
+            subdirDigest, subDirectory);
     boolean exceptionHandled = false;
     try {
       getInterruptiblyOrIOException(
-          fileCache.putDirectory(
-              dirDigest,
-              directoriesIndex,
-              putService));
+          fileCache.putDirectory(dirDigest, directoriesIndex, putService));
     } catch (PutDirectoryException e) {
       exceptionHandled = true;
     }
@@ -310,10 +301,9 @@ class CASFileCacheTest {
     ByteString validBlob = ByteString.copyFromUtf8("valid");
     Digest validDigest = DIGEST_UTIL.compute(ByteString.copyFromUtf8("valid"));
     Path invalidSize = root.resolve(validDigest.getHash() + "_ten");
-    Path incorrectSize = fileCache.getKey(validDigest
-        .toBuilder()
-        .setSizeBytes(validDigest.getSizeBytes() + 1)
-        .build(), false);
+    Path incorrectSize =
+        fileCache.getKey(
+            validDigest.toBuilder().setSizeBytes(validDigest.getSizeBytes() + 1).build(), false);
     Path invalidExec = fileCache.getPath(CASFileCache.getFileName(validDigest, false) + "_regular");
 
     Files.write(tooFewComponents, ImmutableList.of("Too Few Components"), StandardCharsets.UTF_8);
@@ -321,7 +311,8 @@ class CASFileCacheTest {
     Files.write(invalidDigest, ImmutableList.of("Digest is not valid"), StandardCharsets.UTF_8);
     Files.write(invalidSize, validBlob.toByteArray()); // content would match but for size field
     Files.write(incorrectSize, validBlob.toByteArray()); // content would match but for size match
-    Files.write(invalidExec, validBlob.toByteArray()); // content would match but for invalid exec field
+    Files.write(
+        invalidExec, validBlob.toByteArray()); // content would match but for invalid exec field
 
     fileCache.start();
 
@@ -335,10 +326,8 @@ class CASFileCacheTest {
 
   @Test
   public void newInputRemovesNonExistentEntry() throws IOException, InterruptedException {
-    Digest nonexistentDigest = Digest.newBuilder()
-        .setHash("file_does_not_exist")
-        .setSizeBytes(1)
-        .build();
+    Digest nonexistentDigest =
+        Digest.newBuilder().setHash("file_does_not_exist").setSizeBytes(1).build();
     Path nonexistentKey = fileCache.getKey(nonexistentDigest, false);
     Entry entry = new Entry(nonexistentKey, 1, null, Deadline.after(10, SECONDS));
     entry.before = entry;
@@ -356,7 +345,8 @@ class CASFileCacheTest {
   }
 
   @Test
-  public void expireEntryWaitsForUnreferencedEntry() throws ExecutionException, IOException, InterruptedException {
+  public void expireEntryWaitsForUnreferencedEntry()
+      throws ExecutionException, IOException, InterruptedException {
     byte[] bigData = new byte[1023];
     Arrays.fill(bigData, (byte) 1);
     ByteString bigContent = ByteString.copyFrom(bigData);
@@ -366,17 +356,19 @@ class CASFileCacheTest {
 
     AtomicBoolean started = new AtomicBoolean(false);
     ExecutorService service = newSingleThreadExecutor();
-    Future<Void> putFuture = service.submit(new Callable<Void>() {
-      @Override
-      public Void call() throws IOException, InterruptedException {
-        started.set(true);
-        ByteString content = ByteString.copyFromUtf8("CAS Would Exceed Max Size");
-        Digest digest = DIGEST_UTIL.compute(content);
-        blobs.put(digest, content);
-        fileCache.put(digest, /* isExecutable=*/ false);
-        return null;
-      }
-    });
+    Future<Void> putFuture =
+        service.submit(
+            new Callable<Void>() {
+              @Override
+              public Void call() throws IOException, InterruptedException {
+                started.set(true);
+                ByteString content = ByteString.copyFromUtf8("CAS Would Exceed Max Size");
+                Digest digest = DIGEST_UTIL.compute(content);
+                blobs.put(digest, content);
+                fileCache.put(digest, /* isExecutable=*/ false);
+                return null;
+              }
+            });
     while (!started.get()) {
       MICROSECONDS.sleep(1);
     }
@@ -407,7 +399,8 @@ class CASFileCacheTest {
     Path pathOne = fileCache.put(digestOne, /* isExecutable=*/ false);
     Path pathTwo = fileCache.put(digestTwo, /* isExecutable=*/ false);
     Path pathThree = fileCache.put(digestThree, /* isExecutable=*/ false);
-    fileCache.decrementReferences(ImmutableList.of(pathOne, pathTwo, pathThree), ImmutableList.of());
+    fileCache.decrementReferences(
+        ImmutableList.of(pathOne, pathTwo, pathThree), ImmutableList.of());
     /* three -> two -> one */
     assertThat(storage.get(pathOne).after).isEqualTo(storage.get(pathTwo));
     assertThat(storage.get(pathTwo).after).isEqualTo(storage.get(pathThree));
@@ -429,9 +422,7 @@ class CASFileCacheTest {
 
     AtomicBoolean notified = new AtomicBoolean(false);
     Write write = getWrite(digest);
-    write.addListener(
-        () -> notified.set(true),
-        directExecutor());
+    write.addListener(() -> notified.set(true), directExecutor());
     try (OutputStream out = write.getOutput(1, SECONDS, () -> {})) {
       content.writeTo(out);
     }
@@ -452,9 +443,7 @@ class CASFileCacheTest {
     Write incompleteWrite = getWrite(digest);
     AtomicBoolean notified = new AtomicBoolean(false);
     // both should be size committed
-    incompleteWrite.addListener(
-        () -> notified.set(true),
-        directExecutor());
+    incompleteWrite.addListener(() -> notified.set(true), directExecutor());
     OutputStream incompleteOut = incompleteWrite.getOutput(1, SECONDS, () -> {});
     try (OutputStream out = completingWrite.getOutput(1, SECONDS, () -> {})) {
       assertThat(fileCache.size()).isEqualTo(digest.getSizeBytes() * 2);
@@ -480,9 +469,7 @@ class CASFileCacheTest {
     }
     Write write = fileCache.getWrite(digest, writeId, RequestMetadata.getDefaultInstance());
     AtomicBoolean notified = new AtomicBoolean(false);
-    write.addListener(
-        () -> notified.set(true),
-        directExecutor());
+    write.addListener(() -> notified.set(true), directExecutor());
     assertThat(write.getCommittedSize()).isEqualTo(6);
     try (OutputStream out = write.getOutput(1, SECONDS, () -> {})) {
       content.substring(6).writeTo(out);
@@ -525,10 +512,11 @@ class CASFileCacheTest {
 
   @Test
   public void emptyWriteIsComplete() {
-    Write write = fileCache.getWrite(
-        DIGEST_UTIL.compute(ByteString.EMPTY),
-        UUID.randomUUID(),
-        RequestMetadata.getDefaultInstance());
+    Write write =
+        fileCache.getWrite(
+            DIGEST_UTIL.compute(ByteString.EMPTY),
+            UUID.randomUUID(),
+            RequestMetadata.getDefaultInstance());
     assertThat(write.isComplete()).isTrue();
   }
 
@@ -545,40 +533,40 @@ class CASFileCacheTest {
     Digest expiringDigest = expiringBlob.getDigest();
 
     // set the delegate to throw interrupted on write output creation
-    Write interruptingWrite = new Write() {
-      boolean canReset = false;
+    Write interruptingWrite =
+        new Write() {
+          boolean canReset = false;
 
-      @Override
-      public long getCommittedSize() {
-        throw new UnsupportedOperationException();
-      }
+          @Override
+          public long getCommittedSize() {
+            throw new UnsupportedOperationException();
+          }
 
-      @Override
-      public boolean isComplete() {
-        throw new UnsupportedOperationException();
-      }
+          @Override
+          public boolean isComplete() {
+            throw new UnsupportedOperationException();
+          }
 
-      @Override
-      public FeedbackOutputStream getOutput(
-          long deadlineAfter,
-          TimeUnit deadlineAfterUnits,
-          Runnable onReadyHandler) throws IOException {
-        canReset = true;
-        throw new IOException(new InterruptedException());
-      }
+          @Override
+          public FeedbackOutputStream getOutput(
+              long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler)
+              throws IOException {
+            canReset = true;
+            throw new IOException(new InterruptedException());
+          }
 
-      @Override
-      public void reset() {
-        if (!canReset) {
-          throw new UnsupportedOperationException();
-        }
-      }
+          @Override
+          public void reset() {
+            if (!canReset) {
+              throw new UnsupportedOperationException();
+            }
+          }
 
-      @Override
-      public void addListener(Runnable onCompleted, Executor executor) {
-        throw new UnsupportedOperationException();
-      }
-    };
+          @Override
+          public void addListener(Runnable onCompleted, Executor executor) {
+            throw new UnsupportedOperationException();
+          }
+        };
     when(delegate.getWrite(eq(expiringDigest), any(UUID.class), any(RequestMetadata.class)))
         .thenReturn(interruptingWrite);
 
@@ -592,7 +580,8 @@ class CASFileCacheTest {
     }
     assertThat(sequenceException).isNotNull();
 
-    verify(delegate, times(1)).getWrite(eq(expiringDigest), any(UUID.class), any(RequestMetadata.class));
+    verify(delegate, times(1))
+        .getWrite(eq(expiringDigest), any(UUID.class), any(RequestMetadata.class));
   }
 
   void decrementReference(Path path) {
@@ -600,7 +589,8 @@ class CASFileCacheTest {
   }
 
   @Test
-  public void duplicateExpiredEntrySuppressesDigestExpiration() throws IOException, InterruptedException {
+  public void duplicateExpiredEntrySuppressesDigestExpiration()
+      throws IOException, InterruptedException {
     Blob expiringBlob;
     try (ByteString.Output out = ByteString.newOutput(512)) {
       for (int i = 0; i < 512; i++) {
@@ -609,9 +599,13 @@ class CASFileCacheTest {
       expiringBlob = new Blob(out.toByteString(), DIGEST_UTIL);
     }
     blobs.put(expiringBlob.getDigest(), expiringBlob.getData());
-    decrementReference(fileCache.put(expiringBlob.getDigest(), /* isExecutable=*/ false)); // expected eviction
+    decrementReference(
+        fileCache.put(expiringBlob.getDigest(), /* isExecutable=*/ false)); // expected eviction
     blobs.clear();
-    decrementReference(fileCache.put(expiringBlob.getDigest(), /* isExecutable=*/ true)); // should be fed from storage directly, not through delegate
+    decrementReference(
+        fileCache.put(
+            expiringBlob.getDigest(),
+            /* isExecutable=*/ true)); // should be fed from storage directly, not through delegate
 
     fileCache.put(new Blob(ByteString.copyFromUtf8("Hello, World"), DIGEST_UTIL));
 
@@ -641,39 +635,48 @@ class CASFileCacheTest {
     // 2 = delegate write
     AtomicInteger writeState = new AtomicInteger(0);
     // this will ensure that the discharge task is blocked until we release it
-    Future<Void> blockingExpiration = expireService.submit(() -> {
-      writeState.getAndIncrement();
-      while (writeState.get() != 0) {
-        try {
-          MICROSECONDS.sleep(1);
-        } catch (InterruptedException e) {
-          // ignore
-        }
-      }
-      return null;
-    });
-    when(delegate.getWrite(eq(expiringBlob.getDigest()), any(UUID.class), any(RequestMetadata.class))).thenReturn(new NullWrite() {
-      @Override
-      public FeedbackOutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) throws IOException {
-        try {
-          while (writeState.get() != 1) {
-            MICROSECONDS.sleep(1);
-          }
-        } catch (InterruptedException e) {
-          throw new IOException(e);
-        }
-        writeState.getAndIncrement(); // move into output stream state
-        return super.getOutput(deadlineAfter, deadlineAfterUnits, onReadyHandler);
-      }
-    });
-    Thread expiringThread = new Thread(() -> {
-      try {
-        fileCache.put(new Blob(ByteString.copyFromUtf8("Hello, World"), DIGEST_UTIL));
-      } catch (InterruptedException e) {
-        throw new RuntimeException(e);
-      }
-      fail("should not get here");
-    });
+    Future<Void> blockingExpiration =
+        expireService.submit(
+            () -> {
+              writeState.getAndIncrement();
+              while (writeState.get() != 0) {
+                try {
+                  MICROSECONDS.sleep(1);
+                } catch (InterruptedException e) {
+                  // ignore
+                }
+              }
+              return null;
+            });
+    when(delegate.getWrite(
+            eq(expiringBlob.getDigest()), any(UUID.class), any(RequestMetadata.class)))
+        .thenReturn(
+            new NullWrite() {
+              @Override
+              public FeedbackOutputStream getOutput(
+                  long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler)
+                  throws IOException {
+                try {
+                  while (writeState.get() != 1) {
+                    MICROSECONDS.sleep(1);
+                  }
+                } catch (InterruptedException e) {
+                  throw new IOException(e);
+                }
+                writeState.getAndIncrement(); // move into output stream state
+                return super.getOutput(deadlineAfter, deadlineAfterUnits, onReadyHandler);
+              }
+            });
+    Thread expiringThread =
+        new Thread(
+            () -> {
+              try {
+                fileCache.put(new Blob(ByteString.copyFromUtf8("Hello, World"), DIGEST_UTIL));
+              } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+              }
+              fail("should not get here");
+            });
     expiringThread.setUncaughtExceptionHandler((t, e) -> exRef.set(e));
     // wait for blocking state
     while (writeState.get() != 1) {
@@ -735,40 +738,43 @@ class CASFileCacheTest {
     ExecutorService service = newSingleThreadExecutor();
     SettableFuture<Void> writeComplete = SettableFuture.create();
     // we need to register callbacks on the shared write future
-    Write write = new NullWrite() {
-      @Override
-      public void addListener(Runnable onCompleted, Executor executor) {
-        writeComplete.addListener(onCompleted, executor);
-      }
-
-      @Override
-      public FeedbackOutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
-        return new FeedbackOutputStream() {
-          int offset = 0;
-
+    Write write =
+        new NullWrite() {
           @Override
-          public void write(int b) {
-            throw new UnsupportedOperationException();
+          public void addListener(Runnable onCompleted, Executor executor) {
+            writeComplete.addListener(onCompleted, executor);
           }
 
           @Override
-          public void write(byte[] buf, int ofs, int len) throws IOException {
-            // hangs on second read
-            if (offset == 6) {
-              service.submit(() -> writeComplete.set(null));
-              throw new ClosedChannelException();
-            }
-            offset += len;
-          }
+          public FeedbackOutputStream getOutput(
+              long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+            return new FeedbackOutputStream() {
+              int offset = 0;
 
-          @Override
-          public boolean isReady() {
-            return true;
+              @Override
+              public void write(int b) {
+                throw new UnsupportedOperationException();
+              }
+
+              @Override
+              public void write(byte[] buf, int ofs, int len) throws IOException {
+                // hangs on second read
+                if (offset == 6) {
+                  service.submit(() -> writeComplete.set(null));
+                  throw new ClosedChannelException();
+                }
+                offset += len;
+              }
+
+              @Override
+              public boolean isReady() {
+                return true;
+              }
+            };
           }
         };
-      }
-    };
-    when(delegate.getWrite(eq(blob.getDigest()), any(UUID.class), any(RequestMetadata.class))).thenReturn(write);
+    when(delegate.getWrite(eq(blob.getDigest()), any(UUID.class), any(RequestMetadata.class)))
+        .thenReturn(write);
     when(delegate.newInput(eq(blob.getDigest()), eq(0l))).thenReturn(content.newInput());
     // the switch will reset to this point
     InputStream switchedIn = content.newInput();
@@ -794,7 +800,7 @@ class CASFileCacheTest {
     public NativeCASFileCacheTest() throws IOException {
       super(createTempDirectory());
     }
-    
+
     private static Path createTempDirectory() throws IOException {
       if (Thread.interrupted()) {
         throw new RuntimeException(new InterruptedException());
@@ -807,27 +813,25 @@ class CASFileCacheTest {
   @RunWith(JUnit4.class)
   public static class OsXCASFileCacheTest extends CASFileCacheTest {
     public OsXCASFileCacheTest() {
-      super(Iterables.getFirst(
-          Jimfs.newFileSystem(Configuration.osX()).getRootDirectories(),
-          null));
+      super(
+          Iterables.getFirst(Jimfs.newFileSystem(Configuration.osX()).getRootDirectories(), null));
     }
   }
 
   @RunWith(JUnit4.class)
   public static class UnixCASFileCacheTest extends CASFileCacheTest {
     public UnixCASFileCacheTest() {
-      super(Iterables.getFirst(
-          Jimfs.newFileSystem(Configuration.unix()).getRootDirectories(),
-          null));
+      super(
+          Iterables.getFirst(Jimfs.newFileSystem(Configuration.unix()).getRootDirectories(), null));
     }
   }
 
   @RunWith(JUnit4.class)
   public static class WindowsCASFileCacheTest extends CASFileCacheTest {
     public WindowsCASFileCacheTest() {
-      super(Iterables.getFirst(
-          Jimfs.newFileSystem(Configuration.windows()).getRootDirectories(),
-          null));
+      super(
+          Iterables.getFirst(
+              Jimfs.newFileSystem(Configuration.windows()).getRootDirectories(), null));
     }
   }
 }

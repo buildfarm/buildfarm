@@ -14,13 +14,13 @@
 
 package build.buildfarm.instance;
 
-import static com.google.common.truth.Truth.assertThat;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.instance.AbstractServerInstance.ACTION_INPUT_ROOT_DIRECTORY_PATH;
 import static build.buildfarm.instance.AbstractServerInstance.DIRECTORY_NOT_SORTED;
 import static build.buildfarm.instance.AbstractServerInstance.DUPLICATE_DIRENT;
 import static build.buildfarm.instance.AbstractServerInstance.OUTPUT_DIRECTORY_IS_OUTPUT_ANCESTOR;
 import static build.buildfarm.instance.AbstractServerInstance.OUTPUT_FILE_IS_OUTPUT_ANCESTOR;
+import static com.google.common.truth.Truth.assertThat;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
@@ -35,7 +35,6 @@ import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
-import build.buildfarm.common.function.InterruptingPredicate;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -128,9 +127,7 @@ public class AbstractServerInstanceTest {
     }
 
     @Override
-    public ListenableFuture<Void> watchOperation(
-        String operationName,
-        Watcher watcher) {
+    public ListenableFuture<Void> watchOperation(String operationName, Watcher watcher) {
       throw new UnsupportedOperationException();
     }
 
@@ -159,8 +156,7 @@ public class AbstractServerInstanceTest {
   public void duplicateFileInputIsInvalid() {
     AbstractServerInstance instance = new DummyServerInstance();
 
-    PreconditionFailure.Builder preconditionFailure =
-        PreconditionFailure.newBuilder();
+    PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
     instance.validateActionInputDirectory(
         ACTION_INPUT_ROOT_DIRECTORY_PATH,
         Directory.newBuilder()
@@ -188,8 +184,7 @@ public class AbstractServerInstanceTest {
   public void unsortedFileInputIsInvalid() {
     AbstractServerInstance instance = new DummyServerInstance();
 
-    PreconditionFailure.Builder preconditionFailure =
-        PreconditionFailure.newBuilder();
+    PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
     instance.validateActionInputDirectory(
         ACTION_INPUT_ROOT_DIRECTORY_PATH,
         Directory.newBuilder()
@@ -219,8 +214,7 @@ public class AbstractServerInstanceTest {
 
     Directory emptyDirectory = Directory.getDefaultInstance();
     Digest emptyDirectoryDigest = DIGEST_UTIL.compute(emptyDirectory);
-    PreconditionFailure.Builder preconditionFailure =
-        PreconditionFailure.newBuilder();
+    PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
     instance.validateActionInputDirectory(
         ACTION_INPUT_ROOT_DIRECTORY_PATH,
         Directory.newBuilder()
@@ -257,8 +251,7 @@ public class AbstractServerInstanceTest {
 
     Directory emptyDirectory = Directory.getDefaultInstance();
     Digest emptyDirectoryDigest = DIGEST_UTIL.compute(emptyDirectory);
-    PreconditionFailure.Builder preconditionFailure =
-        PreconditionFailure.newBuilder();
+    PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
     instance.validateActionInputDirectory(
         ACTION_INPUT_ROOT_DIRECTORY_PATH,
         Directory.newBuilder()
@@ -290,16 +283,14 @@ public class AbstractServerInstanceTest {
 
   @Test
   public void nestedOutputDirectoriesAreInvalid() {
-    PreconditionFailure.Builder preconditionFailureBuilder =
-        PreconditionFailure.newBuilder();
+    PreconditionFailure.Builder preconditionFailureBuilder = PreconditionFailure.newBuilder();
     AbstractServerInstance.validateOutputs(
         ImmutableSet.<String>of(),
         ImmutableSet.<String>of(),
         ImmutableSet.<String>of(),
         ImmutableSet.<String>of("foo", "foo/bar"),
         preconditionFailureBuilder);
-    PreconditionFailure preconditionFailure =
-        preconditionFailureBuilder.build();
+    PreconditionFailure preconditionFailure = preconditionFailureBuilder.build();
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
     Violation violation = preconditionFailure.getViolationsList().get(0);
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
@@ -309,16 +300,14 @@ public class AbstractServerInstanceTest {
 
   @Test
   public void outputDirectoriesContainingOutputFilesAreInvalid() {
-    PreconditionFailure.Builder preconditionFailureBuilder =
-        PreconditionFailure.newBuilder();
+    PreconditionFailure.Builder preconditionFailureBuilder = PreconditionFailure.newBuilder();
     AbstractServerInstance.validateOutputs(
         ImmutableSet.<String>of(),
         ImmutableSet.<String>of(),
         ImmutableSet.<String>of("foo/bar"),
         ImmutableSet.<String>of("foo"),
         preconditionFailureBuilder);
-    PreconditionFailure preconditionFailure =
-        preconditionFailureBuilder.build();
+    PreconditionFailure preconditionFailure = preconditionFailureBuilder.build();
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
     Violation violation = preconditionFailure.getViolationsList().get(0);
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
@@ -328,16 +317,14 @@ public class AbstractServerInstanceTest {
 
   @Test
   public void outputFilesAsOutputDirectoryAncestorsAreInvalid() {
-    PreconditionFailure.Builder preconditionFailureBuilder =
-        PreconditionFailure.newBuilder();
+    PreconditionFailure.Builder preconditionFailureBuilder = PreconditionFailure.newBuilder();
     AbstractServerInstance.validateOutputs(
         ImmutableSet.<String>of(),
         ImmutableSet.<String>of(),
         ImmutableSet.<String>of("foo"),
         ImmutableSet.<String>of("foo/bar"),
         preconditionFailureBuilder);
-    PreconditionFailure preconditionFailure =
-        preconditionFailureBuilder.build();
+    PreconditionFailure preconditionFailure = preconditionFailureBuilder.build();
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
     Violation violation = preconditionFailure.getViolationsList().get(0);
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);

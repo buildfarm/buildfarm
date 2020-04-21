@@ -20,10 +20,10 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.eq;
-import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
+import static org.mockito.Mockito.when;
 
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.v1test.DispatchedOperation;
@@ -45,18 +45,17 @@ import org.mockito.MockitoAnnotations;
 
 @RunWith(JUnit4.class)
 public class DispatchedMonitorTest {
-  @Mock
-  private ShardBackplane backplane;
+  @Mock private ShardBackplane backplane;
 
-  @Mock
-  private Function<QueueEntry, ListenableFuture<Void>> requeuer;
+  @Mock private Function<QueueEntry, ListenableFuture<Void>> requeuer;
 
   private DispatchedMonitor dispatchedMonitor;
 
   @Before
   public void setUp() throws InterruptedException {
     MockitoAnnotations.initMocks(this);
-    when(requeuer.apply(any(QueueEntry.class))).thenReturn(immediateFailedFuture(new RuntimeException("unexpected requeue")));
+    when(requeuer.apply(any(QueueEntry.class)))
+        .thenReturn(immediateFailedFuture(new RuntimeException("unexpected requeue")));
     dispatchedMonitor = new DispatchedMonitor(backplane, requeuer, /* intervalSeconds=*/ 0);
   }
 
@@ -72,45 +71,54 @@ public class DispatchedMonitorTest {
   @Test
   public void shouldIgnoreOperationWithFutureRequeueAt() throws Exception {
     when(backplane.canQueue()).thenReturn(true);
-    when(backplane.getDispatchedOperations()).thenReturn(
-        ImmutableList.of(DispatchedOperation.newBuilder()
-            .setRequeueAt(Long.MAX_VALUE)
-            .build()));
+    when(backplane.getDispatchedOperations())
+        .thenReturn(
+            ImmutableList.of(
+                DispatchedOperation.newBuilder().setRequeueAt(Long.MAX_VALUE).build()));
     dispatchedMonitor.iterate();
     verifyZeroInteractions(requeuer);
   }
 
   @Test
   public void shouldRequeueOperationWithEarlyRequeueAt() throws Exception {
-    QueueEntry queueEntry = QueueEntry.newBuilder()
-        .setExecuteEntry(ExecuteEntry.newBuilder()
-            .setOperationName("operation-with-early-requeue-at")
-            .build())
-        .build();
+    QueueEntry queueEntry =
+        QueueEntry.newBuilder()
+            .setExecuteEntry(
+                ExecuteEntry.newBuilder()
+                    .setOperationName("operation-with-early-requeue-at")
+                    .build())
+            .build();
     when(backplane.canQueue()).thenReturn(true);
-    when(backplane.getDispatchedOperations()).thenReturn(
-        ImmutableList.of(DispatchedOperation.newBuilder()
-            .setRequeueAt(0)
-            .setQueueEntry(queueEntry)
-            .build()));
+    when(backplane.getDispatchedOperations())
+        .thenReturn(
+            ImmutableList.of(
+                DispatchedOperation.newBuilder()
+                    .setRequeueAt(0)
+                    .setQueueEntry(queueEntry)
+                    .build()));
     when(requeuer.apply(eq(queueEntry))).thenReturn(immediateFuture(null));
     dispatchedMonitor.iterate();
     verify(requeuer, times(1)).apply(queueEntry);
   }
 
   @Test
-  public void shouldIgnoreOperationWithEarlyRequeueAtWhenBackplaneDisallowsQueueing() throws Exception {
-    QueueEntry queueEntry = QueueEntry.newBuilder()
-        .setExecuteEntry(ExecuteEntry.newBuilder()
-            .setOperationName("operation-with-early-requeue-at")
-            .build())
-        .build();
+  public void shouldIgnoreOperationWithEarlyRequeueAtWhenBackplaneDisallowsQueueing()
+      throws Exception {
+    QueueEntry queueEntry =
+        QueueEntry.newBuilder()
+            .setExecuteEntry(
+                ExecuteEntry.newBuilder()
+                    .setOperationName("operation-with-early-requeue-at")
+                    .build())
+            .build();
     when(backplane.canQueue()).thenReturn(false);
-    when(backplane.getDispatchedOperations()).thenReturn(
-        ImmutableList.of(DispatchedOperation.newBuilder()
-            .setRequeueAt(0)
-            .setQueueEntry(queueEntry)
-            .build()));
+    when(backplane.getDispatchedOperations())
+        .thenReturn(
+            ImmutableList.of(
+                DispatchedOperation.newBuilder()
+                    .setRequeueAt(0)
+                    .setQueueEntry(queueEntry)
+                    .build()));
     when(requeuer.apply(eq(queueEntry))).thenReturn(immediateFuture(null));
     dispatchedMonitor.iterate();
     verifyZeroInteractions(requeuer);
@@ -119,26 +127,31 @@ public class DispatchedMonitorTest {
   @Test
   public void shouldIgnoreBackplaneException() throws Exception {
     when(backplane.canQueue()).thenReturn(true);
-    when(backplane.getDispatchedOperations()).thenThrow(
-        new IOException("transient error condition"));
+    when(backplane.getDispatchedOperations())
+        .thenThrow(new IOException("transient error condition"));
     dispatchedMonitor.iterate();
     verifyZeroInteractions(requeuer);
   }
 
   @Test
   public void shouldIgnoreExecutionException() throws Exception {
-    QueueEntry queueEntry = QueueEntry.newBuilder()
-        .setExecuteEntry(ExecuteEntry.newBuilder()
-            .setOperationName("operation-with-early-requeue-at")
-            .build())
-        .build();
+    QueueEntry queueEntry =
+        QueueEntry.newBuilder()
+            .setExecuteEntry(
+                ExecuteEntry.newBuilder()
+                    .setOperationName("operation-with-early-requeue-at")
+                    .build())
+            .build();
     when(backplane.canQueue()).thenReturn(true);
-    when(backplane.getDispatchedOperations()).thenReturn(
-        ImmutableList.of(DispatchedOperation.newBuilder()
-            .setRequeueAt(0)
-            .setQueueEntry(queueEntry)
-            .build()));
-    when(requeuer.apply(eq(queueEntry))).thenReturn(immediateFailedFuture(new Exception("error during requeue")));
+    when(backplane.getDispatchedOperations())
+        .thenReturn(
+            ImmutableList.of(
+                DispatchedOperation.newBuilder()
+                    .setRequeueAt(0)
+                    .setQueueEntry(queueEntry)
+                    .build()));
+    when(requeuer.apply(eq(queueEntry)))
+        .thenReturn(immediateFailedFuture(new Exception("error during requeue")));
     dispatchedMonitor.iterate();
     verify(requeuer, times(1)).apply(queueEntry);
   }
@@ -148,10 +161,13 @@ public class DispatchedMonitorTest {
     when(backplane.canQueue()).thenReturn(true);
     when(backplane.getDispatchedOperations()).thenReturn(ImmutableList.of());
     AtomicBoolean readyForInterrupt = new AtomicBoolean(false);
-    doAnswer((invocation) -> {
-      readyForInterrupt.set(true);
-      return ImmutableList.of();
-    }).when(backplane).getDispatchedOperations();
+    doAnswer(
+            (invocation) -> {
+              readyForInterrupt.set(true);
+              return ImmutableList.of();
+            })
+        .when(backplane)
+        .getDispatchedOperations();
 
     Thread thread = new Thread(dispatchedMonitor);
     thread.start();
@@ -166,21 +182,21 @@ public class DispatchedMonitorTest {
   public void shouldIterateUntilBackplaneIsStopped() throws IOException {
     when(backplane.canQueue()).thenReturn(true);
     when(backplane.getDispatchedOperations()).thenReturn(ImmutableList.of());
-    when(backplane.isStopped())
-        .thenReturn(false)
-        .thenReturn(true);
+    when(backplane.isStopped()).thenReturn(false).thenReturn(true);
     dispatchedMonitor.run();
     verify(backplane, atLeastOnce()).getDispatchedOperations();
     verify(backplane, times(2)).isStopped();
   }
 
-  @Test(expected=RuntimeException.class)
+  @Test(expected = RuntimeException.class)
   public void getOnlyInterruptiblyShouldPropagateRuntimeExceptions() throws InterruptedException {
-    DispatchedMonitor.getOnlyInterruptibly(immediateFailedFuture(new RuntimeException("spurious exception")));
+    DispatchedMonitor.getOnlyInterruptibly(
+        immediateFailedFuture(new RuntimeException("spurious exception")));
   }
 
-  @Test(expected=UncheckedExecutionException.class)
+  @Test(expected = UncheckedExecutionException.class)
   public void getOnlyInterruptiblyShouldWrapCheckedExceptions() throws InterruptedException {
-    DispatchedMonitor.getOnlyInterruptibly(immediateFailedFuture(new IOException("spurious io exception")));
+    DispatchedMonitor.getOnlyInterruptibly(
+        immediateFailedFuture(new IOException("spurious io exception")));
   }
 }

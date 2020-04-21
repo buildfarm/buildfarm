@@ -16,17 +16,16 @@ package build.buildfarm.common;
 
 import static com.google.common.truth.Truth.assertThat;
 
-import build.buildfarm.common.DigestUtil.HashFunction;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.DigestFunction;
+import build.buildfarm.common.DigestUtil.HashFunction;
 import com.google.protobuf.ByteString;
+import java.io.IOException;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import java.io.IOException;
-import java.io.InputStream;
 
 @RunWith(JUnit4.class)
 public class DigestUtilTest {
@@ -89,9 +88,12 @@ public class DigestUtilTest {
 
   @Test
   public void forHashMatchesName() {
-    assertThat(DigestUtil.forHash("MD5").empty()).isEqualTo(new DigestUtil(HashFunction.get(DigestFunction.Value.MD5)).empty());
-    assertThat(DigestUtil.forHash("SHA1").empty()).isEqualTo(new DigestUtil(HashFunction.get(DigestFunction.Value.SHA1)).empty());
-    assertThat(DigestUtil.forHash("SHA256").empty()).isEqualTo(new DigestUtil(HashFunction.get(DigestFunction.Value.SHA256)).empty());
+    assertThat(DigestUtil.forHash("MD5").empty())
+        .isEqualTo(new DigestUtil(HashFunction.get(DigestFunction.Value.MD5)).empty());
+    assertThat(DigestUtil.forHash("SHA1").empty())
+        .isEqualTo(new DigestUtil(HashFunction.get(DigestFunction.Value.SHA1)).empty());
+    assertThat(DigestUtil.forHash("SHA256").empty())
+        .isEqualTo(new DigestUtil(HashFunction.get(DigestFunction.Value.SHA256)).empty());
   }
 
   @Test

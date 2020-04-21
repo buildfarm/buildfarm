@@ -59,13 +59,14 @@ class ActionCacheRequestCounter {
   }
 
   private void schedule() {
-    ListenableFuture<Void> logFuture = scheduleAsync(
-        () -> {
-          logRequests();
-          return immediateFuture(null);
-        },
-        delay.toMillis(),
-        MILLISECONDS,
-        service);
+    ListenableFuture<Void> logFuture =
+        scheduleAsync(
+            () -> {
+              logRequests();
+              return immediateFuture(null);
+            },
+            delay.toMillis(),
+            MILLISECONDS,
+            service);
   }
 }

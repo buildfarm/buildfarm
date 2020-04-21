@@ -21,7 +21,6 @@ import static build.buildfarm.common.UrlPath.parseUploadBlobUUID;
 import static io.grpc.Status.INVALID_ARGUMENT;
 import static io.grpc.Status.NOT_FOUND;
 import static io.grpc.Status.OUT_OF_RANGE;
-import static io.grpc.Status.UNAVAILABLE;
 import static java.lang.String.format;
 import static java.util.logging.Level.SEVERE;
 import static java.util.logging.Level.WARNING;
@@ -31,10 +30,10 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.UrlPath.InvalidResourceNameException;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
-import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.common.grpc.DelegateServerCallStreamObserver;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
+import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.Instance;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamImplBase;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
@@ -44,8 +43,6 @@ import com.google.bytestream.ByteStreamProto.ReadResponse;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
 import com.google.protobuf.ByteString;
-import io.grpc.Context;
-import io.grpc.Context.CancellableContext;
 import io.grpc.Status;
 import io.grpc.Status.Code;
 import io.grpc.stub.CallStreamObserver;
@@ -88,19 +85,13 @@ public class ByteStreamService extends ByteStreamImplBase {
     }
   }
 
-  public ByteStreamService(
-      Instances instances,
-      long deadlineAfter,
-      TimeUnit deadlineAfterUnits) {
+  public ByteStreamService(Instances instances, long deadlineAfter, TimeUnit deadlineAfterUnits) {
     this.instances = instances;
     this.deadlineAfter = deadlineAfter;
     this.deadlineAfterUnits = deadlineAfterUnits;
   }
 
-  void readFrom(
-      InputStream in,
-      long limit,
-      CallStreamObserver<ReadResponse> target) {
+  void readFrom(InputStream in, long limit, CallStreamObserver<ReadResponse> target) {
     final class ReadFromOnReadyHandler implements Runnable {
       private final byte buf[] = new byte[CHUNK_SIZE];
       private final boolean unlimited = limit == 0;
@@ -125,9 +116,7 @@ public class ByteStreamService extends ByteStreamImplBase {
         }
         remaining -= readBytes;
         complete = remaining == 0;
-        return ReadResponse.newBuilder()
-            .setData(ByteString.copyFrom(buf, 0, readBytes))
-            .build();
+        return ReadResponse.newBuilder().setData(ByteString.copyFrom(buf, 0, readBytes)).build();
       }
 
       @Override
@@ -168,9 +157,7 @@ public class ByteStreamService extends ByteStreamImplBase {
   }
 
   ServerCallStreamObserver<ReadResponse> onErrorLogReadObserver(
-      String name,
-      long offset,
-      ServerCallStreamObserver<ReadResponse> delegate) {
+      String name, long offset, ServerCallStreamObserver<ReadResponse> delegate) {
     return new UniformDelegateServerCallStreamObserver<ReadResponse>(delegate) {
       long responseCount = 0;
       long responseBytes = 0;
@@ -187,13 +174,14 @@ public class ByteStreamService extends ByteStreamImplBase {
         Status status = Status.fromThrowable(t);
         if (status.getCode() != Code.NOT_FOUND) {
           Level level = SEVERE;
-          if (responseCount > 0 &&
-              status.getCode() == Code.DEADLINE_EXCEEDED || status.getCode() == Code.CANCELLED) {
+          if (responseCount > 0 && status.getCode() == Code.DEADLINE_EXCEEDED
+              || status.getCode() == Code.CANCELLED) {
             level = WARNING;
           }
           String message = format("error reading %s at offset %d", name, offset);
           if (responseCount > 0) {
-            message += format(" after %d responses and %d bytes of content", responseCount, responseBytes);
+            message +=
+                format(" after %d responses and %d bytes of content", responseCount, responseBytes);
           }
           logger.log(level, message, t);
         }
@@ -207,7 +195,8 @@ public class ByteStreamService extends ByteStreamImplBase {
     };
   }
 
-  ServerCallStreamObserver<ByteString> newChunkObserver(ServerCallStreamObserver<ReadResponse> responseObserver) {
+  ServerCallStreamObserver<ByteString> newChunkObserver(
+      ServerCallStreamObserver<ReadResponse> responseObserver) {
     return new DelegateServerCallStreamObserver<ByteString, ReadResponse>(responseObserver) {
       @Override
       public void onNext(ByteString data) {
@@ -220,9 +209,7 @@ public class ByteStreamService extends ByteStreamImplBase {
             slice = data;
             data = ByteString.EMPTY;
           }
-          responseObserver.onNext(ReadResponse.newBuilder()
-              .setData(slice)
-              .build());
+          responseObserver.onNext(ReadResponse.newBuilder().setData(slice).build());
         }
       }
 
@@ -289,21 +276,23 @@ public class ByteStreamService extends ByteStreamImplBase {
       long limit,
       StreamObserver<ReadResponse> responseObserver) {
     try {
-      InputStream in = instance.newOperationStreamInput(
-          resourceName,
-          offset,
-          deadlineAfter,
-          deadlineAfterUnits,
-          TracingMetadataUtils.fromCurrentContext());
+      InputStream in =
+          instance.newOperationStreamInput(
+              resourceName,
+              offset,
+              deadlineAfter,
+              deadlineAfterUnits,
+              TracingMetadataUtils.fromCurrentContext());
       ServerCallStreamObserver<ReadResponse> target =
           (ServerCallStreamObserver<ReadResponse>) responseObserver;
-      target.setOnCancelHandler(() -> {
-        try {
-          in.close();
-        } catch (IOException e) {
-          logger.log(SEVERE, "error closing stream", e);
-        }
-      });
+      target.setOnCancelHandler(
+          () -> {
+            try {
+              in.close();
+            } catch (IOException e) {
+              logger.log(SEVERE, "error closing stream", e);
+            }
+          });
       readFrom(in, limit, onErrorLogReadObserver(resourceName, offset, target));
     } catch (NoSuchFileException e) {
       responseObserver.onError(NOT_FOUND.asException());
@@ -313,10 +302,7 @@ public class ByteStreamService extends ByteStreamImplBase {
   }
 
   void maybeInstanceRead(
-      String resourceName,
-      long offset,
-      long limit,
-      StreamObserver<ReadResponse> responseObserver)
+      String resourceName, long offset, long limit, StreamObserver<ReadResponse> responseObserver)
       throws InstanceNotFoundException, InvalidResourceNameException {
     switch (detectResourceOperation(resourceName)) {
       case Blob:
@@ -343,17 +329,10 @@ public class ByteStreamService extends ByteStreamImplBase {
   }
 
   @Override
-  public void read(
-      ReadRequest request,
-      StreamObserver<ReadResponse> responseObserver) {
+  public void read(ReadRequest request, StreamObserver<ReadResponse> responseObserver) {
     String resourceName = request.getResourceName();
     long offset = request.getReadOffset(), limit = request.getReadLimit();
-    logger.finest(
-        format(
-            "read resource_name=%s offset=%d limit=%d",
-            resourceName,
-            offset,
-            limit));
+    logger.finest(format("read resource_name=%s offset=%d limit=%d", resourceName, offset, limit));
 
     try {
       maybeInstanceRead(resourceName, offset, limit, responseObserver);
@@ -366,14 +345,10 @@ public class ByteStreamService extends ByteStreamImplBase {
 
   @Override
   public void queryWriteStatus(
-      QueryWriteStatusRequest request,
-      StreamObserver<QueryWriteStatusResponse> responseObserver) {
+      QueryWriteStatusRequest request, StreamObserver<QueryWriteStatusResponse> responseObserver) {
     String resourceName = request.getResourceName();
     try {
-      logger.fine(
-          format(
-              "queryWriteStatus(%s)",
-              resourceName));
+      logger.fine(format("queryWriteStatus(%s)", resourceName));
       Write write = getWrite(resourceName);
       responseObserver.onNext(
           QueryWriteStatusResponse.newBuilder()
@@ -384,13 +359,11 @@ public class ByteStreamService extends ByteStreamImplBase {
       logger.finer(
           format(
               "queryWriteStatus(%s) => committed_size = %d, complete = %s",
-              resourceName,
-              write.getCommittedSize(),
-              write.isComplete()));
+              resourceName, write.getCommittedSize(), write.isComplete()));
     } catch (InstanceNotFoundException e) {
       logger.log(SEVERE, format("queryWriteStatus(%s)", resourceName), e);
       responseObserver.onError(BuildFarmInstances.toStatusException(e));
-    } catch (IllegalArgumentException|InvalidResourceNameException e) {
+    } catch (IllegalArgumentException | InvalidResourceNameException e) {
       logger.log(SEVERE, format("queryWriteStatus(%s)", resourceName), e);
       responseObserver.onError(INVALID_ARGUMENT.withDescription(e.getMessage()).asException());
     } catch (RuntimeException e) {
@@ -399,9 +372,7 @@ public class ByteStreamService extends ByteStreamImplBase {
     }
   }
 
-  static Write getBlobWrite(
-      Instance instance,
-      Digest digest) {
+  static Write getBlobWrite(Instance instance, Digest digest) {
     return new Write() {
       @Override
       public long getCommittedSize() {
@@ -414,7 +385,9 @@ public class ByteStreamService extends ByteStreamImplBase {
       }
 
       @Override
-      public FeedbackOutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) throws IOException {
+      public FeedbackOutputStream getOutput(
+          long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler)
+          throws IOException {
         throw new IOException("cannot get output of blob write");
       }
 
@@ -430,28 +403,22 @@ public class ByteStreamService extends ByteStreamImplBase {
     };
   }
 
-  static Write getUploadBlobWrite(
-      Instance instance,
-      Digest digest,
-      UUID uuid) {
+  static Write getUploadBlobWrite(Instance instance, Digest digest, UUID uuid) {
     if (digest.getSizeBytes() == 0) {
       return new CompleteWrite(0);
     }
     return instance.getBlobWrite(digest, uuid, TracingMetadataUtils.fromCurrentContext());
   }
 
-  static Write getOperationStreamWrite(
-      Instance instance,
-      String resourceName) {
+  static Write getOperationStreamWrite(Instance instance, String resourceName) {
     return instance.getOperationStreamWrite(resourceName);
   }
 
-  Write getWrite(String resourceName) throws InstanceNotFoundException, InvalidResourceNameException {
+  Write getWrite(String resourceName)
+      throws InstanceNotFoundException, InvalidResourceNameException {
     switch (detectResourceOperation(resourceName)) {
       case Blob:
-        return getBlobWrite(
-            instances.getFromBlob(resourceName),
-            parseBlobDigest(resourceName));
+        return getBlobWrite(instances.getFromBlob(resourceName), parseBlobDigest(resourceName));
       case UploadBlob:
         return getUploadBlobWrite(
             instances.getFromUploadBlob(resourceName),
@@ -459,14 +426,14 @@ public class ByteStreamService extends ByteStreamImplBase {
             parseUploadBlobUUID(resourceName));
       case OperationStream:
         return getOperationStreamWrite(
-            instances.getFromOperationStream(resourceName),
-            resourceName);
+            instances.getFromOperationStream(resourceName), resourceName);
       default:
         throw new IllegalArgumentException();
     }
   }
 
-  private ServerCallStreamObserver<WriteResponse> initializeBackPressure(StreamObserver<WriteResponse> responseObserver) {
+  private ServerCallStreamObserver<WriteResponse> initializeBackPressure(
+      StreamObserver<WriteResponse> responseObserver) {
     final ServerCallStreamObserver<WriteResponse> serverCallStreamObserver =
         (ServerCallStreamObserver<WriteResponse>) responseObserver;
     serverCallStreamObserver.disableAutoInboundFlowControl();
@@ -475,8 +442,7 @@ public class ByteStreamService extends ByteStreamImplBase {
   }
 
   @Override
-  public StreamObserver<WriteRequest> write(
-      StreamObserver<WriteResponse> responseObserver) {
+  public StreamObserver<WriteRequest> write(StreamObserver<WriteResponse> responseObserver) {
     ServerCallStreamObserver<WriteResponse> serverCallStreamObserver =
         initializeBackPressure(responseObserver);
     return new WriteStreamObserver(

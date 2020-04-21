@@ -14,35 +14,21 @@
 
 package build.buildfarm;
 
-import build.bazel.remote.execution.v2.Action;
-import build.bazel.remote.execution.v2.ActionResult;
-import build.bazel.remote.execution.v2.Command;
-import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
-import build.bazel.remote.execution.v2.Digest;
-import build.bazel.remote.execution.v2.Directory;
-import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
-import build.bazel.remote.execution.v2.FileNode;
-import build.bazel.remote.execution.v2.OutputFile;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
-import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.longrunning.Operation;
-import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.rpc.Code;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
-import java.util.concurrent.TimeUnit;
 
 class Hist {
   private static ManagedChannel createChannel(String target) {
     NettyChannelBuilder builder =
-        NettyChannelBuilder.forTarget(target)
-            .negotiationType(NegotiationType.PLAINTEXT);
+        NettyChannelBuilder.forTarget(target).negotiationType(NegotiationType.PLAINTEXT);
     return builder.build();
   }
 
@@ -55,7 +41,7 @@ class Hist {
       n++;
     }
     int h = executing > 100 ? (100 - n) : executing;
-    for( int i = 0; i < h; i++ ) {
+    for (int i = 0; i < h; i++) {
       s.append('#');
     }
     if (executing > 100) {
@@ -71,7 +57,7 @@ class Hist {
     String pageToken = "";
     do {
       ImmutableList.Builder<Operation> operations = new ImmutableList.Builder<>();
-      for(;;) {
+      for (; ; ) {
         try {
           pageToken = instance.listOperations(1024, pageToken, "", operations);
         } catch (io.grpc.StatusRuntimeException e) {
@@ -81,7 +67,8 @@ class Hist {
       }
       for (Operation operation : operations.build()) {
         try {
-          ExecuteOperationMetadata metadata = operation.getMetadata().unpack(ExecuteOperationMetadata.class);
+          ExecuteOperationMetadata metadata =
+              operation.getMetadata().unpack(ExecuteOperationMetadata.class);
           switch (metadata.getStage()) {
             case QUEUED:
               queued++;
@@ -95,7 +82,7 @@ class Hist {
         } catch (InvalidProtocolBufferException e) {
         }
       }
-    } while(!pageToken.equals(""));
+    } while (!pageToken.equals(""));
     printHistogramValue(executing, queued);
   }
 
@@ -106,7 +93,7 @@ class Hist {
     ManagedChannel channel = createChannel(host);
     Instance instance = new StubInstance(instanceName, digestUtil, channel);
     try {
-      for(;;) {
+      for (; ; ) {
         printHistogram(instance);
         Thread.sleep(500);
       }

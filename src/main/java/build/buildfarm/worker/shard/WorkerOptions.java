@@ -17,30 +17,21 @@ package build.buildfarm.worker.shard;
 import com.google.devtools.common.options.Option;
 import com.google.devtools.common.options.OptionsBase;
 
-/**
- * Command-line options definition for Worker.
- */
+/** Command-line options definition for Worker. */
 public class WorkerOptions extends OptionsBase {
 
-  @Option(
-      name = "help",
-      abbrev = 'h',
-      help = "Prints usage info.",
-      defaultValue = "true"
-    )
+  @Option(name = "help", abbrev = 'h', help = "Prints usage info.", defaultValue = "true")
   public boolean help;
 
   @Option(
       name = "root",
       help = "Root base directory for all work being performed.",
-      defaultValue = ""
-    )
+      defaultValue = "")
   public String root;
 
   @Option(
       name = "public_name",
       help = "HOST:PORT pair used when registering this worker as a CAS member.",
-      defaultValue = ""
-    )
+      defaultValue = "")
   public String publicName;
 }

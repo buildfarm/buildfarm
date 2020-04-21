@@ -14,12 +14,11 @@
 
 package build.buildfarm;
 
-import org.junit.runners.Suite;
-import org.junit.runners.model.RunnerBuilder;
-
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Set;
+import org.junit.runners.Suite;
+import org.junit.runners.model.RunnerBuilder;
 
 /**
  * A JUnit4 suite implementation that delegates the class finding to a {@code suite()} method on the
@@ -27,9 +26,7 @@ import java.util.Set;
  */
 public final class CustomSuite extends Suite {
 
-  /**
-   * Only called reflectively. Do not use programmatically.
-   */
+  /** Only called reflectively. Do not use programmatically. */
   public CustomSuite(Class<?> klass, RunnerBuilder builder) throws Throwable {
     super(builder, klass, getClasses(klass));
   }

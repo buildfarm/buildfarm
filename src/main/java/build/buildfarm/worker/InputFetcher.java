@@ -16,15 +16,13 @@ package build.buildfarm.worker;
 
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.QUEUED;
 import static java.lang.String.format;
-import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.SEVERE;
 import static java.util.logging.Level.WARNING;
 
 import build.bazel.remote.execution.v2.Action;
-import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.ExecutedActionMetadata;
-import build.buildfarm.common.Poller;
 import build.buildfarm.v1test.QueuedOperation;
 import com.google.common.base.Stopwatch;
 import com.google.protobuf.Duration;
@@ -32,8 +30,6 @@ import com.google.protobuf.util.Timestamps;
 import io.grpc.Deadline;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 import java.util.logging.Logger;
 
 public class InputFetcher implements Runnable {
@@ -44,7 +40,8 @@ public class InputFetcher implements Runnable {
   private final InputFetchStage owner;
   private boolean success = false;
 
-  InputFetcher(WorkerContext workerContext, OperationContext operationContext, InputFetchStage owner) {
+  InputFetcher(
+      WorkerContext workerContext, OperationContext operationContext, InputFetchStage owner) {
     this.workerContext = workerContext;
     this.operationContext = operationContext;
     this.owner = owner;
@@ -56,8 +53,9 @@ public class InputFetcher implements Runnable {
     if (action.hasTimeout() && workerContext.hasMaximumActionTimeout()) {
       Duration timeout = action.getTimeout();
       Duration maximum = workerContext.getMaximumActionTimeout();
-      if (timeout.getSeconds() > maximum.getSeconds() ||
-          (timeout.getSeconds() == maximum.getSeconds() && timeout.getNanos() > maximum.getNanos())) {
+      if (timeout.getSeconds() > maximum.getSeconds()
+          || (timeout.getSeconds() == maximum.getSeconds()
+              && timeout.getNanos() > maximum.getNanos())) {
         return false;
       }
     }
@@ -82,31 +80,32 @@ public class InputFetcher implements Runnable {
   }
 
   private long fetchPolled(Stopwatch stopwatch) throws InterruptedException {
-    String operationName = operationContext.queueEntry
-        .getExecuteEntry().getOperationName();
+    String operationName = operationContext.queueEntry.getExecuteEntry().getOperationName();
     logger.info(format("fetching inputs: %s", operationName));
 
-    ExecutedActionMetadata.Builder executedAction = operationContext.executeResponse
-        .getResultBuilder()
-        .getExecutionMetadataBuilder()
-        .setInputFetchStartTimestamp(Timestamps.fromMillis(System.currentTimeMillis()));
+    ExecutedActionMetadata.Builder executedAction =
+        operationContext
+            .executeResponse
+            .getResultBuilder()
+            .getExecutionMetadataBuilder()
+            .setInputFetchStartTimestamp(Timestamps.fromMillis(System.currentTimeMillis()));
 
     QueuedOperation queuedOperation;
     Path execDir;
     try {
       queuedOperation = workerContext.getQueuedOperation(operationContext.queueEntry);
-      if (queuedOperation == null
-          || !isQueuedOperationValid(queuedOperation)) {
+      if (queuedOperation == null || !isQueuedOperationValid(queuedOperation)) {
         logger.severe(format("invalid queued operation: %s", operationName));
         owner.error().put(operationContext);
         return 0;
       }
 
-      execDir = workerContext.createExecDir(
-          operationName,
-          queuedOperation.getTree(),
-          queuedOperation.getAction(),
-          queuedOperation.getCommand());
+      execDir =
+          workerContext.createExecDir(
+              operationName,
+              queuedOperation.getTree(),
+              queuedOperation.getAction(),
+              queuedOperation.getCommand());
     } catch (IOException e) {
       logger.log(WARNING, "error creating exec dir for " + operationName, e);
       owner.error().put(operationContext);
@@ -114,8 +113,8 @@ public class InputFetcher implements Runnable {
     }
     success = true;
 
-    executedAction
-        .setInputFetchCompletedTimestamp(Timestamps.fromMillis(System.currentTimeMillis()));
+    executedAction.setInputFetchCompletedTimestamp(
+        Timestamps.fromMillis(System.currentTimeMillis()));
 
     // we are now responsible for destroying the exec dir if anything goes wrong
     boolean completed = false;
@@ -135,12 +134,15 @@ public class InputFetcher implements Runnable {
     }
   }
 
-  private void proceedToOutput(QueuedOperation queuedOperation, Path execDir) throws InterruptedException {
-    OperationContext executeOperationContext = operationContext.toBuilder()
-        .setExecDir(execDir)
-        .setAction(queuedOperation.getAction())
-        .setCommand(queuedOperation.getCommand())
-        .build();
+  private void proceedToOutput(QueuedOperation queuedOperation, Path execDir)
+      throws InterruptedException {
+    OperationContext executeOperationContext =
+        operationContext
+            .toBuilder()
+            .setExecDir(execDir)
+            .setAction(queuedOperation.getAction())
+            .setCommand(queuedOperation.getCommand())
+            .build();
     boolean claimed = owner.output().claim();
     operationContext.poller.pause();
     if (claimed) {
@@ -151,8 +153,7 @@ public class InputFetcher implements Runnable {
         throw e;
       }
     } else {
-      String operationName = operationContext.queueEntry
-          .getExecuteEntry().getOperationName();
+      String operationName = operationContext.queueEntry.getExecuteEntry().getOperationName();
       workerContext.logInfo("InputFetcher: Operation " + operationName + " Failed to claim output");
 
       owner.error().put(operationContext);
@@ -162,8 +163,7 @@ public class InputFetcher implements Runnable {
   @Override
   public void run() {
     long stallUSecs = 0;
-    String operationName = operationContext.queueEntry
-        .getExecuteEntry().getOperationName();
+    String operationName = operationContext.queueEntry.getExecuteEntry().getOperationName();
     Stopwatch stopwatch = Stopwatch.createStarted();
     try {
       stallUSecs = runInterruptibly(stopwatch);
@@ -189,10 +189,7 @@ public class InputFetcher implements Runnable {
       // allow release to occur without interrupted state
       try {
         owner.releaseInputFetcher(
-            operationName,
-            stopwatch.elapsed(MICROSECONDS),
-            stallUSecs,
-            success);
+            operationName, stopwatch.elapsed(MICROSECONDS), stallUSecs, success);
       } finally {
         if (wasInterrupted) {
           Thread.currentThread().interrupt();

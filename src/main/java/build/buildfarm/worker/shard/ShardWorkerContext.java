@@ -23,7 +23,6 @@ import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.logging.Level.SEVERE;
-import static java.util.logging.Level.WARNING;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
@@ -49,16 +48,14 @@ import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.Retrier.Backoff;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Instance.MatchListener;
-import build.buildfarm.worker.RetryingMatchListener;
-import build.buildfarm.worker.WorkerContext;
-import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
+import build.buildfarm.worker.RetryingMatchListener;
+import build.buildfarm.worker.WorkerContext;
 import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -83,14 +80,12 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Consumer;
 import java.util.logging.Logger;
 
 class ShardWorkerContext implements WorkerContext {
@@ -113,15 +108,13 @@ class ShardWorkerContext implements WorkerContext {
   private final Duration defaultActionTimeout;
   private final Duration maximumActionTimeout;
   private final Map<String, QueueEntry> activeOperations = Maps.newConcurrentMap();
-  
+
   static Platform getMatchPlatform(Platform platform, Iterable<ExecutionPolicy> policyNames) {
     Platform.Builder builder = platform.toBuilder();
     for (ExecutionPolicy policy : policyNames) {
       String name = policy.getName();
       if (!name.isEmpty()) {
-        builder.addPropertiesBuilder()
-            .setName("execution-policy")
-            .setValue(name);
+        builder.addPropertiesBuilder().setName("execution-policy").setValue(name);
       }
     }
     return builder.build();
@@ -165,12 +158,12 @@ class ShardWorkerContext implements WorkerContext {
   private static Retrier createBackplaneRetrier() {
     return new Retrier(
         Backoff.exponential(
-              java.time.Duration.ofMillis(/*options.experimentalRemoteRetryStartDelayMillis=*/ 100),
-              java.time.Duration.ofMillis(/*options.experimentalRemoteRetryMaxDelayMillis=*/ 5000),
-              /*options.experimentalRemoteRetryMultiplier=*/ 2,
-              /*options.experimentalRemoteRetryJitter=*/ 0.1,
-              /*options.experimentalRemoteRetryMaxAttempts=*/ 5),
-          Retrier.REDIS_IS_RETRIABLE);
+            java.time.Duration.ofMillis(/*options.experimentalRemoteRetryStartDelayMillis=*/ 100),
+            java.time.Duration.ofMillis(/*options.experimentalRemoteRetryMaxDelayMillis=*/ 5000),
+            /*options.experimentalRemoteRetryMultiplier=*/ 2,
+            /*options.experimentalRemoteRetryJitter=*/ 0.1,
+            /*options.experimentalRemoteRetryMaxAttempts=*/ 5),
+        Retrier.REDIS_IS_RETRIABLE);
   }
 
   @Override
@@ -198,12 +191,17 @@ class ShardWorkerContext implements WorkerContext {
         () -> {
           boolean success = false;
           try {
-            success = operationPoller.poll(queueEntry, stage, System.currentTimeMillis() + 30 * 1000);
+            success =
+                operationPoller.poll(queueEntry, stage, System.currentTimeMillis() + 30 * 1000);
           } catch (IOException e) {
-            logger.log(SEVERE, format("%s: poller: error while polling %s", name, operationName), e);
+            logger.log(
+                SEVERE, format("%s: poller: error while polling %s", name, operationName), e);
           }
 
-          logger.info(format("%s: poller: Completed Poll for %s: %s", name, operationName, success ? "OK" : "Failed"));
+          logger.info(
+              format(
+                  "%s: poller: Completed Poll for %s: %s",
+                  name, operationName, success ? "OK" : "Failed"));
           if (!success) {
             onFailure.run();
           }
@@ -252,8 +250,7 @@ class ShardWorkerContext implements WorkerContext {
     }
   }
 
-  private void matchInterruptible(MatchListener listener)
-      throws IOException, InterruptedException {
+  private void matchInterruptible(MatchListener listener) throws IOException, InterruptedException {
     listener.onWaitStart();
     QueueEntry queueEntry = null;
     try {
@@ -278,54 +275,55 @@ class ShardWorkerContext implements WorkerContext {
 
   @Override
   public void match(MatchListener listener) throws InterruptedException {
-    RetryingMatchListener dedupMatchListener = new RetryingMatchListener() {
-      boolean matched = false;
+    RetryingMatchListener dedupMatchListener =
+        new RetryingMatchListener() {
+          boolean matched = false;
 
-      @Override
-      public boolean getMatched() {
-        return matched;
-      }
+          @Override
+          public boolean getMatched() {
+            return matched;
+          }
 
-      @Override
-      public void onWaitStart() {
-        listener.onWaitStart();
-      }
+          @Override
+          public void onWaitStart() {
+            listener.onWaitStart();
+          }
 
-      @Override
-      public void onWaitEnd() {
-        listener.onWaitEnd();
-      }
+          @Override
+          public void onWaitEnd() {
+            listener.onWaitEnd();
+          }
 
-      @Override
-      public boolean onEntry(QueueEntry queueEntry) throws InterruptedException {
-        if (queueEntry == null) {
-          matched = true;
-          return listener.onEntry(null);
-        }
-        String operationName = queueEntry.getExecuteEntry().getOperationName();
-        if (activeOperations.putIfAbsent(operationName, queueEntry) != null) {
-          logger.warning("matched duplicate operation " + operationName);
-          return false;
-        }
-        matched = true;
-        boolean success = listener.onEntry(queueEntry);
-        if (!success) {
-          requeue(operationName);
-        }
-        return success;
-      }
+          @Override
+          public boolean onEntry(QueueEntry queueEntry) throws InterruptedException {
+            if (queueEntry == null) {
+              matched = true;
+              return listener.onEntry(null);
+            }
+            String operationName = queueEntry.getExecuteEntry().getOperationName();
+            if (activeOperations.putIfAbsent(operationName, queueEntry) != null) {
+              logger.warning("matched duplicate operation " + operationName);
+              return false;
+            }
+            matched = true;
+            boolean success = listener.onEntry(queueEntry);
+            if (!success) {
+              requeue(operationName);
+            }
+            return success;
+          }
 
-      @Override
-      public void onError(Throwable t) {
-        Throwables.throwIfUnchecked(t);
-        throw new RuntimeException(t);
-      }
+          @Override
+          public void onError(Throwable t) {
+            Throwables.throwIfUnchecked(t);
+            throw new RuntimeException(t);
+          }
 
-      @Override
-      public void setOnCancelHandler(Runnable onCancelHandler) {
-        listener.setOnCancelHandler(onCancelHandler);
-      }
-    };
+          @Override
+          public void setOnCancelHandler(Runnable onCancelHandler) {
+            listener.setOnCancelHandler(onCancelHandler);
+          }
+        };
     while (!dedupMatchListener.getMatched()) {
       try {
         matchInterruptible(dedupMatchListener);
@@ -343,8 +341,11 @@ class ShardWorkerContext implements WorkerContext {
 
     if (metadata.is(QueuedOperationMetadata.class)) {
       try {
-        return operation.getMetadata().unpack(QueuedOperationMetadata.class).getExecuteOperationMetadata();
-      } catch(InvalidProtocolBufferException e) {
+        return operation
+            .getMetadata()
+            .unpack(QueuedOperationMetadata.class)
+            .getExecuteOperationMetadata();
+      } catch (InvalidProtocolBufferException e) {
         logger.log(SEVERE, "invalid operation metadata: " + operation.getName(), e);
         return null;
       }
@@ -353,7 +354,7 @@ class ShardWorkerContext implements WorkerContext {
     if (metadata.is(ExecuteOperationMetadata.class)) {
       try {
         return operation.getMetadata().unpack(ExecuteOperationMetadata.class);
-      } catch(InvalidProtocolBufferException e) {
+      } catch (InvalidProtocolBufferException e) {
         logger.log(SEVERE, "invalid operation metadata: " + operation.getName(), e);
         return null;
       }
@@ -449,7 +450,10 @@ class ShardWorkerContext implements WorkerContext {
 
   private void insertFile(Digest digest, Path file) throws IOException, InterruptedException {
     AtomicBoolean complete = new AtomicBoolean(false);
-    Write write = execFileSystem.getStorage().getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
+    Write write =
+        execFileSystem
+            .getStorage()
+            .getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
     write.addListener(() -> complete.set(true), directExecutor());
     try (OutputStream out = write.getOutput(deadlineAfter, deadlineAfterUnits, () -> {})) {
       try (InputStream in = Files.newInputStream(file)) {
@@ -468,7 +472,8 @@ class ShardWorkerContext implements WorkerContext {
     }
   }
 
-  private void updateActionResultStdOutputs(ActionResult.Builder resultBuilder) throws InterruptedException {
+  private void updateActionResultStdOutputs(ActionResult.Builder resultBuilder)
+      throws InterruptedException {
     ByteString stdoutRaw = resultBuilder.getStdoutRaw();
     if (stdoutRaw.size() > 0) {
       // reset to allow policy to determine inlining
@@ -506,7 +511,8 @@ class ShardWorkerContext implements WorkerContext {
 
       if (Files.isDirectory(outputPath)) {
         logInfo("ReportResultStage: " + outputFile + " is a directory");
-        preconditionFailure.addViolationsBuilder()
+        preconditionFailure
+            .addViolationsBuilder()
             .setType(VIOLATION_TYPE_INVALID)
             .setSubject(outputFile)
             .setDescription("An output file was a directory");
@@ -524,17 +530,21 @@ class ShardWorkerContext implements WorkerContext {
         continue;
       }
 
-      OutputFile.Builder outputFileBuilder = resultBuilder.addOutputFilesBuilder()
-          .setPath(outputFile)
-          .setDigest(digest)
-          .setIsExecutable(Files.isExecutable(outputPath));
+      OutputFile.Builder outputFileBuilder =
+          resultBuilder
+              .addOutputFilesBuilder()
+              .setPath(outputFile)
+              .setDigest(digest)
+              .setIsExecutable(Files.isExecutable(outputPath));
       try {
         insertFile(digest, outputPath);
       } catch (EntryLimitException e) {
-        preconditionFailure.addViolationsBuilder()
+        preconditionFailure
+            .addViolationsBuilder()
             .setType(VIOLATION_TYPE_MISSING)
             .setSubject("blobs/" + DigestUtil.toString(digest))
-            .setDescription("An output could not be uploaded because it exceeded the maximum size of an entry");
+            .setDescription(
+                "An output could not be uploaded because it exceeded the maximum size of an entry");
       }
     }
 
@@ -547,7 +557,8 @@ class ShardWorkerContext implements WorkerContext {
 
       if (!Files.isDirectory(outputDirPath)) {
         logInfo("ReportResultStage: " + outputDir + " is not a directory...");
-        preconditionFailure.addViolationsBuilder()
+        preconditionFailure
+            .addViolationsBuilder()
             .setType(VIOLATION_TYPE_INVALID)
             .setSubject(outputDir)
             .setDescription("An output directory was not a directory");
@@ -556,70 +567,83 @@ class ShardWorkerContext implements WorkerContext {
 
       Tree.Builder treeBuilder = Tree.newBuilder();
       Directory.Builder outputRoot = treeBuilder.getRootBuilder();
-      Files.walkFileTree(outputDirPath, new SimpleFileVisitor<Path>() {
-        Directory.Builder currentDirectory = null;
-        Stack<Directory.Builder> path = new Stack<>();
+      Files.walkFileTree(
+          outputDirPath,
+          new SimpleFileVisitor<Path>() {
+            Directory.Builder currentDirectory = null;
+            Stack<Directory.Builder> path = new Stack<>();
 
-        @Override
-        public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-          Digest digest;
-          try {
-            digest = getDigestUtil().compute(file);
-          } catch (NoSuchFileException e) {
-            logger.log(SEVERE, format("error visiting file %s under output dir %s", outputDirPath.relativize(file), outputDirPath.toAbsolutePath()), e);
-            return FileVisitResult.CONTINUE;
-          }
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+                throws IOException {
+              Digest digest;
+              try {
+                digest = getDigestUtil().compute(file);
+              } catch (NoSuchFileException e) {
+                logger.log(
+                    SEVERE,
+                    format(
+                        "error visiting file %s under output dir %s",
+                        outputDirPath.relativize(file), outputDirPath.toAbsolutePath()),
+                    e);
+                return FileVisitResult.CONTINUE;
+              }
 
-          // should we cast to PosixFilePermissions and do gymnastics there for executable?
+              // should we cast to PosixFilePermissions and do gymnastics there for executable?
 
-          // TODO symlink per revision proposal
-          FileNode.Builder fileNodeBuilder = currentDirectory.addFilesBuilder()
-              .setName(file.getFileName().toString())
-              .setDigest(digest)
-              .setIsExecutable(Files.isExecutable(file));
-          try {
-            insertFile(digest, file);
-          } catch (InterruptedException e) {
-            throw new IOException(e);
-          } catch (EntryLimitException e) {
-            preconditionFailure.addViolationsBuilder()
-                .setType(VIOLATION_TYPE_MISSING)
-                .setSubject("blobs/" + DigestUtil.toString(digest))
-                .setDescription("An output could not be uploaded because it exceeded the maximum size of an entry");
-          }
-          return FileVisitResult.CONTINUE;
-        }
+              // TODO symlink per revision proposal
+              FileNode.Builder fileNodeBuilder =
+                  currentDirectory
+                      .addFilesBuilder()
+                      .setName(file.getFileName().toString())
+                      .setDigest(digest)
+                      .setIsExecutable(Files.isExecutable(file));
+              try {
+                insertFile(digest, file);
+              } catch (InterruptedException e) {
+                throw new IOException(e);
+              } catch (EntryLimitException e) {
+                preconditionFailure
+                    .addViolationsBuilder()
+                    .setType(VIOLATION_TYPE_MISSING)
+                    .setSubject("blobs/" + DigestUtil.toString(digest))
+                    .setDescription(
+                        "An output could not be uploaded because it exceeded the maximum size of an entry");
+              }
+              return FileVisitResult.CONTINUE;
+            }
 
-        @Override
-        public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
-          path.push(currentDirectory);
-          if (dir.equals(outputDirPath)) {
-            currentDirectory = outputRoot;
-          } else {
-            currentDirectory = treeBuilder.addChildrenBuilder();
-          }
-          return FileVisitResult.CONTINUE;
-        }
+            @Override
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
+                throws IOException {
+              path.push(currentDirectory);
+              if (dir.equals(outputDirPath)) {
+                currentDirectory = outputRoot;
+              } else {
+                currentDirectory = treeBuilder.addChildrenBuilder();
+              }
+              return FileVisitResult.CONTINUE;
+            }
 
-        @Override
-        public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
-          Directory.Builder parentDirectory = path.pop();
-          if (parentDirectory != null) {
-            parentDirectory.addDirectoriesBuilder()
-                .setName(dir.getFileName().toString())
-                .setDigest(getDigestUtil().compute(currentDirectory.build()));
-          }
-          currentDirectory = parentDirectory;
-          return FileVisitResult.CONTINUE;
-        }
-      });
+            @Override
+            public FileVisitResult postVisitDirectory(Path dir, IOException exc)
+                throws IOException {
+              Directory.Builder parentDirectory = path.pop();
+              if (parentDirectory != null) {
+                parentDirectory
+                    .addDirectoriesBuilder()
+                    .setName(dir.getFileName().toString())
+                    .setDigest(getDigestUtil().compute(currentDirectory.build()));
+              }
+              currentDirectory = parentDirectory;
+              return FileVisitResult.CONTINUE;
+            }
+          });
       Tree tree = treeBuilder.build();
       ByteString treeBlob = tree.toByteString();
       Digest treeDigest = getDigestUtil().compute(treeBlob);
       insertBlob(treeDigest, treeBlob);
-      resultBuilder.addOutputDirectoriesBuilder()
-          .setPath(outputDir)
-          .setTreeDigest(treeDigest);
+      resultBuilder.addOutputDirectoriesBuilder().setPath(outputDir).setTreeDigest(treeDigest);
     }
     checkPreconditionFailure(actionDigest, preconditionFailure.build());
 
@@ -637,7 +661,8 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
-  public boolean putOperation(Operation operation, Action action) throws IOException, InterruptedException {
+  public boolean putOperation(Operation operation, Action action)
+      throws IOException, InterruptedException {
     boolean success = createBackplaneRetrier().execute(() -> instance.putOperation(operation));
     if (success && operation.getDone()) {
       logComplete(operation.getName());
@@ -645,8 +670,7 @@ class ShardWorkerContext implements WorkerContext {
     return success;
   }
 
-  private Map<Digest, Directory> createDirectoriesIndex(
-      Iterable<Directory> directories) {
+  private Map<Digest, Directory> createDirectoriesIndex(Iterable<Directory> directories) {
     Set<Digest> directoryDigests = Sets.newHashSet();
     ImmutableMap.Builder<Digest, Directory> directoriesIndex = new ImmutableMap.Builder<>();
     for (Directory directory : directories) {
@@ -662,36 +686,38 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
-  public Path createExecDir(String operationName, Tree tree, Action action, Command command) throws IOException, InterruptedException {
+  public Path createExecDir(String operationName, Tree tree, Action action, Command command)
+      throws IOException, InterruptedException {
     return execFileSystem.createExecDir(
-        operationName,
-        getDigestUtil().createDirectoriesIndex(tree),
-        action,
-        command);
+        operationName, getDigestUtil().createDirectoriesIndex(tree), action, command);
   }
 
-  // might want to split for removeDirectory and decrement references to avoid removing for streamed output
+  // might want to split for removeDirectory and decrement references to avoid removing for streamed
+  // output
   @Override
   public void destroyExecDir(Path execDir) throws IOException, InterruptedException {
     execFileSystem.destroyExecDir(execDir);
   }
 
   @Override
-  public void blacklistAction(String actionId)
-      throws IOException, InterruptedException {
-    createBackplaneRetrier().execute(() -> {
-      backplane.blacklistAction(actionId);
-      return null;
-    });
+  public void blacklistAction(String actionId) throws IOException, InterruptedException {
+    createBackplaneRetrier()
+        .execute(
+            () -> {
+              backplane.blacklistAction(actionId);
+              return null;
+            });
   }
 
   @Override
   public void putActionResult(ActionKey actionKey, ActionResult actionResult)
       throws IOException, InterruptedException {
-    createBackplaneRetrier().execute(() -> {
-      instance.putActionResult(actionKey, actionResult);
-      return null;
-    });
+    createBackplaneRetrier()
+        .execute(
+            () -> {
+              instance.putActionResult(actionKey, actionResult);
+              return null;
+            });
   }
 
   @Override

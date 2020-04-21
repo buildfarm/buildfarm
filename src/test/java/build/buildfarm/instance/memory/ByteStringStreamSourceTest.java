@@ -18,7 +18,6 @@ import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -26,11 +25,11 @@ import static org.mockito.Mockito.verify;
 
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
+import java.io.IOException;
+import java.io.InputStream;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import java.io.IOException;
-import java.io.InputStream;
 
 @RunWith(JUnit4.class)
 public class ByteStringStreamSourceTest {
@@ -38,10 +37,7 @@ public class ByteStringStreamSourceTest {
   public void closeCallsCommittedFuture() throws IOException {
     FutureCallback<Void> mockCallback = mock(FutureCallback.class);
     ByteStringStreamSource source = new ByteStringStreamSource();
-    Futures.addCallback(
-        source.getClosedFuture(),
-        mockCallback,
-        directExecutor());
+    Futures.addCallback(source.getClosedFuture(), mockCallback, directExecutor());
     verify(mockCallback, never()).onSuccess(any(Void.class));
     source.getOutput().close();
     verify(mockCallback, times(1)).onSuccess(null);
@@ -73,7 +69,6 @@ public class ByteStringStreamSourceTest {
     assertThat(inputStream.read()).isEqualTo(-1);
   }
 
-
   @Test
   public void skipNegativePreventsSkip() throws IOException {
     ByteStringStreamSource source = new ByteStringStreamSource();
@@ -85,13 +80,15 @@ public class ByteStringStreamSourceTest {
   public void skipBlocksForInput() throws IOException, InterruptedException {
     ByteStringStreamSource source = new ByteStringStreamSource();
     InputStream inputStream = source.openStream();
-    Thread thread = new Thread(() -> {
-      try {
-        assertThat(inputStream.skip(1)).isEqualTo(1);
-      } catch (IOException e) {
-        fail("Unexpected IOException: " + e);
-      }
-    });
+    Thread thread =
+        new Thread(
+            () -> {
+              try {
+                assertThat(inputStream.skip(1)).isEqualTo(1);
+              } catch (IOException e) {
+                fail("Unexpected IOException: " + e);
+              }
+            });
     thread.start();
     while (!thread.isAlive()) {
       Thread.sleep(10);
@@ -106,13 +103,15 @@ public class ByteStringStreamSourceTest {
   public void readBlocksForInput() throws IOException, InterruptedException {
     ByteStringStreamSource source = new ByteStringStreamSource();
     InputStream inputStream = source.openStream();
-    Thread thread = new Thread(() -> {
-      try {
-        assertThat(inputStream.read()).isEqualTo('a');
-      } catch (IOException e) {
-        fail("Unexpected IOException: " + e);
-      }
-    });
+    Thread thread =
+        new Thread(
+            () -> {
+              try {
+                assertThat(inputStream.read()).isEqualTo('a');
+              } catch (IOException e) {
+                fail("Unexpected IOException: " + e);
+              }
+            });
     thread.start();
     while (!thread.isAlive()) {
       Thread.sleep(10);

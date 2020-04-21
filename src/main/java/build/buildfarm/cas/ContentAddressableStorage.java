@@ -29,8 +29,8 @@ import java.util.UUID;
 
 public interface ContentAddressableStorage extends InputStreamFactory {
   /**
-   * Blob storage for the CAS. This class should be used at all times when interacting with
-   * complete blobs in order to cut down on independent digest computation.
+   * Blob storage for the CAS. This class should be used at all times when interacting with complete
+   * blobs in order to cut down on independent digest computation.
    */
   public static final class Blob {
     private final Digest digest;
@@ -104,11 +104,9 @@ public interface ContentAddressableStorage extends InputStreamFactory {
   /**
    * Insert a value into the CAS with expiration callback.
    *
-   * <p>The callback provided will be run after the value is expired
-   * and removed from the storage. Successive calls to this method
-   * for a unique blob digest will register additional callbacks, does
-   * not deduplicate by callback, and the order of which is not
-   * guaranteed for invocation.
+   * <p>The callback provided will be run after the value is expired and removed from the storage.
+   * Successive calls to this method for a unique blob digest will register additional callbacks,
+   * does not deduplicate by callback, and the order of which is not guaranteed for invocation.
    */
   @ThreadSafe
   void put(Blob blob, Runnable onExpiration) throws InterruptedException;

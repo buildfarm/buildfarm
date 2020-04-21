@@ -74,7 +74,9 @@ class Writes {
     }
 
     @Override
-    public FeedbackOutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) throws IOException {
+    public FeedbackOutputStream getOutput(
+        long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler)
+        throws IOException {
       try {
         return delegate.getOutput(deadlineAfter, deadlineAfterUnits, onReadyHandler);
       } catch (Exception e) {
@@ -101,35 +103,29 @@ class Writes {
   }
 
   Writes(Supplier<Instance> instanceSupplier) {
-    this(
-        instanceSupplier,
-        /* writeExpiresAfter=*/ 1,
-        /* writeExpiresUnit=*/ TimeUnit.HOURS);
+    this(instanceSupplier, /* writeExpiresAfter=*/ 1, /* writeExpiresUnit=*/ TimeUnit.HOURS);
   }
 
-  Writes(
-      Supplier<Instance> instanceSupplier,
-      long writeExpiresAfter,
-      TimeUnit writeExpiresUnit) {
+  Writes(Supplier<Instance> instanceSupplier, long writeExpiresAfter, TimeUnit writeExpiresUnit) {
     this.instanceSupplier = instanceSupplier;
-    blobWriteInstances = CacheBuilder.newBuilder()
-        .expireAfterWrite(writeExpiresAfter, writeExpiresUnit)
-        .build(new CacheLoader<BlobWriteKey, Instance>() {
-          @Override
-          public Instance load(BlobWriteKey key) {
-            return instanceSupplier.get();
-          }
-        });
+    blobWriteInstances =
+        CacheBuilder.newBuilder()
+            .expireAfterWrite(writeExpiresAfter, writeExpiresUnit)
+            .build(
+                new CacheLoader<BlobWriteKey, Instance>() {
+                  @Override
+                  public Instance load(BlobWriteKey key) {
+                    return instanceSupplier.get();
+                  }
+                });
   }
 
   public Write get(Digest digest, UUID uuid, RequestMetadata requestMetadata) {
     if (digest.getSizeBytes() == 0) {
       return new CompleteWrite(0);
     }
-    BlobWriteKey key = BlobWriteKey.newBuilder()
-        .setDigest(digest)
-        .setIdentifier(uuid.toString())
-        .build();
+    BlobWriteKey key =
+        BlobWriteKey.newBuilder().setDigest(digest).setIdentifier(uuid.toString()).build();
     try {
       return new InvalidatingWrite(
           blobWriteInstances.get(key).getBlobWrite(digest, uuid, requestMetadata),

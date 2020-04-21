@@ -52,8 +52,7 @@ import java.util.concurrent.atomic.AtomicLong;
 class Extract {
   static ManagedChannel createChannel(String target) {
     NettyChannelBuilder builder =
-        NettyChannelBuilder.forTarget(target)
-            .negotiationType(NegotiationType.PLAINTEXT);
+        NettyChannelBuilder.forTarget(target).negotiationType(NegotiationType.PLAINTEXT);
     return builder.build();
   }
 
@@ -81,7 +80,12 @@ class Extract {
     return String.format("%s/blobs/%s/%d", instanceName, digest.getHash(), digest.getSizeBytes());
   }
 
-  static Runnable blobGetter(Path root, String instanceName, Digest digest, ByteStreamStub bsStub, AtomicLong outstandingOperations) {
+  static Runnable blobGetter(
+      Path root,
+      String instanceName,
+      Digest digest,
+      ByteStreamStub bsStub,
+      AtomicLong outstandingOperations) {
     if (digest.getSizeBytes() == 0) {
       return () -> outstandingOperations.getAndDecrement();
     }
@@ -90,9 +94,7 @@ class Extract {
       public void run() {
         System.out.println("Getting blob " + digest.getHash());
         bsStub.read(
-            ReadRequest.newBuilder()
-                .setResourceName(blobName(instanceName, digest))
-                .build(),
+            ReadRequest.newBuilder().setResourceName(blobName(instanceName, digest)).build(),
             new StreamObserver<ReadResponse>() {
               OutputStream out = null;
 
@@ -142,12 +144,11 @@ class Extract {
     };
   }
 
-  static ByteString getBlob(String instanceName, Digest digest, ByteStreamStub bsStub) throws InterruptedException {
+  static ByteString getBlob(String instanceName, Digest digest, ByteStreamStub bsStub)
+      throws InterruptedException {
     SettableFuture<ByteString> blobFuture = SettableFuture.create();
     bsStub.read(
-        ReadRequest.newBuilder()
-            .setResourceName(blobName(instanceName, digest))
-            .build(),
+        ReadRequest.newBuilder().setResourceName(blobName(instanceName, digest)).build(),
         new StreamObserver<ReadResponse>() {
           ByteString.Output out = ByteString.newOutput((int) digest.getSizeBytes());
 
@@ -222,7 +223,8 @@ class Extract {
           if (!visitedDigests.contains(fileDigest)) {
             visitedDigests.add(fileDigest);
             outstandingOperations.getAndIncrement();
-            executor.execute(blobGetter(root, instanceName, fileDigest, bsStub, outstandingOperations));
+            executor.execute(
+                blobGetter(root, instanceName, fileDigest, bsStub, outstandingOperations));
           }
         }
 
@@ -234,14 +236,25 @@ class Extract {
             visitedDigests.add(directoryDigest);
             visitedDirectories.add(directoryDigest);
             outstandingOperations.getAndIncrement();
-            executor.execute(directoryGetter(root, instanceName, directoryDigest, visitedDirectories, visitedDigests, bsStub, executor, outstandingOperations));
+            executor.execute(
+                directoryGetter(
+                    root,
+                    instanceName,
+                    directoryDigest,
+                    visitedDirectories,
+                    visitedDigests,
+                    bsStub,
+                    executor,
+                    outstandingOperations));
           }
         }
       }
     };
   }
 
-  static void downloadActionContents(Path root, String instanceName, Set<Digest> actionDigests, Channel channel) throws IOException, InterruptedException {
+  static void downloadActionContents(
+      Path root, String instanceName, Set<Digest> actionDigests, Channel channel)
+      throws IOException, InterruptedException {
     ByteStreamStub bsStub = ByteStreamGrpc.newStub(channel);
 
     ExecutorService service = newSingleThreadExecutor();
@@ -263,14 +276,24 @@ class Extract {
       if (!visitedDigests.contains(commandDigest)) {
         visitedDigests.add(commandDigest);
         outstandingOperations.getAndIncrement();
-        service.execute(blobGetter(root, instanceName, commandDigest, bsStub, outstandingOperations));
+        service.execute(
+            blobGetter(root, instanceName, commandDigest, bsStub, outstandingOperations));
       }
       Digest inputRootDigest = action.getInputRootDigest();
       if (!visitedDigests.contains(inputRootDigest)) {
         visitedDirectories.add(inputRootDigest);
         visitedDigests.add(inputRootDigest);
         outstandingOperations.getAndIncrement();
-        service.execute(directoryGetter(root, instanceName, inputRootDigest, visitedDirectories, visitedDigests, bsStub, service, outstandingOperations));
+        service.execute(
+            directoryGetter(
+                root,
+                instanceName,
+                inputRootDigest,
+                visitedDirectories,
+                visitedDigests,
+                bsStub,
+                service,
+                outstandingOperations));
       }
     }
 

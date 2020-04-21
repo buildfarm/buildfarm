@@ -23,7 +23,6 @@ import build.buildfarm.instance.shard.ShardInstance;
 import build.buildfarm.v1test.InstanceConfig;
 import io.grpc.Status;
 import io.grpc.StatusException;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,13 +37,18 @@ public class BuildFarmInstances implements Instances {
   private final Map<String, Instance> instances;
   private final Instance defaultInstance;
 
-  public BuildFarmInstances(String session, List<InstanceConfig> instanceConfigs, String defaultInstanceName, Runnable onStop)
+  public BuildFarmInstances(
+      String session,
+      List<InstanceConfig> instanceConfigs,
+      String defaultInstanceName,
+      Runnable onStop)
       throws InterruptedException, ConfigurationException {
     instances = new HashMap<String, Instance>();
     createInstances(session, instanceConfigs, onStop);
     if (!defaultInstanceName.isEmpty()) {
       if (!instances.containsKey(defaultInstanceName)) {
-        throw new ConfigurationException(defaultInstanceName + " not specified in instance configs.");
+        throw new ConfigurationException(
+            defaultInstanceName + " not specified in instance configs.");
       }
       defaultInstance = instances.get(defaultInstanceName);
     } else {
@@ -71,41 +75,38 @@ public class BuildFarmInstances implements Instances {
   }
 
   @Override
-  public Instance getFromOperationsCollectionName(
-      String operationsCollectionName) throws InstanceNotFoundException {
+  public Instance getFromOperationsCollectionName(String operationsCollectionName)
+      throws InstanceNotFoundException {
     String instanceName = UrlPath.fromOperationsCollectionName(operationsCollectionName);
     return get(instanceName);
   }
 
   @Override
-  public Instance getFromOperationName(String operationName)
-      throws InstanceNotFoundException {
+  public Instance getFromOperationName(String operationName) throws InstanceNotFoundException {
     String instanceName = UrlPath.fromOperationName(operationName);
     return get(instanceName);
   }
 
   @Override
-  public Instance getFromOperationStream(String operationStream)
-      throws InstanceNotFoundException {
+  public Instance getFromOperationStream(String operationStream) throws InstanceNotFoundException {
     String instanceName = UrlPath.fromOperationStream(operationStream);
     return get(instanceName);
   }
 
   @Override
-  public Instance getFromBlob(String blobName)
-      throws InstanceNotFoundException {
+  public Instance getFromBlob(String blobName) throws InstanceNotFoundException {
     String instanceName = UrlPath.fromBlobName(blobName);
     return get(instanceName);
   }
 
   @Override
-  public Instance getFromUploadBlob(String uploadBlobName)
-      throws InstanceNotFoundException {
+  public Instance getFromUploadBlob(String uploadBlobName) throws InstanceNotFoundException {
     String instanceName = UrlPath.fromUploadBlobName(uploadBlobName);
     return get(instanceName);
   }
 
-  private static HashFunction getValidHashFunction(InstanceConfig config) throws ConfigurationException {
+  private static HashFunction getValidHashFunction(InstanceConfig config)
+      throws ConfigurationException {
     try {
       return HashFunction.get(config.getDigestFunction());
     } catch (IllegalArgumentException e) {
@@ -113,7 +114,8 @@ public class BuildFarmInstances implements Instances {
     }
   }
 
-  private void createInstances(String session, List<InstanceConfig> instanceConfigs, Runnable onStop)
+  private void createInstances(
+      String session, List<InstanceConfig> instanceConfigs, Runnable onStop)
       throws InterruptedException, ConfigurationException {
     for (InstanceConfig instanceConfig : instanceConfigs) {
       String name = instanceConfig.getName();
@@ -124,17 +126,18 @@ public class BuildFarmInstances implements Instances {
         case TYPE_NOT_SET:
           throw new IllegalArgumentException("Instance type not set in config");
         case MEMORY_INSTANCE_CONFIG:
-          instances.put(name, new MemoryInstance(
-              name,
-              digestUtil,
-              instanceConfig.getMemoryInstanceConfig()));
+          instances.put(
+              name, new MemoryInstance(name, digestUtil, instanceConfig.getMemoryInstanceConfig()));
           break;
         case SHARD_INSTANCE_CONFIG:
-          instances.put(name, new ShardInstance(
+          instances.put(
               name,
-              session + "-" + name,
-              digestUtil,
-              instanceConfig.getShardInstanceConfig(), onStop));
+              new ShardInstance(
+                  name,
+                  session + "-" + name,
+                  digestUtil,
+                  instanceConfig.getShardInstanceConfig(),
+                  onStop));
           break;
       }
     }

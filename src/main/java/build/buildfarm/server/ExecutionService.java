@@ -18,7 +18,6 @@ import static com.google.common.util.concurrent.Futures.addCallback;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.scheduleAsync;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
-import static java.lang.String.format;
 import static java.util.logging.Level.WARNING;
 
 import build.bazel.remote.execution.v2.ExecuteRequest;
@@ -32,8 +31,8 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import io.grpc.Context;
 import io.grpc.Status;
-import io.grpc.stub.StreamObserver;
 import io.grpc.stub.ServerCallStreamObserver;
+import io.grpc.stub.StreamObserver;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -60,8 +59,7 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
   }
 
   private void withCancellation(
-      ServerCallStreamObserver<Operation> serverCallStreamObserver,
-      ListenableFuture<Void> future) {
+      ServerCallStreamObserver<Operation> serverCallStreamObserver, ListenableFuture<Void> future) {
     addCallback(
         future,
         new FutureCallback<Void>() {
@@ -89,8 +87,7 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
           }
         },
         Context.current().fixedContextExecutor(directExecutor()));
-    serverCallStreamObserver.setOnCancelHandler(
-        () -> future.cancel(false));
+    serverCallStreamObserver.setOnCancelHandler(() -> future.cancel(false));
   }
 
   abstract class KeepaliveWatcher implements Watcher {
@@ -104,7 +101,8 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
       serverCallStreamObserver.setOnCancelHandler(this::cancel);
     }
 
-    @Nullable ListenableFuture<?> getFuture() {
+    @Nullable
+    ListenableFuture<?> getFuture() {
       return keepaliveFuture;
     }
 
@@ -142,9 +140,7 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
     private synchronized void deliverKeepalive(String operationName) {
       if (!serverCallStreamObserver.isCancelled()) {
         try {
-          deliver(Operation.newBuilder()
-              .setName(operationName)
-              .build());
+          deliver(Operation.newBuilder().setName(operationName).build());
           keepaliveFuture = scheduleKeepalive(operationName);
         } catch (IllegalStateException e) {
           if (!e.getMessage().equals("call is closed")) {
@@ -155,8 +151,7 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
     }
   }
 
-  KeepaliveWatcher createWatcher(
-      ServerCallStreamObserver<Operation> serverCallStreamObserver) {
+  KeepaliveWatcher createWatcher(ServerCallStreamObserver<Operation> serverCallStreamObserver) {
     return new KeepaliveWatcher(serverCallStreamObserver) {
       @Override
       void deliver(Operation operation) {
@@ -181,14 +176,11 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
         (ServerCallStreamObserver<Operation>) responseObserver;
     withCancellation(
         serverCallStreamObserver,
-        instance.watchOperation(
-            operationName,
-            createWatcher(serverCallStreamObserver)));
+        instance.watchOperation(operationName, createWatcher(serverCallStreamObserver)));
   }
 
   @Override
-  public void execute(
-      ExecuteRequest request, StreamObserver<Operation> responseObserver) {
+  public void execute(ExecuteRequest request, StreamObserver<Operation> responseObserver) {
     Instance instance;
     try {
       instance = instances.get(request.getInstanceName());

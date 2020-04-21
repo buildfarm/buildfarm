@@ -14,23 +14,17 @@
 
 package build.buildfarm.common.cache;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.base.Preconditions.checkState;
 import static build.buildfarm.common.cache.CacheBuilder.NULL_TICKER;
 import static build.buildfarm.common.cache.CacheBuilder.UNSET_INT;
+import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.util.concurrent.Futures.addCallback;
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.Futures.transformAsync;
-import static com.google.common.util.concurrent.Futures.addCallback;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.Uninterruptibles.getUninterruptibly;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
-import com.google.common.annotations.GwtCompatible;
-import com.google.common.annotations.GwtIncompatible;
-import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Equivalence;
-import com.google.common.base.Stopwatch;
-import com.google.common.base.Ticker;
 import build.buildfarm.common.cache.AbstractCache.SimpleStatsCounter;
 import build.buildfarm.common.cache.AbstractCache.StatsCounter;
 import build.buildfarm.common.cache.CacheBuilder.NullListener;
@@ -38,6 +32,12 @@ import build.buildfarm.common.cache.CacheBuilder.OneWeigher;
 import build.buildfarm.common.cache.CacheLoader.InvalidCacheLoadException;
 import build.buildfarm.common.cache.CacheLoader.UnsupportedLoadingOperationException;
 import build.buildfarm.common.cache.LocalCache.AbstractCacheSet;
+import com.google.common.annotations.GwtCompatible;
+import com.google.common.annotations.GwtIncompatible;
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Equivalence;
+import com.google.common.base.Stopwatch;
+import com.google.common.base.Ticker;
 import com.google.common.collect.AbstractSequentialIterator;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -46,8 +46,8 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.primitives.Ints;
 import com.google.common.util.concurrent.ExecutionError;
-import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
@@ -2088,7 +2088,8 @@ class LocalCache<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V> 
           if (value != null) {
             recordRead(e, now);
             try {
-              return getUninterruptibly(scheduleRefresh(e, e.getKey(), hash, value, now, map.defaultLoader));
+              return getUninterruptibly(
+                  scheduleRefresh(e, e.getKey(), hash, value, now, map.defaultLoader));
             } catch (Throwable t) {
               // don't let refresh exceptions propagate; error was already logged
               return null;
@@ -2186,19 +2187,25 @@ class LocalCache<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V> 
       }
     }
 
-    ListenableFuture<V> waitForLoadingValue(ReferenceEntry<K, V> e, K key, ValueReference<K, V> valueReference) {
+    ListenableFuture<V> waitForLoadingValue(
+        ReferenceEntry<K, V> e, K key, ValueReference<K, V> valueReference) {
       if (!valueReference.isLoading()) {
         throw new AssertionError();
       }
 
       checkState(!Thread.holdsLock(e), "Recursive load of: %s", key);
       // don't consider expiration as we're concurrent with loading
-      ListenableFuture<V> valueFuture = transform(valueReference.getFuture(), (value) -> {
-        if (value == null) {
-          throw new InvalidCacheLoadException("CacheLoader returned null for key " + key + ".");
-        }
-        return value;
-      }, directExecutor());
+      ListenableFuture<V> valueFuture =
+          transform(
+              valueReference.getFuture(),
+              (value) -> {
+                if (value == null) {
+                  throw new InvalidCacheLoadException(
+                      "CacheLoader returned null for key " + key + ".");
+                }
+                return value;
+              },
+              directExecutor());
       addCallback(
           valueFuture,
           new FutureCallback<V>() {
@@ -2210,8 +2217,7 @@ class LocalCache<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V> 
             }
 
             @Override
-            public void onFailure(Throwable t) {
-            }
+            public void onFailure(Throwable t) {}
           },
           directExecutor());
       addCallback(
@@ -2295,8 +2301,9 @@ class LocalCache<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V> 
             return newValue;
           }
           try {
-            return getUninterruptibly(getAndRecordStats(
-                key, hash, loadingValueReference, Futures.immediateFuture(newValue)));
+            return getUninterruptibly(
+                getAndRecordStats(
+                    key, hash, loadingValueReference, Futures.immediateFuture(newValue)));
           } catch (ExecutionException exception) {
             throw new AssertionError("impossible; Futures.immediateFuture can't throw");
           }
@@ -2334,8 +2341,7 @@ class LocalCache<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V> 
           getAndRecordStats(key, hash, loadingValueReference, loadingFuture),
           new FutureCallback<V>() {
             @Override
-            public void onSuccess(V value) {
-            }
+            public void onSuccess(V value) {}
 
             @Override
             public void onFailure(Throwable t) {
@@ -2353,12 +2359,17 @@ class LocalCache<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V> 
         int hash,
         LoadingValueReference<K, V> loadingValueReference,
         ListenableFuture<V> newValue) {
-      ListenableFuture<V> newValueExists = transform(newValue, (value) -> {
-        if (value == null) {
-          throw new InvalidCacheLoadException("CacheLoader returned null for key " + key + ".");
-        }
-        return value;
-      }, directExecutor());
+      ListenableFuture<V> newValueExists =
+          transform(
+              newValue,
+              (value) -> {
+                if (value == null) {
+                  throw new InvalidCacheLoadException(
+                      "CacheLoader returned null for key " + key + ".");
+                }
+                return value;
+              },
+              directExecutor());
       addCallback(
           newValueExists,
           new FutureCallback<V>() {
@@ -2403,7 +2414,8 @@ class LocalCache<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V> 
      * refresh.
      */
     @Nullable
-    ListenableFuture<V> refresh(K key, int hash, CacheLoader<? super K, V> loader, boolean checkTime) {
+    ListenableFuture<V> refresh(
+        K key, int hash, CacheLoader<? super K, V> loader, boolean checkTime) {
       final LoadingValueReference<K, V> loadingValueReference =
           insertLoadingValueReference(key, hash, checkTime);
       if (loadingValueReference == null) {
@@ -3615,10 +3627,10 @@ class LocalCache<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V> 
       }
       V newValue;
       try {
-         newValue = function.apply(key, previousValue);
+        newValue = function.apply(key, previousValue);
       } catch (Throwable th) {
-         this.setException(th);
-         throw th;
+        this.setException(th);
+        throw th;
       }
       this.set(newValue);
       return newValue;
@@ -4923,7 +4935,8 @@ class LocalCache<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V> 
     }
 
     @Override
-    public ListenableFuture<V> get(K key, final Callable<ListenableFuture<? extends V>> valueLoader) {
+    public ListenableFuture<V> get(
+        K key, final Callable<ListenableFuture<? extends V>> valueLoader) {
       checkNotNull(valueLoader);
       return localCache.get(
           key,

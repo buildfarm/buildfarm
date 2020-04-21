@@ -32,13 +32,14 @@ public class EmptyInputStreamFactoryTest {
 
   @Test
   public void emptyDigestIsNotDelegated() throws IOException, InterruptedException {
-    EmptyInputStreamFactory emptyFactory = new EmptyInputStreamFactory(
-        new InputStreamFactory() {
-          @Override
-          public InputStream newInput(Digest digest, long offset) throws IOException {
-            throw new IOException("invalid");
-          }
-        });
+    EmptyInputStreamFactory emptyFactory =
+        new EmptyInputStreamFactory(
+            new InputStreamFactory() {
+              @Override
+              public InputStream newInput(Digest digest, long offset) throws IOException {
+                throw new IOException("invalid");
+              }
+            });
     InputStream in = emptyFactory.newInput(Digest.getDefaultInstance(), /* offset=*/ 0);
     assertThat(in.read()).isEqualTo(-1);
   }
@@ -47,16 +48,17 @@ public class EmptyInputStreamFactoryTest {
   public void nonEmptyDigestIsDelegated() throws IOException, InterruptedException {
     ByteString content = ByteString.copyFromUtf8("Hello, World");
     Digest contentDigest = DIGEST_UTIL.compute(content);
-    EmptyInputStreamFactory emptyFactory = new EmptyInputStreamFactory(
-        new InputStreamFactory() {
-          @Override
-          public InputStream newInput(Digest digest, long offset) throws IOException {
-            if (digest.equals(contentDigest)) {
-              return content.newInput();
-            }
-            throw new IOException("invalid");
-          }
-        });
+    EmptyInputStreamFactory emptyFactory =
+        new EmptyInputStreamFactory(
+            new InputStreamFactory() {
+              @Override
+              public InputStream newInput(Digest digest, long offset) throws IOException {
+                if (digest.equals(contentDigest)) {
+                  return content.newInput();
+                }
+                throw new IOException("invalid");
+              }
+            });
     InputStream in = emptyFactory.newInput(contentDigest, /* offset=*/ 0);
     assertThat(ByteString.readFrom(in)).isEqualTo(content);
   }

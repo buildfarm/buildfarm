@@ -17,17 +17,16 @@ package build.buildfarm.worker;
 import static build.buildfarm.worker.Utils.readdir;
 import static build.buildfarm.worker.Utils.statIfFound;
 
-import build.buildfarm.common.DigestUtil;
-import build.buildfarm.instance.stub.Chunker;
-import build.buildfarm.v1test.CASInsertionPolicy;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.Tree;
+import build.buildfarm.common.DigestUtil;
+import build.buildfarm.instance.stub.Chunker;
+import build.buildfarm.v1test.CASInsertionPolicy;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
@@ -69,9 +68,7 @@ public class UploadManifest {
     this.inlineContentBytes = 0;
   }
 
-  /**
-   * Add a collection of files to the UploadManifest.
-   */
+  /** Add a collection of files to the UploadManifest. */
   public void addFiles(Iterable<Path> files, CASInsertionPolicy policy)
       throws IllegalStateException, IOException, InterruptedException {
     for (Path file : files) {
@@ -95,10 +92,10 @@ public class UploadManifest {
   }
 
   /**
-   * Add a collection of directories to the UploadManifest. Adding a directory has the
-   * effect of 1) uploading a {@link Tree} protobuf message from which the whole structure of the
-   * directory, including the descendants, can be reconstructed and 2) uploading all the
-   * non-directory descendant files.
+   * Add a collection of directories to the UploadManifest. Adding a directory has the effect of 1)
+   * uploading a {@link Tree} protobuf message from which the whole structure of the directory,
+   * including the descendants, can be reconstructed and 2) uploading all the non-directory
+   * descendant files.
    */
   public void addDirectories(Iterable<Path> dirs)
       throws IllegalStateException, IOException, InterruptedException {
@@ -119,8 +116,7 @@ public class UploadManifest {
   }
 
   private void addFiles(Iterable<Path> files, boolean isDirectory, CASInsertionPolicy policy)
-      throws IllegalStateException, IOException, InterruptedException {
-  }
+      throws IllegalStateException, IOException, InterruptedException {}
 
   /** Map of digests to file paths to upload. */
   public Map<Digest, Path> getDigestToFile() {
@@ -129,14 +125,18 @@ public class UploadManifest {
 
   /**
    * Map of digests to chunkers to upload. When the file is a regular, non-directory file it is
-   * transmitted through {@link #getDigestToFile()}. When it is a directory, it is transmitted as
-   * a {@link Tree} protobuf message through {@link #getDigestToChunkers()}.
+   * transmitted through {@link #getDigestToFile()}. When it is a directory, it is transmitted as a
+   * {@link Tree} protobuf message through {@link #getDigestToChunkers()}.
    */
   public Map<Digest, Chunker> getDigestToChunkers() {
     return digestToChunkers;
   }
 
-  public void addContent(ByteString content, CASInsertionPolicy policy, Consumer<ByteString> setRaw, Consumer<Digest> setDigest) {
+  public void addContent(
+      ByteString content,
+      CASInsertionPolicy policy,
+      Consumer<ByteString> setRaw,
+      Consumer<Digest> setDigest) {
     boolean withinLimit = inlineContentBytes + content.size() <= inlineContentLimit;
     if (withinLimit) {
       setRaw.accept(content);
@@ -155,11 +155,12 @@ public class UploadManifest {
 
   private void addFile(Path file, CASInsertionPolicy policy) throws IOException {
     Digest digest = digestUtil.compute(file);
-    OutputFile.Builder builder = result
-        .addOutputFilesBuilder()
-        .setPath(execRoot.relativize(file).toString())
-        .setIsExecutable(Files.isExecutable(file))
-        .setDigest(digest);
+    OutputFile.Builder builder =
+        result
+            .addOutputFilesBuilder()
+            .setPath(execRoot.relativize(file).toString())
+            .setIsExecutable(Files.isExecutable(file))
+            .setDigest(digest);
     digestToFile.put(digest, file);
   }
 
@@ -199,7 +200,10 @@ public class UploadManifest {
       } else if (dirent.getType() == Dirent.Type.FILE
           || (dirent.getType() == Dirent.Type.SYMLINK && allowSymlinks)) {
         Digest digest = digestUtil.compute(child);
-        b.addFilesBuilder().setName(name).setDigest(digest).setIsExecutable(Files.isExecutable(child));
+        b.addFilesBuilder()
+            .setName(name)
+            .setDigest(digest)
+            .setIsExecutable(Files.isExecutable(child));
         digestToFile.put(digest, child);
       } else {
         illegalOutput(child);
@@ -210,8 +214,10 @@ public class UploadManifest {
   }
 
   private void mismatchedOutput(Path what) throws IllegalStateException, IOException {
-    String kind = Files.isSymbolicLink(what)
-        ? "symbolic link" : Files.isDirectory(what) ? "directory" : "file";
+    String kind =
+        Files.isSymbolicLink(what)
+            ? "symbolic link"
+            : Files.isDirectory(what) ? "directory" : "file";
     String expected = kind.equals("directory") ? "file" : "directory";
     throw new IllegalStateException(
         String.format(

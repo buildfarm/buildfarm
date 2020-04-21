@@ -14,18 +14,14 @@
 
 package build.buildfarm;
 
-import org.junit.runner.RunWith;
-import org.junit.runners.Suite;
 import java.util.Set;
+import org.junit.runner.RunWith;
 
-/**
- * General test suite with defaults suitable for most of our tests.
- */
+/** General test suite with defaults suitable for most of our tests. */
 @RunWith(CustomSuite.class)
 public class AllTests {
   private TestSuiteBuilder getBuilder() {
-    return new TestSuiteBuilder()
-        .addPackageRecursive("build.buildfarm");
+    return new TestSuiteBuilder().addPackageRecursive("build.buildfarm");
   }
 
   public static Set<Class<?>> suite() {

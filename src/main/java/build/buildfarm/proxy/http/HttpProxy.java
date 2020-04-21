@@ -22,13 +22,8 @@ import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.util.TransmitStatusRuntimeExceptionInterceptor;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
 import java.util.logging.Level;
@@ -40,8 +35,7 @@ public class HttpProxy {
   // We need to keep references to the root and netty loggers to prevent them from being garbage
   // collected, which would cause us to loose their configuration.
   private static final Logger nettyLogger = Logger.getLogger("io.grpc.netty");
-  public static final Logger logger =
-    Logger.getLogger(HttpProxy.class.getName());
+  public static final Logger logger = Logger.getLogger(HttpProxy.class.getName());
 
   private final HttpProxyOptions options;
   private final Server server;
@@ -52,33 +46,38 @@ public class HttpProxy {
   }
 
   public HttpProxy(
-      ServerBuilder<?> serverBuilder,
-      @Nullable Credentials creds,
-      HttpProxyOptions options) throws URISyntaxException, SSLException {
+      ServerBuilder<?> serverBuilder, @Nullable Credentials creds, HttpProxyOptions options)
+      throws URISyntaxException, SSLException {
     this.options = options;
-    SimpleBlobStore simpleBlobStore = HttpBlobStore.create(
-        URI.create(options.httpCache),
-        /* remoteMaxConnections=*/ 0,
-        (int) SECONDS.toMillis(options.timeout),
-        creds);
-    server = serverBuilder
-        .addService(new ActionCacheService(simpleBlobStore))
-        .addService(new ContentAddressableStorageService(simpleBlobStore, options.treeDefaultPageSize, options.treeMaxPageSize))
-        .addService(new ByteStreamService(simpleBlobStore))
-        .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
-        .build();
+    SimpleBlobStore simpleBlobStore =
+        HttpBlobStore.create(
+            URI.create(options.httpCache),
+            /* remoteMaxConnections=*/ 0,
+            (int) SECONDS.toMillis(options.timeout),
+            creds);
+    server =
+        serverBuilder
+            .addService(new ActionCacheService(simpleBlobStore))
+            .addService(
+                new ContentAddressableStorageService(
+                    simpleBlobStore, options.treeDefaultPageSize, options.treeMaxPageSize))
+            .addService(new ByteStreamService(simpleBlobStore))
+            .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
+            .build();
   }
 
   public void start() throws IOException {
     server.start();
-    Runtime.getRuntime().addShutdownHook(new Thread() {
-      @Override
-      public void run() {
-        System.err.println("*** shutting down gRPC server since JVM is shutting down");
-        HttpProxy.this.stop();
-        System.err.println("*** server shut down");
-      }
-    });
+    Runtime.getRuntime()
+        .addShutdownHook(
+            new Thread() {
+              @Override
+              public void run() {
+                System.err.println("*** shutting down gRPC server since JVM is shutting down");
+                HttpProxy.this.stop();
+                System.err.println("*** server shut down");
+              }
+            });
   }
 
   public void stop() {
@@ -95,8 +94,9 @@ public class HttpProxy {
 
   private static void printUsage(OptionsParser parser) {
     System.out.println("Usage: [OPTIONS]");
-    System.out.println(parser.describeOptions(Collections.<String, String>emptyMap(),
-                                              OptionsParser.HelpVerbosity.LONG));
+    System.out.println(
+        parser.describeOptions(
+            Collections.<String, String>emptyMap(), OptionsParser.HelpVerbosity.LONG));
   }
 
   public static void main(String[] args) throws Exception {
@@ -107,9 +107,8 @@ public class HttpProxy {
     // unknown stream 11369
     nettyLogger.setLevel(Level.SEVERE);
 
-    OptionsParser parser = OptionsParser.newOptionsParser(
-        HttpProxyOptions.class,
-        AuthAndTLSOptions.class);
+    OptionsParser parser =
+        OptionsParser.newOptionsParser(HttpProxyOptions.class, AuthAndTLSOptions.class);
     parser.parseAndExitUponError(args);
     List<String> residue = parser.getResidue();
     if (!residue.isEmpty()) {
@@ -122,9 +121,7 @@ public class HttpProxy {
       throw new IllegalArgumentException("invalid port: " + options.port);
     }
     AuthAndTLSOptions authAndTlsOptions = parser.getOptions(AuthAndTLSOptions.class);
-    HttpProxy server = new HttpProxy(
-        options,
-        GoogleAuthUtils.newCredentials(authAndTlsOptions));
+    HttpProxy server = new HttpProxy(options, GoogleAuthUtils.newCredentials(authAndTlsOptions));
     server.start();
     server.blockUntilShutdown();
   }

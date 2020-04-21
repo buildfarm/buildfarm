@@ -25,13 +25,11 @@ import build.buildfarm.common.Write;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.v1test.ContentAddressableStorageConfig;
 import build.buildfarm.v1test.GrpcCASConfig;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.MultimapBuilder;
-import com.google.protobuf.ByteString;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.protobuf.ByteString;
 import io.grpc.Channel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
@@ -40,26 +38,20 @@ import java.io.InputStream;
 import java.nio.file.NoSuchFileException;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 
 public final class ContentAddressableStorages {
   private static Channel createChannel(String target) {
     NettyChannelBuilder builder =
-        NettyChannelBuilder.forTarget(target)
-            .negotiationType(NegotiationType.PLAINTEXT);
+        NettyChannelBuilder.forTarget(target).negotiationType(NegotiationType.PLAINTEXT);
     return builder.build();
   }
 
   public static ContentAddressableStorage createGrpcCAS(GrpcCASConfig config) {
     Channel channel = createChannel(config.getTarget());
-    ByteStreamUploader byteStreamUploader
-        = new ByteStreamUploader("", channel, null, 300, NO_RETRIES);
-    ListMultimap<Digest, Runnable> onExpirations = synchronizedListMultimap(
-        MultimapBuilder
-            .hashKeys()
-            .arrayListValues()
-            .build());
+    ByteStreamUploader byteStreamUploader =
+        new ByteStreamUploader("", channel, null, 300, NO_RETRIES);
+    ListMultimap<Digest, Runnable> onExpirations =
+        synchronizedListMultimap(MultimapBuilder.hashKeys().arrayListValues().build());
 
     return new GrpcCAS(config.getInstanceName(), channel, byteStreamUploader, onExpirations);
   }
@@ -76,10 +68,7 @@ public final class ContentAddressableStorages {
     }
   }
 
-  /**
-   * decorates a map with a CAS interface, does not react
-   * to removals with expirations
-   */
+  /** decorates a map with a CAS interface, does not react to removals with expirations */
   public static ContentAddressableStorage casMapDecorator(Map<Digest, ByteString> map) {
     return new ContentAddressableStorage() {
       final Writes writes = new Writes(this);
@@ -117,8 +106,7 @@ public final class ContentAddressableStorages {
       }
 
       @Override
-      public ListenableFuture<Iterable<Response>> getAllFuture(
-          Iterable<Digest> digests) {
+      public ListenableFuture<Iterable<Response>> getAllFuture(Iterable<Digest> digests) {
         return immediateFuture(MemoryCAS.getAll(digests, map::get));
       }
 

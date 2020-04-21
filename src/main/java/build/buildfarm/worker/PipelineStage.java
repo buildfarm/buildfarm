@@ -30,7 +30,8 @@ public abstract class PipelineStage implements Runnable {
   private Thread tickThread = null;
   private boolean tickCancelledFlag = false;
 
-  PipelineStage(String name, WorkerContext workerContext, PipelineStage output, PipelineStage error) {
+  PipelineStage(
+      String name, WorkerContext workerContext, PipelineStage output, PipelineStage error) {
     this.name = name;
     this.workerContext = workerContext;
     this.output = output;
@@ -111,7 +112,8 @@ public abstract class PipelineStage implements Runnable {
     }
     after(operationContext);
     long usecs = stopwatch.elapsed(MICROSECONDS);
-    logComplete(operationContext.operation.getName(), usecs, stallUSecs, nextOperationContext != null);
+    logComplete(
+        operationContext.operation.getName(), usecs, stallUSecs, nextOperationContext != null);
   }
 
   private String logIterateId(String operationName) {
@@ -135,19 +137,18 @@ public abstract class PipelineStage implements Runnable {
   }
 
   protected void logComplete(String operationName, long usecs, long stallUSecs, String status) {
-    getLogger().info(String.format(
-        "%s: %g ms (%g ms stalled) %s",
-        logIterateId(operationName),
-        usecs / 1000.0f,
-        stallUSecs / 1000.0f,
-        status));
+    getLogger()
+        .info(
+            String.format(
+                "%s: %g ms (%g ms stalled) %s",
+                logIterateId(operationName), usecs / 1000.0f, stallUSecs / 1000.0f, status));
   }
 
   protected OperationContext tick(OperationContext operationContext) throws InterruptedException {
     return operationContext;
   }
 
-  protected void after(OperationContext operationContext) { }
+  protected void after(OperationContext operationContext) {}
 
   public synchronized boolean claim() throws InterruptedException {
     while (!closed && claimed) {
@@ -187,7 +188,9 @@ public abstract class PipelineStage implements Runnable {
   }
 
   abstract Logger getLogger();
+
   abstract OperationContext take() throws InterruptedException;
+
   abstract void put(OperationContext operationContext) throws InterruptedException;
 
   public static class NullStage extends PipelineStage {
@@ -200,20 +203,35 @@ public abstract class PipelineStage implements Runnable {
     }
 
     @Override
-    public Logger getLogger() { return null; }
+    public Logger getLogger() {
+      return null;
+    }
+
     @Override
-    public boolean claim() { return true; }
+    public boolean claim() {
+      return true;
+    }
+
     @Override
-    public void release() { }
+    public void release() {}
+
     @Override
-    public OperationContext take() { throw new UnsupportedOperationException(); }
+    public OperationContext take() {
+      throw new UnsupportedOperationException();
+    }
+
     @Override
-    public void put(OperationContext operationContext) throws InterruptedException { }
+    public void put(OperationContext operationContext) throws InterruptedException {}
+
     @Override
-    public void run() { }
+    public void run() {}
+
     @Override
-    public void close() { }
+    public void close() {}
+
     @Override
-    public boolean isClosed() { return false; }
+    public boolean isClosed() {
+      return false;
+    }
   }
 }

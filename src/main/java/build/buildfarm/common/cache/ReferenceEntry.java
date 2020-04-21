@@ -14,8 +14,8 @@
 
 package build.buildfarm.common.cache;
 
-import com.google.common.annotations.GwtIncompatible;
 import build.buildfarm.common.cache.LocalCache.ValueReference;
+import com.google.common.annotations.GwtIncompatible;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
 /**

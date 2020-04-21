@@ -18,7 +18,6 @@ import static build.bazel.remote.execution.v2.ExecutionStage.Value.COMPLETED;
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.EXECUTING;
 import static build.buildfarm.common.Actions.asExecutionStatus;
 import static build.buildfarm.common.Actions.isRetriable;
-import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.SEVERE;
 
@@ -84,11 +83,13 @@ public class ReportResultStage extends PipelineStage {
     }
   }
 
-  private OperationContext reportPolled(OperationContext operationContext) throws InterruptedException {
+  private OperationContext reportPolled(OperationContext operationContext)
+      throws InterruptedException {
     String operationName = operationContext.operation.getName();
 
     ActionResult.Builder resultBuilder = operationContext.executeResponse.getResultBuilder();
-    resultBuilder.getExecutionMetadataBuilder()
+    resultBuilder
+        .getExecutionMetadataBuilder()
         .setOutputUploadStartTimestamp(Timestamps.fromMillis(System.currentTimeMillis()));
 
     boolean blacklist = false;
@@ -101,7 +102,8 @@ public class ReportResultStage extends PipelineStage {
           operationContext.command.getOutputDirectoriesList());
     } catch (StatusException e) {
       if (operationContext.executeResponse.build().getStatus().getCode() == Code.OK.getNumber()) {
-        // something about the outputs was malformed - fail the operation with this status if not already failing
+        // something about the outputs was malformed - fail the operation with this status if not
+        // already failing
         Status status = StatusProto.fromThrowable(e);
         if (status == null) {
           logger.log(SEVERE, "no rpc status from exception for " + operationName, e);
@@ -112,7 +114,7 @@ public class ReportResultStage extends PipelineStage {
           blacklist = true;
         }
       }
-    } catch (InterruptedException|ClosedByInterruptException e) {
+    } catch (InterruptedException | ClosedByInterruptException e) {
       // cancellation here should not be logged
       return null;
     } catch (IOException e) {
@@ -122,29 +124,35 @@ public class ReportResultStage extends PipelineStage {
 
     ExecuteOperationMetadata metadata;
     try {
-      metadata = operationContext.operation.getMetadata()
-          .unpack(ExecutingOperationMetadata.class)
-          .getExecuteOperationMetadata();
+      metadata =
+          operationContext
+              .operation
+              .getMetadata()
+              .unpack(ExecutingOperationMetadata.class)
+              .getExecuteOperationMetadata();
     } catch (InvalidProtocolBufferException e) {
       logger.log(SEVERE, "invalid execute operation metadata for " + operationName, e);
       return null;
     }
 
     Timestamp now = Timestamps.fromMillis(System.currentTimeMillis());
-    resultBuilder.getExecutionMetadataBuilder()
+    resultBuilder
+        .getExecutionMetadataBuilder()
         .setWorkerCompletedTimestamp(now)
         .setOutputUploadCompletedTimestamp(now);
 
     ExecuteResponse executeResponse = operationContext.executeResponse.build();
 
-    if (blacklist || (!operationContext.action.getDoNotCache()
-          && executeResponse.getStatus().getCode() == Code.OK.getNumber()
-          && executeResponse.getResult().getExitCode() == 0)) {
+    if (blacklist
+        || (!operationContext.action.getDoNotCache()
+            && executeResponse.getStatus().getCode() == Code.OK.getNumber()
+            && executeResponse.getResult().getExitCode() == 0)) {
       try {
         if (blacklist) {
           workerContext.blacklistAction(metadata.getActionDigest().getHash());
         } else {
-          workerContext.putActionResult(DigestUtil.asActionKey(metadata.getActionDigest()), executeResponse.getResult());
+          workerContext.putActionResult(
+              DigestUtil.asActionKey(metadata.getActionDigest()), executeResponse.getResult());
         }
       } catch (IOException e) {
         logger.log(SEVERE, "error reporting action result for " + operationName, e);
@@ -152,18 +160,20 @@ public class ReportResultStage extends PipelineStage {
       }
     }
 
-    CompletedOperationMetadata completedMetadata = CompletedOperationMetadata.newBuilder()
-        .setExecuteOperationMetadata(metadata.toBuilder()
-            .setStage(COMPLETED)
-            .build())
-        .setRequestMetadata(operationContext.queueEntry.getExecuteEntry().getRequestMetadata())
-        .build();
+    CompletedOperationMetadata completedMetadata =
+        CompletedOperationMetadata.newBuilder()
+            .setExecuteOperationMetadata(metadata.toBuilder().setStage(COMPLETED).build())
+            .setRequestMetadata(operationContext.queueEntry.getExecuteEntry().getRequestMetadata())
+            .build();
 
-    Operation operation = operationContext.operation.toBuilder()
-        .setDone(true)
-        .setMetadata(Any.pack(completedMetadata))
-        .setResponse(Any.pack(executeResponse))
-        .build();
+    Operation operation =
+        operationContext
+            .operation
+            .toBuilder()
+            .setDone(true)
+            .setMetadata(Any.pack(completedMetadata))
+            .setResponse(Any.pack(executeResponse))
+            .build();
 
     operationContext.poller.pause();
 
@@ -176,9 +186,7 @@ public class ReportResultStage extends PipelineStage {
       return null;
     }
 
-    return operationContext.toBuilder()
-        .setOperation(operation)
-        .build();
+    return operationContext.toBuilder().setOperation(operation).build();
   }
 
   @Override

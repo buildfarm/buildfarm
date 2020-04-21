@@ -14,9 +14,9 @@
 
 package build.buildfarm.worker;
 
+import static build.buildfarm.v1test.ExecutionPolicy.PolicyCase.WRAPPER;
 import static com.google.common.collect.Iterables.filter;
 import static com.google.common.collect.Iterables.transform;
-import static build.buildfarm.v1test.ExecutionPolicy.PolicyCase.WRAPPER;
 import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
@@ -25,7 +25,6 @@ import static java.util.logging.Level.SEVERE;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
-import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.Platform.Property;
@@ -35,7 +34,6 @@ import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.ExecutionPolicy;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
-import com.google.common.util.concurrent.SettableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -44,10 +42,8 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.Timestamps;
 import com.google.rpc.Code;
 import io.grpc.Deadline;
-import java.nio.file.Path;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
@@ -63,7 +59,8 @@ class Executor implements Runnable {
   private final ExecuteActionStage owner;
   private int exitCode = INCOMPLETE_EXIT_CODE;
 
-  Executor(WorkerContext workerContext, OperationContext operationContext, ExecuteActionStage owner) {
+  Executor(
+      WorkerContext workerContext, OperationContext operationContext, ExecuteActionStage owner) {
     this.workerContext = workerContext;
     this.operationContext = operationContext;
     this.owner = owner;
@@ -72,26 +69,30 @@ class Executor implements Runnable {
   private long runInterruptible(Stopwatch stopwatch) throws InterruptedException {
     ExecuteOperationMetadata metadata;
     try {
-      metadata = operationContext.operation
-          .getMetadata().unpack(ExecuteOperationMetadata.class);
+      metadata = operationContext.operation.getMetadata().unpack(ExecuteOperationMetadata.class);
     } catch (InvalidProtocolBufferException e) {
       logger.log(SEVERE, "invalid execute operation metadata", e);
       return 0;
     }
-    ExecuteOperationMetadata executingMetadata = metadata.toBuilder()
-        .setStage(ExecutionStage.Value.EXECUTING)
-        .build();
+    ExecuteOperationMetadata executingMetadata =
+        metadata.toBuilder().setStage(ExecutionStage.Value.EXECUTING).build();
 
     long startedAt = System.currentTimeMillis();
 
-    Operation operation = operationContext.operation.toBuilder()
-        .setMetadata(Any.pack(ExecutingOperationMetadata.newBuilder()
-            .setStartedAt(startedAt)
-            .setExecutingOn(workerContext.getName())
-            .setExecuteOperationMetadata(executingMetadata)
-            .setRequestMetadata(operationContext.queueEntry.getExecuteEntry().getRequestMetadata())
-            .build()))
-        .build();
+    Operation operation =
+        operationContext
+            .operation
+            .toBuilder()
+            .setMetadata(
+                Any.pack(
+                    ExecutingOperationMetadata.newBuilder()
+                        .setStartedAt(startedAt)
+                        .setExecutingOn(workerContext.getName())
+                        .setExecuteOperationMetadata(executingMetadata)
+                        .setRequestMetadata(
+                            operationContext.queueEntry.getExecuteEntry().getRequestMetadata())
+                        .build()))
+            .build();
 
     boolean operationUpdateSuccess = false;
     try {
@@ -103,8 +104,7 @@ class Executor implements Runnable {
     if (!operationUpdateSuccess) {
       logger.warning(
           String.format(
-              "Executor::run(%s): could not transition to EXECUTING",
-              operation.getName()));
+              "Executor::run(%s): could not transition to EXECUTING", operation.getName()));
       owner.error().put(operationContext);
       return 0;
     }
@@ -124,10 +124,10 @@ class Executor implements Runnable {
     if (timeout == null) {
       pollDeadline = Deadline.after(10, DAYS);
     } else {
-      pollDeadline = Deadline.after(
-          // 10s of padding for the timeout in question, so that we can guarantee cleanup
-          (timeout.getSeconds() + 10) * 1000000 + timeout.getNanos() / 1000,
-          MICROSECONDS);
+      pollDeadline =
+          Deadline.after(
+              // 10s of padding for the timeout in question, so that we can guarantee cleanup
+              (timeout.getSeconds() + 10) * 1000000 + timeout.getNanos() / 1000, MICROSECONDS);
     }
 
     workerContext.resumePoller(
@@ -145,10 +145,8 @@ class Executor implements Runnable {
     }
   }
 
-  private long executePolled(
-      Operation operation,
-      Duration timeout,
-      Stopwatch stopwatch) throws InterruptedException {
+  private long executePolled(Operation operation, Duration timeout, Stopwatch stopwatch)
+      throws InterruptedException {
     /* execute command */
     workerContext.logInfo("Executor: Operation " + operation.getName() + " Executing command");
 
@@ -164,22 +162,23 @@ class Executor implements Runnable {
       }
     }
 
-    ActionResult.Builder resultBuilder = operationContext.executeResponse
-        .getResultBuilder();
-    resultBuilder.getExecutionMetadataBuilder()
+    ActionResult.Builder resultBuilder = operationContext.executeResponse.getResultBuilder();
+    resultBuilder
+        .getExecutionMetadataBuilder()
         .setExecutionStartTimestamp(Timestamps.fromMillis(System.currentTimeMillis()));
 
     Code statusCode;
     try {
-      statusCode = executeCommand(
-          operation.getName(),
-          operationContext.execDir,
-          operationContext.command,
-          timeout,
-          "", // executingMetadata.getStdoutStreamName(),
-          "", // executingMetadata.getStderrStreamName(),
-          resultBuilder,
-          policies.build());
+      statusCode =
+          executeCommand(
+              operation.getName(),
+              operationContext.execDir,
+              operationContext.command,
+              timeout,
+              "", // executingMetadata.getStdoutStreamName(),
+              "", // executingMetadata.getStderrStreamName(),
+              resultBuilder,
+              policies.build());
     } catch (IOException e) {
       logger.log(SEVERE, "error executing operation " + operation.getName(), e);
       operationContext.poller.pause();
@@ -187,21 +186,19 @@ class Executor implements Runnable {
       return 0;
     }
 
-    resultBuilder.getExecutionMetadataBuilder()
+    resultBuilder
+        .getExecutionMetadataBuilder()
         .setExecutionCompletedTimestamp(Timestamps.fromMillis(System.currentTimeMillis()));
     long executeUSecs = stopwatch.elapsed(MICROSECONDS);
 
     logger.info(
         String.format(
             "Executor::executeCommand(%s): Completed command: exit code %d",
-            operation.getName(),
-            resultBuilder.getExitCode()));
+            operation.getName(), resultBuilder.getExitCode()));
 
-    operationContext.executeResponse.getStatusBuilder()
-        .setCode(statusCode.getNumber());
-    OperationContext reportOperationContext = operationContext.toBuilder()
-				.setOperation(operation)
-				.build();
+    operationContext.executeResponse.getStatusBuilder().setCode(statusCode.getNumber());
+    OperationContext reportOperationContext =
+        operationContext.toBuilder().setOperation(operation).build();
     boolean claimed = owner.output().claim();
     operationContext.poller.pause();
     if (claimed) {
@@ -213,7 +210,8 @@ class Executor implements Runnable {
       }
     } else {
       // FIXME we need to release the action root
-      workerContext.logInfo("Executor: Operation " + operation.getName() + " Failed to claim output");
+      workerContext.logInfo(
+          "Executor: Operation " + operation.getName() + " Failed to claim output");
 
       owner.error().put(operationContext);
     }
@@ -241,7 +239,8 @@ class Executor implements Runnable {
       try {
         owner.error().put(operationContext);
       } catch (InterruptedException errorEx) {
-        logger.log(SEVERE, format("interrupted while erroring %s after error", operationName), errorEx);
+        logger.log(
+            SEVERE, format("interrupted while erroring %s after error", operationName), errorEx);
       } catch (Throwable t) {
         logger.log(SEVERE, format("errored while erroring %s after error", operationName), t);
       }
@@ -249,11 +248,7 @@ class Executor implements Runnable {
     } finally {
       boolean wasInterrupted = Thread.interrupted();
       try {
-        owner.releaseExecutor(
-            operationName,
-            stopwatch.elapsed(MICROSECONDS),
-            stallUSecs,
-            exitCode);
+        owner.releaseExecutor(operationName, stopwatch.elapsed(MICROSECONDS), stallUSecs, exitCode);
       } finally {
         if (wasInterrupted) {
           Thread.currentThread().interrupt();
@@ -280,8 +275,7 @@ class Executor implements Runnable {
     arguments.addAll(command.getArgumentsList());
 
     ProcessBuilder processBuilder =
-        new ProcessBuilder(arguments.build())
-            .directory(execDir.toAbsolutePath().toFile());
+        new ProcessBuilder(arguments.build()).directory(execDir.toAbsolutePath().toFile());
 
     Map<String, String> environment = processBuilder.environment();
     environment.clear();
@@ -291,12 +285,16 @@ class Executor implements Runnable {
 
     final Write stdoutWrite, stderrWrite;
 
-    if (stdoutStreamName != null && !stdoutStreamName.isEmpty() && workerContext.getStreamStdout()) {
+    if (stdoutStreamName != null
+        && !stdoutStreamName.isEmpty()
+        && workerContext.getStreamStdout()) {
       stdoutWrite = workerContext.getOperationStreamWrite(stdoutStreamName);
     } else {
       stdoutWrite = new NullWrite();
     }
-    if (stderrStreamName != null && !stderrStreamName.isEmpty() && workerContext.getStreamStderr()) {
+    if (stderrStreamName != null
+        && !stderrStreamName.isEmpty()
+        && workerContext.getStreamStderr()) {
       stderrWrite = workerContext.getOperationStreamWrite(stderrStreamName);
     } else {
       stderrWrite = new NullWrite();
@@ -319,7 +317,8 @@ class Executor implements Runnable {
       Throwable t = e.getCause();
       String message;
       if (t != null) {
-        message = "Cannot run program \"" + processBuilder.command().get(0) + "\": " + t.getMessage();
+        message =
+            "Cannot run program \"" + processBuilder.command().get(0) + "\": " + t.getMessage();
       } else {
         message = e.getMessage();
       }
@@ -329,10 +328,10 @@ class Executor implements Runnable {
 
     stdoutWrite.reset();
     stderrWrite.reset();
-    ByteStringWriteReader stdoutReader = new ByteStringWriteReader(
-        process.getInputStream(), stdoutWrite);
-    ByteStringWriteReader stderrReader = new ByteStringWriteReader(
-        process.getErrorStream(), stderrWrite);
+    ByteStringWriteReader stdoutReader =
+        new ByteStringWriteReader(process.getInputStream(), stdoutWrite);
+    ByteStringWriteReader stderrReader =
+        new ByteStringWriteReader(process.getErrorStream(), stderrWrite);
 
     Thread stdoutReaderThread = new Thread(stdoutReader);
     Thread stderrReaderThread = new Thread(stderrReader);
@@ -352,7 +351,8 @@ class Executor implements Runnable {
           logger.info("process timed out for " + operationName);
           process.destroy();
           if (!process.waitFor(1, TimeUnit.SECONDS)) {
-            logger.info(format("process did not respond to termination for %s, killing it", operationName));
+            logger.info(
+                format("process did not respond to termination for %s, killing it", operationName));
             process.destroyForcibly();
             process.waitFor(100, TimeUnit.MILLISECONDS); // fair trade, i think
           }

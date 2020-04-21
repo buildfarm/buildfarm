@@ -18,9 +18,9 @@ import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 
 import build.bazel.remote.execution.v2.Digest;
-import build.buildfarm.worker.CASFileCache;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
+import build.buildfarm.worker.CASFileCache;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
@@ -47,12 +47,13 @@ class CASTest {
 
   public static void main(String[] args) throws Exception {
     Path root = Paths.get(args[0]);
-    CASFileCache fileCache = new LocalCASFileCache(
-        root,
-        /* maxSizeInBytes=*/ 100l * 1024 * 1024 * 1024,
-        new DigestUtil(HashFunction.SHA1),
-        /* expireService=*/ newDirectExecutorService(),
-        /* accessRecorder=*/ directExecutor());
+    CASFileCache fileCache =
+        new LocalCASFileCache(
+            root,
+            /* maxSizeInBytes=*/ 100l * 1024 * 1024 * 1024,
+            new DigestUtil(HashFunction.SHA1),
+            /* expireService=*/ newDirectExecutorService(),
+            /* accessRecorder=*/ directExecutor());
     fileCache.start(newDirectExecutorService());
     System.out.println("Done with start, ready to roll...");
   }

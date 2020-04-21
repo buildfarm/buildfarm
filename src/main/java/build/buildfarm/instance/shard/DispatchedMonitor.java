@@ -14,7 +14,6 @@
 
 package build.buildfarm.instance.shard;
 
-import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.successfulAsList;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.lang.String.format;
@@ -26,9 +25,6 @@ import build.buildfarm.v1test.QueueEntry;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
-import com.google.rpc.Code;
-import com.google.rpc.Status;
-import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -36,7 +32,7 @@ import java.util.function.Function;
 import java.util.logging.Logger;
 
 class DispatchedMonitor implements Runnable {
-  private final static Logger logger = Logger.getLogger(DispatchedMonitor.class.getName());
+  private static final Logger logger = Logger.getLogger(DispatchedMonitor.class.getName());
 
   private final ShardBackplane backplane;
   private final Function<QueueEntry, ListenableFuture<Void>> requeuer;
@@ -54,7 +50,10 @@ class DispatchedMonitor implements Runnable {
   private ListenableFuture<Void> requeueDispatchedOperation(DispatchedOperation o, long now) {
     QueueEntry queueEntry = o.getQueueEntry();
     String operationName = queueEntry.getExecuteEntry().getOperationName();
-    logger.info(format("DispatchedMonitor: Testing %s because %d >= %d", operationName, now, o.getRequeueAt()));
+    logger.info(
+        format(
+            "DispatchedMonitor: Testing %s because %d >= %d",
+            operationName, now, o.getRequeueAt()));
     ListenableFuture<Void> requeuedFuture = requeuer.apply(queueEntry);
     long startTime = System.nanoTime();
     requeuedFuture.addListener(

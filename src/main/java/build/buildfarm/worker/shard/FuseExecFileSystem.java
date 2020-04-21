@@ -22,7 +22,6 @@ import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.worker.FuseCAS;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -60,7 +59,9 @@ class FuseExecFileSystem implements ExecFileSystem {
   }
 
   @Override
-  public Path createExecDir(String operationName, Map<Digest, Directory> directoriesIndex, Action action, Command command) throws IOException, InterruptedException {
+  public Path createExecDir(
+      String operationName, Map<Digest, Directory> directoriesIndex, Action action, Command command)
+      throws IOException, InterruptedException {
     fuseCAS.createInputRoot(operationName, action.getInputRootDigest());
     return root.resolve(operationName);
   }

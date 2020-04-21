@@ -17,8 +17,7 @@ package build.buildfarm.common;
 import java.io.IOException;
 
 public class IOUtils {
-  private IOUtils() {
-  }
+  private IOUtils() {}
 
   enum IOErrorFormatter {
     AccessDeniedException("access denied"),

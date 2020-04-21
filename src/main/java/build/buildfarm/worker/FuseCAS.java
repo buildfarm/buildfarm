@@ -36,11 +36,10 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
-import jnr.constants.platform.OpenFlags;
 import jnr.constants.platform.Access;
+import jnr.constants.platform.OpenFlags;
 import jnr.ffi.Pointer;
 import jnr.ffi.types.gid_t;
 import jnr.ffi.types.mode_t;
@@ -71,9 +70,13 @@ public class FuseCAS extends FuseStubFS {
 
   interface Entry {
     boolean isSymlink();
+
     boolean isDirectory();
+
     boolean isWritable();
+
     boolean isExecutable();
+
     int size();
   }
 
@@ -237,9 +240,9 @@ public class FuseCAS extends FuseStubFS {
       return 0;
     }
 
-    abstract public boolean isMutable();
+    public abstract boolean isMutable();
 
-    abstract protected Map<String, Entry> getChildren();
+    protected abstract Map<String, Entry> getChildren();
 
     public synchronized void forAllChildren(Consumer<String> onChild) {
       for (String child : getChildren().keySet()) {
@@ -294,7 +297,7 @@ public class FuseCAS extends FuseStubFS {
     protected Map<String, Entry> getChildren() {
       try {
         return childrenFetcher.apply(this);
-      } catch (InterruptedException|IOException e) {
+      } catch (InterruptedException | IOException e) {
         return null;
       }
     }
@@ -363,10 +366,9 @@ public class FuseCAS extends FuseStubFS {
     void accept(DirectoryEntry entry, String path) throws IOException, InterruptedException;
   }
 
-  static private void resolveTopdir(
-      String topdir,
-      DirectoryEntry root,
-      DirectoryEntryPathConsumer onEntry) throws IOException, InterruptedException {
+  private static void resolveTopdir(
+      String topdir, DirectoryEntry root, DirectoryEntryPathConsumer onEntry)
+      throws IOException, InterruptedException {
     String[] components = topdir.split("/");
     int baseIndex = components.length - 1;
     while (baseIndex >= 0 && components[baseIndex].isEmpty()) {
@@ -395,7 +397,7 @@ public class FuseCAS extends FuseStubFS {
       }
       if (!mounted) {
         logger.info("Mounting FuseCAS");
-        String[] fuseOpts = new String[]{"-o", "max_write=131072", "-o", "big_writes"};
+        String[] fuseOpts = new String[] {"-o", "max_write=131072", "-o", "big_writes"};
         try {
           mount(mountPath, /* blocking=*/ false, /* debug=*/ false, /* fuseOpts=*/ fuseOpts);
         } catch (FuseException e) {
@@ -409,28 +411,36 @@ public class FuseCAS extends FuseStubFS {
   private synchronized void decMounts() {
     if (--mounts == 0 && mountPath != null) {
       logger.info("Scheduling FuseCAS unmount in 10s");
-      unmounter = new Watchdog(Duration.newBuilder().setSeconds(10).setNanos(0).build(), () -> {
-        logger.info("Unmounting FuseCAS");
-        umount();
-        mounted = false;
-      });
+      unmounter =
+          new Watchdog(
+              Duration.newBuilder().setSeconds(10).setNanos(0).build(),
+              () -> {
+                logger.info("Unmounting FuseCAS");
+                umount();
+                mounted = false;
+              });
       new Thread(unmounter).start();
     }
   }
 
-  private Map<String, Entry> fetchChildren(DirectoryEntry dirEntry, Digest digest) throws IOException, InterruptedException {
+  private Map<String, Entry> fetchChildren(DirectoryEntry dirEntry, Digest digest)
+      throws IOException, InterruptedException {
     Map<String, Entry> children = childrenCache.get(digest);
     if (children == null) {
       try {
-        Directory directory = Directory.parseFrom(ByteString.readFrom(inputStreamFactory.newInput(digest, 0)));
+        Directory directory =
+            Directory.parseFrom(ByteString.readFrom(inputStreamFactory.newInput(digest, 0)));
 
         ImmutableMap.Builder<String, Entry> builder = new ImmutableMap.Builder<>();
 
         for (FileNode fileNode : directory.getFilesList()) {
-          builder.put(fileNode.getName(), new FileEntry(fileNode.getDigest(), fileNode.getIsExecutable()));
+          builder.put(
+              fileNode.getName(), new FileEntry(fileNode.getDigest(), fileNode.getIsExecutable()));
         }
         for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
-          builder.put(directoryNode.getName(), new CASDirectoryEntry(fetchChildrenFunction(directoryNode.getDigest())));
+          builder.put(
+              directoryNode.getName(),
+              new CASDirectoryEntry(fetchChildrenFunction(directoryNode.getDigest())));
         }
 
         children = builder.build();
@@ -446,18 +456,25 @@ public class FuseCAS extends FuseStubFS {
     return (dirEntry) -> fetchChildren(dirEntry, digest);
   }
 
-  public void createInputRoot(String topdir, Digest inputRoot) throws IOException, InterruptedException {
+  public void createInputRoot(String topdir, Digest inputRoot)
+      throws IOException, InterruptedException {
     incMounts();
-    resolveTopdir(topdir, root, (currentDir, base) -> {
-      // FIXME duplicates?
-      currentDir.putChild(base, new CASDirectoryEntry(fetchChildrenFunction(inputRoot)));
-    });
+    resolveTopdir(
+        topdir,
+        root,
+        (currentDir, base) -> {
+          // FIXME duplicates?
+          currentDir.putChild(base, new CASDirectoryEntry(fetchChildrenFunction(inputRoot)));
+        });
   }
 
   public void destroyInputRoot(String topdir) throws IOException, InterruptedException {
-    resolveTopdir(topdir, root, (currentDir, base) -> {
-      currentDir.removeChild(base);
-    });
+    resolveTopdir(
+        topdir,
+        root,
+        (currentDir, base) -> {
+          currentDir.removeChild(base);
+        });
     decMounts();
   }
 
@@ -647,8 +664,8 @@ public class FuseCAS extends FuseStubFS {
 
     int contentSize = Math.min((int) size, writeFileEntry.content.size());
     int padSize = (int) (size - contentSize);
-    ByteString content = contentSize == 0
-        ? ByteString.EMPTY : writeFileEntry.content.substring(0, contentSize);
+    ByteString content =
+        contentSize == 0 ? ByteString.EMPTY : writeFileEntry.content.substring(0, contentSize);
     if (padSize > 0) {
       content = content.concat(ByteString.copyFrom(ByteBuffer.allocate(padSize)));
     }
@@ -827,7 +844,8 @@ public class FuseCAS extends FuseStubFS {
   }
 
   @Override
-  public int write(String path, Pointer buf, @size_t long bufSize, @off_t long offset, FuseFileInfo fi) {
+  public int write(
+      String path, Pointer buf, @size_t long bufSize, @off_t long offset, FuseFileInfo fi) {
     Entry entry = fileHandleEntries.get(fi.fh.intValue());
     if (entry == null) {
       return -ErrorCodes.ENOENT();
@@ -861,7 +879,8 @@ public class FuseCAS extends FuseStubFS {
   }
 
   @Override
-  public int read(String path, Pointer buf, @size_t long size, @off_t long offset, FuseFileInfo fi) {
+  public int read(
+      String path, Pointer buf, @size_t long size, @off_t long offset, FuseFileInfo fi) {
     Entry entry = fileHandleEntries.get(fi.fh.intValue());
     if (entry == null) {
       return -ErrorCodes.ENOENT();
@@ -905,7 +924,7 @@ public class FuseCAS extends FuseStubFS {
 
   @Override
   public int mkdir(String path, @mode_t long mode) {
-    // FIXME mode validation 
+    // FIXME mode validation
 
     DirectoryEntry dirEntry = containingDirectoryForCreate(path);
 
@@ -925,7 +944,8 @@ public class FuseCAS extends FuseStubFS {
   }
 
   @Override
-  public int readdir(String path, Pointer buf, FuseFillDir filter, @off_t long offset, FuseFileInfo fi) {
+  public int readdir(
+      String path, Pointer buf, FuseFillDir filter, @off_t long offset, FuseFileInfo fi) {
     DirectoryEntry dirEntry = directoryForPath(path);
 
     if (dirEntry == null) {
@@ -939,7 +959,8 @@ public class FuseCAS extends FuseStubFS {
   }
 
   @Override
-  public int fallocate(String path, int mode, @off_t long off, @off_t long length, FuseFileInfo fi) {
+  public int fallocate(
+      String path, int mode, @off_t long off, @off_t long length, FuseFileInfo fi) {
     if (mode != 0) {
       return -ErrorCodes.EOPNOTSUPP();
     }

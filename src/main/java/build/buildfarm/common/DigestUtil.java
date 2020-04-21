@@ -19,7 +19,6 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.DigestFunction;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.Tree;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import com.google.common.hash.Funnels;
@@ -30,7 +29,6 @@ import com.google.common.hash.HashingOutputStream;
 import com.google.common.io.ByteSource;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Message;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -85,14 +83,17 @@ public class DigestUtil {
     }
 
     public static HashFunction get(DigestFunction.Value digestFunction) {
-      switch(digestFunction) {
-      default:
-      case UNRECOGNIZED:
-      case UNKNOWN:
-        throw new IllegalArgumentException(digestFunction.toString());
-      case SHA256: return SHA256;
-      case SHA1: return SHA1;
-      case MD5: return MD5;
+      switch (digestFunction) {
+        default:
+        case UNRECOGNIZED:
+        case UNKNOWN:
+          throw new IllegalArgumentException(digestFunction.toString());
+        case SHA256:
+          return SHA256;
+        case SHA1:
+          return SHA1;
+        case MD5:
+          return MD5;
       }
     }
 
@@ -143,8 +144,9 @@ public class DigestUtil {
   private final Digest empty;
 
   public static DigestUtil forHash(String hashName) {
-    DigestFunction.Value digestFunction = DigestFunction.Value.valueOf(
-        DigestFunction.Value.getDescriptor().findValueByName(hashName));
+    DigestFunction.Value digestFunction =
+        DigestFunction.Value.valueOf(
+            DigestFunction.Value.getDescriptor().findValueByName(hashName));
     HashFunction hashFunction = HashFunction.get(digestFunction);
     return new DigestUtil(hashFunction);
   }
@@ -188,8 +190,7 @@ public class DigestUtil {
   public Digest build(String hexHash, long size) {
     if (!hashFn.isValidHexDigest(hexHash)) {
       throw new NumberFormatException(
-        String.format("[%s] is not a valid %s hash.", hexHash, hashFn.name())
-      );
+          String.format("[%s] is not a valid %s hash.", hexHash, hashFn.name()));
     }
     return buildDigest(hexHash, size);
   }

@@ -29,7 +29,8 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
   private final Set<Thread> executors = Sets.newHashSet();
   private BlockingQueue<OperationContext> queue = new ArrayBlockingQueue<>(1);
 
-  public ExecuteActionStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
+  public ExecuteActionStage(
+      WorkerContext workerContext, PipelineStage output, PipelineStage error) {
     super(
         "ExecuteActionStage",
         workerContext,
@@ -38,7 +39,8 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
         workerContext.getExecuteStageWidth());
   }
 
-  static PipelineStage createDestroyExecDirStage(WorkerContext workerContext, PipelineStage nextStage) {
+  static PipelineStage createDestroyExecDirStage(
+      WorkerContext workerContext, PipelineStage nextStage) {
     return new PipelineStage.NullStage(workerContext, nextStage) {
       @Override
       public void put(OperationContext operationContext) throws InterruptedException {
@@ -70,7 +72,8 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
 
   synchronized int removeAndRelease(String operationName) {
     if (!executors.remove(Thread.currentThread())) {
-      throw new IllegalStateException("tried to remove unknown executor thread for " + operationName);
+      throw new IllegalStateException(
+          "tried to remove unknown executor thread for " + operationName);
     }
     releaseClaim(operationName);
     return executors.size();

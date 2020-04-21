@@ -49,12 +49,12 @@ public class ByteStringWriteReader implements Runnable {
           writeOut.write(buffer, 0, len);
         }
       }
-    } catch(IOException e) {
+    } catch (IOException e) {
       exception = e;
     } finally {
       try {
         input.close();
-      } catch(IOException e) {
+      } catch (IOException e) {
         if (exception == null) {
           exception = e;
         } else {

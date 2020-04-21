@@ -27,9 +27,9 @@ import static org.mockito.Mockito.when;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecuteResponse;
-import build.bazel.remote.execution.v2.Command;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
@@ -43,7 +43,6 @@ import com.google.protobuf.Any;
 import com.google.rpc.Code;
 import com.google.rpc.Status;
 import io.grpc.protobuf.StatusProto;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.logging.Logger;
 import org.junit.Test;
@@ -91,24 +90,25 @@ public class ReportResultStageTest {
     WorkerContext context = mock(WorkerContext.class);
     SingleOutputSink output = new SingleOutputSink();
 
-    Operation reportedOperation = Operation.newBuilder()
-        .setName("reported")
-        .setMetadata(Any.pack(ExecutingOperationMetadata.getDefaultInstance()))
-        .build();
-    QueueEntry reportedEntry = QueueEntry.newBuilder()
-        .setExecuteEntry(ExecuteEntry.newBuilder()
-            .setOperationName(reportedOperation.getName()))
-        .build();
-    OperationContext reportedContext = OperationContext.newBuilder()
-        .setCommand(Command.getDefaultInstance())
-        .setAction(Action.newBuilder()
-            .setDoNotCache(true)
-            .build())
-        .setOperation(reportedOperation)
-        .setQueueEntry(reportedEntry)
-        .setExecDir(Paths.get("reported-operation-path"))
-        .setPoller(mock(Poller.class))
-        .build();
+    Operation reportedOperation =
+        Operation.newBuilder()
+            .setName("reported")
+            .setMetadata(Any.pack(ExecutingOperationMetadata.getDefaultInstance()))
+            .build();
+    QueueEntry reportedEntry =
+        QueueEntry.newBuilder()
+            .setExecuteEntry(
+                ExecuteEntry.newBuilder().setOperationName(reportedOperation.getName()))
+            .build();
+    OperationContext reportedContext =
+        OperationContext.newBuilder()
+            .setCommand(Command.getDefaultInstance())
+            .setAction(Action.newBuilder().setDoNotCache(true).build())
+            .setOperation(reportedOperation)
+            .setQueueEntry(reportedEntry)
+            .setExecDir(Paths.get("reported-operation-path"))
+            .setPoller(mock(Poller.class))
+            .build();
     when(context.putOperation(any(Operation.class), eq(reportedContext.action))).thenReturn(true);
 
     PipelineStage reportResultStage = new ReportResultStage(context, output, /* error=*/ null);
@@ -126,35 +126,40 @@ public class ReportResultStageTest {
     WorkerContext context = mock(WorkerContext.class);
     SingleOutputSink output = new SingleOutputSink();
 
-    Operation erroringOperation = Operation.newBuilder()
-        .setName("erroring")
-        .setMetadata(Any.pack(ExecutingOperationMetadata.getDefaultInstance()))
-        .build();
+    Operation erroringOperation =
+        Operation.newBuilder()
+            .setName("erroring")
+            .setMetadata(Any.pack(ExecutingOperationMetadata.getDefaultInstance()))
+            .build();
     Action action = Action.getDefaultInstance();
     Digest actionDigest = DIGEST_UTIL.compute(action);
-    QueueEntry erroringEntry = QueueEntry.newBuilder()
-        .setExecuteEntry(ExecuteEntry.newBuilder()
-            .setOperationName(erroringOperation.getName())
-            .setActionDigest(actionDigest))
-        .build();
-    OperationContext erroringContext = OperationContext.newBuilder()
-        .setCommand(Command.getDefaultInstance())
-        .setAction(action)
-        .setOperation(erroringOperation)
-        .setQueueEntry(erroringEntry)
-        .setExecDir(Paths.get("erroring-operation-path"))
-        .setPoller(mock(Poller.class))
-        .build();
+    QueueEntry erroringEntry =
+        QueueEntry.newBuilder()
+            .setExecuteEntry(
+                ExecuteEntry.newBuilder()
+                    .setOperationName(erroringOperation.getName())
+                    .setActionDigest(actionDigest))
+            .build();
+    OperationContext erroringContext =
+        OperationContext.newBuilder()
+            .setCommand(Command.getDefaultInstance())
+            .setAction(action)
+            .setOperation(erroringOperation)
+            .setQueueEntry(erroringEntry)
+            .setExecDir(Paths.get("erroring-operation-path"))
+            .setPoller(mock(Poller.class))
+            .build();
     when(context.putOperation(any(Operation.class), eq(erroringContext.action))).thenReturn(true);
-    Status erroredStatus = Status.newBuilder()
-        .setCode(Code.FAILED_PRECONDITION.getNumber())
-        .build();
-    doThrow(StatusProto.toStatusException(erroredStatus)).when(context).uploadOutputs(
-        eq(actionDigest),
-        any(ActionResult.Builder.class),
-        eq(erroringContext.execDir),
-        eq(ImmutableList.of()),
-        eq(ImmutableList.of()));
+    Status erroredStatus =
+        Status.newBuilder().setCode(Code.FAILED_PRECONDITION.getNumber()).build();
+    doThrow(StatusProto.toStatusException(erroredStatus))
+        .when(context)
+        .uploadOutputs(
+            eq(actionDigest),
+            any(ActionResult.Builder.class),
+            eq(erroringContext.execDir),
+            eq(ImmutableList.of()),
+            eq(ImmutableList.of()));
 
     PipelineStage reportResultStage = new ReportResultStage(context, output, /* error=*/ null);
     reportResultStage.put(erroringContext);
@@ -164,12 +169,13 @@ public class ReportResultStageTest {
     verify(context, times(1)).putOperation(operationCaptor.capture(), eq(erroringContext.action));
     Operation erroredOperation = operationCaptor.getValue();
     assertThat(output.get().operation).isEqualTo(erroredOperation);
-    verify(context, times(1)).uploadOutputs(
-        eq(DIGEST_UTIL.compute(erroringContext.action)),
-        any(ActionResult.Builder.class),
-        eq(erroringContext.execDir),
-        eq(ImmutableList.of()),
-        eq(ImmutableList.of()));
+    verify(context, times(1))
+        .uploadOutputs(
+            eq(DIGEST_UTIL.compute(erroringContext.action)),
+            any(ActionResult.Builder.class),
+            eq(erroringContext.execDir),
+            eq(ImmutableList.of()),
+            eq(ImmutableList.of()));
     assertThat(erroredOperation.getResponse().unpack(ExecuteResponse.class).getStatus())
         .isEqualTo(erroredStatus);
     verify(context, never()).putActionResult(any(ActionKey.class), any(ActionResult.class));

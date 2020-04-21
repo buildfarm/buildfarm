@@ -15,7 +15,6 @@
 package build.buildfarm.instance;
 
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
-import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
 import build.bazel.remote.execution.v2.Digest;
@@ -40,9 +39,8 @@ public class Utils {
   private Utils() {}
 
   public static ByteString getBlob(
-      Instance instance,
-      Digest blobDigest,
-      RequestMetadata requestMetadata) throws IOException, InterruptedException {
+      Instance instance, Digest blobDigest, RequestMetadata requestMetadata)
+      throws IOException, InterruptedException {
     return getBlob(instance, blobDigest, /* offset=*/ 0, 60, TimeUnit.SECONDS, requestMetadata);
   }
 
@@ -52,8 +50,11 @@ public class Utils {
       long offset,
       long deadlineAfter,
       TimeUnit deadlineAfterUnits,
-      RequestMetadata requestMetadata) throws IOException, InterruptedException {
-    try (InputStream in = instance.newBlobInput(blobDigest, offset, deadlineAfter, deadlineAfterUnits, requestMetadata)) {
+      RequestMetadata requestMetadata)
+      throws IOException, InterruptedException {
+    try (InputStream in =
+        instance.newBlobInput(
+            blobDigest, offset, deadlineAfter, deadlineAfterUnits, requestMetadata)) {
       return ByteString.readFrom(in);
     } catch (StatusRuntimeException e) {
       if (e.getStatus().equals(Status.NOT_FOUND)) {
@@ -65,10 +66,7 @@ public class Utils {
 
   private static Status invalidDigestSize(long digestSize, long contentSize) {
     return Status.INVALID_ARGUMENT.withDescription(
-        String.format(
-            "digest size %d did not match content size %d",
-            digestSize,
-            contentSize));
+        String.format("digest size %d did not match content size %d", digestSize, contentSize));
   }
 
   public static ListenableFuture<Digest> putBlobFuture(
@@ -80,17 +78,15 @@ public class Utils {
       RequestMetadata requestMetadata) {
     if (digest.getSizeBytes() != data.size()) {
       return immediateFailedFuture(
-          invalidDigestSize(digest.getSizeBytes(), data.size())
-              .asRuntimeException());
+          invalidDigestSize(digest.getSizeBytes(), data.size()).asRuntimeException());
     }
     Write write = instance.getBlobWrite(digest, UUID.randomUUID(), requestMetadata);
     // indicate that we know this write is novel
     write.reset();
     SettableFuture<Digest> future = SettableFuture.create();
-    write.addListener(
-        () -> future.set(digest),
-        directExecutor());
-    try (OutputStream out = write.getOutput(writeDeadlineAfter, writeDeadlineAfterUnits, () -> {})) {
+    write.addListener(() -> future.set(digest), directExecutor());
+    try (OutputStream out =
+        write.getOutput(writeDeadlineAfter, writeDeadlineAfterUnits, () -> {})) {
       data.writeTo(out);
     } catch (Exception e) {
       future.setException(e);
@@ -108,12 +104,8 @@ public class Utils {
       throws IOException, InterruptedException, StatusException {
     try {
       return putBlobFuture(
-          instance,
-          digest,
-          blob,
-          writeDeadlineAfter,
-          writeDeadlineAfterUnits,
-          requestMetadata).get();
+              instance, digest, blob, writeDeadlineAfter, writeDeadlineAfterUnits, requestMetadata)
+          .get();
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
       if (cause instanceof IOException) {

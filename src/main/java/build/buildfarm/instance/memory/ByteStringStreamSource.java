@@ -32,43 +32,44 @@ class ByteStringStreamSource {
     buffer = ByteString.EMPTY;
     bufferSync = new Object();
     closed = false;
-    outputStream = new FeedbackOutputStream() {
-      @Override
-      public void write(int b) {
-        byte[] buf = new byte[1];
-        buf[0] = (byte) b;
-        write(buf);
-      }
-
-      @Override
-      public void write(byte[] b) {
-        write(b, 0, b.length);
-      }
-
-      @Override
-      public void write(byte[] b, int off, int len) {
-        synchronized (bufferSync) {
-          buffer = buffer.concat(ByteString.copyFrom(b, off, len));
-          bufferSync.notifyAll();
-        }
-      }
-
-      @Override
-      public void close() {
-        synchronized (bufferSync) {
-          if (!closed) {
-            closed = true;
-            bufferSync.notifyAll();
-            closedFuture.set(null);
+    outputStream =
+        new FeedbackOutputStream() {
+          @Override
+          public void write(int b) {
+            byte[] buf = new byte[1];
+            buf[0] = (byte) b;
+            write(buf);
           }
-        }
-      }
 
-      @Override
-      public boolean isReady() {
-        return true;
-      }
-    };
+          @Override
+          public void write(byte[] b) {
+            write(b, 0, b.length);
+          }
+
+          @Override
+          public void write(byte[] b, int off, int len) {
+            synchronized (bufferSync) {
+              buffer = buffer.concat(ByteString.copyFrom(b, off, len));
+              bufferSync.notifyAll();
+            }
+          }
+
+          @Override
+          public void close() {
+            synchronized (bufferSync) {
+              if (!closed) {
+                closed = true;
+                bufferSync.notifyAll();
+                closedFuture.set(null);
+              }
+            }
+          }
+
+          @Override
+          public boolean isReady() {
+            return true;
+          }
+        };
   }
 
   public boolean isClosed() {
@@ -116,7 +117,7 @@ class ByteStringStreamSource {
             while (!closed && availableUnsynchronized() == 0) {
               bufferSync.wait();
             }
-          } catch(InterruptedException e) {
+          } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
           }
           n = Math.min(availableUnsynchronized(), n);
@@ -128,8 +129,7 @@ class ByteStringStreamSource {
       @Override
       public int read() {
         byte[] buf = new byte[1];
-        if (read(buf) < 0)
-          return -1;
+        if (read(buf) < 0) return -1;
         return buf[0];
       }
 
@@ -156,7 +156,7 @@ class ByteStringStreamSource {
           }
           offset += len;
           return len;
-        } catch(InterruptedException e) {
+        } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
           return -1;
         }

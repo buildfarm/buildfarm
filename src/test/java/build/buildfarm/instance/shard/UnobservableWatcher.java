@@ -31,4 +31,3 @@ class UnobservableWatcher extends TimedWatcher {
     throw new UnsupportedOperationException();
   }
 }
-

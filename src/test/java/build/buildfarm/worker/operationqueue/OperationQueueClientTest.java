@@ -15,8 +15,8 @@
 package build.buildfarm.worker.operationqueue;
 
 import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -40,49 +40,49 @@ public class OperationQueueClientTest {
   @Test
   public void matchPlatformContainsExecutionPolicies() throws InterruptedException {
     Instance instance = mock(Instance.class);
-    doAnswer(new Answer<Void>() {
-      @Override
-      public Void answer(InvocationOnMock invocation) throws InterruptedException {
-        MatchListener listener = (MatchListener) invocation.getArguments()[1];
-        listener.onEntry(null);
-        return null;
-      }
-    }).when(instance).match(any(Platform.class), any(MatchListener.class));
-    OperationQueueClient client = new OperationQueueClient(
-        instance,
-        Platform.getDefaultInstance(),
-        ImmutableList.of(ExecutionPolicy.newBuilder().setName("foo").build()));
-    MatchListener listener = new MatchListener() {
-      @Override
-      public void onWaitStart() {
-      }
+    doAnswer(
+            new Answer<Void>() {
+              @Override
+              public Void answer(InvocationOnMock invocation) throws InterruptedException {
+                MatchListener listener = (MatchListener) invocation.getArguments()[1];
+                listener.onEntry(null);
+                return null;
+              }
+            })
+        .when(instance)
+        .match(any(Platform.class), any(MatchListener.class));
+    OperationQueueClient client =
+        new OperationQueueClient(
+            instance,
+            Platform.getDefaultInstance(),
+            ImmutableList.of(ExecutionPolicy.newBuilder().setName("foo").build()));
+    MatchListener listener =
+        new MatchListener() {
+          @Override
+          public void onWaitStart() {}
 
-      @Override
-      public void onWaitEnd() {
-      }
+          @Override
+          public void onWaitEnd() {}
 
-      @Override
-      public boolean onEntry(@Nullable QueueEntry queueEntry) {
-        return true;
-      }
+          @Override
+          public boolean onEntry(@Nullable QueueEntry queueEntry) {
+            return true;
+          }
 
-      @Override
-      public void onError(Throwable t) {
-        t.printStackTrace();
-      }
+          @Override
+          public void onError(Throwable t) {
+            t.printStackTrace();
+          }
 
-      @Override
-      public void setOnCancelHandler(Runnable onCancelHandler) {
-      }
-    };
+          @Override
+          public void setOnCancelHandler(Runnable onCancelHandler) {}
+        };
     client.match(listener);
-    Platform matchPlatform = Platform.newBuilder()
-        .addProperties(
-            Property.newBuilder()
-                .setName("execution-policy")
-                .setValue("foo")
-                .build())
-        .build();
+    Platform matchPlatform =
+        Platform.newBuilder()
+            .addProperties(
+                Property.newBuilder().setName("execution-policy").setValue("foo").build())
+            .build();
     verify(instance, times(1)).match(eq(matchPlatform), any(MatchListener.class));
   }
 }

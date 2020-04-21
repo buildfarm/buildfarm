@@ -14,40 +14,38 @@
 
 package build.buildfarm.common;
 
-import static java.lang.String.format;
 import static io.grpc.Status.Code.DEADLINE_EXCEEDED;
+import static java.lang.String.format;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Platform;
 import com.google.common.collect.ImmutableMap;
-import com.google.rpc.PreconditionFailure;
-import com.google.rpc.PreconditionFailure.Violation;
-import com.google.rpc.Code;
-import com.google.rpc.Status;
 import com.google.protobuf.Any;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.rpc.Code;
+import com.google.rpc.PreconditionFailure;
+import com.google.rpc.PreconditionFailure.Violation;
+import com.google.rpc.Status;
 import io.grpc.StatusException;
 import io.grpc.protobuf.StatusProto;
 import java.util.Map;
 
 public final class Actions {
-  private Actions() {
-  }
+  private Actions() {}
 
   public static String invalidActionMessage(Digest actionDigest) {
     return format("Action %s is invalid", DigestUtil.toString(actionDigest));
   }
 
   public static void checkPreconditionFailure(
-      Digest actionDigest,
-      PreconditionFailure preconditionFailure)
-      throws StatusException {
+      Digest actionDigest, PreconditionFailure preconditionFailure) throws StatusException {
     if (preconditionFailure.getViolationsCount() != 0) {
-      throw StatusProto.toStatusException(Status.newBuilder()
-          .setCode(Code.FAILED_PRECONDITION.getNumber())
-          .setMessage(invalidActionMessage(actionDigest))
-          .addDetails(Any.pack(preconditionFailure))
-          .build());
+      throw StatusProto.toStatusException(
+          Status.newBuilder()
+              .setCode(Code.FAILED_PRECONDITION.getNumber())
+              .setMessage(invalidActionMessage(actionDigest))
+              .addDetails(Any.pack(preconditionFailure))
+              .build());
     }
   }
 
@@ -55,14 +53,14 @@ public final class Actions {
     Status.Builder status = Status.newBuilder();
     io.grpc.Status grpcStatus = io.grpc.Status.fromThrowable(t);
     switch (grpcStatus.getCode()) {
-    case DEADLINE_EXCEEDED:
-      // translate timeouts to retriable errors here, rather than
-      // indications that the execution timed out
-      status.setCode(Code.UNAVAILABLE.getNumber());
-      break;
-    default:
-      status.setCode(grpcStatus.getCode().value());
-      break;
+      case DEADLINE_EXCEEDED:
+        // translate timeouts to retriable errors here, rather than
+        // indications that the execution timed out
+        status.setCode(Code.UNAVAILABLE.getNumber());
+        break;
+      default:
+        status.setCode(grpcStatus.getCode().value());
+        break;
     }
     return status.build();
   }
@@ -103,8 +101,8 @@ public final class Actions {
     }
     Map<String, String> provisions = provisionsBuilder.build();
     for (Platform.Property property : requirements.getPropertiesList()) {
-      if (!provisions.containsKey(property.getName()) ||
-          !provisions.get(property.getName()).equals(property.getValue())) {
+      if (!provisions.containsKey(property.getName())
+          || !provisions.get(property.getName()).equals(property.getValue())) {
         return false;
       }
     }

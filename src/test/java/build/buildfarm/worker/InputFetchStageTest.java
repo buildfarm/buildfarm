@@ -19,32 +19,19 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-import build.bazel.remote.execution.v2.Action;
-import build.bazel.remote.execution.v2.Command;
-import build.bazel.remote.execution.v2.Digest;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Poller;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
-import build.buildfarm.v1test.WorkerConfig;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.google.longrunning.Operation;
-import com.google.protobuf.Any;
 import io.grpc.Deadline;
-import java.nio.file.FileSystems;
-import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 import java.util.logging.Logger;
-import javax.naming.ConfigurationException;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -92,53 +79,52 @@ public class InputFetchStageTest {
 
     Poller poller = mock(Poller.class);
 
-    QueueEntry badEntry = QueueEntry.newBuilder()
-        .setExecuteEntry(ExecuteEntry.newBuilder()
-            .setOperationName("bad"))
-        .build();
+    QueueEntry badEntry =
+        QueueEntry.newBuilder()
+            .setExecuteEntry(ExecuteEntry.newBuilder().setOperationName("bad"))
+            .build();
 
-    WorkerContext workerContext = new StubWorkerContext() {
-      @Override
-      public DigestUtil getDigestUtil() {
-        return null;
-      }
+    WorkerContext workerContext =
+        new StubWorkerContext() {
+          @Override
+          public DigestUtil getDigestUtil() {
+            return null;
+          }
 
-      @Override
-      public void resumePoller(
-          Poller poller,
-          String name,
-          QueueEntry queueEntry,
-          ExecutionStage.Value stage,
-          Runnable onFailure,
-          Deadline deadline) {
-      }
+          @Override
+          public void resumePoller(
+              Poller poller,
+              String name,
+              QueueEntry queueEntry,
+              ExecutionStage.Value stage,
+              Runnable onFailure,
+              Deadline deadline) {}
 
-      @Override
-      public int getInputFetchStageWidth() {
-        return 1;
-      }
+          @Override
+          public int getInputFetchStageWidth() {
+            return 1;
+          }
 
-      @Override
-      public QueuedOperation getQueuedOperation(QueueEntry queueEntry) {
-        assertThat(queueEntry).isEqualTo(badEntry);
-        // inspire empty argument list in Command resulting in null
-        return QueuedOperation.getDefaultInstance();
-      }
-    };
+          @Override
+          public QueuedOperation getQueuedOperation(QueueEntry queueEntry) {
+            assertThat(queueEntry).isEqualTo(badEntry);
+            // inspire empty argument list in Command resulting in null
+            return QueuedOperation.getDefaultInstance();
+          }
+        };
 
     PipelineSink sinkOutput = new PipelineSink((operationContext) -> false);
-    PipelineSink error = new PipelineSink((operationContext) -> true) {
-      @Override
-      public void put(OperationContext operationContext) {
-        super.put(operationContext);
-        sinkOutput.close();
-      }
-    };
+    PipelineSink error =
+        new PipelineSink((operationContext) -> true) {
+          @Override
+          public void put(OperationContext operationContext) {
+            super.put(operationContext);
+            sinkOutput.close();
+          }
+        };
     PipelineStage inputFetchStage = new InputFetchStage(workerContext, sinkOutput, error);
-    OperationContext badContext = OperationContext.newBuilder()
-        .setPoller(poller)
-        .setQueueEntry(badEntry)
-        .build();
+    OperationContext badContext =
+        OperationContext.newBuilder().setPoller(poller).setQueueEntry(badEntry).build();
     inputFetchStage.claim();
     inputFetchStage.put(badContext);
     inputFetchStage.run();

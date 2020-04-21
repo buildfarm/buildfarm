@@ -47,11 +47,12 @@ public class PipelineTest {
   @Test
   public void stageThreadReturnCompletesJoin() throws InterruptedException {
     Pipeline pipeline = new Pipeline();
-    pipeline.add(new AbstractPipelineStage("returner") {
-      @Override
-      public void run() {
-      }
-    }, 1);
+    pipeline.add(
+        new AbstractPipelineStage("returner") {
+          @Override
+          public void run() {}
+        },
+        1);
     pipeline.start();
     pipeline.join();
   }
@@ -59,12 +60,14 @@ public class PipelineTest {
   @Test
   public void stageThreadExceptionCompletesJoin() throws InterruptedException {
     Pipeline pipeline = new Pipeline();
-    pipeline.add(new AbstractPipelineStage("exceptioner") {
-      @Override
-      public void run() {
-        throw new RuntimeException("uncaught");
-      }
-    }, 1);
+    pipeline.add(
+        new AbstractPipelineStage("exceptioner") {
+          @Override
+          public void run() {
+            throw new RuntimeException("uncaught");
+          }
+        },
+        1);
     pipeline.start();
     pipeline.join();
   }

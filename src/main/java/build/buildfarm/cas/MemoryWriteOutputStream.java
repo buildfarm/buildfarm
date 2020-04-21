@@ -17,7 +17,6 @@ package build.buildfarm.cas;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
 import build.bazel.remote.execution.v2.Digest;
-import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.io.FeedbackOutputStream;
@@ -28,7 +27,6 @@ import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 
 class MemoryWriteOutputStream extends FeedbackOutputStream implements Write {
   private final ContentAddressableStorage storage;
@@ -48,9 +46,7 @@ class MemoryWriteOutputStream extends FeedbackOutputStream implements Write {
     if (digest.getSizeBytes() > Integer.MAX_VALUE) {
       throw new IllegalArgumentException(
           String.format(
-              "content size %d exceeds maximum of %d",
-              digest.getSizeBytes(),
-              Integer.MAX_VALUE));
+              "content size %d exceeds maximum of %d", digest.getSizeBytes(), Integer.MAX_VALUE));
     }
     out = ByteString.newOutput((int) digest.getSizeBytes());
     hashOut = DigestUtil.forDigest(digest).newHashingOutputStream(out);
@@ -85,8 +81,7 @@ class MemoryWriteOutputStream extends FeedbackOutputStream implements Write {
     }
 
     try {
-      storage.put(
-          new ContentAddressableStorage.Blob(out.toByteString(), digest));
+      storage.put(new ContentAddressableStorage.Blob(out.toByteString(), digest));
     } catch (InterruptedException e) {
       future.setException(e);
       throw new IOException(e);
@@ -135,7 +130,8 @@ class MemoryWriteOutputStream extends FeedbackOutputStream implements Write {
   }
 
   @Override
-  public FeedbackOutputStream getOutput(long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+  public FeedbackOutputStream getOutput(
+      long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
     return this;
   }
 

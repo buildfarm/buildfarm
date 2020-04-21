@@ -19,10 +19,10 @@ import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsResponse;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
-import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.common.DigestUtil;
@@ -39,7 +39,6 @@ import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.ServerCallStreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Executor;
@@ -52,45 +51,54 @@ public interface Instance {
   DigestUtil getDigestUtil();
 
   void start();
+
   void stop() throws InterruptedException;
 
   ActionResult getActionResult(ActionKey actionKey);
+
   void putActionResult(ActionKey actionKey, ActionResult actionResult) throws InterruptedException;
 
   ListenableFuture<Iterable<Digest>> findMissingBlobs(
-      Iterable<Digest> digests,
-      Executor executor,
-      RequestMetadata requestMetadata);
+      Iterable<Digest> digests, Executor executor, RequestMetadata requestMetadata);
+
   boolean containsBlob(Digest digest, RequestMetadata requestMetadata);
 
   String getBlobName(Digest blobDigest);
+
   void getBlob(
       Digest blobDigest,
       long offset,
       long count,
       ServerCallStreamObserver<ByteString> blobObserver,
       RequestMetadata requestMetadata);
+
   InputStream newBlobInput(
       Digest digest,
       long offset,
       long deadlineAfter,
       TimeUnit deadlineAfterUnits,
-      RequestMetadata requestMetadata) throws IOException;
+      RequestMetadata requestMetadata)
+      throws IOException;
+
   ListenableFuture<Iterable<Response>> getAllBlobsFuture(Iterable<Digest> digests);
+
   String getTree(Digest rootDigest, int pageSize, String pageToken, Tree.Builder tree)
       throws IOException, InterruptedException;
 
   Write getBlobWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata);
+
   Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs, RequestMetadata requestMetadata)
       throws IOException, IllegalArgumentException, InterruptedException;
 
   Write getOperationStreamWrite(String name);
+
   InputStream newOperationStreamInput(
       String name,
       long offset,
       long deadlineAfter,
       TimeUnit deadlineAfterUnits,
-      RequestMetadata requestMetadata) throws IOException;
+      RequestMetadata requestMetadata)
+      throws IOException;
 
   ListenableFuture<Void> execute(
       Digest actionDigest,
@@ -98,24 +106,27 @@ public interface Instance {
       ExecutionPolicy executionPolicy,
       ResultsCachePolicy resultsCachePolicy,
       RequestMetadata requestMetadata,
-      Watcher operationObserver) throws InterruptedException;
+      Watcher operationObserver)
+      throws InterruptedException;
+
   void match(Platform platform, MatchListener listener) throws InterruptedException;
+
   boolean putOperation(Operation operation) throws InterruptedException;
+
   boolean putAndValidateOperation(Operation operation) throws InterruptedException;
+
   boolean pollOperation(String operationName, ExecutionStage.Value stage);
   // returns nextPageToken suitable for list restart
   String listOperations(
-      int pageSize,
-      String pageToken,
-      String filter,
-      ImmutableList.Builder<Operation> operations);
+      int pageSize, String pageToken, String filter, ImmutableList.Builder<Operation> operations);
+
   Operation getOperation(String name);
+
   void cancelOperation(String name) throws InterruptedException;
+
   void deleteOperation(String name);
 
-  ListenableFuture<Void> watchOperation(
-      String operationName,
-      Watcher watcher);
+  ListenableFuture<Void> watchOperation(String operationName, Watcher watcher);
 
   ServerCapabilities getCapabilities();
 

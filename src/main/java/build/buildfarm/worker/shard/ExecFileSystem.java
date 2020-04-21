@@ -20,16 +20,22 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.InputStreamFactory;
-import java.nio.file.Path;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 
 interface ExecFileSystem extends InputStreamFactory {
   void start(Consumer<List<Digest>> onDigests) throws IOException, InterruptedException;
+
   void stop();
+
   ContentAddressableStorage getStorage();
-  Path createExecDir(String operationName, Map<Digest, Directory> directoriesIndex, Action action, Command command) throws IOException, InterruptedException;
+
+  Path createExecDir(
+      String operationName, Map<Digest, Directory> directoriesIndex, Action action, Command command)
+      throws IOException, InterruptedException;
+
   void destroyExecDir(Path execDir) throws IOException, InterruptedException;
 }

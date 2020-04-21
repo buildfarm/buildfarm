@@ -25,7 +25,6 @@ import com.google.longrunning.Operation;
 import com.google.longrunning.OperationsGrpc;
 import com.google.protobuf.Empty;
 import io.grpc.Status;
-import io.grpc.StatusException;
 import io.grpc.stub.StreamObserver;
 
 public class OperationsService extends OperationsGrpc.OperationsImplBase {
@@ -37,12 +36,10 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
 
   @Override
   public void listOperations(
-      ListOperationsRequest request,
-      StreamObserver<ListOperationsResponse> responseObserver) {
+      ListOperationsRequest request, StreamObserver<ListOperationsResponse> responseObserver) {
     Instance instance;
     try {
-      instance = instances.getFromOperationsCollectionName(
-          request.getName());
+      instance = instances.getFromOperationsCollectionName(request.getName());
     } catch (InstanceNotFoundException e) {
       responseObserver.onError(BuildFarmInstances.toStatusException(e));
       return;
@@ -54,26 +51,22 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
       return;
     }
 
-    ImmutableList.Builder<Operation> operations =
-        new ImmutableList.Builder<Operation>();
+    ImmutableList.Builder<Operation> operations = new ImmutableList.Builder<Operation>();
 
-    String nextPageToken = instance.listOperations(
-        pageSize,
-        request.getPageToken(),
-        request.getFilter(),
-        operations);
+    String nextPageToken =
+        instance.listOperations(pageSize, request.getPageToken(), request.getFilter(), operations);
 
-    responseObserver.onNext(ListOperationsResponse.newBuilder()
-        .addAllOperations(operations.build())
-        .setNextPageToken(nextPageToken)
-        .build());
+    responseObserver.onNext(
+        ListOperationsResponse.newBuilder()
+            .addAllOperations(operations.build())
+            .setNextPageToken(nextPageToken)
+            .build());
     responseObserver.onCompleted();
   }
 
   @Override
   public void getOperation(
-      GetOperationRequest request,
-      StreamObserver<Operation> responseObserver) {
+      GetOperationRequest request, StreamObserver<Operation> responseObserver) {
     Instance instance;
     try {
       instance = instances.getFromOperationName(request.getName());
@@ -88,8 +81,7 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
 
   @Override
   public void deleteOperation(
-      DeleteOperationRequest request,
-      StreamObserver<Empty> responseObserver) {
+      DeleteOperationRequest request, StreamObserver<Empty> responseObserver) {
     Instance instance;
     try {
       instance = instances.getFromOperationName(request.getName());
@@ -109,8 +101,7 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
 
   @Override
   public void cancelOperation(
-      CancelOperationRequest request,
-      StreamObserver<Empty> responseObserver) {
+      CancelOperationRequest request, StreamObserver<Empty> responseObserver) {
     Instance instance;
     try {
       instance = instances.getFromOperationName(request.getName());

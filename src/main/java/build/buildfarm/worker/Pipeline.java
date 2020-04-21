@@ -18,7 +18,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
 public class Pipeline {
@@ -114,7 +113,9 @@ public class Pipeline {
             logger.info("Stage has exited at priority " + stageClosePriorities.get(stage));
             inactiveStages.add(stage);
           } else if (stage.isClosed()) {
-            logger.info("Interrupting unterminated closed thread at priority " + stageClosePriorities.get(stage));
+            logger.info(
+                "Interrupting unterminated closed thread at priority "
+                    + stageClosePriorities.get(stage));
             thread.interrupt();
           }
         }

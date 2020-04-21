@@ -14,7 +14,6 @@
 
 package build.buildfarm.cas;
 
-import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.truth.Truth.assertThat;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.Mockito.any;
@@ -31,13 +30,11 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.ByteStreamServiceWriter;
-import build.buildfarm.common.grpc.RetryException;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Chunker;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamImplBase;
 import com.google.bytestream.ByteStreamProto.ReadRequest;
 import com.google.bytestream.ByteStreamProto.ReadResponse;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.MultimapBuilder;
 import com.google.common.hash.HashCode;
@@ -52,7 +49,6 @@ import io.grpc.stub.StreamObserver;
 import io.grpc.util.MutableHandlerRegistry;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -82,8 +78,7 @@ public class GrpcCASTest {
             .build()
             .start();
 
-    onExpirations = MultimapBuilder
-        .hashKeys().arrayListValues().build();
+    onExpirations = MultimapBuilder.hashKeys().arrayListValues().build();
   }
 
   @After
@@ -101,17 +96,19 @@ public class GrpcCASTest {
         new ByteStreamImplBase() {
           @Override
           public void read(ReadRequest request, StreamObserver<ReadResponse> responseObserver) {
-            assertThat(request.getResourceName()).isEqualTo(String.format("%s/blobs/%s", instanceName, DigestUtil.toString(digest)));
+            assertThat(request.getResourceName())
+                .isEqualTo(String.format("%s/blobs/%s", instanceName, DigestUtil.toString(digest)));
             readCalled.compareAndSet(false, true);
             responseObserver.onError(Status.NOT_FOUND.asException());
           }
         });
 
-    GrpcCAS cas = new GrpcCAS(
-        instanceName,
-        InProcessChannelBuilder.forName(fakeServerName).directExecutor().build(),
-        mock(ByteStreamUploader.class),
-        onExpirations);
+    GrpcCAS cas =
+        new GrpcCAS(
+            instanceName,
+            InProcessChannelBuilder.forName(fakeServerName).directExecutor().build(),
+            mock(ByteStreamUploader.class),
+            onExpirations);
     assertThat(cas.get(digest)).isNull();
     assertThat(readCalled.get()).isTrue();
   }
@@ -125,7 +122,8 @@ public class GrpcCASTest {
         new ByteStreamImplBase() {
           @Override
           public void read(ReadRequest request, StreamObserver<ReadResponse> responseObserver) {
-            assertThat(request.getResourceName()).isEqualTo(String.format("%s/blobs/%s", instanceName, DigestUtil.toString(digest)));
+            assertThat(request.getResourceName())
+                .isEqualTo(String.format("%s/blobs/%s", instanceName, DigestUtil.toString(digest)));
             readCalled.compareAndSet(false, true);
             responseObserver.onError(Status.NOT_FOUND.asException());
           }
@@ -134,11 +132,12 @@ public class GrpcCASTest {
     Runnable onExpiration = mock(Runnable.class);
     onExpirations.put(digest, onExpiration);
 
-    GrpcCAS cas = new GrpcCAS(
-        instanceName,
-        InProcessChannelBuilder.forName(fakeServerName).directExecutor().build(),
-        mock(ByteStreamUploader.class),
-        onExpirations);
+    GrpcCAS cas =
+        new GrpcCAS(
+            instanceName,
+            InProcessChannelBuilder.forName(fakeServerName).directExecutor().build(),
+            mock(ByteStreamUploader.class),
+            onExpirations);
     assertThat(cas.get(digest)).isNull();
     assertThat(readCalled.get()).isTrue();
     verify(onExpiration, times(1)).run();
@@ -149,19 +148,15 @@ public class GrpcCASTest {
     ByteString uploadContent = ByteString.copyFromUtf8("uploaded");
     Digest digest = DIGEST_UTIL.compute(uploadContent);
     String instanceName = "test";
-    ListMultimap<Digest, Runnable> onExpirations = MultimapBuilder
-        .hashKeys().arrayListValues().build();
+    ListMultimap<Digest, Runnable> onExpirations =
+        MultimapBuilder.hashKeys().arrayListValues().build();
     Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
     ByteStreamUploader uploader = mock(ByteStreamUploader.class);
-    GrpcCAS cas = new GrpcCAS(
-        instanceName,
-        channel,
-        uploader,
-        onExpirations);
+    GrpcCAS cas = new GrpcCAS(instanceName, channel, uploader, onExpirations);
     Runnable onExpiration = mock(Runnable.class);
     cas.put(new Blob(uploadContent, digest), onExpiration);
-    verify(uploader, times(1)).uploadBlob(
-        eq(HashCode.fromString(digest.getHash())), any(Chunker.class));
+    verify(uploader, times(1))
+        .uploadBlob(eq(HashCode.fromString(digest.getHash())), any(Chunker.class));
     assertThat(onExpirations.get(digest)).containsExactly(onExpiration);
     verifyZeroInteractions(onExpiration);
   }
@@ -173,7 +168,8 @@ public class GrpcCASTest {
     Digest digest = DIGEST_UTIL.compute(writeContent);
     String instanceName = "test";
     HashCode hash = HashCode.fromString(digest.getHash());
-    String resourceName = ByteStreamUploader.uploadResourceName(instanceName, uuid, hash, digest.getSizeBytes());
+    String resourceName =
+        ByteStreamUploader.uploadResourceName(instanceName, uuid, hash, digest.getSizeBytes());
 
     // better test might just put a full gRPC CAS behind an in-process and validate state
     SettableFuture<ByteString> content = SettableFuture.create();
@@ -181,11 +177,7 @@ public class GrpcCASTest {
         new ByteStreamServiceWriter(resourceName, content, (int) digest.getSizeBytes()));
 
     Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
-    GrpcCAS cas = new GrpcCAS(
-        instanceName,
-        channel,
-        /* uploader=*/ null,
-        onExpirations);
+    GrpcCAS cas = new GrpcCAS(instanceName, channel, /* uploader=*/ null, onExpirations);
     RequestMetadata requestMetadata = RequestMetadata.getDefaultInstance();
     Write initialWrite = cas.getWrite(digest, uuid, requestMetadata);
     try (OutputStream writeOut = initialWrite.getOutput(1, SECONDS, () -> {})) {

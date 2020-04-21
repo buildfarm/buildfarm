@@ -18,28 +18,23 @@ import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
-import com.google.common.base.Preconditions;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import com.google.common.collect.Maps;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Message;
 import com.google.protobuf.Parser;
-import java.util.Collection;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
-class DelegateCASMap<K,V extends Message> {
+class DelegateCASMap<K, V extends Message> {
   private final ContentAddressableStorage contentAddressableStorage;
   private final Parser<V> parser;
   private final DigestUtil digestUtil;
   private final Map<K, Digest> digestMap = new ConcurrentHashMap<>();
-  private final Cache<K, Digest> emptyCache = CacheBuilder.newBuilder()
-      .expireAfterWrite(5, TimeUnit.MINUTES)
-      .build();
+  private final Cache<K, Digest> emptyCache =
+      CacheBuilder.newBuilder().expireAfterWrite(5, TimeUnit.MINUTES).build();
 
   public DelegateCASMap(
       ContentAddressableStorage contentAddressableStorage,

@@ -14,9 +14,9 @@
 
 package build.buildfarm.instance.shard;
 
-import static redis.clients.jedis.ScanParams.SCAN_POINTER_START;
 import static java.lang.String.format;
 import static java.util.logging.Level.SEVERE;
+import static redis.clients.jedis.ScanParams.SCAN_POINTER_START;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
@@ -59,10 +59,10 @@ import io.grpc.Status;
 import io.grpc.Status.Code;
 import java.io.IOException;
 import java.net.ConnectException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.time.Instant;
 import java.util.AbstractMap;
 import java.util.ArrayList;
@@ -87,7 +87,6 @@ import redis.clients.jedis.JedisPoolConfig;
 import redis.clients.jedis.Response;
 import redis.clients.jedis.ScanParams;
 import redis.clients.jedis.ScanResult;
-import redis.clients.jedis.Transaction;
 import redis.clients.jedis.exceptions.JedisConnectionException;
 import redis.clients.jedis.exceptions.JedisDataException;
 import redis.clients.jedis.exceptions.JedisException;
@@ -96,25 +95,28 @@ import redis.clients.jedis.exceptions.JedisNoReachableClusterNodeException;
 public class RedisShardBackplane implements ShardBackplane {
   private static final Logger logger = Logger.getLogger(RedisShardBackplane.class.getName());
 
-  private static final JsonFormat.Parser operationParser = JsonFormat.parser()
-      .usingTypeRegistry(
-          JsonFormat.TypeRegistry.newBuilder()
-              .add(CompletedOperationMetadata.getDescriptor())
-              .add(ExecutingOperationMetadata.getDescriptor())
-              .add(ExecuteOperationMetadata.getDescriptor())
-              .add(QueuedOperationMetadata.getDescriptor())
-              .add(PreconditionFailure.getDescriptor())
-              .build())
-      .ignoringUnknownFields();
+  private static final JsonFormat.Parser operationParser =
+      JsonFormat.parser()
+          .usingTypeRegistry(
+              JsonFormat.TypeRegistry.newBuilder()
+                  .add(CompletedOperationMetadata.getDescriptor())
+                  .add(ExecutingOperationMetadata.getDescriptor())
+                  .add(ExecuteOperationMetadata.getDescriptor())
+                  .add(QueuedOperationMetadata.getDescriptor())
+                  .add(PreconditionFailure.getDescriptor())
+                  .build())
+          .ignoringUnknownFields();
 
-  static final JsonFormat.Printer operationPrinter = JsonFormat.printer().usingTypeRegistry(
-      JsonFormat.TypeRegistry.newBuilder()
-          .add(CompletedOperationMetadata.getDescriptor())
-          .add(ExecutingOperationMetadata.getDescriptor())
-          .add(ExecuteOperationMetadata.getDescriptor())
-          .add(QueuedOperationMetadata.getDescriptor())
-          .add(PreconditionFailure.getDescriptor())
-          .build());
+  static final JsonFormat.Printer operationPrinter =
+      JsonFormat.printer()
+          .usingTypeRegistry(
+              JsonFormat.TypeRegistry.newBuilder()
+                  .add(CompletedOperationMetadata.getDescriptor())
+                  .add(ExecutingOperationMetadata.getDescriptor())
+                  .add(ExecuteOperationMetadata.getDescriptor())
+                  .add(QueuedOperationMetadata.getDescriptor())
+                  .add(PreconditionFailure.getDescriptor())
+                  .build());
 
   private final RedisShardBackplaneConfig config;
   private final String source; // used in operation change publication
@@ -138,15 +140,15 @@ public class RedisShardBackplane implements ShardBackplane {
 
   private static class JedisMisconfigurationException extends JedisDataException {
     public JedisMisconfigurationException(final String message) {
-        super(message);
+      super(message);
     }
 
     public JedisMisconfigurationException(final Throwable cause) {
-        super(cause);
+      super(cause);
     }
 
     public JedisMisconfigurationException(final String message, final Throwable cause) {
-        super(message, cause);
+      super(message, cause);
     }
   }
 
@@ -164,10 +166,10 @@ public class RedisShardBackplane implements ShardBackplane {
     }
   }
 
-  private static Supplier<JedisCluster> createJedisClusterFactory(URI redisURI, JedisPoolConfig poolConfig) {
-    return () -> new JedisCluster(
-        new HostAndPort(redisURI.getHost(), redisURI.getPort()),
-        poolConfig);
+  private static Supplier<JedisCluster> createJedisClusterFactory(
+      URI redisURI, JedisPoolConfig poolConfig) {
+    return () ->
+        new JedisCluster(new HostAndPort(redisURI.getHost(), redisURI.getPort()), poolConfig);
   }
 
   public RedisShardBackplane(
@@ -176,7 +178,8 @@ public class RedisShardBackplane implements ShardBackplane {
       Function<Operation, Operation> onPublish,
       Function<Operation, Operation> onComplete,
       Predicate<Operation> isPrequeued,
-      Predicate<Operation> isDispatched) throws ConfigurationException {
+      Predicate<Operation> isDispatched)
+      throws ConfigurationException {
     this(
         config,
         source,
@@ -184,7 +187,8 @@ public class RedisShardBackplane implements ShardBackplane {
         onComplete,
         isPrequeued,
         isDispatched,
-        createJedisClusterFactory(parseRedisURI(config.getRedisUri()), createJedisPoolConfig(config)));
+        createJedisClusterFactory(
+            parseRedisURI(config.getRedisUri()), createJedisPoolConfig(config)));
   }
 
   public RedisShardBackplane(
@@ -357,22 +361,18 @@ public class RedisShardBackplane implements ShardBackplane {
   private void updateWatchers(JedisCluster jedis) {
     Instant now = Instant.now();
     Instant expiresAt = nextExpiresAt(now);
-    Set<String> expiringChannels = Sets.newHashSet(
-        subscriber.expiredWatchedOperationChannels(now));
-    Consumer<String> resetChannel = (operationName) -> {
-      String channel = operationChannel(operationName);
-      if (expiringChannels.remove(channel)) {
-        subscriber.resetWatchers(channel, expiresAt);
-      }
-    };
+    Set<String> expiringChannels = Sets.newHashSet(subscriber.expiredWatchedOperationChannels(now));
+    Consumer<String> resetChannel =
+        (operationName) -> {
+          String channel = operationChannel(operationName);
+          if (expiringChannels.remove(channel)) {
+            subscriber.resetWatchers(channel, expiresAt);
+          }
+        };
 
     if (!expiringChannels.isEmpty()) {
       logger.info(
-          format(
-              "Scan %d watches, %s, expiresAt: %s",
-              expiringChannels.size(),
-              now,
-              expiresAt));
+          format("Scan %d watches, %s, expiresAt: %s", expiringChannels.size(), now, expiresAt));
 
       logger.info("Scan prequeue");
       // scan prequeue, pet watches
@@ -406,25 +406,25 @@ public class RedisShardBackplane implements ShardBackplane {
       if (operation == null || !operation.getDone()) {
         publishExpiration(jedis, channel, now, /* force=*/ false);
       } else {
-        subscriber.onOperation(
-            channel,
-            onPublish.apply(operation),
-            expiresAt);
+        subscriber.onOperation(channel, onPublish.apply(operation), expiresAt);
       }
     }
   }
 
-  static String printOperationChange(OperationChange operationChange) throws InvalidProtocolBufferException {
+  static String printOperationChange(OperationChange operationChange)
+      throws InvalidProtocolBufferException {
     return operationPrinter.print(operationChange);
   }
 
-  void publish(JedisCluster jedis, String channel, Instant effectiveAt, OperationChange.Builder operationChange) {
+  void publish(
+      JedisCluster jedis,
+      String channel,
+      Instant effectiveAt,
+      OperationChange.Builder operationChange) {
     try {
-      String operationChangeJson = printOperationChange(
-          operationChange
-              .setEffectiveAt(toTimestamp(effectiveAt))
-              .setSource(source)
-              .build());
+      String operationChangeJson =
+          printOperationChange(
+              operationChange.setEffectiveAt(toTimestamp(effectiveAt)).setSource(source).build());
       jedis.publish(channel, operationChangeJson);
     } catch (InvalidProtocolBufferException e) {
       logger.log(SEVERE, "error printing operation change", e);
@@ -440,10 +440,11 @@ public class RedisShardBackplane implements ShardBackplane {
         operationChannel(operation.getName()),
         Instant.now(),
         OperationChange.newBuilder()
-            .setReset(OperationChange.Reset.newBuilder()
-                .setExpiresAt(toTimestamp(expiresAt))
-                .setOperation(operation)
-                .build()));
+            .setReset(
+                OperationChange.Reset.newBuilder()
+                    .setExpiresAt(toTimestamp(expiresAt))
+                    .setOperation(operation)
+                    .build()));
   }
 
   static Timestamp toTimestamp(Instant instant) {
@@ -459,9 +460,7 @@ public class RedisShardBackplane implements ShardBackplane {
         channel,
         effectiveAt,
         OperationChange.newBuilder()
-            .setExpire(OperationChange.Expire.newBuilder()
-                .setForce(force)
-                .build()));
+            .setExpire(OperationChange.Expire.newBuilder().setForce(force).build()));
   }
 
   public void updateWatchedIfDone(JedisCluster jedis) {
@@ -473,31 +472,26 @@ public class RedisShardBackplane implements ShardBackplane {
     Instant now = Instant.now();
     List<Map.Entry<String, Response<String>>> operations = new ArrayList(operationChannels.size());
     JedisClusterPipeline p = jedis.pipelined();
-    for (String operationName : Iterables.transform(operationChannels, RedisShardBackplane::parseOperationChannel)) {
-      operations.add(new AbstractMap.SimpleEntry<>(
-          operationName,
-          p.get(operationKey(operationName))));
+    for (String operationName :
+        Iterables.transform(operationChannels, RedisShardBackplane::parseOperationChannel)) {
+      operations.add(
+          new AbstractMap.SimpleEntry<>(operationName, p.get(operationKey(operationName))));
     }
     p.sync();
 
     for (Map.Entry<String, Response<String>> entry : operations) {
       String json = entry.getValue().get();
-      Operation operation = json == null
-          ? null : RedisShardBackplane.parseOperationJson(json);
+      Operation operation = json == null ? null : RedisShardBackplane.parseOperationJson(json);
       String operationName = entry.getKey();
       if (operation == null || operation.getDone()) {
         if (operation != null) {
           operation = onPublish.apply(operation);
         }
-        subscriber.onOperation(
-            operationChannel(operationName),
-            operation,
-            nextExpiresAt(now));
+        subscriber.onOperation(operationChannel(operationName), operation, nextExpiresAt(now));
         logger.info(
             format(
                 "operation %s done due to %s",
-                operationName,
-                operation == null ? "null" : "completed"));
+                operationName, operation == null ? "null" : "completed"));
       }
     }
   }
@@ -511,19 +505,21 @@ public class RedisShardBackplane implements ShardBackplane {
         Multimaps.<String, TimedWatchFuture>synchronizedListMultimap(
             MultimapBuilder.linkedHashKeys().arrayListValues().build());
     subscriberService = Executors.newFixedThreadPool(32);
-    subscriber = new RedisShardSubscriber(watchers, workerSet, config.getWorkerChannel(), subscriberService);
+    subscriber =
+        new RedisShardSubscriber(watchers, workerSet, config.getWorkerChannel(), subscriberService);
 
-    operationSubscription = new RedisShardSubscription(
-        subscriber,
-        /* onUnsubscribe=*/ () -> {
-          subscriptionThread = null;
-          if (onUnsubscribe != null) {
-            onUnsubscribe.runInterruptibly();
-          }
-        },
-        /* onReset=*/ this::updateWatchedIfDone,
-        /* subscriptions=*/ subscriber::subscribedChannels,
-        this::getSubscribeJedis);
+    operationSubscription =
+        new RedisShardSubscription(
+            subscriber,
+            /* onUnsubscribe=*/ () -> {
+              subscriptionThread = null;
+              if (onUnsubscribe != null) {
+                onUnsubscribe.runInterruptibly();
+              }
+            },
+            /* onReset=*/ this::updateWatchedIfDone,
+            /* subscriptions=*/ subscriber::subscribedChannels,
+            this::getSubscribeJedis);
 
     // use Executors...
     subscriptionThread = new Thread(operationSubscription);
@@ -532,19 +528,21 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   private void startFailsafeOperationThread() {
-    failsafeOperationThread = new Thread(() -> {
-      while (true) {
-        try {
-          TimeUnit.SECONDS.sleep(10);
-          updateWatchers(getJedis());
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          break;
-        } catch (Exception e) {
-          logger.log(SEVERE, "error while updating watchers in failsafe", e);
-        }
-      }
-    });
+    failsafeOperationThread =
+        new Thread(
+            () -> {
+              while (true) {
+                try {
+                  TimeUnit.SECONDS.sleep(10);
+                  updateWatchers(getJedis());
+                } catch (InterruptedException e) {
+                  Thread.currentThread().interrupt();
+                  break;
+                } catch (Exception e) {
+                  logger.log(SEVERE, "error while updating watchers in failsafe", e);
+                }
+              }
+            });
 
     failsafeOperationThread.start();
   }
@@ -594,29 +592,29 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   @Override
-  public ListenableFuture<Void> watchOperation(
-      String operationName,
-      Watcher watcher) throws IOException {
-    TimedWatcher timedWatcher = new TimedWatcher(nextExpiresAt(Instant.now())) {
-      @Override
-      public void observe(Operation operation) {
-        watcher.observe(operation);
-      }
-    };
-    return subscriber.watch(
-        operationChannel(operationName),
-        timedWatcher);
+  public ListenableFuture<Void> watchOperation(String operationName, Watcher watcher)
+      throws IOException {
+    TimedWatcher timedWatcher =
+        new TimedWatcher(nextExpiresAt(Instant.now())) {
+          @Override
+          public void observe(Operation operation) {
+            watcher.observe(operation);
+          }
+        };
+    return subscriber.watch(operationChannel(operationName), timedWatcher);
   }
 
   @Override
   public boolean addWorker(ShardWorker shardWorker) throws IOException {
     String json = JsonFormat.printer().print(shardWorker);
-    String workerChangeJson = JsonFormat.printer().print(
-        WorkerChange.newBuilder()
-            .setEffectiveAt(toTimestamp(Instant.now()))
-            .setName(shardWorker.getEndpoint())
-            .setAdd(WorkerChange.Add.getDefaultInstance())
-            .build());
+    String workerChangeJson =
+        JsonFormat.printer()
+            .print(
+                WorkerChange.newBuilder()
+                    .setEffectiveAt(toTimestamp(Instant.now()))
+                    .setName(shardWorker.getEndpoint())
+                    .setAdd(WorkerChange.Add.getDefaultInstance())
+                    .build());
     return withBackplaneException(
         (jedis) -> {
           // could rework with an hget to publish prior, but this seems adequate, and
@@ -638,13 +636,14 @@ public class RedisShardBackplane implements ShardBackplane {
 
   @VisibleForTesting
   public void withVoidBackplaneException(Consumer<JedisCluster> withJedis) throws IOException {
-    withBackplaneException(new JedisContext<Void>() {
-      @Override
-      public Void run(JedisCluster jedis) throws JedisException {
-        withJedis.accept(jedis);
-        return null;
-      }
-    });
+    withBackplaneException(
+        new JedisContext<Void>() {
+          @Override
+          public Void run(JedisCluster jedis) throws JedisException {
+            withJedis.accept(jedis);
+            return null;
+          }
+        });
   }
 
   @VisibleForTesting
@@ -704,16 +703,14 @@ public class RedisShardBackplane implements ShardBackplane {
 
   @Override
   public boolean removeWorker(String name, String reason) throws IOException {
-    WorkerChange workerChange = WorkerChange.newBuilder()
-        .setName(name)
-        .setRemove(WorkerChange.Remove.newBuilder()
-            .setSource(source)
-            .setReason(reason)
-            .build())
-        .build();
+    WorkerChange workerChange =
+        WorkerChange.newBuilder()
+            .setName(name)
+            .setRemove(WorkerChange.Remove.newBuilder().setSource(source).setReason(reason).build())
+            .build();
     String workerChangeJson = JsonFormat.printer().print(workerChange);
-    return subscriber.removeWorker(name) &&
-        withBackplaneException((jedis) -> removeWorkerAndPublish(jedis, name, workerChangeJson));
+    return subscriber.removeWorker(name)
+        && withBackplaneException((jedis) -> removeWorkerAndPublish(jedis, name, workerChangeJson));
   }
 
   @Override
@@ -724,7 +721,8 @@ public class RedisShardBackplane implements ShardBackplane {
     }
 
     synchronized (workerSet) {
-      Set<String> newWorkerSet = withBackplaneException((jedis) -> fetchAndExpireWorkers(jedis, now));
+      Set<String> newWorkerSet =
+          withBackplaneException((jedis) -> fetchAndExpireWorkers(jedis, now));
       workerSet.clear();
       workerSet.addAll(newWorkerSet);
     }
@@ -738,15 +736,15 @@ public class RedisShardBackplane implements ShardBackplane {
     if (!workers.isEmpty()) {
       for (ShardWorker worker : workers) {
         String name = worker.getEndpoint();
-        String reason = format("registration expired at %d, tested at %d", worker.getExpireAt(), testedAt);
-        WorkerChange workerChange = WorkerChange.newBuilder()
-            .setEffectiveAt(toTimestamp(Instant.now()))
-            .setName(name)
-            .setRemove(WorkerChange.Remove.newBuilder()
-                .setSource(source)
-                .setReason(reason)
-                .build())
-            .build();
+        String reason =
+            format("registration expired at %d, tested at %d", worker.getExpireAt(), testedAt);
+        WorkerChange workerChange =
+            WorkerChange.newBuilder()
+                .setEffectiveAt(toTimestamp(Instant.now()))
+                .setName(name)
+                .setRemove(
+                    WorkerChange.Remove.newBuilder().setSource(source).setReason(reason).build())
+                .build();
         try {
           String workerChangeJson = JsonFormat.printer().print(workerChange);
           removeWorkerAndPublish(jedis, name, workerChangeJson);
@@ -765,9 +763,7 @@ public class RedisShardBackplane implements ShardBackplane {
       String name = entry.getKey();
       try {
         if (json == null) {
-          invalidWorkers.add(ShardWorker.newBuilder()
-              .setEndpoint(name)
-              .build());
+          invalidWorkers.add(ShardWorker.newBuilder().setEndpoint(name).build());
         } else {
           ShardWorker.Builder builder = ShardWorker.newBuilder();
           JsonFormat.parser().merge(json, builder);
@@ -779,9 +775,7 @@ public class RedisShardBackplane implements ShardBackplane {
           }
         }
       } catch (InvalidProtocolBufferException e) {
-        invalidWorkers.add(ShardWorker.newBuilder()
-            .setEndpoint(name)
-            .build());
+        invalidWorkers.add(ShardWorker.newBuilder().setEndpoint(name).build());
       }
     }
     removeInvalidWorkers(jedis, now, invalidWorkers.build());
@@ -815,14 +809,16 @@ public class RedisShardBackplane implements ShardBackplane {
   // we do this by action hash only, so that we can use RequestMetadata to filter
   @Override
   public void blacklistAction(String actionId) throws IOException {
-    withVoidBackplaneException((jedis) -> jedis.setex(actionBlacklistKey(actionId), config.getActionBlacklistExpire(), ""));
+    withVoidBackplaneException(
+        (jedis) ->
+            jedis.setex(actionBlacklistKey(actionId), config.getActionBlacklistExpire(), ""));
   }
 
   @Override
-  public void putActionResult(ActionKey actionKey, ActionResult actionResult)
-      throws IOException {
+  public void putActionResult(ActionKey actionKey, ActionResult actionResult) throws IOException {
     String json = JsonFormat.printer().print(actionResult);
-    withVoidBackplaneException((jedis) -> jedis.setex(acKey(actionKey), config.getActionCacheExpire(), json));
+    withVoidBackplaneException(
+        (jedis) -> jedis.setex(acKey(actionKey), config.getActionCacheExpire(), json));
   }
 
   private void removeActionResult(JedisCluster jedis, ActionKey actionKey) {
@@ -836,13 +832,14 @@ public class RedisShardBackplane implements ShardBackplane {
 
   @Override
   public void removeActionResults(Iterable<ActionKey> actionKeys) throws IOException {
-    withVoidBackplaneException((jedis) -> {
-      JedisClusterPipeline p = jedis.pipelined();
-      for (ActionKey actionKey : actionKeys) {
-        p.del(acKey(actionKey));
-      }
-      p.sync();
-    });
+    withVoidBackplaneException(
+        (jedis) -> {
+          JedisClusterPipeline p = jedis.pipelined();
+          for (ActionKey actionKey : actionKeys) {
+            p.del(acKey(actionKey));
+          }
+          p.sync();
+        });
   }
 
   @Override
@@ -851,77 +848,81 @@ public class RedisShardBackplane implements ShardBackplane {
 
     ImmutableList.Builder<Map.Entry<ActionKey, String>> results = new ImmutableList.Builder<>();
 
-    ScanParams scanParams = new ScanParams()
-        .match(config.getActionCachePrefix() + ":*")
-        .count(count);
+    ScanParams scanParams =
+        new ScanParams().match(config.getActionCachePrefix() + ":*").count(count);
 
-    String token = withBackplaneException((jedis) -> {
-      ScanResult<String> scanResult = jedis.scan(jedisScanToken, scanParams);
-      List<String> keyResults = scanResult.getResult();
+    String token =
+        withBackplaneException(
+            (jedis) -> {
+              ScanResult<String> scanResult = jedis.scan(jedisScanToken, scanParams);
+              List<String> keyResults = scanResult.getResult();
 
-      List<Response<String>> actionResults = new ArrayList<>(keyResults.size());
-      JedisClusterPipeline p = jedis.pipelined();
-      for (int i = 0; i < keyResults.size(); i++) {
-        actionResults.add(p.get(keyResults.get(i)));
-      }
-      p.sync();
-      for (int i = 0; i < keyResults.size(); i++) {
-        String json = actionResults.get(i).get();
-        if (json == null) {
-          continue;
-        }
-        String key = keyResults.get(i);
-        results.add(new AbstractMap.SimpleEntry<>(
-            DigestUtil.asActionKey(DigestUtil.parseDigest(key.split(":")[1])),
-            json));
-      }
-      String cursor = scanResult.getCursor();
-      return cursor.equals(SCAN_POINTER_START) ? null : cursor;
-    });
+              List<Response<String>> actionResults = new ArrayList<>(keyResults.size());
+              JedisClusterPipeline p = jedis.pipelined();
+              for (int i = 0; i < keyResults.size(); i++) {
+                actionResults.add(p.get(keyResults.get(i)));
+              }
+              p.sync();
+              for (int i = 0; i < keyResults.size(); i++) {
+                String json = actionResults.get(i).get();
+                if (json == null) {
+                  continue;
+                }
+                String key = keyResults.get(i);
+                results.add(
+                    new AbstractMap.SimpleEntry<>(
+                        DigestUtil.asActionKey(DigestUtil.parseDigest(key.split(":")[1])), json));
+              }
+              String cursor = scanResult.getCursor();
+              return cursor.equals(SCAN_POINTER_START) ? null : cursor;
+            });
     return new ActionCacheScanResult(
         token,
         Iterables.transform(
             results.build(),
-            (entry) -> new AbstractMap.SimpleEntry<>(
-                entry.getKey(),
-                parseActionResult(entry.getValue()))));
+            (entry) ->
+                new AbstractMap.SimpleEntry<>(
+                    entry.getKey(), parseActionResult(entry.getValue()))));
   }
 
   @Override
-  public void adjustBlobLocations(Digest blobDigest, Set<String> addWorkers, Set<String> removeWorkers) throws IOException {
+  public void adjustBlobLocations(
+      Digest blobDigest, Set<String> addWorkers, Set<String> removeWorkers) throws IOException {
     String key = casKey(blobDigest);
-    withVoidBackplaneException((jedis) -> {
-      for (String workerName : addWorkers) {
-        jedis.sadd(key, workerName);
-      }
-      for (String workerName : removeWorkers) {
-        jedis.srem(key, workerName);
-      }
-      jedis.expire(key, config.getCasExpire());
-    });
+    withVoidBackplaneException(
+        (jedis) -> {
+          for (String workerName : addWorkers) {
+            jedis.sadd(key, workerName);
+          }
+          for (String workerName : removeWorkers) {
+            jedis.srem(key, workerName);
+          }
+          jedis.expire(key, config.getCasExpire());
+        });
   }
 
   @Override
   public void addBlobLocation(Digest blobDigest, String workerName) throws IOException {
     String key = casKey(blobDigest);
-    withVoidBackplaneException((jedis) -> {
-      jedis.sadd(key, workerName);
-      jedis.expire(key, config.getCasExpire());
-    });
+    withVoidBackplaneException(
+        (jedis) -> {
+          jedis.sadd(key, workerName);
+          jedis.expire(key, config.getCasExpire());
+        });
   }
 
   @Override
-  public void addBlobsLocation(Iterable<Digest> blobDigests, String workerName)
-      throws IOException {
-    withVoidBackplaneException((jedis) -> {
-      JedisClusterPipeline p = jedis.pipelined();
-      for (Digest blobDigest : blobDigests) {
-        String key = casKey(blobDigest);
-        p.sadd(key, workerName);
-        p.expire(key, config.getCasExpire());
-      }
-      p.sync();
-    });
+  public void addBlobsLocation(Iterable<Digest> blobDigests, String workerName) throws IOException {
+    withVoidBackplaneException(
+        (jedis) -> {
+          JedisClusterPipeline p = jedis.pipelined();
+          for (Digest blobDigest : blobDigests) {
+            String key = casKey(blobDigest);
+            p.sadd(key, workerName);
+            p.expire(key, config.getCasExpire());
+          }
+          p.sync();
+        });
   }
 
   @Override
@@ -933,13 +934,14 @@ public class RedisShardBackplane implements ShardBackplane {
   @Override
   public void removeBlobsLocation(Iterable<Digest> blobDigests, String workerName)
       throws IOException {
-    withVoidBackplaneException((jedis) -> {
-      JedisClusterPipeline p = jedis.pipelined();
-      for (Digest blobDigest : blobDigests) {
-        p.srem(casKey(blobDigest), workerName);
-      }
-      p.sync();
-    });
+    withVoidBackplaneException(
+        (jedis) -> {
+          JedisClusterPipeline p = jedis.pipelined();
+          for (Digest blobDigest : blobDigests) {
+            p.srem(casKey(blobDigest), workerName);
+          }
+          p.sync();
+        });
   }
 
   @Override
@@ -957,25 +959,28 @@ public class RedisShardBackplane implements ShardBackplane {
       throws IOException {
     // FIXME pipeline
     ImmutableMap.Builder<Digest, Set<String>> blobDigestsWorkers = new ImmutableMap.Builder<>();
-    withVoidBackplaneException((jedis) -> {
-      for (Digest blobDigest : blobDigests) {
-        Set<String> workers = jedis.smembers(casKey(blobDigest));
-        if (workers.isEmpty()) {
-          continue;
-        }
-        blobDigestsWorkers.put(blobDigest, workers);
-      }
-    });
+    withVoidBackplaneException(
+        (jedis) -> {
+          for (Digest blobDigest : blobDigests) {
+            Set<String> workers = jedis.smembers(casKey(blobDigest));
+            if (workers.isEmpty()) {
+              continue;
+            }
+            blobDigestsWorkers.put(blobDigest, workers);
+          }
+        });
     return blobDigestsWorkers.build();
   }
 
-  public static WorkerChange parseWorkerChange(String workerChangeJson) throws InvalidProtocolBufferException {
+  public static WorkerChange parseWorkerChange(String workerChangeJson)
+      throws InvalidProtocolBufferException {
     WorkerChange.Builder workerChange = WorkerChange.newBuilder();
     JsonFormat.parser().merge(workerChangeJson, workerChange);
     return workerChange.build();
   }
 
-  public static OperationChange parseOperationChange(String operationChangeJson) throws InvalidProtocolBufferException {
+  public static OperationChange parseOperationChange(String operationChangeJson)
+      throws InvalidProtocolBufferException {
     OperationChange.Builder operationChange = OperationChange.newBuilder();
     operationParser.merge(operationChangeJson, operationChange);
     return operationChange.build();
@@ -1038,15 +1043,16 @@ public class RedisShardBackplane implements ShardBackplane {
     }
 
     String name = operation.getName();
-    withVoidBackplaneException((jedis) -> {
-      jedis.setex(operationKey(name), config.getOperationExpire(), json);
-      if (publishOperation != null) {
-        publishReset(jedis, publishOperation);
-      }
-      if (complete) {
-        completeOperation(jedis, name);
-      }
-    });
+    withVoidBackplaneException(
+        (jedis) -> {
+          jedis.setex(operationKey(name), config.getOperationExpire(), json);
+          if (publishOperation != null) {
+            publishReset(jedis, publishOperation);
+          }
+          if (complete) {
+            completeOperation(jedis, name);
+          }
+        });
     return true;
   }
 
@@ -1063,20 +1069,23 @@ public class RedisShardBackplane implements ShardBackplane {
     String operationJson = operationPrinter.print(operation);
     String queueEntryJson = JsonFormat.printer().print(queueEntry);
     Operation publishOperation = onPublish.apply(operation);
-    withVoidBackplaneException((jedis) -> {
-      jedis.setex(operationKey(operationName), config.getOperationExpire(), operationJson);
-      queue(jedis, operation.getName(), queueEntryJson);
-      publishReset(jedis, publishOperation);
-    });
+    withVoidBackplaneException(
+        (jedis) -> {
+          jedis.setex(operationKey(operationName), config.getOperationExpire(), operationJson);
+          queue(jedis, operation.getName(), queueEntryJson);
+          publishReset(jedis, publishOperation);
+        });
   }
 
   public Map<String, Operation> getOperationsMap() throws IOException {
     ImmutableMap.Builder<String, String> builder = new ImmutableMap.Builder<>();
-    withVoidBackplaneException((jedis) -> {
-      for (Map.Entry<String, String> entry : jedis.hgetAll(config.getDispatchedOperationsHashName()).entrySet()) {
-        builder.put(entry.getKey(), entry.getValue());
-      }
-    });
+    withVoidBackplaneException(
+        (jedis) -> {
+          for (Map.Entry<String, String> entry :
+              jedis.hgetAll(config.getDispatchedOperationsHashName()).entrySet()) {
+            builder.put(entry.getKey(), entry.getValue());
+          }
+        });
     return Maps.transformValues(builder.build(), RedisShardBackplane::parseOperationJson);
   }
 
@@ -1095,7 +1104,8 @@ public class RedisShardBackplane implements ShardBackplane {
   @Override
   public ImmutableList<DispatchedOperation> getDispatchedOperations() throws IOException {
     ImmutableList.Builder<DispatchedOperation> builder = new ImmutableList.Builder<>();
-    Map<String, String> dispatchedOperations = withBackplaneException((jedis) -> jedis.hgetAll(config.getDispatchedOperationsHashName()));
+    Map<String, String> dispatchedOperations =
+        withBackplaneException((jedis) -> jedis.hgetAll(config.getDispatchedOperationsHashName()));
     ImmutableList.Builder<String> invalidOperationNames = new ImmutableList.Builder<>();
     boolean hasInvalid = false;
     // executor work queue?
@@ -1105,7 +1115,11 @@ public class RedisShardBackplane implements ShardBackplane {
         JsonFormat.parser().merge(entry.getValue(), dispatchedOperationBuilder);
         builder.add(dispatchedOperationBuilder.build());
       } catch (InvalidProtocolBufferException e) {
-        logger.log(SEVERE, "RedisShardBackplane::getDispatchedOperations: removing invalid operation " + entry.getKey(), e);
+        logger.log(
+            SEVERE,
+            "RedisShardBackplane::getDispatchedOperations: removing invalid operation "
+                + entry.getKey(),
+            e);
         /* guess we don't want to spin on this */
         invalidOperationNames.add(entry.getKey());
         hasInvalid = true;
@@ -1113,13 +1127,14 @@ public class RedisShardBackplane implements ShardBackplane {
     }
 
     if (hasInvalid) {
-      withVoidBackplaneException((jedis) -> {
-        JedisClusterPipeline p = jedis.pipelined();
-        for (String invalidOperationName : invalidOperationNames.build()) {
-          p.hdel(config.getDispatchedOperationsHashName(), invalidOperationName);
-        }
-        p.sync();
-      });
+      withVoidBackplaneException(
+          (jedis) -> {
+            JedisClusterPipeline p = jedis.pipelined();
+            for (String invalidOperationName : invalidOperationNames.build()) {
+              p.hdel(config.getDispatchedOperationsHashName(), invalidOperationName);
+            }
+            p.sync();
+          });
     }
     return builder.build();
   }
@@ -1127,10 +1142,9 @@ public class RedisShardBackplane implements ShardBackplane {
   private ExecuteEntry deprequeueOperation(JedisCluster jedis) {
     String executeEntryJson;
     do {
-      executeEntryJson = jedis.brpoplpush(
-          config.getPreQueuedOperationsListName(),
-          config.getProcessingListName(),
-          1);
+      executeEntryJson =
+          jedis.brpoplpush(
+              config.getPreQueuedOperationsListName(), config.getProcessingListName(), 1);
       if (Thread.currentThread().isInterrupted()) {
         return null;
       }
@@ -1149,10 +1163,7 @@ public class RedisShardBackplane implements ShardBackplane {
       // destroy the processing entry and ttl
       if (jedis.lrem(config.getProcessingListName(), -1, executeEntryJson) == 0) {
         logger.severe(
-            format(
-                "could not remove %s from %s",
-                operationName,
-                config.getProcessingListName()));
+            format("could not remove %s from %s", operationName, config.getProcessingListName()));
         return null;
       }
       jedis.del(processingKey(operationName)); // may or may not exist
@@ -1175,10 +1186,9 @@ public class RedisShardBackplane implements ShardBackplane {
   private QueueEntry dispatchOperation(JedisCluster jedis) {
     String queueEntryJson;
     do {
-      queueEntryJson = jedis.brpoplpush(
-          config.getQueuedOperationsListName(),
-          config.getDispatchingListName(),
-          1);
+      queueEntryJson =
+          jedis.brpoplpush(
+              config.getQueuedOperationsListName(), config.getDispatchingListName(), 1);
       // right here is an operation loss risk
       if (Thread.currentThread().isInterrupted()) {
         return null;
@@ -1199,19 +1209,17 @@ public class RedisShardBackplane implements ShardBackplane {
     publishReset(jedis, operation);
 
     long requeueAt = System.currentTimeMillis() + 30 * 1000;
-    DispatchedOperation o = DispatchedOperation.newBuilder()
-        .setQueueEntry(queueEntry)
-        .setRequeueAt(requeueAt)
-        .build();
+    DispatchedOperation o =
+        DispatchedOperation.newBuilder().setQueueEntry(queueEntry).setRequeueAt(requeueAt).build();
     boolean success = false;
     try {
       String dispatchedOperationJson = JsonFormat.printer().print(o);
 
       /* if the operation is already in the dispatch list, fail the dispatch */
-      success = jedis.hsetnx(
-          config.getDispatchedOperationsHashName(),
-          operationName,
-          dispatchedOperationJson) == 1;
+      success =
+          jedis.hsetnx(
+                  config.getDispatchedOperationsHashName(), operationName, dispatchedOperationJson)
+              == 1;
     } catch (InvalidProtocolBufferException e) {
       logger.log(SEVERE, "error printing dispatched operation", e);
       // very unlikely, printer would have to fail
@@ -1222,8 +1230,7 @@ public class RedisShardBackplane implements ShardBackplane {
         logger.warning(
             format(
                 "operation %s was missing in %s, may be orphaned",
-                operationName,
-                config.getDispatchingListName()));
+                operationName, config.getDispatchingListName()));
       }
       jedis.del(dispatchingKey(operationName)); // may or may not exist
       return queueEntry;
@@ -1244,20 +1251,20 @@ public class RedisShardBackplane implements ShardBackplane {
   public void rejectOperation(QueueEntry queueEntry) throws IOException {
     String operationName = queueEntry.getExecuteEntry().getOperationName();
     String queueEntryJson = JsonFormat.printer().print(queueEntry);
-    withVoidBackplaneException((jedis) -> {
-      if (jedis.hdel(config.getDispatchedOperationsHashName(), operationName) == 1) {
-        jedis.rpush(config.getQueuedOperationsListName(), queueEntryJson);
-      }
-    });
+    withVoidBackplaneException(
+        (jedis) -> {
+          if (jedis.hdel(config.getDispatchedOperationsHashName(), operationName) == 1) {
+            jedis.rpush(config.getQueuedOperationsListName(), queueEntryJson);
+          }
+        });
   }
 
   @Override
-  public boolean pollOperation(QueueEntry queueEntry, ExecutionStage.Value stage, long requeueAt) throws IOException {
+  public boolean pollOperation(QueueEntry queueEntry, ExecutionStage.Value stage, long requeueAt)
+      throws IOException {
     String operationName = queueEntry.getExecuteEntry().getOperationName();
-    DispatchedOperation o = DispatchedOperation.newBuilder()
-        .setQueueEntry(queueEntry)
-        .setRequeueAt(requeueAt)
-        .build();
+    DispatchedOperation o =
+        DispatchedOperation.newBuilder().setQueueEntry(queueEntry).setRequeueAt(requeueAt).build();
     String json;
     try {
       json = JsonFormat.printer().print(o);
@@ -1265,16 +1272,17 @@ public class RedisShardBackplane implements ShardBackplane {
       logger.log(SEVERE, "error printing dispatched operation " + operationName, e);
       return false;
     }
-    return withBackplaneException((jedis) -> {
-      if (jedis.hexists(config.getDispatchedOperationsHashName(), operationName)) {
-        if (jedis.hset(config.getDispatchedOperationsHashName(), operationName, json) == 0) {
-          return true;
-        }
-        /* someone else beat us to the punch, delete our incorrectly added key */
-        jedis.hdel(config.getDispatchedOperationsHashName(), operationName);
-      }
-      return false;
-    });
+    return withBackplaneException(
+        (jedis) -> {
+          if (jedis.hexists(config.getDispatchedOperationsHashName(), operationName)) {
+            if (jedis.hset(config.getDispatchedOperationsHashName(), operationName, json) == 0) {
+              return true;
+            }
+            /* someone else beat us to the punch, delete our incorrectly added key */
+            jedis.hdel(config.getDispatchedOperationsHashName(), operationName);
+          }
+          return false;
+        });
   }
 
   @Override
@@ -1283,26 +1291,26 @@ public class RedisShardBackplane implements ShardBackplane {
     String operationJson = operationPrinter.print(operation);
     String executeEntryJson = JsonFormat.printer().print(executeEntry);
     Operation publishOperation = onPublish.apply(operation);
-    withVoidBackplaneException((jedis) -> {
-      jedis.setex(operationKey(operationName), config.getOperationExpire(), operationJson);
-      jedis.lpush(config.getPreQueuedOperationsListName(), executeEntryJson);
-      publishReset(jedis, publishOperation);
-    });
+    withVoidBackplaneException(
+        (jedis) -> {
+          jedis.setex(operationKey(operationName), config.getOperationExpire(), operationJson);
+          jedis.lpush(config.getPreQueuedOperationsListName(), executeEntryJson);
+          publishReset(jedis, publishOperation);
+        });
   }
 
   private Operation keepaliveOperation(String operationName) {
-    return Operation.newBuilder()
-        .setName(operationName)
-        .build();
+    return Operation.newBuilder().setName(operationName).build();
   }
 
   @Override
   public void queueing(String operationName) throws IOException {
     Operation operation = keepaliveOperation(operationName);
     // publish so that watchers reset their timeout
-    withVoidBackplaneException((jedis) -> {
-      publishReset(jedis, operation);
-    });
+    withVoidBackplaneException(
+        (jedis) -> {
+          publishReset(jedis, operation);
+        });
   }
 
   @Override
@@ -1310,10 +1318,11 @@ public class RedisShardBackplane implements ShardBackplane {
     String queueEntryJson = JsonFormat.printer().print(queueEntry);
     String operationName = queueEntry.getExecuteEntry().getOperationName();
     Operation publishOperation = keepaliveOperation(operationName);
-    withVoidBackplaneException((jedis) -> {
-      queue(jedis, operationName, queueEntryJson);
-      publishReset(jedis, publishOperation);
-    });
+    withVoidBackplaneException(
+        (jedis) -> {
+          queue(jedis, operationName, queueEntryJson);
+          publishReset(jedis, publishOperation);
+        });
   }
 
   private void completeOperation(JedisCluster jedis, String operationName) {
@@ -1327,22 +1336,22 @@ public class RedisShardBackplane implements ShardBackplane {
 
   @Override
   public void deleteOperation(String operationName) throws IOException {
-    Operation o = Operation.newBuilder()
-        .setName(operationName)
-        .setDone(true)
-        .setError(com.google.rpc.Status.newBuilder()
-            .setCode(Code.UNAVAILABLE.value())
-            .build())
-        .build();
+    Operation o =
+        Operation.newBuilder()
+            .setName(operationName)
+            .setDone(true)
+            .setError(com.google.rpc.Status.newBuilder().setCode(Code.UNAVAILABLE.value()).build())
+            .build();
 
-    withVoidBackplaneException((jedis) -> {
-      completeOperation(jedis, operationName);
-      // FIXME find a way to get rid of this thing from the queue by name
-      // jedis.lrem(config.getQueuedOperationsListName(), 0, operationName);
-      jedis.del(operationKey(operationName));
+    withVoidBackplaneException(
+        (jedis) -> {
+          completeOperation(jedis, operationName);
+          // FIXME find a way to get rid of this thing from the queue by name
+          // jedis.lrem(config.getQueuedOperationsListName(), 0, operationName);
+          jedis.del(operationKey(operationName));
 
-      publishReset(jedis, o);
-    });
+          publishReset(jedis, o);
+        });
   }
 
   private JedisCluster getSubscribeJedis() throws IOException {
@@ -1399,20 +1408,23 @@ public class RedisShardBackplane implements ShardBackplane {
     if (requestMetadata.getActionId().isEmpty()) {
       return false;
     }
-    return withBackplaneException((jedis) -> jedis.exists(actionBlacklistKey(requestMetadata.getActionId())));
+    return withBackplaneException(
+        (jedis) -> jedis.exists(actionBlacklistKey(requestMetadata.getActionId())));
   }
 
   @Override
   public boolean canQueue() throws IOException {
     int maxQueueDepth = config.getMaxQueueDepth();
     return maxQueueDepth < 0
-        || withBackplaneException((jedis) -> jedis.llen(config.getQueuedOperationsListName()) < maxQueueDepth);
+        || withBackplaneException(
+            (jedis) -> jedis.llen(config.getQueuedOperationsListName()) < maxQueueDepth);
   }
 
   @Override
   public boolean canPrequeue() throws IOException {
     int maxPreQueueDepth = config.getMaxPreQueueDepth();
     return maxPreQueueDepth < 0
-        || withBackplaneException((jedis) -> jedis.llen(config.getPreQueuedOperationsListName()) < maxPreQueueDepth);
+        || withBackplaneException(
+            (jedis) -> jedis.llen(config.getPreQueuedOperationsListName()) < maxPreQueueDepth);
   }
 }

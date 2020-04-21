@@ -42,9 +42,9 @@ public class Utils {
   private static final LinkOption[] NO_LINK_OPTION = new LinkOption[0];
   // This isn't generally safe; we rely on the file system APIs not modifying the array.
   private static final LinkOption[] NOFOLLOW_LINKS_OPTION =
-      new LinkOption[] { LinkOption.NOFOLLOW_LINKS };
+      new LinkOption[] {LinkOption.NOFOLLOW_LINKS};
 
-  private Utils() { }
+  private Utils() {}
 
   public static ListenableFuture<Void> removeDirectory(Path path, ExecutorService service) {
     String suffix = UUID.randomUUID().toString();
@@ -57,92 +57,96 @@ public class Utils {
     } catch (IOException e) {
       return immediateFailedFuture(e);
     }
-    return listeningDecorator(service).submit(() -> {
-      try {
-        removeDirectory(tmpPath);
-      } catch (IOException e) {
-        logger.log(SEVERE, "error removing directory", e);
-      }
-    }, null);
+    return listeningDecorator(service)
+        .submit(
+            () -> {
+              try {
+                removeDirectory(tmpPath);
+              } catch (IOException e) {
+                logger.log(SEVERE, "error removing directory", e);
+              }
+            },
+            null);
   }
 
   public static void removeDirectory(Path directory) throws IOException {
-    Files.walkFileTree(directory, new SimpleFileVisitor<Path>() {
-      @Override
-      public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-        Files.delete(file);
-        return FileVisitResult.CONTINUE;
-      }
+    Files.walkFileTree(
+        directory,
+        new SimpleFileVisitor<Path>() {
+          @Override
+          public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+              throws IOException {
+            Files.delete(file);
+            return FileVisitResult.CONTINUE;
+          }
 
-      @Override
-      public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
-        if (e == null) {
-          Files.delete(dir);
-          return FileVisitResult.CONTINUE;
-        }
-        // directory iteration failed
-        throw e;
-      }
-    });
+          @Override
+          public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
+            if (e == null) {
+              Files.delete(dir);
+              return FileVisitResult.CONTINUE;
+            }
+            // directory iteration failed
+            throw e;
+          }
+        });
   }
 
   private static LinkOption[] linkOpts(boolean followSymlinks) {
     return followSymlinks ? NO_LINK_OPTION : NOFOLLOW_LINKS_OPTION;
   }
 
-  /**
-   * Returns the status of a file.
-   */
+  /** Returns the status of a file. */
   public static FileStatus stat(final Path path, final boolean followSymlinks) throws IOException {
     final BasicFileAttributes attributes;
     try {
-      attributes =
-          Files.readAttributes(path, BasicFileAttributes.class, linkOpts(followSymlinks));
+      attributes = Files.readAttributes(path, BasicFileAttributes.class, linkOpts(followSymlinks));
     } catch (java.nio.file.FileSystemException e) {
       throw new FileNotFoundException(path + ERR_NO_SUCH_FILE_OR_DIR);
     }
-    FileStatus status = new FileStatus() {
-      @Override
-      public boolean isFile() {
-        return attributes.isRegularFile() || isSpecialFile();
-      }
+    FileStatus status =
+        new FileStatus() {
+          @Override
+          public boolean isFile() {
+            return attributes.isRegularFile() || isSpecialFile();
+          }
 
-      @Override
-      public boolean isSpecialFile() {
-        return attributes.isOther();
-      }
+          @Override
+          public boolean isSpecialFile() {
+            return attributes.isOther();
+          }
 
-      @Override
-      public boolean isDirectory() {
-        return attributes.isDirectory();
-      }
+          @Override
+          public boolean isDirectory() {
+            return attributes.isDirectory();
+          }
 
-      @Override
-      public boolean isSymbolicLink() {
-        return attributes.isSymbolicLink();
-      }
+          @Override
+          public boolean isSymbolicLink() {
+            return attributes.isSymbolicLink();
+          }
 
-      @Override
-      public long getSize() throws IOException {
-        return attributes.size();
-      }
+          @Override
+          public long getSize() throws IOException {
+            return attributes.size();
+          }
 
-      @Override
-      public long getLastModifiedTime() throws IOException {
-        return attributes.lastModifiedTime().toMillis();
-      }
+          @Override
+          public long getLastModifiedTime() throws IOException {
+            return attributes.lastModifiedTime().toMillis();
+          }
 
-      @Override
-      public long getLastChangeTime() {
-        // This is the best we can do with Java NIO...
-        return attributes.lastModifiedTime().toMillis();
-      }
+          @Override
+          public long getLastChangeTime() {
+            // This is the best we can do with Java NIO...
+            return attributes.lastModifiedTime().toMillis();
+          }
 
-      @Override
-      public Object fileKey() {
-        return attributes.fileKey();
-      }
-    };
+          @Override
+          public Object fileKey() {
+            return attributes.fileKey();
+          }
+        };
 
     return status;
   }
@@ -159,9 +163,7 @@ public class Utils {
     }
   }
 
-  /**
-   * Like stat(), but returns null on failures instead of throwing.
-   */
+  /** Like stat(), but returns null on failures instead of throwing. */
   private static FileStatus statNullable(Path path, boolean followSymlinks) {
     try {
       return stat(path, followSymlinks);

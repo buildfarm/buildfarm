@@ -93,16 +93,14 @@ public class MatchStage extends PipelineStage {
       this.onCancelHandler = onCancelHandler;
     }
 
-    private boolean onOperationPolled(QueueEntry queueEntry, Poller poller) throws InterruptedException {
+    private boolean onOperationPolled(QueueEntry queueEntry, Poller poller)
+        throws InterruptedException {
       String operationName = queueEntry.getExecuteEntry().getOperationName();
       logStart(operationName);
 
       long matchingAtUSecs = stopwatch.elapsed(MICROSECONDS);
-      OperationContext operationContext = match(
-          queueEntry,
-          poller,
-          stopwatch,
-          operationNamedAtUSecs);
+      OperationContext operationContext =
+          match(queueEntry, poller, stopwatch, operationNamedAtUSecs);
       long matchedInUSecs = stopwatch.elapsed(MICROSECONDS) - matchingAtUSecs;
       logComplete(operationName, matchedInUSecs, waitDuration, true);
       operationContext.poller.pause();
@@ -140,32 +138,36 @@ public class MatchStage extends PipelineStage {
   }
 
   private OperationContext match(
-      QueueEntry queueEntry,
-      Poller poller,
-      Stopwatch stopwatch,
-      long matchStartAtUSecs) {
+      QueueEntry queueEntry, Poller poller, Stopwatch stopwatch, long matchStartAtUSecs) {
     OperationContext.Builder builder = OperationContext.newBuilder();
     Timestamp workerStartTimestamp = Timestamps.fromMillis(System.currentTimeMillis());
 
     ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
     // this may be superfluous - we can probably just set the name and action digest
-    Operation operation = Operation.newBuilder()
-        .setName(executeEntry.getOperationName())
-        .setMetadata(Any.pack(ExecuteOperationMetadata.newBuilder()
-            .setActionDigest(executeEntry.getActionDigest())
-            .setStage(QUEUED)
-            .setStdoutStreamName(executeEntry.getStdoutStreamName())
-            .setStderrStreamName(executeEntry.getStderrStreamName())
-            .build()))
-        .build();
+    Operation operation =
+        Operation.newBuilder()
+            .setName(executeEntry.getOperationName())
+            .setMetadata(
+                Any.pack(
+                    ExecuteOperationMetadata.newBuilder()
+                        .setActionDigest(executeEntry.getActionDigest())
+                        .setStage(QUEUED)
+                        .setStdoutStreamName(executeEntry.getStdoutStreamName())
+                        .setStderrStreamName(executeEntry.getStderrStreamName())
+                        .build()))
+            .build();
 
-    OperationContext operationContext = OperationContext.newBuilder()
-        .setOperation(operation)
-        .setPoller(poller)
-        .setQueueEntry(queueEntry)
-        .build();
+    OperationContext operationContext =
+        OperationContext.newBuilder()
+            .setOperation(operation)
+            .setPoller(poller)
+            .setQueueEntry(queueEntry)
+            .build();
 
-    operationContext.executeResponse.getResultBuilder().getExecutionMetadataBuilder()
+    operationContext
+        .executeResponse
+        .getResultBuilder()
+        .getExecutionMetadataBuilder()
         .setWorker(workerContext.getName())
         .setQueuedTimestamp(executeEntry.getQueuedTimestamp())
         .setWorkerStartTimestamp(workerStartTimestamp);

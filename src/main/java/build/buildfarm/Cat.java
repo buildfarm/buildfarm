@@ -41,14 +41,11 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
-import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 import com.google.common.io.ByteStreams;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
@@ -56,8 +53,8 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.Timestamps;
 import com.google.rpc.Code;
-import com.google.rpc.RetryInfo;
 import com.google.rpc.PreconditionFailure;
+import com.google.rpc.RetryInfo;
 import io.grpc.Context;
 import io.grpc.ManagedChannel;
 import io.grpc.Status;
@@ -66,9 +63,7 @@ import io.grpc.netty.NettyChannelBuilder;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Date;
-import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -76,8 +71,7 @@ import java.util.concurrent.TimeUnit;
 class Cat {
   private static ManagedChannel createChannel(String target) {
     NettyChannelBuilder builder =
-        NettyChannelBuilder.forTarget(target)
-            .negotiationType(NegotiationType.PLAINTEXT);
+        NettyChannelBuilder.forTarget(target).negotiationType(NegotiationType.PLAINTEXT);
     return builder.build();
   }
 
@@ -91,10 +85,14 @@ class Cat {
     }
 
     System.out.println("Command Digest: Command " + DigestUtil.toString(action.getCommandDigest()));
-    System.out.println("Input Root Digest: Directory " + DigestUtil.toString(action.getInputRootDigest()));
+    System.out.println(
+        "Input Root Digest: Directory " + DigestUtil.toString(action.getInputRootDigest()));
     System.out.println("DoNotCache: " + (action.getDoNotCache() ? "true" : "false"));
     if (action.hasTimeout()) {
-      System.out.println("Timeout: " + (action.getTimeout().getSeconds() + action.getTimeout().getNanos() / 1e9) + "s");
+      System.out.println(
+          "Timeout: "
+              + (action.getTimeout().getSeconds() + action.getTimeout().getNanos() / 1e9)
+              + "s");
     }
   }
 
@@ -136,10 +134,21 @@ class Cat {
       if (attrs.length() != 0) {
         attrs = " (" + attrs + ")";
       }
-      indentOut(indentLevel, "Output File: " + outputFile.getPath() + attrs + " File " + DigestUtil.toString(outputFile.getDigest()));
+      indentOut(
+          indentLevel,
+          "Output File: "
+              + outputFile.getPath()
+              + attrs
+              + " File "
+              + DigestUtil.toString(outputFile.getDigest()));
     }
     for (OutputDirectory outputDirectory : result.getOutputDirectoriesList()) {
-      indentOut(indentLevel, "Output Directory: " + outputDirectory.getPath() + " Directory " + DigestUtil.toString(outputDirectory.getTreeDigest()));
+      indentOut(
+          indentLevel,
+          "Output Directory: "
+              + outputDirectory.getPath()
+              + " Directory "
+              + DigestUtil.toString(outputDirectory.getTreeDigest()));
     }
     indentOut(indentLevel, "Exit Code: " + result.getExitCode());
     if (!result.getStdoutRaw().isEmpty()) {
@@ -157,27 +166,59 @@ class Cat {
     if (result.hasExecutionMetadata()) {
       indentOut(indentLevel, "ExecutionMetadata:");
       ExecutedActionMetadata executedActionMetadata = result.getExecutionMetadata();
-      indentOut(indentLevel + 1, "Worker: "                  + executedActionMetadata.getWorker());
-      indentOut(indentLevel + 1, "Queued At: "               + Timestamps.toString(executedActionMetadata.getQueuedTimestamp()));
-      indentOut(indentLevel + 1, "Worker Start: "            + Timestamps.toString(executedActionMetadata.getWorkerStartTimestamp()));
-      indentOut(indentLevel + 1, "Input Fetch Start: "       + Timestamps.toString(executedActionMetadata.getInputFetchStartTimestamp()));
-      indentOut(indentLevel + 1, "Input Fetch Completed: "   + Timestamps.toString(executedActionMetadata.getInputFetchCompletedTimestamp()));
-      indentOut(indentLevel + 1, "Execution Start: "         + Timestamps.toString(executedActionMetadata.getExecutionStartTimestamp()));
-      indentOut(indentLevel + 1, "Execution Completed: "     + Timestamps.toString(executedActionMetadata.getExecutionCompletedTimestamp()));
-      indentOut(indentLevel + 1, "Output Upload Start: "     + Timestamps.toString(executedActionMetadata.getOutputUploadStartTimestamp()));
-      indentOut(indentLevel + 1, "Output Upload Completed: " + Timestamps.toString(executedActionMetadata.getOutputUploadCompletedTimestamp()));
-      indentOut(indentLevel + 1, "Worker Completed: "        + Timestamps.toString(executedActionMetadata.getWorkerCompletedTimestamp()));
+      indentOut(indentLevel + 1, "Worker: " + executedActionMetadata.getWorker());
+      indentOut(
+          indentLevel + 1,
+          "Queued At: " + Timestamps.toString(executedActionMetadata.getQueuedTimestamp()));
+      indentOut(
+          indentLevel + 1,
+          "Worker Start: " + Timestamps.toString(executedActionMetadata.getWorkerStartTimestamp()));
+      indentOut(
+          indentLevel + 1,
+          "Input Fetch Start: "
+              + Timestamps.toString(executedActionMetadata.getInputFetchStartTimestamp()));
+      indentOut(
+          indentLevel + 1,
+          "Input Fetch Completed: "
+              + Timestamps.toString(executedActionMetadata.getInputFetchCompletedTimestamp()));
+      indentOut(
+          indentLevel + 1,
+          "Execution Start: "
+              + Timestamps.toString(executedActionMetadata.getExecutionStartTimestamp()));
+      indentOut(
+          indentLevel + 1,
+          "Execution Completed: "
+              + Timestamps.toString(executedActionMetadata.getExecutionCompletedTimestamp()));
+      indentOut(
+          indentLevel + 1,
+          "Output Upload Start: "
+              + Timestamps.toString(executedActionMetadata.getOutputUploadStartTimestamp()));
+      indentOut(
+          indentLevel + 1,
+          "Output Upload Completed: "
+              + Timestamps.toString(executedActionMetadata.getOutputUploadCompletedTimestamp()));
+      indentOut(
+          indentLevel + 1,
+          "Worker Completed: "
+              + Timestamps.toString(executedActionMetadata.getWorkerCompletedTimestamp()));
     }
   }
 
-  private static void printFindMissing(Instance instance, Iterable<Digest> digests) throws ExecutionException, InterruptedException {
+  private static void printFindMissing(Instance instance, Iterable<Digest> digests)
+      throws ExecutionException, InterruptedException {
     Stopwatch stopwatch = Stopwatch.createStarted();
-    Iterable<Digest> missingDigests = instance.findMissingBlobs(digests, directExecutor(), RequestMetadata.getDefaultInstance()).get();
+    Iterable<Digest> missingDigests =
+        instance
+            .findMissingBlobs(digests, directExecutor(), RequestMetadata.getDefaultInstance())
+            .get();
     long elapsedMicros = stopwatch.elapsed(TimeUnit.MICROSECONDS);
 
     boolean missing = false;
     for (Digest missingDigest : missingDigests) {
-      System.out.println(format("Missing: %s Took %gms", DigestUtil.toString(missingDigest), elapsedMicros / 1000.0f));
+      System.out.println(
+          format(
+              "Missing: %s Took %gms",
+              DigestUtil.toString(missingDigest), elapsedMicros / 1000.0f));
       missing = true;
     }
     if (!missing) {
@@ -208,7 +249,8 @@ class Cat {
         if (directoryWeights.containsKey(dirNode.getDigest())) {
           weight += directoryWeights.get(dirNode.getDigest());
         } else {
-          weight += computeDirectoryWeights(dirNode.getDigest(), directoriesIndex, directoryWeights);
+          weight +=
+              computeDirectoryWeights(dirNode.getDigest(), directoriesIndex, directoryWeights);
         }
       }
       // filenodes are already computed
@@ -217,45 +259,59 @@ class Cat {
     return weight;
   }
 
-  private static void printTreeAt(int indentLevel, Directory directory, Map<Digest, Directory> directoriesIndex, long totalWeight, Map<Digest, Long> directoryWeights) {
+  private static void printTreeAt(
+      int indentLevel,
+      Directory directory,
+      Map<Digest, Directory> directoriesIndex,
+      long totalWeight,
+      Map<Digest, Long> directoryWeights) {
     for (DirectoryNode dirNode : directory.getDirectoriesList()) {
       Directory subDirectory = directoriesIndex.get(dirNode.getDigest());
       long weight = directoryWeights.get(dirNode.getDigest());
-      String displayName = String.format(
-          "%s/ %d (%d%%)",
-          dirNode.getName(),
-          weight,
-          (int) (weight * 100.0 / totalWeight));
+      String displayName =
+          String.format(
+              "%s/ %d (%d%%)", dirNode.getName(), weight, (int) (weight * 100.0 / totalWeight));
       indentOut(indentLevel, displayName);
       if (subDirectory == null) {
-        indentOut(indentLevel+1, "DIRECTORY MISSING FROM CAS");
+        indentOut(indentLevel + 1, "DIRECTORY MISSING FROM CAS");
       } else {
-        printTreeAt(indentLevel+1, directoriesIndex.get(dirNode.getDigest()), directoriesIndex, totalWeight, directoryWeights);
+        printTreeAt(
+            indentLevel + 1,
+            directoriesIndex.get(dirNode.getDigest()),
+            directoriesIndex,
+            totalWeight,
+            directoryWeights);
       }
     }
     for (FileNode fileNode : directory.getFilesList()) {
       String name = fileNode.getName();
-      String displayName = String.format("%s%s %s",
-          name,
-          fileNode.getIsExecutable() ? "*" : "",
-          DigestUtil.toString(fileNode.getDigest()));
+      String displayName =
+          String.format(
+              "%s%s %s",
+              name,
+              fileNode.getIsExecutable() ? "*" : "",
+              DigestUtil.toString(fileNode.getDigest()));
       indentOut(indentLevel, displayName);
     }
   }
 
-  private static void printTreeLayout(Map<Digest, Directory> directoriesIndex, Digest rootDigest) throws IOException, InterruptedException {
+  private static void printTreeLayout(Map<Digest, Directory> directoriesIndex, Digest rootDigest)
+      throws IOException, InterruptedException {
     Map<Digest, Long> directoryWeights = Maps.newHashMap();
     long totalWeight = computeDirectoryWeights(rootDigest, directoriesIndex, directoryWeights);
 
-    printTreeAt(0, directoriesIndex.get(rootDigest), directoriesIndex, totalWeight, directoryWeights);
+    printTreeAt(
+        0, directoriesIndex.get(rootDigest), directoriesIndex, totalWeight, directoryWeights);
   }
 
-  private static void printDirectoryTree(Instance instance, Digest rootDigest) throws IOException, InterruptedException {
+  private static void printDirectoryTree(Instance instance, Digest rootDigest)
+      throws IOException, InterruptedException {
     Tree tree = fetchTree(instance, rootDigest);
     System.out.println("Directory (Root): " + rootDigest);
     printDirectory(1, tree.getRoot());
     for (Directory directory : tree.getChildrenList()) {
-      System.out.println("Directory: " + DigestUtil.toString(instance.getDigestUtil().compute(directory)));
+      System.out.println(
+          "Directory: " + DigestUtil.toString(instance.getDigestUtil().compute(directory)));
       printDirectory(1, directory);
     }
   }
@@ -281,7 +337,9 @@ class Cat {
       if (fileNode.getIsExecutable()) {
         displayName = "*" + name + "*";
       }
-      indentOut(indentLevel, "File: " + displayName + " File " + DigestUtil.toString(fileNode.getDigest()));
+      indentOut(
+          indentLevel,
+          "File: " + displayName + " File " + DigestUtil.toString(fileNode.getDigest()));
       if (!filesUnsorted && last.compareTo(name) > 0) {
         filesUnsorted = true;
       } else {
@@ -295,7 +353,12 @@ class Cat {
     boolean directoriesUnsorted = false;
     last = "";
     for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
-      indentOut(indentLevel, "Dir: " + directoryNode.getName() + " Directory " + DigestUtil.toString(directoryNode.getDigest()));
+      indentOut(
+          indentLevel,
+          "Dir: "
+              + directoryNode.getName()
+              + " Directory "
+              + DigestUtil.toString(directoryNode.getDigest()));
       if (!directoriesUnsorted && last.compareTo(directoryNode.getName()) > 0) {
         directoriesUnsorted = true;
       } else {
@@ -325,7 +388,7 @@ class Cat {
         System.out.println("page limit reached");
         break;
       }
-    } while(!pageToken.equals(""));
+    } while (!pageToken.equals(""));
   }
 
   private static void printRequestMetadata(RequestMetadata metadata) {
@@ -337,7 +400,8 @@ class Cat {
     System.out.println("CorrelatedInvocationsId: " + metadata.getCorrelatedInvocationsId());
   }
 
-  private static void printStatus(com.google.rpc.Status status) throws InvalidProtocolBufferException {
+  private static void printStatus(com.google.rpc.Status status)
+      throws InvalidProtocolBufferException {
     System.out.println("  Code: " + Code.forNumber(status.getCode()));
     if (!status.getMessage().isEmpty()) {
       System.out.println("  Message: " + status.getMessage());
@@ -347,7 +411,10 @@ class Cat {
       for (Any detail : status.getDetailsList()) {
         if (detail.is(RetryInfo.class)) {
           RetryInfo retryInfo = detail.unpack(RetryInfo.class);
-          System.out.println("    RetryDelay: " + (retryInfo.getRetryDelay().getSeconds() + retryInfo.getRetryDelay().getNanos() / 1000000000.0f));
+          System.out.println(
+              "    RetryDelay: "
+                  + (retryInfo.getRetryDelay().getSeconds()
+                      + retryInfo.getRetryDelay().getNanos() / 1000000000.0f));
         } else if (detail.is(PreconditionFailure.class)) {
           PreconditionFailure preconditionFailure = detail.unpack(PreconditionFailure.class);
           System.out.println("    PreconditionFailure:");
@@ -363,7 +430,8 @@ class Cat {
     }
   }
 
-  private static void printExecuteResponse(ExecuteResponse response) throws InvalidProtocolBufferException {
+  private static void printExecuteResponse(ExecuteResponse response)
+      throws InvalidProtocolBufferException {
     printStatus(response.getStatus());
     if (Code.forNumber(response.getStatus().getCode()) == Code.OK) {
       printActionResult(response.getResult(), 2);
@@ -385,13 +453,15 @@ class Cat {
         metadata = queuedOperationMetadata.getExecuteOperationMetadata();
         requestMetadata = queuedOperationMetadata.getRequestMetadata();
       } else if (operation.getMetadata().is(ExecutingOperationMetadata.class)) {
-        ExecutingOperationMetadata executingMetadata = operation.getMetadata().unpack(ExecutingOperationMetadata.class);
+        ExecutingOperationMetadata executingMetadata =
+            operation.getMetadata().unpack(ExecutingOperationMetadata.class);
         System.out.println("  Started At: " + new Date(executingMetadata.getStartedAt()));
         System.out.println("  Executing On: " + executingMetadata.getExecutingOn());
         metadata = executingMetadata.getExecuteOperationMetadata();
         requestMetadata = executingMetadata.getRequestMetadata();
       } else if (operation.getMetadata().is(CompletedOperationMetadata.class)) {
-        CompletedOperationMetadata completedMetadata = operation.getMetadata().unpack(CompletedOperationMetadata.class);
+        CompletedOperationMetadata completedMetadata =
+            operation.getMetadata().unpack(CompletedOperationMetadata.class);
         metadata = completedMetadata.getExecuteOperationMetadata();
         requestMetadata = completedMetadata.getRequestMetadata();
       } else {
@@ -409,7 +479,7 @@ class Cat {
       System.out.println("  UNKNOWN TYPE: " + e.getMessage());
     }
     if (operation.getDone()) {
-      switch(operation.getResultCase()) {
+      switch (operation.getResultCase()) {
         case RESPONSE:
           System.out.println("Response:");
           try {
@@ -428,14 +498,19 @@ class Cat {
     }
   }
 
-  private static void watchOperation(Instance instance, String operationName) throws InterruptedException {
+  private static void watchOperation(Instance instance, String operationName)
+      throws InterruptedException {
     try {
-      instance.watchOperation(operationName, (operation) -> {
-        if (operation == null) {
-          throw Status.NOT_FOUND.asRuntimeException();
-        }
-        printOperation(operation);
-      }).get();
+      instance
+          .watchOperation(
+              operationName,
+              (operation) -> {
+                if (operation == null) {
+                  throw Status.NOT_FOUND.asRuntimeException();
+                }
+                printOperation(operation);
+              })
+          .get();
     } catch (ExecutionException e) {
       e.getCause().printStackTrace();
     }
@@ -447,9 +522,11 @@ class Cat {
     DigestUtil digestUtil = DigestUtil.forHash(args[2]);
     ManagedChannel channel = createChannel(host);
     ScheduledExecutorService service = newSingleThreadScheduledExecutor();
-    Context.CancellableContext ctx = Context.current().withDeadlineAfter(10, TimeUnit.SECONDS, service);
+    Context.CancellableContext ctx =
+        Context.current().withDeadlineAfter(10, TimeUnit.SECONDS, service);
     Context prevContext = ctx.attach();
-    Instance instance = new StubInstance(instanceName, "bf-cat", digestUtil, channel, 10, TimeUnit.SECONDS);
+    Instance instance =
+        new StubInstance(instanceName, "bf-cat", digestUtil, channel, 10, TimeUnit.SECONDS);
     String type = args[3];
 
     ServerCapabilities capabilities = instance.getCapabilities();
@@ -477,10 +554,13 @@ class Cat {
           } else if (type.equals("DirectoryTree")) {
             printDirectoryTree(instance, blobDigest);
           } else if (type.equals("TreeLayout")) {
-            printTreeLayout(digestUtil.createDirectoriesIndex(fetchTree(instance, blobDigest)), blobDigest);
+            printTreeLayout(
+                digestUtil.createDirectoriesIndex(fetchTree(instance, blobDigest)), blobDigest);
           } else {
             if (type.equals("File")) {
-              try (InputStream in = instance.newBlobInput(blobDigest, 0, 60, TimeUnit.SECONDS, RequestMetadata.getDefaultInstance())) {
+              try (InputStream in =
+                  instance.newBlobInput(
+                      blobDigest, 0, 60, TimeUnit.SECONDS, RequestMetadata.getDefaultInstance())) {
                 ByteStreams.copy(in, System.out);
               }
             } else {

@@ -15,10 +15,7 @@
 package build.buildfarm.worker.shard;
 
 import build.bazel.remote.execution.v2.Digest;
-import build.buildfarm.cas.ContentAddressableStorage;
-import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.InputStreamFactory;
-import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.NoSuchFileException;
@@ -33,7 +30,8 @@ class FailoverInputStreamFactory implements InputStreamFactory {
   }
 
   @Override
-  public InputStream newInput(Digest blobDigest, long offset) throws IOException, InterruptedException {
+  public InputStream newInput(Digest blobDigest, long offset)
+      throws IOException, InterruptedException {
     try {
       return primary.newInput(blobDigest, offset);
     } catch (NoSuchFileException e) {
