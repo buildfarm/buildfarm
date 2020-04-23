@@ -24,6 +24,7 @@ import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecutionStage;
@@ -48,6 +49,7 @@ import java.nio.file.Path;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
@@ -169,17 +171,30 @@ class Executor implements Runnable {
     resultBuilder.getExecutionMetadataBuilder()
         .setExecutionStartTimestamp(Timestamps.fromMillis(System.currentTimeMillis()));
 
+    Command command = operationContext.command;
+    ImmutableList.Builder<String> arguments = ImmutableList.builder();
+    arguments.addAll(
+        transform(
+            filter(policies.build(), (policy) -> policy.getPolicyCase() == WRAPPER),
+            (policy) -> policy.getWrapper().getPath()));
+    arguments.addAll(command.getArgumentsList());
+
+    Path workingDirectory = operationContext.execDir;
+    if (!command.getWorkingDirectory().isEmpty()) {
+      workingDirectory = workingDirectory.resolve(command.getWorkingDirectory());
+    }
+
     Code statusCode;
     try {
       statusCode = executeCommand(
           operation.getName(),
-          operationContext.execDir,
-          operationContext.command,
+          workingDirectory,
+          arguments.build(),
+          command.getEnvironmentVariablesList(),
           timeout,
           "", // executingMetadata.getStdoutStreamName(),
           "", // executingMetadata.getStderrStreamName(),
-          resultBuilder,
-          policies.build());
+          resultBuilder);
     } catch (IOException e) {
       logger.log(SEVERE, "error executing operation " + operation.getName(), e);
       operationContext.poller.pause();
@@ -265,27 +280,20 @@ class Executor implements Runnable {
   private Code executeCommand(
       String operationName,
       Path execDir,
-      Command command,
+      List<String> arguments,
+      List<EnvironmentVariable> environmentVariables,
       Duration timeout,
       String stdoutStreamName,
       String stderrStreamName,
-      ActionResult.Builder resultBuilder,
-      Iterable<ExecutionPolicy> policies)
+      ActionResult.Builder resultBuilder)
       throws IOException, InterruptedException {
-    ImmutableList.Builder<String> arguments = ImmutableList.builder();
-    arguments.addAll(
-        transform(
-            filter(policies, (policy) -> policy.getPolicyCase() == WRAPPER),
-            (policy) -> policy.getWrapper().getPath()));
-    arguments.addAll(command.getArgumentsList());
-
     ProcessBuilder processBuilder =
-        new ProcessBuilder(arguments.build())
+        new ProcessBuilder(arguments)
             .directory(execDir.toAbsolutePath().toFile());
 
     Map<String, String> environment = processBuilder.environment();
     environment.clear();
-    for (Command.EnvironmentVariable environmentVariable : command.getEnvironmentVariablesList()) {
+    for (EnvironmentVariable environmentVariable : environmentVariables) {
       environment.put(environmentVariable.getName(), environmentVariable.getValue());
     }
 

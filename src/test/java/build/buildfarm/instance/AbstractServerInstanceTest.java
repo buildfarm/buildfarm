@@ -19,9 +19,11 @@ import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.instance.AbstractServerInstance.ACTION_INPUT_ROOT_DIRECTORY_PATH;
 import static build.buildfarm.instance.AbstractServerInstance.DIRECTORY_NOT_SORTED;
 import static build.buildfarm.instance.AbstractServerInstance.DUPLICATE_DIRENT;
+import static build.buildfarm.instance.AbstractServerInstance.INVALID_COMMAND;
 import static build.buildfarm.instance.AbstractServerInstance.OUTPUT_DIRECTORY_IS_OUTPUT_ANCESTOR;
 import static build.buildfarm.instance.AbstractServerInstance.OUTPUT_FILE_IS_OUTPUT_ANCESTOR;
 
+import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
@@ -343,5 +345,72 @@ public class AbstractServerInstanceTest {
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
     assertThat(violation.getSubject()).isEqualTo("foo");
     assertThat(violation.getDescription()).isEqualTo(OUTPUT_FILE_IS_OUTPUT_ANCESTOR);
+  }
+
+  @Test
+  public void emptyArgumentListIsInvalid() {
+    PreconditionFailure.Builder preconditionFailureBuilder =
+        PreconditionFailure.newBuilder();
+    AbstractServerInstance.validateCommand(
+        Command.getDefaultInstance(),
+        DIGEST_UTIL.empty(),
+        ImmutableSet.of(),
+        ImmutableSet.of(),
+        ImmutableMap.of(),
+        preconditionFailureBuilder);
+    PreconditionFailure preconditionFailure =
+        preconditionFailureBuilder.build();
+    assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
+    Violation violation = preconditionFailure.getViolationsList().get(0);
+    assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
+    assertThat(violation.getSubject()).isEqualTo(INVALID_COMMAND);
+    assertThat(violation.getDescription()).isEqualTo("argument list is empty");
+  }
+
+  @Test
+  public void absoluteWorkingDirectoryIsInvalid() {
+    PreconditionFailure.Builder preconditionFailureBuilder =
+        PreconditionFailure.newBuilder();
+    AbstractServerInstance.validateCommand(
+        Command.newBuilder()
+            .addArguments("foo")
+            .setWorkingDirectory("/var/lib/db")
+            .build(),
+        DIGEST_UTIL.empty(),
+        ImmutableSet.of(),
+        ImmutableSet.of(),
+        ImmutableMap.of(),
+        preconditionFailureBuilder);
+    PreconditionFailure preconditionFailure =
+        preconditionFailureBuilder.build();
+    assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
+    Violation violation = preconditionFailure.getViolationsList().get(0);
+    assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
+    assertThat(violation.getSubject()).isEqualTo(INVALID_COMMAND);
+    assertThat(violation.getDescription()).isEqualTo("working directory is absolute");
+  }
+
+  @Test
+  public void undeclaredWorkingDirectoryIsInvalid() {
+    Digest inputRootDigest = DIGEST_UTIL.compute(Directory.getDefaultInstance());
+    PreconditionFailure.Builder preconditionFailureBuilder =
+        PreconditionFailure.newBuilder();
+    AbstractServerInstance.validateCommand(
+        Command.newBuilder()
+            .addArguments("foo")
+            .setWorkingDirectory("not/an/input")
+            .build(),
+        inputRootDigest,
+        ImmutableSet.of(),
+        ImmutableSet.of(),
+        ImmutableMap.of(inputRootDigest, Directory.getDefaultInstance()),
+        preconditionFailureBuilder);
+    PreconditionFailure preconditionFailure =
+        preconditionFailureBuilder.build();
+    assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
+    Violation violation = preconditionFailure.getViolationsList().get(0);
+    assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
+    assertThat(violation.getSubject()).isEqualTo(INVALID_COMMAND);
+    assertThat(violation.getDescription()).isEqualTo("working directory is not an input directory");
   }
 }

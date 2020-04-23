@@ -841,6 +841,68 @@ public abstract class AbstractServerInstance implements Instance {
     checkPreconditionFailure(actionDigest, preconditionFailure.build());
   }
 
+  @VisibleForTesting
+  static void validateCommand(
+      Command command,
+      Digest inputRootDigest,
+      Set<String> inputFiles,
+      Set<String> inputDirectories,
+      Map<Digest, Directory> directoriesIndex,
+      PreconditionFailure.Builder preconditionFailure) {
+    // FIXME should input/output collisions (through directories) be another
+    // invalid action?
+    filesUniqueAndSortedPrecondition(
+        command.getOutputFilesList(), preconditionFailure);
+    filesUniqueAndSortedPrecondition(
+        command.getOutputDirectoriesList(), preconditionFailure);
+
+    validateOutputs(
+        inputFiles,
+        inputDirectories,
+        Sets.newHashSet(command.getOutputFilesList()),
+        Sets.newHashSet(command.getOutputDirectoriesList()),
+        preconditionFailure);
+
+    environmentVariablesUniqueAndSortedPrecondition(
+        command.getEnvironmentVariablesList(), preconditionFailure);
+    if (command.getArgumentsList().isEmpty()) {
+      preconditionFailure.addViolationsBuilder()
+          .setType(VIOLATION_TYPE_INVALID)
+          .setSubject(INVALID_COMMAND)
+          .setDescription("argument list is empty");
+    }
+
+    String workingDirectory = command.getWorkingDirectory();
+    if (!workingDirectory.isEmpty()) {
+      if (workingDirectory.startsWith("/")) {
+        preconditionFailure.addViolationsBuilder()
+            .setType(VIOLATION_TYPE_INVALID)
+            .setSubject(INVALID_COMMAND)
+            .setDescription("working directory is absolute");
+      } else {
+        Directory directory = directoriesIndex.get(inputRootDigest);
+        for (String segment : workingDirectory.split("/")) {
+          Directory nextDirectory = directory;
+          // linear for now
+          for (DirectoryNode dirNode : directory.getDirectoriesList()) {
+            if (dirNode.getName().equals(segment)) {
+              nextDirectory = directoriesIndex.get(dirNode.getDigest());
+              break;
+            }
+          }
+          if (nextDirectory == directory) {
+            preconditionFailure.addViolationsBuilder()
+                .setType(VIOLATION_TYPE_INVALID)
+                .setSubject(INVALID_COMMAND)
+                .setDescription("working directory is not an input directory");
+            break;
+          }
+          directory = nextDirectory;
+        }
+      }
+    }
+  }
+
   private void validateAction(
       Action action,
       @Nullable Command command,
@@ -869,33 +931,18 @@ public abstract class AbstractServerInstance implements Instance {
           .setSubject("blobs/" + DigestUtil.toString(action.getCommandDigest()))
           .setDescription(MISSING_COMMAND);
     } else {
-      // FIXME should input/output collisions (through directories) be another
-      // invalid action?
-      filesUniqueAndSortedPrecondition(
-          command.getOutputFilesList(), preconditionFailure);
-      filesUniqueAndSortedPrecondition(
-          command.getOutputDirectoriesList(), preconditionFailure);
-
-      validateOutputs(
+      validateCommand(
+          command,
+          action.getInputRootDigest(),
           inputFilesBuilder.build(),
           inputDirectoriesBuilder.build(),
-          Sets.newHashSet(command.getOutputFilesList()),
-          Sets.newHashSet(command.getOutputDirectoriesList()),
+          directoriesIndex,
           preconditionFailure);
-
-      environmentVariablesUniqueAndSortedPrecondition(
-          command.getEnvironmentVariablesList(), preconditionFailure);
-      if (command.getArgumentsList().isEmpty()) {
-        preconditionFailure.addViolationsBuilder()
-            .setType(VIOLATION_TYPE_INVALID)
-            .setSubject(INVALID_COMMAND)
-            .setDescription("argument list is empty");
-      }
     }
   }
 
   @VisibleForTesting
-  public static void validateOutputs(
+  static void validateOutputs(
       Set<String> inputFiles,
       Set<String> inputDirectories,
       Set<String> outputFiles,
