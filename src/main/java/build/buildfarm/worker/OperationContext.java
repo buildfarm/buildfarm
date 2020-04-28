@@ -16,8 +16,6 @@ package build.buildfarm.worker;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
-import build.bazel.remote.execution.v2.Digest;
-import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.buildfarm.common.Poller;
 import build.buildfarm.v1test.QueueEntry;
@@ -113,13 +111,7 @@ final class OperationContext {
 
     public OperationContext build() {
       return new OperationContext(
-          executeResponse,
-          operation,
-          poller,
-          execDir,
-          action,
-          command,
-          queueEntry);
+          executeResponse, operation, poller, execDir, action, command, queueEntry);
     }
   }
 
@@ -135,13 +127,6 @@ final class OperationContext {
   }
 
   public Builder toBuilder() {
-    return new Builder(
-        executeResponse,
-        operation,
-        poller,
-        execDir,
-        action,
-        command,
-        queueEntry);
+    return new Builder(executeResponse, operation, poller, execDir, action, command, queueEntry);
   }
 }

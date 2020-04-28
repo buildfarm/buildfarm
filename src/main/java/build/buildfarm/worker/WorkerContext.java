@@ -20,49 +20,107 @@ import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecutionStage;
-import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.Poller;
 import build.buildfarm.common.Write;
-import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
+import com.google.common.collect.ImmutableList;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Duration;
 import io.grpc.Deadline;
 import io.grpc.StatusException;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Map;
 
 public interface WorkerContext {
+  interface IOResource extends AutoCloseable {
+    void close() throws IOException;
+  }
+
   String getName();
+
   Poller createPoller(String name, QueueEntry queueEntry, ExecutionStage.Value stage);
-  void resumePoller(Poller poller, String name, QueueEntry queueEntry, ExecutionStage.Value stage, Runnable onFailure, Deadline deadline);
+
+  void resumePoller(
+      Poller poller,
+      String name,
+      QueueEntry queueEntry,
+      ExecutionStage.Value stage,
+      Runnable onFailure,
+      Deadline deadline);
+
   void match(MatchListener listener) throws InterruptedException;
+
   void logInfo(String msg);
+
   CASInsertionPolicy getFileCasPolicy();
+
   CASInsertionPolicy getStdoutCasPolicy();
+
   CASInsertionPolicy getStderrCasPolicy();
+
   DigestUtil getDigestUtil();
+
   ExecutionPolicy getExecutionPolicy(String name);
+
   int getExecuteStageWidth();
+
   int getInputFetchStageWidth();
+
   boolean hasDefaultActionTimeout();
+
   boolean hasMaximumActionTimeout();
+
   boolean getStreamStdout();
+
   boolean getStreamStderr();
+
   Duration getDefaultActionTimeout();
+
   Duration getMaximumActionTimeout();
-  QueuedOperation getQueuedOperation(QueueEntry queueEntry) throws IOException, InterruptedException;
-  Path createExecDir(String operationName, Tree tree, Action action, Command command) throws IOException, InterruptedException;
+
+  QueuedOperation getQueuedOperation(QueueEntry queueEntry)
+      throws IOException, InterruptedException;
+
+  Path createExecDir(
+      String operationName, Map<Digest, Directory> directoriesIndex, Action action, Command command)
+      throws IOException, InterruptedException;
+
   void destroyExecDir(Path execDir) throws IOException, InterruptedException;
-  void uploadOutputs(Digest actionDigest, ActionResult.Builder resultBuilder, Path actionRoot, Iterable<String> outputFiles, Iterable<String> outputDirs) throws IOException, InterruptedException, StatusException;
+
+  void uploadOutputs(
+      Digest actionDigest,
+      ActionResult.Builder resultBuilder,
+      Path actionRoot,
+      Iterable<String> outputFiles,
+      Iterable<String> outputDirs)
+      throws IOException, InterruptedException, StatusException;
+
   boolean putOperation(Operation operation, Action Action) throws IOException, InterruptedException;
+
   void blacklistAction(String actionId) throws IOException, InterruptedException;
-  void putActionResult(ActionKey actionKey, ActionResult actionResult) throws IOException, InterruptedException;
+
+  void putActionResult(ActionKey actionKey, ActionResult actionResult)
+      throws IOException, InterruptedException;
+
   Write getOperationStreamWrite(String name) throws IOException;
+
+  int getStandardOutputLimit();
+
+  int getStandardErrorLimit();
+
+  void createExecutionLimits();
+
+  void destroyExecutionLimits();
+
+  IOResource limitExecution(
+      String operationName, ImmutableList.Builder<String> arguments, Command command);
+
+  int commandExecutionClaims(Command command);
 }

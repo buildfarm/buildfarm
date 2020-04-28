@@ -23,7 +23,6 @@ import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.function.Consumer;
 
 class InjectedCASFileCache extends CASFileCache {
   private final InputStreamFactory inputStreamFactory;
@@ -41,7 +40,8 @@ class InjectedCASFileCache extends CASFileCache {
   }
 
   @Override
-  protected InputStream newExternalInput(Digest digest, long offset) throws IOException, InterruptedException {
+  protected InputStream newExternalInput(Digest digest, long offset)
+      throws IOException, InterruptedException {
     return inputStreamFactory.newInput(digest, offset);
   }
 }

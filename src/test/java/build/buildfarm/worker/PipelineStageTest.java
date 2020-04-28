@@ -18,6 +18,7 @@ import static com.google.common.truth.Truth.assertThat;
 
 import com.google.longrunning.Operation;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -32,7 +33,8 @@ public class PipelineStageTest {
       this(name, null, null, null);
     }
 
-    public AbstractPipelineStage(String name, WorkerContext workerContext, PipelineStage output, PipelineStage error) {
+    public AbstractPipelineStage(
+        String name, WorkerContext workerContext, PipelineStage output, PipelineStage error) {
       super(name, workerContext, output, error);
     }
 
@@ -54,45 +56,48 @@ public class PipelineStageTest {
 
   @Test
   public void cancelTickInterruptsOperation() throws InterruptedException {
-    PipelineStage output = new AbstractPipelineStage("singleOutput") {
-      @Override
-      public void put(OperationContext operationContext) {
-        close();
-      }
-    };
-    AtomicInteger errorCount = new AtomicInteger();
-    PipelineStage error = new AbstractPipelineStage("error") {
-      @Override
-      public void put(OperationContext operationContext) {
-        errorCount.getAndIncrement();
-      }
-    };
-    OperationContext operationContext = OperationContext.newBuilder()
-        .setOperation(Operation.getDefaultInstance())
-        .build();
-    AtomicInteger count = new AtomicInteger();
-    PipelineStage stage = new AbstractPipelineStage("waiter", new StubWorkerContext(), output, error) {
-      Object lock = new Object();
-
-      @Override
-      public OperationContext tick(OperationContext operationContext) throws InterruptedException {
-        count.getAndIncrement();
-        if (count.get() == 1) {
-          synchronized (lock) {
-            lock.wait();
+    PipelineStage output =
+        new AbstractPipelineStage("singleOutput") {
+          @Override
+          public void put(OperationContext operationContext) {
+            close();
           }
-        }
-        return operationContext;
-      }
+        };
+    AtomicInteger errorCount = new AtomicInteger();
+    PipelineStage error =
+        new AbstractPipelineStage("error") {
+          @Override
+          public void put(OperationContext operationContext) {
+            errorCount.getAndIncrement();
+          }
+        };
+    OperationContext operationContext =
+        OperationContext.newBuilder().setOperation(Operation.getDefaultInstance()).build();
+    AtomicInteger count = new AtomicInteger();
+    PipelineStage stage =
+        new AbstractPipelineStage("waiter", new StubWorkerContext(), output, error) {
+          Object lock = new Object();
 
-      @Override
-      OperationContext take() {
-        return operationContext;
-      }
-    };
+          @Override
+          public OperationContext tick(OperationContext operationContext)
+              throws InterruptedException {
+            count.getAndIncrement();
+            if (count.get() == 1) {
+              synchronized (lock) {
+                lock.wait();
+              }
+            }
+            return operationContext;
+          }
+
+          @Override
+          OperationContext take() {
+            return operationContext;
+          }
+        };
     Thread stageThread = new Thread(stage);
     stageThread.start();
-    while (count.get() != 1);
+    while (count.get() != 1) ;
     stage.cancelTick();
     stageThread.join();
     assertThat(count.get()).isEqualTo(2);

@@ -14,18 +14,15 @@
 
 package build.buildfarm.server;
 
-import static build.buildfarm.instance.Utils.putBlobFuture;
-import static com.google.common.util.concurrent.Futures.immediateFuture;
-import static com.google.common.util.concurrent.Futures.transformAsync;
-import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
-
+import build.buildfarm.common.function.InterruptingPredicate;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Instance.MatchListener;
-import build.buildfarm.common.function.InterruptingPredicate;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.PollOperationRequest;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.TakeOperationRequest;
+import build.buildfarm.v1test.OperationsStatusRequest;
+import build.buildfarm.v1test.OperationsStatus;
 import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
@@ -58,19 +55,18 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
     private final Consumer<Runnable> setOnCancelHandler;
     private QueueEntry queueEntry = null;
 
-    OperationQueueMatchListener(Instance instance, InterruptingPredicate onMatch, Consumer<Runnable> setOnCancelHandler) {
+    OperationQueueMatchListener(
+        Instance instance, InterruptingPredicate onMatch, Consumer<Runnable> setOnCancelHandler) {
       this.instance = instance;
       this.onMatch = onMatch;
       this.setOnCancelHandler = setOnCancelHandler;
     }
 
     @Override
-    public void onWaitStart() {
-    }
+    public void onWaitStart() {}
 
     @Override
-    public void onWaitEnd() {
-    }
+    public void onWaitEnd() {}
 
     @Override
     public boolean onEntry(QueueEntry queueEntry) throws InterruptedException {
@@ -96,20 +92,19 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
         responseObserver.onNext(queueEntry);
         responseObserver.onCompleted();
         return true;
-      } catch(StatusRuntimeException e) {
+      } catch (StatusRuntimeException e) {
         Status status = Status.fromThrowable(e);
         if (status.getCode() != Status.Code.CANCELLED) {
           responseObserver.onError(e);
         }
       }
+      instance.putOperation(instance.getOperation(queueEntry.getExecuteEntry().getOperationName()));
       return false;
     };
   }
 
   @Override
-  public void take(
-      TakeOperationRequest request,
-      StreamObserver<QueueEntry> responseObserver) {
+  public void take(TakeOperationRequest request, StreamObserver<QueueEntry> responseObserver) {
     Instance instance;
     try {
       instance = instances.get(request.getInstanceName());
@@ -132,11 +127,27 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
       Thread.currentThread().interrupt();
     }
   }
+  
+  @Override
+  public void status(OperationsStatusRequest request, StreamObserver<OperationsStatus> responseObserver) {
+    Instance instance;
+    try {
+      instance = instances.get(request.getInstanceName());
+    } catch (InstanceNotFoundException e) {
+      responseObserver.onError(BuildFarmInstances.toStatusException(e));
+      return;
+    }
+
+    try {
+      responseObserver.onNext(instance.operationsStatus());
+      responseObserver.onCompleted();
+    } catch (RuntimeException e) {
+      responseObserver.onError(Status.fromThrowable(e).asException());
+    }
+  }
 
   @Override
-  public void put(
-      Operation operation,
-      StreamObserver<com.google.rpc.Status> responseObserver) {
+  public void put(Operation operation, StreamObserver<com.google.rpc.Status> responseObserver) {
     Instance instance;
     try {
       instance = instances.getFromOperationName(operation.getName());
@@ -148,14 +159,11 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
     try {
       boolean ok = instance.putAndValidateOperation(operation);
       Code code = ok ? Code.OK : Code.UNAVAILABLE;
-      responseObserver.onNext(com.google.rpc.Status.newBuilder()
-          .setCode(code.getNumber())
-          .build());
+      responseObserver.onNext(com.google.rpc.Status.newBuilder().setCode(code.getNumber()).build());
       responseObserver.onCompleted();
     } catch (IllegalStateException e) {
-      responseObserver.onNext(com.google.rpc.Status.newBuilder()
-          .setCode(Code.FAILED_PRECONDITION.getNumber())
-          .build());
+      responseObserver.onNext(
+          com.google.rpc.Status.newBuilder().setCode(Code.FAILED_PRECONDITION.getNumber()).build());
       responseObserver.onCompleted();
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
@@ -164,24 +172,18 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
 
   @Override
   public void poll(
-      PollOperationRequest request,
-      StreamObserver<com.google.rpc.Status> responseObserver) {
+      PollOperationRequest request, StreamObserver<com.google.rpc.Status> responseObserver) {
     Instance instance;
     try {
-      instance = instances.getFromOperationName(
-          request.getOperationName());
+      instance = instances.getFromOperationName(request.getOperationName());
     } catch (InstanceNotFoundException e) {
       responseObserver.onError(BuildFarmInstances.toStatusException(e));
       return;
     }
 
-    boolean ok = instance.pollOperation(
-        request.getOperationName(),
-        request.getStage());
+    boolean ok = instance.pollOperation(request.getOperationName(), request.getStage());
     Code code = ok ? Code.OK : Code.UNAVAILABLE;
-    responseObserver.onNext(com.google.rpc.Status.newBuilder()
-        .setCode(code.getNumber())
-        .build());
+    responseObserver.onNext(com.google.rpc.Status.newBuilder().setCode(code.getNumber()).build());
     responseObserver.onCompleted();
   }
 }

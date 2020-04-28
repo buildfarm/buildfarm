@@ -15,7 +15,6 @@
 package build.buildfarm.worker;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
@@ -32,7 +31,9 @@ import java.util.Stack;
 public class OutputDirectory {
   private final Map<String, OutputDirectory> children;
 
-  private static final OutputDirectory defaultInstance = new OutputDirectory(ImmutableMap.<String, OutputDirectory>of());
+  private static final OutputDirectory defaultInstance =
+      new OutputDirectory(ImmutableMap.of());
+
   private static OutputDirectory getDefaultInstance() {
     return defaultInstance;
   }
@@ -50,7 +51,7 @@ public class OutputDirectory {
     this.children = children;
   }
 
-  private final static class OutputDirectoryEntry implements Comparable<OutputDirectoryEntry> {
+  private static final class OutputDirectoryEntry implements Comparable<OutputDirectoryEntry> {
     public final String outputDirectory;
     public final boolean isRecursive;
 
@@ -66,13 +67,16 @@ public class OutputDirectory {
   }
 
   public static OutputDirectory parse(Iterable<String> outputFiles, Iterable<String> outputDirs) {
-    return parseDirectories(Iterables.concat(
-        Iterables.transform(
-            Iterables.filter(outputFiles, (file) -> file.contains("/")),
-            (file) -> new OutputDirectoryEntry("/" + file.substring(0, file.lastIndexOf('/') + 1), false)),
-        Iterables.transform(
-            outputDirs,
-            (dir) -> new OutputDirectoryEntry(dir.isEmpty() ? "/" : "/" + dir + "/", true))));
+    return parseDirectories(
+        Iterables.concat(
+            Iterables.transform(
+                Iterables.filter(outputFiles, (file) -> file.contains("/")),
+                (file) ->
+                    new OutputDirectoryEntry(
+                        "/" + file.substring(0, file.lastIndexOf('/') + 1), false)),
+            Iterables.transform(
+                outputDirs,
+                (dir) -> new OutputDirectoryEntry(dir.isEmpty() ? "/" : "/" + dir + "/", true))));
   }
 
   private static class Builder {
@@ -98,9 +102,10 @@ public class OutputDirectory {
       if (children.isEmpty()) {
         return OutputDirectory.getDefaultInstance();
       }
-      return new OutputDirectory(ImmutableMap.copyOf(Maps.transformValues(children, (v) -> v.build())));
+      return new OutputDirectory(
+          ImmutableMap.copyOf(Maps.transformValues(children, (v) -> v.build())));
     }
-  };
+  }
 
   private static OutputDirectory parseDirectories(Iterable<OutputDirectoryEntry> outputDirs) {
     Builder builder = new Builder();
@@ -123,7 +128,7 @@ public class OutputDirectory {
         currentBuilder.setIsRecursive(entry.isRecursive);
         continue;
       }
-      String prefixedFile = outputDir.substring(prefix.length(), outputDir.length());
+      String prefixedFile = outputDir.substring(prefix.length());
       while (prefixedFile.length() > 0) {
         int separatorIndex = prefixedFile.indexOf('/');
         if (separatorIndex == 0) {

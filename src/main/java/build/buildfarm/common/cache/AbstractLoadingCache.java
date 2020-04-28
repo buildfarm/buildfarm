@@ -19,7 +19,6 @@ import static com.google.common.util.concurrent.Uninterruptibles.getUninterrupti
 import com.google.common.annotations.GwtIncompatible;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
-import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import java.util.Map;
 import java.util.concurrent.Callable;

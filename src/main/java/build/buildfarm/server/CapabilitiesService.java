@@ -14,11 +14,11 @@
 
 package build.buildfarm.server;
 
-import build.buildfarm.instance.Instance;
 import build.bazel.remote.execution.v2.CapabilitiesGrpc;
 import build.bazel.remote.execution.v2.GetCapabilitiesRequest;
 import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.bazel.semver.SemVer;
+import build.buildfarm.instance.Instance;
 import io.grpc.stub.StreamObserver;
 
 public class CapabilitiesService extends CapabilitiesGrpc.CapabilitiesImplBase {
@@ -39,10 +39,13 @@ public class CapabilitiesService extends CapabilitiesGrpc.CapabilitiesImplBase {
       return;
     }
 
-    responseObserver.onNext(instance.getCapabilities().toBuilder()
-        .setLowApiVersion(SemVer.newBuilder().setMajor(2))
-        .setHighApiVersion(SemVer.newBuilder().setMajor(2))
-        .build());
+    responseObserver.onNext(
+        instance
+            .getCapabilities()
+            .toBuilder()
+            .setLowApiVersion(SemVer.newBuilder().setMajor(2))
+            .setHighApiVersion(SemVer.newBuilder().setMajor(2))
+            .build());
     responseObserver.onCompleted();
   }
 }

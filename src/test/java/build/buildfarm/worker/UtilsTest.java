@@ -42,7 +42,10 @@ class UtilsTest {
     Files.write(tree.resolve("file"), ImmutableList.of("Top level file"), StandardCharsets.UTF_8);
     Path subdir = tree.resolve("subdir");
     Files.createDirectory(subdir);
-    Files.write(subdir.resolve("file"), ImmutableList.of("A file in a subdirectory"), StandardCharsets.UTF_8);
+    Files.write(
+        subdir.resolve("file"),
+        ImmutableList.of("A file in a subdirectory"),
+        StandardCharsets.UTF_8);
 
     Utils.removeDirectory(tree);
 
@@ -54,7 +57,7 @@ class UtilsTest {
     public NativeUtilsTest() throws IOException {
       super(createTempDirectory());
     }
-    
+
     private static Path createTempDirectory() throws IOException {
       if (Thread.interrupted()) {
         throw new RuntimeException(new InterruptedException());
@@ -67,27 +70,25 @@ class UtilsTest {
   @RunWith(JUnit4.class)
   public static class OsXUtilsTest extends UtilsTest {
     public OsXUtilsTest() {
-      super(Iterables.getFirst(
-          Jimfs.newFileSystem(Configuration.osX()).getRootDirectories(),
-          null));
+      super(
+          Iterables.getFirst(Jimfs.newFileSystem(Configuration.osX()).getRootDirectories(), null));
     }
   }
 
   @RunWith(JUnit4.class)
   public static class UnixUtilsTest extends UtilsTest {
     public UnixUtilsTest() {
-      super(Iterables.getFirst(
-          Jimfs.newFileSystem(Configuration.unix()).getRootDirectories(),
-          null));
+      super(
+          Iterables.getFirst(Jimfs.newFileSystem(Configuration.unix()).getRootDirectories(), null));
     }
   }
 
   @RunWith(JUnit4.class)
   public static class WindowsUtilsTest extends UtilsTest {
     public WindowsUtilsTest() {
-      super(Iterables.getFirst(
-          Jimfs.newFileSystem(Configuration.windows()).getRootDirectories(),
-          null));
+      super(
+          Iterables.getFirst(
+              Jimfs.newFileSystem(Configuration.windows()).getRootDirectories(), null));
     }
   }
 }

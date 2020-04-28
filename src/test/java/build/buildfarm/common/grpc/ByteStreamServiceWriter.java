@@ -37,7 +37,8 @@ public class ByteStreamServiceWriter extends ByteStreamImplBase {
     this(resourceName, content, /* expectedSize=*/ 0);
   }
 
-  public ByteStreamServiceWriter(String resourceName, SettableFuture<ByteString> content, int initialCapacity) {
+  public ByteStreamServiceWriter(
+      String resourceName, SettableFuture<ByteString> content, int initialCapacity) {
     this.resourceName = resourceName;
     this.content = content;
     out = ByteString.newOutput(initialCapacity);
@@ -56,7 +57,7 @@ public class ByteStreamServiceWriter extends ByteStreamImplBase {
     public void onNext(WriteRequest request) {
       checkState(
           (hasSeenResourceName && request.getResourceName().isEmpty())
-          || request.getResourceName().equals(resourceName));
+              || request.getResourceName().equals(resourceName));
       hasSeenResourceName = true;
       checkState(!finished);
       ByteString data = request.getData();
@@ -67,9 +68,8 @@ public class ByteStreamServiceWriter extends ByteStreamImplBase {
           if (finished) {
             long committedSize = out.size();
             content.set(out.toByteString());
-            responseObserver.onNext(WriteResponse.newBuilder()
-                .setCommittedSize(committedSize)
-                .build());
+            responseObserver.onNext(
+                WriteResponse.newBuilder().setCommittedSize(committedSize).build());
           }
         } catch (IOException e) {
           responseObserver.onError(Status.fromThrowable(e).asException());
@@ -93,20 +93,19 @@ public class ByteStreamServiceWriter extends ByteStreamImplBase {
   }
 
   @Override
-  public StreamObserver<WriteRequest> write(
-      StreamObserver<WriteResponse> responseObserver) {
+  public StreamObserver<WriteRequest> write(StreamObserver<WriteResponse> responseObserver) {
     return new WriteStreamObserver(responseObserver);
   }
 
   @Override
   public void queryWriteStatus(
-      QueryWriteStatusRequest request,
-      StreamObserver<QueryWriteStatusResponse> responseObserver) {
+      QueryWriteStatusRequest request, StreamObserver<QueryWriteStatusResponse> responseObserver) {
     if (request.getResourceName().equals(resourceName)) {
-      responseObserver.onNext(QueryWriteStatusResponse.newBuilder()
-          .setCommittedSize(out.size())
-          .setComplete(content.isDone())
-          .build());
+      responseObserver.onNext(
+          QueryWriteStatusResponse.newBuilder()
+              .setCommittedSize(out.size())
+              .setComplete(content.isDone())
+              .build());
       responseObserver.onCompleted();
     } else {
       responseObserver.onError(Status.NOT_FOUND.asException());

@@ -17,12 +17,16 @@ package build.buildfarm.worker;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
 
 abstract class SuperscalarPipelineStage extends PipelineStage {
 
   private final int width;
   private final BlockingQueue claims;
   private boolean catastrophic = false;
+
+  // ensure that only a single claim waits for available slots for core count
+  private Object claimLock = new Object();
 
   public SuperscalarPipelineStage(
       String name,
@@ -81,12 +85,19 @@ abstract class SuperscalarPipelineStage extends PipelineStage {
     throw exception;
   }
 
-  protected synchronized void releaseClaim(String operationName) {
+  protected synchronized void releaseClaim(String operationName, int slots) {
     try {
-      claims.take();
+      for (int i = 0; i < slots; i++) {
+        claims.take();
+      }
     } catch (InterruptedException e) {
       catastrophic = true;
-      getLogger().severe(name + ": could not release claim on " + operationName + ", aborting drain to avoid deadlock");
+      getLogger()
+          .log(Level.SEVERE,
+              name
+                  + ": could not release claim on "
+                  + operationName
+                  + ", aborting drain to avoid deadlock");
       close();
     } finally {
       notify();
@@ -97,19 +108,26 @@ abstract class SuperscalarPipelineStage extends PipelineStage {
     return String.format("%s/%d", size, width);
   }
 
-  @Override
-  public boolean claim() throws InterruptedException {
+  protected boolean claim(int count) throws InterruptedException {
     Object handle = new Object();
-    boolean offered = false;
-    while (!offered && !isClosed()) {
-      offered = claims.offer(handle, 10, TimeUnit.MILLISECONDS);
+    synchronized (claimLock) {
+      while (count != 0 && !isClosed()) {
+        if (claims.offer(handle, 10, TimeUnit.MILLISECONDS)) {
+          count--;
+        }
+      }
     }
-    return offered;
+    return count == 0;
+  }
+
+  @Override
+  public boolean claim(OperationContext operationContext) throws InterruptedException {
+    return claim(1);
   }
 
   @Override
   public void release() {
-    releaseClaim("unidentified operation");
+    releaseClaim("unidentified operation", 1);
   }
 
   @Override

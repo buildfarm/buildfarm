@@ -18,7 +18,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class Pipeline {
@@ -89,7 +89,7 @@ public class Pipeline {
             }
           }
           if (stageToClose != null && !stageToClose.isClosed()) {
-            logger.info("Closing stage at priority " + maxPriority);
+            logger.log(Level.INFO, "Closing stage at priority " + maxPriority);
             stageToClose.close();
           }
         }
@@ -111,10 +111,12 @@ public class Pipeline {
           }
 
           if (!thread.isAlive()) {
-            logger.info("Stage has exited at priority " + stageClosePriorities.get(stage));
+            logger.log(Level.INFO, "Stage has exited at priority " + stageClosePriorities.get(stage));
             inactiveStages.add(stage);
           } else if (stage.isClosed()) {
-            logger.info("Interrupting unterminated closed thread at priority " + stageClosePriorities.get(stage));
+            logger.log(Level.INFO,
+                "Interrupting unterminated closed thread at priority "
+                    + stageClosePriorities.get(stage));
             thread.interrupt();
           }
         }

@@ -20,16 +20,18 @@ import static build.buildfarm.common.UrlPath.parseUploadBlobUUID;
 import static build.buildfarm.common.grpc.Retrier.DEFAULT_IS_RETRIABLE;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+import static io.grpc.Status.ABORTED;
 import static io.grpc.Status.INVALID_ARGUMENT;
 import static java.lang.String.format;
-import static java.util.logging.Level.FINER;
-import static java.util.logging.Level.SEVERE;
-import static java.util.logging.Level.WARNING;
 
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.common.UrlPath.InvalidResourceNameException;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.common.io.FeedbackOutputStream;
+import build.buildfarm.instance.ExcessiveWriteSizeException;
 import build.buildfarm.instance.Instance;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
@@ -41,6 +43,7 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 class WriteStreamObserver implements StreamObserver<WriteRequest> {
@@ -59,6 +62,10 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private Write write = null;
   private Instance instance = null;
   private final AtomicBoolean wasReady = new AtomicBoolean(false);
+  private long expectedCommittedSize = -1;
+  private long earliestOffset = -1;
+  private long requestCount = 0;
+  private long requestBytes = 0;
 
   WriteStreamObserver(
       Instances instances,
@@ -79,18 +86,22 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
     if (!committed) {
       try {
         onUncommittedNext(request);
+      } catch (ExcessiveWriteSizeException e) {
+        Status status = Status.UNAVAILABLE;
+        logger.log(Level.FINE, format("error writing %s", (name == null ? request.getResourceName() : name)), e);
+        responseObserver.onError(status.asException());
       } catch (RuntimeException e) {
         Status status = Status.fromThrowable(e);
         logger.log(
-            status.getCode() == Status.Code.CANCELLED ? FINER : SEVERE,
-            "error writing " + (name == null ? request.getResourceName() : name),
+            status.getCode() == Status.Code.CANCELLED ? Level.FINE : Level.SEVERE,
+            format("error writing %s", (name == null ? request.getResourceName() : name)),
             e);
         responseObserver.onError(status.asException());
       }
     }
   }
 
-  void onUncommittedNext(WriteRequest request) {
+  void onUncommittedNext(WriteRequest request) throws ExcessiveWriteSizeException {
     if (initialized) {
       handleRequest(request);
     } else {
@@ -99,17 +110,18 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   }
 
   private Write getWrite(String resourceName)
-      throws InstanceNotFoundException, InvalidResourceNameException {
+      throws ExcessiveWriteSizeException, InstanceNotFoundException, InvalidResourceNameException {
     switch (detectResourceOperation(resourceName)) {
       case UploadBlob:
+        Digest uploadBlobDigest = parseUploadBlobDigest(resourceName);
+        expectedCommittedSize = uploadBlobDigest.getSizeBytes();
         return ByteStreamService.getUploadBlobWrite(
             instances.getFromUploadBlob(resourceName),
-            parseUploadBlobDigest(resourceName),
+            uploadBlobDigest,
             parseUploadBlobUUID(resourceName));
       case OperationStream:
         return ByteStreamService.getOperationStreamWrite(
-            instances.getFromOperationStream(resourceName),
-            resourceName);
+            instances.getFromOperationStream(resourceName), resourceName);
       case Blob:
       default:
         throw INVALID_ARGUMENT
@@ -128,15 +140,32 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
     checkNotNull(write);
 
     if (Context.current().isCancelled()) {
-      logger.finest(format("skipped delivering committed_size to %s for cancelled context", name));
+      logger.log(Level.FINER, format("skipped delivering committed_size to %s for cancelled context", name));
     } else {
       try {
-        commitActive(write.getCommittedSize());
+        long committedSize = write.getCommittedSize();
+        if (expectedCommittedSize >= 0 && expectedCommittedSize != committedSize) {
+          logger.warning(
+              format(
+                  "committed size %d did not match expectation for %s "
+                  + " after %d requests and %d bytes at offset %d, ignoring it",
+                  committedSize, name, requestCount, requestBytes, earliestOffset));
+          committedSize = expectedCommittedSize;
+        }
+        commitActive(committedSize);
       } catch (RuntimeException e) {
+        RequestMetadata requestMetadata = TracingMetadataUtils.fromCurrentContext();
         Status status = Status.fromThrowable(e);
         logger.log(
-            status.getCode() == Status.Code.CANCELLED ? FINER : SEVERE,
-            "error committing " + name,
+            status.getCode() == Status.Code.CANCELLED ? Level.FINE : Level.SEVERE,
+            format(
+                "%s-%s: %s -> %s -> %s: error committing %s",
+                requestMetadata.getToolDetails().getToolName(),
+                requestMetadata.getToolDetails().getToolVersion(),
+                requestMetadata.getCorrelatedInvocationsId(),
+                requestMetadata.getToolInvocationId(),
+                requestMetadata.getActionId(),
+                name),
             e);
         responseObserver.onError(status.asException());
       }
@@ -149,46 +178,50 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
         .build();
 
     try {
-      logger.finest(format("delivering committed_size for %s of %d", name, committedSize));
-      responseObserver.onNext(WriteResponse.newBuilder()
-          .setCommittedSize(committedSize)
-          .build());
+      logger.log(Level.FINER, format("delivering committed_size for %s of %d", name, committedSize));
+      responseObserver.onNext(response);
       responseObserver.onCompleted();
     } catch (Exception e) {
-      logger.log(SEVERE, format("error delivering committed_size to %s", name), e);
+      logger.log(Level.SEVERE, format("error delivering committed_size to %s", name), e);
     }
   }
 
-  private void initialize(WriteRequest request) {
+  private void initialize(WriteRequest request) throws ExcessiveWriteSizeException {
     String resourceName = request.getResourceName();
     if (resourceName.isEmpty()) {
-      responseObserver.onError(INVALID_ARGUMENT
-          .withDescription("resource_name is empty")
-          .asException());
+      responseObserver.onError(
+          INVALID_ARGUMENT.withDescription("resource_name is empty").asException());
     } else {
       name = resourceName;
       try {
         write = getWrite(resourceName);
-        logger.finest(
+        logger.log(Level.FINER,
             format(
                 "registering callback for %s: committed_size = %d, complete = %s",
-                resourceName,
-                write.getCommittedSize(),
-                write.isComplete()));
-        write.addListener(
-            this::commit,
-            withCancellation.fixedContextExecutor(directExecutor()));
+                resourceName, write.getCommittedSize(), write.isComplete()));
+        write.addListener(this::commit, withCancellation.fixedContextExecutor(directExecutor()));
         if (!write.isComplete()) {
           initialized = true;
           handleRequest(request);
         }
       } catch (InstanceNotFoundException e) {
+        logWriteRequest(Level.WARNING, request, e);
         responseObserver.onError(BuildFarmInstances.toStatusException(e));
-      } catch (InvalidResourceNameException|RuntimeException e) {
-        logger.log(WARNING, format("write: %s", request), e);
+      } catch (InvalidResourceNameException | RuntimeException e) {
+        logWriteRequest(Level.WARNING, request, e);
         responseObserver.onError(Status.fromThrowable(e).asException());
       }
     }
+  }
+
+  private void logWriteRequest(Level level, WriteRequest request, Exception e) {
+    logger.log(
+        Level.WARNING,
+        format(
+            "write: %s, %d bytes%s",
+            request.getResourceName(),
+            request.getData().size(),
+            request.getFinishWrite() ? ", finish_write" : ""), e);
   }
 
   private void handleRequest(WriteRequest request) {
@@ -197,42 +230,49 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
       resourceName = name;
     }
     handleWrite(
-        resourceName,
-        request.getWriteOffset(),
-        request.getData(),
-        request.getFinishWrite());
+        resourceName, request.getWriteOffset(), request.getData(), request.getFinishWrite());
   }
 
-  private void handleWrite(
-      String resourceName,
-      long offset,
-      ByteString data,
-      boolean finishWrite) {
+  private void handleWrite(String resourceName, long offset, ByteString data, boolean finishWrite) {
     long committedSize = write.getCommittedSize();
     if (offset != 0 && offset != committedSize) {
       // we are synchronized here for delivery, but not for asynchronous completion
       // of the write - if it has completed already, and that is the source of the
       // offset mismatch, perform nothing further and release sync to allow the
       // callback to complete the write
+      //
+      // ABORTED response is specific to encourage the client to retry
       if (!write.isComplete()) {
-        responseObserver.onError(INVALID_ARGUMENT
-            .withDescription(format("offset %d does not match committed size %d", offset, committedSize))
-            .asException());
+        responseObserver.onError(
+            ABORTED
+                .withDescription(
+                    format("offset %d does not match committed size %d", offset, committedSize))
+                .asException());
       }
     } else if (!resourceName.equals(name)) {
-      responseObserver.onError(INVALID_ARGUMENT
-          .withDescription(format("request resource_name %s does not match previous resource_name %s", resourceName, name))
-          .asException());
+      responseObserver.onError(
+          INVALID_ARGUMENT
+              .withDescription(
+                  format(
+                      "request resource_name %s does not match previous resource_name %s",
+                      resourceName, name))
+              .asException());
     } else {
       if (offset == 0 && offset != committedSize) {
         write.reset();
       }
+      if (earliestOffset < 0 || offset < earliestOffset) {
+        earliestOffset = offset;
+      }
 
-      logger.finest(
+      logger.log(Level.FINER,
           format(
-              "writing %d to %s at %d%s", data.size(), name, offset, finishWrite ? " with finish_write" : ""));
+              "writing %d to %s at %d%s",
+              data.size(), name, offset, finishWrite ? " with finish_write" : ""));
       if (!data.isEmpty()) {
         writeData(data);
+        requestCount++;
+        requestBytes += data.size();
       }
       if (finishWrite) {
         close();
@@ -241,15 +281,14 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   }
 
   private void close() {
-    logger.finest("closing stream due to finishWrite for " + name);
+    logger.log(Level.FINER, format("closing stream due to finishWrite for %s", name));
     try {
       getOutput().close();
     } catch (DigestMismatchException e) {
-      responseObserver.onError(Status.INVALID_ARGUMENT
-          .withDescription(e.getMessage())
-          .asException());
+      responseObserver.onError(
+          Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asException());
     } catch (IOException e) {
-      logger.log(SEVERE, "error closing stream for " + name, e);
+      logger.log(Level.SEVERE, format("error closing stream for %s", name), e);
       responseObserver.onError(Status.fromThrowable(e).asException());
     }
   }
@@ -260,7 +299,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
       requestNextIfReady();
     } catch (IOException e) {
       if (!committed) {
-        logger.log(SEVERE, "error writing data for " + name, e);
+        logger.log(Level.SEVERE, format("error writing data for %s", name), e);
         responseObserver.onError(Status.fromThrowable(e).asException());
       }
       // shouldn't we be erroring the stream at this point if !committed?
@@ -286,7 +325,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
       requestNextIfReady(getOutput());
     } catch (IOException e) {
       if (!committed) {
-        logger.log(SEVERE, "error getting output stream for " + name, e);
+        logger.log(Level.SEVERE, format("error getting output stream for %s", name), e);
         responseObserver.onError(Status.fromThrowable(e).asException());
       }
     }
@@ -303,13 +342,13 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
       try {
         getOutput().close();
       } catch (IOException e) {
-        logger.log(SEVERE, "error closing output stream after error", e);
+        logger.log(Level.SEVERE, "error closing output stream after error", e);
       }
     } else {
       if (!withCancellation.isCancelled()) {
         logger.log(
-            status.getCode() == Status.Code.CANCELLED ? FINER : SEVERE,
-            "cancelling context for " + name,
+            status.getCode() == Status.Code.CANCELLED ? Level.FINE : Level.SEVERE,
+            format("cancelling context for %s", name),
             t);
         withCancellation.cancel(t);
       }
@@ -318,6 +357,6 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
 
   @Override
   public void onCompleted() {
-    logger.finer("got completed for " + name);
+    logger.log(Level.FINE, format("got completed for %s", name));
   }
 }

@@ -98,6 +98,16 @@ platform: {
   # }
 }
 
+# this platform is applied to any executed command to fill in
+# default values for any fields that are not populated on match
+default_platform: {
+  ###
+  # properties: {
+  #   name: "cores"
+  #   value: "1"
+  # }
+}
+
 # limit for contents of files retained
 # from CAS in the cache
 cas_cache_max_size_bytes: 2147483648 # 2 * 1024 * 1024 * 1024
@@ -136,9 +146,15 @@ maximum_action_timeout: {
 # execution policies are automatically added to the advertised
 # platform for a worker
 # prefix command executions with this path
+# arguments are repeated here in order, with '<field>' substituted
+# with a value from the Platform properties list with a matching
+# name. Wrappers with substitutions without matching properties
+# are discarded and not applied to the executed command
 #execution_policies: {
 #  name: "test"
 #  wrapper: {
 #    path: "/path/to/execution/wrapper"
+#    arguments: "-c"
+#    arguments: "<cores>"
 #  }
 #}

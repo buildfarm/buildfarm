@@ -14,22 +14,24 @@
 
 package build.buildfarm.worker;
 
-import static java.util.logging.Level.SEVERE;
-
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class ExecuteActionStage extends SuperscalarPipelineStage {
   private static final Logger logger = Logger.getLogger(ExecuteActionStage.class.getName());
 
   private final Set<Thread> executors = Sets.newHashSet();
+  private final AtomicInteger executorClaims = new AtomicInteger(0);
   private BlockingQueue<OperationContext> queue = new ArrayBlockingQueue<>(1);
 
-  public ExecuteActionStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
+  public ExecuteActionStage(
+      WorkerContext workerContext, PipelineStage output, PipelineStage error) {
     super(
         "ExecuteActionStage",
         workerContext,
@@ -38,19 +40,25 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
         workerContext.getExecuteStageWidth());
   }
 
-  static PipelineStage createDestroyExecDirStage(WorkerContext workerContext, PipelineStage nextStage) {
+  static PipelineStage createDestroyExecDirStage(
+      WorkerContext workerContext, PipelineStage nextStage) {
     return new PipelineStage.NullStage(workerContext, nextStage) {
       @Override
       public void put(OperationContext operationContext) throws InterruptedException {
         try {
           workerContext.destroyExecDir(operationContext.execDir);
         } catch (IOException e) {
-          logger.log(SEVERE, "error while destroying action root " + operationContext.execDir, e);
+          logger.log(Level.SEVERE, "error while destroying action root " + operationContext.execDir, e);
         } finally {
           output.put(operationContext);
         }
       }
     };
+  }
+
+  @Override
+  public boolean claim(OperationContext operationContext) throws InterruptedException {
+    return claim(workerContext.commandExecutionClaims(operationContext.command));
   }
 
   @Override
@@ -68,16 +76,18 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
     queue.put(operationContext);
   }
 
-  synchronized int removeAndRelease(String operationName) {
+  synchronized int removeAndRelease(String operationName, int claims) {
     if (!executors.remove(Thread.currentThread())) {
-      throw new IllegalStateException("tried to remove unknown executor thread for " + operationName);
+      throw new IllegalStateException(
+          "tried to remove unknown executor thread for " + operationName);
     }
-    releaseClaim(operationName);
-    return executors.size();
+    releaseClaim(operationName, claims);
+    return executorClaims.addAndGet(-claims);
   }
 
-  public void releaseExecutor(String operationName, long usecs, long stallUSecs, int exitCode) {
-    int size = removeAndRelease(operationName);
+  public void releaseExecutor(
+      String operationName, int claims, long usecs, long stallUSecs, int exitCode) {
+    int size = removeAndRelease(operationName, claims);
     logComplete(
         operationName,
         usecs,
@@ -95,12 +105,27 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
   @Override
   protected void iterate() throws InterruptedException {
     OperationContext operationContext = take();
-    Thread executor = new Thread(new Executor(workerContext, operationContext, this));
+    int claims = workerContext.commandExecutionClaims(operationContext.command);
+    Executor executor = new Executor(workerContext, operationContext, this);
+    Thread executorThread = new Thread(() -> executor.run(claims));
 
     synchronized (this) {
-      executors.add(executor);
-      logStart(operationContext.operation.getName(), getUsage(executors.size()));
-      executor.start();
+      executors.add(executorThread);
+      int size = executorClaims.addAndGet(claims);
+      logStart(operationContext.operation.getName(), getUsage(size));
+      executorThread.start();
     }
+  }
+
+  @Override
+  public void close() {
+    super.close();
+    workerContext.destroyExecutionLimits();
+  }
+
+  @Override
+  public void run() {
+    workerContext.createExecutionLimits();
+    super.run();
   }
 }

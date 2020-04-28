@@ -2,11 +2,11 @@ package build.buildfarm.common.grpc;
 
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
-import io.grpc.stub.ServerCallStreamObserver;
 import com.google.common.util.concurrent.SettableFuture;
+import io.grpc.stub.ServerCallStreamObserver;
 import java.util.Iterator;
-import java.util.List;
 import java.util.LinkedList;
+import java.util.List;
 import javax.annotation.concurrent.GuardedBy;
 
 public abstract class DelegateServerCallStreamObserver<T, U> extends ServerCallStreamObserver<T> {

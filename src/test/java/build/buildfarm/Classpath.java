@@ -26,9 +26,7 @@ import java.util.Set;
  */
 public final class Classpath {
 
-  /**
-   * Base exception for any classpath related errors.
-   */
+  /** Base exception for any classpath related errors. */
   public static final class ClassPathException extends Exception {
     public ClassPathException(String format, Object... args) {
       super(String.format(format, args));

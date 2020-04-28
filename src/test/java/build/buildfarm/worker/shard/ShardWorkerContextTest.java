@@ -54,25 +54,19 @@ public class ShardWorkerContextTest {
 
   private Path root;
 
-  @Mock
-  private ShardBackplane backplane;
+  @Mock private ShardBackplane backplane;
 
-  @Mock
-  private ExecFileSystem execFileSystem;
+  @Mock private ExecFileSystem execFileSystem;
 
-  @Mock
-  private InputStreamFactory inputStreamFactory;
+  @Mock private InputStreamFactory inputStreamFactory;
 
-  @Mock
-  private Instance instance;
+  @Mock private Instance instance;
 
   @Before
   public void setUp() throws Exception {
     MockitoAnnotations.initMocks(this);
     when(instance.getDigestUtil()).thenReturn(DIGEST_UTIL);
-    root = Iterables.getFirst(
-        Jimfs.newFileSystem(Configuration.unix()).getRootDirectories(),
-        null);
+    root = Iterables.getFirst(Jimfs.newFileSystem(Configuration.unix()).getRootDirectories(), null);
   }
 
   WorkerContext createTestContext() {
@@ -86,7 +80,9 @@ public class ShardWorkerContextTest {
         "test",
         platform,
         /* operationPollPeriod=*/ Duration.getDefaultInstance(),
-        /* operationPoller=*/ (queueEntry, stage, requeueAt) -> { return false; },
+        /* operationPoller=*/ (queueEntry, stage, requeueAt) -> {
+          return false;
+        },
         /* inlineContentLimit=*/ 0,
         /* inputFetchStageWidth=*/ 0,
         /* executeStageWidth=*/ 0,
@@ -98,7 +94,10 @@ public class ShardWorkerContextTest {
         /* deadlineAfter=*/ 0,
         /* deadlineAfterUnits=*/ SECONDS,
         /* defaultActionTimeout=*/ Duration.getDefaultInstance(),
-        /* maximumActionTimeout=*/ Duration.getDefaultInstance());
+        /* maximumActionTimeout=*/ Duration.getDefaultInstance(),
+        /* limitExecution=*/ false,
+        /* limitGlobalExecution=*/ false,
+        /* onlyMulticoreTests=*/ false);
   }
 
   @Test(expected = StatusException.class)

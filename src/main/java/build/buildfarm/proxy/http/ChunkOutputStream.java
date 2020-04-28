@@ -68,5 +68,4 @@ abstract class ChunkOutputStream extends OutputStream {
       flush();
     }
   }
-};
-
+}

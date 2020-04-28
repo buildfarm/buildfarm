@@ -17,30 +17,21 @@ package build.buildfarm.worker.operationqueue;
 import com.google.devtools.common.options.Option;
 import com.google.devtools.common.options.OptionsBase;
 
-/**
- * Command-line options definition for Worker.
- */
+/** Command-line options definition for Worker. */
 public class WorkerOptions extends OptionsBase {
 
-  @Option(
-      name = "help",
-      abbrev = 'h',
-      help = "Prints usage info.",
-      defaultValue = "true"
-    )
+  @Option(name = "help", abbrev = 'h', help = "Prints usage info.", defaultValue = "true")
   public boolean help;
 
   @Option(
       name = "root",
       help = "Root base directory for all work being performed.",
-      defaultValue = ""
-    )
+      defaultValue = "")
   public String root;
 
   @Option(
       name = "cas_cache_directory",
       help = "(Absolute or relative to root) path to cached files from CAS.",
-      defaultValue = ""
-    )
+      defaultValue = "")
   public String casCacheDirectory;
 }

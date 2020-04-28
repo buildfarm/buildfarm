@@ -128,8 +128,7 @@ public class RingBufferInputStream extends InputStream {
     return totalBytesRead;
   }
 
-  private int readPartial(byte[] buf, int off, int len)
-      throws InterruptedException {
+  private int readPartial(byte[] buf, int off, int len) throws InterruptedException {
     if (len <= 0) {
       return 0;
     }

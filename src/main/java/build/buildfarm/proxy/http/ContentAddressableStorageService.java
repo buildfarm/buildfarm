@@ -31,10 +31,10 @@ import build.bazel.remote.execution.v2.GetTreeResponse;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
-import io.grpc.Metadata;
 import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.protobuf.StatusProto;
@@ -42,16 +42,19 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
+import java.util.logging.Logger;
 
-public class ContentAddressableStorageService extends ContentAddressableStorageGrpc.ContentAddressableStorageImplBase {
+public class ContentAddressableStorageService
+    extends ContentAddressableStorageGrpc.ContentAddressableStorageImplBase {
+  private static final Logger logger =
+      Logger.getLogger(ContentAddressableStorageService.class.getName());
+
   private final SimpleBlobStore simpleBlobStore;
   private final int treeDefaultPageSize;
   private final int treeMaxPageSize;
 
   public ContentAddressableStorageService(
-      SimpleBlobStore simpleBlobStore,
-      int treeDefaultPageSize,
-      int treeMaxPageSize) {
+      SimpleBlobStore simpleBlobStore, int treeDefaultPageSize, int treeMaxPageSize) {
     this.simpleBlobStore = simpleBlobStore;
     this.treeDefaultPageSize = treeDefaultPageSize;
     this.treeMaxPageSize = treeMaxPageSize;
@@ -59,10 +62,8 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
 
   @Override
   public void findMissingBlobs(
-      FindMissingBlobsRequest request,
-      StreamObserver<FindMissingBlobsResponse> responseObserver) {
-    FindMissingBlobsResponse.Builder responseBuilder =
-        FindMissingBlobsResponse.newBuilder();
+      FindMissingBlobsRequest request, StreamObserver<FindMissingBlobsResponse> responseObserver) {
+    FindMissingBlobsResponse.Builder responseBuilder = FindMissingBlobsResponse.newBuilder();
     try {
       for (Digest blobDigest : request.getBlobDigestsList()) {
         if (!simpleBlobStore.containsKey(blobDigest.getHash())) {
@@ -86,40 +87,38 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
     ImmutableList.Builder<BatchUpdateBlobsResponse.Response> responses =
         new ImmutableList.Builder<>();
     Function<com.google.rpc.Code, com.google.rpc.Status> statusForCode =
-        (code) -> com.google.rpc.Status.newBuilder()
-            .setCode(code.getNumber())
-            .build();
+        (code) -> com.google.rpc.Status.newBuilder().setCode(code.getNumber()).build();
     for (Request request : batchRequest.getRequestsList()) {
       Digest digest = request.getDigest();
       try {
-        simpleBlobStore.put(
-            digest.getHash(),
-            digest.getSizeBytes(),
-            request.getData().newInput());
-        responses.add(BatchUpdateBlobsResponse.Response.newBuilder()
-            .setDigest(digest)
-            .setStatus(statusForCode.apply(com.google.rpc.Code.OK))
-            .build());
+        simpleBlobStore.put(digest.getHash(), digest.getSizeBytes(), request.getData().newInput());
+        responses.add(
+            BatchUpdateBlobsResponse.Response.newBuilder()
+                .setDigest(digest)
+                .setStatus(statusForCode.apply(com.google.rpc.Code.OK))
+                .build());
       } catch (IOException e) {
         StatusException statusException = Status.fromThrowable(e).asException();
-        responses.add(BatchUpdateBlobsResponse.Response.newBuilder()
-            .setDigest(digest)
-            .setStatus(StatusProto.fromThrowable(statusException))
-            .build());
+        responses.add(
+            BatchUpdateBlobsResponse.Response.newBuilder()
+                .setDigest(digest)
+                .setStatus(StatusProto.fromThrowable(statusException))
+                .build());
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         return;
       }
     }
 
-    responseObserver.onNext(BatchUpdateBlobsResponse.newBuilder()
-        .addAllResponses(responses.build())
-        .build());
+    responseObserver.onNext(
+        BatchUpdateBlobsResponse.newBuilder().addAllResponses(responses.build()).build());
     responseObserver.onCompleted();
   }
 
   private String getTree(
-      Digest rootDigest, int pageSize, String pageToken,
+      Digest rootDigest,
+      int pageSize,
+      String pageToken,
       ImmutableList.Builder<Directory> directories)
       throws IOException, InterruptedException {
     if (pageSize == 0) {
@@ -133,23 +132,32 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
         new TreeIterator(
             (digest) -> {
               ByteString.Output stream = ByteString.newOutput((int) digest.getSizeBytes());
-              return transform(
-                  catching(
-                      simpleBlobStore.get(digest.getHash(), stream),
-                      Throwable.class,
-                      (e) -> false,
-                      directExecutor()),
-                  (success) -> {
-                    if (success) {
-                      try {
-                        return Directory.parseFrom(stream.toByteString());
-                      } catch (InvalidProtocolBufferException e) {
-                        // ignore
-                      }
-                    }
-                    return null;
-                  },
-                  directExecutor());
+              try {
+                return transform(
+                        catching(
+                            simpleBlobStore.get(digest.getHash(), stream),
+                            Exception.class,
+                            (e) -> false,
+                            directExecutor()),
+                        (success) -> {
+                          if (success) {
+                            try {
+                              return Directory.parseFrom(stream.toByteString());
+                            } catch (InvalidProtocolBufferException e) {
+                              // ignore
+                            }
+                          }
+                          return null;
+                        },
+                        directExecutor())
+                    .get();
+              } catch (ExecutionException e) {
+                Throwables.propagateIfInstanceOf(e.getCause(), Error.class);
+                return null; // should not happen due to catching
+              } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return null;
+              }
             },
             rootDigest,
             pageToken);
@@ -169,9 +177,7 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
   }
 
   @Override
-  public void getTree(
-      GetTreeRequest request,
-      StreamObserver<GetTreeResponse> responseObserver) {
+  public void getTree(GetTreeRequest request, StreamObserver<GetTreeResponse> responseObserver) {
     int pageSize = request.getPageSize();
     if (pageSize < 0) {
       responseObserver.onError(Status.INVALID_ARGUMENT.asException());
@@ -179,16 +185,14 @@ public class ContentAddressableStorageService extends ContentAddressableStorageG
     }
     ImmutableList.Builder<Directory> directories = new ImmutableList.Builder<>();
     try {
-      String nextPageToken = getTree(
-          request.getRootDigest(),
-          pageSize,
-          request.getPageToken(),
-          directories);
+      String nextPageToken =
+          getTree(request.getRootDigest(), pageSize, request.getPageToken(), directories);
 
-      responseObserver.onNext(GetTreeResponse.newBuilder()
-          .addAllDirectories(directories.build())
-          .setNextPageToken(nextPageToken)
-          .build());
+      responseObserver.onNext(
+          GetTreeResponse.newBuilder()
+              .addAllDirectories(directories.build())
+              .setNextPageToken(nextPageToken)
+              .build());
       responseObserver.onCompleted();
     } catch (IOException e) {
       responseObserver.onError(Status.fromThrowable(e).asException());

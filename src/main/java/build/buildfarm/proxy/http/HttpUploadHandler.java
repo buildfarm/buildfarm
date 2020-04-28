@@ -120,7 +120,6 @@ final class HttpUploadHandler extends AbstractHttpHandler<FullHttpResponse> {
     return new HttpChunkedInput(new ChunkedStream(msg.data()));
   }
 
-
   @SuppressWarnings("FutureReturnValueIgnored")
   private void failAndClose(Throwable t, ChannelHandlerContext ctx) {
     try {

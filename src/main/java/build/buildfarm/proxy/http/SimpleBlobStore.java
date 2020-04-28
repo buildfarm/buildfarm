@@ -25,9 +25,7 @@ import java.io.OutputStream;
  * <p>Implementations must be thread-safe.
  */
 public interface SimpleBlobStore {
-  /**
-   * Returns {@code key} if the provided {@code key} is stored in the CAS.
-   */
+  /** Returns {@code key} if the provided {@code key} is stored in the CAS. */
   boolean containsKey(String key) throws IOException, InterruptedException;
 
   /**

@@ -51,8 +51,8 @@ abstract class AbstractHttpHandler<T extends HttpObject> extends SimpleChannelIn
     userPromise = null;
   }
 
-  @SuppressWarnings("FutureReturnValueIgnored") 
-  protected void succeedAndResetUserPromise() {  
+  @SuppressWarnings("FutureReturnValueIgnored")
+  protected void succeedAndResetUserPromise() {
     userPromise.setSuccess();
     userPromise = null;
   }

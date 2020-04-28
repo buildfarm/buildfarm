@@ -1,0 +1,493 @@
+// Copyright 2020 The Bazel Authors. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package build.buildfarm.common.redis;
+
+import static java.util.concurrent.TimeUnit.SECONDS;
+
+import build.buildfarm.common.StringVisitor;
+import build.buildfarm.common.redis.RedisClient;
+import build.buildfarm.v1test.QueueStatus;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import redis.clients.jedis.JedisCluster;
+
+///
+/// @class   BalancedRedisQueue
+/// @brief   A balanced redis queue.
+/// @details A balanced redis queue is an implementation of a queue data
+///          structure which internally uses multiple redis nodes to
+///          distribute the data across the cluster. Its important to know
+///          that the lifetime of the queue persists before and after the
+///          queue data structure is created (since it exists in redis).
+///          Therefore, two redis queues with the same name, would in fact be
+///          the same underlying redis queues.
+///
+public class BalancedRedisQueue {
+
+  private static final int START_TIMEOUT_SECONDS = 1;
+
+  private static final int MAX_TIMEOUT_SECONDS = 8;
+
+  ///
+  /// @field   name
+  /// @brief   The unique name of the queue.
+  /// @details The name is used as a template for the internal queues
+  ///          distributed across nodes. Hashtags are added to this base name.
+  ///          This name will not contain a redis hashtag.
+  ///
+  private final String name;
+
+  ///
+  /// @field   originalHashtag
+  /// @brief   The original hashtag of the name provided to the queue.
+  /// @details If the balanced queue is named with a hashtag, we store it, but
+  ///          will not be able to use it for the internal balanced queues. They
+  ///          will need to have their own hashes that correlate to particular
+  ///          nodes. However, if the balanced queue is unable to derive
+  ///          hashtags it will fallback to a single queue. And rely on the
+  ///          original hashtag it was given. If an original hashtag is not
+  ///          given, this will be empty.
+  ///
+  private final String originalHashtag;
+
+  ///
+  /// @field   queues
+  /// @brief   Internal queues used to distribute data across redis nodes.
+  /// @details Although these are multiple queues, the balanced redis queue
+  ///          treats them as one in its interface.
+  ///
+  private List<RedisQueue> queues = new ArrayList<RedisQueue>();
+
+  ///
+  /// @field   currentPushQueue
+  /// @brief   The current queue to act push on.
+  /// @details Used in a round-robin fashion to ensure an even distribution of
+  ///          pushes and appropriate ordering of pops.
+  ///
+  private int currentPushQueue = 0;
+
+  ///
+  /// @field   currentPopQueue
+  /// @brief   The current queue to act pop on.
+  /// @details Used in a round-robin fashion to ensure an even distribution of
+  ///          pushes and appropriate ordering of pops.
+  ///
+  private int currentPopQueue = 0;
+
+  ///
+  /// @brief   Constructor.
+  /// @details Construct a named redis queue with an established redis cluster.
+  /// @param   client   An established redis client.
+  /// @param   name     The global name of the queue.
+  /// @param   hashtags Hashtags to distribute queue data.
+  /// @note    Overloaded.
+  ///
+  public BalancedRedisQueue(String name, List<String> hashtags) {
+    this.originalHashtag = existingHash(name);
+    this.name = unhashedName(name);
+    createHashedQueues(this.name, hashtags);
+  }
+
+  ///
+  /// @brief   Push a value onto the queue.
+  /// @details Adds the value into one of the internal backend redis queues.
+  /// @param   val The value to push onto the queue.
+  ///
+  public void push(JedisCluster jedis, String val) {
+    queues.get(roundRobinPushIndex()).push(jedis, val);
+  }
+
+  ///
+  /// @brief   Remove element from dequeue.
+  /// @details Removes an element from the dequeue and specifies whether it was
+  ///          removed.
+  /// @param   val The value to remove.
+  /// @return  Whether or not the value was removed.
+  /// @note    Suggested return identifier: wasRemoved.
+  ///
+  public boolean removeFromDequeue(JedisCluster jedis, String val) {
+    for (RedisQueue queue : partialIterationQueueOrder()) {
+      if (queue.removeFromDequeue(jedis, val)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  ///
+  /// @brief   Pop element into internal dequeue and return value.
+  /// @details This pops the element from one queue atomically into an internal
+  ///          list called the dequeue. It will perform an exponential backoff.
+  ///          Null is returned if the overall backoff times out.
+  /// @return  The value of the transfered element. null if the thread was interrupted.
+  /// @note    Suggested return identifier: val.
+  ///
+  public String dequeue(JedisCluster jedis) throws InterruptedException {
+    // The conditions of this algorithm are as followed:
+    // - from a client's perspective we want to block indefinitely.
+    //   (so this function should not return null under any normal circumstances.)
+    // - from an implementation perspective however, we don't want to block indefinitely on any one
+    // internal queue.
+
+    // We choose a strategy that round-robins over the queues in different phases.
+    // 1. round-robin each queue with nonblocking calls for 1 cycle
+    // 2. switch to continuously round-robin blocking calls that exponentially increase their
+    // timeout after each full round
+    // 3. continue iterating over each queue at a maximally reached timeout.
+    // During all phases of this algorithm we want to be able to interrupt the thread.
+
+    // The fastest thing to do first, is round-robin over every queue with a nonblocking dequeue
+    // call.
+    // If none of the queues are able to dequeue.  We can move onto a different strategy.
+    // (a strategy in which the system appears to be under less load)
+    int startQueue = currentPopQueue;
+    // end this phase if we have done a full round-robin
+    boolean blocking = false;
+    // try each of the internal queues with exponential backoff
+    int currentTimeout_s = START_TIMEOUT_SECONDS;
+    int maxTimeout_s = MAX_TIMEOUT_SECONDS;
+    while (true) {
+      final String val;
+      RedisQueue queue = queues.get(roundRobinPopIndex());
+      if (blocking) {
+        val = queue.dequeue(jedis, currentTimeout_s);
+      } else {
+        val = queue.nonBlockingDequeue(jedis);
+      }
+      // return if found
+      if (val != null) {
+        return val;
+      }
+
+      if (currentPopQueue == startQueue) {
+        // advance timeout if blocking on queue and not at max each queue cycle
+        if (blocking) {
+          currentTimeout_s = Math.min(currentTimeout_s * 2, maxTimeout_s);
+        } else {
+          blocking = true;
+        }
+      }
+    }
+  }
+
+  ///
+  /// @brief   Get the current pop queue.
+  /// @details Get the queue that the balanced queue intends to pop from next.
+  /// @return  The queue that the balanced queue intends to pop from next.
+  /// @note    Suggested return identifier: currentPopQueue.
+  ///
+  public RedisQueue getCurrentPopQueue() {
+    return queues.get(currentPopQueue);
+  }
+
+  ///
+  /// @brief   Get the current pop queue index.
+  /// @details Get the index of the queue that the balanced queue intends to
+  ///          pop from next.
+  /// @return  The index of the queue that the balanced queue intends to pop from next.
+  /// @note    Suggested return identifier: currentPopQueueIndex.
+  ///
+  public int getCurrentPopQueueIndex() {
+    return currentPopQueue;
+  }
+
+  ///
+  /// @brief   Get queue at index.
+  /// @details Get the internal queue at the specified index.
+  /// @param   index The index to the internal queue (must be in bounds).
+  /// @return  The internal queue found at that index.
+  /// @note    Suggested return identifier: internalQueue.
+  ///
+  public RedisQueue getInternalQueue(int index) {
+    return queues.get(index);
+  }
+
+  ///
+  /// @brief   Get dequeue name.
+  /// @details Get the name of the internal dequeue used by the queue. since
+  ///          each internal queue has their own dequeue, this name is generic
+  ///          without the hashtag.
+  /// @return  The name of the queue.
+  /// @note    Suggested return identifier: name.
+  ///
+  public String getDequeueName() {
+    return name + "_dequeue";
+  }
+
+  ///
+  /// @brief   Get name.
+  /// @details Get the name of the queue. this is the redis key used as base
+  ///          name for internal queues.
+  /// @return  The base name of the queue.
+  /// @note    Suggested return identifier: name.
+  ///
+  public String getName() {
+    return name;
+  }
+
+  ///
+  /// @brief   Get size.
+  /// @details Checks the current length of the queue.
+  /// @return  The current length of the queue.
+  /// @note    Suggested return identifier: length.
+  ///
+  public long size(JedisCluster jedis) {
+    // the accumulated size of all of the queues
+    long size = 0;
+    for (RedisQueue queue : queues) {
+      size += queue.size(jedis);
+    }
+    return size;
+  }
+
+  ///
+  /// @brief   Get status information about the queue.
+  /// @details Helpful for understanding the current load on the queue and how
+  ///          elements are balanced.
+  /// @return  The current status of the queue.
+  /// @note    Suggested return identifier: status.
+  ///
+  public QueueStatus status(JedisCluster jedis) {
+    // get properties
+    long size = size(jedis);
+    List<Long> sizes = new ArrayList<>();
+    for (RedisQueue queue : queues) {
+      sizes.add(queue.size(jedis));
+    }
+
+    // build proto
+    QueueStatus status = QueueStatus.newBuilder().setSize(size).addAllInternalSizes(sizes).build();
+    return status;
+  }
+
+  ///
+  /// @brief   Visit each element in the queue.
+  /// @details Enacts a visitor over each element in the queue.
+  /// @param   visitor A visitor for each visited element in the queue.
+  ///
+  public void visit(JedisCluster jedis, StringVisitor visitor) {
+    for (RedisQueue queue : fullIterationQueueOrder()) {
+      queue.visit(jedis, visitor);
+    }
+  }
+
+  ///
+  /// @brief   Visit each element in the dequeue.
+  /// @details Enacts a visitor over each element in the dequeue.
+  /// @param   visitor A visitor for each visited element in the queue.
+  ///
+  public void visitDequeue(JedisCluster jedis, StringVisitor visitor) {
+    for (RedisQueue queue : fullIterationQueueOrder()) {
+      queue.visitDequeue(jedis, visitor);
+    }
+  }
+
+  ///
+  /// @brief   Check that the internal queues have evenly distributed the
+  ///          values.
+  /// @details We are checking that the size of all the internal queues are the
+  ///          same. This means, the balanced queue will be evenly distributed
+  ///          on every n elements pushed, where n is the number of internal
+  ///          queues.
+  /// @return  Whether or not the queues values are evenly distributed by internal queues.
+  /// @note    Suggested return identifier: isEvenlyDistributed.
+  ///
+  public boolean isEvenlyDistributed(JedisCluster jedis) {
+    long size = queues.get(0).size(jedis);
+    for (RedisQueue queue : partialIterationQueueOrder()) {
+      if (queue.size(jedis) != size) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  ///
+  /// @brief   Create multiple queues for each of the hashes given.
+  /// @details Create the multiple queues that will act as a single balanced
+  ///          queue.
+  /// @param   client   An established redis client.
+  /// @param   name     The global name of the queue.
+  /// @param   hashtags Hashtags to distribute queue data.
+  ///
+  private void createHashedQueues(String name, List<String> hashtags) {
+    // create an internal queue for each of the provided hashtags
+    for (String hashtag : hashtags) {
+      queues.add(new RedisQueue(hashedName(name, hashtag)));
+    }
+
+    // if there were no hashtags, we'll create a single internal queue
+    // so that the balanced redis queue can still function.
+    // we'll use the basename provided to create the single internal queue and use the original
+    // hashtag provided.
+    // if there was no original hashtag, we will use a hashtag that corresponds to the first slot.
+    // note: we must build the balanced queues internal queue with a hashtag because it will dequeue
+    // to the same redis slot.
+    if (hashtags.isEmpty()) {
+
+      if (!originalHashtag.isEmpty()) {
+        queues.add(new RedisQueue(hashedName(name, originalHashtag)));
+      } else {
+        queues.add(new RedisQueue(hashedName(name, "06S")));
+      }
+    }
+  }
+
+  ///
+  /// @brief   Append the hashtag value to the base queue name.
+  /// @details Creates a valid queue name for one of the entire queues.
+  /// @param   name    The global name of the queue.
+  /// @param   hashtag A hashtag for an individual internal queue.
+  /// @return  A valid queue name for one of the internal queues.
+  /// @note    Suggested return identifier: queueName.
+  ///
+  private String hashedName(String name, String hashtag) {
+    return "{" + hashtag + "}" + name;
+  }
+
+  ///
+  /// @brief   Remove any existing redis hashtag from the key name.
+  /// @details Creates a valid key name with any existing hashtags removed.
+  /// @param   name The global name of the queue.
+  /// @return  A valid keyname without hashtags.
+  /// @note    Suggested return identifier: queueName.
+  ///
+  private String unhashedName(String name) {
+    return name.replaceAll("\\{.*?\\}", "");
+  }
+
+  ///
+  /// @brief   Get the existing hashtag of the name.
+  /// @details Parses out the first redis hashtag found. If no hashtags are
+  ///          found, an empty string is returned.
+  /// @param   name The global name of the queue.
+  /// @return  The existing hashtag name found in the string (brackets are removed).
+  /// @note    Suggested return identifier: hashtag.
+  ///
+  private String existingHash(String name) {
+    String regex = "\\{.*?\\}";
+    Pattern pattern = Pattern.compile(regex);
+    Matcher matcher = pattern.matcher(name);
+
+    // hashtag found
+    if (matcher.find()) {
+
+      // extract from matcher
+      String hashtag = matcher.group(0);
+
+      // remove brackets
+      hashtag = hashtag.substring(1, hashtag.length() - 1);
+
+      return hashtag;
+    }
+
+    // hashtag not found
+    return "";
+  }
+
+  ///
+  /// @brief   Get the current queue index for round-robin pushing.
+  /// @details Adjusts the round-robin index for next call.
+  /// @return  The current round-robin index.
+  /// @note    Suggested return identifier: queueIndex.
+  ///
+  private int roundRobinPushIndex() {
+    int currentIndex = currentPushQueue;
+    currentPushQueue = nextQueueInRoundRobin(currentPushQueue);
+    return currentIndex;
+  }
+
+  ///
+  /// @brief   Get the current queue index for round-robin popping.
+  /// @details Adjusts the round-robin index for next call.
+  /// @return  The current round-robin index.
+  /// @note    Suggested return identifier: queueIndex.
+  ///
+  private int roundRobinPopIndex() {
+    int currentIndex = currentPopQueue;
+    currentPopQueue = nextQueueInRoundRobin(currentPopQueue);
+    return currentIndex;
+  }
+
+  ///
+  /// @brief   Get the next queue in the round robin.
+  /// @details If we are currently on the last queue it becomes the first
+  ///          queue.
+  /// @param   index Current queue index.
+  /// @return  And adjusted val based on the current queue index.
+  /// @note    Suggested return identifier: adjustedCurrentQueue.
+  ///
+  private int nextQueueInRoundRobin(int index) {
+    if (index >= queues.size() - 1) {
+      return 0;
+    }
+    return index + 1;
+  }
+
+  ///
+  /// @brief   Get the previous queue in the round robin.
+  /// @details If we are currently on the first queue it becomes the last
+  ///          queue.
+  /// @param   index Current queue index.
+  /// @return  And adjusted val based on the current queue index.
+  /// @note    Suggested return identifier: adjustedCurrentQueue.
+  ///
+  private int previousQueueInRoundRobin(int index) {
+    if (index == 0) {
+      return queues.size() - 1;
+    }
+    return index - 1;
+  }
+
+  ///
+  /// @brief   List of queues in a particular order for full iteration over all
+  ///          of the queues.
+  /// @details An ordered list of queues for operations that assume to traverse
+  ///          over all of the queues. Some operations like clear() / size()
+  ///          require calling methods on all of the internal queues. For those
+  ///          cases, this function represents the desired order of the queues.
+  /// @return  An ordered list of queues.
+  /// @note    Suggested return identifier: queues.
+  ///
+  private List<RedisQueue> fullIterationQueueOrder() {
+    // if we are going to iterate over all of the queues
+    // there will be no noticeable side effects from the order
+    return queues;
+  }
+
+  ///
+  /// @brief   List of queues in a particular order for a possibly partial
+  ///          iteration over all of the queues.
+  /// @details An ordered list of queues for operations that may end early
+  ///          without needing to perform the operation on all of the internal
+  ///          queues. Some operations like exists() / remove() can return early
+  ///          without processing over all of the internal queues. For those
+  ///          cases, this function represents the desired order of the queues.
+  /// @return  An ordered list of queues.
+  /// @note    Suggested return identifier: queues.
+  ///
+  private List<RedisQueue> partialIterationQueueOrder() {
+    // to improve cpu utilization, we can try randomizing
+    // the order we traverse the internal queues for operations
+    // that may return early
+    List<RedisQueue> randomQueues = new ArrayList<RedisQueue>();
+    randomQueues.addAll(queues);
+    Collections.shuffle(randomQueues);
+    return randomQueues;
+  }
+}

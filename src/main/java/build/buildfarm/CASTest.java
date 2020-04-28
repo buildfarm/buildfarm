@@ -18,9 +18,9 @@ import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 
 import build.bazel.remote.execution.v2.Digest;
-import build.buildfarm.worker.CASFileCache;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
+import build.buildfarm.worker.CASFileCache;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
@@ -45,15 +45,38 @@ class CASTest {
     }
   }
 
+  public static long GBtoBytes(long sizeGb) {
+    return sizeGb * 1024 * 1024 * 1024;
+  }
+
+  public static long BytestoGB(long sizeBytes) {
+    return sizeBytes / 1024 / 1024 / 1024;
+  }
+
+  /*
+    When starting the CAS, ensure that the "max size" appropriately reflects the content size of the CAS's root.
+    Otherwise, reaching the "max size" will result in files being deleted from the root.
+    The appropriate size may not be obvious by observing actual disk usage (this especially true for zero filled test data)
+    A closer calculation for ample "max size" could be calculated with "du -hs --apparent-size".
+  */
   public static void main(String[] args) throws Exception {
+
     Path root = Paths.get(args[0]);
-    CASFileCache fileCache = new LocalCASFileCache(
-        root,
-        /* maxSizeInBytes=*/ 100l * 1024 * 1024 * 1024,
-        new DigestUtil(HashFunction.SHA1),
-        /* expireService=*/ newDirectExecutorService(),
-        /* accessRecorder=*/ directExecutor());
+    CASFileCache fileCache =
+        new LocalCASFileCache(
+            root,
+            /* maxSizeInBytes=*/ GBtoBytes(500),
+            new DigestUtil(HashFunction.SHA1),
+            /* expireService=*/ newDirectExecutorService(),
+            /* accessRecorder=*/ directExecutor());
+
+    // Start cache and measure startup time (reported internally).
     fileCache.start(newDirectExecutorService());
-    System.out.println("Done with start, ready to roll...");
+
+    // Report information on started cache.
+    System.out.println("CAS Started.");
+    System.out.println("Storage Count: " + fileCache.storageCount());
+    System.out.println("Directory Count: " + fileCache.directoryStorageCount());
+    System.out.println("Current Size: " + BytestoGB(fileCache.size()) + "GB");
   }
 }

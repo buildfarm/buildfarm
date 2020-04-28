@@ -15,6 +15,8 @@
 package build.buildfarm;
 
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
+import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Digest;
@@ -22,25 +24,34 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.FileNode;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.grpc.ByteStreamHelper;
+import build.buildfarm.common.grpc.Retrier;
 import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamStub;
 import com.google.bytestream.ByteStreamProto.ReadRequest;
 import com.google.bytestream.ByteStreamProto.ReadResponse;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
+import com.google.common.io.ByteStreams;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
+import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.protobuf.ByteString;
 import io.grpc.Channel;
 import io.grpc.ManagedChannel;
+import io.grpc.Status;
+import io.grpc.Status.Code;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.stub.StreamObserver;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
@@ -52,8 +63,7 @@ import java.util.concurrent.atomic.AtomicLong;
 class Extract {
   static ManagedChannel createChannel(String target) {
     NettyChannelBuilder builder =
-        NettyChannelBuilder.forTarget(target)
-            .negotiationType(NegotiationType.PLAINTEXT);
+        NettyChannelBuilder.forTarget(target).negotiationType(NegotiationType.PLAINTEXT);
     return builder.build();
   }
 
@@ -81,73 +91,66 @@ class Extract {
     return String.format("%s/blobs/%s/%d", instanceName, digest.getHash(), digest.getSizeBytes());
   }
 
-  static Runnable blobGetter(Path root, String instanceName, Digest digest, ByteStreamStub bsStub, AtomicLong outstandingOperations) {
+  static InputStream newInput(String instanceName, Digest digest, ByteStreamStub bsStub, ListeningScheduledExecutorService retryService) {
+    return ByteStreamHelper.newInput(
+        blobName(instanceName, digest),
+        0,
+        () -> bsStub.withDeadlineAfter(10, TimeUnit.SECONDS),
+        Retrier.Backoff.exponential(Duration.ofSeconds(0), Duration.ofSeconds(0), 2, 0, 5),
+        Retrier.DEFAULT_IS_RETRIABLE,
+        retryService);
+  }
+
+  static Runnable blobGetter(
+      Path root,
+      String instanceName,
+      Digest digest,
+      ByteStreamStub bsStub,
+      AtomicLong outstandingOperations,
+      ListeningScheduledExecutorService retryService) {
     if (digest.getSizeBytes() == 0) {
       return () -> outstandingOperations.getAndDecrement();
     }
     return new Runnable() {
       @Override
       public void run() {
-        System.out.println("Getting blob " + digest.getHash());
-        bsStub.read(
-            ReadRequest.newBuilder()
-                .setResourceName(blobName(instanceName, digest))
-                .build(),
-            new StreamObserver<ReadResponse>() {
-              OutputStream out = null;
-
-              void initialize() {
-                if (out == null) {
-                  try {
-                    out = Files.newOutputStream(root.resolve(digest.getHash()));
-                  } catch (IOException e) {
-                    e.printStackTrace();
-                  }
-                }
+        Path file = root.resolve(digest.getHash());
+        try {
+          if (!Files.exists(file) || Files.size(file) != digest.getSizeBytes()) {
+            System.out.println("Getting blob " + digest.getHash() + "/" + digest.getSizeBytes());
+            try (OutputStream out = Files.newOutputStream(file)) {
+              try (InputStream in = newInput(instanceName, digest, bsStub, retryService)) {
+                ByteStreams.copy(in, out);
               }
-
-              void finish() {
-                if (out != null) {
-                  try {
-                    out.close();
-                  } catch (IOException e) {
-                    e.printStackTrace();
-                  }
-                }
-                outstandingOperations.getAndDecrement();
-              }
-
-              @Override
-              public void onNext(ReadResponse response) {
-                initialize();
-                try {
-                  response.getData().writeTo(out);
-                } catch (IOException e) {
-                  e.printStackTrace();
-                }
-              }
-
-              @Override
-              public void onError(Throwable t) {
-                t.printStackTrace();
-                finish();
-              }
-
-              @Override
-              public void onCompleted() {
-                finish();
-              }
-            });
+            }
+          }
+        } catch (IOException e) {
+          e.printStackTrace();
+        }
+        outstandingOperations.getAndDecrement();
       }
     };
+  }
+
+  static ByteString getBlobIntoFile(String type, String instanceName, Digest digest, ByteStreamStub bsStub, Path root) throws IOException, InterruptedException {
+    Path file = root.resolve(digest.getHash());
+    if (Files.exists(file) && Files.size(file) == digest.getSizeBytes()) {
+      try (InputStream in = Files.newInputStream(file)) {
+        return ByteString.readFrom(in);
+      }
+    }
+    System.out.println("Getting " + type + " " + digest.getHash() + "/" + digest.getSizeBytes());
+    ByteString content = getBlob(instanceName, digest, bsStub);
+    try (OutputStream out = Files.newOutputStream(file)) {
+      content.writeTo(out);
+    }
+    return content;
   }
 
   static ByteString getBlob(String instanceName, Digest digest, ByteStreamStub bsStub) throws InterruptedException {
     SettableFuture<ByteString> blobFuture = SettableFuture.create();
     bsStub.read(
-        ReadRequest.newBuilder()
-            .setResourceName(blobName(instanceName, digest))
-            .build(),
+        ReadRequest.newBuilder().setResourceName(blobName(instanceName, digest)).build(),
         new StreamObserver<ReadResponse>() {
           ByteString.Output out = ByteString.newOutput((int) digest.getSizeBytes());
 
@@ -162,6 +165,10 @@ class Extract {
 
           @Override
           public void onError(Throwable t) {
+            Status status = Status.fromThrowable(t);
+            if (status.getCode() == Code.NOT_FOUND) {
+              t = new FileNotFoundException(digest.getHash() + "/" + digest.getSizeBytes());
+            }
             blobFuture.setException(t);
           }
 
@@ -174,7 +181,7 @@ class Extract {
       return blobFuture.get();
     } catch (ExecutionException e) {
       if (e.getCause() instanceof RuntimeException) {
-        throw (RuntimeException) e.getCause();
+        throw new RuntimeException(e.getCause());
       }
       throw new UncheckedExecutionException(e.getCause());
     }
@@ -188,7 +195,8 @@ class Extract {
       Set<Digest> visitedDigests,
       ByteStreamStub bsStub,
       Executor executor,
-      AtomicLong outstandingOperations) {
+      AtomicLong outstandingOperations,
+      ListeningScheduledExecutorService retryService) {
     return new Runnable() {
       @Override
       public void run() {
@@ -202,27 +210,22 @@ class Extract {
       }
 
       void runInterruptibly() throws InterruptedException {
-        System.out.println("Getting directory " + digest.getHash());
-        ByteString content = getBlob(instanceName, digest, bsStub);
         try {
-          runIO(content);
+          ByteString content = getBlobIntoFile("directory", instanceName, digest, bsStub, root);
+          handleDirectory(Directory.parseFrom(content));
         } catch (IOException e) {
           e.printStackTrace();
         }
       }
 
-      void runIO(ByteString content) throws IOException {
-        Path file = root.resolve(digest.getHash());
-        try (OutputStream out = Files.newOutputStream(file)) {
-          content.writeTo(out);
-        }
-        Directory directory = Directory.parseFrom(content);
+      void handleDirectory(Directory directory) {
         for (FileNode fileNode : directory.getFilesList()) {
           Digest fileDigest = fileNode.getDigest();
           if (!visitedDigests.contains(fileDigest)) {
             visitedDigests.add(fileDigest);
             outstandingOperations.getAndIncrement();
-            executor.execute(blobGetter(root, instanceName, fileDigest, bsStub, outstandingOperations));
+            executor.execute(
+                blobGetter(root, instanceName, fileDigest, bsStub, outstandingOperations, retryService));
           }
         }
 
@@ -234,17 +237,30 @@ class Extract {
             visitedDigests.add(directoryDigest);
             visitedDirectories.add(directoryDigest);
             outstandingOperations.getAndIncrement();
-            executor.execute(directoryGetter(root, instanceName, directoryDigest, visitedDirectories, visitedDigests, bsStub, executor, outstandingOperations));
+            executor.execute(
+                directoryGetter(
+                    root,
+                    instanceName,
+                    directoryDigest,
+                    visitedDirectories,
+                    visitedDigests,
+                    bsStub,
+                    executor,
+                    outstandingOperations,
+                    retryService));
           }
         }
       }
     };
   }
 
-  static void downloadActionContents(Path root, String instanceName, Set<Digest> actionDigests, Channel channel) throws IOException, InterruptedException {
+  static void downloadActionContents(
+      Path root, String instanceName, Set<Digest> actionDigests, Channel channel)
+      throws IOException, InterruptedException {
     ByteStreamStub bsStub = ByteStreamGrpc.newStub(channel);
 
     ExecutorService service = newSingleThreadExecutor();
+    ListeningScheduledExecutorService retryService = listeningDecorator(newSingleThreadScheduledExecutor());
 
     Set<Digest> visitedDigests = Sets.newHashSet();
     Set<Digest> visitedDirectories = Sets.newHashSet();
@@ -252,25 +268,31 @@ class Extract {
     AtomicLong outstandingOperations = new AtomicLong(0);
 
     for (Digest actionDigest : actionDigests) {
-      System.out.println("Getting action " + actionDigest.getHash());
-      ByteString content = getBlob(instanceName, actionDigest, bsStub);
-      Path file = root.resolve(actionDigest.getHash());
-      try (OutputStream out = Files.newOutputStream(file)) {
-        content.writeTo(out);
-      }
+      ByteString content = getBlobIntoFile("action", instanceName, actionDigest, bsStub, root);
       Action action = Action.parseFrom(content);
       Digest commandDigest = action.getCommandDigest();
       if (!visitedDigests.contains(commandDigest)) {
         visitedDigests.add(commandDigest);
         outstandingOperations.getAndIncrement();
-        service.execute(blobGetter(root, instanceName, commandDigest, bsStub, outstandingOperations));
+        service.execute(
+            blobGetter(root, instanceName, commandDigest, bsStub, outstandingOperations, retryService));
       }
       Digest inputRootDigest = action.getInputRootDigest();
       if (!visitedDigests.contains(inputRootDigest)) {
         visitedDirectories.add(inputRootDigest);
         visitedDigests.add(inputRootDigest);
         outstandingOperations.getAndIncrement();
-        service.execute(directoryGetter(root, instanceName, inputRootDigest, visitedDirectories, visitedDigests, bsStub, service, outstandingOperations));
+        service.execute(
+            directoryGetter(
+                root,
+                instanceName,
+                inputRootDigest,
+                visitedDirectories,
+                visitedDigests,
+                bsStub,
+                service,
+                outstandingOperations,
+                retryService));
       }
     }
 
@@ -281,5 +303,7 @@ class Extract {
 
     service.shutdown();
     service.awaitTermination(1, TimeUnit.MINUTES);
+    retryService.shutdown();
+    retryService.awaitTermination(1, TimeUnit.MINUTES);
   }
 }
