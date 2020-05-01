@@ -85,3 +85,39 @@ the WORKSPACE with a `maven_install` `artifacts` parameter.
 
 Things that aren't supported by `rules_jvm_external` are being imported as manually managed remote repos via
 the `WORKSPACE` file.
+
+### Deployments
+
+Buildfarm can be used as an external repository for composition into a deployment of your choice.
+
+Add the following to your WORKSPACE to get access to buildfarm targets, filling in the commit and sha256 values:
+
+```
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+BUILDFARM_EXTERNAL_COMMIT = "<revision commit id>"
+BUILDFARM_EXTERNAL_SHA256 = "<sha256 digest of url below>"
+
+http_archive(
+    name = "bazel_buildfarm",
+    strip_prefix = "bazel-buildfarm-%s" % BUILDFARM_EXTERNAL_COMMIT,
+    sha256 = BUILDFARM_EXTERNAL_SHA256,
+    url = "https://github.com/bazelbuild/bazel-buildfarm/archive/%s.zip" % BUILDFARM_EXTERNAL_COMMIT,
+)
+
+load("@bazel_buildfarm//:deps.bzl", "buildfarm_dependencies")
+
+buildfarm_dependencies()
+
+load("@bazel_buildfarm//:defs.bzl", "buildfarm_init")
+
+buildfarm_init()
+```
+
+Optionally, if you want to use the buildfarm docker container image targets, you can add this:
+
+```
+load("@bazel_buildfarm//:images.bzl", "buildfarm_images")
+
+buildfarm_images()
+```
