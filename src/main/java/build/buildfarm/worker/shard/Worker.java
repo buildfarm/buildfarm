@@ -552,6 +552,10 @@ public class Worker extends LoggingMain {
     if (!Strings.isNullOrEmpty(options.publicName)) {
       builder.setPublicName(options.publicName);
     }
+    else{
+      logger.log(SEVERE, "worker's public name should not be empty");
+      System.exit(0);
+    }
 
     return builder.build();
   }
