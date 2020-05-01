@@ -53,7 +53,6 @@ import build.buildfarm.worker.Pipeline;
 import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.ReportResultStage;
-import build.buildfarm.worker.WorkerContext;
 import com.google.common.base.Strings;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
@@ -551,8 +550,7 @@ public class Worker extends LoggingMain {
     }
     if (!Strings.isNullOrEmpty(options.publicName)) {
       builder.setPublicName(options.publicName);
-    }
-    else{
+    } else {
       logger.log(SEVERE, "worker's public name should not be empty");
       System.exit(0);
     }
@@ -562,9 +560,8 @@ public class Worker extends LoggingMain {
 
   private static void printUsage(OptionsParser parser) {
     logger.log(INFO, "Usage: CONFIG_PATH");
-    logger.log(INFO,
-        parser.describeOptions(
-            Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
+    logger.log(
+        INFO, parser.describeOptions(Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
   }
 
   public static void main(String[] args) throws Exception {
