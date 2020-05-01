@@ -542,7 +542,7 @@ public class Worker extends LoggingMain {
   }
 
   private static ShardWorkerConfig toShardWorkerConfig(Readable input, WorkerOptions options)
-      throws IOException {
+      throws IOException, ConfigurationException {
     ShardWorkerConfig.Builder builder = ShardWorkerConfig.newBuilder();
     TextFormat.merge(input, builder);
     if (!Strings.isNullOrEmpty(options.root)) {
@@ -551,8 +551,7 @@ public class Worker extends LoggingMain {
     if (!Strings.isNullOrEmpty(options.publicName)) {
       builder.setPublicName(options.publicName);
     } else {
-      logger.log(SEVERE, "worker's public name should not be empty");
-      System.exit(0);
+      throw new ConfigurationException("worker's public name should not be empty");
     }
 
     return builder.build();
