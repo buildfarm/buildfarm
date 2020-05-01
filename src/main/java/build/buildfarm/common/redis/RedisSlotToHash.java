@@ -20,6 +20,7 @@ import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import redis.clients.jedis.util.JedisClusterCRC16;
 
 ///
 /// @class   RedisSlotToHash
@@ -46,7 +47,38 @@ public class RedisSlotToHash {
   /// @note    Suggested return identifier: hashtag.
   ///
   public static String correlate(long slotNumber) {
-    Preconditions.checkState(slotNumber < HASHSLOTS);
+    Preconditions.checkState(slotNumber >= 0 && slotNumber < HASHSLOTS);
+    return staticLookup(slotNumber);
+  }
+  ///
+  /// @brief   Dynamically convert a range of slot number into string that
+  ///          hashes to a slot within the range.
+  /// @details Dynamically generates hashtags and tests them for valid slot
+  ///          number. Slower than static lookup, but less code.
+  /// @param   start The starting slot range number to find a hashable string for.
+  /// @param   end   The ending slot range number to find a hashable string for.
+  /// @return  The string value to be used in a key's hashtag.
+  /// @note    Suggested return identifier: hashtag.
+  ///
+  public static String correlateRange(long start, long end) {
+    Preconditions.checkState(start >= 0 && end < HASHSLOTS);
+
+    long hashNumber = 0;
+    int slotNumber = JedisClusterCRC16.getSlot(Long.toString(hashNumber));
+    while (slotNumber < start || slotNumber > end) {
+      hashNumber++;
+      slotNumber = JedisClusterCRC16.getSlot(Long.toString(hashNumber));
+    }
+    return Long.toString(hashNumber);
+  }
+  ///
+  /// @brief   Convert the slot to a hashtag using a static lookup table.
+  /// @details Fastest, but requires all keys in memory.
+  /// @param   slotNumber The slot number to find a hashable string for.
+  /// @return  The string value to be used in a key's hashtag.
+  /// @note    Suggested return identifier: hashtag.
+  ///
+  private static String staticLookup(long slotNumber) {
     List<String> lookupTable = getLookupTable();
     return lookupTable.get((int) slotNumber);
   }
