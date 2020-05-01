@@ -564,33 +564,38 @@ public class Worker extends LoggingMain {
   }
 
   public static void main(String[] args) throws Exception {
-    // Only log severe log messages from Netty. Otherwise it logs warnings that look like this:
-    //
-    // 170714 08:16:28.552:WT 18 [io.grpc.netty.NettyServerHandler.onStreamError] Stream Error
-    // io.netty.handler.codec.http2.Http2Exception$StreamException: Received DATA frame for an
-    // unknown stream 11369
-    nettyLogger.setLevel(SEVERE);
 
-    OptionsParser parser = OptionsParser.newOptionsParser(WorkerOptions.class);
-    parser.parseAndExitUponError(args);
-    List<String> residue = parser.getResidue();
-    if (residue.isEmpty()) {
-      printUsage(parser);
-      throw new IllegalArgumentException("Missing CONFIG_PATH");
+    try {
+      // Only log severe log messages from Netty. Otherwise it logs warnings that look like this:
+      //
+      // 170714 08:16:28.552:WT 18 [io.grpc.netty.NettyServerHandler.onStreamError] Stream Error
+      // io.netty.handler.codec.http2.Http2Exception$StreamException: Received DATA frame for an
+      // unknown stream 11369
+      nettyLogger.setLevel(SEVERE);
+
+      OptionsParser parser = OptionsParser.newOptionsParser(WorkerOptions.class);
+      parser.parseAndExitUponError(args);
+      List<String> residue = parser.getResidue();
+      if (residue.isEmpty()) {
+        printUsage(parser);
+        throw new IllegalArgumentException("Missing CONFIG_PATH");
+      }
+      Path configPath = Paths.get(residue.get(0));
+      String session = UUID.randomUUID().toString();
+      Worker worker;
+      try (InputStream configInputStream = Files.newInputStream(configPath)) {
+        worker =
+            new Worker(
+                session,
+                toShardWorkerConfig(
+                    new InputStreamReader(configInputStream),
+                    parser.getOptions(WorkerOptions.class)));
+      }
+      worker.start();
+      worker.blockUntilShutdown();
+      System.exit(0); // bullet to the head in case anything is stuck
+    } catch (Exception e) {
+      Worker.logger.log(SEVERE, e.toString());
     }
-    Path configPath = Paths.get(residue.get(0));
-    String session = UUID.randomUUID().toString();
-    Worker worker;
-    try (InputStream configInputStream = Files.newInputStream(configPath)) {
-      worker =
-          new Worker(
-              session,
-              toShardWorkerConfig(
-                  new InputStreamReader(configInputStream),
-                  parser.getOptions(WorkerOptions.class)));
-    }
-    worker.start();
-    worker.blockUntilShutdown();
-    System.exit(0); // bullet to the head in case anything is stuck
   }
 }
