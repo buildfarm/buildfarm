@@ -15,12 +15,12 @@
 package build.buildfarm.common.redis;
 
 import static com.google.common.truth.Truth.assertThat;
+import static redis.clients.jedis.JedisCluster.HASHSLOTS;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import redis.clients.jedis.util.JedisClusterCRC16;
-import build.buildfarm.common.redis.RedisSlotToHash;
 
 ///
 /// @class   RedisSlotToHashTest
@@ -45,8 +45,7 @@ public class RedisSlotToHashTest {
   @Test
   public void correlateCorrectForEverySlot() throws Exception {
 
-    int totalRedisSlots = 16384;
-    for (int i = 0; i < totalRedisSlots; ++i) {
+    for (int i = 0; i < HASHSLOTS; ++i) {
 
       // convert to hashtag
       String hashtag = RedisSlotToHash.correlate(i);
@@ -66,5 +65,21 @@ public class RedisSlotToHashTest {
   public void correlateEnsureConstruction() throws Exception {
 
     RedisSlotToHash slotToHash = new RedisSlotToHash();
+  }
+
+  // Function under test: dynamicCorrelate
+  // Reason for testing: given a slot range a correct hashtag is dynamically derived
+  // Failure explanation: the hashtag does not correlate back to the slot number
+  @Test
+  public void dynamicCorrelateCorrectHashtagFoundForSlotRange() throws Exception {
+
+    // convert to hashtag
+    String hashtag = RedisSlotToHash.dynamicCorrelate(100, 200);
+
+    // convert hashtag back to slot
+    int slotNumber = JedisClusterCRC16.getSlot(hashtag);
+
+    // check correct correlation
+    assertThat(slotNumber >= 100 && slotNumber <= 200).isTrue();
   }
 }
