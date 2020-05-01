@@ -67,14 +67,14 @@ public class RedisSlotToHashTest {
     RedisSlotToHash slotToHash = new RedisSlotToHash();
   }
 
-  // Function under test: dynamicCorrelate
+  // Function under test: correlateRange
   // Reason for testing: given a slot range a correct hashtag is dynamically derived
   // Failure explanation: the hashtag does not correlate back to the slot number
   @Test
-  public void dynamicCorrelateCorrectHashtagFoundForSlotRange() throws Exception {
+  public void correlateRangeCorrectHashtagFoundForSlotRange() throws Exception {
 
     // convert to hashtag
-    String hashtag = RedisSlotToHash.dynamicCorrelate(100, 200);
+    String hashtag = RedisSlotToHash.correlateRange(100, 200);
 
     // convert hashtag back to slot
     int slotNumber = JedisClusterCRC16.getSlot(hashtag);

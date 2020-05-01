@@ -47,8 +47,7 @@ public class RedisSlotToHash {
   /// @note    Suggested return identifier: hashtag.
   ///
   public static String correlate(long slotNumber) {
-    Preconditions.checkState(slotNumber >= 0);
-    Preconditions.checkState(slotNumber < HASHSLOTS);
+    Preconditions.checkState(slotNumber >= 0 && slotNumber < HASHSLOTS);
     return staticLookup(slotNumber);
   }
   ///
@@ -61,9 +60,8 @@ public class RedisSlotToHash {
   /// @return  The string value to be used in a key's hashtag.
   /// @note    Suggested return identifier: hashtag.
   ///
-  public static String dynamicCorrelate(long start, long end) {
-    Preconditions.checkState(start >= 0);
-    Preconditions.checkState(end < HASHSLOTS);
+  public static String correlateRange(long start, long end) {
+    Preconditions.checkState(start >= 0 && end < HASHSLOTS);
 
     long hashNumber = 0;
     int slotNumber = JedisClusterCRC16.getSlot(Long.toString(hashNumber));
