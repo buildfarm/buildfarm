@@ -563,7 +563,7 @@ public class Worker extends LoggingMain {
         INFO, parser.describeOptions(Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
   }
 
-  public static void main(String[] args) throws Exception {
+  public static void main(String[] args) {
 
     try {
       startWorker(args);
