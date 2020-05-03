@@ -564,7 +564,6 @@ public class Worker extends LoggingMain {
   }
 
   public static void main(String[] args) {
-
     try {
       startWorker(args);
     } catch (Exception e) {
@@ -574,7 +573,6 @@ public class Worker extends LoggingMain {
   }
 
   public static void startWorker(String[] args) throws Exception {
-
     // Only log severe log messages from Netty. Otherwise it logs warnings that look like this:
     //
     // 170714 08:16:28.552:WT 18 [io.grpc.netty.NettyServerHandler.onStreamError] Stream Error
