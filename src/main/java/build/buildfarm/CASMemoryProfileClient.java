@@ -5,20 +5,16 @@ import io.grpc.Channel;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.StatusRuntimeException;
-
-import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-
 public class CASMemoryProfileClient {
-  private static final Logger logger =
-      Logger.getLogger(CASMemoryProfileClient.class.getName());
+  private static final Logger logger = Logger.getLogger(CASMemoryProfileClient.class.getName());
 
   private final CASMemoryProfileGrpc.CASMemoryProfileBlockingStub blockingStub;
 
-  public CASMemoryProfileClient (Channel channel) {
+  public CASMemoryProfileClient(Channel channel) {
     blockingStub = CASMemoryProfileGrpc.newBlockingStub(channel);
   }
 
@@ -51,7 +47,14 @@ public class CASMemoryProfileClient {
 
   public static void main(String[] args) throws Exception {
     if (args.length != 2) {
-      logger.log(Level.SEVERE, "need the ip address of server you want to profile");
+      logger.log(
+          Level.SEVERE,
+          "running pariodic profile needs two arguments: \n"
+              + "1) the ip address of worker you want to profile and \n"
+              + "2) number of seconds you want to wait between two profile. \n"
+              + "example: CAS_profile_client 0.0.0.0 20");
+
+      return;
     }
 
     String target = args[0] + ":8981";
