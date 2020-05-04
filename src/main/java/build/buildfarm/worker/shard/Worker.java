@@ -542,17 +542,16 @@ public class Worker extends LoggingMain {
   }
 
   private static ShardWorkerConfig toShardWorkerConfig(Readable input, WorkerOptions options)
-      throws IOException, ConfigurationException {
+      throws ConfigurationException, IOException {
     ShardWorkerConfig.Builder builder = ShardWorkerConfig.newBuilder();
     TextFormat.merge(input, builder);
     if (!Strings.isNullOrEmpty(options.root)) {
       builder.setRoot(options.root);
     }
-    if (!Strings.isNullOrEmpty(options.publicName)) {
-      builder.setPublicName(options.publicName);
-    } else {
+    if (Strings.isNullOrEmpty(options.publicName)) {
       throw new ConfigurationException("worker's public name should not be empty");
     }
+    builder.setPublicName(options.publicName);
 
     return builder.build();
   }
