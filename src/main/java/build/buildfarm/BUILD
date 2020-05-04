@@ -353,6 +353,7 @@ java_library(
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
         "@googleapis//:google_rpc_error_details_java_proto",
     ],
 )
@@ -712,6 +713,25 @@ java_binary(
         ":common",
         ":instance",
         ":stub-instance",
+        "@maven//:io_grpc_grpc_api",
+        "@maven//:io_grpc_grpc_context",
+        "@maven//:io_grpc_grpc_core",
+        "@maven//:io_grpc_grpc_netty",
+        "@maven//:io_grpc_grpc_protobuf",
+        "@maven//:io_grpc_grpc_stub",
+    ],
+)
+
+java_binary(
+    name = "CAS_profile_client",
+    srcs = ["CASMemoryProfileClient.java"],
+    classpath_resources = [
+        ":configs",
+    ],
+    main_class = "build.buildfarm.CASMemoryProfileClient",
+    deps = [
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@maven//:io_grpc_grpc_api",
         "@maven//:io_grpc_grpc_context",
         "@maven//:io_grpc_grpc_core",

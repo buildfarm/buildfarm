@@ -617,3 +617,19 @@ message BlobWriteKey {
 
   string identifier = 2;
 }
+
+message MemoryUsage {
+  string memory_used_for = 1;
+  int64 memory_usage = 2;
+}
+message MemoryUsageMessage {
+  repeated MemoryUsage entry = 1;
+}
+
+message MemoryUsageRequest {
+  int32 profile_interval = 1;
+}
+
+service CASMemoryProfile {
+  rpc getCASMemoryUsage(MemoryUsageRequest) returns (MemoryUsageMessage) {}
+}
