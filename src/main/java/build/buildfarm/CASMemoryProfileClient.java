@@ -57,7 +57,8 @@ public class CASMemoryProfileClient {
       return;
     }
 
-    String target = args[0] + ":8981";
+    String workerPort = "8981"; // the default worker port
+    String target = args[0] + ":" + workerPort; 
 
     logger.log(Level.INFO, "Tying to profile memory usage of CASFileCache or worker: " + target);
     int profileInterval = Integer.parseInt(args[1]);
