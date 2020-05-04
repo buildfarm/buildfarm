@@ -1297,6 +1297,7 @@ public class RedisShardBackplane implements ShardBackplane {
                 .setPrequeue(prequeue.status(jedis))
                 .setOperationQueue(operationQueue.status(jedis))
                 .setDispatchedSize(jedis.hlen(config.getDispatchedOperationsHashName()))
+                .addAllActiveWorkers(workerSet)
                 .build());
   }
 }
