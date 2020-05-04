@@ -42,6 +42,8 @@ IO_GRPC_MODULES = [
 def buildfarm_init():
     maven_install(
         artifacts = [
+            "com.amazonaws:aws-java-sdk-core:1.11.729",
+            "com.amazonaws:aws-java-sdk-sns:1.11.729",
             "com.github.jnr:jnr-constants:0.9.9",
             "com.github.jnr:jnr-ffi:2.1.7",
             "com.github.jnr:jffi:1.2.16",

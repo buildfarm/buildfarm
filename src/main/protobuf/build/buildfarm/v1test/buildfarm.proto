@@ -70,6 +70,38 @@ message BuildFarmServerConfig {
   string aws_namespace = 4;
 
   int32 execute_keepalive_after_seconds = 5;
+
+  MetricsConfig metrics_config = 6;
+}
+
+message MetricsConfig {
+  string metrics_destination = 1;
+
+  string cluster_id = 2;
+
+  oneof type {
+    AwsMetricsConfig aws_metrics_config = 3;
+    GcpMetricsConfig gcp_metrics_config = 4;
+    LogMetricsConfig log_metrics_config = 5;
+  }
+}
+
+message AwsMetricsConfig {
+  string operations_metrics_topic = 1;
+
+  int32 sns_client_max_connections = 2;
+
+  string aws_access_key_id = 3;
+
+  string aws_secret_key = 4;
+}
+
+message GcpMetricsConfig {
+  string operations_metrics_topic = 1;
+}
+
+message LogMetricsConfig {
+  string log_level = 1;
 }
 
 message MemoryCASConfig {
@@ -474,6 +506,8 @@ message OperationRequestMetadata {
   build.bazel.remote.execution.v2.ExecuteOperationMetadata execute_operation_metadata = 4;
 
   build.bazel.remote.execution.v2.ExecuteResponse execute_response = 5;
+
+  string cluster_id = 6;
 }
 
 message InstanceConfig {
