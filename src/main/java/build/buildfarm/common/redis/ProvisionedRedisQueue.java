@@ -87,4 +87,22 @@ public class ProvisionedRedisQueue {
     }
     return true;
   }
+  ///
+  /// @brief   Get queue.
+  /// @details Obtain the internal queue.
+  /// @return  The internal queue.
+  /// @note    Suggested return identifier: queue.
+  ///
+  public BalancedRedisQueue queue() {
+    return queue;
+  }
+  ///
+  /// @brief   Get provisions.
+  /// @details Obtain the required provisions.
+  /// @return  The required provisions.
+  /// @note    Suggested return identifier: provisions.
+  ///
+  public SetMultimap<String, String> provisions() {
+    return requiredProvisions;
+  }
 }
