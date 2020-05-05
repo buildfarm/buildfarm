@@ -108,7 +108,7 @@ public class OperationQueue {
   /// @note    Suggested return identifier: name.
   ///
   public String getDequeueName() {
-    return queues.get(0).queue().getDequeueName();
+    return "operation_dequeue";
   }
   ///
   /// @brief   Get dequeue name.
