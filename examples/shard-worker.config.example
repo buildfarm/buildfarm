@@ -60,6 +60,18 @@ cas: {
   }
 }
 
+# another cas entry specification here will provide a fallback
+# for the filesystem cas. Any number of consecutive filesystem
+# fallbacks may be used, terminated with zero or one of grpc or
+# memory types.
+#
+#cas: {
+#  grpc: {
+#      instance_name: "external-cas",
+#      target: "cas.external.com:1234",
+#  }
+#}
+
 # the number of concurrently available slots in the execute phase
 execute_stage_width: 1
 
