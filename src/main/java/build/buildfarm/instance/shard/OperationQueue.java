@@ -18,9 +18,11 @@ import build.bazel.remote.execution.v2.Platform;
 import build.buildfarm.common.StringVisitor;
 import build.buildfarm.common.redis.BalancedRedisQueue;
 import build.buildfarm.common.redis.ProvisionedRedisQueue;
+import build.buildfarm.v1test.OperationQueueStatus;
 import build.buildfarm.v1test.QueueStatus;
 import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.SetMultimap;
+import java.util.ArrayList;
 import java.util.List;
 import redis.clients.jedis.JedisCluster;
 
@@ -159,8 +161,17 @@ public class OperationQueue {
   /// @note    Overloaded.
   /// @note    Suggested return identifier: status.
   ///
-  public QueueStatus status(JedisCluster jedis) {
-    return queues.get(0).queue().status(jedis);
+  public OperationQueueStatus status(JedisCluster jedis) {
+    // get properties
+    List<QueueStatus> provisions = new ArrayList<>();
+    for (ProvisionedRedisQueue pQueue : queues) {
+      provisions.add(pQueue.queue().status(jedis));
+    }
+
+    // build proto
+    OperationQueueStatus status =
+        OperationQueueStatus.newBuilder().addAllProvisions(provisions).build();
+    return status;
   }
   ///
   /// @brief   Get status information about the queue.
