@@ -104,6 +104,7 @@ class ShardWorkerContext implements WorkerContext {
   private static final Logger logger = Logger.getLogger(ShardWorkerContext.class.getName());
 
   private final String name;
+  private final Platform platform;
   private final SetMultimap<String, String> matchProvisions;
   private final Duration operationPollPeriod;
   private final OperationPoller operationPoller;
@@ -163,6 +164,7 @@ class ShardWorkerContext implements WorkerContext {
       boolean limitGlobalExecution,
       boolean onlyMulticoreTests) {
     this.name = name;
+    this.platform = platform;
     this.matchProvisions = getMatchProvisions(platform, policies, executeStageWidth);
     this.operationPollPeriod = operationPollPeriod;
     this.operationPoller = operationPoller;
@@ -181,8 +183,12 @@ class ShardWorkerContext implements WorkerContext {
     this.limitExecution = limitExecution;
     this.limitGlobalExecution = limitGlobalExecution;
     this.onlyMulticoreTests = onlyMulticoreTests;
-    Preconditions.checkState(!limitGlobalExecution || limitExecution, "limit_global_execution is meaningless without limit_execution");
-    Preconditions.checkState(!onlyMulticoreTests || limitExecution, "only_multicore_tests is meaningless without limit_execution");
+    Preconditions.checkState(
+        !limitGlobalExecution || limitExecution,
+        "limit_global_execution is meaningless without limit_execution");
+    Preconditions.checkState(
+        !onlyMulticoreTests || limitExecution,
+        "only_multicore_tests is meaningless without limit_execution");
   }
 
   private static Retrier createBackplaneRetrier() {
@@ -224,10 +230,12 @@ class ShardWorkerContext implements WorkerContext {
             success =
                 operationPoller.poll(queueEntry, stage, System.currentTimeMillis() + 30 * 1000);
           } catch (IOException e) {
-            logger.log(Level.SEVERE, format("%s: poller: error while polling %s", name, operationName), e);
+            logger.log(
+                Level.SEVERE, format("%s: poller: error while polling %s", name, operationName), e);
           }
 
-          logger.log(Level.INFO,
+          logger.log(
+              Level.INFO,
               format(
                   "%s: poller: Completed Poll for %s: %s",
                   name, operationName, success ? "OK" : "Failed"));
@@ -237,7 +245,8 @@ class ShardWorkerContext implements WorkerContext {
           return success;
         },
         () -> {
-          logger.log(Level.INFO, format("%s: poller: Deadline expired for %s", name, operationName));
+          logger.log(
+              Level.INFO, format("%s: poller: Deadline expired for %s", name, operationName));
           onFailure.run();
         },
         deadline);
@@ -270,7 +279,8 @@ class ShardWorkerContext implements WorkerContext {
     try {
       return QueuedOperation.parseFrom(queuedOperationBlob);
     } catch (InvalidProtocolBufferException e) {
-      logger.log(Level.WARNING,
+      logger.log(
+          Level.WARNING,
           format(
               "invalid queued operation: %s(%s)",
               queueEntry.getExecuteEntry().getOperationName(),
@@ -283,7 +293,7 @@ class ShardWorkerContext implements WorkerContext {
     listener.onWaitStart();
     QueueEntry queueEntry = null;
     try {
-      queueEntry = backplane.dispatchOperation();
+      queueEntry = backplane.dispatchOperation(platform.getPropertiesList());
     } catch (IOException e) {
       Status status = Status.fromThrowable(e);
       if (status.getCode() != Code.UNAVAILABLE) {
@@ -597,10 +607,7 @@ class ShardWorkerContext implements WorkerContext {
     Directory toDirectory() {
       Collections.sort(files, Comparator.comparing(node -> node.getName()));
       Collections.sort(directories, Comparator.comparing(node -> node.getName()));
-      return Directory.newBuilder()
-          .addAllFiles(files)
-          .addAllDirectories(directories)
-          .build();
+      return Directory.newBuilder().addAllFiles(files).addAllDirectories(directories).build();
     }
   }
 
@@ -641,7 +648,8 @@ class ShardWorkerContext implements WorkerContext {
             try {
               digest = getDigestUtil().compute(file);
             } catch (NoSuchFileException e) {
-              logger.log(Level.SEVERE,
+              logger.log(
+                  Level.SEVERE,
                   format(
                       "error visiting file %s under output dir %s",
                       outputDirPath.relativize(file), outputDirPath.toAbsolutePath()),
@@ -652,11 +660,12 @@ class ShardWorkerContext implements WorkerContext {
             // should we cast to PosixFilePermissions and do gymnastics there for executable?
 
             // TODO symlink per revision proposal
-            currentDirectory.addFile(FileNode.newBuilder()
-                .setName(file.getFileName().toString())
-                .setDigest(digest)
-                .setIsExecutable(Files.isExecutable(file))
-                .build());
+            currentDirectory.addFile(
+                FileNode.newBuilder()
+                    .setName(file.getFileName().toString())
+                    .setDigest(digest)
+                    .setIsExecutable(Files.isExecutable(file))
+                    .build());
             try {
               insertFile(digest, file);
             } catch (InterruptedException e) {
@@ -685,8 +694,7 @@ class ShardWorkerContext implements WorkerContext {
           }
 
           @Override
-          public FileVisitResult postVisitDirectory(Path dir, IOException exc)
-              throws IOException {
+          public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
             OutputDirectoryContext parentDirectory = path.pop();
             Directory directory = currentDirectory.toDirectory();
             if (parentDirectory == null) {

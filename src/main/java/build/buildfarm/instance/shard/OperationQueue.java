@@ -127,20 +127,9 @@ public class OperationQueue {
   ///
   /// @brief   Push a value onto the queue.
   /// @details Adds the value into one of the internal backend redis queues.
-  /// @param   jedis Jedis cluster client.
-  /// @param   val   The value to push onto the queue.
-  /// @note    Overloaded.
-  ///
-  public void push(JedisCluster jedis, String val) {
-    queues.get(0).queue().push(jedis, val);
-  }
-  ///
-  /// @brief   Push a value onto the queue.
-  /// @details Adds the value into one of the internal backend redis queues.
   /// @param   jedis      Jedis cluster client.
   /// @param   provisions Provisions used to select an eligible queue.
   /// @param   val        The value to push onto the queue.
-  /// @note    Overloaded.
   ///
   public void push(JedisCluster jedis, List<Platform.Property> provisions, String val) {
     BalancedRedisQueue queue = chooseEligibleQueue(provisions);
@@ -151,23 +140,9 @@ public class OperationQueue {
   /// @details This pops the element from one queue atomically into an internal
   ///          list called the dequeue. It will perform an exponential backoff.
   ///          Null is returned if the overall backoff times out.
-  /// @param   jedis Jedis cluster client.
-  /// @return  The value of the transfered element. null if the thread was interrupted.
-  /// @note    Overloaded.
-  /// @note    Suggested return identifier: val.
-  ///
-  public String dequeue(JedisCluster jedis) throws InterruptedException {
-    return queues.get(0).queue().dequeue(jedis);
-  }
-  ///
-  /// @brief   Pop element into internal dequeue and return value.
-  /// @details This pops the element from one queue atomically into an internal
-  ///          list called the dequeue. It will perform an exponential backoff.
-  ///          Null is returned if the overall backoff times out.
   /// @param   jedis      Jedis cluster client.
   /// @param   provisions Provisions used to select an eligible queue.
   /// @return  The value of the transfered element. null if the thread was interrupted.
-  /// @note    Overloaded.
   /// @note    Suggested return identifier: val.
   ///
   public String dequeue(JedisCluster jedis, List<Platform.Property> provisions)

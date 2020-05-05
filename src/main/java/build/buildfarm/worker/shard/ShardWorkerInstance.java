@@ -36,10 +36,10 @@ import build.buildfarm.common.Write;
 import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
+import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ShardWorkerInstanceConfig;
-import build.buildfarm.v1test.OperationsStatus;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -53,10 +53,12 @@ import io.grpc.StatusRuntimeException;
 import io.grpc.stub.ServerCallStreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
-import javax.naming.ConfigurationException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.naming.ConfigurationException;
 
 public class ShardWorkerInstance extends AbstractServerInstance {
   private static final Logger logger = Logger.getLogger(ShardWorkerInstance.class.getName());
@@ -80,7 +82,8 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  public ListenableFuture<ActionResult> getActionResult(ActionKey actionKey, RequestMetadata requestMetadata) {
+  public ListenableFuture<ActionResult> getActionResult(
+      ActionKey actionKey, RequestMetadata requestMetadata) {
     return immediateFailedFuture(new UnsupportedOperationException());
   }
 
@@ -172,7 +175,8 @@ public class ShardWorkerInstance extends AbstractServerInstance {
             try {
               input.close();
             } catch (IOException e) {
-              logger.log(Level.SEVERE,
+              logger.log(
+                  Level.SEVERE,
                   String.format(
                       "error closing stream for %s after cancellation",
                       DigestUtil.toString(blobDigest)),
@@ -185,7 +189,10 @@ public class ShardWorkerInstance extends AbstractServerInstance {
       try {
         backplane.removeBlobLocation(blobDigest, getName());
       } catch (IOException backplaneException) {
-        logger.log(Level.SEVERE, String.format("error removing blob location for %s", DigestUtil.toString(blobDigest)), backplaneException);
+        logger.log(
+            Level.SEVERE,
+            String.format("error removing blob location for %s", DigestUtil.toString(blobDigest)),
+            backplaneException);
       }
     } catch (InterruptedException e) {
       blobObserver.onError(Status.CANCELLED.withCause(e).asException());
@@ -229,7 +236,9 @@ public class ShardWorkerInstance extends AbstractServerInstance {
     while (!backplane.isStopped()) {
       listener.onWaitStart();
       try {
-        QueueEntry queueEntry = backplane.dispatchOperation();
+
+        List<Platform.Property> provisions = new ArrayList<>();
+        QueueEntry queueEntry = backplane.dispatchOperation(provisions);
         if (queueEntry != null) {
           return queueEntry;
         }
@@ -248,7 +257,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   public void match(Platform platform, MatchListener listener) throws InterruptedException {
     throw new UnsupportedOperationException();
   }
-  
+
   @Override
   public OperationsStatus operationsStatus() {
     throw new UnsupportedOperationException();
@@ -337,7 +346,10 @@ public class ShardWorkerInstance extends AbstractServerInstance {
             .unpack(QueuedOperationMetadata.class)
             .getExecuteOperationMetadata();
       } catch (InvalidProtocolBufferException e) {
-        logger.log(Level.SEVERE, String.format("error unpacking queued operation metadata from %s", operation.getName()), e);
+        logger.log(
+            Level.SEVERE,
+            String.format("error unpacking queued operation metadata from %s", operation.getName()),
+            e);
         return null;
       }
     } else if (operation.getMetadata().is(ExecutingOperationMetadata.class)) {
@@ -347,7 +359,11 @@ public class ShardWorkerInstance extends AbstractServerInstance {
             .unpack(ExecutingOperationMetadata.class)
             .getExecuteOperationMetadata();
       } catch (InvalidProtocolBufferException e) {
-        logger.log(Level.SEVERE, String.format("error unpacking executing operation metadata from %s", operation.getName()), e);
+        logger.log(
+            Level.SEVERE,
+            String.format(
+                "error unpacking executing operation metadata from %s", operation.getName()),
+            e);
         return null;
       }
     } else if (operation.getMetadata().is(CompletedOperationMetadata.class)) {
@@ -357,7 +373,11 @@ public class ShardWorkerInstance extends AbstractServerInstance {
             .unpack(CompletedOperationMetadata.class)
             .getExecuteOperationMetadata();
       } catch (InvalidProtocolBufferException e) {
-        logger.log(Level.SEVERE, String.format("error unpacking completed operation metadata from %s", operation.getName()), e);
+        logger.log(
+            Level.SEVERE,
+            String.format(
+                "error unpacking completed operation metadata from %s", operation.getName()),
+            e);
         return null;
       }
     } else {
