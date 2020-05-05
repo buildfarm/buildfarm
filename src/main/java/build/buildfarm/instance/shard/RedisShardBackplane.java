@@ -491,7 +491,9 @@ public class RedisShardBackplane implements ShardBackplane {
     client = new RedisClient(jedisClusterFactory.get());
     List<String> hashtags = client.call(jedis -> RedisNodeHashes.getEvenlyDistributedHashes(jedis));
     this.prequeue = new BalancedRedisQueue(config.getPreQueuedOperationsListName(), hashtags);
-
+    
+    // The operations queue can be divided into multiple queues handling different platform executions.
+    // In this case, we have a single with no explicitly required platform executions.
     ProvisionedRedisQueue defaultQueue =
         new ProvisionedRedisQueue(
             config.getQueuedOperationsListName(), hashtags, LinkedHashMultimap.create());
