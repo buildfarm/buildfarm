@@ -1120,7 +1120,7 @@ public class RedisShardBackplane implements ShardBackplane {
     client.run(
         jedis -> {
           if (jedis.hdel(config.getDispatchedOperationsHashName(), operationName) == 1) {
-            operationQueue.push(jedis, queueEntryJson);
+            operationQueue.push(jedis, queueEntry.getPlatform().getPropertiesList(), queueEntryJson);
           }
         });
   }
