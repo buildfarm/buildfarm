@@ -66,7 +66,7 @@ public class ProvisionedRedisQueue {
   /// @param   hashtags           Hashtags to distribute queue data.
   /// @param   requiredProvisions The required provisions of the queue.
   ///
-  public void redisProvisionQueue(
+  public ProvisionedRedisQueue(
       String name, List<String> hashtags, SetMultimap<String, String> requiredProvisions) {
     this.queue = new BalancedRedisQueue(name, hashtags);
     this.requiredProvisions = requiredProvisions;
