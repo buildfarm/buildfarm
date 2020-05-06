@@ -60,6 +60,7 @@ import com.google.rpc.RetryInfo;
 import io.grpc.Context;
 import io.grpc.ManagedChannel;
 import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import java.io.IOException;
@@ -607,6 +608,33 @@ class Cat {
     return 10;
   }
 
+  private static void getCASMemoryProfile(Instance instance, int interval) {
+    CASUsageMessage response = null;
+    while (true) {
+      try {
+        response = instance.getCASMemoryProfile();
+      } catch (StatusRuntimeException e) {
+        System.out.println(e.getMessage());
+      }
+
+      if (response == null) {
+        continue;
+      }
+
+      System.out.println("Current Entry Count: " + response.getEntryCount());
+      System.out.println("Current DirectoryEntry Count: " + response.getDirectoryEntryCount());
+      System.out.println("Current ContainedDirectories total: " + response.getContainingDirectoriesCount());
+      System.out.println("Current ContainedDirectories Max: " + response.getContainingDirectoriesMax());
+
+      try {
+        TimeUnit.SECONDS.sleep(interval);
+      } catch (InterruptedException e) {
+        System.out.println(e.getMessage());
+        return;
+      }
+    }
+  }
+
   public static void main(String[] args) throws Exception {
     String host = args[0];
     String instanceName = args[1];
@@ -641,6 +669,9 @@ class Cat {
   }
 
   static void instanceMain(Instance instance, String type, String[] args) throws Exception {
+    if (type.equals("CASMemory")) {
+      getCASMemoryProfile(instance, Integer.parseInt(args[4]));
+    }
     if (type.equals("Capabilities")) {
       ServerCapabilities capabilities = instance.getCapabilities();
       printCapabilities(capabilities);

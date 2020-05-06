@@ -63,6 +63,7 @@ import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.StubWriteOutputStream;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.OperationQueueGrpc;
+import build.buildfarm.v1test.CASUsageProfileGrpc.CASUsageProfileBlockingStub;
 import build.buildfarm.v1test.OperationQueueGrpc.OperationQueueBlockingStub;
 import build.buildfarm.v1test.OperationsStatusRequest;
 import build.buildfarm.v1test.PollOperationRequest;
@@ -265,6 +266,14 @@ public class StubInstance implements Instance {
               return OperationQueueGrpc.newBlockingStub(channel);
             }
           });
+
+  private final Supplier<CASUsageProfileBlockingStub> CASMemoryProfileBlockingStub =
+      Suppliers.memoize(new Supplier<CASUsageProfileBlockingStub>() {
+        @Override
+        public CASUsageProfileBlockingStub get() {
+          return CASUsageProfileGrpc.newBlockingStub(channel);
+        }
+      });
 
   private <T extends AbstractStub<T>> T deadlined(Supplier<T> getter) {
     T stub = getter.get();
@@ -751,5 +760,10 @@ public class StubInstance implements Instance {
     throwIfStopped();
     return deadlined(capsBlockingStub)
         .getCapabilities(GetCapabilitiesRequest.newBuilder().setInstanceName(getName()).build());
+  }
+
+  @Override
+  public CASUsageMessage getCASMemoryProfile() {
+    return CASMemoryProfileBlockingStub.get().getCASUsage(CASUsageRequest.newBuilder().build());
   }
 }

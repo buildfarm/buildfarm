@@ -1,4 +1,4 @@
-// Copyright 2017 The Bazel Authors. All rights reserved.
+// Copyright 2020 The Bazel Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,43 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.server;
+package build.buildfarm.worker.shard;
 
 import build.buildfarm.cas.ContentAddressableStorage;
-import build.buildfarm.v1test.*;
+import build.buildfarm.v1test.CASUsageProfileGrpc;
+import build.buildfarm.v1test.CASUsageMessage;
+import build.buildfarm.v1test.CASUsageRequest;
 import build.buildfarm.worker.CASFileCache;
 import io.grpc.stub.StreamObserver;
 import java.util.logging.Logger;
 
-public class CASMemoryProfileService extends CASMemoryProfileGrpc.CASMemoryProfileImplBase {
+public class CASMemoryProfileService extends CASUsageProfileGrpc.CASUsageProfileImplBase{
   private static final Logger logger = Logger.getLogger(CASMemoryProfileService.class.getName());
 
   private final CASFileCache storage;
 
   public CASMemoryProfileService(ContentAddressableStorage storage) {
-
     this.storage = (CASFileCache) storage;
   }
 
   @Override
-  public void getCASMemoryUsage(
-      MemoryUsageRequest request, StreamObserver<MemoryUsageMessage> responseObserver) {
-    // get Entry storage size
-    MemoryUsage entry =
-        MemoryUsage.newBuilder()
-            .setMemoryUsedFor("Number of Entry")
-            .setMemoryUsage(storage.storageCount())
-            .build();
+  public void getCASUsage(
+      CASUsageRequest request, StreamObserver<CASUsageMessage> responseObserver) {
 
-    // get DirecotyEntry storage size
-    MemoryUsage dirEntry =
-        MemoryUsage.newBuilder()
-            .setMemoryUsedFor("Number of DirectoryEntry")
-            .setMemoryUsage(storage.directoryStorageCount())
+    CASUsageMessage reply =
+        CASUsageMessage.newBuilder()
+            .setEntryCount(storage.storageCount())
+            .setDirectoryEntryCount(storage.directoryStorageCount())
             .build();
-
-    MemoryUsageMessage reply =
-        MemoryUsageMessage.newBuilder().addEntry(entry).addEntry(dirEntry).build();
 
     responseObserver.onNext(reply);
     responseObserver.onCompleted();

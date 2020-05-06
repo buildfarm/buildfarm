@@ -49,6 +49,7 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.bazel.remote.execution.v2.SymlinkAbsolutePathStrategy;
+import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.buildfarm.ac.ActionCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
@@ -85,6 +86,7 @@ import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.ServerCallStreamObserver;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashSet;
@@ -100,6 +102,16 @@ import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import static build.buildfarm.common.Actions.asExecutionStatus;
+import static build.buildfarm.common.Actions.checkPreconditionFailure;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
+import static build.buildfarm.instance.Utils.putBlob;
+import static com.google.common.util.concurrent.Futures.*;
+import static com.google.common.util.concurrent.MoreExecutors.*;
+import static java.lang.String.format;
+import static java.util.concurrent.TimeUnit.SECONDS;
 
 public abstract class AbstractServerInstance implements Instance {
   private static final Logger logger = Logger.getLogger(AbstractServerInstance.class.getName());
@@ -1619,6 +1631,11 @@ public abstract class AbstractServerInstance implements Instance {
         .setCacheCapabilities(getCacheCapabilities())
         .setExecutionCapabilities(getExecutionCapabilities())
         .build();
+  }
+
+  @Override
+  public CASUsageMessage getCASMemoryProfile() {
+    return null;
   }
 
   protected abstract Logger getLogger();

@@ -28,6 +28,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
+import build.buildfarm.v1test.CASUsageMessage;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.Tree;
@@ -134,6 +135,8 @@ public interface Instance {
   ListenableFuture<Void> watchOperation(String operationName, Watcher watcher);
 
   ServerCapabilities getCapabilities();
+
+  CASUsageMessage getCASMemoryProfile();
 
   interface MatchListener {
     // start/end pair called for each wait period
