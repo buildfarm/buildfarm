@@ -38,6 +38,7 @@ import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
+import build.buildfarm.v1test.CASUsageMessage;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.QueuedOperationMetadata;
@@ -608,11 +609,11 @@ class Cat {
     return 10;
   }
 
-  private static void getCASMemoryProfile(Instance instance, int interval) {
+  private static void getCASUsageProfile(Instance instance, int interval) {
     CASUsageMessage response = null;
     while (true) {
       try {
-        response = instance.getCASMemoryProfile();
+        response = instance.getCASUsageProfile();
       } catch (StatusRuntimeException e) {
         System.out.println(e.getMessage());
       }
@@ -670,7 +671,7 @@ class Cat {
 
   static void instanceMain(Instance instance, String type, String[] args) throws Exception {
     if (type.equals("CASMemory")) {
-      getCASMemoryProfile(instance, Integer.parseInt(args[4]));
+      getCASUsageProfile(instance, Integer.parseInt(args[4]));
     }
     if (type.equals("Capabilities")) {
       ServerCapabilities capabilities = instance.getCapabilities();

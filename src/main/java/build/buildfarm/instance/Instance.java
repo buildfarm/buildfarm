@@ -136,7 +136,7 @@ public interface Instance {
 
   ServerCapabilities getCapabilities();
 
-  CASUsageMessage getCASMemoryProfile();
+  CASUsageMessage getCASUsageProfile();
 
   interface MatchListener {
     // start/end pair called for each wait period

@@ -62,12 +62,15 @@ import build.buildfarm.common.grpc.ByteStreamHelper;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.StubWriteOutputStream;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.v1test.OperationQueueGrpc;
+import build.buildfarm.v1test.CASUsageMessage;
+import build.buildfarm.v1test.CASUsageProfileGrpc;
 import build.buildfarm.v1test.CASUsageProfileGrpc.CASUsageProfileBlockingStub;
+import build.buildfarm.v1test.CASUsageRequest;
 import build.buildfarm.v1test.OperationQueueGrpc.OperationQueueBlockingStub;
 import build.buildfarm.v1test.OperationsStatusRequest;
-import build.buildfarm.v1test.PollOperationRequest;
+import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.OperationsStatus;
+import build.buildfarm.v1test.PollOperationRequest;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.TakeOperationRequest;
 import build.buildfarm.v1test.Tree;
@@ -763,7 +766,7 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public CASUsageMessage getCASMemoryProfile() {
+  public CASUsageMessage getCASUsageProfile() {
     return CASMemoryProfileBlockingStub.get().getCASUsage(CASUsageRequest.newBuilder().build());
   }
 }

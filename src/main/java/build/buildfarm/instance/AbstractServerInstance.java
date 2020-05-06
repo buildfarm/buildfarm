@@ -1634,7 +1634,7 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public CASUsageMessage getCASMemoryProfile() {
+  public CASUsageMessage getCASUsageProfile() {
     return null;
   }
 
