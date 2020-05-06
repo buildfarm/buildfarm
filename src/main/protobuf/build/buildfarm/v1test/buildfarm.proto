@@ -67,11 +67,9 @@ message BuildFarmServerConfig {
 
   int32 port = 3;
 
-  string aws_namespace = 4;
+  int32 execute_keepalive_after_seconds = 4;
 
-  int32 execute_keepalive_after_seconds = 5;
-
-  MetricsConfig metrics_config = 6;
+  MetricsConfig metrics_config = 5;
 }
 
 message MetricsConfig {
@@ -94,6 +92,8 @@ message AwsMetricsConfig {
   string aws_access_key_id = 3;
 
   string aws_secret_key = 4;
+
+  string region = 5;
 }
 
 message GcpMetricsConfig {

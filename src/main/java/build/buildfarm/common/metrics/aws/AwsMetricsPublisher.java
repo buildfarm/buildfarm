@@ -21,7 +21,6 @@ import com.amazonaws.ClientConfiguration;
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.handlers.AsyncHandler;
-import com.amazonaws.regions.Regions;
 import com.amazonaws.services.sns.AmazonSNSAsync;
 import com.amazonaws.services.sns.AmazonSNSAsyncClientBuilder;
 import com.amazonaws.services.sns.model.PublishRequest;
@@ -38,6 +37,7 @@ public class AwsMetricsPublisher extends AbstractMetricsPublisher {
   private String snsTopicOperations;
   private String awsAccessKeyId;
   private String awsSecretKey;
+  private String region;
   private int snsClientMaxConnections;
 
   public AwsMetricsPublisher(MetricsConfig metricsConfig) {
@@ -45,11 +45,13 @@ public class AwsMetricsPublisher extends AbstractMetricsPublisher {
     snsTopicOperations = metricsConfig.getAwsMetricsConfig().getOperationsMetricsTopic();
     awsAccessKeyId = metricsConfig.getAwsMetricsConfig().getAwsAccessKeyId();
     awsSecretKey = metricsConfig.getAwsMetricsConfig().getAwsSecretKey();
+    region = metricsConfig.getAwsMetricsConfig().getRegion();
     snsClientMaxConnections = metricsConfig.getAwsMetricsConfig().getSnsClientMaxConnections();
     if (!StringUtils.isNullOrEmpty(snsTopicOperations)
       && snsClientMaxConnections > 0
       && !StringUtils.isNullOrEmpty(awsAccessKeyId)
-      && !StringUtils.isNullOrEmpty(awsSecretKey)) {
+      && !StringUtils.isNullOrEmpty(awsSecretKey)
+      && !StringUtils.isNullOrEmpty(region)) {
       snsClient = initSnsClient();
     }
   }
@@ -80,7 +82,7 @@ public class AwsMetricsPublisher extends AbstractMetricsPublisher {
     logger.log(Level.INFO, "Initializing SNS Client.");
     return
       AmazonSNSAsyncClientBuilder.standard()
-        .withRegion(Regions.US_EAST_1)
+        .withRegion(region)
         .withClientConfiguration(
           new ClientConfiguration()
             .withMaxConnections(snsClientMaxConnections))
