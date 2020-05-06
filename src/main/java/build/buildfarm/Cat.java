@@ -626,6 +626,8 @@ class Cat {
       System.out.println("Current DirectoryEntry Count: " + response.getDirectoryEntryCount());
       System.out.println("Current ContainedDirectories total: " + response.getContainingDirectoriesCount());
       System.out.println("Current ContainedDirectories Max: " + response.getContainingDirectoriesMax());
+      System.out.println("Current ContainedDirectories average: " +
+          response.getContainingDirectoriesCount() * 1.0 / response.getEntryCount());
 
       try {
         TimeUnit.SECONDS.sleep(interval);

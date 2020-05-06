@@ -19,6 +19,7 @@ import build.buildfarm.v1test.CASUsageProfileGrpc;
 import build.buildfarm.v1test.CASUsageMessage;
 import build.buildfarm.v1test.CASUsageRequest;
 import build.buildfarm.worker.CASFileCache;
+import build.buildfarm.worker.CASFileCache.Entry;
 import io.grpc.stub.StreamObserver;
 import java.util.logging.Logger;
 
@@ -35,10 +36,14 @@ public class CASMemoryProfileService extends CASUsageProfileGrpc.CASUsageProfile
   public void getCASUsage(
       CASUsageRequest request, StreamObserver<CASUsageMessage> responseObserver) {
 
+    long [] containedDirectories = storage.getContainedDirectoriesCounts();
+
     CASUsageMessage reply =
         CASUsageMessage.newBuilder()
             .setEntryCount(storage.storageCount())
             .setDirectoryEntryCount(storage.directoryStorageCount())
+            .setContainingDirectoriesCount(containedDirectories[0])
+            .setContainingDirectoriesMax(containedDirectories[1])
             .build();
 
     responseObserver.onNext(reply);
