@@ -25,10 +25,6 @@ public class GcpMetricsPublisher extends AbstractMetricsPublisher {
     super(metricsConfig.getClusterId());
   }
 
-  public GcpMetricsPublisher() {
-    super();
-  }
-
   @Override
   public void publishMetric(String metricName, Object metricValue) {
     throw new UnsupportedOperationException();

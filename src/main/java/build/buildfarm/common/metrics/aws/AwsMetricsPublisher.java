@@ -56,10 +56,6 @@ public class AwsMetricsPublisher extends AbstractMetricsPublisher {
     }
   }
 
-  public AwsMetricsPublisher() {
-    super();
-  }
-
   @Override
   public void publishRequestMetadata(Operation operation, RequestMetadata requestMetadata) {
     try {
