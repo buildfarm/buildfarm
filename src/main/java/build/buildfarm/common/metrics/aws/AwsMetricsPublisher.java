@@ -48,10 +48,10 @@ public class AwsMetricsPublisher extends AbstractMetricsPublisher {
     region = metricsConfig.getAwsMetricsConfig().getRegion();
     snsClientMaxConnections = metricsConfig.getAwsMetricsConfig().getSnsClientMaxConnections();
     if (!StringUtils.isNullOrEmpty(snsTopicOperations)
-      && snsClientMaxConnections > 0
-      && !StringUtils.isNullOrEmpty(awsAccessKeyId)
-      && !StringUtils.isNullOrEmpty(awsSecretKey)
-      && !StringUtils.isNullOrEmpty(region)) {
+        && snsClientMaxConnections > 0
+        && !StringUtils.isNullOrEmpty(awsAccessKeyId)
+        && !StringUtils.isNullOrEmpty(awsSecretKey)
+        && !StringUtils.isNullOrEmpty(region)) {
       snsClient = initSnsClient();
     }
   }
@@ -64,39 +64,47 @@ public class AwsMetricsPublisher extends AbstractMetricsPublisher {
   public void publishRequestMetadata(Operation operation, RequestMetadata requestMetadata) {
     try {
       if (snsClient != null) {
-        snsClient.publishAsync(new PublishRequest(snsTopicOperations, formatRequestMetadataToJson(populateRequestMetadata(operation, requestMetadata))), new AsyncHandler<PublishRequest, PublishResult>() {
-          @Override
-          public void onError(Exception e) {
-            logger.log(Level.WARNING, "Could not publish metrics data to SNS.", e);
-          }
-          @Override
-          public void onSuccess(PublishRequest request, PublishResult publishResult) { }
-        });
+        snsClient.publishAsync(
+            new PublishRequest(
+                snsTopicOperations,
+                formatRequestMetadataToJson(populateRequestMetadata(operation, requestMetadata))),
+            new AsyncHandler<PublishRequest, PublishResult>() {
+              @Override
+              public void onError(Exception e) {
+                logger.log(Level.WARNING, "Could not publish metrics data to SNS.", e);
+              }
+
+              @Override
+              public void onSuccess(PublishRequest request, PublishResult publishResult) {}
+            });
       }
     } catch (Exception e) {
-      logger.log(Level.WARNING, String.format("Could not publish request metadata to SNS for %s.", operation.getName()), e);
+      logger.log(
+          Level.WARNING,
+          String.format("Could not publish request metadata to SNS for %s.", operation.getName()),
+          e);
     }
   }
 
   private AmazonSNSAsync initSnsClient() {
     logger.log(Level.INFO, "Initializing SNS Client.");
-    return
-      AmazonSNSAsyncClientBuilder.standard()
+    return AmazonSNSAsyncClientBuilder.standard()
         .withRegion(region)
         .withClientConfiguration(
-          new ClientConfiguration()
-            .withMaxConnections(snsClientMaxConnections))
-        .withCredentials(new AWSStaticCredentialsProvider(new AWSCredentials() {
-          @Override
-          public String getAWSAccessKeyId() {
-            return awsAccessKeyId;
-          }
+            new ClientConfiguration().withMaxConnections(snsClientMaxConnections))
+        .withCredentials(
+            new AWSStaticCredentialsProvider(
+                new AWSCredentials() {
+                  @Override
+                  public String getAWSAccessKeyId() {
+                    return awsAccessKeyId;
+                  }
 
-          @Override
-          public String getAWSSecretKey() {
-            return awsSecretKey;
-          }
-        }))
+                  @Override
+                  public String getAWSSecretKey() {
+                    return awsSecretKey;
+                  }
+                }))
         .build();
   }
 
