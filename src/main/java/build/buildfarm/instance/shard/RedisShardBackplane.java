@@ -124,6 +124,7 @@ public class RedisShardBackplane implements ShardBackplane {
   private @Nullable InterruptingRunnable onUnsubscribe = null;
   private Thread subscriptionThread = null;
   private Thread failsafeOperationThread = null;
+  private Thread casIndexerThread = null;
   private RedisShardSubscriber subscriber = null;
   private RedisShardSubscription operationSubscription = null;
   private ExecutorService subscriberService = null;
@@ -444,7 +445,7 @@ public class RedisShardBackplane implements ShardBackplane {
             MultimapBuilder.linkedHashKeys().arrayListValues().build());
     subscriberService = Executors.newFixedThreadPool(32);
     subscriber =
-        new RedisShardSubscriber(watchers, workerSet, config.getWorkerChannel(), subscriberService);
+        new RedisShardSubscriber(watchers, workerSet, this::onWorkerChange, config.getWorkerChannel(), subscriberService);
 
     operationSubscription =
         new RedisShardSubscription(
@@ -463,6 +464,36 @@ public class RedisShardBackplane implements ShardBackplane {
     subscriptionThread = new Thread(operationSubscription);
 
     subscriptionThread.start();
+  }
+  
+  private void onWorkerChange(WorkerChange workerChange) {
+    switch (workerChange.getTypeCase()) {
+      case TYPE_NOT_SET:
+        logger.log(Level.SEVERE,
+            format(
+                "WorkerChange oneof type is not set from %s at %s",
+                workerChange.getName(), workerChange.getEffectiveAt()));
+        break;
+      case ADD:
+        workerSet.add(workerChange.getName());
+        break;
+      case REMOVE:
+        workerSet.remove(workerChange.getName());
+        startCasIndexerThread();
+        break;
+    }
+  }
+  
+  private void startCasIndexerThread() {
+    casIndexerThread = new Thread(
+        () -> {
+          try {
+              client.run(CasIndexer::reindexWorkers);
+            } catch (Exception e) {
+              logger.log(Level.SEVERE, "error while re-indexing the CAS", e);
+            }
+        });
+    casIndexerThread.start();
   }
 
   private void startFailsafeOperationThread() {
@@ -519,6 +550,11 @@ public class RedisShardBackplane implements ShardBackplane {
       failsafeOperationThread.stop();
       failsafeOperationThread.join();
       logger.log(Level.FINE, "failsafeOperationThread has been stopped");
+    }
+    if (casIndexerThread != null) {
+      casIndexerThread.stop();
+      casIndexerThread.join();
+      logger.log(Level.FINE, "casIndexerThread has been stopped");
     }
     if (operationSubscription != null) {
       operationSubscription.stop();

@@ -61,16 +61,19 @@ class RedisShardSubscriber extends JedisPubSub {
 
   private final ListMultimap<String, TimedWatchFuture> watchers;
   private final Set<String> workers;
+  private final Consumer<WorkerChange> onWorkerChange;
   private final String workerChannel;
   private final Executor executor;
 
   RedisShardSubscriber(
       ListMultimap<String, TimedWatchFuture> watchers,
       Set<String> workers,
+      Consumer<WorkerChange> onWorkerChange,
       String workerChannel,
       Executor executor) {
     this.watchers = watchers;
     this.workers = workers;
+    this.onWorkerChange = onWorkerChange;
     this.workerChannel = workerChannel;
     this.executor = executor;
   }
@@ -244,29 +247,12 @@ class RedisShardSubscriber extends JedisPubSub {
 
   void onWorkerMessage(String message) {
     try {
-      onWorkerChange(parseWorkerChange(message));
+      onWorkerChange.accept(parseWorkerChange(message));
     } catch (InvalidProtocolBufferException e) {
       logger.log(Level.INFO, format("invalid worker change message: %s", message), e);
     }
   }
-
-  void onWorkerChange(WorkerChange workerChange) {
-    switch (workerChange.getTypeCase()) {
-      case TYPE_NOT_SET:
-        logger.log(Level.SEVERE,
-            format(
-                "WorkerChange oneof type is not set from %s at %s",
-                workerChange.getName(), workerChange.getEffectiveAt()));
-        break;
-      case ADD:
-        addWorker(workerChange.getName());
-        break;
-      case REMOVE:
-        removeWorker(workerChange.getName());
-        break;
-    }
-  }
-
+  
   void addWorker(String worker) {
     synchronized (workers) {
       workers.add(worker);
