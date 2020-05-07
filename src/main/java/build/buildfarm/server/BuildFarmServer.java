@@ -21,7 +21,12 @@ import static java.util.logging.Level.SEVERE;
 
 import build.buildfarm.common.LoggingMain;
 import build.buildfarm.common.grpc.TracingMetadataUtils.ServerHeadersInterceptor;
+import build.buildfarm.common.metrics.MetricsPublisher;
+import build.buildfarm.common.metrics.aws.AwsMetricsPublisher;
+import build.buildfarm.common.metrics.gcp.GcpMetricsPublisher;
+import build.buildfarm.common.metrics.log.LogMetricsPublisher;
 import build.buildfarm.v1test.BuildFarmServerConfig;
+import build.buildfarm.v1test.MetricsConfig;
 import com.google.devtools.common.options.OptionsParser;
 import com.google.protobuf.TextFormat;
 import io.grpc.Server;
@@ -42,7 +47,6 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 import javax.naming.ConfigurationException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -96,7 +100,8 @@ public class BuildFarmServer extends LoggingMain {
                     instances,
                     config.getExecuteKeepaliveAfterSeconds(),
                     TimeUnit.SECONDS,
-                    keepaliveScheduler))
+                    keepaliveScheduler,
+                    getMetricsPublisher(config.getMetricsConfig())))
             .addService(new OperationQueueService(instances))
             .addService(new OperationsService(instances))
             .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
@@ -114,6 +119,17 @@ public class BuildFarmServer extends LoggingMain {
       builder.setPort(options.port);
     }
     return builder.build();
+  }
+
+  private static MetricsPublisher getMetricsPublisher(MetricsConfig metricsConfig) {
+    switch (metricsConfig.getMetricsDestination()) {
+      default:
+        return new LogMetricsPublisher(metricsConfig);
+      case "aws":
+        return new AwsMetricsPublisher(metricsConfig);
+      case "gcp":
+        return new GcpMetricsPublisher(metricsConfig);
+    }
   }
 
   public void start() throws IOException {
