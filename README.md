@@ -99,17 +99,17 @@ BUILDFARM_EXTERNAL_COMMIT = "<revision commit id>"
 BUILDFARM_EXTERNAL_SHA256 = "<sha256 digest of url below>"
 
 http_archive(
-    name = "bazel_buildfarm",
+    name = "build_buildfarm",
     strip_prefix = "bazel-buildfarm-%s" % BUILDFARM_EXTERNAL_COMMIT,
     sha256 = BUILDFARM_EXTERNAL_SHA256,
     url = "https://github.com/bazelbuild/bazel-buildfarm/archive/%s.zip" % BUILDFARM_EXTERNAL_COMMIT,
 )
 
-load("@bazel_buildfarm//:deps.bzl", "buildfarm_dependencies")
+load("@build_buildfarm//:deps.bzl", "buildfarm_dependencies")
 
 buildfarm_dependencies()
 
-load("@bazel_buildfarm//:defs.bzl", "buildfarm_init")
+load("@build_buildfarm//:defs.bzl", "buildfarm_init")
 
 buildfarm_init()
 ```
@@ -117,7 +117,7 @@ buildfarm_init()
 Optionally, if you want to use the buildfarm docker container image targets, you can add this:
 
 ```
-load("@bazel_buildfarm//:images.bzl", "buildfarm_images")
+load("@build_buildfarm//:images.bzl", "buildfarm_images")
 
 buildfarm_images()
 ```
