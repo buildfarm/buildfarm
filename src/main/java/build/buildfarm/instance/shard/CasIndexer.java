@@ -17,8 +17,12 @@ package build.buildfarm.instance.shard;
 import static redis.clients.jedis.JedisCluster.HASHSLOTS;
 
 import build.buildfarm.common.redis.RedisSlotToHash;
+import java.util.List;
 import java.util.Set;
 import redis.clients.jedis.JedisCluster;
+import redis.clients.jedis.ScanParams;
+import redis.clients.jedis.ScanResult;
+import redis.clients.jedis.util.JedisClusterCRC16;
 
 ///
 /// @class   CasIndexer
@@ -33,13 +37,90 @@ import redis.clients.jedis.JedisCluster;
 public class CasIndexer {
 
   ///
+  /// @field   CAS_WILDCARD
+  /// @brief   The prefix for finding CAS keys.
+  /// @details Can be used in scan operations on CAS.
+  ///
+  private static final String CAS_WILDCARD = "ContentAddressableStorage:*";
+
+  ///
+  /// @field   DEFAULT_SCAN_COUNT
+  /// @brief   A default scan count.
+  /// @details Can be used in scan operations on CAS.
+  ///
+  private static final int DEFAULT_SCAN_COUNT = 10000;
+
+  ///
+  /// @field   WORKERS_KEY_NAME
+  /// @brief   The worker key name in redis.
+  /// @details Used to get all worker key names.
+  ///
+  private static final String WORKERS_KEY_NAME = "Workers";
+
+  ///
+  /// @field   TEMP_WORKER_SET
+  /// @brief   The key name for a worker set.
+  /// @details This set is temporary for performing same slot intersections.
+  ///
+  private static final String TEMP_WORKER_SET = "intersecting-workers";
+
+  ///
+  /// @field   CURSOR_SENTINAL
+  /// @brief   Cursor sentimental used by jedis.
+  /// @details Used to begin and end scan paging.
+  ///
+  private static final String CURSOR_SENTINAL = "0";
+
+  ///
   /// @brief   Re-index the workers associated with CAS data.
   /// @details Removes references to worker nodes that are no longer running.
   /// @param   cluster An established jedis client to operate on a redis cluster.
   ///
   public static void reindexWorkers(JedisCluster cluster) {
+    // setup
     storeActiveWorkersInAllSlots(cluster);
+
+    // worker index deletion
+    performIndexing(cluster);
+
+    // cleanup
     deleteActiveWorkersFromAllSlots(cluster);
+  }
+  ///
+  /// @brief   Perform the indexing operation to remove workers.
+  /// @details Assumes the needed worker information is available in each slot.
+  /// @param   cluster An established jedis client to operate on a redis cluster.
+  ///
+  private static void performIndexing(JedisCluster cluster) {
+    // construct CAS query
+    ScanParams params = new ScanParams();
+    params.match(CAS_WILDCARD);
+    params.count(DEFAULT_SCAN_COUNT);
+
+    // run query and perform intersections
+    String nextCursor = CURSOR_SENTINAL;
+    do {
+
+      // update workers on scanned keys
+      ScanResult scanResult = cluster.scan(nextCursor, params);
+      List<String> keys = scanResult.getResult();
+      deleteWorkersThroughIntersection(cluster, keys);
+
+      nextCursor = scanResult.getCursor();
+    } while (!nextCursor.equals(CURSOR_SENTINAL));
+  }
+  ///
+  /// @brief   Reindex the workers through intersection.
+  /// @details Uses all the CAS keys to update their references to workers.
+  /// @param   cluster An established jedis client to operate on a redis cluster.
+  /// @param   casKeys CAS keys to reindex.
+  ///
+  private static void deleteWorkersThroughIntersection(JedisCluster cluster, List<String> casKeys) {
+    for (String casKey : casKeys) {
+      int casSlotNumber = JedisClusterCRC16.getSlot(casKey);
+      String workerKey = slotSpecificActiveWorkerSet(casSlotNumber);
+      cluster.sinterstore(casKey, workerKey, casKey);
+    }
   }
   ///
   /// @brief   Store the active workers in a set designated at each slot.
@@ -48,7 +129,7 @@ public class CasIndexer {
   /// @param   cluster An established jedis client to operate on a redis cluster.
   ///
   private static void storeActiveWorkersInAllSlots(JedisCluster cluster) {
-    Set<String> workers = cluster.hkeys("Workers");
+    Set<String> workers = cluster.hkeys(WORKERS_KEY_NAME);
     for (int i = 0; i < HASHSLOTS; ++i) {
       String key = slotSpecificActiveWorkerSet(i);
       cluster.del(key);
@@ -76,6 +157,6 @@ public class CasIndexer {
   ///
   private static String slotSpecificActiveWorkerSet(long slotNumber) {
     String hashtag = RedisSlotToHash.correlate(slotNumber);
-    return "{" + hashtag + "}:intersecting-workers";
+    return "{" + hashtag + "}:" + TEMP_WORKER_SET;
   }
 }
