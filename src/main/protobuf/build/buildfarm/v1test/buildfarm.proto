@@ -623,6 +623,8 @@ message CASUsageMessage {
   int64 directory_entry_count = 2;
   int64 containing_directories_count = 3;
   int64 containing_directories_max = 4;
+  int32 evicted_entry_count = 5;
+  int64 evicted_entry_size = 6;
 }
 
 message CASUsageRequest {

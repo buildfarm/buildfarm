@@ -628,6 +628,8 @@ class Cat {
       System.out.println("Current ContainedDirectories Max: " + response.getContainingDirectoriesMax());
       System.out.println("Current ContainedDirectories average: " +
           response.getContainingDirectoriesCount() * 1.0 / response.getEntryCount());
+      System.out.println("Number of Evicted Entries in last period: " + response.getEntryCount());
+      System.out.println("Total size of Evicted Entries in last period: " + response.getEvictedEntrySize());
 
       try {
         TimeUnit.SECONDS.sleep(interval);

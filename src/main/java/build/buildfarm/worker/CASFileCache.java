@@ -120,6 +120,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private final long maxEntrySizeInBytes;
   private final DigestUtil digestUtil;
   private final ConcurrentMap<Path, Entry> storage;
+  private long removedEntrySize = 0;
+  private int removedEntryCount = 0;
   private final Map<Digest, DirectoryEntry> directoryStorage = Maps.newHashMap();
   private final LockMap locks = new LockMap();
   private final Consumer<Digest> onPut;
@@ -183,6 +185,33 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   public long directoryStorageCount() {
     return directoryStorage.size();
+  }
+
+  // used by CASUsageProfile grpc service
+  public long[] getContainedDirectoriesCounts() {
+    Entry e = header.after;
+    long containedDirectoriesCount = 0;
+    int containedDirectoriesMax = 0;
+    while (e != header) {
+      int size = e.containingDirectories.size();
+      containedDirectoriesCount += size;
+      containedDirectoriesMax = Math.max(containedDirectoriesMax, size);
+      e = e.after;
+    }
+
+    return new long[] {containedDirectoriesCount, containedDirectoriesMax};
+  }
+
+  public synchronized int getEvictedCount() {
+    int count = removedEntryCount;
+    removedEntryCount = 0;
+    return count;
+  }
+
+  public synchronized long getEvictedSize() {
+    long size = removedEntrySize;
+    removedEntrySize = 0;
+    return size;
   }
 
   class CacheScanResults {
@@ -365,20 +394,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return true;
   }
 
-  public long[] getContainedDirectoriesCounts() {
-    Entry e = header.after;
-    long containedDirectoriesCount = 0;
-    int containedDirectoriesMax = 0;
-    while (e != header) {
-      int size = e.containingDirectories.size();
-      containedDirectoriesCount += size;
-      containedDirectoriesMax = Math.max(containedDirectoriesMax, size);
-      e = e.after;
-    }
-
-    return new long[] {containedDirectoriesCount, containedDirectoriesMax};
-  }
-
   private void accessed(Iterable<Path> keys) {
     /* could also bucket these */
     try {
@@ -474,6 +489,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             if (removedEntry == e) {
               unlinkEntry(removedEntry);
               removed = true;
+              removedEntryCount++;
+              removedEntrySize += removedEntry.size;
             } else if (removedEntry != null) {
               logger.log(Level.SEVERE,
                   "nonexistent entry %s did not match last unreferenced entry, restoring it", key);
@@ -1753,6 +1770,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         if (interrupted) {
           Thread.currentThread().interrupt();
         }
+        removedEntryCount++;
+        removedEntrySize += removedEntry.size;
         return pathFuture;
       }
       if (removedEntry == null) {
@@ -2317,6 +2336,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Entry removedEntry = storage.remove(key);
       if (removedEntry != null) {
         unlinkEntry(removedEntry);
+        removedEntryCount++;
+        removedEntrySize += removedEntry.size;
       }
       return false;
     }

@@ -104,16 +104,6 @@ import javax.annotation.Nullable;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import static build.buildfarm.common.Actions.asExecutionStatus;
-import static build.buildfarm.common.Actions.checkPreconditionFailure;
-import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
-import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
-import static build.buildfarm.instance.Utils.putBlob;
-import static com.google.common.util.concurrent.Futures.*;
-import static com.google.common.util.concurrent.MoreExecutors.*;
-import static java.lang.String.format;
-import static java.util.concurrent.TimeUnit.SECONDS;
-
 public abstract class AbstractServerInstance implements Instance {
   private static final Logger logger = Logger.getLogger(AbstractServerInstance.class.getName());
 

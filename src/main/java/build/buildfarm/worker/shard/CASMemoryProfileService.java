@@ -44,6 +44,8 @@ public class CASMemoryProfileService extends CASUsageProfileGrpc.CASUsageProfile
             .setDirectoryEntryCount(storage.directoryStorageCount())
             .setContainingDirectoriesCount(containedDirectories[0])
             .setContainingDirectoriesMax(containedDirectories[1])
+            .setEvictedEntryCount(storage.getEvictedCount())
+            .setEvictedEntrySize(storage.getEvictedSize())
             .build();
 
     responseObserver.onNext(reply);
