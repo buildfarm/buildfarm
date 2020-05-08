@@ -188,7 +188,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   // used by CASUsageProfile grpc service
-  public long[] getContainedDirectoriesCounts() {
+  public synchronized long[] getContainedDirectoriesCounts() {
     Entry e = header.after;
     long containedDirectoriesCount = 0;
     int containedDirectoriesMax = 0;
