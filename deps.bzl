@@ -1,4 +1,4 @@
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_jar")
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_jar", "http_file")
 load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
 
 RULES_JVM_EXTERNAL_TAG = "3.0"
@@ -78,3 +78,15 @@ def buildfarm_dependencies(repository_name="build_buildfarm"):
         urls = [
             "https://github.com/werkt/jedis/releases/download/jedis-3.2.0-3e25324dbe/jedis-3.2.0-3e25324dbe.jar",
         ])
+
+    maybe(
+        http_file,
+        "grpc-health-probe",
+        sha256 = "fc7e9f992f882c6f55e549c1038a31fc5ed47880bf4b91601cea64f93ef7f442",
+        executable = True,
+        downloaded_file_path = "grpc_health_probe",
+        urls = [
+            "https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.3.2/grpc_health_probe-linux-amd64",
+        ])
+
+

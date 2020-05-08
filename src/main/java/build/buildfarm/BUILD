@@ -354,6 +354,7 @@ java_binary(
     ],
 )
 
+
 container_image(
     name = "server.container",
     base = "@java_base//image",
@@ -369,6 +370,7 @@ container_image(
     # https://docs.bazel.build/versions/master/be/java.html#java_binary_implicit_outputs
     files = [
         ":buildfarm-server_deploy.jar",
+        "@grpc-health-probe//file",
     ],
     visibility = ["//visibility:public"],
 )
