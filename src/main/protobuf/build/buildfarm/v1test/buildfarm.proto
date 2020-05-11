@@ -613,6 +613,9 @@ message WorkerConfig {
   // initial platform used to match operations
   build.bazel.remote.execution.v2.Platform platform = 17;
 
+  // default platform to populate matched commands
+  build.bazel.remote.execution.v2.Platform default_platform = 25;
+
   // input fetch width
   int32 input_fetch_stage_width = 23;
 
