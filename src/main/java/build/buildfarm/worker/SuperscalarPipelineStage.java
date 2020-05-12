@@ -86,6 +86,8 @@ abstract class SuperscalarPipelineStage extends PipelineStage {
   }
 
   protected synchronized void releaseClaim(String operationName, int slots) {
+    // clear interrupted flag for take
+    boolean interrupted = Thread.interrupted();
     try {
       for (int i = 0; i < slots; i++) {
         claims.take();
@@ -101,6 +103,9 @@ abstract class SuperscalarPipelineStage extends PipelineStage {
       close();
     } finally {
       notify();
+      if (interrupted) {
+        Thread.currentThread().interrupt();
+      }
     }
   }
 
