@@ -1577,7 +1577,7 @@ public class ShardInstance extends AbstractServerInstance {
             }
           }
         }
-        if (operation.getMetadata().is(Action.class)) {
+        if (operation != null && operation.getMetadata().is(Action.class)) {
           // post-action validation sequence, do not propagate to watcher
           try {
             writeThrough = !operation.getMetadata().unpack(Action.class).getDoNotCache();
