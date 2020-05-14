@@ -828,4 +828,68 @@ public class ShardInstanceTest {
     verify(mockBackplane, times(1)).getOperation(incompleteOperation.getName());
     verify(mockBackplane, times(1)).watchOperation(incompleteOperation.getName(), watcher);
   }
+
+  @Test
+  public void actionResultWatcherPropagatesNull() {
+    ActionKey actionKey = DigestUtil.asActionKey(Digest.newBuilder().setHash("test").build());
+    Watcher mockWatcher = mock(Watcher.class);
+    Watcher actionResultWatcher = instance.newActionResultWatcher(actionKey, mockWatcher);
+
+    actionResultWatcher.observe(null);
+
+    verify(mockWatcher, times(1)).observe(null);
+  }
+
+  @Test
+  public void actionResultWatcherDiscardsUncacheableResult() throws Exception {
+    ActionKey actionKey = DigestUtil.asActionKey(Digest.newBuilder().setHash("test").build());
+    Watcher mockWatcher = mock(Watcher.class);
+    Watcher actionResultWatcher = instance.newActionResultWatcher(actionKey, mockWatcher);
+
+    Action uncacheableAction = Action.newBuilder()
+        .setDoNotCache(true)
+        .build();
+    Operation operation = Operation.newBuilder()
+        .setMetadata(Any.pack(uncacheableAction))
+        .build();
+    ExecuteResponse executeResponse = ExecuteResponse.newBuilder()
+        .setCachedResult(true)
+        .build();
+    Operation completedOperation = Operation.newBuilder()
+        .setDone(true)
+        .setResponse(Any.pack(executeResponse))
+        .build();
+
+    actionResultWatcher.observe(operation);
+    actionResultWatcher.observe(completedOperation);
+
+    verify(mockWatcher, never()).observe(operation);
+    assertThat(instance.getActionResult(actionKey, RequestMetadata.getDefaultInstance()).get()).isNull();
+    verify(mockWatcher, times(1)).observe(completedOperation);
+  }
+
+  @Test
+  public void actionResultWatcherWritesThroughCachedResult() throws Exception {
+    ActionKey actionKey = DigestUtil.asActionKey(Digest.newBuilder().setHash("test").build());
+    Watcher mockWatcher = mock(Watcher.class);
+    Watcher actionResultWatcher = instance.newActionResultWatcher(actionKey, mockWatcher);
+
+    ActionResult actionResult = ActionResult.newBuilder()
+        .setStdoutDigest(Digest.newBuilder().setHash("stdout").setSizeBytes(1))
+        .build();
+    ExecuteResponse executeResponse = ExecuteResponse.newBuilder()
+        .setResult(actionResult)
+        .build();
+    Operation completedOperation = Operation.newBuilder()
+        .setDone(true)
+        .setResponse(Any.pack(executeResponse))
+        .build();
+
+    actionResultWatcher.observe(completedOperation);
+
+    // backplane default response of null here ensures that it comes from instance cache
+    verify(mockWatcher, times(1)).observe(completedOperation);
+    assertThat(instance.getActionResult(actionKey, RequestMetadata.getDefaultInstance()).get())
+        .isEqualTo(actionResult);
+  }
 }
