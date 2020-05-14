@@ -404,19 +404,23 @@ public class ShardInstance extends AbstractServerInstance {
       operationQueuer.start();
     }
       
-    indexerService.scheduleAtFixedRate(() -> {
-      try { 
-          
-          // ensure only one scheduler performs the re-indexing.
-          if (backplane.takeIndexerLock()) {
-            backplane.runIndexer();
-            backplane.releaseIndexerLock();
+    indexerService.scheduleAtFixedRate(
+        () -> {
+          try {
+
+            // ensure only one scheduler performs the re-indexing.
+            if (backplane.takeIndexerLock()) {
+              backplane.runIndexer();
+              backplane.releaseIndexerLock();
+            }
+
+          } catch (Exception e) {
+            logger.log(Level.SEVERE, "error while re-indexing the CAS", e);
           }
-        
-        } catch (Exception e) { 
-          logger.log(Level.SEVERE, "error while re-indexing the CAS", e); 
-        } 
-    }, indexerFrequencyMinutes, indexerFrequencyMinutes, TimeUnit.MINUTES);
+        },
+        indexerFrequencyMinutes,
+        indexerFrequencyMinutes,
+        TimeUnit.MINUTES);
   }
 
   @Override
