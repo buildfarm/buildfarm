@@ -205,6 +205,7 @@ public class Worker extends LoggingMain {
                 new ContentAddressableStorageService(
                     instances, /* deadlineAfter=*/ 1, DAYS, /* requestLogLevel=*/ FINER))
             .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, DAYS))
+            .addService(new CASMemoryProfileService(storage))
             .build();
 
     ShardWorkerContext context =

@@ -194,7 +194,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     int containedDirectoriesMax = 0;
     while (e != header) {
       int size = e.containingDirectories.size();
-      containedDirectoriesCount += size;
+      containedDirectoriesCount += (long) size;
       containedDirectoriesMax = Math.max(containedDirectoriesMax, size);
       e = e.after;
     }
