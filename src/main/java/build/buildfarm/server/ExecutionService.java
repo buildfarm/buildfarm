@@ -25,6 +25,7 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.WaitExecutionRequest;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
+import build.buildfarm.common.metrics.MetricsPublisher;
 import build.buildfarm.instance.Instance;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -47,16 +48,19 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
   private final long keepaliveAfter;
   private final TimeUnit keepaliveUnit;
   private final ScheduledExecutorService keepaliveScheduler;
+  private final MetricsPublisher metricsPublisher;
 
   public ExecutionService(
       Instances instances,
       long keepaliveAfter,
       TimeUnit keepaliveUnit,
-      ScheduledExecutorService keepaliveScheduler) {
+      ScheduledExecutorService keepaliveScheduler,
+      MetricsPublisher metricsPublisher) {
     this.instances = instances;
     this.keepaliveAfter = keepaliveAfter;
     this.keepaliveUnit = keepaliveUnit;
     this.keepaliveScheduler = keepaliveScheduler;
+    this.metricsPublisher = metricsPublisher;
   }
 
   private void withCancellation(
@@ -158,6 +162,9 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
     return new KeepaliveWatcher(serverCallStreamObserver) {
       @Override
       void deliver(Operation operation) {
+        if (operation != null) {
+          metricsPublisher.publishRequestMetadata(operation, requestMetadata);
+        }
         serverCallStreamObserver.onNext(operation);
       }
     };

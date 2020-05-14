@@ -23,7 +23,9 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.common.metrics.log.LogMetricsPublisher;
 import build.buildfarm.server.ExecutionService.KeepaliveWatcher;
+import build.buildfarm.v1test.MetricsConfig;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import io.grpc.stub.ServerCallStreamObserver;
@@ -53,7 +55,8 @@ public class ExecutionServiceTest {
             instances,
             /* keepaliveAfter=*/ 1,
             /* keepaliveUnit=*/ SECONDS, // far enough in the future that we'll get scheduled and
-            keepaliveScheduler);         // cancelled without executing
+            keepaliveScheduler,
+            new LogMetricsPublisher(MetricsConfig.getDefaultInstance()));         // cancelled without executing
     ServerCallStreamObserver<Operation> response = mock(ServerCallStreamObserver.class);
     RequestMetadata requestMetadata = RequestMetadata.newBuilder().build();
     Operation operation =
