@@ -141,6 +141,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
+import java.util.concurrent.Executors;
 
 public class ShardInstance extends AbstractServerInstance {
   private static final Logger logger = Logger.getLogger(ShardInstance.class.getName());
@@ -176,6 +177,8 @@ public class ShardInstance extends AbstractServerInstance {
   private final ExecutorService operationDeletionService = newSingleThreadExecutor();
   private final BlockingQueue transformTokensQueue = new LinkedBlockingQueue(256);
   private Thread operationQueuer;
+  private final long indexerFrequencyMinutes = 120;
+  private final ScheduledExecutorService indexerService = Executors.newSingleThreadScheduledExecutor();
   private boolean stopping = false;
   private boolean stopped = true;
 
@@ -400,6 +403,20 @@ public class ShardInstance extends AbstractServerInstance {
     if (operationQueuer != null) {
       operationQueuer.start();
     }
+      
+    indexerService.scheduleAtFixedRate(() -> {
+      try { 
+          
+          // ensure only one scheduler performs the re-indexing.
+          if (backplane.takeIndexerLock()) {
+            backplane.runIndexer();
+            backplane.releaseIndexerLock();
+          }
+        
+        } catch (Exception e) { 
+          logger.log(Level.SEVERE, "error while re-indexing the CAS", e); 
+        } 
+    }, indexerFrequencyMinutes, indexerFrequencyMinutes, TimeUnit.MINUTES);
   }
 
   @Override
@@ -415,6 +432,7 @@ public class ShardInstance extends AbstractServerInstance {
     if (dispatchedMonitor != null) {
       dispatchedMonitor.stop();
     }
+    indexerService.shutdown();
     contextDeadlineScheduler.shutdown();
     operationDeletionService.shutdown();
     operationTransformService.shutdown();
