@@ -53,7 +53,6 @@ import build.buildfarm.worker.Pipeline;
 import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.ReportResultStage;
-import build.buildfarm.worker.WorkerContext;
 import com.google.common.base.Strings;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
@@ -147,6 +146,9 @@ public class Worker extends LoggingMain {
     this.config = config;
     String identifier = "buildfarm-worker-" + config.getPublicName() + "-" + session;
     root = getValidRoot(config);
+    if (config.getPublicName().isEmpty()) {
+      throw new ConfigurationException("worker's public name should not be empty");
+    }
 
     digestUtil = new DigestUtil(getValidHashFunction(config));
 
@@ -553,18 +555,25 @@ public class Worker extends LoggingMain {
     if (!Strings.isNullOrEmpty(options.publicName)) {
       builder.setPublicName(options.publicName);
     }
-
     return builder.build();
   }
 
   private static void printUsage(OptionsParser parser) {
     logger.log(INFO, "Usage: CONFIG_PATH");
-    logger.log(INFO,
-        parser.describeOptions(
-            Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
+    logger.log(
+        INFO, parser.describeOptions(Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
   }
 
-  public static void main(String[] args) throws Exception {
+  public static void main(String[] args) {
+    try {
+      startWorker(args);
+    } catch (Exception e) {
+      logger.log(SEVERE, "exception caught", e);
+      System.exit(1);
+    }
+  }
+
+  public static void startWorker(String[] args) throws Exception {
     // Only log severe log messages from Netty. Otherwise it logs warnings that look like this:
     //
     // 170714 08:16:28.552:WT 18 [io.grpc.netty.NettyServerHandler.onStreamError] Stream Error

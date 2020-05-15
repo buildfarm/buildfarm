@@ -75,6 +75,77 @@ java_library(
 )
 
 java_library(
+    name = "common-metrics",
+    srcs = glob([
+        "common/metrics/AbstractMetricsPublisher.java",
+        "common/metrics/MetricsPublisher.java",
+    ]),
+    deps = [
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "@maven//:com_google_guava_guava",
+        "@maven//:com_google_protobuf_protobuf_java",
+        "@maven//:com_google_protobuf_protobuf_java_util",
+        "@googleapis//:google_rpc_code_java_proto",
+        "@googleapis//:google_rpc_error_details_java_proto",
+        "@googleapis//:google_rpc_status_java_proto",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+    ],
+)
+
+java_library(
+    name = "aws-metrics",
+    srcs = glob([
+        "common/metrics/aws/*.java",
+    ]),
+    deps = [
+        ":common-metrics",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "@maven//:com_amazonaws_aws_java_sdk_core",
+        "@maven//:com_amazonaws_aws_java_sdk_sns",
+        "@maven//:com_google_guava_guava",
+        "@maven//:com_google_protobuf_protobuf_java_util",
+        "@googleapis//:google_rpc_code_java_proto",
+        "@googleapis//:google_rpc_error_details_java_proto",
+        "@googleapis//:google_rpc_status_java_proto",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+    ],
+)
+
+java_library(
+    name = "log-metrics",
+    srcs = glob([
+        "common/metrics/log/*.java",
+    ]),
+    deps = [
+        ":common-metrics",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "@maven//:com_google_guava_guava",
+        "@maven//:com_google_protobuf_protobuf_java_util",
+        "@googleapis//:google_rpc_code_java_proto",
+        "@googleapis//:google_rpc_error_details_java_proto",
+        "@googleapis//:google_rpc_status_java_proto",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+    ],
+)
+
+java_library(
+    name = "gcp-metrics",
+    srcs = glob([
+        "common/metrics/gcp/*.java",
+    ]),
+    deps = [
+        ":common-metrics",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "@maven//:com_google_guava_guava",
+        "@maven//:com_google_protobuf_protobuf_java_util",
+        "@googleapis//:google_rpc_code_java_proto",
+        "@googleapis//:google_rpc_error_details_java_proto",
+        "@googleapis//:google_rpc_status_java_proto",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+    ],
+)
+
+java_library(
     name = "common-redis",
     srcs = glob([
         "common/redis/*.java",
@@ -240,6 +311,10 @@ java_library(
         ":cas",
         ":common",
         ":common-grpc",
+        ":common-metrics",
+        ":aws-metrics",
+        ":gcp-metrics",
+        ":log-metrics",
         ":instance",
         ":memory-instance",
         ":shard-instance",

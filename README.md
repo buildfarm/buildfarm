@@ -17,7 +17,9 @@ All commandline options override corresponding config settings.
 
 Run via
 
-    bazel run //src/main/java/build/buildfarm:buildfarm-server <configfile> [<-p|--port> PORT]
+```
+bazel run //src/main/java/build/buildfarm:buildfarm-server <configfile> [<-p|--port> PORT]
+```
 
 - **`configfile`** has to be in Protocol Buffer text format, corresponding to a [BuildFarmServerConfig](https://github.com/bazelbuild/bazel-buildfarm/blob/master/src/main/protobuf/build/buildfarm/v1test/buildfarm.proto#L55) definition.
 
@@ -30,7 +32,9 @@ Run via
 
 Run via
 
-    bazel run //src/main/java/build/buildfarm:buildfarm-operationqueue-worker <configfile> [--root ROOT] [--cas_cache_directory CAS_CACHE_DIRECTORY]
+```
+bazel run //src/main/java/build/buildfarm:buildfarm-operationqueue-worker <configfile> [--root ROOT] [--cas_cache_directory CAS_CACHE_DIRECTORY]
+```
 
 - **`configfile`** has to be in Protocol Buffer text format, corresponding to a [WorkerConfig](https://github.com/bazelbuild/bazel-buildfarm/blob/master/src/main/protobuf/build/buildfarm/v1test/buildfarm.proto#L459) definition.
 
@@ -59,16 +63,22 @@ Buildfarm uses [Java's Logging framework](https://docs.oracle.com/javase/10/core
 You can use typical Java logging configuration to filter these results and observe the flow of executions through your running services.
 An example `logging.properties` file has been provided at [examples/debug.logging.properties](examples/debug.logging.properties) for use as follows:
 
-    bazel run //src/main/java/build/buildfarm:buildfarm-server --jvm_flag=-Djava.util.logging.config.file=examples/debug.logging.properties ...
+```
+bazel run //src/main/java/build/buildfarm:buildfarm-server --jvm_flag=-Djava.util.logging.config.file=examples/debug.logging.properties ...
+```
 
 and
 
-    bazel run //src/main/java/build/buildfarm/buildfarm-operationqueue-worker --jvm_flag=-Djava.util.logging.config.file=examples/debug.logging.properties ...
+```
+bazel run //src/main/java/build/buildfarm/buildfarm-operationqueue-worker --jvm_flag=-Djava.util.logging.config.file=examples/debug.logging.properties ...
+```
 
 To attach a remote debugger, run the executable with the `--debug=<PORT>` flag. For example:
 
-    bazel run src/main/java/build/buildfarm/buildfarm-server --debug=5005 \
-        $PWD/config/server.config
+```
+bazel run src/main/java/build/buildfarm/buildfarm-server --debug=5005 \
+    $PWD/config/server.config
+```
 
 ## Developer Information
 
@@ -85,3 +95,39 @@ the WORKSPACE with a `maven_install` `artifacts` parameter.
 
 Things that aren't supported by `rules_jvm_external` are being imported as manually managed remote repos via
 the `WORKSPACE` file.
+
+### Deployments
+
+Buildfarm can be used as an external repository for composition into a deployment of your choice.
+
+Add the following to your WORKSPACE to get access to buildfarm targets, filling in the commit and sha256 values:
+
+```starlark
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+BUILDFARM_EXTERNAL_COMMIT = "<revision commit id>"
+BUILDFARM_EXTERNAL_SHA256 = "<sha256 digest of url below>"
+
+http_archive(
+    name = "build_buildfarm",
+    strip_prefix = "bazel-buildfarm-%s" % BUILDFARM_EXTERNAL_COMMIT,
+    sha256 = BUILDFARM_EXTERNAL_SHA256,
+    url = "https://github.com/bazelbuild/bazel-buildfarm/archive/%s.zip" % BUILDFARM_EXTERNAL_COMMIT,
+)
+
+load("@build_buildfarm//:deps.bzl", "buildfarm_dependencies")
+
+buildfarm_dependencies()
+
+load("@build_buildfarm//:defs.bzl", "buildfarm_init")
+
+buildfarm_init()
+```
+
+Optionally, if you want to use the buildfarm docker container image targets, you can add this:
+
+```starlark
+load("@build_buildfarm//:images.bzl", "buildfarm_images")
+
+buildfarm_images()
+```
