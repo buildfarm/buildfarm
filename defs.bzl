@@ -72,7 +72,6 @@ def buildfarm_init():
             "org.mockito:mockito-core:2.25.0",
             "org.openjdk.jmh:jmh-core:1.23",
             "org.openjdk.jmh:jmh-generator-annprocess:1.23",
-            "org.slf4j:slf4j-api:1.7.22",
             "org.threeten:threetenbp:1.3.3",
         ],
         repositories = [
