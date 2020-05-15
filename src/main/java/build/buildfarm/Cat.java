@@ -38,12 +38,12 @@ import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
-import build.buildfarm.v1test.WorkerProfileMessage;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
-import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.Tree;
+import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.QueuedOperation;
+import build.buildfarm.v1test.WorkerProfileMessage;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
@@ -72,7 +72,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Date;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -624,12 +623,17 @@ class Cat {
 
       System.out.println("Current Entry Count: " + response.getCASEntryCount());
       System.out.println("Current DirectoryEntry Count: " + response.getCASDirectoryEntryCount());
-      System.out.println("Current ContainedDirectories total: " + response.getEntryContainingDirectoriesCount());
-      System.out.println("Current ContainedDirectories Max: " + response.getEntryContainingDirectoriesMax());
-      System.out.println("Current ContainedDirectories average: " +
-          response.getEntryContainingDirectoriesCount() * 1.0 / response.getCASEntryCount());
-      System.out.println("Number of Evicted Entries in last period: " + response.getCASEntryCount());
-      System.out.println("Total size of Evicted Entries in last period: " + response.getCASEvictedEntrySize());
+      System.out.println(
+          "Current ContainedDirectories total: " + response.getEntryContainingDirectoriesCount());
+      System.out.println(
+          "Current ContainedDirectories Max: " + response.getEntryContainingDirectoriesMax());
+      System.out.println(
+          "Current ContainedDirectories average: " +
+              response.getEntryContainingDirectoriesCount() * 1.0 / response.getCASEntryCount());
+      System.out.println(
+          "Number of Evicted Entries in last period: " + response.getCASEntryCount());
+      System.out.println(
+          "Total size of Evicted Entries in last period: " + response.getCASEvictedEntrySize());
 
       try {
         TimeUnit.SECONDS.sleep(interval);

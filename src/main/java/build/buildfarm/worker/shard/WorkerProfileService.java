@@ -19,11 +19,10 @@ import build.buildfarm.v1test.WorkerProfileGrpc;
 import build.buildfarm.v1test.WorkerProfileMessage;
 import build.buildfarm.v1test.WorkerProfileRequest;
 import build.buildfarm.worker.CASFileCache;
-import build.buildfarm.worker.CASFileCache.Entry;
 import io.grpc.stub.StreamObserver;
 import java.util.logging.Logger;
 
-public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBase{
+public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBase {
   private static final Logger logger = Logger.getLogger(WorkerProfileService.class.getName());
 
   private final CASFileCache storage;
@@ -36,7 +35,7 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
   public void getWorkerProfile(
       WorkerProfileRequest request, StreamObserver<WorkerProfileMessage> responseObserver) {
 
-    long [] containedDirectories = storage.getContainedDirectoriesCounts();
+    long[] containedDirectories = storage.getContainedDirectoriesCounts();
 
     WorkerProfileMessage reply =
         WorkerProfileMessage.newBuilder()

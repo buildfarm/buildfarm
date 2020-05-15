@@ -62,18 +62,18 @@ import build.buildfarm.common.grpc.ByteStreamHelper;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.StubWriteOutputStream;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.v1test.WorkerProfileMessage;
-import build.buildfarm.v1test.WorkerProfileGrpc;
-import build.buildfarm.v1test.WorkerProfileGrpc.WorkerProfileBlockingStub;
-import build.buildfarm.v1test.WorkerProfileRequest;
 import build.buildfarm.v1test.OperationQueueGrpc.OperationQueueBlockingStub;
-import build.buildfarm.v1test.OperationsStatusRequest;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.OperationsStatus;
+import build.buildfarm.v1test.OperationsStatusRequest;
 import build.buildfarm.v1test.PollOperationRequest;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.TakeOperationRequest;
 import build.buildfarm.v1test.Tree;
+import build.buildfarm.v1test.WorkerProfileMessage;
+import build.buildfarm.v1test.WorkerProfileGrpc;
+import build.buildfarm.v1test.WorkerProfileGrpc.WorkerProfileBlockingStub;
+import build.buildfarm.v1test.WorkerProfileRequest;
 import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamBlockingStub;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamStub;
@@ -271,12 +271,13 @@ public class StubInstance implements Instance {
           });
 
   private final Supplier<WorkerProfileBlockingStub> WorkerProfileBlockingStub =
-      Suppliers.memoize(new Supplier<WorkerProfileBlockingStub>() {
-        @Override
-        public WorkerProfileBlockingStub get() {
-          return WorkerProfileGrpc.newBlockingStub(channel);
-        }
-      });
+      Suppliers.memoize(
+          new Supplier<WorkerProfileBlockingStub>() {
+            @Override
+            public WorkerProfileBlockingStub get() {
+              return WorkerProfileGrpc.newBlockingStub(channel);
+          }
+        });
 
   private <T extends AbstractStub<T>> T deadlined(Supplier<T> getter) {
     T stub = getter.get();
