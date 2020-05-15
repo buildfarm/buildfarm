@@ -655,18 +655,18 @@ message BlobWriteKey {
   string identifier = 2;
 }
 
-message CASUsageMessage {
-  int64 entry_count = 1;
-  int64 directory_entry_count = 2;
-  int64 containing_directories_count = 3;
-  int64 containing_directories_max = 4;
-  int32 evicted_entry_count = 5;
-  int64 evicted_entry_size = 6;
+message WorkerProfileMessage {
+  int64 CAS_entry_count = 1;
+  int64 CAS_directory_entry_count = 2;
+  int64 entry_containing_directories_count = 3;
+  int64 entry_containing_directories_max = 4;
+  int32 CAS_evicted_entry_count = 5;
+  int64 CAS_evicted_entry_size = 6;
 }
 
-message CASUsageRequest {
+message WorkerProfileRequest {
 }
 
-service CASUsageProfile {
-  rpc getCASUsage(CASUsageRequest) returns (CASUsageMessage) {}
+service WorkerProfile {
+  rpc getWorkerProfile(WorkerProfileRequest) returns (WorkerProfileMessage) {}
 }

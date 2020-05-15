@@ -38,7 +38,7 @@ import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
-import build.buildfarm.v1test.CASUsageMessage;
+import build.buildfarm.v1test.WorkerProfileMessage;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.QueuedOperationMetadata;
@@ -609,11 +609,11 @@ class Cat {
     return 10;
   }
 
-  private static void getCASUsageProfile(Instance instance, int interval) {
-    CASUsageMessage response = null;
+  private static void getWorkerProfile(Instance instance, int interval) {
+    WorkerProfileMessage response = null;
     while (true) {
       try {
-        response = instance.getCASUsageProfile();
+        response = instance.getWorkerProfile();
       } catch (StatusRuntimeException e) {
         System.out.println(e.getMessage());
       }
@@ -622,14 +622,14 @@ class Cat {
         continue;
       }
 
-      System.out.println("Current Entry Count: " + response.getEntryCount());
-      System.out.println("Current DirectoryEntry Count: " + response.getDirectoryEntryCount());
-      System.out.println("Current ContainedDirectories total: " + response.getContainingDirectoriesCount());
-      System.out.println("Current ContainedDirectories Max: " + response.getContainingDirectoriesMax());
+      System.out.println("Current Entry Count: " + response.getCASEntryCount());
+      System.out.println("Current DirectoryEntry Count: " + response.getCASDirectoryEntryCount());
+      System.out.println("Current ContainedDirectories total: " + response.getEntryContainingDirectoriesCount());
+      System.out.println("Current ContainedDirectories Max: " + response.getEntryContainingDirectoriesMax());
       System.out.println("Current ContainedDirectories average: " +
-          response.getContainingDirectoriesCount() * 1.0 / response.getEntryCount());
-      System.out.println("Number of Evicted Entries in last period: " + response.getEntryCount());
-      System.out.println("Total size of Evicted Entries in last period: " + response.getEvictedEntrySize());
+          response.getEntryContainingDirectoriesCount() * 1.0 / response.getCASEntryCount());
+      System.out.println("Number of Evicted Entries in last period: " + response.getCASEntryCount());
+      System.out.println("Total size of Evicted Entries in last period: " + response.getCASEvictedEntrySize());
 
       try {
         TimeUnit.SECONDS.sleep(interval);
@@ -675,7 +675,7 @@ class Cat {
 
   static void instanceMain(Instance instance, String type, String[] args) throws Exception {
     if (type.equals("CASMemory")) {
-      getCASUsageProfile(instance, Integer.parseInt(args[4]));
+      getWorkerProfile(instance, Integer.parseInt(args[4]));
     }
     if (type.equals("Capabilities")) {
       ServerCapabilities capabilities = instance.getCapabilities();

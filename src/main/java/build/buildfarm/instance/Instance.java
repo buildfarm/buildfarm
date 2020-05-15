@@ -28,7 +28,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
-import build.buildfarm.v1test.CASUsageMessage;
+import build.buildfarm.v1test.WorkerProfileMessage;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.Tree;
@@ -136,7 +136,7 @@ public interface Instance {
 
   ServerCapabilities getCapabilities();
 
-  CASUsageMessage getCASUsageProfile();
+  WorkerProfileMessage getWorkerProfile();
 
   interface MatchListener {
     // start/end pair called for each wait period

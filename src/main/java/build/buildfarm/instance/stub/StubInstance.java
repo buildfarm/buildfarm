@@ -62,10 +62,10 @@ import build.buildfarm.common.grpc.ByteStreamHelper;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.StubWriteOutputStream;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.v1test.CASUsageMessage;
-import build.buildfarm.v1test.CASUsageProfileGrpc;
-import build.buildfarm.v1test.CASUsageProfileGrpc.CASUsageProfileBlockingStub;
-import build.buildfarm.v1test.CASUsageRequest;
+import build.buildfarm.v1test.WorkerProfileMessage;
+import build.buildfarm.v1test.WorkerProfileGrpc;
+import build.buildfarm.v1test.WorkerProfileGrpc.WorkerProfileBlockingStub;
+import build.buildfarm.v1test.WorkerProfileRequest;
 import build.buildfarm.v1test.OperationQueueGrpc.OperationQueueBlockingStub;
 import build.buildfarm.v1test.OperationsStatusRequest;
 import build.buildfarm.v1test.OperationQueueGrpc;
@@ -270,11 +270,11 @@ public class StubInstance implements Instance {
             }
           });
 
-  private final Supplier<CASUsageProfileBlockingStub> CASMemoryProfileBlockingStub =
-      Suppliers.memoize(new Supplier<CASUsageProfileBlockingStub>() {
+  private final Supplier<WorkerProfileBlockingStub> WorkerProfileBlockingStub =
+      Suppliers.memoize(new Supplier<WorkerProfileBlockingStub>() {
         @Override
-        public CASUsageProfileBlockingStub get() {
-          return CASUsageProfileGrpc.newBlockingStub(channel);
+        public WorkerProfileBlockingStub get() {
+          return WorkerProfileGrpc.newBlockingStub(channel);
         }
       });
 
@@ -766,7 +766,8 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public CASUsageMessage getCASUsageProfile() {
-    return CASMemoryProfileBlockingStub.get().getCASUsage(CASUsageRequest.newBuilder().build());
+  public WorkerProfileMessage getWorkerProfile() {
+
+    return WorkerProfileBlockingStub.get().getWorkerProfile(WorkerProfileRequest.newBuilder().build());
   }
 }
