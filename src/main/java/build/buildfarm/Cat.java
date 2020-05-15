@@ -634,6 +634,10 @@ class Cat {
           "Number of Evicted Entries in last period: " + response.getCASEntryCount());
       System.out.println(
           "Total size of Evicted Entries in last period: " + response.getCASEvictedEntrySize());
+      System.out.println(
+          "Slots usage/configured in InputFetchStage: " + response.getInputFetchStageSlotsUsedOverConfigured());
+      System.out.println(
+          "Slots usage/configured in ExecuteActionStage: " + response.getExecuteActionStageSlotsUsedOverConfigured());
 
       try {
         TimeUnit.SECONDS.sleep(interval);

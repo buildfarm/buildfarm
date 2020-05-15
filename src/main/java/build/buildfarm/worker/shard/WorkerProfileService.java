@@ -19,6 +19,10 @@ import build.buildfarm.v1test.WorkerProfileGrpc;
 import build.buildfarm.v1test.WorkerProfileMessage;
 import build.buildfarm.v1test.WorkerProfileRequest;
 import build.buildfarm.worker.CASFileCache;
+import build.buildfarm.worker.ExecuteActionStage;
+import build.buildfarm.worker.InputFetchStage;
+import build.buildfarm.worker.PipelineStage;
+import build.buildfarm.worker.WorkerContext;
 import io.grpc.stub.StreamObserver;
 import java.util.logging.Logger;
 
@@ -26,9 +30,19 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
   private static final Logger logger = Logger.getLogger(WorkerProfileService.class.getName());
 
   private final CASFileCache storage;
+  private final InputFetchStage inputFetchStage;
+  private final ExecuteActionStage executeActionStage;
+  private final WorkerContext context;
 
-  public WorkerProfileService(ContentAddressableStorage storage) {
+  public WorkerProfileService(
+      ContentAddressableStorage storage,
+      PipelineStage inputFetchStage,
+      PipelineStage executeActionStage,
+      WorkerContext context) {
     this.storage = (CASFileCache) storage;
+    this.inputFetchStage = (InputFetchStage) inputFetchStage;
+    this.executeActionStage = (ExecuteActionStage) executeActionStage;
+    this.context = context;
   }
 
   @Override
@@ -37,17 +51,28 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
 
     long[] containedDirectories = storage.getContainedDirectoriesCounts();
 
-    WorkerProfileMessage reply =
+    WorkerProfileMessage.Builder replyBuilder =
         WorkerProfileMessage.newBuilder()
             .setCASEntryCount(storage.storageCount())
             .setCASDirectoryEntryCount(storage.directoryStorageCount())
             .setEntryContainingDirectoriesCount(containedDirectories[0])
             .setEntryContainingDirectoriesMax(containedDirectories[1])
             .setCASEvictedEntryCount(storage.getEvictedCount())
-            .setCASEvictedEntrySize(storage.getEvictedSize())
-            .build();
+            .setCASEvictedEntrySize(storage.getEvictedSize());
 
-    responseObserver.onNext(reply);
+    // get slots usage/configure of stages
+    String inputFetchStageSlotUsage =
+        String.format("%d/%d", inputFetchStage.getSlotUsage(), context.getInputFetchStageWidth());
+    String executeActionStageSlotUsage =
+        String.format("%d/%d", executeActionStage.getSlotUsage(), context.getExecuteStageWidth());
+
+    // get Opeartion
+
+    replyBuilder
+        .setInputFetchStageSlotsUsedOverConfigured(inputFetchStageSlotUsage)
+        .setExecuteActionStageSlotsUsedOverConfigured(executeActionStageSlotUsage);
+
+    responseObserver.onNext(replyBuilder.build());
     responseObserver.onCompleted();
   }
 }

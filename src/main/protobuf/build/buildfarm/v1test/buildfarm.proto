@@ -662,6 +662,8 @@ message WorkerProfileMessage {
   int64 entry_containing_directories_max = 4;
   int32 CAS_evicted_entry_count = 5;
   int64 CAS_evicted_entry_size = 6;
+  string InputFetchStage_slots_used_over_configured = 7;
+  string ExecuteActionStage_slots_used_over_configured = 8;
 }
 
 message WorkerProfileRequest {

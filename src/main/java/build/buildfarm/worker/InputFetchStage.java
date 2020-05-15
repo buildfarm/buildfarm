@@ -64,6 +64,10 @@ public class InputFetchStage extends SuperscalarPipelineStage {
         String.format("%s, %s", success ? "Success" : "Failure", getUsage(size)));
   }
 
+  public int getSlotUsage() {
+    return fetchers.size();
+  }
+
   @Override
   protected synchronized void interruptAll() {
     for (Thread fetcher : fetchers) {

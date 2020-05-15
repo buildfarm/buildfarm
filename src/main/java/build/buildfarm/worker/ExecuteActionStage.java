@@ -29,6 +29,7 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
   private final Set<Thread> executors = Sets.newHashSet();
   private final AtomicInteger executorClaims = new AtomicInteger(0);
   private BlockingQueue<OperationContext> queue = new ArrayBlockingQueue<>(1);
+  private int size = 0;
 
   public ExecuteActionStage(
       WorkerContext workerContext, PipelineStage output, PipelineStage error) {
@@ -87,12 +88,16 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
 
   public void releaseExecutor(
       String operationName, int claims, long usecs, long stallUSecs, int exitCode) {
-    int size = removeAndRelease(operationName, claims);
+    size = removeAndRelease(operationName, claims);
     logComplete(
         operationName,
         usecs,
         stallUSecs,
         String.format("exit code: %d, %s", exitCode, getUsage(size)));
+  }
+
+  public int getSlotUsage() {
+    return size;
   }
 
   @Override
@@ -111,7 +116,7 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
 
     synchronized (this) {
       executors.add(executorThread);
-      int size = executorClaims.addAndGet(claims);
+      size = executorClaims.addAndGet(claims);
       logStart(operationContext.operation.getName(), getUsage(size));
       executorThread.start();
     }
