@@ -120,8 +120,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private final long maxEntrySizeInBytes;
   private final DigestUtil digestUtil;
   private final ConcurrentMap<Path, Entry> storage;
-  private long removedEntrySize = 0;
-  private int removedEntryCount = 0;
   private final Map<Digest, DirectoryEntry> directoryStorage = Maps.newHashMap();
   private final LockMap locks = new LockMap();
   private final Consumer<Digest> onPut;
@@ -174,6 +172,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   private transient long sizeInBytes = 0;
   private transient Entry header = new SentinelEntry();
+
+  private long removedEntrySize = 0;
+  private int removedEntryCount = 0;
 
   public synchronized long size() {
     return sizeInBytes;
