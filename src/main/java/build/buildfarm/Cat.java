@@ -626,7 +626,7 @@ class Cat {
         "Current ContainedDirectories average: " +
             response.getEntryContainingDirectoriesCount() * 1.0 / response.getCASEntryCount());
     System.out.println(
-        "Number of Evicted Entries in last period: " + response.getCASEntryCount());
+        "Number of Evicted Entries in last period: " + response.getCASEvictedEntryCount());
     System.out.println(
         "Total size of Evicted Entries in last period: " + response.getCASEvictedEntrySize());
     System.out.println(
