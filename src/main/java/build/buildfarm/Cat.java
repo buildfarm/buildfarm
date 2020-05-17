@@ -608,44 +608,32 @@ class Cat {
     return 10;
   }
 
-  private static void getWorkerProfile(Instance instance, int interval) {
+  private static void getWorkerProfile(Instance instance) {
     WorkerProfileMessage response = null;
-    while (true) {
-      try {
-        response = instance.getWorkerProfile();
-      } catch (StatusRuntimeException e) {
-        System.out.println(e.getMessage());
-      }
-
-      if (response == null) {
-        continue;
-      }
-
-      System.out.println("Current Entry Count: " + response.getCASEntryCount());
-      System.out.println("Current DirectoryEntry Count: " + response.getCASDirectoryEntryCount());
-      System.out.println(
-          "Current ContainedDirectories total: " + response.getEntryContainingDirectoriesCount());
-      System.out.println(
-          "Current ContainedDirectories Max: " + response.getEntryContainingDirectoriesMax());
-      System.out.println(
-          "Current ContainedDirectories average: " +
-              response.getEntryContainingDirectoriesCount() * 1.0 / response.getCASEntryCount());
-      System.out.println(
-          "Number of Evicted Entries in last period: " + response.getCASEntryCount());
-      System.out.println(
-          "Total size of Evicted Entries in last period: " + response.getCASEvictedEntrySize());
-      System.out.println(
-          "Slots usage/configured in InputFetchStage: " + response.getInputFetchStageSlotsUsedOverConfigured());
-      System.out.println(
-          "Slots usage/configured in ExecuteActionStage: " + response.getExecuteActionStageSlotsUsedOverConfigured());
-
-      try {
-        TimeUnit.SECONDS.sleep(interval);
-      } catch (InterruptedException e) {
-        System.out.println(e.getMessage());
-        return;
-      }
+    try {
+      response = instance.getWorkerProfile();
+    } catch (StatusRuntimeException e) {
+      System.out.println(e.getMessage());
     }
+
+    System.out.println("Current Entry Count: " + response.getCASEntryCount());
+    System.out.println("Current DirectoryEntry Count: " + response.getCASDirectoryEntryCount());
+    System.out.println(
+        "Current ContainedDirectories total: " + response.getEntryContainingDirectoriesCount());
+    System.out.println(
+        "Current ContainedDirectories Max: " + response.getEntryContainingDirectoriesMax());
+    System.out.println(
+        "Current ContainedDirectories average: " +
+            response.getEntryContainingDirectoriesCount() * 1.0 / response.getCASEntryCount());
+    System.out.println(
+        "Number of Evicted Entries in last period: " + response.getCASEntryCount());
+    System.out.println(
+        "Total size of Evicted Entries in last period: " + response.getCASEvictedEntrySize());
+    System.out.println(
+        "Slots usage/configured in InputFetchStage: " + response.getInputFetchStageSlotsUsedOverConfigured());
+    System.out.println(
+        "Slots usage/configured in ExecuteActionStage: " + response.getExecuteActionStageSlotsUsedOverConfigured());
+
   }
 
   public static void main(String[] args) throws Exception {
@@ -682,8 +670,8 @@ class Cat {
   }
 
   static void instanceMain(Instance instance, String type, String[] args) throws Exception {
-    if (type.equals("CASMemory")) {
-      getWorkerProfile(instance, Integer.parseInt(args[4]));
+    if (type.equals("WorkerProfile")) {
+      getWorkerProfile(instance);
     }
     if (type.equals("Capabilities")) {
       ServerCapabilities capabilities = instance.getCapabilities();
