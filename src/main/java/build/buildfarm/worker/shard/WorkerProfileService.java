@@ -49,14 +49,12 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
   public void getWorkerProfile(
       WorkerProfileRequest request, StreamObserver<WorkerProfileMessage> responseObserver) {
 
-    long[] containedDirectories = storage.getContainedDirectoriesCounts();
-
     WorkerProfileMessage.Builder replyBuilder =
         WorkerProfileMessage.newBuilder()
             .setCASEntryCount(storage.storageCount())
             .setCASDirectoryEntryCount(storage.directoryStorageCount())
-            .setEntryContainingDirectoriesCount(containedDirectories[0])
-            .setEntryContainingDirectoriesMax(containedDirectories[1])
+            .setEntryContainingDirectoriesCount(CASFileCache.Entry.containedDirectoriesCount)
+            .setEntryContainingDirectoriesMax(CASFileCache.Entry.containedDirectoriesMax)
             .setCASEvictedEntryCount(storage.getEvictedCount())
             .setCASEvictedEntrySize(storage.getEvictedSize());
 
