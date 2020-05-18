@@ -192,8 +192,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   class StartupCacheResults {
+    public Path cacheDirectory;
     public CacheScanResults scan;
     public List<Path> invalidDirectories;
+    public Duration startupTime;
   }
 
   public static class IncompleteBlobException extends IOException {
@@ -1147,7 +1149,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       fileCacheDelegate.start(onPut, removeDirectoryService);
     }
 
-    Instant start_time = Instant.now();
+    logger.log(Level.INFO, "Initializing cache at: " + root);
+    Instant startTime = Instant.now();
 
     //Phase 1: Scan
     //build scan cache results by analyzing each file on the root.
@@ -1161,13 +1164,17 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     LogComputeDirectoriesResults(invalidDirectories);
     deleteInvalidFileContent(invalidDirectories,removeDirectoryService);
 
-    Instant end_time = Instant.now();
-    logger.log(Level.INFO, "Startup Time: " + Duration.between(start_time, end_time).getSeconds() + "s");
+    // Calculate Startup time
+    Instant endTime = Instant.now();
+    Duration startupTime = Duration.between(startTime, endTime);
+    logger.log(Level.INFO, "Startup Time: " + startupTime.getSeconds() + "s");
 
-    // return information about the system's startup.
+    // return information about the cache startup.
     StartupCacheResults startupResults = new StartupCacheResults();
+    startupResults.cacheDirectory = root;
     startupResults.scan = cacheScanResults;
     startupResults.invalidDirectories = invalidDirectories;
+    startupResults.startupTime = startupTime;
     return startupResults;
   }
   
