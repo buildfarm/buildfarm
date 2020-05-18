@@ -74,7 +74,7 @@ def buildfarm_dependencies(repository_name="build_buildfarm"):
     maybe(
         http_jar,
         "jedis",
-        sha256 = "7a1eed5f5ae31881f0fd61b685adde3d20ec15a4abda304686c436293e3076ff",
+        sha256 = "934c416359965d5b17a8703e66c8fa221037ddf40f29caa25d2f59525ac4c32e",
         urls = [
-            "https://github.com/werkt/jedis/releases/download/jedis-3.2.0-3e25324dbe/jedis-3.2.0-3e25324dbe.jar",
+            "https://github.com/werkt/jedis/releases/download/jedis-3.2.0-d34c20f0d2/jedis-3.2.0-d34c20f0d2.jar",
         ])
