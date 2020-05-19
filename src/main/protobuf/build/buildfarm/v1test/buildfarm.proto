@@ -681,7 +681,8 @@ message WorkerProfileMessage {
   // sum up size of containingDirectories of all active entries
   int64 entry_containing_directories_count = 3;
 
-  // ? check notes
+  // the observed largest size of Entry.containingDirectories, this is the largest value
+  // since the start of the specific worker
   int64 entry_containing_directories_max = 4;
 
   // number of evicted Entries since last profile request
