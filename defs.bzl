@@ -46,6 +46,8 @@ IO_GRPC_MODULES = [
 def buildfarm_init(name="buildfarm"):
     """
     Initialize the WORKSPACE for buildfarm-related targets
+    
+    Args: the macro name
     """
     maven_install(
         artifacts = [
