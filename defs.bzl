@@ -43,12 +43,12 @@ IO_GRPC_MODULES = [
     "services",
 ]
 
-def buildfarm_init(repository_name="buildfarm"):
+def buildfarm_init(ame="buildfarm"):
     """
     Initialize the WORKSPACE for buildfarm-related targets
     
     Args:
-      repository_name: the name of the repository
+      name: the name of the repository
     """
     maven_install(
         artifacts = [
