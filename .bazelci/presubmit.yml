@@ -2,7 +2,7 @@
 platforms:
   ubuntu1604:
     shell_commands:
-    - ls
+    - ./.bazelci/format.sh --check
     build_targets:
     - "..."
     test_targets:
