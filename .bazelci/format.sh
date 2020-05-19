@@ -21,11 +21,12 @@ then
     if [ $? -eq 0 ]
     then
        echo "Files are correctly formatted."
+       exit 0
     else
         >&2 echo "Not all files are correctly formatted."
         >&2 echo "Run ./.bazelci/format.sh to resolve this issue."
+        exit 1
     fi
-    exit $?
 fi
 
 # Fixes formatting issues
