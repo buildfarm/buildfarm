@@ -72,7 +72,7 @@ def buildfarm_dependencies(repository_name="build_buildfarm"):
     Define all 3rd party archive rules for buildfarm
     
     Args:
-      name: the macro name
+      repository_name: the name of the repository
     """
     third_party = "@%s//third_party" % repository_name
     for dependency in archive_dependencies(third_party):
