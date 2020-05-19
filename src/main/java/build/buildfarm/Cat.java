@@ -40,6 +40,7 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
+import build.buildfarm.v1test.OperationTimesBetweenStages;
 import build.buildfarm.v1test.Tree;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.QueuedOperation;
@@ -635,6 +636,23 @@ class Cat {
         "Slots usage/configured in ExecuteActionStage: " + response.getExecuteActionStageSlotsUsedOverConfigured());
     System.out.println(
         "Number of Operations completed since last profile: " + response.getWorkerThroughput());
+
+    OperationTimesBetweenStages times = response.getTimes();
+    System.out.println(
+        String.format("Queued -> MatchStage: %f nanoseconds", times.getQueuedToMatchStage()));
+    System.out.println(
+        String.format(
+            "MatchStage -> InputFetchStage start: %f nanoseconds", times.getMatchStageToInputFetchStageStart()));
+    System.out.println(
+        String.format("InputFetchStage: %f nanoseconds", times.getInputFetchStageStartToInputFetchStageCompleted()));
+    System.out.println(
+        String.format("InputFetchStage -> ExecutionStage: %f nanoseconds", times.getInputFetchStageCompletedToExecutionStageStart()));
+    System.out.println(
+        String.format("ExecutionStage: %f nanoseconds", times.getExecutionStageStartToExecutionStageCompleted()));
+    System.out.println(
+        String.format("ExecutionStage -> ReportResultStage: %f nanoseconds", times.getExecutionStageCompletedToOutputUploadStart()));
+    System.out.println(
+        String.format("OutputUploadStage: %f nanoseconds", times.getOutputUploadStartToOutputUploadCompleted()));
   }
 
   public static void main(String[] args) throws Exception {

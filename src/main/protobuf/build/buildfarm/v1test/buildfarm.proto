@@ -655,6 +655,22 @@ message BlobWriteKey {
   string identifier = 2;
 }
 
+message OperationTimesBetweenStages {
+  float queued_to_match_stage = 1;
+
+  float match_stage_to_input_fetch_stage_start = 2;
+
+  float input_fetch_stage_start_to_input_fetch_stage_completed = 3;
+
+  float input_fetch_stage_completed_to_execution_stage_start = 4;
+
+  float execution_stage_start_to_execution_stage_completed = 5;
+
+  float execution_stage_completed_to_output_upload_start = 6;
+
+  float output_upload_start_to_output_upload_completed = 7;
+}
+
 message WorkerProfileMessage {
   // number of Entry in CAS LRU
   int64 CAS_entry_count = 1;
@@ -682,6 +698,8 @@ message WorkerProfileMessage {
 
   // number of operations completed since last profile invocation
   int32 worker_throughput = 9;
+
+  OperationTimesBetweenStages times = 10;
 }
 
 message WorkerProfileRequest {

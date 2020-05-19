@@ -15,6 +15,7 @@
 package build.buildfarm.worker.shard;
 
 import build.buildfarm.cas.ContentAddressableStorage;
+import build.buildfarm.v1test.OperationTimesBetweenStages;
 import build.buildfarm.v1test.WorkerProfileGrpc;
 import build.buildfarm.v1test.WorkerProfileMessage;
 import build.buildfarm.v1test.WorkerProfileRequest;
@@ -73,7 +74,21 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
         .setExecuteActionStageSlotsUsedOverConfigured(executeActionStageSlotUsage);
 
     // get worker throughput
-    replyBuilder.setWorkerThroughput(completeStage.getCount());
+    replyBuilder.setWorkerThroughput(completeStage.getOperatonCount());
+
+    // get aggregated time cost on each stages
+    float[] times = completeStage.getAverageOperationTimes();
+    OperationTimesBetweenStages.Builder timesBuilder = OperationTimesBetweenStages.newBuilder();
+    timesBuilder
+        .setQueuedToMatchStage(times[0])
+        .setMatchStageToInputFetchStageStart(times[1])
+        .setInputFetchStageStartToInputFetchStageCompleted(times[2])
+        .setInputFetchStageCompletedToExecutionStageStart(times[3])
+        .setExecutionStageCompletedToOutputUploadStart(times[4])
+        .setOutputUploadStartToOutputUploadCompleted(times[5])
+        .setOutputUploadStartToOutputUploadCompleted(times[6]);
+
+    replyBuilder.setTimes(timesBuilder.build());
 
     responseObserver.onNext(replyBuilder.build());
     responseObserver.onCompleted();

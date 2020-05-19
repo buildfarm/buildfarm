@@ -14,14 +14,16 @@
 
 package build.buildfarm.worker;
 
+import build.bazel.remote.execution.v2.ExecutedActionMetadata;
 import build.buildfarm.common.function.InterruptingConsumer;
 import com.google.longrunning.Operation;
 
 public class PutOperationStage extends PipelineStage.NullStage {
   private final InterruptingConsumer<Operation> onPut;
 
-  private int count = 0;
+  private int operatonCount = 0;
   private boolean startToCount = false;
+  private float[] operationAverageTimes = null;
 
 
   public PutOperationStage(InterruptingConsumer<Operation> onPut) {
@@ -32,14 +34,57 @@ public class PutOperationStage extends PipelineStage.NullStage {
   public void put(OperationContext operationContext) throws InterruptedException {
     onPut.acceptInterruptibly(operationContext.operation);
     if (startToCount) {
-      count++;
+      computeOperationTime(operationContext);
+      operatonCount++;
     }
   }
 
-  public int getCount() {
+  public int getOperatonCount() {
     startToCount = true;
-    int currentCount = count;
-    count = 0;
+    int currentCount = operatonCount;
+    operatonCount = 0;
     return currentCount;
+  }
+
+  public float[] getAverageOperationTimes() {
+    float[] currentOperationAverageTimes = operationAverageTimes;
+    operationAverageTimes = null;
+    return currentOperationAverageTimes;
+  }
+
+  private void computeOperationTime(OperationContext context) {
+    ExecutedActionMetadata metadata = context.executeResponse.build().getResult().getExecutionMetadata();
+    float[] timestamps = new float[] {
+        metadata.getQueuedTimestamp().getNanos(),
+        metadata.getWorkerStartTimestamp().getNanos(),
+        metadata.getInputFetchStartTimestamp().getNanos(),
+        metadata.getInputFetchCompletedTimestamp().getNanos(),
+        metadata.getExecutionStartTimestamp().getNanos(),
+        metadata.getExecutionCompletedTimestamp().getNanos(),
+        metadata.getOutputUploadStartTimestamp().getNanos(),
+        metadata.getOutputUploadCompletedTimestamp().getNanos(),
+    };
+
+    // [
+    //  queued                -> worker_start(MatchStage),
+    //  worker_start          -> input_fetch_start,
+    //  input_fetch_start     -> input_fetch_completed,
+    //  input_fetch_completed -> execution_start,
+    //  execution_start       -> execution_completed,
+    //  execution_completed   -> output_upload_start,
+    //  output_upload_start   -> output_upload_completed
+    // ]
+    float[] results = new float[timestamps.length - 1];
+    for (int i = 0; i < results.length; i++) {
+      results[i] = timestamps[i+1] - timestamps[i];
+    }
+
+    if (operationAverageTimes == null) {
+      operationAverageTimes = results;
+    } else {
+      for (int i = 0; i < operationAverageTimes.length; i++) {
+        operationAverageTimes[i] = (operatonCount * operationAverageTimes[i] + results[i]) / operatonCount + 1;
+      }
+    }
   }
 }
