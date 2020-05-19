@@ -43,7 +43,7 @@ IO_GRPC_MODULES = [
     "services",
 ]
 
-def buildfarm_init(ame="buildfarm"):
+def buildfarm_init(name="buildfarm"):
     """
     Initialize the WORKSPACE for buildfarm-related targets
     
