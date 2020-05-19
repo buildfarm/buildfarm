@@ -679,6 +679,9 @@ message WorkerProfileMessage {
 
   // ${number of slots used} / ${number of slots configured} in ExecuteActionStage
   string ExecuteActionStage_slots_used_over_configured = 8;
+
+  // number of operations completed since last profile invocation
+  int32 worker_throughput = 9;
 }
 
 message WorkerProfileRequest {

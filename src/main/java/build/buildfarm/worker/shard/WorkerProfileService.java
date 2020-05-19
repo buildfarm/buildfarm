@@ -22,6 +22,7 @@ import build.buildfarm.worker.CASFileCache;
 import build.buildfarm.worker.ExecuteActionStage;
 import build.buildfarm.worker.InputFetchStage;
 import build.buildfarm.worker.PipelineStage;
+import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.WorkerContext;
 import io.grpc.stub.StreamObserver;
 import java.util.logging.Logger;
@@ -33,16 +34,19 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
   private final InputFetchStage inputFetchStage;
   private final ExecuteActionStage executeActionStage;
   private final WorkerContext context;
+  private final PutOperationStage completeStage;
 
   public WorkerProfileService(
       ContentAddressableStorage storage,
       PipelineStage inputFetchStage,
       PipelineStage executeActionStage,
-      WorkerContext context) {
+      WorkerContext context,
+      PipelineStage completeStage) {
     this.storage = (CASFileCache) storage;
     this.inputFetchStage = (InputFetchStage) inputFetchStage;
     this.executeActionStage = (ExecuteActionStage) executeActionStage;
     this.context = context;
+    this.completeStage = (PutOperationStage) completeStage;
   }
 
   @Override
@@ -64,11 +68,12 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
     String executeActionStageSlotUsage =
         String.format("%d/%d", executeActionStage.getSlotUsage(), context.getExecuteStageWidth());
 
-    // get Opeartion
-
     replyBuilder
         .setInputFetchStageSlotsUsedOverConfigured(inputFetchStageSlotUsage)
         .setExecuteActionStageSlotsUsedOverConfigured(executeActionStageSlotUsage);
+
+    // get worker throughput
+    replyBuilder.setWorkerThroughput(completeStage.getCount());
 
     responseObserver.onNext(replyBuilder.build());
     responseObserver.onCompleted();

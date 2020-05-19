@@ -20,6 +20,10 @@ import com.google.longrunning.Operation;
 public class PutOperationStage extends PipelineStage.NullStage {
   private final InterruptingConsumer<Operation> onPut;
 
+  private int count = 0;
+  private boolean startToCount = false;
+
+
   public PutOperationStage(InterruptingConsumer<Operation> onPut) {
     this.onPut = onPut;
   }
@@ -27,5 +31,15 @@ public class PutOperationStage extends PipelineStage.NullStage {
   @Override
   public void put(OperationContext operationContext) throws InterruptedException {
     onPut.acceptInterruptibly(operationContext.operation);
+    if (startToCount) {
+      count++;
+    }
+  }
+
+  public int getCount() {
+    startToCount = true;
+    int currentCount = count;
+    count = 0;
+    return currentCount;
   }
 }

@@ -633,7 +633,8 @@ class Cat {
         "Slots usage/configured in InputFetchStage: " + response.getInputFetchStageSlotsUsedOverConfigured());
     System.out.println(
         "Slots usage/configured in ExecuteActionStage: " + response.getExecuteActionStageSlotsUsedOverConfigured());
-
+    System.out.println(
+        "Number of Operations completed since last profile: " + response.getWorkerThroughput());
   }
 
   public static void main(String[] args) throws Exception {

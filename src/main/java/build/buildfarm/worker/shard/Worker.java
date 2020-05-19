@@ -250,7 +250,7 @@ public class Worker extends LoggingMain {
                 new ContentAddressableStorageService(
                     instances, /* deadlineAfter=*/ 1, DAYS, /* requestLogLevel=*/ FINER))
             .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, DAYS))
-            .addService(new WorkerProfileService(storage, inputFetchStage, executeActionStage, context))
+            .addService(new WorkerProfileService(storage, inputFetchStage, executeActionStage, context, completeStage))
             .build();
 
     logger.log(INFO, String.format("%s initialized", identifier));
