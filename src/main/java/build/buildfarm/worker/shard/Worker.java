@@ -146,6 +146,9 @@ public class Worker extends LoggingMain {
     this.config = config;
     String identifier = "buildfarm-worker-" + config.getPublicName() + "-" + session;
     root = getValidRoot(config);
+    if (config.getPublicName().isEmpty()) {
+      throw new ConfigurationException("worker's public name should not be empty");
+    }
 
     digestUtil = new DigestUtil(getValidHashFunction(config));
 
@@ -542,17 +545,15 @@ public class Worker extends LoggingMain {
   }
 
   private static ShardWorkerConfig toShardWorkerConfig(Readable input, WorkerOptions options)
-      throws ConfigurationException, IOException {
+      throws IOException {
     ShardWorkerConfig.Builder builder = ShardWorkerConfig.newBuilder();
     TextFormat.merge(input, builder);
     if (!Strings.isNullOrEmpty(options.root)) {
       builder.setRoot(options.root);
     }
-    if (Strings.isNullOrEmpty(options.publicName)) {
-      throw new ConfigurationException("worker's public name should not be empty");
+    if (!Strings.isNullOrEmpty(options.publicName)) {
+      builder.setPublicName(options.publicName);
     }
-    builder.setPublicName(options.publicName);
-
     return builder.build();
   }
 
