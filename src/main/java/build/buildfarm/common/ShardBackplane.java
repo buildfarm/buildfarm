@@ -17,19 +17,21 @@ package build.buildfarm.common;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecutionStage;
+import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.ThreadSafety.ThreadSafe;
 import build.buildfarm.common.function.InterruptingRunnable;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
+import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.ShardWorker;
-import build.buildfarm.v1test.OperationsStatus;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -136,8 +138,8 @@ public interface ShardBackplane {
 
   /** Remove or add workers to a blob's location set as requested */
   @ThreadSafe
-  void adjustBlobLocations(
-    Digest blobDigest, Set<String> addWorkers, Set<String> removeWorkers) throws IOException;
+  void adjustBlobLocations(Digest blobDigest, Set<String> addWorkers, Set<String> removeWorkers)
+      throws IOException;
 
   /**
    * The CAS is represented as a map where the key is the digest of the blob that is being stored
@@ -215,7 +217,8 @@ public interface ShardBackplane {
    * <p>Moves an operation from the list of queued operations to the list of dispatched operations.
    */
   @ThreadSafe
-  QueueEntry dispatchOperation() throws IOException, InterruptedException;
+  QueueEntry dispatchOperation(List<Platform.Property> provisions)
+      throws IOException, InterruptedException;
 
   /**
    * Pushes an operation onto the head of the list of queued operations after a rejection which does
@@ -286,7 +289,7 @@ public interface ShardBackplane {
   /** Test for whether an operation may be prequeued */
   @ThreadSafe
   boolean canPrequeue() throws IOException;
-  
+
   @ThreadSafe
   OperationsStatus operationsStatus() throws IOException;
 }

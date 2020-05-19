@@ -14,9 +14,15 @@
 
 package build.buildfarm.instance.shard;
 
+import build.bazel.remote.execution.v2.Platform;
 import build.buildfarm.common.StringVisitor;
+import build.buildfarm.common.redis.BalancedRedisQueue;
 import build.buildfarm.common.redis.ProvisionedRedisQueue;
+import build.buildfarm.v1test.OperationQueueStatus;
 import build.buildfarm.v1test.QueueStatus;
+import com.google.common.collect.LinkedHashMultimap;
+import com.google.common.collect.SetMultimap;
+import java.util.ArrayList;
 import java.util.List;
 import redis.clients.jedis.JedisCluster;
 
@@ -100,31 +106,51 @@ public class OperationQueue {
   ///          each internal queue has their own dequeue, this name is generic
   ///          without the hashtag.
   /// @return  The name of the queue.
+  /// @note    Overloaded.
   /// @note    Suggested return identifier: name.
   ///
   public String getDequeueName() {
-    return queues.get(0).queue().getDequeueName();
+    return "operation_dequeue";
+  }
+  ///
+  /// @brief   Get dequeue name.
+  /// @details Get the name of the internal dequeue used by the queue. since
+  ///          each internal queue has their own dequeue, this name is generic
+  ///          without the hashtag.
+  /// @param   provisions Provisions used to select an eligible queue.
+  /// @return  The name of the queue.
+  /// @note    Overloaded.
+  /// @note    Suggested return identifier: name.
+  ///
+  public String getDequeueName(List<Platform.Property> provisions) {
+    BalancedRedisQueue queue = chooseEligibleQueue(provisions);
+    return queue.getDequeueName();
   }
   ///
   /// @brief   Push a value onto the queue.
   /// @details Adds the value into one of the internal backend redis queues.
-  /// @param   jedis Jedis cluster client.
-  /// @param   val   The value to push onto the queue.
+  /// @param   jedis      Jedis cluster client.
+  /// @param   provisions Provisions used to select an eligible queue.
+  /// @param   val        The value to push onto the queue.
   ///
-  public void push(JedisCluster jedis, String val) {
-    queues.get(0).queue().push(jedis, val);
+  public void push(JedisCluster jedis, List<Platform.Property> provisions, String val) {
+    BalancedRedisQueue queue = chooseEligibleQueue(provisions);
+    queue.push(jedis, val);
   }
   ///
   /// @brief   Pop element into internal dequeue and return value.
   /// @details This pops the element from one queue atomically into an internal
   ///          list called the dequeue. It will perform an exponential backoff.
   ///          Null is returned if the overall backoff times out.
-  /// @param   jedis Jedis cluster client.
+  /// @param   jedis      Jedis cluster client.
+  /// @param   provisions Provisions used to select an eligible queue.
   /// @return  The value of the transfered element. null if the thread was interrupted.
   /// @note    Suggested return identifier: val.
   ///
-  public String dequeue(JedisCluster jedis) throws InterruptedException {
-    return queues.get(0).queue().dequeue(jedis);
+  public String dequeue(JedisCluster jedis, List<Platform.Property> provisions)
+      throws InterruptedException {
+    BalancedRedisQueue queue = chooseEligibleQueue(provisions);
+    return queue.dequeue(jedis);
   }
   ///
   /// @brief   Get status information about the queue.
@@ -132,9 +158,66 @@ public class OperationQueue {
   ///          elements are balanced.
   /// @param   jedis Jedis cluster client.
   /// @return  The current status of the queue.
+  /// @note    Overloaded.
   /// @note    Suggested return identifier: status.
   ///
-  public QueueStatus status(JedisCluster jedis) {
-    return queues.get(0).queue().status(jedis);
+  public OperationQueueStatus status(JedisCluster jedis) {
+    // get properties
+    List<QueueStatus> provisions = new ArrayList<>();
+    for (ProvisionedRedisQueue pQueue : queues) {
+      provisions.add(pQueue.queue().status(jedis));
+    }
+
+    // build proto
+    OperationQueueStatus status =
+        OperationQueueStatus.newBuilder().addAllProvisions(provisions).build();
+    return status;
+  }
+  ///
+  /// @brief   Get status information about the queue.
+  /// @details Helpful for understanding the current load on the queue and how
+  ///          elements are balanced.
+  /// @param   jedis      Jedis cluster client.
+  /// @param   provisions Provisions used to select an eligible queue.
+  /// @return  The current status of the queue.
+  /// @note    Overloaded.
+  /// @note    Suggested return identifier: status.
+  ///
+  public QueueStatus status(JedisCluster jedis, List<Platform.Property> provisions) {
+    BalancedRedisQueue queue = chooseEligibleQueue(provisions);
+    return queue.status(jedis);
+  }
+  ///
+  /// @brief   Choose an eligible queue based on given properties.
+  /// @details We use the platform execution properties of a queue entry to
+  ///          determine the appropriate queue. If there no eligible queues, an
+  ///          exception is thrown.
+  /// @param   provisions Provisions to check that requirements are met.
+  /// @return  The chosen queue.
+  /// @note    Suggested return identifier: queue.
+  ///
+  private BalancedRedisQueue chooseEligibleQueue(List<Platform.Property> provisions) {
+    for (ProvisionedRedisQueue pQueue : queues) {
+      if (pQueue.isEligible(toMultimap(provisions))) {
+        return pQueue.queue();
+      }
+    }
+    throw new RuntimeException(
+        "there are no eligible queues for the provided execution requirements");
+  }
+  ///
+  /// @brief   Convert proto provisions into java multimap.
+  /// @details This conversion is done to more easily check if a key/value
+  ///          exists in the provisions.
+  /// @param   provisions Provisions list to convert.
+  /// @return  The provisions as a set.
+  /// @note    Suggested return identifier: provisionSet.
+  ///
+  private SetMultimap<String, String> toMultimap(List<Platform.Property> provisions) {
+    SetMultimap<String, String> set = LinkedHashMultimap.create();
+    for (Platform.Property property : provisions) {
+      set.put(property.getName(), property.getValue());
+    }
+    return set;
   }
 }

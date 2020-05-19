@@ -441,10 +441,14 @@ message QueueStatus {
   repeated int64 internal_sizes = 2;
 }
 
+message OperationQueueStatus {
+  repeated QueueStatus provisions = 1;
+}
+
 message OperationsStatus {
   QueueStatus prequeue = 1;
 
-  QueueStatus operation_queue = 2;
+  OperationQueueStatus operation_queue = 2;
 
   int64 dispatched_size = 3;
 }

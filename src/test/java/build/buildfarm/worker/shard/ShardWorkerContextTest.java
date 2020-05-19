@@ -15,6 +15,7 @@
 package build.buildfarm.worker.shard;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -41,6 +42,7 @@ import com.google.protobuf.Duration;
 import io.grpc.StatusException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -70,9 +72,7 @@ public class ShardWorkerContextTest {
   }
 
   WorkerContext createTestContext() {
-    return createTestContext(
-        Platform.getDefaultInstance(),
-        /* policies=*/ ImmutableList.of());
+    return createTestContext(Platform.getDefaultInstance(), /* policies=*/ ImmutableList.of());
   }
 
   WorkerContext createTestContext(Platform platform, Iterable<ExecutionPolicy> policies) {
@@ -114,20 +114,17 @@ public class ShardWorkerContextTest {
 
   @Test
   public void queueEntryWithExecutionPolicyPlatformMatches() throws Exception {
-    WorkerContext context = createTestContext(
-        Platform.getDefaultInstance(),
-        ImmutableList.of(ExecutionPolicy.newBuilder().setName("foo").build()));
-    Platform matchPlatform = Platform.newBuilder()
-        .addProperties(
-            Property.newBuilder()
-                .setName("execution-policy")
-                .setValue("foo")
-                .build())
-        .build();
-    QueueEntry queueEntry = QueueEntry.newBuilder()
-        .setPlatform(matchPlatform)
-        .build();
-    when(backplane.dispatchOperation())
+    WorkerContext context =
+        createTestContext(
+            Platform.getDefaultInstance(),
+            ImmutableList.of(ExecutionPolicy.newBuilder().setName("foo").build()));
+    Platform matchPlatform =
+        Platform.newBuilder()
+            .addProperties(
+                Property.newBuilder().setName("execution-policy").setValue("foo").build())
+            .build();
+    QueueEntry queueEntry = QueueEntry.newBuilder().setPlatform(matchPlatform).build();
+    when(backplane.dispatchOperation(any(List.class)))
         .thenReturn(queueEntry)
         .thenReturn(null); // provide a match completion in failure case
     MatchListener listener = mock(MatchListener.class);
