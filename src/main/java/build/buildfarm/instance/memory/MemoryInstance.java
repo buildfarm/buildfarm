@@ -63,9 +63,9 @@ import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.GrpcACConfig;
 import build.buildfarm.v1test.MemoryInstanceConfig;
 import build.buildfarm.v1test.OperationIteratorToken;
+import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
-import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.Tree;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -111,9 +111,9 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.annotation.Nullable;
 
 public class MemoryInstance extends AbstractServerInstance {
   private static final Logger logger = Logger.getLogger(MemoryInstance.class.getName());
@@ -134,7 +134,10 @@ public class MemoryInstance extends AbstractServerInstance {
                   try {
                     notification.getValue().getOutput().close();
                   } catch (IOException e) {
-                    logger.log(Level.SEVERE, format("error closing stream source %s", notification.getKey()), e);
+                    logger.log(
+                        Level.SEVERE,
+                        format("error closing stream source %s", notification.getKey()),
+                        e);
                   }
                 }
               })
@@ -234,7 +237,7 @@ public class MemoryInstance extends AbstractServerInstance {
     this.operationTimeoutDelays = operationTimeoutDelays;
 
     // a default configuration for a GPU/fallback configuration
-    queuedOperations.AddWorkers("Other",workers);
+    queuedOperations.AddWorkers("Other", workers);
   }
 
   private static ActionCache createActionCache(
@@ -468,7 +471,8 @@ public class MemoryInstance extends AbstractServerInstance {
       Operation operation, com.google.rpc.Status.Builder status) throws InterruptedException {
     Digest actionDigest = expectActionDigest(operation);
     if (actionDigest == null) {
-      logger.log(Level.WARNING,
+      logger.log(
+          Level.WARNING,
           format("Could not determine Action Digest for operation %s", operation.getName()));
       String message =
           String.format("Could not determine Action Digest from Operation %s", operation.getName());
@@ -477,7 +481,8 @@ public class MemoryInstance extends AbstractServerInstance {
     }
     ByteString actionBlob = getBlob(actionDigest);
     if (actionBlob == null) {
-      logger.log(Level.WARNING,
+      logger.log(
+          Level.WARNING,
           format(
               "Action %s for operation %s went missing, cannot initiate execution monitoring",
               DigestUtil.toString(actionDigest), operation.getName()));
@@ -497,7 +502,8 @@ public class MemoryInstance extends AbstractServerInstance {
     try {
       return Action.parseFrom(actionBlob);
     } catch (InvalidProtocolBufferException e) {
-      logger.log(Level.WARNING,
+      logger.log(
+          Level.WARNING,
           format(
               "Could not parse Action %s for Operation %s",
               DigestUtil.toString(actionDigest), operation.getName()),
@@ -814,7 +820,8 @@ public class MemoryInstance extends AbstractServerInstance {
             enqueueOperation(operation);
           }
         } catch (StatusException | IOException | ExcessiveWriteSizeException e) {
-          logger.log(Level.SEVERE, format("could not emplace queued operation: %s", operationName), e);
+          logger.log(
+              Level.SEVERE, format("could not emplace queued operation: %s", operationName), e);
         }
       } else {
         rejectedOperations.add(operation);
@@ -839,7 +846,7 @@ public class MemoryInstance extends AbstractServerInstance {
       matchSynchronized(platform, listener);
     }
   }
-  
+
   @Override
   public OperationsStatus operationsStatus() {
     throw new UnsupportedOperationException();

@@ -27,7 +27,6 @@ import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.worker.RetryingMatchListener;
-import com.google.common.base.Throwables;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -48,9 +47,7 @@ class OperationQueueClient {
     for (ExecutionPolicy policy : policies) {
       String name = policy.getName();
       if (!name.isEmpty()) {
-        builder.addPropertiesBuilder()
-            .setName("execution-policy")
-            .setValue(policy.getName());
+        builder.addPropertiesBuilder().setName("execution-policy").setValue(policy.getName());
       }
     }
     return builder.build();
@@ -62,65 +59,71 @@ class OperationQueueClient {
   }
 
   void match(MatchListener listener) throws InterruptedException {
-    RetryingMatchListener dedupMatchListener = new RetryingMatchListener() {
-      boolean matched = false;
+    RetryingMatchListener dedupMatchListener =
+        new RetryingMatchListener() {
+          boolean matched = false;
 
-      @Override
-      public boolean getMatched() {
-        return matched;
-      }
+          @Override
+          public boolean getMatched() {
+            return matched;
+          }
 
-      @Override
-      public void onWaitStart() {
-        listener.onWaitStart();
-      }
+          @Override
+          public void onWaitStart() {
+            listener.onWaitStart();
+          }
 
-      @Override
-      public void onWaitEnd() {
-        listener.onWaitEnd();
-      }
+          @Override
+          public void onWaitEnd() {
+            listener.onWaitEnd();
+          }
 
-      @Override
-      public boolean onEntry(@Nullable QueueEntry queueEntry) throws InterruptedException {
-        if (queueEntry == null) {
-          matched = true;
-          return listener.onEntry(null);
-        }
-        ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
-        String operationName = executeEntry.getOperationName();
-        if (activeOperations.contains(operationName)) {
-          logger.severe("WorkerContext::match: WARNING matched duplicate operation " + operationName);
-          return false;
-        }
-        matched = true;
-        activeOperations.add(operationName);
-        boolean success = listener.onEntry(queueEntry);
-        if (!success) {
-          requeue(Operation.newBuilder()
-              .setName(operationName)
-              .setMetadata(Any.pack(QueuedOperationMetadata.newBuilder()
-                  .setExecuteOperationMetadata(ExecuteOperationMetadata.newBuilder()
-                      .setActionDigest(executeEntry.getActionDigest())
-                      .setStdoutStreamName(executeEntry.getStdoutStreamName())
-                      .setStderrStreamName(executeEntry.getStderrStreamName())
-                      .setStage(ExecutionStage.Value.QUEUED))
-                  .setQueuedOperationDigest(queueEntry.getQueuedOperationDigest())
-                  .build()))
-              .build());
-        }
-        return success;
-      }
+          @Override
+          public boolean onEntry(@Nullable QueueEntry queueEntry) throws InterruptedException {
+            if (queueEntry == null) {
+              matched = true;
+              return listener.onEntry(null);
+            }
+            ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
+            String operationName = executeEntry.getOperationName();
+            if (activeOperations.contains(operationName)) {
+              logger.severe(
+                  "WorkerContext::match: WARNING matched duplicate operation " + operationName);
+              return false;
+            }
+            matched = true;
+            activeOperations.add(operationName);
+            boolean success = listener.onEntry(queueEntry);
+            if (!success) {
+              requeue(
+                  Operation.newBuilder()
+                      .setName(operationName)
+                      .setMetadata(
+                          Any.pack(
+                              QueuedOperationMetadata.newBuilder()
+                                  .setExecuteOperationMetadata(
+                                      ExecuteOperationMetadata.newBuilder()
+                                          .setActionDigest(executeEntry.getActionDigest())
+                                          .setStdoutStreamName(executeEntry.getStdoutStreamName())
+                                          .setStderrStreamName(executeEntry.getStderrStreamName())
+                                          .setStage(ExecutionStage.Value.QUEUED))
+                                  .setQueuedOperationDigest(queueEntry.getQueuedOperationDigest())
+                                  .build()))
+                      .build());
+            }
+            return success;
+          }
 
-      @Override
-      public void onError(Throwable t) {
-        listener.onError(t);
-      }
+          @Override
+          public void onError(Throwable t) {
+            listener.onError(t);
+          }
 
-      @Override
-      public void setOnCancelHandler(Runnable onCancelHandler) {
-        listener.setOnCancelHandler(onCancelHandler);
-      }
-    };
+          @Override
+          public void setOnCancelHandler(Runnable onCancelHandler) {
+            listener.setOnCancelHandler(onCancelHandler);
+          }
+        };
     while (!dedupMatchListener.getMatched()) {
       instance.match(matchPlatform, dedupMatchListener);
     }
@@ -132,16 +135,14 @@ class OperationQueueClient {
       ExecuteOperationMetadata metadata =
           operation.getMetadata().unpack(ExecuteOperationMetadata.class);
 
-      ExecuteOperationMetadata executingMetadata = metadata.toBuilder()
-          .setStage(ExecutionStage.Value.QUEUED)
-          .build();
+      ExecuteOperationMetadata executingMetadata =
+          metadata.toBuilder().setStage(ExecutionStage.Value.QUEUED).build();
 
-      operation = operation.toBuilder()
-          .setMetadata(Any.pack(executingMetadata))
-          .build();
+      operation = operation.toBuilder().setMetadata(Any.pack(executingMetadata)).build();
       instance.putOperation(operation);
     } catch (InvalidProtocolBufferException e) {
-      logger.log(SEVERE, "error unpacking execute operation metadata for " + operation.getName(), e);
+      logger.log(
+          SEVERE, "error unpacking execute operation metadata for " + operation.getName(), e);
     }
   }
 

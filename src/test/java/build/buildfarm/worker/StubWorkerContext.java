@@ -201,7 +201,8 @@ class StubWorkerContext implements WorkerContext {
   }
 
   @Override
-  public IOResource limitExecution(String operationName, ImmutableList.Builder<String> arguments, Command command) {
+  public IOResource limitExecution(
+      String operationName, ImmutableList.Builder<String> arguments, Command command) {
     throw new UnsupportedOperationException();
   }
 

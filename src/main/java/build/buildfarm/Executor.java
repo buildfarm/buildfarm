@@ -152,7 +152,8 @@ class Executor {
           print(code, responseType, micros);
           statusCounts[code].incrementAndGet();
         } catch (InvalidProtocolBufferException e) {
-          System.err.println("An unlikely error has occurred for " + operationName + ": " + e.getMessage());
+          System.err.println(
+              "An unlikely error has occurred for " + operationName + ": " + e.getMessage());
         }
       } else if (operation.getMetadata().is(ExecuteOperationMetadata.class)) {
         try {
@@ -163,7 +164,8 @@ class Executor {
           }
         } catch (InvalidProtocolBufferException e) {
           e.printStackTrace();
-          System.err.println("An unlikely error has occurred for " + operationName + ": " + e.getMessage());
+          System.err.println(
+              "An unlikely error has occurred for " + operationName + ": " + e.getMessage());
         }
         noticeFuture = service.schedule(this::printStillWaiting, 30, SECONDS);
       } else {
@@ -379,9 +381,8 @@ class Executor {
       for (Path file : stream) {
         FileStatus stat = stat(file, /* followSymlinks=*/ false);
 
-        Digest digest = DigestUtil.buildDigest(
-            file.getFileName().toString().split("_")[0],
-            stat.getSize());
+        Digest digest =
+            DigestUtil.buildDigest(file.getFileName().toString().split("_")[0], stat.getSize());
 
         request.addBlobDigests(digest);
         size++;

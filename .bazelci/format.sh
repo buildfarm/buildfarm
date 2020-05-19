@@ -37,4 +37,4 @@ then
 fi
 
 # Fixes formatting issues
-java -jar $LOCAL_FORMATTER -r $files 
+java -jar $LOCAL_FORMATTER -i $files 

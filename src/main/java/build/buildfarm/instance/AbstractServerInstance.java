@@ -97,9 +97,9 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
-import javax.annotation.Nullable;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.annotation.Nullable;
 
 public abstract class AbstractServerInstance implements Instance {
   private static final Logger logger = Logger.getLogger(AbstractServerInstance.class.getName());
@@ -207,7 +207,8 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public ListenableFuture<ActionResult> getActionResult(ActionKey actionKey, RequestMetadata requestMetadata) {
+  public ListenableFuture<ActionResult> getActionResult(
+      ActionKey actionKey, RequestMetadata requestMetadata) {
     return immediateFuture(actionCache.get(actionKey));
   }
 
@@ -675,8 +676,7 @@ public abstract class AbstractServerInstance implements Instance {
     return listeningDecorator(service)
         .submit(
             () -> {
-              Tree.Builder tree = Tree.newBuilder()
-                  .setRootDigest(inputRoot);
+              Tree.Builder tree = Tree.newBuilder().setRootDigest(inputRoot);
 
               TokenizableIterator<DirectoryEntry> iterator =
                   createTreeIterator(reason, inputRoot, /* pageToken=*/ "");
@@ -723,11 +723,13 @@ public abstract class AbstractServerInstance implements Instance {
         getLogger().log(Level.SEVERE, "no rpc status from exception", cause);
         status = asExecutionStatus(cause);
       } else if (Code.forNumber(status.getCode()) == Code.DEADLINE_EXCEEDED) {
-        logger.log(Level.WARNING, "an rpc status was thrown with DEADLINE_EXCEEDED, discarding it", cause);
-        status = com.google.rpc.Status.newBuilder()
-            .setCode(com.google.rpc.Code.UNAVAILABLE.getNumber())
-            .setMessage("SUPPRESSED DEADLINE_EXCEEDED: " + cause.getMessage())
-            .build();
+        logger.log(
+            Level.WARNING, "an rpc status was thrown with DEADLINE_EXCEEDED, discarding it", cause);
+        status =
+            com.google.rpc.Status.newBuilder()
+                .setCode(com.google.rpc.Code.UNAVAILABLE.getNumber())
+                .setMessage("SUPPRESSED DEADLINE_EXCEEDED: " + cause.getMessage())
+                .build();
       }
       throw StatusProto.toStatusException(status);
     }
@@ -811,8 +813,9 @@ public abstract class AbstractServerInstance implements Instance {
       throws InterruptedException, StatusException {
     ExecutorService service = newDirectExecutorService();
     ImmutableSet.Builder<Digest> inputDigestsBuilder = ImmutableSet.builder();
-    Tree tree = getUnchecked(
-        getTreeFuture(operationName, action.getInputRootDigest(), service, requestMetadata));
+    Tree tree =
+        getUnchecked(
+            getTreeFuture(operationName, action.getInputRootDigest(), service, requestMetadata));
     validateAction(
         action,
         getUnchecked(expect(action.getCommandDigest(), Command.parser(), service, requestMetadata)),
@@ -874,7 +877,8 @@ public abstract class AbstractServerInstance implements Instance {
     String workingDirectory = command.getWorkingDirectory();
     if (!workingDirectory.isEmpty()) {
       if (workingDirectory.startsWith("/")) {
-        preconditionFailure.addViolationsBuilder()
+        preconditionFailure
+            .addViolationsBuilder()
             .setType(VIOLATION_TYPE_INVALID)
             .setSubject(INVALID_COMMAND)
             .setDescription("working directory is absolute");
@@ -890,7 +894,8 @@ public abstract class AbstractServerInstance implements Instance {
             }
           }
           if (nextDirectory == directory) {
-            preconditionFailure.addViolationsBuilder()
+            preconditionFailure
+                .addViolationsBuilder()
                 .setType(VIOLATION_TYPE_INVALID)
                 .setSubject(INVALID_COMMAND)
                 .setDescription("working directory is not an input directory");
@@ -1126,9 +1131,11 @@ public abstract class AbstractServerInstance implements Instance {
           void onCompleted(@Nullable ActionResult actionResult) {
             final ExecuteOperationMetadata nextMetadata;
             if (actionResult == null) {
-              nextMetadata = cacheCheckMetadata.toBuilder().setStage(ExecutionStage.Value.QUEUED).build();
+              nextMetadata =
+                  cacheCheckMetadata.toBuilder().setStage(ExecutionStage.Value.QUEUED).build();
             } else {
-              nextMetadata = cacheCheckMetadata.toBuilder().setStage(ExecutionStage.Value.COMPLETED).build();
+              nextMetadata =
+                  cacheCheckMetadata.toBuilder().setStage(ExecutionStage.Value.COMPLETED).build();
               operationBuilder
                   .setDone(true)
                   .setResponse(
@@ -1136,7 +1143,9 @@ public abstract class AbstractServerInstance implements Instance {
                           ExecuteResponse.newBuilder()
                               .setResult(actionResult)
                               .setStatus(
-                                  com.google.rpc.Status.newBuilder().setCode(Code.OK.getNumber()).build())
+                                  com.google.rpc.Status.newBuilder()
+                                      .setCode(Code.OK.getNumber())
+                                      .build())
                               .setCachedResult(true)
                               .build()));
             }
@@ -1146,7 +1155,8 @@ public abstract class AbstractServerInstance implements Instance {
 
             try {
               if (!nextOperation.getDone()) {
-                updateOperationWatchers(nextOperation); // updates watchers initially for queued stage
+                updateOperationWatchers(
+                    nextOperation); // updates watchers initially for queued stage
               }
               putOperation(nextOperation);
             } catch (InterruptedException e) {
@@ -1161,7 +1171,10 @@ public abstract class AbstractServerInstance implements Instance {
 
           @Override
           public void onFailure(Throwable t) {
-            logger.log(Level.WARNING, format("action cache check of %s failed", DigestUtil.toString(actionDigest)), t);
+            logger.log(
+                Level.WARNING,
+                format("action cache check of %s failed", DigestUtil.toString(actionDigest)),
+                t);
             onCompleted(null);
           }
         },
@@ -1245,7 +1258,8 @@ public abstract class AbstractServerInstance implements Instance {
     try {
       return operation.getMetadata().unpack(ExecuteOperationMetadata.class);
     } catch (InvalidProtocolBufferException e) {
-      logger.log(Level.SEVERE, format("invalid execute operation metadata %s", operation.getName()), e);
+      logger.log(
+          Level.SEVERE, format("invalid execute operation metadata %s", operation.getName()), e);
     }
     return null;
   }
@@ -1262,14 +1276,18 @@ public abstract class AbstractServerInstance implements Instance {
             try {
               future.set(parser.parseFrom(blob));
             } catch (InvalidProtocolBufferException e) {
-              logger.log(Level.WARNING, format("expect parse for %s failed", DigestUtil.toString(digest)), e);
+              logger.log(
+                  Level.WARNING,
+                  format("expect parse for %s failed", DigestUtil.toString(digest)),
+                  e);
               future.setException(e);
             }
           }
 
           @Override
           public void onFailure(Throwable t) {
-            logger.log(Level.WARNING, format("expect for %s failed", DigestUtil.toString(digest)), t);
+            logger.log(
+                Level.WARNING, format("expect for %s failed", DigestUtil.toString(digest)), t);
             future.setException(t);
           }
         },

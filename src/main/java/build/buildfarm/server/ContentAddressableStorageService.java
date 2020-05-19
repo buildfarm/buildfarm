@@ -113,7 +113,8 @@ public class ContentAddressableStorageService
               responseObserver.onNext(response);
               responseObserver.onCompleted();
               long elapsedMicros = stopwatch.elapsed(MICROSECONDS);
-              logger.log(requestLogLevel,
+              logger.log(
+                  requestLogLevel,
                   format(
                       "FindMissingBlobs(%s) for %d blobs in %gms",
                       instance.getName(),
@@ -128,7 +129,8 @@ public class ContentAddressableStorageService
           public void onFailure(Throwable t) {
             Status status = Status.fromThrowable(t);
             if (status.getCode() != Code.CANCELLED) {
-              logger.log(Level.SEVERE,
+              logger.log(
+                  Level.SEVERE,
                   format(
                       "findMissingBlobs(%s): %d",
                       request.getInstanceName(), request.getBlobDigestsCount()),
@@ -241,8 +243,7 @@ public class ContentAddressableStorageService
       StreamObserver<GetTreeResponse> responseObserver) {
     try {
       do {
-        Tree.Builder builder = Tree.newBuilder()
-            .setRootDigest(rootDigest);
+        Tree.Builder builder = Tree.newBuilder().setRootDigest(rootDigest);
         String nextPageToken = instance.getTree(rootDigest, pageSize, pageToken, builder);
         Tree tree = builder.build();
 

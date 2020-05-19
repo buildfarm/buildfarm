@@ -16,14 +16,11 @@ package build.buildfarm.common.redis;
 
 import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import build.buildfarm.common.StringVisitor;
-import build.buildfarm.instance.shard.JedisClusterFactory;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -48,8 +45,7 @@ import redis.clients.jedis.JedisCluster;
 @RunWith(JUnit4.class)
 public class RedisQueueMockTest {
 
-  @Mock
-  private JedisCluster redis;
+  @Mock private JedisCluster redis;
 
   @Before
   public void setUp() {

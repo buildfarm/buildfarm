@@ -31,8 +31,7 @@ import java.util.Stack;
 public class OutputDirectory {
   private final Map<String, OutputDirectory> children;
 
-  private static final OutputDirectory defaultInstance =
-      new OutputDirectory(ImmutableMap.of());
+  private static final OutputDirectory defaultInstance = new OutputDirectory(ImmutableMap.of());
 
   private static OutputDirectory getDefaultInstance() {
     return defaultInstance;

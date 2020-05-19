@@ -14,10 +14,7 @@
 
 package build.buildfarm.common.redis;
 
-import static java.util.concurrent.TimeUnit.SECONDS;
-
 import build.buildfarm.common.StringVisitor;
-import build.buildfarm.common.redis.RedisClient;
 import build.buildfarm.v1test.QueueStatus;
 import java.util.ArrayList;
 import java.util.Collections;

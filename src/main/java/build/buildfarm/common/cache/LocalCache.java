@@ -1969,15 +1969,9 @@ class LocalCache<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V> 
               ? new ConcurrentLinkedQueue<ReferenceEntry<K, V>>()
               : LocalCache.discardingQueue();
 
-      writeQueue =
-          map.usesWriteQueue()
-              ? new WriteQueue<K, V>()
-              : LocalCache.discardingQueue();
+      writeQueue = map.usesWriteQueue() ? new WriteQueue<K, V>() : LocalCache.discardingQueue();
 
-      accessQueue =
-          map.usesAccessQueue()
-              ? new AccessQueue<K, V>()
-              : LocalCache.discardingQueue();
+      accessQueue = map.usesAccessQueue() ? new AccessQueue<K, V>() : LocalCache.discardingQueue();
     }
 
     AtomicReferenceArray<ReferenceEntry<K, V>> newEntryArray(int size) {

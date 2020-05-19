@@ -26,15 +26,16 @@ import java.nio.file.attribute.PosixFileAttributes;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import jnr.constants.platform.OpenFlags;
 import jnr.ffi.Pointer;
 import jnr.posix.FileStat;
 import jnr.posix.POSIX;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 public class IOUtils {
   private static final Logger logger = Logger.getLogger(IOUtils.class.getName());
+
   private IOUtils() {}
 
   enum IOErrorFormatter {

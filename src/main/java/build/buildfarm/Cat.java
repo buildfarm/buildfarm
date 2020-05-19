@@ -40,9 +40,9 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
+import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.Tree;
-import build.buildfarm.v1test.QueuedOperation;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
@@ -70,7 +70,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Date;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -98,11 +97,11 @@ class Cat {
   }
 
   private static void printAction(int level, Action action) {
-    indentOut(level + 1, "Command Digest: Command " + DigestUtil.toString(action.getCommandDigest()));
+    indentOut(
+        level + 1, "Command Digest: Command " + DigestUtil.toString(action.getCommandDigest()));
     indentOut(
         level, "Input Root Digest: Directory " + DigestUtil.toString(action.getInputRootDigest()));
-    indentOut(
-        level, "DoNotCache: " + (action.getDoNotCache() ? "true" : "false"));
+    indentOut(level, "DoNotCache: " + (action.getDoNotCache() ? "true" : "false"));
     if (action.hasTimeout()) {
       indentOut(
           level,
@@ -295,12 +294,7 @@ class Cat {
       if (subDirectory == null) {
         indentOut(indentLevel + 1, "DIRECTORY MISSING FROM CAS");
       } else {
-        printTreeAt(
-            indentLevel + 1,
-            subDirectory,
-            directoriesIndex,
-            totalWeight,
-            directoryWeights);
+        printTreeAt(indentLevel + 1, subDirectory, directoriesIndex, totalWeight, directoryWeights);
       }
     }
     for (FileNode fileNode : directory.getFilesList()) {
@@ -315,12 +309,11 @@ class Cat {
     }
   }
 
-  private static void printRETreeLayout(DigestUtil digestUtil, build.bazel.remote.execution.v2.Tree reTree)
+  private static void printRETreeLayout(
+      DigestUtil digestUtil, build.bazel.remote.execution.v2.Tree reTree)
       throws IOException, InterruptedException {
     Tree tree = reTreeToTree(digestUtil, reTree);
-    printTreeLayout(
-        DigestUtil.proxyDirectoriesIndex(tree.getDirectories()),
-        tree.getRootDigest());
+    printTreeLayout(DigestUtil.proxyDirectoriesIndex(tree.getDirectories()), tree.getRootDigest());
   }
 
   private static void printTreeLayout(Map<Digest, Directory> directoriesIndex, Digest rootDigest)
@@ -332,10 +325,10 @@ class Cat {
         0, directoriesIndex.get(rootDigest), directoriesIndex, totalWeight, directoryWeights);
   }
 
-  private static Tree reTreeToTree(DigestUtil digestUtil, build.bazel.remote.execution.v2.Tree reTree) {
+  private static Tree reTreeToTree(
+      DigestUtil digestUtil, build.bazel.remote.execution.v2.Tree reTree) {
     Digest rootDigest = digestUtil.compute(reTree.getRoot());
-    Tree.Builder tree = Tree.newBuilder()
-        .setRootDigest(rootDigest);
+    Tree.Builder tree = Tree.newBuilder().setRootDigest(rootDigest);
     tree.putDirectories(rootDigest.getHash(), reTree.getRoot());
     for (Directory directory : reTree.getChildrenList()) {
       tree.putDirectories(digestUtil.compute(directory).getHash(), directory);
@@ -343,7 +336,8 @@ class Cat {
     return tree.build();
   }
 
-  private static void printREDirectoryTree(DigestUtil digestUtil, build.bazel.remote.execution.v2.Tree reTree)
+  private static void printREDirectoryTree(
+      DigestUtil digestUtil, build.bazel.remote.execution.v2.Tree reTree)
       throws IOException, InterruptedException {
     Tree tree = reTreeToTree(digestUtil, reTree);
     printTree(0, tree, tree.getRootDigest(), digestUtil);
@@ -371,7 +365,8 @@ class Cat {
       return;
     }
     System.out.println("QueuedOperation:");
-    System.out.println("  Action: " + DigestUtil.toString(digestUtil.compute(queuedOperation.getAction())));
+    System.out.println(
+        "  Action: " + DigestUtil.toString(digestUtil.compute(queuedOperation.getAction())));
     printAction(2, queuedOperation.getAction());
     System.out.println("  Command:");
     printCommand(2, queuedOperation.getCommand());
@@ -379,7 +374,8 @@ class Cat {
     printTree(2, queuedOperation.getTree(), queuedOperation.getTree().getRootDigest(), digestUtil);
   }
 
-  private static void dumpQueuedOperation(ByteString blob, DigestUtil digestUtil) throws IOException {
+  private static void dumpQueuedOperation(ByteString blob, DigestUtil digestUtil)
+      throws IOException {
     QueuedOperation queuedOperation;
     try {
       queuedOperation = QueuedOperation.parseFrom(blob);
@@ -394,7 +390,8 @@ class Cat {
     Path blobs = Paths.get("blobs");
     for (Message message : messages.build()) {
       Digest digest = digestUtil.compute(message);
-      try (OutputStream out = Files.newOutputStream(blobs.resolve(digest.getHash() + "_" + digest.getSizeBytes()))) {
+      try (OutputStream out =
+          Files.newOutputStream(blobs.resolve(digest.getHash() + "_" + digest.getSizeBytes()))) {
         message.toByteString().writeTo(out);
       }
     }
@@ -615,7 +612,8 @@ class Cat {
 
     ScheduledExecutorService service = newSingleThreadScheduledExecutor();
     Context.CancellableContext ctx =
-        Context.current().withDeadlineAfter(deadlineSecondsForType(type), TimeUnit.SECONDS, service);
+        Context.current()
+            .withDeadlineAfter(deadlineSecondsForType(type), TimeUnit.SECONDS, service);
     Context prevContext = ctx.attach();
     try {
       cancellableMain(host, instanceName, digestUtil, type, args);
@@ -629,7 +627,8 @@ class Cat {
   }
 
   static void cancellableMain(
-      String host, String instanceName, DigestUtil digestUtil, String type, String[] args) throws Exception {
+      String host, String instanceName, DigestUtil digestUtil, String type, String[] args)
+      throws Exception {
     ManagedChannel channel = createChannel(host);
     Instance instance =
         new StubInstance(instanceName, "bf-cat", digestUtil, channel, 10, TimeUnit.SECONDS);
@@ -668,14 +667,17 @@ class Cat {
         } else {
           Digest blobDigest = DigestUtil.parseDigest(args[i]);
           if (type.equals("ActionResult")) {
-            printActionResult(instance.getActionResult(DigestUtil.asActionKey(blobDigest), RequestMetadata.getDefaultInstance()).get(), 0);
+            printActionResult(
+                instance
+                    .getActionResult(
+                        DigestUtil.asActionKey(blobDigest), RequestMetadata.getDefaultInstance())
+                    .get(),
+                0);
           } else if (type.equals("DirectoryTree")) {
             printDirectoryTree(instance, blobDigest);
           } else if (type.equals("TreeLayout")) {
             Tree tree = fetchTree(instance, blobDigest);
-            printTreeLayout(
-                DigestUtil.proxyDirectoriesIndex(tree.getDirectories()),
-                blobDigest);
+            printTreeLayout(DigestUtil.proxyDirectoriesIndex(tree.getDirectories()), blobDigest);
           } else {
             if (type.equals("File")) {
               try (InputStream in =
@@ -692,9 +694,11 @@ class Cat {
               } else if (type.equals("DumpQueuedOperation")) {
                 dumpQueuedOperation(blob, instance.getDigestUtil());
               } else if (type.equals("REDirectoryTree")) {
-                printREDirectoryTree(instance.getDigestUtil(), build.bazel.remote.execution.v2.Tree.parseFrom(blob));
+                printREDirectoryTree(
+                    instance.getDigestUtil(), build.bazel.remote.execution.v2.Tree.parseFrom(blob));
               } else if (type.equals("RETreeLayout")) {
-                printRETreeLayout(instance.getDigestUtil(), build.bazel.remote.execution.v2.Tree.parseFrom(blob));
+                printRETreeLayout(
+                    instance.getDigestUtil(), build.bazel.remote.execution.v2.Tree.parseFrom(blob));
               } else if (type.equals("Command")) {
                 printCommand(blob);
               } else if (type.equals("Directory")) {

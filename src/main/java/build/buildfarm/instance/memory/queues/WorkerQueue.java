@@ -32,7 +32,7 @@ public class WorkerQueue {
 
   /* a name for the queue */
   public String name;
-  
+
   /* The required provisions to allow workers and operations to be added to the queue. */
   public SetMultimap<String, String> requiredProvisions = LinkedHashMultimap.create();
 

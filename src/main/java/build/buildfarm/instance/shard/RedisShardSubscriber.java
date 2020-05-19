@@ -33,9 +33,9 @@ import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
-import javax.annotation.Nullable;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.annotation.Nullable;
 import redis.clients.jedis.Client;
 import redis.clients.jedis.JedisPubSub;
 
@@ -188,7 +188,8 @@ class RedisShardSubscriber extends JedisPubSub {
         (watcher) -> {
           boolean expired = force || watcher.isExpiredAt(now);
           if (expired) {
-            logger.log(Level.SEVERE,
+            logger.log(
+                Level.SEVERE,
                 format(
                     "Terminating expired watcher of %s because: %s >= %s%s",
                     channel, now, watcher.getExpiresAt(), force ? " with force" : ""));
@@ -253,7 +254,8 @@ class RedisShardSubscriber extends JedisPubSub {
   void onWorkerChange(WorkerChange workerChange) {
     switch (workerChange.getTypeCase()) {
       case TYPE_NOT_SET:
-        logger.log(Level.SEVERE,
+        logger.log(
+            Level.SEVERE,
             format(
                 "WorkerChange oneof type is not set from %s at %s",
                 workerChange.getName(), workerChange.getEffectiveAt()));
@@ -283,7 +285,8 @@ class RedisShardSubscriber extends JedisPubSub {
     try {
       onOperationChange(channel, parseOperationChange(message));
     } catch (InvalidProtocolBufferException e) {
-      logger.log(Level.INFO, format("invalid operation change message for %s: %s", channel, message), e);
+      logger.log(
+          Level.INFO, format("invalid operation change message for %s: %s", channel, message), e);
     }
   }
 
@@ -300,7 +303,8 @@ class RedisShardSubscriber extends JedisPubSub {
     switch (operationChange.getTypeCase()) {
       case TYPE_NOT_SET:
         // FIXME present nice timestamp
-        logger.log(Level.SEVERE,
+        logger.log(
+            Level.SEVERE,
             format(
                 "OperationChange oneof type is not set from %s at %s",
                 operationChange.getSource(), operationChange.getEffectiveAt()));

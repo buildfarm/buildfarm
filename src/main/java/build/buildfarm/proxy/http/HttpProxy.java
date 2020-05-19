@@ -94,8 +94,7 @@ public class HttpProxy extends LoggingMain {
   private static void printUsage(OptionsParser parser) {
     System.out.println("Usage: [OPTIONS]");
     System.out.println(
-        parser.describeOptions(
-            Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
+        parser.describeOptions(Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
   }
 
   public static void main(String[] args) throws Exception {

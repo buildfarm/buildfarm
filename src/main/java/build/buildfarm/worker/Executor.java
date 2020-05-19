@@ -101,11 +101,13 @@ class Executor {
     try {
       operationUpdateSuccess = workerContext.putOperation(operation, operationContext.action);
     } catch (IOException e) {
-      logger.log(Level.SEVERE, format("error putting operation %s as EXECUTING", operation.getName()), e);
+      logger.log(
+          Level.SEVERE, format("error putting operation %s as EXECUTING", operation.getName()), e);
     }
 
     if (!operationUpdateSuccess) {
-      logger.log(Level.WARNING,
+      logger.log(
+          Level.WARNING,
           String.format(
               "Executor::run(%s): could not transition to EXECUTING", operation.getName()));
       owner.error().put(operationContext);
@@ -216,7 +218,8 @@ class Executor {
         .setExecutionCompletedTimestamp(Timestamps.fromMillis(System.currentTimeMillis()));
     long executeUSecs = stopwatch.elapsed(MICROSECONDS);
 
-    logger.log(Level.INFO,
+    logger.log(
+        Level.INFO,
         String.format(
             "Executor::executeCommand(%s): Completed command: exit code %d",
             operationName, resultBuilder.getExitCode()));
@@ -235,8 +238,7 @@ class Executor {
       }
     } else {
       // FIXME we need to release the action root
-      workerContext.logInfo(
-          "Executor: Operation " + operationName + " Failed to claim output");
+      workerContext.logInfo("Executor: Operation " + operationName + " Failed to claim output");
 
       owner.error().put(operationContext);
     }
@@ -263,9 +265,13 @@ class Executor {
       try {
         owner.error().put(operationContext);
       } catch (InterruptedException errorEx) {
-        logger.log(Level.SEVERE, format("interrupted while erroring %s after error", operationName), errorEx);
+        logger.log(
+            Level.SEVERE,
+            format("interrupted while erroring %s after error", operationName),
+            errorEx);
       } catch (Exception errorEx) {
-        logger.log(Level.SEVERE, format("errored while erroring %s after error", operationName), errorEx);
+        logger.log(
+            Level.SEVERE, format("errored while erroring %s after error", operationName), errorEx);
       }
       throw e;
     } finally {
@@ -398,7 +404,8 @@ class Executor {
           exitCode = process.exitValue();
           processCompleted = true;
         } else {
-          logger.log(Level.INFO,
+          logger.log(
+              Level.INFO,
               format(
                   "process timed out for %s after %ds with %s timeout",
                   operationName, timeout.getSeconds(), isDefaultTimeout ? "default" : "action"));
@@ -410,7 +417,8 @@ class Executor {
         process.destroy();
         int waitMillis = 1000;
         while (!process.waitFor(waitMillis, TimeUnit.MILLISECONDS)) {
-          logger.log(Level.INFO,
+          logger.log(
+              Level.INFO,
               format("process did not respond to termination for %s, killing it", operationName));
           process.destroyForcibly();
           waitMillis = 100;
@@ -428,7 +436,10 @@ class Executor {
       if (statusCode != Code.DEADLINE_EXCEEDED) {
         throw e;
       }
-      logger.log(Level.INFO, format("error getting process outputs for %s after timeout", operationName), e);
+      logger.log(
+          Level.INFO,
+          format("error getting process outputs for %s after timeout", operationName),
+          e);
     }
     return statusCode;
   }
