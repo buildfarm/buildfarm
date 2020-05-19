@@ -57,8 +57,8 @@ public class OperationQueue {
   /// @param   visitor A visitor for each visited element in the queue.
   ///
   public void visitDequeue(JedisCluster jedis, StringVisitor visitor) {
-    for (ProvisionedRedisQueue pQueue : queues) {
-      pQueue.queue().visitDequeue(jedis, visitor);
+    for (ProvisionedRedisQueue provisionedQueue : queues) {
+      provisionedQueue.queue().visitDequeue(jedis, visitor);
     }
   }
   ///
@@ -71,8 +71,8 @@ public class OperationQueue {
   /// @note    Suggested return identifier: wasRemoved.
   ///
   public boolean removeFromDequeue(JedisCluster jedis, String val) {
-    for (ProvisionedRedisQueue pQueue : queues) {
-      if (pQueue.queue().removeFromDequeue(jedis, val)) {
+    for (ProvisionedRedisQueue provisionedQueue : queues) {
+      if (provisionedQueue.queue().removeFromDequeue(jedis, val)) {
         return true;
       }
     }
@@ -85,8 +85,8 @@ public class OperationQueue {
   /// @param   visitor A visitor for each visited element in the queue.
   ///
   public void visit(JedisCluster jedis, StringVisitor visitor) {
-    for (ProvisionedRedisQueue pQueue : queues) {
-      pQueue.queue().visit(jedis, visitor);
+    for (ProvisionedRedisQueue provisionedQueue : queues) {
+      provisionedQueue.queue().visit(jedis, visitor);
     }
   }
   ///
@@ -164,8 +164,8 @@ public class OperationQueue {
   public OperationQueueStatus status(JedisCluster jedis) {
     // get properties
     List<QueueStatus> provisions = new ArrayList<>();
-    for (ProvisionedRedisQueue pQueue : queues) {
-      provisions.add(pQueue.queue().status(jedis));
+    for (ProvisionedRedisQueue provisionedQueue : queues) {
+      provisions.add(provisionedQueue.queue().status(jedis));
     }
 
     // build proto
@@ -197,9 +197,9 @@ public class OperationQueue {
   /// @note    Suggested return identifier: queue.
   ///
   private BalancedRedisQueue chooseEligibleQueue(List<Platform.Property> provisions) {
-    for (ProvisionedRedisQueue pQueue : queues) {
-      if (pQueue.isEligible(toMultimap(provisions))) {
-        return pQueue.queue();
+    for (ProvisionedRedisQueue provisionedQueue : queues) {
+      if (provisionedQueue.isEligible(toMultimap(provisions))) {
+        return provisionedQueue.queue();
       }
     }
     throw new RuntimeException(
