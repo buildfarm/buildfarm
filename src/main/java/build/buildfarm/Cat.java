@@ -639,20 +639,20 @@ class Cat {
 
     OperationTimesBetweenStages times = response.getTimes();
     System.out.println(
-        String.format("Queued -> MatchStage: %f nanoseconds", times.getQueuedToMatchStage()));
+        String.format("Queued -> MatchStage: %f milliseconds", times.getQueuedToMatchStage()));
     System.out.println(
         String.format(
-            "MatchStage -> InputFetchStage start: %f nanoseconds", times.getMatchStageToInputFetchStageStart()));
+            "MatchStage -> InputFetchStage start: %f milliseconds", times.getMatchStageToInputFetchStageStart()));
     System.out.println(
-        String.format("InputFetchStage: %f nanoseconds", times.getInputFetchStageStartToInputFetchStageCompleted()));
+        String.format("InputFetchStage: %f millisecond", times.getInputFetchStageStartToInputFetchStageCompleted()));
     System.out.println(
-        String.format("InputFetchStage -> ExecutionStage: %f nanoseconds", times.getInputFetchStageCompletedToExecutionStageStart()));
+        String.format("InputFetchStage -> ExecutionStage: %f millisecond", times.getInputFetchStageCompletedToExecutionStageStart()));
     System.out.println(
-        String.format("ExecutionStage: %f nanoseconds", times.getExecutionStageStartToExecutionStageCompleted()));
+        String.format("ExecutionStage: %f millisecond", times.getExecutionStageStartToExecutionStageCompleted()));
     System.out.println(
-        String.format("ExecutionStage -> ReportResultStage: %f nanoseconds", times.getExecutionStageCompletedToOutputUploadStart()));
+        String.format("ExecutionStage -> ReportResultStage: %f millisecond", times.getExecutionStageCompletedToOutputUploadStart()));
     System.out.println(
-        String.format("OutputUploadStage: %f nanoseconds", times.getOutputUploadStartToOutputUploadCompleted()));
+        String.format("OutputUploadStage: %f millisecond", times.getOutputUploadStartToOutputUploadCompleted()));
   }
 
   public static void main(String[] args) throws Exception {

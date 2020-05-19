@@ -74,9 +74,10 @@ public class PutOperationStage extends PipelineStage.NullStage {
     //  execution_completed   -> output_upload_start,
     //  output_upload_start   -> output_upload_completed
     // ]
+    float nanoToMilli = (float) Math.pow(10.0, 6.0);
     float[] results = new float[timestamps.length - 1];
     for (int i = 0; i < results.length; i++) {
-      results[i] = timestamps[i+1] - timestamps[i];
+      results[i] = (timestamps[i+1] - timestamps[i]) / nanoToMilli;
     }
 
     if (operationAverageTimes == null) {

@@ -84,8 +84,8 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
         .setMatchStageToInputFetchStageStart(times[1])
         .setInputFetchStageStartToInputFetchStageCompleted(times[2])
         .setInputFetchStageCompletedToExecutionStageStart(times[3])
-        .setExecutionStageCompletedToOutputUploadStart(times[4])
-        .setOutputUploadStartToOutputUploadCompleted(times[5])
+        .setExecutionStageStartToExecutionStageCompleted(times[4])
+        .setExecutionStageCompletedToOutputUploadStart(times[5])
         .setOutputUploadStartToOutputUploadCompleted(times[6]);
 
     replyBuilder.setTimes(timesBuilder.build());
