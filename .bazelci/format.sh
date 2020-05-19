@@ -5,6 +5,14 @@
 JAVA_FORMATTER_URL=https://github.com/google/google-java-format/releases/download/google-java-format-1.7/google-java-format-1.7-all-deps.jar
 LOCAL_FORMATTER="java_formatter.jar"
 
+# Print an error such that it will surface in the context of buildkite
+print_error () {
+    >&2 echo "$1"
+    if [ -x buildkite-agent ]; then
+        buildkite-agent annotate "$1" --style 'error' --context 'ctx-error'
+    fi
+}
+
  # Download the formatter if we don't already have it.
 if [ ! -f "$LOCAL_FORMATTER" ] ; then
     wget -O $LOCAL_FORMATTER $JAVA_FORMATTER_URL
@@ -23,8 +31,7 @@ then
        echo "Files are correctly formatted."
        exit 0
     else
-        buildkite-agent annotate 'Not all files are correctly formatted.' --style 'error' --context 'ctx-error'
-        buildkite-agent annotate 'Run ./.bazelci/format.sh to resolve this issue.' --style 'error' --context 'ctx-error'
+        print_error 'Run ./.bazelci/format.sh to resolve formatting issues.'
         exit 1
     fi
 fi
