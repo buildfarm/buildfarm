@@ -1,3 +1,7 @@
+"""
+buildfarm definitions that can be imported into other WORKSPACE files
+"""
+
 load("@rules_jvm_external//:defs.bzl", "maven_install")
 
 load("@remote_apis//:repository_rules.bzl", "switched_rules_by_language")
@@ -39,7 +43,10 @@ IO_GRPC_MODULES = [
     "services",
 ]
 
-def buildfarm_init():
+def buildfarm_init(name="buildfarm"):
+    """
+    Initialize the WORKSPACE for buildfarm-related targets
+    """
     maven_install(
         artifacts = [
             "com.amazonaws:aws-java-sdk-core:1.11.729",
