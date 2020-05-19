@@ -476,8 +476,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             if (removedEntry == e) {
               unlinkEntry(removedEntry);
               removed = true;
-              removedEntryCount++;
-              removedEntrySize += removedEntry.size;
             } else if (removedEntry != null) {
               logger.log(Level.SEVERE,
                   "nonexistent entry %s did not match last unreferenced entry, restoring it", key);
@@ -1559,6 +1557,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   @GuardedBy("this")
   private void discharge(long size) {
     sizeInBytes -= size;
+    removedEntryCount++;
+    removedEntrySize += size;
   }
 
   @GuardedBy("this")
@@ -1757,8 +1757,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         if (interrupted) {
           Thread.currentThread().interrupt();
         }
-        removedEntryCount++;
-        removedEntrySize += removedEntry.size;
         return pathFuture;
       }
       if (removedEntry == null) {
@@ -2323,8 +2321,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Entry removedEntry = storage.remove(key);
       if (removedEntry != null) {
         unlinkEntry(removedEntry);
-        removedEntryCount++;
-        removedEntrySize += removedEntry.size;
       }
       return false;
     }
@@ -2758,6 +2754,16 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     @Override
     public void recordAccess(Entry header) {
       throw new UnsupportedOperationException("sentinal cannot be accessed");
+    }
+
+    @Override
+    public void addContainingDirectory(Digest containingDirectory) {
+      throw new UnsupportedOperationException("sentinal cannot be contained by directory");
+    }
+
+    @Override
+    public void removeContainingDirectory(Digest containingDirectory) {
+      throw new UnsupportedOperationException("sentinal cannot be contained by directory");
     }
   }
 
