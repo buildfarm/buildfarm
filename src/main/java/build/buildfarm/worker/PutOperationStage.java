@@ -23,7 +23,7 @@ public class PutOperationStage extends PipelineStage.NullStage {
 
   private int operatonCount = 0;
   private boolean startToCount = false;
-  private float[] operationAverageTimes = null;
+  private float[] operationAverageTimes = new float[7];
 
 
   public PutOperationStage(InterruptingConsumer<Operation> onPut) {
@@ -48,7 +48,7 @@ public class PutOperationStage extends PipelineStage.NullStage {
 
   public float[] getAverageOperationTimes() {
     float[] currentOperationAverageTimes = operationAverageTimes;
-    operationAverageTimes = null;
+    operationAverageTimes = new float[7];
     return currentOperationAverageTimes;
   }
 
@@ -80,12 +80,8 @@ public class PutOperationStage extends PipelineStage.NullStage {
       results[i] = (timestamps[i+1] - timestamps[i]) / nanoToMilli;
     }
 
-    if (operationAverageTimes == null) {
-      operationAverageTimes = results;
-    } else {
-      for (int i = 0; i < operationAverageTimes.length; i++) {
-        operationAverageTimes[i] = (operatonCount * operationAverageTimes[i] + results[i]) / operatonCount + 1;
-      }
+    for (int i = 0; i < operationAverageTimes.length; i++) {
+      operationAverageTimes[i] = (operatonCount * operationAverageTimes[i] + results[i]) / (operatonCount + 1);
     }
   }
 }
