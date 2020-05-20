@@ -16,10 +16,19 @@ package build.buildfarm.worker;
 
 import build.bazel.remote.execution.v2.ExecutedActionMetadata;
 import build.buildfarm.common.function.InterruptingConsumer;
+import build.buildfarm.worker.shard.Worker;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Timestamp;
 
+import java.util.Arrays;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 public class PutOperationStage extends PipelineStage.NullStage {
+
+  private static final java.util.logging.Logger nettyLogger =
+      java.util.logging.Logger.getLogger("io.grpc.netty");
+  private static final Logger logger = Logger.getLogger(PutOperationStage.class.getName());
   private final InterruptingConsumer<Operation> onPut;
 
   private int operationCount = 0;
@@ -76,6 +85,8 @@ public class PutOperationStage extends PipelineStage.NullStage {
     for (int i = 0; i < times.length; i++) {
       times[i] = timestamps[i].getSeconds() * 1000.0f + timestamps[i].getNanos() / (1000.0f * 1000.0f);
     }
+    logger.log(Level.WARNING, "PUT OPERATION CURRENT TIMES: ");
+    logger.log(Level.WARNING, Arrays.toString(times));
 
     // [
     //  queued                -> worker_start(MatchStage),
