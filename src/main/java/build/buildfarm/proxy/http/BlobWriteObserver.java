@@ -62,7 +62,8 @@ class BlobWriteObserver implements WriteObserver {
     checkState(error == null);
     String requestResourceName = request.getResourceName();
     if (!requestResourceName.isEmpty() && !resourceName.equals(requestResourceName)) {
-      logger.log(Level.WARNING,
+      logger.log(
+          Level.WARNING,
           String.format(
               "ByteStreamServer:write:%s: resource name %s does not match first request",
               resourceName, requestResourceName));
@@ -72,7 +73,8 @@ class BlobWriteObserver implements WriteObserver {
               resourceName, requestResourceName));
     }
     if (complete) {
-      logger.log(Level.WARNING,
+      logger.log(
+          Level.WARNING,
           String.format(
               "ByteStreamServer:write:%s: write received after finish_write specified",
               resourceName));
@@ -80,7 +82,8 @@ class BlobWriteObserver implements WriteObserver {
     }
     long committedSize = getCommittedSize();
     if (request.getWriteOffset() != committedSize) {
-      logger.log(Level.WARNING,
+      logger.log(
+          Level.WARNING,
           String.format(
               "ByteStreamServer:write:%s: offset %d != committed_size %d",
               resourceName, request.getWriteOffset(), getCommittedSize()));
@@ -88,7 +91,8 @@ class BlobWriteObserver implements WriteObserver {
     }
     long sizeAfterWrite = committedSize + request.getData().size();
     if (request.getFinishWrite() && sizeAfterWrite != size) {
-      logger.log(Level.WARNING,
+      logger.log(
+          Level.WARNING,
           String.format(
               "ByteStreamServer:write:%s: finish_write request of size %d for write size %d != expected %d",
               resourceName, request.getData().size(), sizeAfterWrite, size));

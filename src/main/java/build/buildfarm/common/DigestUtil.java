@@ -244,7 +244,8 @@ public class DigestUtil {
     return new DigestUtil(HashFunction.forHash(digest.getHash()));
   }
 
-  public static Map<Digest, Directory> proxyDirectoriesIndex(Map<String, Directory> directoriesIndex) {
+  public static Map<Digest, Directory> proxyDirectoriesIndex(
+      Map<String, Directory> directoriesIndex) {
     return new Map<Digest, Directory>() {
       @Override
       public void clear() {

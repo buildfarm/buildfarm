@@ -103,8 +103,10 @@ public class Util {
           try {
             backplane.adjustBlobLocations(digest, foundWorkers, newLocationSet);
           } catch (IOException e) {
-            logger.log(Level.SEVERE,
-                format("error adjusting blob location for %s", DigestUtil.toString(digest)), e);
+            logger.log(
+                Level.SEVERE,
+                format("error adjusting blob location for %s", DigestUtil.toString(digest)),
+                e);
           }
           return foundWorkers;
         },
@@ -146,7 +148,8 @@ public class Util {
             fail(Status.fromThrowable(t).asRuntimeException());
           }
         };
-    logger.log(Level.INFO,
+    logger.log(
+        Level.INFO,
         format(
             "scanning through %d workers to find %s",
             workerSet.size(), DigestUtil.toString(digest)));
@@ -189,7 +192,8 @@ public class Util {
           @Override
           public void onSuccess(Iterable<Digest> missingDigests) {
             boolean found = Iterables.isEmpty(missingDigests);
-            logger.log(Level.INFO,
+            logger.log(
+                Level.INFO,
                 format(
                     "check missing response for %s to %s was %sfound",
                     DigestUtil.toString(digest), worker, found ? "" : "not "));
@@ -200,7 +204,8 @@ public class Util {
           public void onFailure(Throwable t) {
             Status status = Status.fromThrowable(t);
             if (status.getCode() == Code.UNAVAILABLE) {
-              logger.log(Level.INFO,
+              logger.log(
+                  Level.INFO,
                   format(
                       "check missing response for %s to %s was not found for unavailable",
                       DigestUtil.toString(digest), worker));
@@ -209,8 +214,10 @@ public class Util {
                 || Context.current().isCancelled()
                 || status.getCode() == Code.DEADLINE_EXCEEDED
                 || !SHARD_IS_RETRIABLE.test(status)) {
-              logger.log(Level.SEVERE,
-                  format("error checking for %s on %s", DigestUtil.toString(digest), worker), t);
+              logger.log(
+                  Level.SEVERE,
+                  format("error checking for %s on %s", DigestUtil.toString(digest), worker),
+                  t);
               foundCallback.onFailure(t);
             } else {
               checkMissingBlobOnInstance(

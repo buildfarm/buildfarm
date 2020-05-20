@@ -50,7 +50,8 @@ class DispatchedMonitor implements Runnable {
   private ListenableFuture<Void> requeueDispatchedOperation(DispatchedOperation o, long now) {
     QueueEntry queueEntry = o.getQueueEntry();
     String operationName = queueEntry.getExecuteEntry().getOperationName();
-    logger.log(Level.INFO,
+    logger.log(
+        Level.INFO,
         format(
             "DispatchedMonitor: Testing %s because %d >= %d",
             operationName, now, o.getRequeueAt()));
@@ -60,7 +61,8 @@ class DispatchedMonitor implements Runnable {
         () -> {
           long endTime = System.nanoTime();
           float ms = (endTime - startTime) / 1000000.0f;
-          logger.log(Level.INFO, format("DispatchedMonitor::run: requeue(%s) %gms", operationName, ms));
+          logger.log(
+              Level.INFO, format("DispatchedMonitor::run: requeue(%s) %gms", operationName, ms));
         },
         directExecutor());
     return requeuedFuture;

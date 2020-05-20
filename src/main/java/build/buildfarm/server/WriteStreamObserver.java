@@ -88,7 +88,10 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
         onUncommittedNext(request);
       } catch (ExcessiveWriteSizeException e) {
         Status status = Status.UNAVAILABLE;
-        logger.log(Level.FINE, format("error writing %s", (name == null ? request.getResourceName() : name)), e);
+        logger.log(
+            Level.FINE,
+            format("error writing %s", (name == null ? request.getResourceName() : name)),
+            e);
         responseObserver.onError(status.asException());
       } catch (RuntimeException e) {
         Status status = Status.fromThrowable(e);
@@ -140,7 +143,9 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
     checkNotNull(write);
 
     if (Context.current().isCancelled()) {
-      logger.log(Level.FINER, format("skipped delivering committed_size to %s for cancelled context", name));
+      logger.log(
+          Level.FINER,
+          format("skipped delivering committed_size to %s for cancelled context", name));
     } else {
       try {
         long committedSize = write.getCommittedSize();
@@ -148,7 +153,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
           logger.warning(
               format(
                   "committed size %d did not match expectation for %s "
-                  + " after %d requests and %d bytes at offset %d, ignoring it",
+                      + " after %d requests and %d bytes at offset %d, ignoring it",
                   committedSize, name, requestCount, requestBytes, earliestOffset));
           committedSize = expectedCommittedSize;
         }
@@ -173,12 +178,11 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   }
 
   void commitActive(long committedSize) {
-    WriteResponse response = WriteResponse.newBuilder()
-        .setCommittedSize(committedSize)
-        .build();
+    WriteResponse response = WriteResponse.newBuilder().setCommittedSize(committedSize).build();
 
     try {
-      logger.log(Level.FINER, format("delivering committed_size for %s of %d", name, committedSize));
+      logger.log(
+          Level.FINER, format("delivering committed_size for %s of %d", name, committedSize));
       responseObserver.onNext(response);
       responseObserver.onCompleted();
     } catch (Exception e) {
@@ -195,7 +199,8 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
       name = resourceName;
       try {
         write = getWrite(resourceName);
-        logger.log(Level.FINER,
+        logger.log(
+            Level.FINER,
             format(
                 "registering callback for %s: committed_size = %d, complete = %s",
                 resourceName, write.getCommittedSize(), write.isComplete()));
@@ -221,7 +226,8 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
             "write: %s, %d bytes%s",
             request.getResourceName(),
             request.getData().size(),
-            request.getFinishWrite() ? ", finish_write" : ""), e);
+            request.getFinishWrite() ? ", finish_write" : ""),
+        e);
   }
 
   private void handleRequest(WriteRequest request) {
@@ -265,7 +271,8 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
         earliestOffset = offset;
       }
 
-      logger.log(Level.FINER,
+      logger.log(
+          Level.FINER,
           format(
               "writing %d to %s at %d%s",
               data.size(), name, offset, finishWrite ? " with finish_write" : ""));

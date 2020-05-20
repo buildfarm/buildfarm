@@ -31,7 +31,6 @@ import io.grpc.Deadline;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.junit.Test;
 import org.junit.runner.RunWith;

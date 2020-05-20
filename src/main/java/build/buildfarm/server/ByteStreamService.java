@@ -331,7 +331,9 @@ public class ByteStreamService extends ByteStreamImplBase {
   public void read(ReadRequest request, StreamObserver<ReadResponse> responseObserver) {
     String resourceName = request.getResourceName();
     long offset = request.getReadOffset(), limit = request.getReadLimit();
-    logger.log(Level.FINER, format("read resource_name=%s offset=%d limit=%d", resourceName, offset, limit));
+    logger.log(
+        Level.FINER,
+        format("read resource_name=%s offset=%d limit=%d", resourceName, offset, limit));
 
     try {
       maybeInstanceRead(resourceName, offset, limit, responseObserver);
@@ -355,7 +357,8 @@ public class ByteStreamService extends ByteStreamImplBase {
               .setComplete(write.isComplete())
               .build());
       responseObserver.onCompleted();
-      logger.log(Level.FINE,
+      logger.log(
+          Level.FINE,
           format(
               "queryWriteStatus(%s) => committed_size = %d, complete = %s",
               resourceName, write.getCommittedSize(), write.isComplete()));
@@ -367,9 +370,8 @@ public class ByteStreamService extends ByteStreamImplBase {
       responseObserver.onError(INVALID_ARGUMENT.withDescription(e.getMessage()).asException());
     } catch (ExcessiveWriteSizeException e) {
       logger.log(Level.WARNING, format("queryWriteStatus(%s)", resourceName), e);
-      responseObserver.onError(Status.RESOURCE_EXHAUSTED
-          .withDescription(e.getMessage())
-          .asException());
+      responseObserver.onError(
+          Status.RESOURCE_EXHAUSTED.withDescription(e.getMessage()).asException());
     } catch (RuntimeException e) {
       logger.log(Level.SEVERE, format("queryWriteStatus(%s)", resourceName), e);
       responseObserver.onError(Status.fromThrowable(e).asException());

@@ -95,7 +95,8 @@ abstract class SuperscalarPipelineStage extends PipelineStage {
     } catch (InterruptedException e) {
       catastrophic = true;
       getLogger()
-          .log(Level.SEVERE,
+          .log(
+              Level.SEVERE,
               name
                   + ": could not release claim on "
                   + operationName

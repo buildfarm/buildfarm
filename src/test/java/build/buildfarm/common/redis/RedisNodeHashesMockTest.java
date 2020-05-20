@@ -44,8 +44,7 @@ import redis.clients.jedis.JedisPool;
 @RunWith(JUnit4.class)
 public class RedisNodeHashesMockTest {
 
-  @Mock
-  private JedisCluster redis;
+  @Mock private JedisCluster redis;
 
   @Before
   public void setUp() {
@@ -85,8 +84,7 @@ public class RedisNodeHashesMockTest {
   // Reason for testing: without mocking we exercise the fallback behavior
   // Failure explanation: the fallback behavior does not result in successful completion of call
   @Test
-  public void getEvenlyDistributedHashesCannotRetrieveDistributedHashes()
-      throws Exception {
+  public void getEvenlyDistributedHashesCannotRetrieveDistributedHashes() throws Exception {
 
     // ACT
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);

@@ -36,9 +36,9 @@ import io.grpc.Deadline;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Map;
-import javax.annotation.Nullable;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.annotation.Nullable;
 
 public class InputFetcher implements Runnable {
   private static final Logger logger = Logger.getLogger(InputFetcher.class.getName());
@@ -195,8 +195,7 @@ public class InputFetcher implements Runnable {
             .getCommand()
             .toBuilder()
             .clearArguments()
-            .addArguments(
-                getExecutablePath(programName, root, directoriesIndex))
+            .addArguments(getExecutablePath(programName, root, directoriesIndex))
             .addAllArguments(Iterables.skip(queuedOperation.getCommand().getArgumentsList(), 1))
             .build();
 
@@ -215,7 +214,9 @@ public class InputFetcher implements Runnable {
         try {
           workerContext.destroyExecDir(execDir);
         } catch (IOException e) {
-          logger.log(Level.SEVERE, format("error deleting exec dir for %s after interrupt", operationName));
+          logger.log(
+              Level.SEVERE,
+              format("error deleting exec dir for %s after interrupt", operationName));
         }
       }
     }
