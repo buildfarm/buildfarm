@@ -74,7 +74,7 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
         .setExecuteActionStageSlotsUsedOverConfigured(executeActionStageSlotUsage);
 
     // get worker throughput
-    replyBuilder.setWorkerThroughput(completeStage.getOperatonCount());
+    replyBuilder.setWorkerThroughput(completeStage.getOperationCount());
 
     // get aggregated time cost on each stages
     float[] times = completeStage.getAverageOperationTimes();

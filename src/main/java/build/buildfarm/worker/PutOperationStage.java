@@ -17,11 +17,12 @@ package build.buildfarm.worker;
 import build.bazel.remote.execution.v2.ExecutedActionMetadata;
 import build.buildfarm.common.function.InterruptingConsumer;
 import com.google.longrunning.Operation;
+import java.util.logging.Level;
 
 public class PutOperationStage extends PipelineStage.NullStage {
   private final InterruptingConsumer<Operation> onPut;
 
-  private int operatonCount = 0;
+  private int operationCount = 0;
   private boolean startToCount = false;
   private float[] operationAverageTimes = new float[7];
 
@@ -35,15 +36,15 @@ public class PutOperationStage extends PipelineStage.NullStage {
     synchronized (this) {
       if (startToCount) {
         computeOperationTime(operationContext);
-        operatonCount++;
+        operationCount++;
       }
     }
   }
 
-  public synchronized int getOperatonCount() {
+  public synchronized int getOperationCount() {
     startToCount = true;
-    int currentCount = operatonCount;
-    operatonCount = 0;
+    int currentCount = operationCount;
+    operationCount = 0;
     return currentCount;
   }
 
@@ -53,9 +54,10 @@ public class PutOperationStage extends PipelineStage.NullStage {
     return currentOperationAverageTimes;
   }
 
-  private synchronized void computeOperationTime(OperationContext context) {
+  private void computeOperationTime(OperationContext context) {
     ExecutedActionMetadata metadata =
         context.executeResponse.build().getResult().getExecutionMetadata();
+    getLogger().log(Level.WARNING, String.format("NAME OF THE OPERATION: %s", context.operation.getName()));
     float[] timestamps =
         new float[] {
           metadata.getQueuedTimestamp().getNanos(),
@@ -67,6 +69,7 @@ public class PutOperationStage extends PipelineStage.NullStage {
           metadata.getOutputUploadStartTimestamp().getNanos(),
           metadata.getOutputUploadCompletedTimestamp().getNanos(),
         };
+    getLogger().log(Level.WARNING, String.format("NAME OF THE OPERATION: %s", context.operation.getName()));
 
     // [
     //  queued                -> worker_start(MatchStage),
@@ -85,7 +88,7 @@ public class PutOperationStage extends PipelineStage.NullStage {
 
     for (int i = 0; i < operationAverageTimes.length; i++) {
       operationAverageTimes[i] =
-          (operatonCount * operationAverageTimes[i] + results[i]) / (operatonCount + 1);
+          (operationCount * operationAverageTimes[i] + results[i]) / (operationCount + 1);
     }
   }
 }
