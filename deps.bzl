@@ -1,3 +1,7 @@
+"""
+buildfarm dependencies that can be imported into other WORKSPACE files
+"""
+
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_jar")
 load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
 
@@ -64,6 +68,12 @@ def archive_dependencies(third_party):
     ]
 
 def buildfarm_dependencies(repository_name="build_buildfarm"):
+    """
+    Define all 3rd party archive rules for buildfarm
+    
+    Args:
+      repository_name: the name of the repository
+    """
     third_party = "@%s//third_party" % repository_name
     for dependency in archive_dependencies(third_party):
         params = {}
