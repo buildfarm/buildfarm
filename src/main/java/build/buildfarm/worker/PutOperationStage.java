@@ -17,14 +17,18 @@ package build.buildfarm.worker;
 import build.bazel.remote.execution.v2.ExecutedActionMetadata;
 import build.buildfarm.common.function.InterruptingConsumer;
 import com.google.longrunning.Operation;
+import com.google.protobuf.Timestamp;
+
+import java.util.Arrays;
 import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class PutOperationStage extends PipelineStage.NullStage {
   private final InterruptingConsumer<Operation> onPut;
 
   private int operationCount = 0;
   private boolean startToCount = false;
-  private float[] operationAverageTimes = new float[7];
+  private float[] averageOperationTimes = new float[7];
 
   public PutOperationStage(InterruptingConsumer<Operation> onPut) {
     this.onPut = onPut;
@@ -49,25 +53,33 @@ public class PutOperationStage extends PipelineStage.NullStage {
   }
 
   public synchronized float[] getAverageOperationTimes() {
-    float[] currentOperationAverageTimes = operationAverageTimes;
-    operationAverageTimes = new float[7];
+    float[] currentOperationAverageTimes = averageOperationTimes;
+    averageOperationTimes = new float[7];
     return currentOperationAverageTimes;
   }
 
   private void computeOperationTime(OperationContext context) {
     ExecutedActionMetadata metadata =
         context.executeResponse.build().getResult().getExecutionMetadata();
-    float[] timestamps =
-        new float[] {
-          metadata.getQueuedTimestamp().getNanos(),
-          metadata.getWorkerStartTimestamp().getNanos(),
-          metadata.getInputFetchStartTimestamp().getNanos(),
-          metadata.getInputFetchCompletedTimestamp().getNanos(),
-          metadata.getExecutionStartTimestamp().getNanos(),
-          metadata.getExecutionCompletedTimestamp().getNanos(),
-          metadata.getOutputUploadStartTimestamp().getNanos(),
-          metadata.getOutputUploadCompletedTimestamp().getNanos(),
+    Timestamp[] timestamps =
+        new Timestamp[] {
+          metadata.getQueuedTimestamp(),
+          metadata.getWorkerStartTimestamp(),
+          metadata.getInputFetchStartTimestamp(),
+          metadata.getInputFetchCompletedTimestamp(),
+          metadata.getExecutionStartTimestamp(),
+          metadata.getExecutionCompletedTimestamp(),
+          metadata.getOutputUploadStartTimestamp(),
+          metadata.getOutputUploadCompletedTimestamp(),
         };
+
+    // The time unit we want is millisecond.
+    // 1 second = 1000 milliseconds
+    // 1 millisecond = 1000,000 nanoseconds
+    double[] times = new double[timestamps.length];
+    for (int i = 0; i < times.length; i++) {
+      times[i] = (timestamps[i].getSeconds() - timestamps[0].getSeconds()) * 1000.0 + timestamps[i].getNanos() / (1000.0 * 1000.0);
+    }
 
     // [
     //  queued                -> worker_start(MatchStage),
@@ -78,15 +90,14 @@ public class PutOperationStage extends PipelineStage.NullStage {
     //  execution_completed   -> output_upload_start,
     //  output_upload_start   -> output_upload_completed
     // ]
-    float nanoToMilli = (float) Math.pow(10.0, 6.0);
-    float[] results = new float[timestamps.length - 1];
-    for (int i = 0; i < results.length; i++) {
-      results[i] = (timestamps[i + 1] - timestamps[i]) / nanoToMilli;
+    float[] operationTimes = new float[times.length - 1];
+    for (int i = 0; i < operationTimes.length; i++) {
+      operationTimes[i] = (float) (times[i + 1] - times[i]);
     }
 
-    for (int i = 0; i < operationAverageTimes.length; i++) {
-      operationAverageTimes[i] =
-          (operationCount * operationAverageTimes[i] + results[i]) / (operationCount + 1);
+    for (int i = 0; i < averageOperationTimes.length; i++) {
+      averageOperationTimes[i] =
+          (operationCount * averageOperationTimes[i] + operationTimes[i]) / (operationCount + 1);
     }
   }
 }
