@@ -622,16 +622,18 @@ class Cat {
     System.out.println(
         "Current ContainedDirectories Max: " + response.getEntryContainingDirectoriesMax());
     System.out.println(
-        "Current ContainedDirectories average: " +
-            response.getEntryContainingDirectoriesCount() * 1.0 / response.getCASEntryCount());
+        "Current ContainedDirectories average: "
+            + response.getEntryContainingDirectoriesCount() * 1.0 / response.getCASEntryCount());
     System.out.println(
         "Number of Evicted Entries in last period: " + response.getCASEvictedEntryCount());
     System.out.println(
         "Total size of Evicted Entries in last period: " + response.getCASEvictedEntrySize());
     System.out.println(
-        "Slots usage/configured in InputFetchStage: " + response.getInputFetchStageSlotsUsedOverConfigured());
+        "Slots usage/configured in InputFetchStage: "
+            + response.getInputFetchStageSlotsUsedOverConfigured());
     System.out.println(
-        "Slots usage/configured in ExecuteActionStage: " + response.getExecuteActionStageSlotsUsedOverConfigured());
+        "Slots usage/configured in ExecuteActionStage: "
+            + response.getExecuteActionStageSlotsUsedOverConfigured());
     System.out.println(
         "Number of Operations completed since last profile: " + response.getWorkerThroughput());
 
@@ -640,17 +642,28 @@ class Cat {
         String.format("Queued -> MatchStage: %f milliseconds", times.getQueuedToMatchStage()));
     System.out.println(
         String.format(
-            "MatchStage -> InputFetchStage start: %f milliseconds", times.getMatchStageToInputFetchStageStart()));
+            "MatchStage -> InputFetchStage start: %f milliseconds",
+            times.getMatchStageToInputFetchStageStart()));
     System.out.println(
-        String.format("InputFetchStage: %f millisecond", times.getInputFetchStageStartToInputFetchStageCompleted()));
+        String.format(
+            "InputFetchStage: %f millisecond",
+            times.getInputFetchStageStartToInputFetchStageCompleted()));
     System.out.println(
-        String.format("InputFetchStage -> ExecutionStage: %f millisecond", times.getInputFetchStageCompletedToExecutionStageStart()));
+        String.format(
+            "InputFetchStage -> ExecutionStage: %f millisecond",
+            times.getInputFetchStageCompletedToExecutionStageStart()));
     System.out.println(
-        String.format("ExecutionStage: %f millisecond", times.getExecutionStageStartToExecutionStageCompleted()));
+        String.format(
+            "ExecutionStage: %f millisecond",
+            times.getExecutionStageStartToExecutionStageCompleted()));
     System.out.println(
-        String.format("ExecutionStage -> ReportResultStage: %f millisecond", times.getExecutionStageCompletedToOutputUploadStart()));
+        String.format(
+            "ExecutionStage -> ReportResultStage: %f millisecond",
+            times.getExecutionStageCompletedToOutputUploadStart()));
     System.out.println(
-        String.format("OutputUploadStage: %f millisecond", times.getOutputUploadStartToOutputUploadCompleted()));
+        String.format(
+            "OutputUploadStage: %f millisecond",
+            times.getOutputUploadStartToOutputUploadCompleted()));
   }
 
   public static void main(String[] args) throws Exception {

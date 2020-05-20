@@ -53,7 +53,6 @@ import build.buildfarm.worker.Pipeline;
 import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.ReportResultStage;
-import build.buildfarm.worker.WorkerContext;
 import com.google.common.base.Strings;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
@@ -250,7 +249,9 @@ public class Worker extends LoggingMain {
                 new ContentAddressableStorageService(
                     instances, /* deadlineAfter=*/ 1, DAYS, /* requestLogLevel=*/ FINER))
             .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, DAYS))
-            .addService(new WorkerProfileService(storage, inputFetchStage, executeActionStage, context, completeStage))
+            .addService(
+                new WorkerProfileService(
+                    storage, inputFetchStage, executeActionStage, context, completeStage))
             .build();
 
     logger.log(INFO, String.format("%s initialized", identifier));

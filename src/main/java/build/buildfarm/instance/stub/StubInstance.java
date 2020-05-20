@@ -70,9 +70,9 @@ import build.buildfarm.v1test.PollOperationRequest;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.TakeOperationRequest;
 import build.buildfarm.v1test.Tree;
-import build.buildfarm.v1test.WorkerProfileMessage;
 import build.buildfarm.v1test.WorkerProfileGrpc;
 import build.buildfarm.v1test.WorkerProfileGrpc.WorkerProfileBlockingStub;
+import build.buildfarm.v1test.WorkerProfileMessage;
 import build.buildfarm.v1test.WorkerProfileRequest;
 import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamBlockingStub;
@@ -276,8 +276,8 @@ public class StubInstance implements Instance {
             @Override
             public WorkerProfileBlockingStub get() {
               return WorkerProfileGrpc.newBlockingStub(channel);
-          }
-        });
+            }
+          });
 
   private <T extends AbstractStub<T>> T deadlined(Supplier<T> getter) {
     T stub = getter.get();
@@ -768,6 +768,7 @@ public class StubInstance implements Instance {
   @Override
   public WorkerProfileMessage getWorkerProfile() {
 
-    return WorkerProfileBlockingStub.get().getWorkerProfile(WorkerProfileRequest.newBuilder().build());
+    return WorkerProfileBlockingStub.get()
+        .getWorkerProfile(WorkerProfileRequest.newBuilder().build());
   }
 }

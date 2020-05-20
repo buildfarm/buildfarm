@@ -25,7 +25,6 @@ public class PutOperationStage extends PipelineStage.NullStage {
   private boolean startToCount = false;
   private float[] operationAverageTimes = new float[7];
 
-
   public PutOperationStage(InterruptingConsumer<Operation> onPut) {
     this.onPut = onPut;
   }
@@ -55,17 +54,19 @@ public class PutOperationStage extends PipelineStage.NullStage {
   }
 
   private synchronized void computeOperationTime(OperationContext context) {
-    ExecutedActionMetadata metadata = context.executeResponse.build().getResult().getExecutionMetadata();
-    float[] timestamps = new float[] {
-        metadata.getQueuedTimestamp().getNanos(),
-        metadata.getWorkerStartTimestamp().getNanos(),
-        metadata.getInputFetchStartTimestamp().getNanos(),
-        metadata.getInputFetchCompletedTimestamp().getNanos(),
-        metadata.getExecutionStartTimestamp().getNanos(),
-        metadata.getExecutionCompletedTimestamp().getNanos(),
-        metadata.getOutputUploadStartTimestamp().getNanos(),
-        metadata.getOutputUploadCompletedTimestamp().getNanos(),
-    };
+    ExecutedActionMetadata metadata =
+        context.executeResponse.build().getResult().getExecutionMetadata();
+    float[] timestamps =
+        new float[] {
+          metadata.getQueuedTimestamp().getNanos(),
+          metadata.getWorkerStartTimestamp().getNanos(),
+          metadata.getInputFetchStartTimestamp().getNanos(),
+          metadata.getInputFetchCompletedTimestamp().getNanos(),
+          metadata.getExecutionStartTimestamp().getNanos(),
+          metadata.getExecutionCompletedTimestamp().getNanos(),
+          metadata.getOutputUploadStartTimestamp().getNanos(),
+          metadata.getOutputUploadCompletedTimestamp().getNanos(),
+        };
 
     // [
     //  queued                -> worker_start(MatchStage),
@@ -79,11 +80,12 @@ public class PutOperationStage extends PipelineStage.NullStage {
     float nanoToMilli = (float) Math.pow(10.0, 6.0);
     float[] results = new float[timestamps.length - 1];
     for (int i = 0; i < results.length; i++) {
-      results[i] = (timestamps[i+1] - timestamps[i]) / nanoToMilli;
+      results[i] = (timestamps[i + 1] - timestamps[i]) / nanoToMilli;
     }
 
     for (int i = 0; i < operationAverageTimes.length; i++) {
-      operationAverageTimes[i] = (operatonCount * operationAverageTimes[i] + results[i]) / (operatonCount + 1);
+      operationAverageTimes[i] =
+          (operatonCount * operationAverageTimes[i] + results[i]) / (operatonCount + 1);
     }
   }
 }
