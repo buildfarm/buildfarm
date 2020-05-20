@@ -16,7 +16,6 @@ package build.buildfarm.worker;
 
 import build.bazel.remote.execution.v2.ExecutedActionMetadata;
 import build.buildfarm.common.function.InterruptingConsumer;
-import build.buildfarm.worker.shard.Worker;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Timestamp;
 
