@@ -63,6 +63,7 @@ public class PutOperationStage extends PipelineStage.NullStage {
   }
 
   private void computeOperationTime(OperationContext context) {
+    logger.log(Level.WARNING, "PUT OPERATION CURRENT TIMES: ");
     ExecutedActionMetadata metadata =
         context.executeResponse.build().getResult().getExecutionMetadata();
     Timestamp[] timestamps =
@@ -77,6 +78,19 @@ public class PutOperationStage extends PipelineStage.NullStage {
           metadata.getOutputUploadCompletedTimestamp(),
         };
 
+    long[] seconds = new long[timestamps.length];
+    for (int i = 0; i < seconds.length; i++) {
+      seconds[i] = timestamps[i].getSeconds();
+    }
+    logger.log(Level.WARNING, "SECONDS: ");
+    logger.log(Level.WARNING, Arrays.toString(seconds));
+
+    long[] nanos = new long[timestamps.length];
+    for (int i = 0; i < nanos.length; i++) {
+      seconds[i] = timestamps[i].getNanos();
+    }
+    logger.log(Level.WARNING, "NANOS: ");
+    logger.log(Level.WARNING, Arrays.toString(nanos));
     // The time unit we want is millisecond.
     // 1 second = 1000 milliseconds
     // 1 millisecond = 1000,000 nanoseconds
@@ -84,7 +98,7 @@ public class PutOperationStage extends PipelineStage.NullStage {
     for (int i = 0; i < times.length; i++) {
       times[i] = timestamps[i].getSeconds() * 1000.0f + timestamps[i].getNanos() / (1000.0f * 1000.0f);
     }
-    logger.log(Level.WARNING, "PUT OPERATION CURRENT TIMES: ");
+    logger.log(Level.WARNING, "result: ");
     logger.log(Level.WARNING, Arrays.toString(times));
 
     // [
