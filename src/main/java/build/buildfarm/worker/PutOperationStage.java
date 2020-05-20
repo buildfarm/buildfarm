@@ -33,26 +33,28 @@ public class PutOperationStage extends PipelineStage.NullStage {
   @Override
   public void put(OperationContext operationContext) throws InterruptedException {
     onPut.acceptInterruptibly(operationContext.operation);
-    if (startToCount) {
-      computeOperationTime(operationContext);
-      operatonCount++;
+    synchronized (this) {
+      if (startToCount) {
+        computeOperationTime(operationContext);
+        operatonCount++;
+      }
     }
   }
 
-  public int getOperatonCount() {
+  public synchronized int getOperatonCount() {
     startToCount = true;
     int currentCount = operatonCount;
     operatonCount = 0;
     return currentCount;
   }
 
-  public float[] getAverageOperationTimes() {
+  public synchronized float[] getAverageOperationTimes() {
     float[] currentOperationAverageTimes = operationAverageTimes;
     operationAverageTimes = new float[7];
     return currentOperationAverageTimes;
   }
 
-  private void computeOperationTime(OperationContext context) {
+  private synchronized void computeOperationTime(OperationContext context) {
     ExecutedActionMetadata metadata = context.executeResponse.build().getResult().getExecutionMetadata();
     float[] timestamps = new float[] {
         metadata.getQueuedTimestamp().getNanos(),
