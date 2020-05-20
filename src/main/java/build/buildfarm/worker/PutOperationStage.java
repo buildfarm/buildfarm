@@ -24,7 +24,7 @@ public class PutOperationStage extends PipelineStage.NullStage {
 
   private int operationCount = 0;
   private boolean startToCount = false;
-  private float[] operationAverageTimes = new float[7];
+  private float[] averageOperationTimes = new float[7];
 
   public PutOperationStage(InterruptingConsumer<Operation> onPut) {
     this.onPut = onPut;
@@ -49,8 +49,8 @@ public class PutOperationStage extends PipelineStage.NullStage {
   }
 
   public synchronized float[] getAverageOperationTimes() {
-    float[] currentOperationAverageTimes = operationAverageTimes;
-    operationAverageTimes = new float[7];
+    float[] currentOperationAverageTimes = averageOperationTimes;
+    averageOperationTimes = new float[7];
     return currentOperationAverageTimes;
   }
 
@@ -69,11 +69,11 @@ public class PutOperationStage extends PipelineStage.NullStage {
           metadata.getOutputUploadCompletedTimestamp(),
         };
 
-    float[] times = new float[timestamps.length];
     // The time unit we want is millisecond.
     // 1 second = 1000 milliseconds
     // 1 millisecond = 1000,000 nanoseconds
-    for (int i = 0; i< times.length; i++) {
+    float[] times = new float[timestamps.length];
+    for (int i = 0; i < times.length; i++) {
       times[i] = timestamps[i].getSeconds() * 1000.0f + timestamps[i].getNanos() / (1000.0f * 1000.0f);
     }
 
@@ -86,14 +86,14 @@ public class PutOperationStage extends PipelineStage.NullStage {
     //  execution_completed   -> output_upload_start,
     //  output_upload_start   -> output_upload_completed
     // ]
-    float[] results = new float[times.length - 1];
-    for (int i = 0; i < results.length; i++) {
-      results[i] = (times[i + 1] - times[i]);
+    float[] operationTimes = new float[times.length - 1];
+    for (int i = 0; i < operationTimes.length; i++) {
+      operationTimes[i] = (times[i + 1] - times[i]);
     }
 
-    for (int i = 0; i < operationAverageTimes.length; i++) {
-      operationAverageTimes[i] =
-          (operationCount * operationAverageTimes[i] + results[i]) / (operationCount + 1);
+    for (int i = 0; i < averageOperationTimes.length; i++) {
+      averageOperationTimes[i] =
+          (operationCount * averageOperationTimes[i] + operationTimes[i]) / (operationCount + 1);
     }
   }
 }
