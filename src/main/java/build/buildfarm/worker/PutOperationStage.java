@@ -87,7 +87,7 @@ public class PutOperationStage extends PipelineStage.NullStage {
 
     long[] nanos = new long[timestamps.length];
     for (int i = 0; i < nanos.length; i++) {
-      seconds[i] = timestamps[i].getNanos();
+      nanos[i] = timestamps[i].getNanos();
     }
     logger.log(Level.WARNING, "NANOS: ");
     logger.log(Level.WARNING, Arrays.toString(nanos));
