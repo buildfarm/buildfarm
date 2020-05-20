@@ -39,9 +39,9 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import javax.annotation.concurrent.GuardedBy;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.annotation.concurrent.GuardedBy;
 
 public class MemoryCAS implements ContentAddressableStorage {
   private static final Logger logger = Logger.getLogger(MemoryCAS.class.getName());
@@ -167,7 +167,7 @@ public class MemoryCAS implements ContentAddressableStorage {
         response.setData(blob).setStatus(OK);
       }
     } catch (Throwable t) {
-      logger.log(Level.SEVERE,"error getting " + DigestUtil.toString(digest), t);
+      logger.log(Level.SEVERE, "error getting " + DigestUtil.toString(digest), t);
       response.setStatus(statusFromThrowable(t));
     }
     return response.build();
@@ -239,7 +239,8 @@ public class MemoryCAS implements ContentAddressableStorage {
     }
 
     if (sizeInBytes > maxSizeInBytes) {
-      logger.log(Level.WARNING,
+      logger.log(
+          Level.WARNING,
           String.format(
               "Out of nodes to remove, sizeInBytes = %d, maxSizeInBytes = %d, storage = %d, list = %d",
               sizeInBytes, maxSizeInBytes, storage.size(), size()));
@@ -275,7 +276,8 @@ public class MemoryCAS implements ContentAddressableStorage {
       try (OutputStream out = write.getOutput(1, MINUTES, () -> {})) {
         e.value.getData().writeTo(out);
       } catch (IOException ioEx) {
-        logger.log(Level.SEVERE, String.format("error delegating %s", DigestUtil.toString(e.key)), ioEx);
+        logger.log(
+            Level.SEVERE, String.format("error delegating %s", DigestUtil.toString(e.key)), ioEx);
       }
     }
     storage.remove(e.key);

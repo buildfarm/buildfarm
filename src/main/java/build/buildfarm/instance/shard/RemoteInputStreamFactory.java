@@ -159,8 +159,7 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
         remoteWorkers = workers;
       } else {
         synchronized (workers) {
-          remoteWorkers =
-              Sets.difference(workers, ImmutableSet.of(publicName)).immutableCopy();
+          remoteWorkers = Sets.difference(workers, ImmutableSet.of(publicName)).immutableCopy();
         }
       }
       locationSet =

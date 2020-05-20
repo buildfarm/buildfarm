@@ -56,7 +56,8 @@ public interface Instance {
 
   void stop() throws InterruptedException;
 
-  ListenableFuture<ActionResult> getActionResult(ActionKey actionKey, RequestMetadata requestMetadata);
+  ListenableFuture<ActionResult> getActionResult(
+      ActionKey actionKey, RequestMetadata requestMetadata);
 
   void putActionResult(ActionKey actionKey, ActionResult actionResult) throws InterruptedException;
 
@@ -114,7 +115,7 @@ public interface Instance {
       throws InterruptedException;
 
   void match(Platform platform, MatchListener listener) throws InterruptedException;
-  
+
   OperationsStatus operationsStatus();
 
   boolean putOperation(Operation operation) throws InterruptedException;

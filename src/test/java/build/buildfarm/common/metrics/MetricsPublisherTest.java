@@ -38,89 +38,118 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class MetricsPublisherTest {
-    private Consumer<String> snsMetricsPublisher = requestMetadata -> { };
-    private ExecuteOperationMetadata defaultExecuteOperationMetadata = ExecuteOperationMetadata.getDefaultInstance();
-    private RequestMetadata defaultRequestMetadata = RequestMetadata.getDefaultInstance().toBuilder()
-            .setCorrelatedInvocationsId("http://user@host-name?uuid_source\\u003d%2Fproc%2Fsys%2Fkernel%2Frandom%2Fuuid\\u0026OSTYPE\\u003dlinux-gnu#c09a5efa-f015-4d7b-b889-8ee0d097dff7")
-            .build();
-    private Operation defaultOperation = Operation.getDefaultInstance().toBuilder()
-            .setDone(true)
-            .setName("shard/operations/123")
-            .build();
-    private ExecuteResponse defaultExecuteResponse = ExecuteResponse.getDefaultInstance();
-    private PreconditionFailure.Violation defaultViolation = PreconditionFailure.Violation.newBuilder()
-            .setType(VIOLATION_TYPE_MISSING)
-            .setSubject("TEST")
-            .setDescription("TEST")
-            .build();
-    private PreconditionFailure preconditionFailure = PreconditionFailure.getDefaultInstance().toBuilder()
-            .addViolations(defaultViolation)
-            .build();
-    private MetricsConfig metricsConfig = MetricsConfig.newBuilder()
-      .setClusterId("buildfarm-test")
-      .setMetricsDestination("aws")
-      .setAwsMetricsConfig(AwsMetricsConfig.getDefaultInstance())
-      .build();
-
-    @Test
-    public void publishCompleteMetricsTest() throws InvalidProtocolBufferException {
-        Operation operation = defaultOperation.toBuilder()
-                .setResponse(Any.pack(defaultExecuteResponse))
-                .setMetadata(Any.pack(defaultExecuteOperationMetadata))
-                .build();
-
-        AwsMetricsPublisher metricsPublisher = new AwsMetricsPublisher(metricsConfig);
-        assertThat(metricsPublisher.formatRequestMetadataToJson(metricsPublisher.populateRequestMetadata(operation, defaultRequestMetadata))).isNotNull();
-
-        OperationRequestMetadata operationRequestMetadata = OperationRequestMetadata.newBuilder()
-                .setRequestMetadata(defaultRequestMetadata)
-                .setOperationName(operation.getName())
-                .setDone(operation.getDone())
-                .setClusterId("buildfarm-test")
-                .setExecuteResponse(operation.getResponse().unpack(ExecuteResponse.class))
-                .setExecuteOperationMetadata(operation.getMetadata().unpack(ExecuteOperationMetadata.class))
-                .build();
-
-        assertThat(metricsPublisher.formatRequestMetadataToJson(metricsPublisher.populateRequestMetadata(operation, defaultRequestMetadata))).isEqualTo(JsonFormat.printer().omittingInsignificantWhitespace().print(operationRequestMetadata));
-    }
-
-    @Test
-    public void publishMetricsWithNoExecuteResponseTest() {
-        Operation operation = defaultOperation.toBuilder()
-                .setMetadata(Any.pack(defaultExecuteOperationMetadata))
-                .build();
-
-        assertThat(new AwsMetricsPublisher(metricsConfig).populateRequestMetadata(operation, defaultRequestMetadata)).isNotNull();
-    }
-
-    @Test
-    public void publishMetricsWithNoExecuteOperationMetadataTest() {
-        Operation operation = defaultOperation.toBuilder()
-                .setResponse(Any.pack(defaultExecuteResponse))
-                .build();
-
-        assertThat(new AwsMetricsPublisher(metricsConfig).populateRequestMetadata(operation, defaultRequestMetadata)).isNotNull();
-    }
-
-    @Test
-    public void preconditionFailureTest() {
-        Status status = Status.getDefaultInstance().toBuilder()
-                .addDetails(Any.pack(preconditionFailure)).build();
-
-        Operation operation = defaultOperation.toBuilder()
-                .setResponse(Any.pack(defaultExecuteResponse.toBuilder().setStatus(status).build()))
-                .setMetadata(Any.pack(defaultExecuteOperationMetadata))
-                .build();
-
-        assertThat(new AwsMetricsPublisher(metricsConfig).populateRequestMetadata(operation, defaultRequestMetadata)).isNotNull();
-    }
-
-    @Test
-    public void noMetricsConfiguredTest() {
-        Operation operation = defaultOperation.toBuilder()
-          .setResponse(Any.pack(defaultExecuteResponse))
+  private Consumer<String> snsMetricsPublisher = requestMetadata -> {};
+  private ExecuteOperationMetadata defaultExecuteOperationMetadata =
+      ExecuteOperationMetadata.getDefaultInstance();
+  private RequestMetadata defaultRequestMetadata =
+      RequestMetadata.getDefaultInstance()
+          .toBuilder()
+          .setCorrelatedInvocationsId(
+              "http://user@host-name?uuid_source\\u003d%2Fproc%2Fsys%2Fkernel%2Frandom%2Fuuid\\u0026OSTYPE\\u003dlinux-gnu#c09a5efa-f015-4d7b-b889-8ee0d097dff7")
+          .build();
+  private Operation defaultOperation =
+      Operation.getDefaultInstance()
+          .toBuilder()
+          .setDone(true)
+          .setName("shard/operations/123")
+          .build();
+  private ExecuteResponse defaultExecuteResponse = ExecuteResponse.getDefaultInstance();
+  private PreconditionFailure.Violation defaultViolation =
+      PreconditionFailure.Violation.newBuilder()
+          .setType(VIOLATION_TYPE_MISSING)
+          .setSubject("TEST")
+          .setDescription("TEST")
+          .build();
+  private PreconditionFailure preconditionFailure =
+      PreconditionFailure.getDefaultInstance().toBuilder().addViolations(defaultViolation).build();
+  private MetricsConfig metricsConfig =
+      MetricsConfig.newBuilder()
+          .setClusterId("buildfarm-test")
+          .setMetricsDestination("aws")
+          .setAwsMetricsConfig(AwsMetricsConfig.getDefaultInstance())
           .build();
 
-        assertThat(new LogMetricsPublisher(MetricsConfig.getDefaultInstance()).populateRequestMetadata(operation, defaultRequestMetadata)).isNotNull();
-    }
+  @Test
+  public void publishCompleteMetricsTest() throws InvalidProtocolBufferException {
+    Operation operation =
+        defaultOperation
+            .toBuilder()
+            .setResponse(Any.pack(defaultExecuteResponse))
+            .setMetadata(Any.pack(defaultExecuteOperationMetadata))
+            .build();
+
+    AwsMetricsPublisher metricsPublisher = new AwsMetricsPublisher(metricsConfig);
+    assertThat(
+            metricsPublisher.formatRequestMetadataToJson(
+                metricsPublisher.populateRequestMetadata(operation, defaultRequestMetadata)))
+        .isNotNull();
+
+    OperationRequestMetadata operationRequestMetadata =
+        OperationRequestMetadata.newBuilder()
+            .setRequestMetadata(defaultRequestMetadata)
+            .setOperationName(operation.getName())
+            .setDone(operation.getDone())
+            .setClusterId("buildfarm-test")
+            .setExecuteResponse(operation.getResponse().unpack(ExecuteResponse.class))
+            .setExecuteOperationMetadata(
+                operation.getMetadata().unpack(ExecuteOperationMetadata.class))
+            .build();
+
+    assertThat(
+            metricsPublisher.formatRequestMetadataToJson(
+                metricsPublisher.populateRequestMetadata(operation, defaultRequestMetadata)))
+        .isEqualTo(
+            JsonFormat.printer().omittingInsignificantWhitespace().print(operationRequestMetadata));
+  }
+
+  @Test
+  public void publishMetricsWithNoExecuteResponseTest() {
+    Operation operation =
+        defaultOperation.toBuilder().setMetadata(Any.pack(defaultExecuteOperationMetadata)).build();
+
+    assertThat(
+            new AwsMetricsPublisher(metricsConfig)
+                .populateRequestMetadata(operation, defaultRequestMetadata))
+        .isNotNull();
+  }
+
+  @Test
+  public void publishMetricsWithNoExecuteOperationMetadataTest() {
+    Operation operation =
+        defaultOperation.toBuilder().setResponse(Any.pack(defaultExecuteResponse)).build();
+
+    assertThat(
+            new AwsMetricsPublisher(metricsConfig)
+                .populateRequestMetadata(operation, defaultRequestMetadata))
+        .isNotNull();
+  }
+
+  @Test
+  public void preconditionFailureTest() {
+    Status status =
+        Status.getDefaultInstance().toBuilder().addDetails(Any.pack(preconditionFailure)).build();
+
+    Operation operation =
+        defaultOperation
+            .toBuilder()
+            .setResponse(Any.pack(defaultExecuteResponse.toBuilder().setStatus(status).build()))
+            .setMetadata(Any.pack(defaultExecuteOperationMetadata))
+            .build();
+
+    assertThat(
+            new AwsMetricsPublisher(metricsConfig)
+                .populateRequestMetadata(operation, defaultRequestMetadata))
+        .isNotNull();
+  }
+
+  @Test
+  public void noMetricsConfiguredTest() {
+    Operation operation =
+        defaultOperation.toBuilder().setResponse(Any.pack(defaultExecuteResponse)).build();
+
+    assertThat(
+            new LogMetricsPublisher(MetricsConfig.getDefaultInstance())
+                .populateRequestMetadata(operation, defaultRequestMetadata))
+        .isNotNull();
+  }
 }

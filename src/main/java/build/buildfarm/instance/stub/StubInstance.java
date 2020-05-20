@@ -62,8 +62,8 @@ import build.buildfarm.common.grpc.ByteStreamHelper;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.StubWriteOutputStream;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.v1test.OperationQueueGrpc.OperationQueueBlockingStub;
 import build.buildfarm.v1test.OperationQueueGrpc;
+import build.buildfarm.v1test.OperationQueueGrpc.OperationQueueBlockingStub;
 import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.OperationsStatusRequest;
 import build.buildfarm.v1test.PollOperationRequest;
@@ -114,9 +114,9 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import javax.annotation.Nullable;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.annotation.Nullable;
 
 public class StubInstance implements Instance {
   private static final Logger logger = Logger.getLogger(StubInstance.class.getName());
@@ -317,7 +317,8 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public ListenableFuture<ActionResult> getActionResult(ActionKey actionKey, RequestMetadata requestMetadata) {
+  public ListenableFuture<ActionResult> getActionResult(
+      ActionKey actionKey, RequestMetadata requestMetadata) {
     throwIfStopped();
     return catching(
         deadlined(actionCacheFutureStub)
@@ -661,14 +662,12 @@ public class StubInstance implements Instance {
       }
     }
   }
-  
+
   @Override
   public OperationsStatus operationsStatus() {
     throwIfStopped();
     return deadlined(operationQueueBlockingStub)
-        .status(OperationsStatusRequest.newBuilder()
-            .setInstanceName(getName())
-            .build());
+        .status(OperationsStatusRequest.newBuilder().setInstanceName(getName()).build());
   }
 
   @Override

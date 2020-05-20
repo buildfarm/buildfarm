@@ -21,6 +21,7 @@ import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecutionStage;
+import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
@@ -491,8 +492,9 @@ public class RedisShardBackplane implements ShardBackplane {
     client = new RedisClient(jedisClusterFactory.get());
     List<String> hashtags = client.call(jedis -> RedisNodeHashes.getEvenlyDistributedHashes(jedis));
     this.prequeue = new BalancedRedisQueue(config.getPreQueuedOperationsListName(), hashtags);
-    
-    // The operations queue can be divided into multiple queues handling different platform executions.
+
+    // The operations queue can be divided into multiple queues handling different platform
+    // executions.
     // In this case, we have a single with no explicitly required platform executions.
     ProvisionedRedisQueue defaultQueue =
         new ProvisionedRedisQueue(
@@ -937,11 +939,15 @@ public class RedisShardBackplane implements ShardBackplane {
     return true;
   }
 
-  private void queue(JedisCluster jedis, String operationName, String queueEntryJson) {
+  private void queue(
+      JedisCluster jedis,
+      String operationName,
+      List<Platform.Property> provisions,
+      String queueEntryJson) {
     if (jedis.hdel(config.getDispatchedOperationsHashName(), operationName) == 1) {
       logger.log(Level.WARNING, format("removed dispatched operation %s", operationName));
     }
-    operationQueue.push(jedis, queueEntryJson);
+    operationQueue.push(jedis, provisions, queueEntryJson);
   }
 
   @Override
@@ -953,7 +959,11 @@ public class RedisShardBackplane implements ShardBackplane {
     client.run(
         jedis -> {
           jedis.setex(operationKey(operationName), config.getOperationExpire(), operationJson);
-          queue(jedis, operation.getName(), queueEntryJson);
+          queue(
+              jedis,
+              operation.getName(),
+              queueEntry.getPlatform().getPropertiesList(),
+              queueEntryJson);
           publishReset(jedis, publishOperation);
         });
   }
@@ -1057,9 +1067,10 @@ public class RedisShardBackplane implements ShardBackplane {
     return client.blockingCall(this::deprequeueOperation);
   }
 
-  private QueueEntry dispatchOperation(JedisCluster jedis) throws InterruptedException {
+  private QueueEntry dispatchOperation(JedisCluster jedis, List<Platform.Property> provisions)
+      throws InterruptedException {
 
-    String queueEntryJson = operationQueue.dequeue(jedis);
+    String queueEntryJson = operationQueue.dequeue(jedis, provisions);
     if (queueEntryJson == null) {
       return null;
     }
@@ -1109,8 +1120,12 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   @Override
-  public QueueEntry dispatchOperation() throws IOException, InterruptedException {
-    return client.blockingCall(this::dispatchOperation);
+  public QueueEntry dispatchOperation(List<Platform.Property> provisions)
+      throws IOException, InterruptedException {
+    return client.blockingCall(
+        jedis -> {
+          return dispatchOperation(jedis, provisions);
+        });
   }
 
   @Override
@@ -1120,7 +1135,8 @@ public class RedisShardBackplane implements ShardBackplane {
     client.run(
         jedis -> {
           if (jedis.hdel(config.getDispatchedOperationsHashName(), operationName) == 1) {
-            operationQueue.push(jedis, queueEntryJson);
+            operationQueue.push(
+                jedis, queueEntry.getPlatform().getPropertiesList(), queueEntryJson);
           }
         });
   }
@@ -1186,7 +1202,7 @@ public class RedisShardBackplane implements ShardBackplane {
     Operation publishOperation = keepaliveOperation(operationName);
     client.run(
         jedis -> {
-          queue(jedis, operationName, queueEntryJson);
+          queue(jedis, operationName, queueEntry.getPlatform().getPropertiesList(), queueEntryJson);
           publishReset(jedis, publishOperation);
         });
   }
@@ -1281,6 +1297,7 @@ public class RedisShardBackplane implements ShardBackplane {
                 .setPrequeue(prequeue.status(jedis))
                 .setOperationQueue(operationQueue.status(jedis))
                 .setDispatchedSize(jedis.hlen(config.getDispatchedOperationsHashName()))
+                .addAllActiveWorkers(workerSet)
                 .build());
   }
 }

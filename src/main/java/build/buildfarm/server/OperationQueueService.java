@@ -18,11 +18,11 @@ import build.buildfarm.common.function.InterruptingPredicate;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.v1test.OperationQueueGrpc;
+import build.buildfarm.v1test.OperationsStatus;
+import build.buildfarm.v1test.OperationsStatusRequest;
 import build.buildfarm.v1test.PollOperationRequest;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.TakeOperationRequest;
-import build.buildfarm.v1test.OperationsStatusRequest;
-import build.buildfarm.v1test.OperationsStatus;
 import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
@@ -127,9 +127,10 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
       Thread.currentThread().interrupt();
     }
   }
-  
+
   @Override
-  public void status(OperationsStatusRequest request, StreamObserver<OperationsStatus> responseObserver) {
+  public void status(
+      OperationsStatusRequest request, StreamObserver<OperationsStatus> responseObserver) {
     Instance instance;
     try {
       instance = instances.get(request.getInstanceName());

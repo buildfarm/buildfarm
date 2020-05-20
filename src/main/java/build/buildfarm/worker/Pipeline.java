@@ -111,10 +111,12 @@ public class Pipeline {
           }
 
           if (!thread.isAlive()) {
-            logger.log(Level.INFO, "Stage has exited at priority " + stageClosePriorities.get(stage));
+            logger.log(
+                Level.INFO, "Stage has exited at priority " + stageClosePriorities.get(stage));
             inactiveStages.add(stage);
           } else if (stage.isClosed()) {
-            logger.log(Level.INFO,
+            logger.log(
+                Level.INFO,
                 "Interrupting unterminated closed thread at priority "
                     + stageClosePriorities.get(stage));
             thread.interrupt();

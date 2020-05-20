@@ -14,9 +14,9 @@
 
 package build.buildfarm;
 
+import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
-import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Digest;
@@ -33,9 +33,9 @@ import com.google.bytestream.ByteStreamProto.ReadResponse;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.google.common.io.ByteStreams;
+import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
-import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.protobuf.ByteString;
 import io.grpc.Channel;
 import io.grpc.ManagedChannel;
@@ -91,7 +91,11 @@ class Extract {
     return String.format("%s/blobs/%s/%d", instanceName, digest.getHash(), digest.getSizeBytes());
   }
 
-  static InputStream newInput(String instanceName, Digest digest, ByteStreamStub bsStub, ListeningScheduledExecutorService retryService) {
+  static InputStream newInput(
+      String instanceName,
+      Digest digest,
+      ByteStreamStub bsStub,
+      ListeningScheduledExecutorService retryService) {
     return ByteStreamHelper.newInput(
         blobName(instanceName, digest),
         0,
@@ -132,7 +136,9 @@ class Extract {
     };
   }
 
-  static ByteString getBlobIntoFile(String type, String instanceName, Digest digest, ByteStreamStub bsStub, Path root) throws IOException, InterruptedException {
+  static ByteString getBlobIntoFile(
+      String type, String instanceName, Digest digest, ByteStreamStub bsStub, Path root)
+      throws IOException, InterruptedException {
     Path file = root.resolve(digest.getHash());
     if (Files.exists(file) && Files.size(file) == digest.getSizeBytes()) {
       try (InputStream in = Files.newInputStream(file)) {
@@ -147,7 +153,8 @@ class Extract {
     return content;
   }
 
-  static ByteString getBlob(String instanceName, Digest digest, ByteStreamStub bsStub) throws InterruptedException {
+  static ByteString getBlob(String instanceName, Digest digest, ByteStreamStub bsStub)
+      throws InterruptedException {
     SettableFuture<ByteString> blobFuture = SettableFuture.create();
     bsStub.read(
         ReadRequest.newBuilder().setResourceName(blobName(instanceName, digest)).build(),
@@ -225,7 +232,8 @@ class Extract {
             visitedDigests.add(fileDigest);
             outstandingOperations.getAndIncrement();
             executor.execute(
-                blobGetter(root, instanceName, fileDigest, bsStub, outstandingOperations, retryService));
+                blobGetter(
+                    root, instanceName, fileDigest, bsStub, outstandingOperations, retryService));
           }
         }
 
@@ -260,7 +268,8 @@ class Extract {
     ByteStreamStub bsStub = ByteStreamGrpc.newStub(channel);
 
     ExecutorService service = newSingleThreadExecutor();
-    ListeningScheduledExecutorService retryService = listeningDecorator(newSingleThreadScheduledExecutor());
+    ListeningScheduledExecutorService retryService =
+        listeningDecorator(newSingleThreadScheduledExecutor());
 
     Set<Digest> visitedDigests = Sets.newHashSet();
     Set<Digest> visitedDirectories = Sets.newHashSet();
@@ -275,7 +284,8 @@ class Extract {
         visitedDigests.add(commandDigest);
         outstandingOperations.getAndIncrement();
         service.execute(
-            blobGetter(root, instanceName, commandDigest, bsStub, outstandingOperations, retryService));
+            blobGetter(
+                root, instanceName, commandDigest, bsStub, outstandingOperations, retryService));
       }
       Digest inputRootDigest = action.getInputRootDigest();
       if (!visitedDigests.contains(inputRootDigest)) {

@@ -216,9 +216,11 @@ public class MemoryInstanceTest {
     Action action = Action.getDefaultInstance();
 
     assertThat(
-        instance.getActionResult(
-            instance.getDigestUtil().computeActionKey(action),
-            RequestMetadata.getDefaultInstance()).get())
+            instance
+                .getActionResult(
+                    instance.getDigestUtil().computeActionKey(action),
+                    RequestMetadata.getDefaultInstance())
+                .get())
         .isNull();
   }
 
@@ -230,9 +232,11 @@ public class MemoryInstanceTest {
     Action action = Action.getDefaultInstance();
     instance.putActionResult(instance.getDigestUtil().computeActionKey(action), result);
     assertThat(
-        instance.getActionResult(
-            instance.getDigestUtil().computeActionKey(action),
-            RequestMetadata.getDefaultInstance()).get())
+            instance
+                .getActionResult(
+                    instance.getDigestUtil().computeActionKey(action),
+                    RequestMetadata.getDefaultInstance())
+                .get())
         .isEqualTo(result);
   }
 

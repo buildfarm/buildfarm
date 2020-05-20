@@ -48,7 +48,8 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
   public abstract void publishMetric(String metricName, Object metricValue);
 
   @VisibleForTesting
-  protected OperationRequestMetadata populateRequestMetadata(Operation operation, RequestMetadata requestMetadata) {
+  protected OperationRequestMetadata populateRequestMetadata(
+      Operation operation, RequestMetadata requestMetadata) {
     try {
       OperationRequestMetadata operationRequestMetadata =
           OperationRequestMetadata.newBuilder()
@@ -74,24 +75,28 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
       }
       return operationRequestMetadata;
     } catch (Exception e) {
-      logger.log(Level.WARNING, String.format("Could not populate request metadata for %s.", operation.getName()), e);
+      logger.log(
+          Level.WARNING,
+          String.format("Could not populate request metadata for %s.", operation.getName()),
+          e);
       return null;
     }
   }
 
-  protected static String formatRequestMetadataToJson(OperationRequestMetadata operationRequestMetadata) throws InvalidProtocolBufferException {
+  protected static String formatRequestMetadataToJson(
+      OperationRequestMetadata operationRequestMetadata) throws InvalidProtocolBufferException {
     JsonFormat.TypeRegistry typeRegistry =
-      JsonFormat.TypeRegistry.newBuilder()
-        .add(ExecuteResponse.getDescriptor())
-        .add(ExecuteOperationMetadata.getDescriptor())
-        .add(PreconditionFailure.getDescriptor())
-        .build();
+        JsonFormat.TypeRegistry.newBuilder()
+            .add(ExecuteResponse.getDescriptor())
+            .add(ExecuteOperationMetadata.getDescriptor())
+            .add(PreconditionFailure.getDescriptor())
+            .build();
 
     String formattedRequestMetadata =
-      JsonFormat.printer()
-        .usingTypeRegistry(typeRegistry)
-        .omittingInsignificantWhitespace()
-        .print(operationRequestMetadata);
+        JsonFormat.printer()
+            .usingTypeRegistry(typeRegistry)
+            .omittingInsignificantWhitespace()
+            .print(operationRequestMetadata);
     logger.log(Level.FINE, "{}", formattedRequestMetadata);
     return formattedRequestMetadata;
   }
