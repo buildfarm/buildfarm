@@ -39,6 +39,7 @@ import com.google.protobuf.ByteString;
 import io.grpc.StatusRuntimeException;
 import java.io.IOException;
 import java.net.SocketException;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import org.junit.Before;
@@ -75,7 +76,7 @@ public class ShardWorkerInstanceTest {
 
   @Test(expected = SocketException.class)
   public void dispatchOperationThrowsOnSocketException() throws IOException, InterruptedException {
-    when(backplane.dispatchOperation()).thenThrow(SocketException.class);
+    when(backplane.dispatchOperation(any(List.class))).thenThrow(SocketException.class);
     MatchListener listener = mock(MatchListener.class);
     instance.dispatchOperation(listener);
   }
@@ -86,10 +87,10 @@ public class ShardWorkerInstanceTest {
         QueueEntry.newBuilder()
             .setExecuteEntry(ExecuteEntry.newBuilder().setOperationName("op"))
             .build();
-    when(backplane.dispatchOperation()).thenReturn(null).thenReturn(queueEntry);
+    when(backplane.dispatchOperation(any(List.class))).thenReturn(null).thenReturn(queueEntry);
     MatchListener listener = mock(MatchListener.class);
     assertThat(instance.dispatchOperation(listener)).isEqualTo(queueEntry);
-    verify(backplane, times(2)).dispatchOperation();
+    verify(backplane, times(2)).dispatchOperation(any(List.class));
   }
 
   @Test(expected = StatusRuntimeException.class)
@@ -131,7 +132,11 @@ public class ShardWorkerInstanceTest {
 
   @Test(expected = UnsupportedOperationException.class)
   public void getTreeIsUnsupported() {
-    instance.getTree(/* rootDigest=*/ Digest.getDefaultInstance(), /* pageSize=*/ 0, /* pageToken=*/ "", /* tree=*/ Tree.newBuilder());
+    instance.getTree(
+        /* rootDigest=*/ Digest.getDefaultInstance(),
+        /* pageSize=*/ 0,
+        /* pageToken=*/ "",
+        /* tree=*/ Tree.newBuilder());
   }
 
   @Test(expected = UnsupportedOperationException.class)

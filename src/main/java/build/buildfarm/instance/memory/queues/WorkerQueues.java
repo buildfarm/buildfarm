@@ -100,18 +100,16 @@ public class WorkerQueues {
     }
     return true;
   }
-  
+
   public boolean AddWorkers(String queueName, List<Worker> workers) {
     for (WorkerQueue queue : specificQueues) {
       if (queue.name == queueName) {
-          queue.workers.addAll(workers);
-          return true;
-        }
+        queue.workers.addAll(workers);
+        return true;
       }
+    }
     return false;
   }
-  
-  
 
   /*
     Removes all instances of an existing listener from any of the queues

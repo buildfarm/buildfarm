@@ -552,7 +552,9 @@ public class ShardInstanceTest {
   @Test
   public void missingActionResultReturnsNull() throws Exception {
     ActionKey defaultActionKey = DIGEST_UTIL.computeActionKey(Action.getDefaultInstance());
-    assertThat(instance.getActionResult(defaultActionKey, RequestMetadata.getDefaultInstance()).get()).isNull();
+    assertThat(
+            instance.getActionResult(defaultActionKey, RequestMetadata.getDefaultInstance()).get())
+        .isNull();
     verify(mockBackplane, times(1)).getActionResult(defaultActionKey);
   }
 
@@ -846,25 +848,18 @@ public class ShardInstanceTest {
     Watcher mockWatcher = mock(Watcher.class);
     Watcher actionResultWatcher = instance.newActionResultWatcher(actionKey, mockWatcher);
 
-    Action uncacheableAction = Action.newBuilder()
-        .setDoNotCache(true)
-        .build();
-    Operation operation = Operation.newBuilder()
-        .setMetadata(Any.pack(uncacheableAction))
-        .build();
-    ExecuteResponse executeResponse = ExecuteResponse.newBuilder()
-        .setCachedResult(true)
-        .build();
-    Operation completedOperation = Operation.newBuilder()
-        .setDone(true)
-        .setResponse(Any.pack(executeResponse))
-        .build();
+    Action uncacheableAction = Action.newBuilder().setDoNotCache(true).build();
+    Operation operation = Operation.newBuilder().setMetadata(Any.pack(uncacheableAction)).build();
+    ExecuteResponse executeResponse = ExecuteResponse.newBuilder().setCachedResult(true).build();
+    Operation completedOperation =
+        Operation.newBuilder().setDone(true).setResponse(Any.pack(executeResponse)).build();
 
     actionResultWatcher.observe(operation);
     actionResultWatcher.observe(completedOperation);
 
     verify(mockWatcher, never()).observe(operation);
-    assertThat(instance.getActionResult(actionKey, RequestMetadata.getDefaultInstance()).get()).isNull();
+    assertThat(instance.getActionResult(actionKey, RequestMetadata.getDefaultInstance()).get())
+        .isNull();
     verify(mockWatcher, times(1)).observe(completedOperation);
   }
 
@@ -874,16 +869,13 @@ public class ShardInstanceTest {
     Watcher mockWatcher = mock(Watcher.class);
     Watcher actionResultWatcher = instance.newActionResultWatcher(actionKey, mockWatcher);
 
-    ActionResult actionResult = ActionResult.newBuilder()
-        .setStdoutDigest(Digest.newBuilder().setHash("stdout").setSizeBytes(1))
-        .build();
-    ExecuteResponse executeResponse = ExecuteResponse.newBuilder()
-        .setResult(actionResult)
-        .build();
-    Operation completedOperation = Operation.newBuilder()
-        .setDone(true)
-        .setResponse(Any.pack(executeResponse))
-        .build();
+    ActionResult actionResult =
+        ActionResult.newBuilder()
+            .setStdoutDigest(Digest.newBuilder().setHash("stdout").setSizeBytes(1))
+            .build();
+    ExecuteResponse executeResponse = ExecuteResponse.newBuilder().setResult(actionResult).build();
+    Operation completedOperation =
+        Operation.newBuilder().setDone(true).setResponse(Any.pack(executeResponse)).build();
 
     actionResultWatcher.observe(completedOperation);
 

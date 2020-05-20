@@ -10,6 +10,5 @@ java_library(
     ],
     runtime_deps = [
         "@maven//:org_apache_commons_commons_pool2",
-        "@maven//:org_slf4j_slf4j_api",
     ],
 )

@@ -31,8 +31,8 @@ import io.grpc.Status.Code;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import java.util.logging.Level;
-import javax.annotation.Nullable;
 import java.util.logging.Logger;
+import javax.annotation.Nullable;
 
 public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
   public static final Logger logger = Logger.getLogger(ActionCacheService.class.getName());
@@ -56,9 +56,10 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
       return;
     }
 
-    ListenableFuture<ActionResult> resultFuture = instance.getActionResult(
-        DigestUtil.asActionKey(request.getActionDigest()),
-        TracingMetadataUtils.fromCurrentContext());
+    ListenableFuture<ActionResult> resultFuture =
+        instance.getActionResult(
+            DigestUtil.asActionKey(request.getActionDigest()),
+            TracingMetadataUtils.fromCurrentContext());
 
     addCallback(
         resultFuture,
@@ -79,7 +80,12 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
 
           @Override
           public void onFailure(Throwable t) {
-            logger.log(Level.WARNING, String.format("getActionResult(%s): %s", request.getInstanceName(), DigestUtil.toString(request.getActionDigest())), t);
+            logger.log(
+                Level.WARNING,
+                String.format(
+                    "getActionResult(%s): %s",
+                    request.getInstanceName(), DigestUtil.toString(request.getActionDigest())),
+                t);
             Status status = Status.fromThrowable(t);
             if (status.getCode() != Code.CANCELLED) {
               try {

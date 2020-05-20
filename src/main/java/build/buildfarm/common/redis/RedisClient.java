@@ -91,16 +91,19 @@ public class RedisClient implements Closeable {
         });
   }
 
-  public <T> T blockingCall(JedisInterruptibleContext<T> withJedis) throws IOException, InterruptedException {
+  public <T> T blockingCall(JedisInterruptibleContext<T> withJedis)
+      throws IOException, InterruptedException {
     AtomicReference<InterruptedException> interruption = new AtomicReference<>(null);
-    T result = call(jedis -> {
-      try {
-        return withJedis.run(jedis);
-      } catch (InterruptedException e) {
-        interruption.set(e);
-        return null;
-      }
-    });
+    T result =
+        call(
+            jedis -> {
+              try {
+                return withJedis.run(jedis);
+              } catch (InterruptedException e) {
+                interruption.set(e);
+                return null;
+              }
+            });
     InterruptedException e = interruption.get();
     if (e != null) {
       throw e;

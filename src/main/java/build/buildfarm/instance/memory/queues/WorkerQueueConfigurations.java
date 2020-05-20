@@ -14,7 +14,6 @@
 
 package build.buildfarm.instance;
 
-import build.buildfarm.instance.memory.Worker;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -23,19 +22,18 @@ import java.util.List;
     or referenced as test examples.
 */
 public class WorkerQueueConfigurations {
-    
+
   public static WorkerQueues gpuAndFallback() {
     WorkerQueues queues = new WorkerQueues();
     queues.AddQueues(WorkerQueueConfigurations.gpuAndFallbackQueues());
     return queues;
   }
-  
+
   public static WorkerQueues gpu() {
     WorkerQueues queues = new WorkerQueues();
     queues.AddQueues(WorkerQueueConfigurations.gpuQueues());
     return queues;
   }
-    
 
   /* This is a queue paradigm for a GPU and non-GPU queue */
   private static List<WorkerQueue> gpuAndFallbackQueues() {

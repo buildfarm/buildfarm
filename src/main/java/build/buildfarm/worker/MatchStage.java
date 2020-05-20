@@ -29,9 +29,8 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.Timestamps;
-import javax.annotation.Nullable;
-import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.annotation.Nullable;
 
 public class MatchStage extends PipelineStage {
   private static final Logger logger = Logger.getLogger(MatchStage.class.getName());

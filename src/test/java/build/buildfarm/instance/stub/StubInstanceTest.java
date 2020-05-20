@@ -133,7 +133,8 @@ public class StubInstanceTest {
         });
     Instance instance = newStubInstance("test");
     ActionKey actionKey = DIGEST_UTIL.computeActionKey(Action.getDefaultInstance());
-    assertThat(instance.getActionResult(actionKey, RequestMetadata.getDefaultInstance()).get()).isNull();
+    assertThat(instance.getActionResult(actionKey, RequestMetadata.getDefaultInstance()).get())
+        .isNull();
     GetActionResultRequest request = reference.get();
     assertThat(request.getInstanceName()).isEqualTo(instance.getName());
     assertThat(request.getActionDigest()).isEqualTo(actionKey.getDigest());

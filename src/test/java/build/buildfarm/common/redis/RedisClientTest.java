@@ -31,8 +31,7 @@ import redis.clients.jedis.exceptions.JedisConnectionException;
 @RunWith(JUnit4.class)
 class RedisClientTest {
   @Test
-  public void runExceptionEndOfStreamIsUnavailable()
-      throws IOException, InterruptedException {
+  public void runExceptionEndOfStreamIsUnavailable() throws IOException, InterruptedException {
     RedisClient client = new RedisClient(mock(JedisCluster.class));
     Status status = Status.UNKNOWN;
     try {
@@ -47,8 +46,7 @@ class RedisClientTest {
   }
 
   @Test
-  public void runExceptionConnectionResetIsUnavailable()
-      throws IOException, InterruptedException {
+  public void runExceptionConnectionResetIsUnavailable() throws IOException, InterruptedException {
     RedisClient client = new RedisClient(mock(JedisCluster.class));
     Status status = Status.UNKNOWN;
     try {
@@ -77,5 +75,4 @@ class RedisClientTest {
     }
     assertThat(status.getCode()).isEqualTo(Code.DEADLINE_EXCEEDED);
   }
-
 }

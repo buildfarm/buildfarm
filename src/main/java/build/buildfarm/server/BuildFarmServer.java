@@ -47,9 +47,9 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import javax.naming.ConfigurationException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.naming.ConfigurationException;
 
 public class BuildFarmServer extends LoggingMain {
   // We need to keep references to the root and netty loggers to prevent them from being garbage
@@ -93,7 +93,10 @@ public class BuildFarmServer extends LoggingMain {
             .addService(new CapabilitiesService(instances))
             .addService(
                 new ContentAddressableStorageService(
-                    instances, /* deadlineAfter=*/ 1, TimeUnit.DAYS, /* requestLogLevel=*/ Level.INFO))
+                    instances,
+                    /* deadlineAfter=*/ 1,
+                    TimeUnit.DAYS,
+                    /* requestLogLevel=*/ Level.INFO))
             .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, TimeUnit.DAYS))
             .addService(
                 new ExecutionService(
@@ -183,9 +186,9 @@ public class BuildFarmServer extends LoggingMain {
 
   private static void printUsage(OptionsParser parser) {
     logger.log(Level.INFO, "Usage: CONFIG_PATH");
-    logger.log(Level.INFO,
-        parser.describeOptions(
-            Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
+    logger.log(
+        Level.INFO,
+        parser.describeOptions(Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
   }
 
   /** returns success or failure */

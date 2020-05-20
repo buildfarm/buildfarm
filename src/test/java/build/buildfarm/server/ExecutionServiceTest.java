@@ -49,14 +49,15 @@ public class ExecutionServiceTest {
   @Test
   public void keepaliveIsCancelledWithContext() throws Exception {
     ScheduledExecutorService keepaliveScheduler = newSingleThreadScheduledExecutor();
-    Consumer<String> snsMetricsPublisher = requestMetadata -> { };
+    Consumer<String> snsMetricsPublisher = requestMetadata -> {};
     ExecutionService service =
         new ExecutionService(
             instances,
             /* keepaliveAfter=*/ 1,
             /* keepaliveUnit=*/ SECONDS, // far enough in the future that we'll get scheduled and
             keepaliveScheduler,
-            new LogMetricsPublisher(MetricsConfig.getDefaultInstance()));         // cancelled without executing
+            new LogMetricsPublisher(
+                MetricsConfig.getDefaultInstance())); // cancelled without executing
     ServerCallStreamObserver<Operation> response = mock(ServerCallStreamObserver.class);
     RequestMetadata requestMetadata = RequestMetadata.newBuilder().build();
     Operation operation =

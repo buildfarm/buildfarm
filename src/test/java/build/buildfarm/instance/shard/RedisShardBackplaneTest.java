@@ -30,8 +30,6 @@ import build.buildfarm.v1test.WorkerChange;
 import com.google.common.collect.ImmutableMap;
 import com.google.longrunning.Operation;
 import com.google.protobuf.util.JsonFormat;
-import io.grpc.Status;
-import io.grpc.Status.Code;
 import java.io.IOException;
 import java.util.function.Supplier;
 import org.junit.Before;

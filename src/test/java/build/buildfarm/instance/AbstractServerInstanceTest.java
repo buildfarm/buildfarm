@@ -30,7 +30,6 @@ import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
-import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
@@ -38,6 +37,7 @@ import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
+import build.buildfarm.v1test.OperationsStatus;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -50,7 +50,6 @@ import com.google.rpc.PreconditionFailure.Violation;
 import java.io.InputStream;
 import java.util.Stack;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -58,8 +57,7 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class AbstractServerInstanceTest {
-  private static final Logger logger =
-      Logger.getLogger(AbstractServerInstanceTest.class.getName());
+  private static final Logger logger = Logger.getLogger(AbstractServerInstanceTest.class.getName());
 
   private static final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
 
@@ -140,10 +138,10 @@ public class AbstractServerInstanceTest {
     public void match(Platform platform, MatchListener listener) {
       throw new UnsupportedOperationException();
     }
-    
+
     @Override
     public OperationsStatus operationsStatus() {
-        throw new UnsupportedOperationException();
+      throw new UnsupportedOperationException();
     }
 
     @Override
@@ -346,8 +344,7 @@ public class AbstractServerInstanceTest {
   public void emptyArgumentListIsInvalid() {
     AbstractServerInstance instance = new DummyServerInstance();
 
-    PreconditionFailure.Builder preconditionFailureBuilder =
-        PreconditionFailure.newBuilder();
+    PreconditionFailure.Builder preconditionFailureBuilder = PreconditionFailure.newBuilder();
     instance.validateCommand(
         Command.getDefaultInstance(),
         DIGEST_UTIL.empty(),
@@ -355,8 +352,7 @@ public class AbstractServerInstanceTest {
         ImmutableSet.of(),
         ImmutableMap.of(),
         preconditionFailureBuilder);
-    PreconditionFailure preconditionFailure =
-        preconditionFailureBuilder.build();
+    PreconditionFailure preconditionFailure = preconditionFailureBuilder.build();
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
     Violation violation = preconditionFailure.getViolationsList().get(0);
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
@@ -368,20 +364,15 @@ public class AbstractServerInstanceTest {
   public void absoluteWorkingDirectoryIsInvalid() {
     AbstractServerInstance instance = new DummyServerInstance();
 
-    PreconditionFailure.Builder preconditionFailureBuilder =
-        PreconditionFailure.newBuilder();
+    PreconditionFailure.Builder preconditionFailureBuilder = PreconditionFailure.newBuilder();
     instance.validateCommand(
-        Command.newBuilder()
-            .addArguments("foo")
-            .setWorkingDirectory("/var/lib/db")
-            .build(),
+        Command.newBuilder().addArguments("foo").setWorkingDirectory("/var/lib/db").build(),
         DIGEST_UTIL.empty(),
         ImmutableSet.of(),
         ImmutableSet.of(),
         ImmutableMap.of(),
         preconditionFailureBuilder);
-    PreconditionFailure preconditionFailure =
-        preconditionFailureBuilder.build();
+    PreconditionFailure preconditionFailure = preconditionFailureBuilder.build();
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
     Violation violation = preconditionFailure.getViolationsList().get(0);
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);
@@ -394,20 +385,15 @@ public class AbstractServerInstanceTest {
     AbstractServerInstance instance = new DummyServerInstance();
 
     Digest inputRootDigest = DIGEST_UTIL.compute(Directory.getDefaultInstance());
-    PreconditionFailure.Builder preconditionFailureBuilder =
-        PreconditionFailure.newBuilder();
+    PreconditionFailure.Builder preconditionFailureBuilder = PreconditionFailure.newBuilder();
     instance.validateCommand(
-        Command.newBuilder()
-            .addArguments("foo")
-            .setWorkingDirectory("not/an/input")
-            .build(),
+        Command.newBuilder().addArguments("foo").setWorkingDirectory("not/an/input").build(),
         inputRootDigest,
         ImmutableSet.of(),
         ImmutableSet.of(),
         ImmutableMap.of(inputRootDigest, Directory.getDefaultInstance()),
         preconditionFailureBuilder);
-    PreconditionFailure preconditionFailure =
-        preconditionFailureBuilder.build();
+    PreconditionFailure preconditionFailure = preconditionFailureBuilder.build();
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
     Violation violation = preconditionFailure.getViolationsList().get(0);
     assertThat(violation.getType()).isEqualTo(VIOLATION_TYPE_INVALID);

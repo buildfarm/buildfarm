@@ -18,10 +18,8 @@ import static com.google.common.truth.Truth.assertThat;
 
 import build.buildfarm.common.StringVisitor;
 import build.buildfarm.instance.shard.JedisClusterFactory;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;

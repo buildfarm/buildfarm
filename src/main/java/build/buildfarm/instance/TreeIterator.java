@@ -14,15 +14,12 @@
 
 package build.buildfarm.instance;
 
-import build.buildfarm.common.DigestUtil;
-import build.buildfarm.instance.TokenizableIterator;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
 import build.buildfarm.v1test.TreeIteratorToken;
 import com.google.common.collect.Iterators;
 import com.google.common.io.BaseEncoding;
 import com.google.common.util.concurrent.ListenableFuture;
-import build.bazel.remote.execution.v2.Digest;
-import build.bazel.remote.execution.v2.Directory;
-import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.MessageLite;
 import java.io.IOException;
@@ -40,7 +37,11 @@ public class TreeIterator implements TokenizableIterator<TreeIterator.DirectoryE
   private final ArrayDeque<Digest> parentPath;
   private final Stack<Iterator<Digest>> pointers;
 
-  public TreeIterator(Function<Digest, ListenableFuture<Directory>> getDirectoryFuture, Digest rootDigest, String pageToken) throws IOException, InterruptedException {
+  public TreeIterator(
+      Function<Digest, ListenableFuture<Directory>> getDirectoryFuture,
+      Digest rootDigest,
+      String pageToken)
+      throws IOException, InterruptedException {
     this.getDirectoryFuture = getDirectoryFuture;
     parentPath = new ArrayDeque<Digest>();
     pointers = new Stack<Iterator<Digest>>();
@@ -70,11 +71,12 @@ public class TreeIterator implements TokenizableIterator<TreeIterator.DirectoryE
           // is correct and will be next directory fetched
           break;
         }
-        iter = Iterators.transform(
-            directory.getDirectoriesList().iterator(),
-            directoryNode -> {
-              return directoryNode.getDigest();
-            });
+        iter =
+            Iterators.transform(
+                directory.getDirectoriesList().iterator(),
+                directoryNode -> {
+                  return directoryNode.getDigest();
+                });
       }
     }
     pointers.push(iter);
@@ -138,9 +140,10 @@ public class TreeIterator implements TokenizableIterator<TreeIterator.DirectoryE
         /* the path to a new iter set is the path to its parent */
         parentPath.addLast(digest);
         path = parentPath.clone();
-        pointers.push(Iterators.transform(
-            directory.getDirectoriesList().iterator(),
-            directoryNode -> directoryNode.getDigest()));
+        pointers.push(
+            Iterators.transform(
+                directory.getDirectoriesList().iterator(),
+                directoryNode -> directoryNode.getDigest()));
       }
       advanceIterator();
       return entry;
@@ -159,9 +162,7 @@ public class TreeIterator implements TokenizableIterator<TreeIterator.DirectoryE
   }
 
   private MessageLite toToken() {
-    return TreeIteratorToken.newBuilder()
-        .addAllDirectories(path)
-        .build();
+    return TreeIteratorToken.newBuilder().addAllDirectories(path).build();
   }
 
   public String toNextPageToken() {

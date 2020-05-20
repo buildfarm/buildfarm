@@ -97,7 +97,8 @@ public class GrpcActionCacheTest {
     serviceRegistry.addService(
         new ActionCacheImplBase() {
           @Override
-          public void getActionResult(GetActionResultRequest request, StreamObserver<ActionResult> responseObserver) {
+          public void getActionResult(
+              GetActionResultRequest request, StreamObserver<ActionResult> responseObserver) {
             responseObserver.onError(Status.NOT_FOUND.asException());
           }
         });
