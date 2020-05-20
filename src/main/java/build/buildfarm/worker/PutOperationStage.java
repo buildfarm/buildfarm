@@ -94,7 +94,7 @@ public class PutOperationStage extends PipelineStage.NullStage {
     // The time unit we want is millisecond.
     // 1 second = 1000 milliseconds
     // 1 millisecond = 1000,000 nanoseconds
-    float[] times = new float[timestamps.length];
+    double[] times = new double[timestamps.length];
     for (int i = 0; i < times.length; i++) {
       times[i] = timestamps[i].getSeconds() * 1000.0f + timestamps[i].getNanos() / (1000.0f * 1000.0f);
     }
@@ -112,7 +112,7 @@ public class PutOperationStage extends PipelineStage.NullStage {
     // ]
     float[] operationTimes = new float[times.length - 1];
     for (int i = 0; i < operationTimes.length; i++) {
-      operationTimes[i] = (times[i + 1] - times[i]);
+      operationTimes[i] = (float) (times[i + 1] - times[i]);
     }
 
     for (int i = 0; i < averageOperationTimes.length; i++) {
