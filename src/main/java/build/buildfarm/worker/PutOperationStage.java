@@ -24,10 +24,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class PutOperationStage extends PipelineStage.NullStage {
-
-  private static final java.util.logging.Logger nettyLogger =
-      java.util.logging.Logger.getLogger("io.grpc.netty");
-  private static final Logger logger = Logger.getLogger(PutOperationStage.class.getName());
   private final InterruptingConsumer<Operation> onPut;
 
   private int operationCount = 0;
@@ -63,7 +59,6 @@ public class PutOperationStage extends PipelineStage.NullStage {
   }
 
   private void computeOperationTime(OperationContext context) {
-    logger.log(Level.WARNING, "PUT OPERATION CURRENT TIMES: ");
     ExecutedActionMetadata metadata =
         context.executeResponse.build().getResult().getExecutionMetadata();
     Timestamp[] timestamps =
@@ -78,19 +73,6 @@ public class PutOperationStage extends PipelineStage.NullStage {
           metadata.getOutputUploadCompletedTimestamp(),
         };
 
-    long[] seconds = new long[timestamps.length];
-    for (int i = 0; i < seconds.length; i++) {
-      seconds[i] = timestamps[i].getSeconds();
-    }
-    logger.log(Level.WARNING, "SECONDS: ");
-    logger.log(Level.WARNING, Arrays.toString(seconds));
-
-    long[] nanos = new long[timestamps.length];
-    for (int i = 0; i < nanos.length; i++) {
-      nanos[i] = timestamps[i].getNanos();
-    }
-    logger.log(Level.WARNING, "NANOS: ");
-    logger.log(Level.WARNING, Arrays.toString(nanos));
     // The time unit we want is millisecond.
     // 1 second = 1000 milliseconds
     // 1 millisecond = 1000,000 nanoseconds
@@ -98,8 +80,6 @@ public class PutOperationStage extends PipelineStage.NullStage {
     for (int i = 0; i < times.length; i++) {
       times[i] = (timestamps[i].getSeconds() - timestamps[0].getSeconds()) * 1000.0 + timestamps[i].getNanos() / (1000.0 * 1000.0);
     }
-    logger.log(Level.WARNING, "result: ");
-    logger.log(Level.WARNING, Arrays.toString(times));
 
     // [
     //  queued                -> worker_start(MatchStage),
