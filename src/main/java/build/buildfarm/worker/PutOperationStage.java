@@ -17,7 +17,7 @@ package build.buildfarm.worker;
 import build.bazel.remote.execution.v2.ExecutedActionMetadata;
 import build.buildfarm.common.function.InterruptingConsumer;
 import com.google.longrunning.Operation;
-import java.util.logging.Level;
+import com.google.protobuf.Timestamp;
 
 public class PutOperationStage extends PipelineStage.NullStage {
   private final InterruptingConsumer<Operation> onPut;
@@ -57,17 +57,25 @@ public class PutOperationStage extends PipelineStage.NullStage {
   private void computeOperationTime(OperationContext context) {
     ExecutedActionMetadata metadata =
         context.executeResponse.build().getResult().getExecutionMetadata();
-    float[] timestamps =
-        new float[] {
-          metadata.getQueuedTimestamp().getNanos(),
-          metadata.getWorkerStartTimestamp().getNanos(),
-          metadata.getInputFetchStartTimestamp().getNanos(),
-          metadata.getInputFetchCompletedTimestamp().getNanos(),
-          metadata.getExecutionStartTimestamp().getNanos(),
-          metadata.getExecutionCompletedTimestamp().getNanos(),
-          metadata.getOutputUploadStartTimestamp().getNanos(),
-          metadata.getOutputUploadCompletedTimestamp().getNanos(),
+    Timestamp[] timestamps =
+        new Timestamp[] {
+          metadata.getQueuedTimestamp(),
+          metadata.getWorkerStartTimestamp(),
+          metadata.getInputFetchStartTimestamp(),
+          metadata.getInputFetchCompletedTimestamp(),
+          metadata.getExecutionStartTimestamp(),
+          metadata.getExecutionCompletedTimestamp(),
+          metadata.getOutputUploadStartTimestamp(),
+          metadata.getOutputUploadCompletedTimestamp(),
         };
+
+    float[] times = new float[timestamps.length];
+    // The time unit we want is millisecond.
+    // 1 second = 1000 milliseconds
+    // 1 millisecond = 1000,000 nanoseconds
+    for (int i = 0; i< times.length; i++) {
+      times[i] = timestamps[i].getSeconds() * 1000.0f + timestamps[i].getNanos() / (1000.0f * 1000.0f);
+    }
 
     // [
     //  queued                -> worker_start(MatchStage),
@@ -78,10 +86,9 @@ public class PutOperationStage extends PipelineStage.NullStage {
     //  execution_completed   -> output_upload_start,
     //  output_upload_start   -> output_upload_completed
     // ]
-    float nanoToMilli = (float) Math.pow(10.0, 6.0);
-    float[] results = new float[timestamps.length - 1];
+    float[] results = new float[times.length - 1];
     for (int i = 0; i < results.length; i++) {
-      results[i] = (timestamps[i + 1] - timestamps[i]) / nanoToMilli;
+      results[i] = (times[i + 1] - times[i]);
     }
 
     for (int i = 0; i < operationAverageTimes.length; i++) {
