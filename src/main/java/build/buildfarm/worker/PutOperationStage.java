@@ -57,7 +57,6 @@ public class PutOperationStage extends PipelineStage.NullStage {
   private void computeOperationTime(OperationContext context) {
     ExecutedActionMetadata metadata =
         context.executeResponse.build().getResult().getExecutionMetadata();
-    System.out.println("NAME OF OPERATION begin: "+ context.operation.getName());
     float[] timestamps =
         new float[] {
           metadata.getQueuedTimestamp().getNanos(),
@@ -69,7 +68,6 @@ public class PutOperationStage extends PipelineStage.NullStage {
           metadata.getOutputUploadStartTimestamp().getNanos(),
           metadata.getOutputUploadCompletedTimestamp().getNanos(),
         };
-    System.out.println("NAME OF OPERATION end: "+ context.operation.getName());
 
     // [
     //  queued                -> worker_start(MatchStage),
