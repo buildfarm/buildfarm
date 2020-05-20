@@ -96,7 +96,7 @@ public class PutOperationStage extends PipelineStage.NullStage {
     // 1 millisecond = 1000,000 nanoseconds
     double[] times = new double[timestamps.length];
     for (int i = 0; i < times.length; i++) {
-      times[i] = timestamps[i].getSeconds() * 1000.0f + timestamps[i].getNanos() / (1000.0f * 1000.0f);
+      times[i] = (timestamps[i].getSeconds() - timestamps[0].getSeconds()) * 1000.0 + timestamps[i].getNanos() / (1000.0 * 1000.0);
     }
     logger.log(Level.WARNING, "result: ");
     logger.log(Level.WARNING, Arrays.toString(times));
