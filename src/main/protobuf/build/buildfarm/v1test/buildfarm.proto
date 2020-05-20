@@ -451,6 +451,8 @@ message OperationsStatus {
   OperationQueueStatus operation_queue = 2;
 
   int64 dispatched_size = 3;
+
+  repeated string active_workers = 4;
 }
 
 message QueuedOperationMetadata {
