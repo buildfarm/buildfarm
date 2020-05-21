@@ -601,11 +601,21 @@ public class ShardInstance extends AbstractServerInstance {
       Executor executor,
       SettableFuture<Iterable<Digest>> missingDigestsFuture,
       RequestMetadata requestMetadata) {
-    String worker = workers.removeFirst();
+    Instance workerStub = null;
+    String worker;
+    do {
+      worker = workers.removeFirst();
+      try {
+        workerStub = workerStub(worker);
+      } catch (IllegalStateException e) {
+        removeMalfunctioningWorker(worker, e, "findMissingBlobs(" + requestId + ")");
+      }
+    } while (workerStub == null);
     ListenableFuture<Iterable<Digest>> workerMissingBlobsFuture =
-        workerStub(worker).findMissingBlobs(blobDigests, executor, requestMetadata);
+      workerStub.findMissingBlobs(blobDigests, executor, requestMetadata);
 
     Stopwatch stopwatch = Stopwatch.createStarted();
+    String validWorker = worker;
     addCallback(
         workerMissingBlobsFuture,
         new FutureCallback<Iterable<Digest>>() {
@@ -616,7 +626,7 @@ public class ShardInstance extends AbstractServerInstance {
             } else {
               responses.add(
                   new FindMissingResponseEntry(
-                      worker,
+                      validWorker,
                       stopwatch.elapsed(MICROSECONDS),
                       null,
                       Iterables.size(missingDigests)));
@@ -636,10 +646,10 @@ public class ShardInstance extends AbstractServerInstance {
           public void onFailure(Throwable t) {
             responses.add(
                 new FindMissingResponseEntry(
-                    worker, stopwatch.elapsed(MICROSECONDS), t, Iterables.size(blobDigests)));
+                    validWorker, stopwatch.elapsed(MICROSECONDS), t, Iterables.size(blobDigests)));
             Status status = Status.fromThrowable(t);
             if (status.getCode() == Code.UNAVAILABLE || status.getCode() == Code.UNIMPLEMENTED) {
-              removeMalfunctioningWorker(worker, t, "findMissingBlobs(" + requestId + ")");
+              removeMalfunctioningWorker(validWorker, t, "findMissingBlobs(" + requestId + ")");
             } else if (status.getCode() == Code.DEADLINE_EXCEEDED) {
               for (FindMissingResponseEntry response : responses.build()) {
                 logger.log(
@@ -661,7 +671,7 @@ public class ShardInstance extends AbstractServerInstance {
               missingDigestsFuture.setException(status.asException());
             } else {
               // why not, always
-              workers.addLast(worker);
+              workers.addLast(validWorker);
             }
 
             if (!missingDigestsFuture.isDone()) {
