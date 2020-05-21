@@ -614,62 +614,83 @@ class Cat {
     } catch (StatusRuntimeException e) {
       System.out.println(e.getMessage());
     }
-
-    System.out.println("Current Entry Count: " + response.getCASEntryCount());
-    System.out.println("Current DirectoryEntry Count: " + response.getCASDirectoryEntryCount());
+    String strNumFormat = "%-50s : %d";
     System.out.println(
-        "Current ContainedDirectories total: " + response.getEntryContainingDirectoriesCount());
-    System.out.println(
-        "Current ContainedDirectories Max of single Entry: "
-            + response.getEntryContainingDirectoriesMax());
-    System.out.println("Number of Evicted Entries: " + response.getCASEvictedEntryCount());
-    System.out.println("Total size of Evicted Entries: " + response.getCASEvictedEntrySize());
-    System.out.println(
-        "Slots usage/configured in InputFetchStage: "
-            + response.getInputFetchStageSlotsUsedOverConfigured());
-    System.out.println(
-        "Slots usage/configured in ExecuteActionStage: "
-            + response.getExecuteActionStageSlotsUsedOverConfigured());
-    System.out.println(
-        "Number of Operations completed since last profile: " + response.getWorkerThroughput());
-
-    OperationTimesBetweenStages times = response.getTimes();
-    String format = "%-28s -> %-28s : %.2f ms";
-    System.out.println(
-        String.format(format, "Queued", "MatchStage", times.getQueuedToMatchStage()));
+        String.format(strNumFormat, "Current Entry Count", response.getCASEntryCount()));
     System.out.println(
         String.format(
-            format,
+            strNumFormat, "Current DirectoryEntry Count", response.getCASDirectoryEntryCount()));
+    System.out.println(
+        String.format(
+            strNumFormat,
+            "Current ContainedDirectories total",
+            response.getEntryContainingDirectoriesCount()));
+    System.out.println(
+        String.format(
+            strNumFormat,
+            "Current ContainedDirectories Max of single Entry",
+            response.getEntryContainingDirectoriesMax()));
+    System.out.println(
+        String.format(
+            strNumFormat, "Number of Evicted Entries", response.getCASEvictedEntryCount()));
+    System.out.println(
+        String.format(
+            strNumFormat, "Total size of Evicted Entries", response.getCASEvictedEntrySize()));
+
+    String strStrFormat = "%-50s : %s";
+    System.out.println(
+        String.format(
+            strStrFormat,
+            "Slots usage/configured in InputFetchStage",
+            response.getInputFetchStageSlotsUsedOverConfigured()));
+    System.out.println(
+        String.format(
+            strStrFormat,
+            "Slots usage/configured in ExecuteActionStage",
+            response.getExecuteActionStageSlotsUsedOverConfigured()));
+    System.out.println(
+        String.format(
+            strNumFormat,
+            "Number of Operations completed since last profile",
+            response.getWorkerThroughput()));
+
+    OperationTimesBetweenStages times = response.getTimes();
+    String strStrNumFormat = "%-28s -> %-28s : %.2f ms";
+    System.out.println(
+        String.format(strStrNumFormat, "Queued", "MatchStage", times.getQueuedToMatchStage()));
+    System.out.println(
+        String.format(
+            strStrNumFormat,
             "MatchStage",
             "InputFetchStage start",
             times.getMatchStageToInputFetchStageStart()));
     System.out.println(
         String.format(
-            format,
+            strStrNumFormat,
             "InputFetchStage Start",
             "InputFetchStage Completed",
             times.getInputFetchStageStartToInputFetchStageCompleted()));
     System.out.println(
         String.format(
-            format,
+            strStrNumFormat,
             "InputFetchStage Completed",
             "ExecutionStage Start",
             times.getInputFetchStageCompletedToExecutionStageStart()));
     System.out.println(
         String.format(
-            format,
+            strStrNumFormat,
             "ExecutionStage Start",
             "ExecutionStage Completed",
             times.getExecutionStageStartToExecutionStageCompleted()));
     System.out.println(
         String.format(
-            format,
+            strStrNumFormat,
             "ExecutionStage Completed",
             "ReportResultStage Started",
             times.getExecutionStageCompletedToOutputUploadStart()));
     System.out.println(
         String.format(
-            format,
+            strStrNumFormat,
             "OutputUploadStage Started",
             "OutputUploadStage Completed",
             times.getOutputUploadStartToOutputUploadCompleted()));
