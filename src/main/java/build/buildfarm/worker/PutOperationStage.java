@@ -18,13 +18,16 @@ import build.bazel.remote.execution.v2.ExecutedActionMetadata;
 import build.buildfarm.common.function.InterruptingConsumer;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Timestamp;
+import javax.annotation.concurrent.GuardedBy;
 
 public class PutOperationStage extends PipelineStage.NullStage {
   private final InterruptingConsumer<Operation> onPut;
+  //
+  private final int NumOfFieldInOperationTimes = 7;
 
   private int operationCount = 0;
   private boolean startToCount = false;
-  private float[] averageOperationTimes = new float[7];
+  private float[] averageTimeCostPerStage = new float[NumOfFieldInOperationTimes];
 
   public PutOperationStage(InterruptingConsumer<Operation> onPut) {
     this.onPut = onPut;
@@ -35,7 +38,7 @@ public class PutOperationStage extends PipelineStage.NullStage {
     onPut.acceptInterruptibly(operationContext.operation);
     synchronized (this) {
       if (startToCount) {
-        computeOperationTime(operationContext);
+        computeAverageTimeCostPerStage(operationContext);
         operationCount++;
       }
     }
@@ -48,13 +51,14 @@ public class PutOperationStage extends PipelineStage.NullStage {
     return currentCount;
   }
 
-  public synchronized float[] getAverageOperationTimes() {
-    float[] currentOperationAverageTimes = averageOperationTimes;
-    averageOperationTimes = new float[7];
+  public synchronized float[] getAverageTimeCostPerStage() {
+    float[] currentOperationAverageTimes = averageTimeCostPerStage;
+    averageTimeCostPerStage = new float[NumOfFieldInOperationTimes];
     return currentOperationAverageTimes;
   }
 
-  private void computeOperationTime(OperationContext context) {
+  @GuardedBy("this")
+  private void computeAverageTimeCostPerStage(OperationContext context) {
     ExecutedActionMetadata metadata =
         context.executeResponse.build().getResult().getExecutionMetadata();
     Timestamp[] timestamps =
@@ -88,14 +92,15 @@ public class PutOperationStage extends PipelineStage.NullStage {
     //  execution_completed   -> output_upload_start,
     //  output_upload_start   -> output_upload_completed
     // ]
-    float[] operationTimes = new float[times.length - 1];
-    for (int i = 0; i < operationTimes.length; i++) {
-      operationTimes[i] = (float) (times[i + 1] - times[i]);
+    float[] timeCostPerStage = new float[times.length - 1];
+    for (int i = 0; i < timeCostPerStage.length; i++) {
+      timeCostPerStage[i] = (float) (times[i + 1] - times[i]);
     }
 
-    for (int i = 0; i < averageOperationTimes.length; i++) {
-      averageOperationTimes[i] =
-          (operationCount * averageOperationTimes[i] + operationTimes[i]) / (operationCount + 1);
+    for (int i = 0; i < averageTimeCostPerStage.length; i++) {
+      averageTimeCostPerStage[i] =
+          (operationCount * averageTimeCostPerStage[i] + timeCostPerStage[i])
+              / (operationCount + 1);
     }
   }
 }

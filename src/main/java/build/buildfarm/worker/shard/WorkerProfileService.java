@@ -77,7 +77,7 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
     replyBuilder.setWorkerThroughput(completeStage.getOperationCount());
 
     // get aggregated time cost on each stages
-    float[] times = completeStage.getAverageOperationTimes();
+    float[] times = completeStage.getAverageTimeCostPerStage();
     OperationTimesBetweenStages.Builder timesBuilder = OperationTimesBetweenStages.newBuilder();
     timesBuilder
         .setQueuedToMatchStage(times[0])
