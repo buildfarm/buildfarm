@@ -340,7 +340,7 @@ class Executor {
                   + DigestUtil.toString(missingDigest)
                   + " in "
                   + (stopwatch.elapsed(MICROSECONDS) / 1000.0)
-                  + "us");
+                  + "ms");
         }
       }
     }

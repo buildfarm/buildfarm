@@ -142,7 +142,7 @@ public abstract class PipelineStage implements Runnable {
         .log(
             Level.INFO,
             String.format(
-                "%s: %g ms (%g ms stalled) %s",
+                "%s: %g us (%g us stalled) %s",
                 logIterateId(operationName), usecs / 1000.0f, stallUSecs / 1000.0f, status));
   }
 
