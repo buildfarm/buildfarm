@@ -634,31 +634,44 @@ class Cat {
         "Number of Operations completed since last profile: " + response.getWorkerThroughput());
 
     OperationTimesBetweenStages times = response.getTimes();
+    String format = "%-28s -> %-28s : %.2f ms";
     System.out.println(
-        String.format("Queued -> MatchStage: %f milliseconds", times.getQueuedToMatchStage()));
+        String.format(format, "Queued", "MatchStage", times.getQueuedToMatchStage()));
     System.out.println(
         String.format(
-            "MatchStage -> InputFetchStage start: %f milliseconds",
+            format,
+            "MatchStage",
+            "InputFetchStage start",
             times.getMatchStageToInputFetchStageStart()));
     System.out.println(
         String.format(
-            "InputFetchStage: %f millisecond",
+            format,
+            "InputFetchStage Start",
+            "InputFetchStage Completed",
             times.getInputFetchStageStartToInputFetchStageCompleted()));
     System.out.println(
         String.format(
-            "InputFetchStage -> ExecutionStage: %f millisecond",
+            format,
+            "InputFetchStage Completed",
+            "ExecutionStage Start",
             times.getInputFetchStageCompletedToExecutionStageStart()));
     System.out.println(
         String.format(
-            "ExecutionStage: %f millisecond",
+            format,
+            "ExecutionStage Start",
+            "ExecutionStage Completed",
             times.getExecutionStageStartToExecutionStageCompleted()));
     System.out.println(
         String.format(
-            "ExecutionStage -> ReportResultStage: %f millisecond",
+            format,
+            "ExecutionStage Completed",
+            "ReportResultStage Started",
             times.getExecutionStageCompletedToOutputUploadStart()));
     System.out.println(
         String.format(
-            "OutputUploadStage: %f millisecond",
+            format,
+            "OutputUploadStage Started",
+            "OutputUploadStage Completed",
             times.getOutputUploadStartToOutputUploadCompleted()));
   }
 
