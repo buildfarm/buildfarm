@@ -439,10 +439,14 @@ message QueueStatus {
   int64 size = 1;
 
   repeated int64 internal_sizes = 2;
+  
+  string name = 3;
 }
 
 message OperationQueueStatus {
   repeated QueueStatus provisions = 1;
+  
+  int64 size = 2;
 }
 
 message OperationsStatus {
