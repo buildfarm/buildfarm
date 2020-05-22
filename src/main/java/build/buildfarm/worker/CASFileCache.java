@@ -1432,35 +1432,38 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Entry e = fileKeys.get(dirent.inode);
 
       // decide if file is a directory or empty/non-empty file
-      Boolean isDirectory = false;
-      Boolean isEmptyFile = false;
-      Boolean isEmptyExecutable = false;
+      boolean isDirectory = false;
+      boolean isEmptyFile = false;
+      Path entryPath = path.resolve(name);
       if (e == null) {
-        File file = Paths.get(path + name).toFile();
-        isDirectory = file.isDirectory();
+        isDirectory = Files.isDirectory(entryPath);
 
         if (!isDirectory) {
-          if (file.length() == 0) {
+          if (Files.size(entryPath) == 0) {
             isEmptyFile = true;
-            isEmptyExecutable = file.canExecute();
+          } else {
+            // no entry, not a directory, will NPE
+            b.addFilesBuilder().setName(name + "-MISSING");
+            // continue here to hopefully result in invalid directory
+            break;
           }
         }
       }
 
       // directory
       if (isDirectory) {
-        Path child = path.resolve(name);
-        List<Inode> childDirent = listFFIdirentSorted(libc, runtime, child);
-        Directory dir = computeDirectory(child, childDirent, fileKeys, inputsBuilder);
+        List<Inode> childDirent = listFFIdirentSorted(libc, runtime, entryPath);
+        Directory dir = computeDirectory(entryPath, childDirent, fileKeys, inputsBuilder);
         b.addDirectoriesBuilder().setName(name).setDigest(digestUtil.compute(dir));
       }
 
       // empty file
       else if (isEmptyFile) {
+        boolean isExecutable = Files.isExecutable(entryPath);
         b.addFilesBuilder()
             .setName(name)
             .setDigest(digestUtil.empty())
-            .setIsExecutable(isEmptyExecutable);
+            .setIsExecutable(isExecutable);
       }
 
       // non-empty file
@@ -1853,7 +1856,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                 .submit(
                     () -> {
                       Files.createFile(filePath);
-                      // ignore executable
+                      setPermissions(filePath, fileNode.getIsExecutable());
                       return filePath;
                     });
       }
