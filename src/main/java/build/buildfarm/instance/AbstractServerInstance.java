@@ -1642,7 +1642,8 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public WorkerProfileMessage getWorkerProfile() {
-    return null;
+    throw new UnsupportedOperationException(
+        "AbstractServerInstance doesn't support getWorkerProfile() method.");
   }
 
   protected abstract Logger getLogger();

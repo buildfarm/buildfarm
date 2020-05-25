@@ -22,7 +22,6 @@ import javax.annotation.concurrent.GuardedBy;
 
 public class PutOperationStage extends PipelineStage.NullStage {
   private final InterruptingConsumer<Operation> onPut;
-  //
   private final int NumOfFieldInOperationTimes = 7;
 
   private int operationCount = 0;

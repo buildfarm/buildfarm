@@ -608,12 +608,8 @@ class Cat {
   }
 
   private static void getWorkerProfile(Instance instance) {
-    WorkerProfileMessage response = null;
-    try {
-      response = instance.getWorkerProfile();
-    } catch (StatusRuntimeException e) {
-      System.out.println(e.getMessage());
-    }
+    WorkerProfileMessage response = instance.getWorkerProfile();
+
     String strNumFormat = "%-50s : %d";
     System.out.println(
         String.format(strNumFormat, "Current Entry Count", response.getCASEntryCount()));

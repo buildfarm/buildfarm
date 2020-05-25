@@ -29,7 +29,7 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
   private final Set<Thread> executors = Sets.newHashSet();
   private final AtomicInteger executorClaims = new AtomicInteger(0);
   private BlockingQueue<OperationContext> queue = new ArrayBlockingQueue<>(1);
-  private int size = 0;
+  private volatile int size = 0;
 
   public ExecuteActionStage(
       WorkerContext workerContext, PipelineStage output, PipelineStage error) {
