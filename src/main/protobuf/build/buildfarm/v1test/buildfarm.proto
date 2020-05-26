@@ -662,19 +662,21 @@ message BlobWriteKey {
 }
 
 message OperationTimesBetweenStages {
-  float queued_to_match_stage = 1;
+  float queued_to_match = 1;
 
-  float match_stage_to_input_fetch_stage_start = 2;
+  float match_to_input_fetch_start = 2;
 
-  float input_fetch_stage_start_to_input_fetch_stage_completed = 3;
+  float input_fetch_start_to_complete = 3;
 
-  float input_fetch_stage_completed_to_execution_stage_start = 4;
+  float input_fetch_complete_to_execution_start = 4;
 
-  float execution_stage_start_to_execution_stage_completed = 5;
+  float execution_start_to_complete = 5;
 
-  float execution_stage_completed_to_output_upload_start = 6;
+  float execution_complete_to_output_upload_start = 6;
 
-  float output_upload_start_to_output_upload_completed = 7;
+  float output_upload_start_to_complete = 7;
+
+  int32 number_of_operation = 8;
 }
 
 message WorkerProfileMessage {

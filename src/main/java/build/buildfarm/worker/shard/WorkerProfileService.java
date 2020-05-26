@@ -80,13 +80,13 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
     float[] times = completeStage.getAverageTimeCostPerStage();
     OperationTimesBetweenStages.Builder timesBuilder = OperationTimesBetweenStages.newBuilder();
     timesBuilder
-        .setQueuedToMatchStage(times[0])
-        .setMatchStageToInputFetchStageStart(times[1])
-        .setInputFetchStageStartToInputFetchStageCompleted(times[2])
-        .setInputFetchStageCompletedToExecutionStageStart(times[3])
-        .setExecutionStageStartToExecutionStageCompleted(times[4])
-        .setExecutionStageCompletedToOutputUploadStart(times[5])
-        .setOutputUploadStartToOutputUploadCompleted(times[6]);
+        .setQueuedToMatch(times[0])
+        .setMatchToInputFetchStart(times[1])
+        .setInputFetchStartToComplete(times[2])
+        .setInputFetchCompleteToExecutionStart(times[3])
+        .setExecutionStartToComplete(times[4])
+        .setExecutionCompleteToOutputUploadStart(times[5])
+        .setOutputUploadStartToComplete(times[6]);
 
     replyBuilder.setTimes(timesBuilder.build());
 

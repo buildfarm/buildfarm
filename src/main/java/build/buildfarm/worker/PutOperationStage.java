@@ -17,89 +17,212 @@ package build.buildfarm.worker;
 import build.bazel.remote.execution.v2.ExecutedActionMetadata;
 import build.buildfarm.common.function.InterruptingConsumer;
 import com.google.longrunning.Operation;
+import com.google.protobuf.Duration;
 import com.google.protobuf.Timestamp;
+import com.google.protobuf.util.Timestamps;
+import java.util.Arrays;
 import javax.annotation.concurrent.GuardedBy;
 
 public class PutOperationStage extends PipelineStage.NullStage {
   private final InterruptingConsumer<Operation> onPut;
-  private final int NumOfFieldInOperationTimes = 7;
 
-  private int operationCount = 0;
-  private boolean startToCount = false;
-  private float[] averageTimeCostPerStage = new float[NumOfFieldInOperationTimes];
+  private AverageTimeCostOfLastPeriod[] averagesWithinDifferentPeriods;
 
   public PutOperationStage(InterruptingConsumer<Operation> onPut) {
     this.onPut = onPut;
+    this.averagesWithinDifferentPeriods =
+        new AverageTimeCostOfLastPeriod[] {
+            new AverageTimeCostOfLastPeriod(100),
+            new AverageTimeCostOfLastPeriod(60 * 10),
+            new AverageTimeCostOfLastPeriod(60 * 60),
+            new AverageTimeCostOfLastPeriod(3 * 60 * 60),
+            new AverageTimeCostOfLastPeriod(24 * 100 * 100)
+        };
   }
 
   @Override
   public void put(OperationContext operationContext) throws InterruptedException {
     onPut.acceptInterruptibly(operationContext.operation);
-    synchronized (this) {
-      if (startToCount) {
-        computeAverageTimeCostPerStage(operationContext);
-        operationCount++;
-      }
+    for (AverageTimeCostOfLastPeriod average : averagesWithinDifferentPeriods) {
+      average.addOperation(operationContext);
     }
   }
 
-  public synchronized int getOperationCount() {
-    startToCount = true;
-    int currentCount = operationCount;
-    operationCount = 0;
-    return currentCount;
+  public synchronized int[] getOperationCount() {
+    return new int[1];
   }
 
-  public synchronized float[] getAverageTimeCostPerStage() {
-    float[] currentOperationAverageTimes = averageTimeCostPerStage;
-    averageTimeCostPerStage = new float[NumOfFieldInOperationTimes];
-    return currentOperationAverageTimes;
+  public synchronized OperationStageDurations[] getAverageTimeCostPerStage() {
+    return Arrays.stream(averagesWithinDifferentPeriods)
+        .map(AverageTimeCostOfLastPeriod::getAverageOfLastPeriod)
+        .toArray(OperationStageDurations[]::new);
   }
 
   @GuardedBy("this")
-  private void computeAverageTimeCostPerStage(OperationContext context) {
-    ExecutedActionMetadata metadata =
-        context.executeResponse.build().getResult().getExecutionMetadata();
-    Timestamp[] timestamps =
-        new Timestamp[] {
-          metadata.getQueuedTimestamp(),
-          metadata.getWorkerStartTimestamp(),
-          metadata.getInputFetchStartTimestamp(),
-          metadata.getInputFetchCompletedTimestamp(),
-          metadata.getExecutionStartTimestamp(),
-          metadata.getExecutionCompletedTimestamp(),
-          metadata.getOutputUploadStartTimestamp(),
-          metadata.getOutputUploadCompletedTimestamp(),
-        };
+  private void computeAverageTimeCostPerStage(OperationContext context) {}
 
-    // The time unit we want is millisecond.
-    // 1 second = 1000 milliseconds
-    // 1 millisecond = 1000,000 nanoseconds
-    double[] times = new double[timestamps.length];
-    for (int i = 0; i < times.length; i++) {
-      times[i] =
-          (timestamps[i].getSeconds() - timestamps[0].getSeconds()) * 1000.0
-              + timestamps[i].getNanos() / (1000.0 * 1000.0);
+  private static class AverageTimeCostOfLastPeriod {
+    static final int NumOfSlots = 100;
+    private OperationStageDurations[] slots = new OperationStageDurations[NumOfSlots];
+    private int lastUsedSlot = -1;
+    private int period;
+    private OperationStageDurations nextOperation;
+    private OperationStageDurations averageTimeCosts;
+    private Timestamp lastOperationCompleteTime = null;
+
+    AverageTimeCostOfLastPeriod(int period) {
+      this.period = period;
+      for (OperationStageDurations slot : slots) {
+        slot = new OperationStageDurations();
+      }
+      nextOperation = new OperationStageDurations();
+      averageTimeCosts = new OperationStageDurations();
     }
 
-    // [
-    //  queued                -> worker_start(MatchStage),
-    //  worker_start          -> input_fetch_start,
-    //  input_fetch_start     -> input_fetch_completed,
-    //  input_fetch_completed -> execution_start,
-    //  execution_start       -> execution_completed,
-    //  execution_completed   -> output_upload_start,
-    //  output_upload_start   -> output_upload_completed
-    // ]
-    float[] timeCostPerStage = new float[times.length - 1];
-    for (int i = 0; i < timeCostPerStage.length; i++) {
-      timeCostPerStage[i] = (float) (times[i + 1] - times[i]);
+    OperationStageDurations getAverageOfLastPeriod() {
+      averageTimeCosts.reset();
+      for (OperationStageDurations slot : slots) {
+        averageTimeCosts.addOperations(slot);
+      }
+      return averageTimeCosts;
     }
 
-    for (int i = 0; i < averageTimeCostPerStage.length; i++) {
-      averageTimeCostPerStage[i] =
-          (operationCount * averageTimeCostPerStage[i] + timeCostPerStage[i])
-              / (operationCount + 1);
+    void addOperation(OperationContext context) {
+      ExecutedActionMetadata metadata =
+          context.executeResponse.build().getResult().getExecutionMetadata();
+
+      // The duration between the complete time of the new Operation and last Operation
+      // added could be longer than the logging period here.
+      Timestamp completeTime = metadata.getOutputUploadCompletedTimestamp();
+      int currentSlot = (int) completeTime.getSeconds() % period / (period / NumOfSlots);
+      if (lastOperationCompleteTime == null || lastUsedSlot < 0) {
+        lastOperationCompleteTime = completeTime;
+        lastUsedSlot = currentSlot;
+      } else {
+        Duration duration = Timestamps.between(lastOperationCompleteTime, completeTime);
+        if (duration.getSeconds() >= (this.period / NumOfSlots)) {
+          for (int i = lastUsedSlot + 1; (i % NumOfSlots) <= currentSlot; i++) {
+            slots[i].reset();
+          }
+        }
+      }
+
+      nextOperation.set(metadata);
+      slots[currentSlot].addOperations(nextOperation);
+    }
+  }
+
+  // when operationCount == 1, an object represents one operation's time costs on each stage;
+  // when operationCount > 1, an object represents aggregated time costs of multiple operations.
+  private static class OperationStageDurations {
+    float queuedToMatch;
+    float matchToInputFetchStart;
+    float inputFetchStartToComplete;
+    float inputFetchCompleteToExecutionStart;
+    float executionStartToComplete;
+    float executionCompleteToOutputUploadStart;
+    float outputUploadStartToComplete;
+    int operationCount;
+
+    OperationStageDurations() {
+      reset();
+    }
+
+    void set(ExecutedActionMetadata metadata) {
+      queuedToMatch =
+          millisecondBetween(metadata.getQueuedTimestamp(), metadata.getWorkerStartTimestamp());
+      matchToInputFetchStart =
+          millisecondBetween(
+              metadata.getWorkerStartTimestamp(), metadata.getInputFetchStartTimestamp());
+      inputFetchStartToComplete =
+          millisecondBetween(
+              metadata.getInputFetchStartTimestamp(), metadata.getInputFetchCompletedTimestamp());
+      inputFetchCompleteToExecutionStart =
+          millisecondBetween(
+              metadata.getInputFetchCompletedTimestamp(), metadata.getExecutionStartTimestamp());
+      executionStartToComplete =
+          millisecondBetween(
+              metadata.getExecutionStartTimestamp(), metadata.getExecutionCompletedTimestamp());
+      executionCompleteToOutputUploadStart =
+          millisecondBetween(
+              metadata.getExecutionCompletedTimestamp(), metadata.getOutputUploadStartTimestamp());
+      outputUploadStartToComplete =
+          millisecondBetween(
+              metadata.getOutputUploadStartTimestamp(),
+              metadata.getOutputUploadCompletedTimestamp());
+      operationCount = 1;
+    }
+
+    void reset() {
+      queuedToMatch = 0.0f;
+      matchToInputFetchStart = 0.0f;
+      inputFetchStartToComplete = 0.0f;
+      inputFetchCompleteToExecutionStart = 0.0f;
+      executionStartToComplete = 0.0f;
+      executionCompleteToOutputUploadStart = 0.0f;
+      outputUploadStartToComplete = 0.0f;
+      operationCount = 0;
+    }
+
+    void addOperations(OperationStageDurations other) {
+      this.queuedToMatch =
+          computeAverage(
+              this.queuedToMatch, this.operationCount, other.queuedToMatch, other.operationCount);
+      this.matchToInputFetchStart =
+          computeAverage(
+              this.matchToInputFetchStart,
+              this.operationCount,
+              other.matchToInputFetchStart,
+              other.operationCount);
+      this.inputFetchStartToComplete =
+          computeAverage(
+              this.inputFetchStartToComplete,
+              this.operationCount,
+              other.inputFetchStartToComplete,
+              other.operationCount);
+      this.inputFetchCompleteToExecutionStart =
+          computeAverage(
+              this.inputFetchCompleteToExecutionStart,
+              this.operationCount,
+              other.inputFetchCompleteToExecutionStart,
+              other.operationCount);
+      this.executionStartToComplete =
+          computeAverage(
+              this.executionStartToComplete,
+              this.operationCount,
+              other.executionStartToComplete,
+              other.operationCount);
+      this.executionCompleteToOutputUploadStart =
+          computeAverage(
+              this.executionCompleteToOutputUploadStart,
+              this.operationCount,
+              other.executionCompleteToOutputUploadStart,
+              other.operationCount);
+      this.outputUploadStartToComplete =
+          computeAverage(
+              this.outputUploadStartToComplete,
+              this.operationCount,
+              other.outputUploadStartToComplete,
+              other.operationCount);
+      this.operationCount += other.operationCount;
+    }
+
+    private static float computeAverage(
+        float time1, int operationCount1, float time2, int operationCount2) {
+      if (operationCount1 == 0 && operationCount2 == 0) {
+        return 0.0f;
+      }
+      return (time1 * operationCount1 + time2 * operationCount2)
+          / (operationCount1 + operationCount2);
+    }
+
+    private static float millisecondBetween(Timestamp from, Timestamp to) {
+      // The time unit we want is millisecond.
+      // 1 second = 1000 milliseconds
+      // 1 millisecond = 1000,000 nanoseconds
+      Duration d = Timestamps.between(from, to);
+      double interval = d.getSeconds() * 1000.0 + d.getNanos() / (1000.0 * 1000.0);
+      return (float) interval;
     }
   }
 }

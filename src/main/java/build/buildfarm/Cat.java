@@ -653,43 +653,43 @@ class Cat {
     OperationTimesBetweenStages times = response.getTimes();
     String strStrNumFormat = "%-28s -> %-28s : %.2f ms";
     System.out.println(
-        String.format(strStrNumFormat, "Queued", "MatchStage", times.getQueuedToMatchStage()));
+        String.format(strStrNumFormat, "Queued", "MatchStage", times.getQueuedToMatch()));
     System.out.println(
         String.format(
             strStrNumFormat,
             "MatchStage",
             "InputFetchStage start",
-            times.getMatchStageToInputFetchStageStart()));
+            times.getMatchToInputFetchStart()));
     System.out.println(
         String.format(
             strStrNumFormat,
             "InputFetchStage Start",
             "InputFetchStage Completed",
-            times.getInputFetchStageStartToInputFetchStageCompleted()));
+            times.getInputFetchStartToComplete()));
     System.out.println(
         String.format(
             strStrNumFormat,
             "InputFetchStage Completed",
             "ExecutionStage Start",
-            times.getInputFetchStageCompletedToExecutionStageStart()));
+            times.getInputFetchCompleteToExecutionStart()));
     System.out.println(
         String.format(
             strStrNumFormat,
             "ExecutionStage Start",
             "ExecutionStage Completed",
-            times.getExecutionStageStartToExecutionStageCompleted()));
+            times.getExecutionStartToComplete()));
     System.out.println(
         String.format(
             strStrNumFormat,
             "ExecutionStage Completed",
             "ReportResultStage Started",
-            times.getExecutionStageCompletedToOutputUploadStart()));
+            times.getExecutionCompleteToOutputUploadStart()));
     System.out.println(
         String.format(
             strStrNumFormat,
             "OutputUploadStage Started",
             "OutputUploadStage Completed",
-            times.getOutputUploadStartToOutputUploadCompleted()));
+            times.getOutputUploadStartToComplete()));
   }
 
   public static void main(String[] args) throws Exception {
