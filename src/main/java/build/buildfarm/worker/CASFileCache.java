@@ -1508,7 +1508,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     decrementReferencesSynchronized(inputFiles, inputDirectories);
   }
 
-  // The different contexts in which cache files are written to disk
+  /**
+   * The different contexts in which cache files are written to disk. Files are made non-writable in
+   * order to prevent operations from deleting them.
+   */
   private void putDirectoryHardLink(Path newHardLink, Path path) throws IOException {
     Files.createLink(newHardLink, path);
     new File(newHardLink.toString()).setWritable(false, false);
@@ -1516,12 +1519,15 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   private void putDirectoryFile(Path path, FileNode fileNode) throws IOException {
     Files.createFile(path);
-    setPermissions(path, fileNode.getIsExecutable());
     new File(path.toString()).setWritable(false, false);
+    setPermissions(path, fileNode.getIsExecutable());
   }
 
   private void putDirectory(Path path) throws IOException {
-    Files.createDirectory(path);
+    if (!Files.exists(path)) {
+      File dir = new File(path.toString());
+      dir.mkdir();
+    }
   }
 
   private void putRootHardLink(Path newHardLink, Path path) throws IOException {
