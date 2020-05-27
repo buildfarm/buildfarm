@@ -62,7 +62,6 @@ import com.google.rpc.RetryInfo;
 import io.grpc.Context;
 import io.grpc.ManagedChannel;
 import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import java.io.IOException;
@@ -72,6 +71,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
@@ -609,7 +609,7 @@ class Cat {
 
   private static void getWorkerProfile(Instance instance) {
     WorkerProfileMessage response = instance.getWorkerProfile();
-
+    System.out.println("\nWorkerProfile:");
     String strNumFormat = "%-50s : %d";
     System.out.println(
         String.format(strNumFormat, "Current Entry Count", response.getCASEntryCount()));
@@ -644,52 +644,76 @@ class Cat {
             strStrFormat,
             "Slots usage/configured in ExecuteActionStage",
             response.getExecuteActionStageSlotsUsedOverConfigured()));
-    System.out.println(
-        String.format(
-            strNumFormat,
-            "Number of Operations completed since last profile",
-            response.getWorkerThroughput()));
 
-    OperationTimesBetweenStages times = response.getTimes();
+    List<OperationTimesBetweenStages> times = response.getTimesList();
+    for (OperationTimesBetweenStages time : times) {
+      printOperationTime(time);
+    }
+  }
+
+  private static void printOperationTime(OperationTimesBetweenStages time) {
+    String periodInfo = "\nIn last ";
+    switch (time.getPeriod()) {
+      case 100:
+        periodInfo += "100 seconds";
+        break;
+      case 600:
+        periodInfo += "10 minutes";
+        break;
+      case 3600:
+        periodInfo += "1 hour";
+        break;
+      case 10800:
+        periodInfo += "3 hours";
+        break;
+      case 86400:
+        periodInfo += "24 hours";
+        break;
+    }
+
+    periodInfo += ":";
+    System.out.println(periodInfo);
+    System.out.println("Number of operations completed: " + time.getNumberOfOperation());
     String strStrNumFormat = "%-28s -> %-28s : %.2f ms";
     System.out.println(
-        String.format(strStrNumFormat, "Queued", "MatchStage", times.getQueuedToMatchStage()));
+        String.format(strStrNumFormat, "Queued", "MatchStage", time.getQueuedToMatch()));
     System.out.println(
         String.format(
             strStrNumFormat,
             "MatchStage",
             "InputFetchStage start",
-            times.getMatchStageToInputFetchStageStart()));
+            time.getMatchToInputFetchStart()));
     System.out.println(
         String.format(
             strStrNumFormat,
             "InputFetchStage Start",
             "InputFetchStage Completed",
-            times.getInputFetchStageStartToInputFetchStageCompleted()));
+            time.getInputFetchStartToComplete()));
     System.out.println(
         String.format(
             strStrNumFormat,
             "InputFetchStage Completed",
             "ExecutionStage Start",
-            times.getInputFetchStageCompletedToExecutionStageStart()));
+            time.getInputFetchCompleteToExecutionStart()));
     System.out.println(
         String.format(
             strStrNumFormat,
             "ExecutionStage Start",
             "ExecutionStage Completed",
-            times.getExecutionStageStartToExecutionStageCompleted()));
+            time.getExecutionStartToComplete()));
     System.out.println(
         String.format(
             strStrNumFormat,
             "ExecutionStage Completed",
             "ReportResultStage Started",
-            times.getExecutionStageCompletedToOutputUploadStart()));
+            time.getExecutionCompleteToOutputUploadStart()));
     System.out.println(
         String.format(
             strStrNumFormat,
             "OutputUploadStage Started",
             "OutputUploadStage Completed",
-            times.getOutputUploadStartToOutputUploadCompleted()));
+            time.getOutputUploadStartToComplete()));
+    System.out.println();
   }
 
   public static void main(String[] args) throws Exception {
