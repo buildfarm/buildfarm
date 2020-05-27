@@ -609,7 +609,7 @@ class Cat {
 
   private static void getWorkerProfile(Instance instance) {
     WorkerProfileMessage response = instance.getWorkerProfile();
-
+    System.out.println("\nWorkerProfile:");
     String strNumFormat = "%-50s : %d";
     System.out.println(
         String.format(strNumFormat, "Current Entry Count", response.getCASEntryCount()));
@@ -658,7 +658,7 @@ class Cat {
         periodInfo += "100 seconds";
         break;
       case 600:
-        periodInfo += "6 minutes";
+        periodInfo += "10 minutes";
         break;
       case 3600:
         periodInfo += "1 hour";
