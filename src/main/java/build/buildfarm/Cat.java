@@ -652,7 +652,7 @@ class Cat {
   }
 
   private static void printOperationTime(OperationTimesBetweenStages time) {
-    String periodInfo = "In last ";
+    String periodInfo = "\nIn last ";
     switch (time.getPeriod()) {
       case 100:
         periodInfo += "100 seconds";
@@ -671,8 +671,9 @@ class Cat {
         break;
     }
 
-    periodInfo += ":\n";
+    periodInfo += ":";
     System.out.println(periodInfo);
+    System.out.println("Number of operations completed: " + time.getNumberOfOperation());
     String strStrNumFormat = "%-28s -> %-28s : %.2f ms";
     System.out.println(
         String.format(strStrNumFormat, "Queued", "MatchStage", time.getQueuedToMatch()));

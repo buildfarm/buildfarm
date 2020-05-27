@@ -53,7 +53,7 @@ public class PutOperationStage extends PipelineStage.NullStage {
       results[i] = averagesWithinDifferentPeriods[i].getAverageOfLastPeriod();
     }
     return results;
-    //return Arrays.stream(averagesWithinDifferentPeriods)
+    // return Arrays.stream(averagesWithinDifferentPeriods)
     //    .map(AverageTimeCostOfLastPeriod::getAverageOfLastPeriod)
     //    .toArray(OperationStageDurations[]::new);
   }
@@ -93,15 +93,15 @@ public class PutOperationStage extends PipelineStage.NullStage {
       // The duration between the complete time of the new Operation and last Operation
       // added could be longer than the logging period here.
       Timestamp completeTime = metadata.getOutputUploadCompletedTimestamp();
-      int currentSlot = (int) completeTime.getSeconds() % period / (period / NumOfSlots);
+      int currentSlot = (int) completeTime.getSeconds() % period / (period / slots.length);
       if (lastOperationCompleteTime == null || lastUsedSlot < 0) {
         lastOperationCompleteTime = completeTime;
         lastUsedSlot = currentSlot;
       } else {
         Duration duration = Timestamps.between(lastOperationCompleteTime, completeTime);
-        if (duration.getSeconds() >= (this.period / NumOfSlots)) {
-          for (int i = lastUsedSlot + 1; (i % NumOfSlots) <= currentSlot; i++) {
-            slots[i].reset();
+        if (duration.getSeconds() >= (this.period / slots.length)) {
+          for (int i = lastUsedSlot + 1; (i % slots.length) <= currentSlot; i++) {
+            slots[i % slots.length].reset();
           }
         }
       }
