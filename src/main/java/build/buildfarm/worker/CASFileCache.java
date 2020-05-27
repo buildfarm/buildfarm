@@ -2459,6 +2459,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                     expiredFuture,
                     (expiredKey) -> {
                       try {
+                        new File(expiredKey.toString()).setWritable(true, true);
                         Files.delete(expiredKey);
                       } catch (NoSuchFileException eNoEnt) {
                         logger.log(
