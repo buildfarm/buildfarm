@@ -21,7 +21,6 @@ import com.google.protobuf.Duration;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.Timestamps;
 import java.util.Arrays;
-import javax.annotation.concurrent.GuardedBy;
 
 public class PutOperationStage extends PipelineStage.NullStage {
   private final InterruptingConsumer<Operation> onPut;
@@ -32,11 +31,11 @@ public class PutOperationStage extends PipelineStage.NullStage {
     this.onPut = onPut;
     this.averagesWithinDifferentPeriods =
         new AverageTimeCostOfLastPeriod[] {
-            new AverageTimeCostOfLastPeriod(100),
-            new AverageTimeCostOfLastPeriod(60 * 10),
-            new AverageTimeCostOfLastPeriod(60 * 60),
-            new AverageTimeCostOfLastPeriod(3 * 60 * 60),
-            new AverageTimeCostOfLastPeriod(24 * 100 * 100)
+          new AverageTimeCostOfLastPeriod(100),
+          new AverageTimeCostOfLastPeriod(60 * 10),
+          new AverageTimeCostOfLastPeriod(60 * 60),
+          new AverageTimeCostOfLastPeriod(3 * 60 * 60),
+          new AverageTimeCostOfLastPeriod(24 * 60 * 60)
         };
   }
 
@@ -48,18 +47,11 @@ public class PutOperationStage extends PipelineStage.NullStage {
     }
   }
 
-  public synchronized int[] getOperationCount() {
-    return new int[1];
-  }
-
   public synchronized OperationStageDurations[] getAverageTimeCostPerStage() {
     return Arrays.stream(averagesWithinDifferentPeriods)
         .map(AverageTimeCostOfLastPeriod::getAverageOfLastPeriod)
         .toArray(OperationStageDurations[]::new);
   }
-
-  @GuardedBy("this")
-  private void computeAverageTimeCostPerStage(OperationContext context) {}
 
   private static class AverageTimeCostOfLastPeriod {
     static final int NumOfSlots = 100;
@@ -84,6 +76,7 @@ public class PutOperationStage extends PipelineStage.NullStage {
       for (OperationStageDurations slot : slots) {
         averageTimeCosts.addOperations(slot);
       }
+      averageTimeCosts.period = period;
       return averageTimeCosts;
     }
 
@@ -114,15 +107,16 @@ public class PutOperationStage extends PipelineStage.NullStage {
 
   // when operationCount == 1, an object represents one operation's time costs on each stage;
   // when operationCount > 1, an object represents aggregated time costs of multiple operations.
-  private static class OperationStageDurations {
-    float queuedToMatch;
-    float matchToInputFetchStart;
-    float inputFetchStartToComplete;
-    float inputFetchCompleteToExecutionStart;
-    float executionStartToComplete;
-    float executionCompleteToOutputUploadStart;
-    float outputUploadStartToComplete;
-    int operationCount;
+  public static class OperationStageDurations {
+    public float queuedToMatch;
+    public float matchToInputFetchStart;
+    public float inputFetchStartToComplete;
+    public float inputFetchCompleteToExecutionStart;
+    public float executionStartToComplete;
+    public float executionCompleteToOutputUploadStart;
+    public float outputUploadStartToComplete;
+    public int operationCount;
+    public int period;
 
     OperationStageDurations() {
       reset();

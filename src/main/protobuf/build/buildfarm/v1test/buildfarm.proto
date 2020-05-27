@@ -677,6 +677,8 @@ message OperationTimesBetweenStages {
   float output_upload_start_to_complete = 7;
 
   int32 number_of_operation = 8;
+
+  int32 period = 9;
 }
 
 message WorkerProfileMessage {
@@ -705,10 +707,7 @@ message WorkerProfileMessage {
   // ${number of slots used} / ${number of slots configured} in ExecuteActionStage
   string ExecuteActionStage_slots_used_over_configured = 8;
 
-  // number of operations completed since last profile invocation
-  int32 worker_throughput = 9;
-
-  OperationTimesBetweenStages times = 10;
+  repeated OperationTimesBetweenStages times = 10;
 }
 
 message WorkerProfileRequest {

@@ -24,6 +24,7 @@ import build.buildfarm.worker.ExecuteActionStage;
 import build.buildfarm.worker.InputFetchStage;
 import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.PutOperationStage;
+import build.buildfarm.worker.PutOperationStage.OperationStageDurations;
 import build.buildfarm.worker.WorkerContext;
 import io.grpc.stub.StreamObserver;
 import java.util.logging.Logger;
@@ -73,22 +74,23 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
         .setInputFetchStageSlotsUsedOverConfigured(inputFetchStageSlotUsage)
         .setExecuteActionStageSlotsUsedOverConfigured(executeActionStageSlotUsage);
 
-    // get worker throughput
-    replyBuilder.setWorkerThroughput(completeStage.getOperationCount());
-
     // get aggregated time cost on each stages
-    float[] times = completeStage.getAverageTimeCostPerStage();
-    OperationTimesBetweenStages.Builder timesBuilder = OperationTimesBetweenStages.newBuilder();
-    timesBuilder
-        .setQueuedToMatch(times[0])
-        .setMatchToInputFetchStart(times[1])
-        .setInputFetchStartToComplete(times[2])
-        .setInputFetchCompleteToExecutionStart(times[3])
-        .setExecutionStartToComplete(times[4])
-        .setExecutionCompleteToOutputUploadStart(times[5])
-        .setOutputUploadStartToComplete(times[6]);
-
-    replyBuilder.setTimes(timesBuilder.build());
+    OperationStageDurations[] durations = completeStage.getAverageTimeCostPerStage();
+    for (int i = 0; i < durations.length; i++) {
+      OperationTimesBetweenStages.Builder timesBuilder = OperationTimesBetweenStages.newBuilder();
+      timesBuilder
+          .setQueuedToMatch(durations[i].queuedToMatch)
+          .setMatchToInputFetchStart(durations[i].matchToInputFetchStart)
+          .setInputFetchStartToComplete(durations[i].inputFetchStartToComplete)
+          .setInputFetchCompleteToExecutionStart(durations[i].inputFetchCompleteToExecutionStart)
+          .setExecutionStartToComplete(durations[i].executionStartToComplete)
+          .setExecutionCompleteToOutputUploadStart(
+              durations[i].executionCompleteToOutputUploadStart)
+          .setOutputUploadStartToComplete(durations[i].outputUploadStartToComplete)
+          .setNumberOfOperation(durations[i].operationCount)
+          .setPeriod(durations[i].period);
+      replyBuilder.setTimes(i, timesBuilder.build());
+    }
 
     responseObserver.onNext(replyBuilder.build());
     responseObserver.onCompleted();
