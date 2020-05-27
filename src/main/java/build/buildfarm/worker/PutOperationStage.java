@@ -20,6 +20,7 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.Duration;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.Timestamps;
+import java.util.Arrays;
 
 public class PutOperationStage extends PipelineStage.NullStage {
   private final InterruptingConsumer<Operation> onPut;
@@ -31,7 +32,7 @@ public class PutOperationStage extends PipelineStage.NullStage {
     this.averagesWithinDifferentPeriods =
         new AverageTimeCostOfLastPeriod[] {
           new AverageTimeCostOfLastPeriod(100),
-          new AverageTimeCostOfLastPeriod(60 * 10),
+          new AverageTimeCostOfLastPeriod(10 * 60),
           new AverageTimeCostOfLastPeriod(60 * 60),
           new AverageTimeCostOfLastPeriod(3 * 60 * 60),
           new AverageTimeCostOfLastPeriod(24 * 60 * 60)
@@ -49,15 +50,9 @@ public class PutOperationStage extends PipelineStage.NullStage {
   }
 
   public synchronized OperationStageDurations[] getAverageTimeCostPerStage() {
-    OperationStageDurations[] results =
-        new OperationStageDurations[averagesWithinDifferentPeriods.length];
-    for (int i = 0; i < results.length; i++) {
-      results[i] = averagesWithinDifferentPeriods[i].getAverageOfLastPeriod();
-    }
-    return results;
-    // return Arrays.stream(averagesWithinDifferentPeriods)
-    //    .map(AverageTimeCostOfLastPeriod::getAverageOfLastPeriod)
-    //    .toArray(OperationStageDurations[]::new);
+    return Arrays.stream(averagesWithinDifferentPeriods)
+        .map(AverageTimeCostOfLastPeriod::getAverageOfLastPeriod)
+        .toArray(OperationStageDurations[]::new);
   }
 
   private static class AverageTimeCostOfLastPeriod {
@@ -67,7 +62,7 @@ public class PutOperationStage extends PipelineStage.NullStage {
     private int period;
     private OperationStageDurations nextOperation;
     private OperationStageDurations averageTimeCosts;
-    private Timestamp lastOperationCompleteTime = null;
+    private Timestamp lastOperationCompleteTime;
 
     AverageTimeCostOfLastPeriod(int period) {
       this.period = period;
@@ -98,9 +93,12 @@ public class PutOperationStage extends PipelineStage.NullStage {
       // The data in the new slot should be thrown away before storing new data.
       if (lastOperationCompleteTime != null && lastUsedSlot >= 0) {
         Duration duration = Timestamps.between(lastOperationCompleteTime, completeTime);
-        // if duration between the new added operation and last added one is longer
-        // than period here, all data stored slots should be thrown away.
-        if (duration.getSeconds() > this.period) {
+        // if 1) duration between the new added operation and last added one is longer than period
+        // or 2) the duration is shorter than period but longer than time range of a single slot
+        //       and at the same time currentSlot == lastUsedSlot
+        if ((duration.getSeconds() >= this.period)
+            || (lastUsedSlot == currentSlot
+                && duration.getSeconds() > (this.period / slots.length))) {
           for (OperationStageDurations slot : slots) {
             slot.reset();
           }
@@ -133,10 +131,6 @@ public class PutOperationStage extends PipelineStage.NullStage {
     public float outputUploadStartToComplete;
     public int operationCount;
     public int period;
-
-    OperationStageDurations() {
-      reset();
-    }
 
     void set(ExecutedActionMetadata metadata) {
       queuedToMatch =
