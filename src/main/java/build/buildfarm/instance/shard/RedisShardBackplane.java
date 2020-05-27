@@ -40,6 +40,7 @@ import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.OperationChange;
 import build.buildfarm.v1test.OperationsStatus;
+import build.buildfarm.v1test.ProvisionedQueue;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.RedisShardBackplaneConfig;
@@ -54,6 +55,7 @@ import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.MultimapBuilder;
 import com.google.common.collect.Multimaps;
+import com.google.common.collect.SetMultimap;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
@@ -486,26 +488,56 @@ public class RedisShardBackplane implements ShardBackplane {
     failsafeOperationThread.start();
   }
 
+  private SetMultimap<String, String> toMultimap(List<Platform.Property> provisions) {
+    SetMultimap<String, String> set = LinkedHashMultimap.create();
+    for (Platform.Property property : provisions) {
+      set.put(property.getName(), property.getValue());
+    }
+    return set;
+  }
+
   @Override
   public void start() throws IOException {
 
+    // Construct a single redis client to be used throughout the entire backplane.
+    // We wish to avoid various synchronous and error handling issues that could occur when using
+    // multiple clients.
     client = new RedisClient(jedisClusterFactory.get());
+
+    // Construct the prequeue so that elements are balanced across all redis nodes.
     List<String> hashtags = client.call(jedis -> RedisNodeHashes.getEvenlyDistributedHashes(jedis));
     this.prequeue = new BalancedRedisQueue(config.getPreQueuedOperationsListName(), hashtags);
 
-    // The operations queue can be divided into multiple queues handling different platform
-    // executions.
-    // In this case, we have a single with no explicitly required platform executions.
-    ProvisionedRedisQueue defaultQueue =
-        new ProvisionedRedisQueue(
-            config.getQueuedOperationsListName(), hashtags, LinkedHashMultimap.create());
-    List<ProvisionedRedisQueue> provisionedQueues =
-        new ArrayList<ProvisionedRedisQueue>() {
-          {
-            add(defaultQueue);
-          }
-        };
-    this.operationQueue = new OperationQueue(provisionedQueues);
+    // Construct an operation queue based on user configuration.
+    // An operation queue consists of multiple provisioned queues in which the order dictates the
+    // eligibility and placement of operations.
+    // Therefore, it is recommended to have a final provision queue with no actual platform
+    // requirements.  This will ensure that all operations are eligible for the final queue.
+    List<ProvisionedRedisQueue> allprovisionedQueues = new ArrayList<ProvisionedRedisQueue>();
+    for (ProvisionedQueue queueConfig : config.getProvisionedQueues().getQueuesList()) {
+      ProvisionedRedisQueue provisionedQueue =
+          new ProvisionedRedisQueue(
+              queueConfig.getName(),
+              hashtags,
+              toMultimap(queueConfig.getPlatform().getPropertiesList()));
+      allprovisionedQueues.add(provisionedQueue);
+    }
+
+    // If the user did not configure any provisioned queues, we might consider that an error.
+    // After all, the operation queue is made up of n provisioned queues, and if there were no
+    // provisioned queues provided, we can not properly construct the operation queue.
+    // In this case however, we will automatically provide a default queue will full eligibility on
+    // all operations.
+    // This will ensure the expected behavior for the paradigm in which all work is put on the same
+    // queue.
+    if (config.getProvisionedQueues().getQueuesList().isEmpty()) {
+      ProvisionedRedisQueue defaultQueue =
+          new ProvisionedRedisQueue(
+              config.getQueuedOperationsListName(), hashtags, LinkedHashMultimap.create());
+      allprovisionedQueues.add(defaultQueue);
+    }
+
+    this.operationQueue = new OperationQueue(allprovisionedQueues);
 
     if (config.getSubscribeToBackplane()) {
       startSubscriptionThread();

@@ -206,7 +206,7 @@ message ProvisionedQueue {
 }
 
 message ProvisionedQueuesConfig {
-  repeated ProvisionedQueue queue = 1;
+  repeated ProvisionedQueue queues = 1;
 }
 
 message RedisShardBackplaneConfig {

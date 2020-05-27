@@ -203,7 +203,7 @@ public class OperationQueue {
       }
     }
     throw new RuntimeException(
-        "there are no eligible queues for the provided execution requirements");
+        "there are no eligible queues for the provided execution requirements.  One solution to is to configure a provision queue with no requirements which would be eligible to all operations.");
   }
   ///
   /// @brief   Convert proto provisions into java multimap.
