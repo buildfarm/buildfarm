@@ -713,6 +713,7 @@ class Cat {
             "OutputUploadStage Started",
             "OutputUploadStage Completed",
             time.getOutputUploadStartToComplete()));
+    System.out.println();
   }
 
   public static void main(String[] args) throws Exception {
