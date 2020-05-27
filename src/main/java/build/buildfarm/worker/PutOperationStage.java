@@ -50,12 +50,6 @@ public class PutOperationStage extends PipelineStage.NullStage {
   }
 
   public synchronized OperationStageDurations[] getAverageTimeCostPerStage() {
-    // OperationStageDurations[] results =
-    //    new OperationStageDurations[averagesWithinDifferentPeriods.length];
-    // for (int i = 0; i < results.length; i++) {
-    //  results[i] = averagesWithinDifferentPeriods[i].getAverageOfLastPeriod();
-    // }
-    // return results;
     return Arrays.stream(averagesWithinDifferentPeriods)
         .map(AverageTimeCostOfLastPeriod::getAverageOfLastPeriod)
         .toArray(OperationStageDurations[]::new);
@@ -68,7 +62,7 @@ public class PutOperationStage extends PipelineStage.NullStage {
     private int period;
     private OperationStageDurations nextOperation;
     private OperationStageDurations averageTimeCosts;
-    private Timestamp lastOperationCompleteTime = null;
+    private Timestamp lastOperationCompleteTime;
 
     AverageTimeCostOfLastPeriod(int period) {
       this.period = period;
@@ -138,10 +132,6 @@ public class PutOperationStage extends PipelineStage.NullStage {
     public int operationCount;
     public int period;
 
-    OperationStageDurations() {
-      reset();
-    }
-
     void set(ExecutedActionMetadata metadata) {
       queuedToMatch =
           millisecondBetween(metadata.getQueuedTimestamp(), metadata.getWorkerStartTimestamp());
@@ -179,7 +169,6 @@ public class PutOperationStage extends PipelineStage.NullStage {
     }
 
     void addOperations(OperationStageDurations other) {
-      com.google.common.base.Preconditions.checkNotNull(other);
       this.queuedToMatch =
           computeAverage(
               this.queuedToMatch, this.operationCount, other.queuedToMatch, other.operationCount);
