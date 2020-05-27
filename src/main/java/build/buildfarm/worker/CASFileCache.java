@@ -1524,10 +1524,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   private void putDirectory(Path path) throws IOException {
-    if (!Files.exists(path)) {
-      File dir = new File(path.toString());
-      dir.mkdir();
-    }
+    Files.createDirectory(path);
   }
 
   private void putRootHardLink(Path newHardLink, Path path) throws IOException {
