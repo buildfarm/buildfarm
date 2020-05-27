@@ -64,8 +64,8 @@ public class PutOperationStage extends PipelineStage.NullStage {
 
     AverageTimeCostOfLastPeriod(int period) {
       this.period = period;
-      for (OperationStageDurations slot : slots) {
-        slot = new OperationStageDurations();
+      for (int i = 0; i < slots.length; i++) {
+        slots[i] = new OperationStageDurations();
       }
       nextOperation = new OperationStageDurations();
       averageTimeCosts = new OperationStageDurations();
