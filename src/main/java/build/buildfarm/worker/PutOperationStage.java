@@ -44,7 +44,8 @@ public class PutOperationStage extends PipelineStage.NullStage {
     onPut.acceptInterruptibly(operationContext.operation);
     synchronized (this) {
       for (AverageTimeCostOfLastPeriod average : averagesWithinDifferentPeriods) {
-        average.addOperation(operationContext);
+        average.addOperation(
+            operationContext.executeResponse.build().getResult().getExecutionMetadata());
       }
     }
   }
@@ -74,25 +75,12 @@ public class PutOperationStage extends PipelineStage.NullStage {
       averageTimeCosts = new OperationStageDurations();
     }
 
-    OperationStageDurations getAverageOfLastPeriod() {
-      averageTimeCosts.reset();
-      for (OperationStageDurations slot : slots) {
-        averageTimeCosts.addOperations(slot);
-      }
-      averageTimeCosts.period = period;
-      return averageTimeCosts;
-    }
-
-    void addOperation(OperationContext context) {
-      ExecutedActionMetadata metadata =
-          context.executeResponse.build().getResult().getExecutionMetadata();
-      Timestamp completeTime = metadata.getOutputUploadCompletedTimestamp();
-      int currentSlot = (int) completeTime.getSeconds() % period / (period / slots.length);
-
+    private void removeStaleData(Timestamp now) {
       // currentSlot != lastUsedSlot means stepping over to a new slot.
       // The data in the new slot should be thrown away before storing new data.
+      int currentSlot = getCurrentSlot(now);
       if (lastOperationCompleteTime != null && lastUsedSlot >= 0) {
-        Duration duration = Timestamps.between(lastOperationCompleteTime, completeTime);
+        Duration duration = Timestamps.between(lastOperationCompleteTime, now);
         // if 1) duration between the new added operation and last added one is longer than period
         // or 2) the duration is shorter than period but longer than time range of a single slot
         //       and at the same time currentSlot == lastUsedSlot
@@ -108,14 +96,38 @@ public class PutOperationStage extends PipelineStage.NullStage {
           for (int i = lastUsedSlot + 1; i <= currentSlot; i++) {
             slots[i % slots.length].reset();
           }
-          currentSlot %= NumOfSlots;
         }
       }
-      lastOperationCompleteTime = completeTime;
-      lastUsedSlot = currentSlot;
+    }
 
+    private int getCurrentSlot(Timestamp time) {
+      return (int) time.getSeconds() % period / (period / slots.length);
+    }
+
+    OperationStageDurations getAverageOfLastPeriod() {
+      // creating a Timestamp representing now to trigger stale data throwing away
+      Timestamp now = Timestamps.fromMillis(System.currentTimeMillis());
+      removeStaleData(now);
+      averageTimeCosts.reset();
+      for (OperationStageDurations slot : slots) {
+        averageTimeCosts.addOperations(slot);
+      }
+      averageTimeCosts.period = period;
+      return averageTimeCosts;
+    }
+
+    void addOperation(ExecutedActionMetadata metadata) {
+      // remove stale data first
+      Timestamp completeTime = metadata.getOutputUploadCompletedTimestamp();
+      removeStaleData(completeTime);
+
+      // add new ExecutedOperation metadata
+      int currentSlot = getCurrentSlot(completeTime);
       nextOperation.set(metadata);
       slots[currentSlot].addOperations(nextOperation);
+
+      lastOperationCompleteTime = completeTime;
+      lastUsedSlot = currentSlot;
     }
   }
 
@@ -225,8 +237,7 @@ public class PutOperationStage extends PipelineStage.NullStage {
       // 1 second = 1000 milliseconds
       // 1 millisecond = 1000,000 nanoseconds
       Duration d = Timestamps.between(from, to);
-      double interval = d.getSeconds() * 1000.0 + d.getNanos() / (1000.0 * 1000.0);
-      return (float) interval;
+      return d.getSeconds() * 1000.0f + d.getNanos() / (1000.0f * 1000.0f);
     }
   }
 }
