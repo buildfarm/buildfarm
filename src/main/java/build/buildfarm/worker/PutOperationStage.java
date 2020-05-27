@@ -20,7 +20,6 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.Duration;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.Timestamps;
-import java.util.Arrays;
 
 public class PutOperationStage extends PipelineStage.NullStage {
   private final InterruptingConsumer<Operation> onPut;
@@ -48,14 +47,17 @@ public class PutOperationStage extends PipelineStage.NullStage {
   }
 
   public synchronized OperationStageDurations[] getAverageTimeCostPerStage() {
-    return Arrays.stream(averagesWithinDifferentPeriods)
-        .map(AverageTimeCostOfLastPeriod::getAverageOfLastPeriod)
-        .toArray(OperationStageDurations[]::new);
+    OperationStageDurations[] results =
+        new OperationStageDurations[averagesWithinDifferentPeriods.length];
+    for (int i = 0; i < results.length; i++) {
+      results[i] = averagesWithinDifferentPeriods[i].getAverageOfLastPeriod();
+    }
+    return results;
   }
 
   private static class AverageTimeCostOfLastPeriod {
     static final int NumOfSlots = 100;
-    private OperationStageDurations[] slots = new OperationStageDurations[NumOfSlots];
+    private OperationStageDurations[] slots;
     private int lastUsedSlot = -1;
     private int period;
     private OperationStageDurations nextOperation;
@@ -64,6 +66,7 @@ public class PutOperationStage extends PipelineStage.NullStage {
 
     AverageTimeCostOfLastPeriod(int period) {
       this.period = period;
+      slots = new OperationStageDurations[NumOfSlots];
       for (int i = 0; i < slots.length; i++) {
         slots[i] = new OperationStageDurations();
       }
