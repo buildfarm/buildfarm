@@ -91,17 +91,26 @@ public class PutOperationStage extends PipelineStage.NullStage {
     void addOperation(OperationContext context) {
       ExecutedActionMetadata metadata =
           context.executeResponse.build().getResult().getExecutionMetadata();
-
-      // The duration between the complete time of the new Operation and last Operation
-      // added could be longer than the logging period here.
       Timestamp completeTime = metadata.getOutputUploadCompletedTimestamp();
       int currentSlot = (int) completeTime.getSeconds() % period / (period / slots.length);
+
+      // currentSlot != lastUsedSlot means stepping over to a new slot.
+      // The data in the new slot should be thrown away before storing new data.
       if (lastOperationCompleteTime != null && lastUsedSlot >= 0) {
         Duration duration = Timestamps.between(lastOperationCompleteTime, completeTime);
-        if (duration.getSeconds() >= (this.period / slots.length)) {
-          for (int i = lastUsedSlot + 1; (i % slots.length) <= currentSlot; i++) {
+        // if duration between the new added operation and last added one is longer
+        // than period here, all data stored slots should be thrown away.
+        if (duration.getSeconds() > this.period) {
+          for (OperationStageDurations slot : slots) {
+            slot.reset();
+          }
+        } else if (lastUsedSlot != currentSlot) {
+          // currentSlot < lastUsedSlot means wrap around happened
+          currentSlot = currentSlot < lastUsedSlot ? currentSlot + NumOfSlots : currentSlot;
+          for (int i = lastUsedSlot + 1; i <= currentSlot; i++) {
             slots[i % slots.length].reset();
           }
+          currentSlot %= NumOfSlots;
         }
       }
       lastOperationCompleteTime = completeTime;
