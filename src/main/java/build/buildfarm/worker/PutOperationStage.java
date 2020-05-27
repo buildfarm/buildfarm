@@ -24,7 +24,7 @@ import com.google.protobuf.util.Timestamps;
 public class PutOperationStage extends PipelineStage.NullStage {
   private final InterruptingConsumer<Operation> onPut;
 
-  private AverageTimeCostOfLastPeriod[] averagesWithinDifferentPeriods;
+  private volatile AverageTimeCostOfLastPeriod[] averagesWithinDifferentPeriods;
 
   public PutOperationStage(InterruptingConsumer<Operation> onPut) {
     this.onPut = onPut;
@@ -41,8 +41,10 @@ public class PutOperationStage extends PipelineStage.NullStage {
   @Override
   public void put(OperationContext operationContext) throws InterruptedException {
     onPut.acceptInterruptibly(operationContext.operation);
-    for (AverageTimeCostOfLastPeriod average : averagesWithinDifferentPeriods) {
-      average.addOperation(operationContext);
+    synchronized (this) {
+      for (AverageTimeCostOfLastPeriod average : averagesWithinDifferentPeriods) {
+        average.addOperation(operationContext);
+      }
     }
   }
 
@@ -94,10 +96,7 @@ public class PutOperationStage extends PipelineStage.NullStage {
       // added could be longer than the logging period here.
       Timestamp completeTime = metadata.getOutputUploadCompletedTimestamp();
       int currentSlot = (int) completeTime.getSeconds() % period / (period / slots.length);
-      if (lastOperationCompleteTime == null || lastUsedSlot < 0) {
-        lastOperationCompleteTime = completeTime;
-        lastUsedSlot = currentSlot;
-      } else {
+      if (lastOperationCompleteTime != null && lastUsedSlot >= 0) {
         Duration duration = Timestamps.between(lastOperationCompleteTime, completeTime);
         if (duration.getSeconds() >= (this.period / slots.length)) {
           for (int i = lastUsedSlot + 1; (i % slots.length) <= currentSlot; i++) {
@@ -105,6 +104,8 @@ public class PutOperationStage extends PipelineStage.NullStage {
           }
         }
       }
+      lastOperationCompleteTime = completeTime;
+      lastUsedSlot = currentSlot;
 
       nextOperation.set(metadata);
       slots[currentSlot].addOperations(nextOperation);
