@@ -669,6 +669,10 @@ class Cat {
       case 86400:
         periodInfo += "24 hours";
         break;
+      default:
+        System.out.println("The period is UNKNOWN: " + time.getPeriod());
+        periodInfo = periodInfo + time.getPeriod() + " seconds";
+        break;
     }
 
     periodInfo += ":";
