@@ -678,7 +678,7 @@ class Cat {
     periodInfo += ":";
     System.out.println(periodInfo);
     System.out.println("Number of operations completed: " + time.getNumberOfOperation());
-    String strStrNumFormat = "%-28s -> %-28s : %.2f ms";
+    String strStrNumFormat = "%-28s -> %-28s : %12.2f ms";
     System.out.println(
         String.format(strStrNumFormat, "Queued", "MatchStage", time.getQueuedToMatch()));
     System.out.println(
