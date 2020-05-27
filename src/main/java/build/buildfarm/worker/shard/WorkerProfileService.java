@@ -89,7 +89,7 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
           .setOutputUploadStartToComplete(durations[i].outputUploadStartToComplete)
           .setNumberOfOperation(durations[i].operationCount)
           .setPeriod(durations[i].period);
-      replyBuilder.setTimes(i, timesBuilder.build());
+      replyBuilder.addTimes(timesBuilder.build());
     }
 
     responseObserver.onNext(replyBuilder.build());

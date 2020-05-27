@@ -53,6 +53,9 @@ public class PutOperationStage extends PipelineStage.NullStage {
       results[i] = averagesWithinDifferentPeriods[i].getAverageOfLastPeriod();
     }
     return results;
+    //return Arrays.stream(averagesWithinDifferentPeriods)
+    //    .map(AverageTimeCostOfLastPeriod::getAverageOfLastPeriod)
+    //    .toArray(OperationStageDurations[]::new);
   }
 
   private static class AverageTimeCostOfLastPeriod {
