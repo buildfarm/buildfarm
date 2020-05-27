@@ -1508,6 +1508,27 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     decrementReferencesSynchronized(inputFiles, inputDirectories);
   }
 
+  // The different contexts in which cache files are written to disk
+  private void putDirectoryHardLink(Path newHardLink, Path path) throws IOException {
+    Files.createLink(newHardLink, path);
+    new File(newHardLink.toString()).setWritable(false, false);
+  }
+
+  private void putDirectoryFile(Path path, FileNode fileNode) throws IOException {
+    Files.createFile(path);
+    setPermissions(path, fileNode.getIsExecutable());
+    new File(path.toString()).setWritable(false, false);
+  }
+
+  private void putDirectory(Path path) throws IOException {
+    Files.createDirectory(path);
+  }
+
+  private void putRootHardLink(Path newHardLink, Path path) throws IOException {
+    Files.createLink(newHardLink, path);
+    new File(newHardLink.toString()).setWritable(false, false);
+  }
+
   private int decrementInputReferences(Iterable<Path> inputFiles) {
     int entriesDereferenced = 0;
     for (Path input : inputFiles) {
@@ -1842,7 +1863,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                 put(fileNode.getDigest(), fileNode.getIsExecutable(), containingDirectory, service),
                 (fileCacheKey) -> {
                   // FIXME this can die with 'too many links'... needs some cascading fallout
-                  Files.createLink(filePath, fileCacheKey);
+                  putDirectoryHardLink(filePath, fileCacheKey);
                   // we saw null entries in the built immutable list without synchronization
                   synchronized (inputsBuilder) {
                     inputsBuilder.add(fileCacheKey);
@@ -1855,8 +1876,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             listeningDecorator(service)
                 .submit(
                     () -> {
-                      Files.createFile(filePath);
-                      setPermissions(filePath, fileNode.getIsExecutable());
+                      putDirectoryFile(filePath, fileNode);
                       return filePath;
                     });
       }
@@ -1891,7 +1911,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       throw new IOException(
           format("directory not found for %s(%s)", path, DigestUtil.toString(digest)));
     }
-    Files.createDirectory(path);
+    putDirectory(path);
     putDirectoryFiles(
         directory.getFilesList(), path, containingDirectory, inputsBuilder, putFutures, service);
     for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
@@ -2588,7 +2608,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         Entry existingEntry = null;
         boolean inserted = false;
         try {
-          Files.createLink(key, writePath);
+          putRootHardLink(key, writePath);
           existingEntry = storage.putIfAbsent(key, entry);
           inserted = existingEntry == null;
         } catch (FileAlreadyExistsException e) {
