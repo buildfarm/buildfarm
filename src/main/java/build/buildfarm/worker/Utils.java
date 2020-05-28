@@ -48,6 +48,7 @@ public class Utils {
     Path tmpPath = path.resolveSibling(tmpFilename);
     try {
       // rename must be synchronous to call
+      enableAllWriteAccess(path);
       Files.move(path, tmpPath);
     } catch (IOException e) {
       return immediateFailedFuture(e);
@@ -71,7 +72,6 @@ public class Utils {
           @Override
           public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
               throws IOException {
-            new File(file.toString()).setWritable(true);
             Files.delete(file);
             return FileVisitResult.CONTINUE;
           }
@@ -79,7 +79,6 @@ public class Utils {
           @Override
           public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
             if (e == null) {
-              new File(dir.toString()).setWritable(true);
               Files.delete(dir);
               return FileVisitResult.CONTINUE;
             }
@@ -89,7 +88,7 @@ public class Utils {
         });
   }
 
-  public static void removeAllWriteAccess(Path directory) throws IOException {
+  public static void disableAllWriteAccess(Path directory) throws IOException {
     Files.walkFileTree(
         directory,
         new SimpleFileVisitor<Path>() {
@@ -104,6 +103,29 @@ public class Utils {
           public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
             if (e == null) {
               new File(dir.toString()).setWritable(false);
+              return FileVisitResult.CONTINUE;
+            }
+            // directory iteration failed
+            throw e;
+          }
+        });
+  }
+
+  public static void enableAllWriteAccess(Path directory) throws IOException {
+    Files.walkFileTree(
+        directory,
+        new SimpleFileVisitor<Path>() {
+          @Override
+          public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+              throws IOException {
+            new File(file.toString()).setWritable(true);
+            return FileVisitResult.CONTINUE;
+          }
+
+          @Override
+          public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
+            if (e == null) {
+              new File(dir.toString()).setWritable(true);
               return FileVisitResult.CONTINUE;
             }
             // directory iteration failed

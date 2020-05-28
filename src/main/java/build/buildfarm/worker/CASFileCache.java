@@ -17,7 +17,7 @@ package build.buildfarm.worker;
 import static build.buildfarm.common.IOUtils.listDir;
 import static build.buildfarm.common.IOUtils.listFFIdirentSorted;
 import static build.buildfarm.common.IOUtils.stat;
-import static build.buildfarm.worker.Utils.removeAllWriteAccess;
+import static build.buildfarm.worker.Utils.disableAllWriteAccess;
 import static build.buildfarm.worker.Utils.removeDirectory;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -2097,7 +2097,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             fetchFuture,
             (result) -> {
               try {
-                removeAllWriteAccess(path);
+                disableAllWriteAccess(path);
               } catch (IOException chmodException) {
                 logger.log(
                     Level.SEVERE,
