@@ -662,23 +662,23 @@ message BlobWriteKey {
 }
 
 message OperationTimesBetweenStages {
-  float queued_to_match = 1;
+  google.protobuf.Duration queued_to_match = 1;
 
-  float match_to_input_fetch_start = 2;
+  google.protobuf.Duration match_to_input_fetch_start = 2;
 
-  float input_fetch_start_to_complete = 3;
+  google.protobuf.Duration input_fetch_start_to_complete = 3;
 
-  float input_fetch_complete_to_execution_start = 4;
+  google.protobuf.Duration input_fetch_complete_to_execution_start = 4;
 
-  float execution_start_to_complete = 5;
+  google.protobuf.Duration execution_start_to_complete = 5;
 
-  float execution_complete_to_output_upload_start = 6;
+  google.protobuf.Duration execution_complete_to_output_upload_start = 6;
 
-  float output_upload_start_to_complete = 7;
+  google.protobuf.Duration output_upload_start_to_complete = 7;
 
   int32 number_of_operation = 8;
 
-  int32 period = 9;
+  google.protobuf.Duration period = 9;
 }
 
 message WorkerProfileMessage {

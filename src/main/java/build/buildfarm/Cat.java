@@ -53,6 +53,7 @@ import com.google.common.io.ByteStreams;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
+import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Message;
 import com.google.protobuf.util.Timestamps;
@@ -653,7 +654,7 @@ class Cat {
 
   private static void printOperationTime(OperationTimesBetweenStages time) {
     String periodInfo = "\nIn last ";
-    switch (time.getPeriod()) {
+    switch ((int) time.getPeriod().getSeconds()) {
       case 60:
         periodInfo += "1 minute";
         break;
@@ -680,44 +681,49 @@ class Cat {
     System.out.println("Number of operations completed: " + time.getNumberOfOperation());
     String strStrNumFormat = "%-28s -> %-28s : %12.2f ms";
     System.out.println(
-        String.format(strStrNumFormat, "Queued", "MatchStage", time.getQueuedToMatch()));
+        String.format(
+            strStrNumFormat, "Queued", "MatchStage", durationToMillis(time.getQueuedToMatch())));
     System.out.println(
         String.format(
             strStrNumFormat,
             "MatchStage",
             "InputFetchStage start",
-            time.getMatchToInputFetchStart()));
+            durationToMillis(time.getMatchToInputFetchStart())));
     System.out.println(
         String.format(
             strStrNumFormat,
             "InputFetchStage Start",
             "InputFetchStage Completed",
-            time.getInputFetchStartToComplete()));
+            durationToMillis(time.getInputFetchStartToComplete())));
     System.out.println(
         String.format(
             strStrNumFormat,
             "InputFetchStage Completed",
             "ExecutionStage Start",
-            time.getInputFetchCompleteToExecutionStart()));
+            durationToMillis(time.getInputFetchCompleteToExecutionStart())));
     System.out.println(
         String.format(
             strStrNumFormat,
             "ExecutionStage Start",
             "ExecutionStage Completed",
-            time.getExecutionStartToComplete()));
+            durationToMillis(time.getExecutionStartToComplete())));
     System.out.println(
         String.format(
             strStrNumFormat,
             "ExecutionStage Completed",
             "ReportResultStage Started",
-            time.getExecutionCompleteToOutputUploadStart()));
+            durationToMillis(time.getExecutionCompleteToOutputUploadStart())));
     System.out.println(
         String.format(
             strStrNumFormat,
             "OutputUploadStage Started",
             "OutputUploadStage Completed",
-            time.getOutputUploadStartToComplete()));
+            durationToMillis(time.getOutputUploadStartToComplete())));
     System.out.println();
+  }
+
+  private static float durationToMillis(Duration d) {
+    return d.getSeconds() * 1000.0f + d.getSeconds() / (1000.0f * 1000.0f);
   }
 
   public static void main(String[] args) throws Exception {

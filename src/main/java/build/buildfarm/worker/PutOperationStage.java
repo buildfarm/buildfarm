@@ -51,29 +51,29 @@ public class PutOperationStage extends PipelineStage.NullStage {
     }
   }
 
-  public synchronized OperationStageDurations[] getAverageTimeCostPerStage() {
+  public synchronized OperationStageDurationsInMillis[] getAverageTimeCostPerStage() {
     return Arrays.stream(averagesWithinDifferentPeriods)
         .map(AverageTimeCostOfLastPeriod::getAverageOfLastPeriod)
-        .toArray(OperationStageDurations[]::new);
+        .toArray(OperationStageDurationsInMillis[]::new);
   }
 
   private static class AverageTimeCostOfLastPeriod {
     static final int NumOfSlots = 100;
-    private OperationStageDurations[] slots;
+    private OperationStageDurationsInMillis[] slots;
     private int lastUsedSlot = -1;
     private Duration period;
-    private OperationStageDurations nextOperation;
-    private OperationStageDurations averageTimeCosts;
+    private OperationStageDurationsInMillis nextOperation;
+    private OperationStageDurationsInMillis averageTimeCosts;
     private Timestamp lastOperationCompleteTime;
 
     AverageTimeCostOfLastPeriod(int period) {
       this.period = Durations.fromSeconds(period);
-      slots = new OperationStageDurations[NumOfSlots];
+      slots = new OperationStageDurationsInMillis[NumOfSlots];
       for (int i = 0; i < slots.length; i++) {
-        slots[i] = new OperationStageDurations();
+        slots[i] = new OperationStageDurationsInMillis();
       }
-      nextOperation = new OperationStageDurations();
-      averageTimeCosts = new OperationStageDurations();
+      nextOperation = new OperationStageDurationsInMillis();
+      averageTimeCosts = new OperationStageDurationsInMillis();
     }
 
     private void removeStaleData(Timestamp now) {
@@ -88,7 +88,7 @@ public class PutOperationStage extends PipelineStage.NullStage {
         if ((Durations.toMillis(duration) >= Durations.toMillis(period))
             || (lastUsedSlot == currentSlot
                 && Durations.toMillis(duration) > (Durations.toMillis(period) / slots.length))) {
-          for (OperationStageDurations slot : slots) {
+          for (OperationStageDurationsInMillis slot : slots) {
             slot.reset();
           }
         } else if (lastUsedSlot != currentSlot) {
@@ -107,15 +107,15 @@ public class PutOperationStage extends PipelineStage.NullStage {
       return (int) (Timestamps.toMillis(time) % millisPeriod / (millisPeriod / slots.length));
     }
 
-    OperationStageDurations getAverageOfLastPeriod() {
+    OperationStageDurationsInMillis getAverageOfLastPeriod() {
       // creating a Timestamp representing now to trigger stale data throwing away
       Timestamp now = Timestamps.fromMillis(System.currentTimeMillis());
       removeStaleData(now);
       averageTimeCosts.reset();
-      for (OperationStageDurations slot : slots) {
+      for (OperationStageDurationsInMillis slot : slots) {
         averageTimeCosts.addOperations(slot);
       }
-      averageTimeCosts.period = (int) period.getSeconds();
+      averageTimeCosts.period = (int) Durations.toMillis(period);
       return averageTimeCosts;
     }
 
@@ -136,7 +136,7 @@ public class PutOperationStage extends PipelineStage.NullStage {
 
   // when operationCount == 1, an object represents one operation's time costs on each stage;
   // when operationCount > 1, an object represents aggregated time costs of multiple operations.
-  public static class OperationStageDurations {
+  public static class OperationStageDurationsInMillis {
     public float queuedToMatch;
     public float matchToInputFetchStart;
     public float inputFetchStartToComplete;
@@ -183,7 +183,7 @@ public class PutOperationStage extends PipelineStage.NullStage {
       operationCount = 0;
     }
 
-    void addOperations(OperationStageDurations other) {
+    void addOperations(OperationStageDurationsInMillis other) {
       this.queuedToMatch =
           computeAverage(
               this.queuedToMatch, this.operationCount, other.queuedToMatch, other.operationCount);
