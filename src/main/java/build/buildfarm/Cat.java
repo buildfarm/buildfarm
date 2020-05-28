@@ -654,8 +654,8 @@ class Cat {
   private static void printOperationTime(OperationTimesBetweenStages time) {
     String periodInfo = "\nIn last ";
     switch (time.getPeriod()) {
-      case 100:
-        periodInfo += "100 seconds";
+      case 60:
+        periodInfo += "1 minute";
         break;
       case 600:
         periodInfo += "10 minutes";

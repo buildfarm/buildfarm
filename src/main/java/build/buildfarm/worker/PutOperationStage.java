@@ -19,6 +19,7 @@ import build.buildfarm.common.function.InterruptingConsumer;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Duration;
 import com.google.protobuf.Timestamp;
+import com.google.protobuf.util.Durations;
 import com.google.protobuf.util.Timestamps;
 import java.util.Arrays;
 
@@ -31,7 +32,7 @@ public class PutOperationStage extends PipelineStage.NullStage {
     this.onPut = onPut;
     this.averagesWithinDifferentPeriods =
         new AverageTimeCostOfLastPeriod[] {
-          new AverageTimeCostOfLastPeriod(100),
+          new AverageTimeCostOfLastPeriod(60),
           new AverageTimeCostOfLastPeriod(10 * 60),
           new AverageTimeCostOfLastPeriod(60 * 60),
           new AverageTimeCostOfLastPeriod(3 * 60 * 60),
@@ -60,13 +61,13 @@ public class PutOperationStage extends PipelineStage.NullStage {
     static final int NumOfSlots = 100;
     private OperationStageDurations[] slots;
     private int lastUsedSlot = -1;
-    private int period;
+    private Duration period;
     private OperationStageDurations nextOperation;
     private OperationStageDurations averageTimeCosts;
     private Timestamp lastOperationCompleteTime;
 
     AverageTimeCostOfLastPeriod(int period) {
-      this.period = period;
+      this.period = Durations.fromSeconds(period);
       slots = new OperationStageDurations[NumOfSlots];
       for (int i = 0; i < slots.length; i++) {
         slots[i] = new OperationStageDurations();
@@ -84,9 +85,9 @@ public class PutOperationStage extends PipelineStage.NullStage {
         // if 1) duration between the new added operation and last added one is longer than period
         // or 2) the duration is shorter than period but longer than time range of a single slot
         //       and at the same time currentSlot == lastUsedSlot
-        if ((duration.getSeconds() >= this.period)
+        if ((Durations.toMillis(duration) >= Durations.toMillis(period))
             || (lastUsedSlot == currentSlot
-                && duration.getSeconds() > (this.period / slots.length))) {
+                && Durations.toMillis(duration) > (Durations.toMillis(period) / slots.length))) {
           for (OperationStageDurations slot : slots) {
             slot.reset();
           }
@@ -100,8 +101,10 @@ public class PutOperationStage extends PipelineStage.NullStage {
       }
     }
 
+    // Compute the slot index the Timestamp would belong to
     private int getCurrentSlot(Timestamp time) {
-      return (int) time.getSeconds() % period / (period / slots.length);
+      long millisPeriod = Durations.toMillis(period);
+      return (int) (Timestamps.toMillis(time) % millisPeriod / (millisPeriod / slots.length));
     }
 
     OperationStageDurations getAverageOfLastPeriod() {
@@ -112,7 +115,7 @@ public class PutOperationStage extends PipelineStage.NullStage {
       for (OperationStageDurations slot : slots) {
         averageTimeCosts.addOperations(slot);
       }
-      averageTimeCosts.period = period;
+      averageTimeCosts.period = (int) period.getSeconds();
       return averageTimeCosts;
     }
 
