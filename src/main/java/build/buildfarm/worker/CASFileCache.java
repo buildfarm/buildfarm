@@ -173,8 +173,17 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private transient long sizeInBytes = 0;
   private transient Entry header = new SentinelEntry();
 
+  @GuardedBy("this")
   private long removedEntrySize = 0;
+
+  @GuardedBy("this")
   private int removedEntryCount = 0;
+
+  @GuardedBy("this")
+  public int containedDirectoriesMax = 0;
+
+  @GuardedBy("this")
+  public long containedDirectoriesCount = 0;
 
   public synchronized long size() {
     return sizeInBytes;
@@ -198,6 +207,32 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     long size = removedEntrySize;
     removedEntrySize = 0;
     return size;
+  }
+
+  public synchronized int getContainedDirectoriesMax() {
+    return containedDirectoriesMax;
+  }
+
+  public synchronized long getContainedDirectoriesCount() {
+    return containedDirectoriesCount;
+  }
+
+  @GuardedBy("this")
+  public void addContainingDirectory(Entry entry, Digest directory) {
+    if (!entry.containingDirectories.contains(directory)) {
+      entry.containingDirectories.add(directory);
+      containedDirectoriesCount++;
+      containedDirectoriesMax =
+          Math.max(containedDirectoriesMax, entry.containingDirectories.size());
+    }
+  }
+
+  @GuardedBy("this")
+  public synchronized void removeContainingDirectory(Entry entry, Digest directory) {
+    if (entry.containingDirectories.contains(directory)) {
+      entry.containingDirectories.remove(directory);
+      containedDirectoriesCount--;
+    }
   }
 
   class CacheScanResults {
@@ -1414,7 +1449,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                   directoryStorage.put(digest, e);
                   for (Path input : e.inputs) {
                     Entry entry = storage.get(input);
-                    entry.addContainingDirectory(digest);
+                    addContainingDirectory(entry, digest);
                   }
                 }
               } else {
@@ -1807,7 +1842,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Entry fileEntry = storage.get(input);
 
       if (fileEntry != null) {
-        fileEntry.removeContainingDirectory(digest);
+        removeContainingDirectory(fileEntry, digest);
       }
     }
   }
@@ -2368,7 +2403,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
 
     if (containingDirectory != null) {
-      e.addContainingDirectory(containingDirectory);
+      addContainingDirectory(e, containingDirectory);
     }
     e.incrementReference();
     return true;
@@ -2598,6 +2633,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
         Entry entry =
             new Entry(key, blobSizeInBytes, containingDirectory, Deadline.after(10, SECONDS));
+        synchronized (CASFileCache.this) {
+          containedDirectoriesCount++;
+          containedDirectoriesMax =
+              Math.max(containedDirectoriesMax, entry.containingDirectories.size());
+        }
 
         Entry existingEntry = null;
         boolean inserted = false;
@@ -2664,9 +2704,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     int referenceCount;
     Deadline existsDeadline;
 
-    public static int containedDirectoriesMax = 0;
-    public static long containedDirectoriesCount = 0;
-
     private Entry() {
       key = null;
       size = -1;
@@ -2681,20 +2718,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       referenceCount = 1;
       containingDirectories = Sets.newHashSet();
       if (containingDirectory != null) {
-        addContainingDirectory(containingDirectory);
+        containingDirectories.add(containingDirectory);
       }
       this.existsDeadline = existsDeadline;
-    }
-
-    public void addContainingDirectory(Digest containingDirectory) {
-      containingDirectories.add(containingDirectory);
-      containedDirectoriesCount++;
-      containedDirectoriesMax = Math.max(containedDirectoriesMax, containingDirectories.size());
-    }
-
-    public void removeContainingDirectory(Digest containingDirectory) {
-      containingDirectories.remove(containingDirectory);
-      containedDirectoriesCount--;
     }
 
     public void unlink() {
@@ -2801,16 +2827,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     @Override
     public void recordAccess(Entry header) {
       throw new UnsupportedOperationException("sentinal cannot be accessed");
-    }
-
-    @Override
-    public void addContainingDirectory(Digest containingDirectory) {
-      throw new UnsupportedOperationException("sentinal cannot be contained by directory");
-    }
-
-    @Override
-    public void removeContainingDirectory(Digest containingDirectory) {
-      throw new UnsupportedOperationException("sentinal cannot be contained by directory");
     }
   }
 

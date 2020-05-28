@@ -612,10 +612,10 @@ class Cat {
     System.out.println("\nWorkerProfile:");
     String strNumFormat = "%-50s : %d";
     System.out.println(
-        String.format(strNumFormat, "Current Entry Count", response.getCASEntryCount()));
+        String.format(strNumFormat, "Current Entry Count", response.getCasEntryCount()));
     System.out.println(
         String.format(
-            strNumFormat, "Current DirectoryEntry Count", response.getCASDirectoryEntryCount()));
+            strNumFormat, "Current DirectoryEntry Count", response.getCasDirectoryEntryCount()));
     System.out.println(
         String.format(
             strNumFormat,
@@ -628,10 +628,10 @@ class Cat {
             response.getEntryContainingDirectoriesMax()));
     System.out.println(
         String.format(
-            strNumFormat, "Number of Evicted Entries", response.getCASEvictedEntryCount()));
+            strNumFormat, "Number of Evicted Entries", response.getCasEvictedEntryCount()));
     System.out.println(
         String.format(
-            strNumFormat, "Total size of Evicted Entries", response.getCASEvictedEntrySize()));
+            strNumFormat, "Total size of Evicted Entries", response.getCasEvictedEntrySize()));
 
     String strStrFormat = "%-50s : %s";
     System.out.println(

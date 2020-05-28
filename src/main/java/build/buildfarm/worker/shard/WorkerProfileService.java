@@ -57,12 +57,12 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
 
     WorkerProfileMessage.Builder replyBuilder =
         WorkerProfileMessage.newBuilder()
-            .setCASEntryCount(storage.storageCount())
-            .setCASDirectoryEntryCount(storage.directoryStorageCount())
-            .setEntryContainingDirectoriesCount(CASFileCache.Entry.containedDirectoriesCount)
-            .setEntryContainingDirectoriesMax(CASFileCache.Entry.containedDirectoriesMax)
-            .setCASEvictedEntryCount(storage.getEvictedCount())
-            .setCASEvictedEntrySize(storage.getEvictedSize());
+            .setCasEntryCount(storage.storageCount())
+            .setCasDirectoryEntryCount(storage.directoryStorageCount())
+            .setEntryContainingDirectoriesCount(storage.getContainedDirectoriesCount())
+            .setEntryContainingDirectoriesMax(storage.getContainedDirectoriesMax())
+            .setCasEvictedEntryCount(storage.getEvictedCount())
+            .setCasEvictedEntrySize(storage.getEvictedSize());
 
     // get slots usage/configure of stages
     String inputFetchStageSlotUsage =
