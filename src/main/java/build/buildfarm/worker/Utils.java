@@ -34,6 +34,7 @@ import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.io.File;
 
 public class Utils {
   private static final Logger logger = Logger.getLogger(Utils.class.getName());
@@ -70,14 +71,20 @@ public class Utils {
           @Override
           public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
               throws IOException {
+            new File(file.getParent().toString()).setWritable(true,true);
+            new File(file.toString()).setWritable(true,true);
             Files.delete(file);
+            //new File(file.getParent().toString()).setWritable(false,false);
             return FileVisitResult.CONTINUE;
           }
 
           @Override
           public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
             if (e == null) {
+              new File(dir.getParent().toString()).setWritable(true,true);
+              new File(dir.toString()).setWritable(true,true);
               Files.delete(dir);
+              //new File(dir.getParent().toString()).setWritable(false,false);
               return FileVisitResult.CONTINUE;
             }
             // directory iteration failed

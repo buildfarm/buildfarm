@@ -1507,30 +1507,78 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Iterable<Path> inputFiles, Iterable<Digest> inputDirectories) {
     decrementReferencesSynchronized(inputFiles, inputDirectories);
   }
+  
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   /**
    * The different contexts in which cache files are written to disk. Files are made non-writable in
    * order to prevent operations from deleting them.
    */
   private void putDirectoryHardLink(Path newHardLink, Path path) throws IOException {
+    
+    Unlock(newHardLink.getParent());
     Files.createLink(newHardLink, path);
-    new File(newHardLink.toString()).setWritable(false, false);
+    Lock(newHardLink);
+    Lock(newHardLink.getParent());
   }
 
   private void putDirectoryFile(Path path, FileNode fileNode) throws IOException {
+    Unlock(path.getParent());
     Files.createFile(path);
-    new File(path.toString()).setWritable(false, false);
+    Lock(path);
     setPermissions(path, fileNode.getIsExecutable());
+    Lock(path.getParent());
   }
 
   private void putDirectory(Path path) throws IOException {
+    Unlock(path.getParent());
     Files.createDirectory(path);
+    Lock(path);
+    Lock(path.getParent());
   }
 
   private void putRootHardLink(Path newHardLink, Path path) throws IOException {
+    Unlock(newHardLink.getParent());
     Files.createLink(newHardLink, path);
-    new File(newHardLink.toString()).setWritable(false, false);
+    Lock(newHardLink);
+    Lock(newHardLink.getParent());
   }
+  
+  private HashingOutputStream getDigestOutputStream(Path path) throws IOException {
+    Unlock(path.getParent());
+    Unlock(path);
+    return digestUtil.newHashingOutputStream(Files.newOutputStream(path, CREATE));
+  }
+  
+  private void RemoveBeforeFetching(Path path) throws IOException {
+    
+    Unlock(path.getParent());
+    Unlock(path);
+    if (Files.isDirectory(path)) {
+      logger.log(Level.FINE, "removing existing directory " + path + " for fetch");
+      removeDirectory(path);
+    } else {
+      Files.delete(path);
+    }
+    Lock(path.getParent());
+  }
+  private void RemoveDirectoryForRollback(Path path) throws IOException {
+    Unlock(path.getParent());
+    Unlock(path);
+    removeDirectory(path);
+    Lock(path.getParent());
+  }
+  
+  private void Lock(Path path) throws IOException {
+    new File(path.toString()).setWritable(false,false);
+  }
+  private void Unlock(Path path) throws IOException {
+    new File(path.toString()).setWritable(true,true);
+  }
+      
+      
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+      
 
   private int decrementInputReferences(Iterable<Path> inputFiles) {
     int entriesDereferenced = 0;
@@ -1897,12 +1945,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       ExecutorService service)
       throws IOException, InterruptedException {
     if (Files.exists(path)) {
-      if (Files.isDirectory(path)) {
-        logger.log(Level.FINE, "removing existing directory " + path + " for fetch");
-        removeDirectory(path);
-      } else {
-        Files.delete(path);
-      }
+      RemoveBeforeFetching(path);
     }
     Directory directory;
     if (digest.getSizeBytes() == 0) {
@@ -2125,7 +2168,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               }
               try {
                 logger.log(Level.FINE, "removing directory to roll back " + path);
-                removeDirectory(path);
+                RemoveDirectoryForRollback(path);
               } catch (IOException removeException) {
                 logger.log(
                     Level.SEVERE,
@@ -2522,7 +2565,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       }
     } else {
       committedSize = 0;
-      hashOut = digestUtil.newHashingOutputStream(Files.newOutputStream(writePath, CREATE));
+      hashOut = getDigestOutputStream(writePath);
     }
     return new CancellableOutputStream(hashOut) {
       long written = committedSize;
