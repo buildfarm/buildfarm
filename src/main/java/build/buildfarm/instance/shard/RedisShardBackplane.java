@@ -508,7 +508,7 @@ public class RedisShardBackplane implements ShardBackplane {
     List<String> hashtags = client.call(jedis -> RedisNodeHashes.getEvenlyDistributedHashes(jedis));
     this.prequeue = new BalancedRedisQueue(config.getPreQueuedOperationsListName(), hashtags);
 
-    // Construct an operation queue based on user configuration.
+    // Construct an operation queue based on configuration.
     // An operation queue consists of multiple provisioned queues in which the order dictates the
     // eligibility and placement of operations.
     // Therefore, it is recommended to have a final provision queue with no actual platform
@@ -523,7 +523,7 @@ public class RedisShardBackplane implements ShardBackplane {
       allprovisionedQueues.add(provisionedQueue);
     }
 
-    // If the user did not configure any provisioned queues, we might consider that an error.
+    // If there is no configuration for provisioned queues, we might consider that an error.
     // After all, the operation queue is made up of n provisioned queues, and if there were no
     // provisioned queues provided, we can not properly construct the operation queue.
     // In this case however, we will automatically provide a default queue will full eligibility on
