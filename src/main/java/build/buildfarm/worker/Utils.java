@@ -23,6 +23,7 @@ import build.buildfarm.common.FileStatus;
 import build.buildfarm.common.IOUtils;
 import com.google.common.collect.Iterables;
 import com.google.common.util.concurrent.ListenableFuture;
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
@@ -70,6 +71,7 @@ public class Utils {
           @Override
           public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
               throws IOException {
+            new File(file.toString()).setWritable(true);
             Files.delete(file);
             return FileVisitResult.CONTINUE;
           }
@@ -77,7 +79,31 @@ public class Utils {
           @Override
           public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
             if (e == null) {
+              new File(dir.toString()).setWritable(true);
               Files.delete(dir);
+              return FileVisitResult.CONTINUE;
+            }
+            // directory iteration failed
+            throw e;
+          }
+        });
+  }
+
+  public static void removeAllWriteAccess(Path directory) throws IOException {
+    Files.walkFileTree(
+        directory,
+        new SimpleFileVisitor<Path>() {
+          @Override
+          public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+              throws IOException {
+            new File(file.toString()).setWritable(false);
+            return FileVisitResult.CONTINUE;
+          }
+
+          @Override
+          public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
+            if (e == null) {
+              new File(dir.toString()).setWritable(false);
               return FileVisitResult.CONTINUE;
             }
             // directory iteration failed
