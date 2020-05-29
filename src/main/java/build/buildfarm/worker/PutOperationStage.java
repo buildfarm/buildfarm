@@ -32,11 +32,11 @@ public class PutOperationStage extends PipelineStage.NullStage {
     this.onPut = onPut;
     this.averagesWithinDifferentPeriods =
         new AverageTimeCostOfLastPeriod[] {
-          new AverageTimeCostOfLastPeriod(60),
-          new AverageTimeCostOfLastPeriod(10 * 60),
-          new AverageTimeCostOfLastPeriod(60 * 60),
-          new AverageTimeCostOfLastPeriod(3 * 60 * 60),
-          new AverageTimeCostOfLastPeriod(24 * 60 * 60)
+          new AverageTimeCostOfLastPeriod(60), // 1 minute
+          new AverageTimeCostOfLastPeriod(10 * 60), // 10 minutes
+          new AverageTimeCostOfLastPeriod(60 * 60), // 1 hour
+          new AverageTimeCostOfLastPeriod(3 * 60 * 60), // 3 hours
+          new AverageTimeCostOfLastPeriod(24 * 60 * 60) // 24 hours
         };
   }
 
@@ -226,13 +226,11 @@ public class PutOperationStage extends PipelineStage.NullStage {
       this.operationCount += other.operationCount;
     }
 
-    private static float computeAverage(
-        float time1, int operationCount1, float time2, int operationCount2) {
-      if (operationCount1 == 0 && operationCount2 == 0) {
+    private static float computeAverage(float time1, int count1, float time2, int count2) {
+      if (count1 == 0 && count2 == 0) {
         return 0.0f;
       }
-      return (time1 * operationCount1 + time2 * operationCount2)
-          / (operationCount1 + operationCount2);
+      return (time1 * count1 + time2 * count2) / (count1 + count2);
     }
 
     private static float millisecondBetween(Timestamp from, Timestamp to) {

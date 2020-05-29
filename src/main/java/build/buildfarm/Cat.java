@@ -672,7 +672,7 @@ class Cat {
         periodInfo += "24 hours";
         break;
       default:
-        System.out.println("The period is UNKNOWN: " + time.getPeriod());
+        System.out.println("The period is UNKNOWN: " + time.getPeriod().getSeconds());
         periodInfo = periodInfo + time.getPeriod().getSeconds() + " seconds";
         break;
     }

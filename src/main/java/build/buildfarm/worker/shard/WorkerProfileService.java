@@ -56,7 +56,7 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
   @Override
   public void getWorkerProfile(
       WorkerProfileRequest request, StreamObserver<WorkerProfileMessage> responseObserver) {
-
+    // get usage of CASFileCache
     WorkerProfileMessage.Builder replyBuilder =
         WorkerProfileMessage.newBuilder()
             .setCasEntryCount(storage.storageCount())
@@ -66,17 +66,16 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
             .setCasEvictedEntryCount(storage.getEvictedCount())
             .setCasEvictedEntrySize(storage.getEvictedSize());
 
-    // get slots usage/configure of stages
+    // get slots used/configured of superscalar stages
     String inputFetchStageSlotUsage =
         String.format("%d/%d", inputFetchStage.getSlotUsage(), context.getInputFetchStageWidth());
     String executeActionStageSlotUsage =
         String.format("%d/%d", executeActionStage.getSlotUsage(), context.getExecuteStageWidth());
-
     replyBuilder
         .setInputFetchStageSlotsUsedOverConfigured(inputFetchStageSlotUsage)
         .setExecuteActionStageSlotsUsedOverConfigured(executeActionStageSlotUsage);
 
-    // get aggregated time cost on each stages
+    // get average time costs on each stage
     OperationStageDurationsInMillis[] durations = completeStage.getAverageTimeCostPerStage();
     for (OperationStageDurationsInMillis duration : durations) {
       OperationTimesBetweenStages.Builder timesBuilder = OperationTimesBetweenStages.newBuilder();
@@ -94,12 +93,12 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
           .setPeriod(millisToDuration(duration.period));
       replyBuilder.addTimes(timesBuilder.build());
     }
-
     responseObserver.onNext(replyBuilder.build());
     responseObserver.onCompleted();
   }
 
   private Duration millisToDuration(float msDuration) {
+    // multiply by 1000 to avoid precision loss
     return Durations.fromMicros((long) (msDuration * 1000));
   }
 }

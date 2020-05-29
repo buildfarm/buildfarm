@@ -767,7 +767,6 @@ public class StubInstance implements Instance {
 
   @Override
   public WorkerProfileMessage getWorkerProfile() {
-
     return WorkerProfileBlockingStub.get()
         .getWorkerProfile(WorkerProfileRequest.newBuilder().build());
   }
