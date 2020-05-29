@@ -24,16 +24,11 @@ import build.buildfarm.worker.ExecuteActionStage;
 import build.buildfarm.worker.InputFetchStage;
 import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.PutOperationStage;
-import build.buildfarm.worker.PutOperationStage.OperationStageDurationsInMillis;
+import build.buildfarm.worker.PutOperationStage.OperationStageDurations;
 import build.buildfarm.worker.WorkerContext;
-import com.google.protobuf.Duration;
-import com.google.protobuf.util.Durations;
 import io.grpc.stub.StreamObserver;
-import java.util.logging.Logger;
 
 public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBase {
-  private static final Logger logger = Logger.getLogger(WorkerProfileService.class.getName());
-
   private final CASFileCache storage;
   private final InputFetchStage inputFetchStage;
   private final ExecuteActionStage executeActionStage;
@@ -76,29 +71,22 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
         .setExecuteActionStageSlotsUsedOverConfigured(executeActionStageSlotUsage);
 
     // get average time costs on each stage
-    OperationStageDurationsInMillis[] durations = completeStage.getAverageTimeCostPerStage();
-    for (OperationStageDurationsInMillis duration : durations) {
+    OperationStageDurations[] durations = completeStage.getAverageTimeCostPerStage();
+    for (OperationStageDurations duration : durations) {
       OperationTimesBetweenStages.Builder timesBuilder = OperationTimesBetweenStages.newBuilder();
       timesBuilder
-          .setQueuedToMatch(millisToDuration(duration.queuedToMatch))
-          .setMatchToInputFetchStart(millisToDuration(duration.matchToInputFetchStart))
-          .setInputFetchStartToComplete(millisToDuration(duration.inputFetchStartToComplete))
-          .setInputFetchCompleteToExecutionStart(
-              millisToDuration(duration.inputFetchCompleteToExecutionStart))
-          .setExecutionStartToComplete(millisToDuration(duration.executionStartToComplete))
-          .setExecutionCompleteToOutputUploadStart(
-              millisToDuration(duration.executionCompleteToOutputUploadStart))
-          .setOutputUploadStartToComplete(millisToDuration(duration.outputUploadStartToComplete))
+          .setQueuedToMatch(duration.queuedToMatch)
+          .setMatchToInputFetchStart(duration.matchToInputFetchStart)
+          .setInputFetchStartToComplete(duration.inputFetchStartToComplete)
+          .setInputFetchCompleteToExecutionStart(duration.inputFetchCompleteToExecutionStart)
+          .setExecutionStartToComplete(duration.executionStartToComplete)
+          .setExecutionCompleteToOutputUploadStart(duration.executionCompleteToOutputUploadStart)
+          .setOutputUploadStartToComplete(duration.outputUploadStartToComplete)
           .setOperationCount(duration.operationCount)
-          .setPeriod(millisToDuration(duration.period));
+          .setPeriod(duration.period);
       replyBuilder.addTimes(timesBuilder.build());
     }
     responseObserver.onNext(replyBuilder.build());
     responseObserver.onCompleted();
-  }
-
-  private Duration millisToDuration(float msDuration) {
-    // multiply by 1000 to avoid precision loss
-    return Durations.fromMicros((long) (msDuration * 1000));
   }
 }
