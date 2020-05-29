@@ -428,6 +428,7 @@ java_library(
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
         "@googleapis//:google_rpc_error_details_java_proto",
     ],
 )

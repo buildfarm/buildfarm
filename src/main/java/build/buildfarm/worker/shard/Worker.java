@@ -201,13 +201,6 @@ public class Worker extends LoggingMain {
             config.getShardWorkerInstanceConfig());
 
     Instances instances = Instances.singular(instance);
-    server =
-        serverBuilder
-            .addService(
-                new ContentAddressableStorageService(
-                    instances, /* deadlineAfter=*/ 1, DAYS, /* requestLogLevel=*/ FINER))
-            .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, DAYS))
-            .build();
 
     ShardWorkerContext context =
         new ShardWorkerContext(
@@ -249,6 +242,17 @@ public class Worker extends LoggingMain {
     pipeline.add(inputFetchStage, 3);
     pipeline.add(executeActionStage, 2);
     pipeline.add(reportResultStage, 1);
+
+    server =
+        serverBuilder
+            .addService(
+                new ContentAddressableStorageService(
+                    instances, /* deadlineAfter=*/ 1, DAYS, /* requestLogLevel=*/ FINER))
+            .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, DAYS))
+            .addService(
+                new WorkerProfileService(
+                    storage, inputFetchStage, executeActionStage, context, completeStage))
+            .build();
 
     logger.log(INFO, String.format("%s initialized", identifier));
   }

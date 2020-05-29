@@ -31,6 +31,7 @@ import build.buildfarm.common.Write;
 import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.Tree;
+import build.buildfarm.v1test.WorkerProfileMessage;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -135,6 +136,8 @@ public interface Instance {
   ListenableFuture<Void> watchOperation(String operationName, Watcher watcher);
 
   ServerCapabilities getCapabilities();
+
+  WorkerProfileMessage getWorkerProfile();
 
   interface MatchListener {
     // start/end pair called for each wait period
