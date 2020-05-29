@@ -676,19 +676,19 @@ message OperationTimesBetweenStages {
 
   google.protobuf.Duration output_upload_start_to_complete = 7;
 
-  int32 number_of_operation = 8;
+  google.protobuf.Duration period = 8;
 
-  google.protobuf.Duration period = 9;
+  int32 operation_count = 9;
 }
 
 message WorkerProfileMessage {
-  // number of Entry in CAS LRU
+  // number of Entry in CAS
   int64 cas_entry_count = 1;
 
-  // number of Entry in CAS
+  // number of DirectoryEntry in CAS
   int64 cas_directory_entry_count = 2;
 
-  // sum up size of containingDirectories of all active entries
+  // sum up size of containingDirectories of all Entries
   int64 entry_containing_directories_count = 3;
 
   // the observed largest size of Entry.containingDirectories, this is the largest value

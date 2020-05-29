@@ -679,7 +679,7 @@ class Cat {
 
     periodInfo += ":";
     System.out.println(periodInfo);
-    System.out.println("Number of operations completed: " + time.getNumberOfOperation());
+    System.out.println("Number of operations completed: " + time.getOperationCount());
     String strStrNumFormat = "%-28s -> %-28s : %12.2f ms";
     System.out.println(
         String.format(
