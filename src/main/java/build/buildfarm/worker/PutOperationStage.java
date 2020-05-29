@@ -150,6 +150,21 @@ public class PutOperationStage extends PipelineStage.NullStage {
     public int operationCount;
     public Duration period;
 
+    OperationStageDurations() {
+      reset();
+    }
+
+    void reset() {
+      queuedToMatch = Duration.newBuilder().build();
+      matchToInputFetchStart = Duration.newBuilder().build();
+      inputFetchStartToComplete = Duration.newBuilder().build();
+      inputFetchCompleteToExecutionStart = Duration.newBuilder().build();
+      executionStartToComplete = Duration.newBuilder().build();
+      executionCompleteToOutputUploadStart = Duration.newBuilder().build();
+      outputUploadStartToComplete = Duration.newBuilder().build();
+      operationCount = 0;
+    }
+
     void set(ExecutedActionMetadata metadata) {
       queuedToMatch =
           Timestamps.between(metadata.getQueuedTimestamp(), metadata.getWorkerStartTimestamp());
@@ -175,17 +190,6 @@ public class PutOperationStage extends PipelineStage.NullStage {
       operationCount = 1;
     }
 
-    void reset() {
-      queuedToMatch = null;
-      matchToInputFetchStart = null;
-      inputFetchStartToComplete = null;
-      inputFetchCompleteToExecutionStart = null;
-      executionStartToComplete = null;
-      executionCompleteToOutputUploadStart = null;
-      outputUploadStartToComplete = null;
-      operationCount = 0;
-    }
-
     void addOperations(OperationStageDurations other) {
       this.queuedToMatch = Durations.add(this.queuedToMatch, other.queuedToMatch);
       this.matchToInputFetchStart =
@@ -208,11 +212,6 @@ public class PutOperationStage extends PipelineStage.NullStage {
 
     private OperationStageDurations computeAverage(int weight) {
       OperationStageDurations average = new OperationStageDurations();
-      // if this object is created but fields are not initialized
-      if (operationCount == 0) {
-        return average;
-      }
-
       average.queuedToMatch = Durations.fromNanos(Durations.toNanos(this.queuedToMatch) / weight);
       average.matchToInputFetchStart =
           Durations.fromNanos(Durations.toNanos(this.matchToInputFetchStart) / weight);
