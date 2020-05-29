@@ -208,6 +208,10 @@ public class PutOperationStage extends PipelineStage.NullStage {
 
     private OperationStageDurations computeAverage(int weight) {
       OperationStageDurations average = new OperationStageDurations();
+      // if this object is created but fields are not initialized
+      if (operationCount == 0) {
+        return average;
+      }
 
       average.queuedToMatch = Durations.fromNanos(Durations.toNanos(this.queuedToMatch) / weight);
       average.matchToInputFetchStart =
