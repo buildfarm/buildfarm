@@ -100,6 +100,6 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
   }
 
   private Duration millisToDuration(float msDuration) {
-    return Durations.fromMicros((int) (msDuration * 1000));
+    return Durations.fromMicros((long) (msDuration * 1000));
   }
 }

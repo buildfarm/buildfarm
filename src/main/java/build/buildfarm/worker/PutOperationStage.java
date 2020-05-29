@@ -145,7 +145,7 @@ public class PutOperationStage extends PipelineStage.NullStage {
     public float executionCompleteToOutputUploadStart;
     public float outputUploadStartToComplete;
     public int operationCount;
-    public int period;
+    public long period;
 
     void set(ExecutedActionMetadata metadata) {
       queuedToMatch =

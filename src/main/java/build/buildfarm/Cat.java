@@ -56,6 +56,7 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Message;
+import com.google.protobuf.util.Durations;
 import com.google.protobuf.util.Timestamps;
 import com.google.rpc.Code;
 import com.google.rpc.PreconditionFailure;
@@ -672,7 +673,7 @@ class Cat {
         break;
       default:
         System.out.println("The period is UNKNOWN: " + time.getPeriod());
-        periodInfo = periodInfo + time.getPeriod() + " seconds";
+        periodInfo = periodInfo + time.getPeriod().getSeconds() + " seconds";
         break;
     }
 
@@ -723,7 +724,7 @@ class Cat {
   }
 
   private static float durationToMillis(Duration d) {
-    return d.getSeconds() * 1000.0f + d.getSeconds() / (1000.0f * 1000.0f);
+    return Durations.toNanos(d) / (1000.0f * 1000.0f);
   }
 
   public static void main(String[] args) throws Exception {
