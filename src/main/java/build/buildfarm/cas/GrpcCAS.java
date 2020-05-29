@@ -155,29 +155,32 @@ public class GrpcCAS implements ContentAddressableStorage {
       long count,
       ServerCallStreamObserver<ByteString> blobObserver,
       RequestMetadata requestMetadata) {
-    ReadRequest request = ReadRequest.newBuilder()
-        .setResourceName(getBlobName(digest))
-        .setReadOffset(offset)
-        .setReadLimit(count)
-        .build();
+    ReadRequest request =
+        ReadRequest.newBuilder()
+            .setResourceName(getBlobName(digest))
+            .setReadOffset(offset)
+            .setReadLimit(count)
+            .build();
     ByteStreamGrpc.newStub(channel)
         .withInterceptors(attachMetadataInterceptor(requestMetadata))
-        .read(request, new DelegateServerCallStreamObserver<ReadResponse, ByteString>(blobObserver) {
-          @Override
-          public void onNext(ReadResponse response) {
-            blobObserver.onNext(response.getData());
-          }
+        .read(
+            request,
+            new DelegateServerCallStreamObserver<ReadResponse, ByteString>(blobObserver) {
+              @Override
+              public void onNext(ReadResponse response) {
+                blobObserver.onNext(response.getData());
+              }
 
-          @Override
-          public void onError(Throwable t) {
-            blobObserver.onError(t);
-          }
+              @Override
+              public void onError(Throwable t) {
+                blobObserver.onError(t);
+              }
 
-          @Override
-          public void onCompleted() {
-            blobObserver.onCompleted();
-          }
-        });
+              @Override
+              public void onCompleted() {
+                blobObserver.onCompleted();
+              }
+            });
   }
 
   @Override

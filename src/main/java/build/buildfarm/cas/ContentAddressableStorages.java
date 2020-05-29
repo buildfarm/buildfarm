@@ -64,21 +64,22 @@ public final class ContentAddressableStorages {
   }
 
   public static ContentAddressableStorage createFilesystemCAS(FilesystemCASConfig config) {
-    CASFileCache cas = new CASFileCache(
-        Paths.get(config.getPath()),
-        config.getMaxSizeBytes(),
-        config.getMaxEntrySizeBytes(),
-        DigestUtil.forHash("SHA256"),
-        /* expireService=*/ newDirectExecutorService(),
-        /* accessRecorder=*/ directExecutor()) {
-      @Override
-      protected InputStream newExternalInput(Digest digest, long offset) throws IOException {
-        throw new NoSuchFileException(digest.getHash());
-      }
-    };
+    CASFileCache cas =
+        new CASFileCache(
+            Paths.get(config.getPath()),
+            config.getMaxSizeBytes(),
+            config.getMaxEntrySizeBytes(),
+            DigestUtil.forHash("SHA256"),
+            /* expireService=*/ newDirectExecutorService(),
+            /* accessRecorder=*/ directExecutor()) {
+          @Override
+          protected InputStream newExternalInput(Digest digest, long offset) throws IOException {
+            throw new NoSuchFileException(digest.getHash());
+          }
+        };
     try {
       cas.start();
-    } catch (IOException|InterruptedException e) {
+    } catch (IOException | InterruptedException e) {
       throw new RuntimeException("error starting filesystem cas", e);
     }
     return cas;

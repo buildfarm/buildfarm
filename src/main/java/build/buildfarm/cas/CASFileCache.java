@@ -44,8 +44,6 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.RequestMetadata;
-import build.buildfarm.cas.ContentAddressableStorage;
-import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.FileStatus;
 import build.buildfarm.common.Inode;
@@ -578,13 +576,14 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       blobObserver.onError(e);
       return;
     }
-    blobObserver.setOnCancelHandler(() -> {
-      try {
-        in.close();
-      } catch (IOException e) {
-        logger.log(Level.SEVERE, "error closing input stream on cancel", e);
-      }
-    });
+    blobObserver.setOnCancelHandler(
+        () -> {
+          try {
+            in.close();
+          } catch (IOException e) {
+            logger.log(Level.SEVERE, "error closing input stream on cancel", e);
+          }
+        });
     byte[] buffer = new byte[CHUNK_SIZE];
     int initialLength;
     try {
