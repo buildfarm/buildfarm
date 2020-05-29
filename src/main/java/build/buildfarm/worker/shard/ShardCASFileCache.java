@@ -15,10 +15,10 @@
 package build.buildfarm.worker.shard;
 
 import build.bazel.remote.execution.v2.Digest;
+import build.buildfarm.cas.CASFileCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.InputStreamFactory;
-import build.buildfarm.worker.CASFileCache;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.io.InputStream;

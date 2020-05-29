@@ -353,17 +353,7 @@ public abstract class AbstractServerInstance implements Instance {
       long count,
       ServerCallStreamObserver<ByteString> blobObserver,
       RequestMetadata requestMetadata) {
-    try {
-      ByteString blob = getBlob(blobDigest, offset, count);
-      if (blob == null) {
-        blobObserver.onError(Status.NOT_FOUND.asException());
-      } else {
-        blobObserver.onNext(blob);
-        blobObserver.onCompleted();
-      }
-    } catch (InterruptedException e) {
-      blobObserver.onError(e);
-    }
+    contentAddressableStorage.get(blobDigest, offset, count, blobObserver, requestMetadata);
   }
 
   @Override

@@ -27,12 +27,12 @@ import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
-import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
 import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
@@ -65,20 +65,17 @@ public class ShardWorkerInstance extends AbstractServerInstance {
 
   private final ShardWorkerInstanceConfig config;
   private final ShardBackplane backplane;
-  private final InputStreamFactory inputStreamFactory;
 
   public ShardWorkerInstance(
       String name,
       DigestUtil digestUtil,
       ShardBackplane backplane,
       ContentAddressableStorage contentAddressableStorage,
-      InputStreamFactory inputStreamFactory,
       ShardWorkerInstanceConfig config)
       throws ConfigurationException {
     super(name, digestUtil, contentAddressableStorage, null, null, null, null);
     this.config = config;
     this.backplane = backplane;
-    this.inputStreamFactory = inputStreamFactory;
   }
 
   @Override
@@ -116,87 +113,51 @@ public class ShardWorkerInstance extends AbstractServerInstance {
     throw new UnsupportedOperationException();
   }
 
-  private void getBlob(
-      InputStream input, long count, ServerCallStreamObserver<ByteString> blobObserver) {
-    blobObserver.setOnReadyHandler(
-        new Runnable() {
-          long remainingBytes = count;
-          long chunkSize = Math.min(128 * 1024, remainingBytes);
-          byte[] chunk = new byte[(int) chunkSize];
-
-          @Override
-          public void run() {
-            try {
-              while (remainingBytes > 0 && blobObserver.isReady()) {
-                int n = input.read(chunk);
-                if (n < 0) {
-                  throw new IOException(
-                      "read beyond file limit with " + remainingBytes + " remaining");
-                }
-                if (n != 0) {
-                  blobObserver.onNext(ByteString.copyFrom(chunk, 0, n));
-                  remainingBytes -= n;
-                }
-              }
-              if (remainingBytes <= 0) {
-                input.close();
-                blobObserver.onCompleted();
-              }
-            } catch (IOException e) {
-              try {
-                input.close();
-              } catch (IOException closeEx) {
-                e.addSuppressed(e);
-              }
-              blobObserver.onError(e);
-            } catch (StatusRuntimeException e) {
-              try {
-                input.close();
-              } catch (IOException closeEx) {
-                logger.log(Level.SEVERE, "error closing stream after status exception", closeEx);
-              }
-            }
-          }
-        });
-  }
-
   @Override
   public void getBlob(
-      Digest blobDigest,
+      Digest digest,
       long offset,
       long count,
       ServerCallStreamObserver<ByteString> blobObserver,
       RequestMetadata requestMetadata) {
     Preconditions.checkState(count != 0);
-    try {
-      InputStream input = inputStreamFactory.newInput(blobDigest, offset);
-      blobObserver.setOnCancelHandler(
-          () -> {
+    contentAddressableStorage.get(
+        digest,
+        offset,
+        count,
+        new UniformDelegateServerCallStreamObserver<ByteString>(blobObserver) {
+          @Override
+          public void onNext(ByteString data) {
+            blobObserver.onNext(data);
+          }
+
+          void removeBlobLocation() {
             try {
-              input.close();
-            } catch (IOException e) {
+              backplane.removeBlobLocation(digest, getName());
+            } catch (IOException backplaneException) {
               logger.log(
                   Level.SEVERE,
-                  String.format(
-                      "error closing stream for %s after cancellation",
-                      DigestUtil.toString(blobDigest)),
-                  e);
+                  String.format("error removing blob location for %s", DigestUtil.toString(digest)),
+                  backplaneException);
             }
-          });
-      getBlob(input, count, blobObserver);
-    } catch (IOException e) {
-      blobObserver.onError(Status.NOT_FOUND.withCause(e).asException());
-      try {
-        backplane.removeBlobLocation(blobDigest, getName());
-      } catch (IOException backplaneException) {
-        logger.log(
-            Level.SEVERE,
-            String.format("error removing blob location for %s", DigestUtil.toString(blobDigest)),
-            backplaneException);
-      }
-    } catch (InterruptedException e) {
-      blobObserver.onError(Status.CANCELLED.withCause(e).asException());
-    }
+          }
+
+          @Override
+          public void onError(Throwable t) {
+            if (t instanceof IOException) {
+              blobObserver.onError(Status.NOT_FOUND.withCause(t).asException());
+              removeBlobLocation();
+            } else {
+              blobObserver.onError(t);
+            }
+          }
+
+          @Override
+          public void onCompleted() {
+            blobObserver.onCompleted();
+          }
+        },
+        requestMetadata);
   }
 
   protected TokenizableIterator<DirectoryEntry> createTreeIterator(

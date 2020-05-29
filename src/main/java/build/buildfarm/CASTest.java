@@ -20,7 +20,7 @@ import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorS
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
-import build.buildfarm.worker.CASFileCache;
+import build.buildfarm.cas.CASFileCache;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;

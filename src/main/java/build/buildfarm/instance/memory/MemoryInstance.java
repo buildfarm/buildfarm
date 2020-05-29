@@ -39,6 +39,7 @@ import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.ac.ActionCache;
+import build.buildfarm.ac.FilesystemActionCache;
 import build.buildfarm.ac.GrpcActionCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorages;
@@ -60,6 +61,7 @@ import build.buildfarm.instance.WorkerQueueConfigurations;
 import build.buildfarm.instance.WorkerQueues;
 import build.buildfarm.v1test.ActionCacheConfig;
 import build.buildfarm.v1test.ExecuteEntry;
+import build.buildfarm.v1test.FilesystemACConfig;
 import build.buildfarm.v1test.GrpcACConfig;
 import build.buildfarm.v1test.MemoryInstanceConfig;
 import build.buildfarm.v1test.OperationIteratorToken;
@@ -100,6 +102,7 @@ import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Paths;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -250,6 +253,8 @@ public class MemoryInstance extends AbstractServerInstance {
         return createGrpcActionCache(config.getGrpc());
       case DELEGATE_CAS:
         return createDelegateCASActionCache(cas, digestUtil);
+      case FILESYSTEM:
+        return createFilesystemActionCache(config.getFilesystem());
     }
   }
 
@@ -280,6 +285,10 @@ public class MemoryInstance extends AbstractServerInstance {
         map.put(actionKey, actionResult);
       }
     };
+  }
+
+  private static ActionCache createFilesystemActionCache(FilesystemACConfig config) {
+    return new FilesystemActionCache(Paths.get(config.getPath()));
   }
 
   private static OperationsMap createCompletedOperationMap(

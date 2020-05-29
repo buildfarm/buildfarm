@@ -30,12 +30,15 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.ByteStreamHelper;
+import build.buildfarm.common.grpc.DelegateServerCallStreamObserver;
 import build.buildfarm.common.grpc.StubWriteOutputStream;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Chunker;
 import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamBlockingStub;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamStub;
+import com.google.bytestream.ByteStreamProto.ReadRequest;
+import com.google.bytestream.ByteStreamProto.ReadResponse;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
@@ -46,6 +49,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.protobuf.ByteString;
 import io.grpc.Channel;
 import io.grpc.StatusRuntimeException;
+import io.grpc.stub.ServerCallStreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
@@ -142,6 +146,38 @@ public class GrpcCAS implements ContentAddressableStorage {
     for (Runnable r : digestOnExpirations) {
       r.run();
     }
+  }
+
+  @Override
+  public void get(
+      Digest digest,
+      long offset,
+      long count,
+      ServerCallStreamObserver<ByteString> blobObserver,
+      RequestMetadata requestMetadata) {
+    ReadRequest request = ReadRequest.newBuilder()
+        .setResourceName(getBlobName(digest))
+        .setReadOffset(offset)
+        .setReadLimit(count)
+        .build();
+    ByteStreamGrpc.newStub(channel)
+        .withInterceptors(attachMetadataInterceptor(requestMetadata))
+        .read(request, new DelegateServerCallStreamObserver<ReadResponse, ByteString>(blobObserver) {
+          @Override
+          public void onNext(ReadResponse response) {
+            blobObserver.onNext(response.getData());
+          }
+
+          @Override
+          public void onError(Throwable t) {
+            blobObserver.onError(t);
+          }
+
+          @Override
+          public void onCompleted() {
+            blobObserver.onCompleted();
+          }
+        });
   }
 
   @Override
