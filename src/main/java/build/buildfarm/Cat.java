@@ -633,7 +633,7 @@ class Cat {
             strNumFormat, "Number of Evicted Entries", response.getCasEvictedEntryCount()));
     System.out.println(
         String.format(
-            strNumFormat, "Total size of Evicted Entries", response.getCasEvictedEntrySize()));
+            strNumFormat, "Total Evicted Entries size in Bytes", response.getCasEvictedEntrySize()));
 
     String strStrFormat = "%-50s : %s";
     System.out.println(
