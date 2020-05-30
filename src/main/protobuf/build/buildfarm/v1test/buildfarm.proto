@@ -131,6 +131,11 @@ message FilesystemCASConfig {
   int64 max_entry_size_bytes = 3;
 }
 
+message FilesystemACConfig {
+  // path to action cache files from AC
+  string path = 1;
+}
+
 message FuseCASConfig {
   // used to identify the backing store
   string name = 1;
@@ -159,6 +164,7 @@ message GrpcACConfig {
 message ActionCacheConfig {
   oneof type {
     DelegateCASConfig delegate_cas = 1;
+    FilesystemACConfig filesystem = 3;
     GrpcACConfig grpc = 2;
   }
 }

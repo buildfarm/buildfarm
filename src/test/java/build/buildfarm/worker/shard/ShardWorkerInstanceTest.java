@@ -27,7 +27,6 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
-import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.v1test.ExecuteEntry;
@@ -57,8 +56,6 @@ public class ShardWorkerInstanceTest {
 
   @Mock private ContentAddressableStorage storage;
 
-  @Mock private InputStreamFactory inputStreamFactory;
-
   private ShardWorkerInstance instance;
 
   @Before
@@ -70,7 +67,6 @@ public class ShardWorkerInstanceTest {
             DIGEST_UTIL,
             backplane,
             storage,
-            inputStreamFactory,
             ShardWorkerInstanceConfig.getDefaultInstance());
   }
 
