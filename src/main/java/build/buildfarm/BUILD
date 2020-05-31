@@ -442,6 +442,7 @@ java_binary(
     runtime_deps = [
         ":shard-worker",
     ],
+    visibility = ["//visibility:public"],
 )
 
 container_image(
@@ -606,6 +607,7 @@ java_binary(
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
     ],
+    visibility = ["//visibility:public"],
 )
 
 java_binary(
@@ -624,6 +626,7 @@ java_binary(
         "@maven//:com_google_guava_guava",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
+    visibility = ["//visibility:public"],
 )
 
 java_plugin(
@@ -647,6 +650,7 @@ java_binary(
         "@maven//:com_github_jnr_jnr_posix",
         "@maven//:org_openjdk_jmh_jmh_core",
     ],
+    visibility = ["//visibility:public"],
 )
 
 java_binary(
@@ -672,6 +676,7 @@ java_binary(
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
+    visibility = ["//visibility:public"],
 )
 
 java_binary(
@@ -693,6 +698,7 @@ java_binary(
         "@maven//:io_grpc_grpc_stub",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
+    visibility = ["//visibility:public"],
 )
 
 java_binary(
@@ -719,6 +725,7 @@ java_binary(
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
     ],
+    visibility = ["//visibility:public"],
 )
 
 java_binary(
@@ -741,12 +748,14 @@ java_binary(
         "@maven//:io_grpc_grpc_stub",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
+    visibility = ["//visibility:public"],
 )
 
 java_binary(
     name = "buildfarm-http-proxy",
     main_class = "build.buildfarm.proxy.http.HttpProxy",
     runtime_deps = [":http-proxy"],
+    visibility = ["//visibility:public"],
 )
 
 java_library(
@@ -800,4 +809,5 @@ java_binary(
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
     ],
+    visibility = ["//visibility:public"],
 )
