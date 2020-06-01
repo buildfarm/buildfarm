@@ -83,6 +83,7 @@ def buildfarm_init(name="buildfarm"):
             "org.openjdk.jmh:jmh-core:1.23",
             "org.openjdk.jmh:jmh-generator-annprocess:1.23",
             "org.threeten:threetenbp:1.3.3",
+            "org.xerial:sqlite-jdbc:3.31.1",
         ],
         repositories = [
             "https://repo.maven.apache.org/maven2",
