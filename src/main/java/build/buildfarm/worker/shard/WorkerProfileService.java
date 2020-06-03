@@ -56,8 +56,6 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
         WorkerProfileMessage.newBuilder()
             .setCasEntryCount(storage.storageCount())
             .setCasDirectoryEntryCount(storage.directoryStorageCount())
-            .setEntryContainingDirectoriesCount(storage.getContainedDirectoriesCount())
-            .setEntryContainingDirectoriesMax(storage.getContainedDirectoriesMax())
             .setCasEvictedEntryCount(storage.getEvictedCount())
             .setCasEvictedEntrySize(storage.getEvictedSize());
 

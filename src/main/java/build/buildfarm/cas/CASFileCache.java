@@ -184,12 +184,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   @GuardedBy("this")
   private int removedEntryCount = 0;
 
-  @GuardedBy("this")
-  public int containedDirectoriesMax = 0;
-
-  @GuardedBy("this")
-  public long containedDirectoriesCount = 0;
-
   public synchronized long size() {
     return sizeInBytes;
   }
@@ -212,14 +206,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     long size = removedEntrySize;
     removedEntrySize = 0;
     return size;
-  }
-
-  public synchronized int getContainedDirectoriesMax() {
-    return containedDirectoriesMax;
-  }
-
-  public synchronized long getContainedDirectoriesCount() {
-    return containedDirectoriesCount;
   }
 
   class CacheScanResults {
