@@ -698,13 +698,6 @@ message WorkerProfileMessage {
   // number of DirectoryEntry in CAS
   int64 cas_directory_entry_count = 2;
 
-  // sum up size of containingDirectories of all Entries
-  int64 entry_containing_directories_count = 3;
-
-  // the observed largest size of Entry.containingDirectories, this is the largest value
-  // since the start of the specific worker
-  int64 entry_containing_directories_max = 4;
-
   // number of evicted Entries since last profile request
   int32 cas_evicted_entry_count = 5;
 

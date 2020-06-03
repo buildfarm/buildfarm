@@ -17,7 +17,6 @@ package build.buildfarm.cas;
 import static build.buildfarm.cas.CASFileCache.getInterruptiblyOrIOException;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
-import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
@@ -102,7 +101,7 @@ class CASFileCacheTest {
 
   private ExecutorService expireService;
 
-  private ConcurrentMap<Path, Entry> storage;
+  private ConcurrentMap<String, Entry> storage;
 
   protected CASFileCacheTest(Path root) {
     this.root = root;
@@ -128,6 +127,7 @@ class CASFileCacheTest {
             expireService,
             /* accessRecorder=*/ directExecutor(),
             storage,
+            /* directoriesIndexDbName=*/ ":memory:",
             onPut,
             onExpire,
             delegate) {
@@ -164,21 +164,6 @@ class CASFileCacheTest {
   @Test(expected = IllegalStateException.class)
   public void putEmptyFileThrowsIllegalStateException() throws IOException, InterruptedException {
     InputStreamFactory mockInputStreamFactory = mock(InputStreamFactory.class);
-    CASFileCache fileCache =
-        new CASFileCache(
-            root,
-            /* maxSizeInBytes=*/ 1024,
-            /* maxEntrySizeInBytes=*/ 1024,
-            DIGEST_UTIL,
-            /* expireService=*/ newDirectExecutorService(),
-            /* accessRecorder=*/ directExecutor()) {
-          @Override
-          protected InputStream newExternalInput(Digest digest, long offset)
-              throws IOException, InterruptedException {
-            return mockInputStreamFactory.newInput(digest, offset);
-          }
-        };
-
     ByteString blob = ByteString.copyFromUtf8("");
     Digest blobDigest = DIGEST_UTIL.compute(blob);
     // supply an empty input stream if called for test clarity
@@ -342,8 +327,10 @@ class CASFileCacheTest {
     Digest validDigest = DIGEST_UTIL.compute(ByteString.copyFromUtf8("valid"));
     Path invalidSize = root.resolve(validDigest.getHash() + "_ten");
     Path incorrectSize =
-        fileCache.getKey(
-            validDigest.toBuilder().setSizeBytes(validDigest.getSizeBytes() + 1).build(), false);
+        fileCache.getPath(
+            fileCache.getKey(
+                validDigest.toBuilder().setSizeBytes(validDigest.getSizeBytes() + 1).build(),
+                false));
     Path invalidExec = fileCache.getPath(CASFileCache.getFileName(validDigest, false) + "_regular");
 
     Files.write(tooFewComponents, ImmutableList.of("Too Few Components"), StandardCharsets.UTF_8);
@@ -368,8 +355,8 @@ class CASFileCacheTest {
   public void newInputRemovesNonExistentEntry() throws IOException, InterruptedException {
     Digest nonexistentDigest =
         Digest.newBuilder().setHash("file_does_not_exist").setSizeBytes(1).build();
-    Path nonexistentKey = fileCache.getKey(nonexistentDigest, false);
-    Entry entry = new Entry(nonexistentKey, 1, null, Deadline.after(10, SECONDS));
+    String nonexistentKey = fileCache.getKey(nonexistentDigest, false);
+    Entry entry = new Entry(nonexistentKey, 1, Deadline.after(10, SECONDS));
     entry.before = entry;
     entry.after = entry;
     storage.put(nonexistentKey, entry);
@@ -436,9 +423,10 @@ class CASFileCacheTest {
     Digest digestThree = DIGEST_UTIL.compute(contentThree);
     blobs.put(digestThree, contentThree);
 
-    Path pathOne = fileCache.put(digestOne, /* isExecutable=*/ false);
-    Path pathTwo = fileCache.put(digestTwo, /* isExecutable=*/ false);
-    Path pathThree = fileCache.put(digestThree, /* isExecutable=*/ false);
+    String pathOne = fileCache.put(digestOne, /* isExecutable=*/ false).getFileName().toString();
+    String pathTwo = fileCache.put(digestTwo, /* isExecutable=*/ false).getFileName().toString();
+    String pathThree =
+        fileCache.put(digestThree, /* isExecutable=*/ false).getFileName().toString();
     fileCache.decrementReferences(
         ImmutableList.of(pathOne, pathTwo, pathThree), ImmutableList.of());
     /* three -> two -> one */
@@ -467,9 +455,9 @@ class CASFileCacheTest {
       content.writeTo(out);
     }
     assertThat(notified.get()).isTrue();
-    Path key = fileCache.getKey(digest, false);
+    String key = fileCache.getKey(digest, false);
     assertThat(storage.get(key)).isNotNull();
-    try (InputStream in = Files.newInputStream(key)) {
+    try (InputStream in = Files.newInputStream(fileCache.getPath(key))) {
       assertThat(ByteString.readFrom(in)).isEqualTo(content);
     }
   }
@@ -502,8 +490,8 @@ class CASFileCacheTest {
     Digest digest = DIGEST_UTIL.compute(content);
 
     UUID writeId = UUID.randomUUID();
-    Path key = fileCache.getKey(digest, false);
-    Path writePath = key.resolveSibling(key.getFileName() + "." + writeId);
+    String key = fileCache.getKey(digest, false);
+    Path writePath = fileCache.getPath(key).resolveSibling(key + "." + writeId);
     try (OutputStream out = Files.newOutputStream(writePath)) {
       content.substring(0, 6).writeTo(out);
     }
@@ -536,18 +524,18 @@ class CASFileCacheTest {
     Blob blob = new Blob(content, DIGEST_UTIL);
 
     fileCache.put(blob);
-    Path path = fileCache.getKey(blob.getDigest(), /* isExecutable=*/ false);
+    String key = fileCache.getKey(blob.getDigest(), /* isExecutable=*/ false);
     // putCreatesFile verifies this
-    Files.delete(path);
+    Files.delete(fileCache.getPath(key));
     // update entry with expired deadline
-    storage.get(path).existsDeadline = Deadline.after(0, SECONDS);
+    storage.get(key).existsDeadline = Deadline.after(0, SECONDS);
 
     try (InputStream in = fileCache.newInput(blob.getDigest(), /* offset=*/ 0)) {
       fail("should not get here");
     } catch (NoSuchFileException e) {
       // success
     }
-    assertThat(storage.containsKey(path)).isFalse();
+    assertThat(storage.containsKey(key)).isFalse();
   }
 
   @Test
@@ -625,7 +613,8 @@ class CASFileCacheTest {
   }
 
   void decrementReference(Path path) {
-    fileCache.decrementReferences(ImmutableList.of(path), ImmutableList.of());
+    fileCache.decrementReferences(
+        ImmutableList.of(path.getFileName().toString()), ImmutableList.of());
   }
 
   @Test
@@ -651,9 +640,9 @@ class CASFileCacheTest {
 
     verifyZeroInteractions(onExpire);
     // assert expiration of non-executable digest
-    Path expiringKey = fileCache.getKey(expiringBlob.getDigest(), /* isExecutable=*/ false);
+    String expiringKey = fileCache.getKey(expiringBlob.getDigest(), /* isExecutable=*/ false);
     assertThat(storage.containsKey(expiringKey)).isFalse();
-    assertThat(Files.exists(expiringKey)).isFalse();
+    assertThat(Files.exists(fileCache.getPath(expiringKey))).isFalse();
   }
 
   @Test
