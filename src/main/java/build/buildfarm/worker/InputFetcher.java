@@ -16,6 +16,7 @@ package build.buildfarm.worker;
 
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.QUEUED;
 import static java.lang.String.format;
+import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
@@ -224,6 +225,16 @@ public class InputFetcher implements Runnable {
 
   private void proceedToOutput(Action action, Command command, Path execDir)
       throws InterruptedException {
+    // switch poller to disable deadline
+    operationContext.poller.pause();
+    workerContext.resumePoller(
+        operationContext.poller,
+        "InputFetcher(claim)",
+        operationContext.queueEntry,
+        QUEUED,
+        () -> {},
+        Deadline.after(10, DAYS));
+
     OperationContext fetchedOperationContext =
         operationContext
             .toBuilder()
