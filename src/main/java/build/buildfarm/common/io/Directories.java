@@ -14,6 +14,7 @@
 
 package build.buildfarm.common.io;
 
+import static build.buildfarm.common.IOUtils.enableAllWriteAccess;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 
@@ -41,6 +42,7 @@ public class Directories {
     Path tmpPath = path.resolveSibling(tmpFilename);
     try {
       // rename must be synchronous to call
+      enableAllWriteAccess(path);
       Files.move(path, tmpPath);
     } catch (IOException e) {
       return immediateFailedFuture(e);

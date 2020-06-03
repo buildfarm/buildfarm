@@ -19,107 +19,12 @@ import build.bazel.remote.execution.v2.Platform.Property;
 import build.buildfarm.common.FileStatus;
 import build.buildfarm.common.IOUtils;
 import com.google.common.collect.Iterables;
-import com.google.common.util.concurrent.ListenableFuture;
-import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Path;
 
 public class Utils {
   private Utils() {}
-
-  public static ListenableFuture<Void> removeDirectory(Path path, ExecutorService service) {
-    String suffix = UUID.randomUUID().toString();
-    Path filename = path.getFileName();
-    String tmpFilename = filename + ".tmp." + suffix;
-    Path tmpPath = path.resolveSibling(tmpFilename);
-    try {
-      // rename must be synchronous to call
-      enableAllWriteAccess(path);
-      Files.move(path, tmpPath);
-    } catch (IOException e) {
-      return immediateFailedFuture(e);
-    }
-    return listeningDecorator(service)
-        .submit(
-            () -> {
-              try {
-                removeDirectory(tmpPath);
-              } catch (IOException e) {
-                logger.log(Level.SEVERE, "error removing directory " + tmpPath, e);
-              }
-            },
-            null);
-  }
-
-  public static void removeDirectory(Path directory) throws IOException {
-    Files.walkFileTree(
-        directory,
-        new SimpleFileVisitor<Path>() {
-          @Override
-          public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
-              throws IOException {
-            Files.delete(file);
-            return FileVisitResult.CONTINUE;
-          }
-
-          @Override
-          public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
-            if (e == null) {
-              Files.delete(dir);
-              return FileVisitResult.CONTINUE;
-            }
-            // directory iteration failed
-            throw e;
-          }
-        });
-  }
-
-  public static void disableAllWriteAccess(Path directory) throws IOException {
-    Files.walkFileTree(
-        directory,
-        new SimpleFileVisitor<Path>() {
-          @Override
-          public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
-              throws IOException {
-            new File(file.toString()).setWritable(false);
-            return FileVisitResult.CONTINUE;
-          }
-
-          @Override
-          public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
-            if (e == null) {
-              new File(dir.toString()).setWritable(false);
-              return FileVisitResult.CONTINUE;
-            }
-            // directory iteration failed
-            throw e;
-          }
-        });
-  }
-
-  public static void enableAllWriteAccess(Path directory) throws IOException {
-    Files.walkFileTree(
-        directory,
-        new SimpleFileVisitor<Path>() {
-          @Override
-          public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
-              throws IOException {
-            new File(file.toString()).setWritable(true);
-            return FileVisitResult.CONTINUE;
-          }
-
-          @Override
-          public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
-            if (e == null) {
-              new File(dir.toString()).setWritable(true);
-              return FileVisitResult.CONTINUE;
-            }
-            // directory iteration failed
-            throw e;
-          }
-        });
-  }
 
   public static FileStatus statIfFound(Path path, boolean followSymlinks) {
     try {

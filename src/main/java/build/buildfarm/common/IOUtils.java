@@ -18,9 +18,11 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.PosixFileAttributes;
 import java.util.ArrayList;
@@ -328,5 +330,51 @@ public class IOUtils {
   public static Boolean jnrIsDir(POSIX posix, String path) {
     int fd = posix.open(path, OpenFlags.O_DIRECTORY.intValue(), 0444);
     return fd > 0;
+  }
+
+  public static void disableAllWriteAccess(Path directory) throws IOException {
+    Files.walkFileTree(
+        directory,
+        new SimpleFileVisitor<Path>() {
+          @Override
+          public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+              throws IOException {
+            new File(file.toString()).setWritable(false);
+            return FileVisitResult.CONTINUE;
+          }
+
+          @Override
+          public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
+            if (e == null) {
+              new File(dir.toString()).setWritable(false);
+              return FileVisitResult.CONTINUE;
+            }
+            // directory iteration failed
+            throw e;
+          }
+        });
+  }
+
+  public static void enableAllWriteAccess(Path directory) throws IOException {
+    Files.walkFileTree(
+        directory,
+        new SimpleFileVisitor<Path>() {
+          @Override
+          public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+              throws IOException {
+            new File(file.toString()).setWritable(true);
+            return FileVisitResult.CONTINUE;
+          }
+
+          @Override
+          public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
+            if (e == null) {
+              new File(dir.toString()).setWritable(true);
+              return FileVisitResult.CONTINUE;
+            }
+            // directory iteration failed
+            throw e;
+          }
+        });
   }
 }
