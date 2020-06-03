@@ -14,10 +14,10 @@
 
 package build.buildfarm.cas;
 
-import static build.buildfarm.common.IOUtils.disableAllWriteAccess;
 import static build.buildfarm.common.IOUtils.listDir;
 import static build.buildfarm.common.IOUtils.listFFIdirentSorted;
 import static build.buildfarm.common.IOUtils.stat;
+import static build.buildfarm.common.io.Directories.disableAllWriteAccess;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.io.ByteStreams.nullOutputStream;
