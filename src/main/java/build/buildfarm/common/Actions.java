@@ -42,7 +42,11 @@ public final class Actions {
       throw StatusProto.toStatusException(
           Status.newBuilder()
               .setCode(Code.FAILED_PRECONDITION.getNumber())
-              .setMessage(invalidActionMessage(actionDigest))
+              .setMessage(
+                  invalidActionMessage(actionDigest)
+                      + preconditionFailure.getViolationsList().stream()
+                          .map(Violation::getDescription)
+                          .reduce("", (message, description) -> message + "; " + description))
               .addDetails(Any.pack(preconditionFailure))
               .build());
     }
