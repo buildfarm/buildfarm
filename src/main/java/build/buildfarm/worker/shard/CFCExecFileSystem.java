@@ -14,9 +14,8 @@
 
 package build.buildfarm.worker.shard;
 
+import static build.buildfarm.cas.CASFileCache.getInterruptiblyOrIOException;
 import static build.buildfarm.common.IOUtils.readdir;
-import static build.buildfarm.worker.CASFileCache.getInterruptiblyOrIOException;
-import static build.buildfarm.worker.Utils.removeDirectory;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Iterables.concat;
 import static com.google.common.util.concurrent.Futures.allAsList;
@@ -35,10 +34,11 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.FileNode;
+import build.buildfarm.cas.CASFileCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Dirent;
-import build.buildfarm.worker.CASFileCache;
+import build.buildfarm.common.io.Directories;
 import build.buildfarm.worker.OutputDirectory;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -105,7 +105,7 @@ class CFCExecFileSystem implements ExecFileSystem {
       String name = dirent.getName();
       Path child = root.resolve(name);
       if (!child.equals(fileCache.getRoot())) {
-        removeDirectoryFutures.add(removeDirectory(root.resolve(name), removeDirectoryService));
+        removeDirectoryFutures.add(Directories.remove(root.resolve(name), removeDirectoryService));
       }
     }
 
@@ -282,7 +282,7 @@ class CFCExecFileSystem implements ExecFileSystem {
 
     Path execDir = root.resolve(operationName);
     if (Files.exists(execDir)) {
-      removeDirectory(execDir);
+      Directories.remove(execDir);
     }
     Files.createDirectories(execDir);
 
@@ -335,7 +335,7 @@ class CFCExecFileSystem implements ExecFileSystem {
     } finally {
       if (!success) {
         fileCache.decrementReferences(inputFiles.build(), inputDirectories.build());
-        removeDirectory(execDir);
+        Directories.remove(execDir);
       }
     }
 
@@ -367,7 +367,7 @@ class CFCExecFileSystem implements ExecFileSystem {
           inputDirectories == null ? ImmutableList.of() : inputDirectories);
     }
     if (Files.exists(execDir)) {
-      removeDirectory(execDir);
+      Directories.remove(execDir);
     }
   }
 }

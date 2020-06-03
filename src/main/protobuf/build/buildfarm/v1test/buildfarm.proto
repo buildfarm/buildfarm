@@ -131,6 +131,11 @@ message FilesystemCASConfig {
   int64 max_entry_size_bytes = 3;
 }
 
+message FilesystemACConfig {
+  // path to action cache files from AC
+  string path = 1;
+}
+
 message FuseCASConfig {
   // used to identify the backing store
   string name = 1;
@@ -159,6 +164,7 @@ message GrpcACConfig {
 message ActionCacheConfig {
   oneof type {
     DelegateCASConfig delegate_cas = 1;
+    FilesystemACConfig filesystem = 3;
     GrpcACConfig grpc = 2;
   }
 }
@@ -663,4 +669,60 @@ message BlobWriteKey {
   build.bazel.remote.execution.v2.Digest digest = 1;
 
   string identifier = 2;
+}
+
+message OperationTimesBetweenStages {
+  google.protobuf.Duration queued_to_match = 1;
+
+  google.protobuf.Duration match_to_input_fetch_start = 2;
+
+  google.protobuf.Duration input_fetch_start_to_complete = 3;
+
+  google.protobuf.Duration input_fetch_complete_to_execution_start = 4;
+
+  google.protobuf.Duration execution_start_to_complete = 5;
+
+  google.protobuf.Duration execution_complete_to_output_upload_start = 6;
+
+  google.protobuf.Duration output_upload_start_to_complete = 7;
+
+  google.protobuf.Duration period = 8;
+
+  int32 operation_count = 9;
+}
+
+message WorkerProfileMessage {
+  // number of Entry in CAS
+  int64 cas_entry_count = 1;
+
+  // number of DirectoryEntry in CAS
+  int64 cas_directory_entry_count = 2;
+
+  // sum up size of containingDirectories of all Entries
+  int64 entry_containing_directories_count = 3;
+
+  // the observed largest size of Entry.containingDirectories, this is the largest value
+  // since the start of the specific worker
+  int64 entry_containing_directories_max = 4;
+
+  // number of evicted Entries since last profile request
+  int32 cas_evicted_entry_count = 5;
+
+  // the total size of evicted Entries since last profile request
+  int64 cas_evicted_entry_size = 6;
+
+  // ${number of slots used} / ${number of slots configured} in InputFetchStage
+  string input_fetch_stage_slots_used_over_configured = 7;
+
+  // ${number of slots used} / ${number of slots configured} in ExecuteActionStage
+  string execute_action_stage_slots_used_over_configured = 8;
+
+  repeated OperationTimesBetweenStages times = 10;
+}
+
+message WorkerProfileRequest {
+}
+
+service WorkerProfile {
+  rpc getWorkerProfile(WorkerProfileRequest) returns (WorkerProfileMessage) {}
 }

@@ -25,6 +25,7 @@ import static java.util.logging.Level.INFO;
 import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.Digest;
+import build.buildfarm.cas.CASFileCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.cas.MemoryCAS;
@@ -44,7 +45,6 @@ import build.buildfarm.v1test.ContentAddressableStorageConfig;
 import build.buildfarm.v1test.FilesystemCASConfig;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.ShardWorkerConfig;
-import build.buildfarm.worker.CASFileCache;
 import build.buildfarm.worker.ExecuteActionStage;
 import build.buildfarm.worker.FuseCAS;
 import build.buildfarm.worker.InputFetchStage;
@@ -197,17 +197,9 @@ public class Worker extends LoggingMain {
             digestUtil,
             backplane,
             storage,
-            execFileSystem,
             config.getShardWorkerInstanceConfig());
 
     Instances instances = Instances.singular(instance);
-    server =
-        serverBuilder
-            .addService(
-                new ContentAddressableStorageService(
-                    instances, /* deadlineAfter=*/ 1, DAYS, /* requestLogLevel=*/ FINER))
-            .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, DAYS))
-            .build();
 
     ShardWorkerContext context =
         new ShardWorkerContext(
@@ -249,6 +241,17 @@ public class Worker extends LoggingMain {
     pipeline.add(inputFetchStage, 3);
     pipeline.add(executeActionStage, 2);
     pipeline.add(reportResultStage, 1);
+
+    server =
+        serverBuilder
+            .addService(
+                new ContentAddressableStorageService(
+                    instances, /* deadlineAfter=*/ 1, DAYS, /* requestLogLevel=*/ FINER))
+            .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, DAYS))
+            .addService(
+                new WorkerProfileService(
+                    storage, inputFetchStage, executeActionStage, context, completeStage))
+            .build();
 
     logger.log(INFO, String.format("%s initialized", identifier));
   }

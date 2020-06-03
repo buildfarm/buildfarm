@@ -1,0 +1,92 @@
+// Copyright 2020 The Bazel Authors. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package build.buildfarm.worker.shard;
+
+import build.buildfarm.cas.CASFileCache;
+import build.buildfarm.cas.ContentAddressableStorage;
+import build.buildfarm.v1test.OperationTimesBetweenStages;
+import build.buildfarm.v1test.WorkerProfileGrpc;
+import build.buildfarm.v1test.WorkerProfileMessage;
+import build.buildfarm.v1test.WorkerProfileRequest;
+import build.buildfarm.worker.ExecuteActionStage;
+import build.buildfarm.worker.InputFetchStage;
+import build.buildfarm.worker.PipelineStage;
+import build.buildfarm.worker.PutOperationStage;
+import build.buildfarm.worker.PutOperationStage.OperationStageDurations;
+import build.buildfarm.worker.WorkerContext;
+import io.grpc.stub.StreamObserver;
+
+public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBase {
+  private final CASFileCache storage;
+  private final InputFetchStage inputFetchStage;
+  private final ExecuteActionStage executeActionStage;
+  private final WorkerContext context;
+  private final PutOperationStage completeStage;
+
+  public WorkerProfileService(
+      ContentAddressableStorage storage,
+      PipelineStage inputFetchStage,
+      PipelineStage executeActionStage,
+      WorkerContext context,
+      PipelineStage completeStage) {
+    this.storage = (CASFileCache) storage;
+    this.inputFetchStage = (InputFetchStage) inputFetchStage;
+    this.executeActionStage = (ExecuteActionStage) executeActionStage;
+    this.context = context;
+    this.completeStage = (PutOperationStage) completeStage;
+  }
+
+  @Override
+  public void getWorkerProfile(
+      WorkerProfileRequest request, StreamObserver<WorkerProfileMessage> responseObserver) {
+    // get usage of CASFileCache
+    WorkerProfileMessage.Builder replyBuilder =
+        WorkerProfileMessage.newBuilder()
+            .setCasEntryCount(storage.storageCount())
+            .setCasDirectoryEntryCount(storage.directoryStorageCount())
+            .setEntryContainingDirectoriesCount(storage.getContainedDirectoriesCount())
+            .setEntryContainingDirectoriesMax(storage.getContainedDirectoriesMax())
+            .setCasEvictedEntryCount(storage.getEvictedCount())
+            .setCasEvictedEntrySize(storage.getEvictedSize());
+
+    // get slots used/configured of superscalar stages
+    String inputFetchStageSlotUsage =
+        String.format("%d/%d", inputFetchStage.getSlotUsage(), context.getInputFetchStageWidth());
+    String executeActionStageSlotUsage =
+        String.format("%d/%d", executeActionStage.getSlotUsage(), context.getExecuteStageWidth());
+    replyBuilder
+        .setInputFetchStageSlotsUsedOverConfigured(inputFetchStageSlotUsage)
+        .setExecuteActionStageSlotsUsedOverConfigured(executeActionStageSlotUsage);
+
+    // get average time costs on each stage
+    OperationStageDurations[] durations = completeStage.getAverageTimeCostPerStage();
+    for (OperationStageDurations duration : durations) {
+      OperationTimesBetweenStages.Builder timesBuilder = OperationTimesBetweenStages.newBuilder();
+      timesBuilder
+          .setQueuedToMatch(duration.queuedToMatch)
+          .setMatchToInputFetchStart(duration.matchToInputFetchStart)
+          .setInputFetchStartToComplete(duration.inputFetchStartToComplete)
+          .setInputFetchCompleteToExecutionStart(duration.inputFetchCompleteToExecutionStart)
+          .setExecutionStartToComplete(duration.executionStartToComplete)
+          .setExecutionCompleteToOutputUploadStart(duration.executionCompleteToOutputUploadStart)
+          .setOutputUploadStartToComplete(duration.outputUploadStartToComplete)
+          .setOperationCount(duration.operationCount)
+          .setPeriod(duration.period);
+      replyBuilder.addTimes(timesBuilder.build());
+    }
+    responseObserver.onNext(replyBuilder.build());
+    responseObserver.onCompleted();
+  }
+}
