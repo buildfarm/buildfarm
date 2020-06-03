@@ -14,10 +14,9 @@
 
 package build.buildfarm.worker.operationqueue;
 
+import static build.buildfarm.cas.CASFileCache.getInterruptiblyOrIOException;
 import static build.buildfarm.common.IOUtils.formatIOError;
 import static build.buildfarm.instance.Utils.getBlob;
-import static build.buildfarm.worker.CASFileCache.getInterruptiblyOrIOException;
-import static build.buildfarm.worker.Utils.removeDirectory;
 import static com.google.common.collect.Maps.uniqueIndex;
 import static com.google.common.util.concurrent.Futures.allAsList;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
@@ -39,6 +38,7 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.cas.CASFileCache;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
@@ -47,6 +47,7 @@ import build.buildfarm.common.Poller;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.Retrier.Backoff;
+import build.buildfarm.common.io.Directories;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.instance.stub.ByteStreamUploader;
@@ -58,7 +59,6 @@ import build.buildfarm.v1test.InstanceEndpoint;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.WorkerConfig;
-import build.buildfarm.worker.CASFileCache;
 import build.buildfarm.worker.ExecuteActionStage;
 import build.buildfarm.worker.InputFetchStage;
 import build.buildfarm.worker.MatchStage;
@@ -566,7 +566,7 @@ public class Worker {
 
             Path execDir = root.resolve(operationName);
             if (Files.exists(execDir)) {
-              removeDirectory(execDir);
+              Directories.remove(execDir);
             }
             Files.createDirectories(execDir);
 
@@ -611,7 +611,7 @@ public class Worker {
             Iterable<Digest> inputDirectories = rootInputDirectories.remove(execDir);
 
             fileCache.decrementReferences(inputFiles, inputDirectories);
-            removeDirectory(execDir);
+            Directories.remove(execDir);
           }
 
           @Override

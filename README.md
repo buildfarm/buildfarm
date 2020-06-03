@@ -1,4 +1,4 @@
-[![Build status](https://badge.buildkite.com/45f4fd4c0cfb95f7705156a4119641c6d5d6c310452d6e65a4.svg)](https://buildkite.com/bazel/buildfarm-postsubmit)
+[![Build status](https://badge.buildkite.com/45f4fd4c0cfb95f7705156a4119641c6d5d6c310452d6e65a4.svg?branch=master)](https://buildkite.com/bazel/buildfarm-postsubmit)
 
 # Bazel Buildfarm
 
@@ -8,6 +8,8 @@ Background information on the status of caching and remote execution in bazel ca
 found in the [bazel documentation](https://docs.bazel.build/versions/master/remote-caching.html).
 
 File issues here for bugs or feature requests, and ask questions via build team [slack](https://join.slack.com/t/buildteamworld/shared_invite/zt-4zy8f5j5-KwiJuBoAAUorB_mdQHwF7Q) in the #buildfarm channel.
+
+[Buildfarm Wiki](https://github.com/bazelbuild/bazel-buildfarm/wiki)
 
 ## Usage
 

@@ -29,6 +29,7 @@ import com.google.protobuf.ByteString;
 import com.google.rpc.Code;
 import com.google.rpc.Status;
 import io.grpc.protobuf.StatusProto;
+import io.grpc.stub.ServerCallStreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -120,6 +121,27 @@ public class MemoryCAS implements ContentAddressableStorage {
     InputStream in = blob.getData().newInput();
     in.skip(offset);
     return in;
+  }
+
+  @Override
+  public void get(
+      Digest digest,
+      long offset,
+      long limit,
+      ServerCallStreamObserver<ByteString> blobObserver,
+      RequestMetadata requestMetadata) {
+    Blob blob = get(digest);
+    if (blob == null) {
+      if (delegate != null) {
+        // FIXME change this to a read-through get
+        delegate.get(digest, offset, limit, blobObserver, requestMetadata);
+      } else {
+        blobObserver.onError(io.grpc.Status.NOT_FOUND.asException());
+      }
+    } else {
+      blobObserver.onNext(blob.getData());
+      blobObserver.onCompleted();
+    }
   }
 
   @Override

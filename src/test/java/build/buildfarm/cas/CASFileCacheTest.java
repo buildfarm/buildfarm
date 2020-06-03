@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker;
+package build.buildfarm.cas;
 
-import static build.buildfarm.worker.CASFileCache.getInterruptiblyOrIOException;
+import static build.buildfarm.cas.CASFileCache.getInterruptiblyOrIOException;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
@@ -37,18 +37,16 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.RequestMetadata;
-import build.buildfarm.cas.ContentAddressableStorage;
+import build.buildfarm.cas.CASFileCache.Entry;
+import build.buildfarm.cas.CASFileCache.PutDirectoryException;
+import build.buildfarm.cas.CASFileCache.StartupCacheResults;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
-import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.NullWrite;
 import build.buildfarm.common.io.FeedbackOutputStream;
-import build.buildfarm.worker.CASFileCache.Entry;
-import build.buildfarm.worker.CASFileCache.PutDirectoryException;
-import build.buildfarm.worker.CASFileCache.StartupCacheResults;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;

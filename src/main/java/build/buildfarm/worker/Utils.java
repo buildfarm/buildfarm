@@ -14,77 +14,17 @@
 
 package build.buildfarm.worker;
 
-import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
-import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
-
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Platform.Property;
 import build.buildfarm.common.FileStatus;
 import build.buildfarm.common.IOUtils;
 import com.google.common.collect.Iterables;
-import com.google.common.util.concurrent.ListenableFuture;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.nio.file.FileVisitResult;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
-import java.util.UUID;
-import java.util.concurrent.ExecutorService;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 public class Utils {
-  private static final Logger logger = Logger.getLogger(Utils.class.getName());
-
   private Utils() {}
-
-  public static ListenableFuture<Void> removeDirectory(Path path, ExecutorService service) {
-    String suffix = UUID.randomUUID().toString();
-    Path filename = path.getFileName();
-    String tmpFilename = filename + ".tmp." + suffix;
-    Path tmpPath = path.resolveSibling(tmpFilename);
-    try {
-      // rename must be synchronous to call
-      Files.move(path, tmpPath);
-    } catch (IOException e) {
-      return immediateFailedFuture(e);
-    }
-    return listeningDecorator(service)
-        .submit(
-            () -> {
-              try {
-                removeDirectory(tmpPath);
-              } catch (IOException e) {
-                logger.log(Level.SEVERE, "error removing directory " + tmpPath, e);
-              }
-            },
-            null);
-  }
-
-  public static void removeDirectory(Path directory) throws IOException {
-    Files.walkFileTree(
-        directory,
-        new SimpleFileVisitor<Path>() {
-          @Override
-          public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
-              throws IOException {
-            Files.delete(file);
-            return FileVisitResult.CONTINUE;
-          }
-
-          @Override
-          public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
-            if (e == null) {
-              Files.delete(dir);
-              return FileVisitResult.CONTINUE;
-            }
-            // directory iteration failed
-            throw e;
-          }
-        });
-  }
 
   public static FileStatus statIfFound(Path path, boolean followSymlinks) {
     try {
