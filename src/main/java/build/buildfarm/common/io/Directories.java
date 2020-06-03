@@ -42,7 +42,6 @@ public class Directories {
     Path tmpPath = path.resolveSibling(tmpFilename);
     try {
       // rename must be synchronous to call
-      enableAllWriteAccess(path);
       Files.move(path, tmpPath);
     } catch (IOException e) {
       return immediateFailedFuture(e);
@@ -51,6 +50,7 @@ public class Directories {
         .submit(
             () -> {
               try {
+                enableAllWriteAccess(tmpPath);
                 remove(tmpPath);
               } catch (IOException e) {
                 logger.log(Level.SEVERE, "error removing directory " + tmpPath, e);
