@@ -95,12 +95,11 @@ public class Directories {
 
           @Override
           public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
-            if (e == null) {
-              new File(dir.toString()).setWritable(false);
-              return FileVisitResult.CONTINUE;
+            if (e != null) {
+              throw e;
             }
-            // directory iteration failed
-            throw e;
+            new File(dir.toString()).setWritable(false);
+            return FileVisitResult.CONTINUE;
           }
         });
   }
@@ -118,12 +117,11 @@ public class Directories {
 
           @Override
           public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
-            if (e == null) {
-              new File(dir.toString()).setWritable(true);
-              return FileVisitResult.CONTINUE;
+            if (e != null) {
+              throw e;
             }
-            // directory iteration failed
-            throw e;
+            new File(dir.toString()).setWritable(true);
+            return FileVisitResult.CONTINUE;
           }
         });
   }

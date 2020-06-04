@@ -2211,9 +2211,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             service);
 
     ListenableFuture<Void> chmodFuture =
-        transform(
+        transformAsync(
             fetchFuture,
             (result) -> {
+              ImmutableList.Builder<Throwable> failures = ImmutableList.builder();
+              boolean failed = false;
               try {
                 disableAllWriteAccess(path);
               } catch (IOException chmodException) {
@@ -2221,8 +2223,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                     Level.SEVERE,
                     "error while disabling write permissions on " + path,
                     chmodException);
+                return immediateFailedFuture(chmodException);
               }
-              return null;
+              return immediateFuture(null);
             },
             service);
 
