@@ -40,12 +40,14 @@ public final class Actions {
       Digest actionDigest, PreconditionFailure failure) {
     // if the list of violations get very long, display 3 at most
     int maxNumOfViolation = 3;
-    String errorMessage = failure.getViolationsList()
-        .stream()
-        .map(Violation::getDescription)
-        .limit(maxNumOfViolation)
-        .reduce("", (message, description) -> message + description + "; ");
-    String format = "Action %s is invalid: %s " + (failure.getViolationsList().size() > maxNumOfViolation ? "..." : "");
+    String errorMessage =
+        failure.getViolationsList().stream()
+            .map(Violation::getDescription)
+            .limit(maxNumOfViolation)
+            .reduce("", (message, description) -> message + description + "; ");
+    String format =
+        "Action %s is invalid: %s "
+            + (failure.getViolationsList().size() > maxNumOfViolation ? "..." : "");
     return format(format, DigestUtil.toString(actionDigest), errorMessage);
   }
 
