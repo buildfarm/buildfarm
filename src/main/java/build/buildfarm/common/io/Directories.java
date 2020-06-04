@@ -59,10 +59,17 @@ public class Directories {
   }
 
   public static void remove(Path directory) throws IOException {
-    enableAllWriteAccess(directory);
     Files.walkFileTree(
         directory,
         new SimpleFileVisitor<Path>() {
+
+          @Override
+          public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
+              throws IOException {
+            new File(dir.toString()).setWritable(true);
+            return FileVisitResult.CONTINUE;
+          }
+
           @Override
           public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
               throws IOException {
@@ -72,12 +79,11 @@ public class Directories {
 
           @Override
           public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
-            if (e == null) {
-              Files.delete(dir);
-              return FileVisitResult.CONTINUE;
+            if (e != null) {
+              throw e;
             }
-            // directory iteration failed
-            throw e;
+            Files.delete(dir);
+            return FileVisitResult.CONTINUE;
           }
         });
   }
