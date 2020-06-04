@@ -38,12 +38,15 @@ public final class Actions {
 
   public static String invalidActionVerboseMessage(
       Digest actionDigest, PreconditionFailure failure) {
-    return format(
-        "Action %s is invalid: %s",
-        DigestUtil.toString(actionDigest),
-        failure.getViolationsList().stream()
-            .map(Violation::getDescription)
-            .reduce("", (message, description) -> message + description + " "));
+    // if the list of violations get very long, display 3 at most
+    int maxNumOfViolation = 3;
+    String errorMessage = failure.getViolationsList()
+        .stream()
+        .map(Violation::getDescription)
+        .limit(maxNumOfViolation)
+        .reduce("", (message, description) -> message + description + "; ");
+    String format = "Action %s is invalid: %s " + (failure.getViolationsList().size() > maxNumOfViolation ? "..." : "");
+    return format(format, DigestUtil.toString(actionDigest), errorMessage);
   }
 
   public static void checkPreconditionFailure(
