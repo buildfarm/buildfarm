@@ -191,7 +191,7 @@ public class PutOperationStage extends PipelineStage.NullStage {
     }
 
     void addOperations(OperationStageDurations other) {
-      // if any Duration fields of input is not a valid Duration, ignore the input
+      // if any Duration field of input is not a valid Duration, ignore the input
       if (!validateOperationStageDuration(other)) {
         return;
       }
