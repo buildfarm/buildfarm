@@ -73,6 +73,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
+import com.google.protobuf.Duration;
 import com.google.rpc.Code;
 import com.google.rpc.PreconditionFailure;
 import com.google.rpc.PreconditionFailure.Violation;
@@ -130,6 +131,7 @@ public class ShardInstanceTest {
             /* dispatchedMonitorIntervalSeconds=*/ 0,
             /* runOperationQueuer=*/ false,
             /* maxBlobSize=*/ 0,
+            /* maxActionTimeout=*/ Duration.getDefaultInstance(),
             mockOnStop,
             CacheBuilder.newBuilder().build(mockInstanceLoader));
     instance.start();
