@@ -191,6 +191,11 @@ public class PutOperationStage extends PipelineStage.NullStage {
     }
 
     void addOperations(OperationStageDurations other) {
+      // if any Duration fields of input is not a valid Duration, ignore the input
+      if (!validateOperationStageDuration(other)) {
+        return;
+      }
+
       this.queuedToMatch = Durations.add(this.queuedToMatch, other.queuedToMatch);
       this.matchToInputFetchStart =
           Durations.add(this.matchToInputFetchStart, other.matchToInputFetchStart);
@@ -208,6 +213,16 @@ public class PutOperationStage extends PipelineStage.NullStage {
       this.outputUploadStartToComplete =
           Durations.add(this.outputUploadStartToComplete, other.outputUploadStartToComplete);
       this.operationCount += other.operationCount;
+    }
+
+    private static boolean validateOperationStageDuration(OperationStageDurations other) {
+      return Durations.isValid(other.queuedToMatch)
+          && Durations.isValid(other.matchToInputFetchStart)
+          && Durations.isValid(other.inputFetchStartToComplete)
+          && Durations.isValid(other.inputFetchCompleteToExecutionStart)
+          && Durations.isValid(other.executionStartToComplete)
+          && Durations.isValid(other.executionCompleteToOutputUploadStart)
+          && Durations.isValid(other.outputUploadStartToComplete);
     }
 
     private OperationStageDurations computeAverage(int weight) {
