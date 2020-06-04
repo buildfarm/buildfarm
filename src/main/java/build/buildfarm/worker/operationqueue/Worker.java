@@ -115,7 +115,7 @@ public class Worker {
   private final WorkerConfig config;
   private final Path root;
   private final CASFileCache fileCache;
-  private final Map<Path, Iterable<Path>> rootInputFiles = new ConcurrentHashMap<>();
+  private final Map<Path, Iterable<String>> rootInputFiles = new ConcurrentHashMap<>();
   private final Map<Path, Iterable<Digest>> rootInputDirectories = new ConcurrentHashMap<>();
 
   private static final ListeningScheduledExecutorService retryScheduler =
@@ -243,7 +243,7 @@ public class Worker {
       Digest inputRoot,
       Map<Digest, Directory> directoriesIndex,
       OutputDirectory outputDirectory,
-      ImmutableList.Builder<Path> inputFiles,
+      ImmutableList.Builder<String> inputFiles,
       ImmutableList.Builder<Digest> inputDirectories)
       throws IOException, InterruptedException {
     Directory directory;
@@ -570,7 +570,7 @@ public class Worker {
             }
             Files.createDirectories(execDir);
 
-            ImmutableList.Builder<Path> inputFiles = new ImmutableList.Builder<>();
+            ImmutableList.Builder<String> inputFiles = new ImmutableList.Builder<>();
             ImmutableList.Builder<Digest> inputDirectories = new ImmutableList.Builder<>();
 
             boolean fetched = false;
@@ -607,7 +607,7 @@ public class Worker {
 
           @Override
           public void destroyExecDir(Path execDir) throws IOException {
-            Iterable<Path> inputFiles = rootInputFiles.remove(execDir);
+            Iterable<String> inputFiles = rootInputFiles.remove(execDir);
             Iterable<Digest> inputDirectories = rootInputDirectories.remove(execDir);
 
             fileCache.decrementReferences(inputFiles, inputDirectories);

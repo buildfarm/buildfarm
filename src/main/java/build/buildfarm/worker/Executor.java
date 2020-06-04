@@ -213,6 +213,16 @@ class Executor {
       return 0;
     }
 
+    // switch poller to disable deadline
+    operationContext.poller.pause();
+    workerContext.resumePoller(
+        operationContext.poller,
+        "Executor(claim)",
+        operationContext.queueEntry,
+        ExecutionStage.Value.EXECUTING,
+        () -> {},
+        Deadline.after(10, DAYS));
+
     resultBuilder
         .getExecutionMetadataBuilder()
         .setExecutionCompletedTimestamp(Timestamps.fromMillis(System.currentTimeMillis()));

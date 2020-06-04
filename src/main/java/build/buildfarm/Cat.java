@@ -620,16 +620,6 @@ class Cat {
             strNumFormat, "Current DirectoryEntry Count", response.getCasDirectoryEntryCount()));
     System.out.println(
         String.format(
-            strNumFormat,
-            "Current ContainedDirectories total",
-            response.getEntryContainingDirectoriesCount()));
-    System.out.println(
-        String.format(
-            strNumFormat,
-            "Current ContainedDirectories Max of single Entry",
-            response.getEntryContainingDirectoriesMax()));
-    System.out.println(
-        String.format(
             strNumFormat, "Number of Evicted Entries", response.getCasEvictedEntryCount()));
     System.out.println(
         String.format(

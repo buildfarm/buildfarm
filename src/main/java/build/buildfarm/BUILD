@@ -545,6 +545,9 @@ java_library(
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
+    runtime_deps = [
+        "@maven//:org_xerial_sqlite_jdbc",
+    ],
 )
 
 java_library(
