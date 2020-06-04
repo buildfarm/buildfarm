@@ -21,9 +21,9 @@ import java.util.logging.Level;
 
 abstract class SuperscalarPipelineStage extends PipelineStage {
 
-  private final int width;
-  private final BlockingQueue claims;
-  private boolean catastrophic = false;
+  protected final int width;
+  protected final BlockingQueue claims;
+  private volatile boolean catastrophic = false;
 
   // ensure that only a single claim waits for available slots for core count
   private Object claimLock = new Object();
@@ -116,10 +116,30 @@ abstract class SuperscalarPipelineStage extends PipelineStage {
 
   protected boolean claim(int count) throws InterruptedException {
     Object handle = new Object();
+    int claimed = 0;
     synchronized (claimLock) {
-      while (count != 0 && !isClosed()) {
-        if (claims.offer(handle, 10, TimeUnit.MILLISECONDS)) {
-          count--;
+      while (count > 0 && !isClosed()) {
+        try {
+          if (claims.offer(handle, 10, TimeUnit.MILLISECONDS)) {
+            claimed++;
+            count--;
+          }
+        } catch (InterruptedException e) {
+          boolean interrupted = Thread.interrupted();
+          while (claimed != 0) {
+            interrupted = Thread.interrupted() || interrupted;
+            try {
+              claims.take();
+              claimed--;
+            } catch (InterruptedException intEx) {
+              // ignore, we must release our claims
+              e.addSuppressed(intEx);
+            }
+          }
+          if (interrupted) {
+            Thread.currentThread().interrupt();
+          }
+          throw e;
         }
       }
     }
