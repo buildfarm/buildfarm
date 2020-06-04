@@ -17,6 +17,7 @@ package build.buildfarm.cas;
 import static build.buildfarm.common.IOUtils.listDir;
 import static build.buildfarm.common.IOUtils.listFFIdirentSorted;
 import static build.buildfarm.common.IOUtils.stat;
+import static build.buildfarm.common.io.Directories.disableAllWriteAccess;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.io.ByteStreams.nullOutputStream;
@@ -2208,9 +2209,29 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                   service);
             },
             service);
+
+    ListenableFuture<Void> chmodFuture =
+        transformAsync(
+            fetchFuture,
+            (result) -> {
+              ImmutableList.Builder<Throwable> failures = ImmutableList.builder();
+              boolean failed = false;
+              try {
+                disableAllWriteAccess(path);
+              } catch (IOException chmodException) {
+                logger.log(
+                    Level.SEVERE,
+                    "error while disabling write permissions on " + path,
+                    chmodException);
+                return immediateFailedFuture(chmodException);
+              }
+              return immediateFuture(null);
+            },
+            service);
+
     ListenableFuture<Void> rollbackFuture =
         catchingAsync(
-            fetchFuture,
+            chmodFuture,
             Throwable.class,
             (e) -> {
               ImmutableList<String> inputs = inputsBuilder.build();
