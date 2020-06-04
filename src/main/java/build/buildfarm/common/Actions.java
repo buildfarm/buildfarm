@@ -41,8 +41,8 @@ public final class Actions {
     // if the list of violations get very long, display 3 at most
     int maxNumOfViolation = 3;
     String format =
-        "Action %s is invalid: %s "
-            + (failure.getViolationsList().size() > maxNumOfViolation ? "..." : "");
+        "Action %s is invalid: %s"
+            + (failure.getViolationsList().size() > maxNumOfViolation ? " ..." : ".");
     String[] errorMessages =
         failure.getViolationsList().stream()
             .map(Violation::getDescription)
