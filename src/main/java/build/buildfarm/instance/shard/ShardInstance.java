@@ -124,6 +124,7 @@ import java.util.Collections;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Queue;
 import java.util.Random;
 import java.util.Set;
@@ -137,6 +138,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -1446,11 +1448,11 @@ public class ShardInstance extends AbstractServerInstance {
 
   @Override
   protected void validateAction(
-      String operationName,
       Action action,
-      PreconditionFailure.Builder preconditionFailure,
-      RequestMetadata requestMetadata)
-      throws InterruptedException, StatusException {
+      @Nullable Command command,
+      Map<Digest, Directory> directoriesIndex,
+      Consumer<Digest> onInputDigest,
+      PreconditionFailure.Builder preconditionFailure) {
     if (action.hasTimeout() && hasMaxActionTimeout()) {
       Duration timeout = action.getTimeout();
       if (timeout.getSeconds() > maxActionTimeout.getSeconds()
@@ -1464,7 +1466,7 @@ public class ShardInstance extends AbstractServerInstance {
       }
     }
 
-    super.validateAction(operationName, action, preconditionFailure, requestMetadata);
+    super.validateAction(action, command, directoriesIndex, onInputDigest, preconditionFailure);
   }
 
   private ListenableFuture<Void> validateAndRequeueOperation(
