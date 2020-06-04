@@ -98,6 +98,7 @@ import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
+import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Parser;
 import com.google.protobuf.util.Durations;
@@ -147,12 +148,16 @@ public class ShardInstance extends AbstractServerInstance {
 
   private static ListenableFuture<Void> IMMEDIATE_VOID_FUTURE = Futures.immediateFuture(null);
 
+  private static final String TIMEOUT_OUT_OF_BOUNDS =
+      "A timeout specified is out of bounds with a configured range";
+
   private final Runnable onStop;
   private final long maxBlobSize;
   private final ShardBackplane backplane;
   private final RemoteInputStreamFactory remoteInputStreamFactory;
   private final com.google.common.cache.LoadingCache<String, Instance> workerStubs;
   private final Thread dispatchedMonitor;
+  private final Duration maxActionTimeout;
   private final Cache<Digest, Directory> directoryCache =
       CacheBuilder.newBuilder().maximumSize(64 * 1024).build();
   private final Cache<Digest, Command> commandCache =
@@ -194,6 +199,7 @@ public class ShardInstance extends AbstractServerInstance {
         config.getDispatchedMonitorIntervalSeconds(),
         config.getRunOperationQueuer(),
         config.getMaxBlobSize(),
+        config.getMaximumActionTimeout(),
         onStop,
         WorkerStubs.create(digestUtil));
   }
@@ -242,6 +248,7 @@ public class ShardInstance extends AbstractServerInstance {
       int dispatchedMonitorIntervalSeconds,
       boolean runOperationQueuer,
       long maxBlobSize,
+      Duration maxActionTimeout,
       Runnable onStop,
       com.google.common.cache.LoadingCache<String, Instance> workerStubs)
       throws InterruptedException {
@@ -250,6 +257,7 @@ public class ShardInstance extends AbstractServerInstance {
     this.workerStubs = workerStubs;
     this.onStop = onStop;
     this.maxBlobSize = maxBlobSize;
+    this.maxActionTimeout = maxActionTimeout;
     this.actionResultCache = createActionResultCache(backplane);
     backplane.setOnUnsubscribe(this::stop);
 
@@ -1430,6 +1438,33 @@ public class ShardInstance extends AbstractServerInstance {
           .setSubject(INVALID_PLATFORM)
           .setDescription(format("max-cores (%d) must be >= min-cores (%d)", maxCores, minCores));
     }
+  }
+
+  private boolean hasMaxActionTimeout() {
+    return maxActionTimeout.getSeconds() > 0 || maxActionTimeout.getNanos() > 0;
+  }
+
+  @Override
+  protected void validateAction(
+      String operationName,
+      Action action,
+      PreconditionFailure.Builder preconditionFailure,
+      RequestMetadata requestMetadata)
+      throws InterruptedException, StatusException {
+    if (action.hasTimeout() && hasMaxActionTimeout()) {
+      Duration timeout = action.getTimeout();
+      if (timeout.getSeconds() > maxActionTimeout.getSeconds()
+          || (timeout.getSeconds() == maxActionTimeout.getSeconds()
+              && timeout.getNanos() > maxActionTimeout.getNanos())) {
+        preconditionFailure
+            .addViolationsBuilder()
+            .setType(VIOLATION_TYPE_INVALID)
+            .setSubject(Durations.toString(timeout) + " > " + Durations.toString(maxActionTimeout))
+            .setDescription(TIMEOUT_OUT_OF_BOUNDS);
+      }
+    }
+
+    super.validateAction(operationName, action, preconditionFailure, requestMetadata);
   }
 
   private ListenableFuture<Void> validateAndRequeueOperation(

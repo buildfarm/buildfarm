@@ -246,6 +246,11 @@ message ShardInstanceConfig {
   }
 
   int64 max_blob_size = 5;
+
+  // maximum selectable timeout
+  // a maximum threshold for an action's specified timeout,
+  // beyond which an action will be rejected for execution
+  google.protobuf.Duration maximum_action_timeout = 7;
 }
 
 message ShardWorkerInstanceConfig {
@@ -266,17 +271,6 @@ message ShardWorkerInstanceConfig {
 
   // page size for getTree request
   uint32 tree_page_size = 12;
-
-  // default timeout for actions
-  // if a timeout is unspecified for an action, this value
-  // is imposed on it, after which the operation will
-  // be killed
-  google.protobuf.Duration default_action_timeout = 13;
-
-  // maximum selectable timeout
-  // a maximum threshold for an action's specified timeout,
-  // beyond which an action will be rejected for execution
-  google.protobuf.Duration maximum_action_timeout = 14;
 }
 
 message ShardWorkerConfig {

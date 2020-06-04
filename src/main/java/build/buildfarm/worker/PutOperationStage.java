@@ -44,9 +44,11 @@ public class PutOperationStage extends PipelineStage.NullStage {
   public void put(OperationContext operationContext) throws InterruptedException {
     onPut.acceptInterruptibly(operationContext.operation);
     synchronized (this) {
-      for (AverageTimeCostOfLastPeriod average : averagesWithinDifferentPeriods) {
-        average.addOperation(
-            operationContext.executeResponse.build().getResult().getExecutionMetadata());
+      if (operationContext.operation.getDone()) {
+        for (AverageTimeCostOfLastPeriod average : averagesWithinDifferentPeriods) {
+          average.addOperation(
+              operationContext.executeResponse.build().getResult().getExecutionMetadata());
+        }
       }
     }
   }
