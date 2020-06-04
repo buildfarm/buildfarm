@@ -898,7 +898,7 @@ public abstract class AbstractServerInstance implements Instance {
     }
   }
 
-  private void validateAction(
+  protected void validateAction(
       Action action,
       @Nullable Command command,
       Map<Digest, Directory> directoriesIndex,
