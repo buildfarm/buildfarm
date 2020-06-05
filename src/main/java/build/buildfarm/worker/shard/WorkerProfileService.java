@@ -17,6 +17,7 @@ package build.buildfarm.worker.shard;
 import build.buildfarm.cas.CASFileCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.v1test.OperationTimesBetweenStages;
+import build.buildfarm.v1test.StageInformation;
 import build.buildfarm.v1test.WorkerProfileGrpc;
 import build.buildfarm.v1test.WorkerProfileMessage;
 import build.buildfarm.v1test.WorkerProfileRequest;
@@ -59,14 +60,20 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
             .setCasEvictedEntryCount(storage.getEvictedCount())
             .setCasEvictedEntrySize(storage.getEvictedSize());
 
-    // get slots used/configured of superscalar stages
-    String inputFetchStageSlotUsage =
-        String.format("%d/%d", inputFetchStage.getSlotUsage(), context.getInputFetchStageWidth());
-    String executeActionStageSlotUsage =
-        String.format("%d/%d", executeActionStage.getSlotUsage(), context.getExecuteStageWidth());
+    // get slots configured and used of superscalar stages
     replyBuilder
-        .setInputFetchStageSlotsUsedOverConfigured(inputFetchStageSlotUsage)
-        .setExecuteActionStageSlotsUsedOverConfigured(executeActionStageSlotUsage);
+        .addStages(
+            StageInformation.newBuilder()
+                .setName("InputFetchStage")
+                .setSlotsConfigured(context.getInputFetchStageWidth())
+                .setSlotsUsed(inputFetchStage.getSlotUsage())
+                .build())
+        .addStages(
+            StageInformation.newBuilder()
+                .setName("ExecuteActionStage")
+                .setSlotsConfigured(context.getExecuteStageWidth())
+                .setSlotsUsed(executeActionStage.getSlotUsage())
+                .build());
 
     // get average time costs on each stage
     OperationStageDurations[] durations = completeStage.getAverageTimeCostPerStage();
