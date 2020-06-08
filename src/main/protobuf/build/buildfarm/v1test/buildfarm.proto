@@ -338,6 +338,9 @@ message ShardWorkerConfig {
 
   // only allow test executions to be multicore (min-cores > 1), limiting both to 1 if not a test
   bool only_multicore_tests = 30;
+  
+  //register the worker to the backplane
+  bool enable_registration = 32;
 }
 
 message ShardWorker {

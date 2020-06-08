@@ -531,7 +531,16 @@ public class Worker extends LoggingMain {
       execFileSystem.start((digests) -> addBlobsLocation(digests, config.getPublicName()));
 
       server.start();
-      startFailsafeRegistration();
+
+      // Not all workers need to be registered and visible in the backplane.
+      // For example, a GPU worker may perform work that we do not want cached for other workers.
+      // All the workers have the ability to opt out of registration of the backplane.
+      if (config.getEnableRegistration()) {
+        startFailsafeRegistration();
+      } else {
+        logger.log(INFO, "Skipping Worker Registration");
+      }
+
     } catch (Exception e) {
       stop();
       logger.log(SEVERE, "error starting worker", e);
