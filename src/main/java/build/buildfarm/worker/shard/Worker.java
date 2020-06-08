@@ -409,7 +409,9 @@ public class Worker extends LoggingMain {
 
   private void onStoragePut(Digest digest) {
     try {
-      backplane.addBlobLocation(digest, config.getPublicName());
+      if (config.getEnableStoragePut()) {
+        backplane.addBlobLocation(digest, config.getPublicName());
+      }
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }
@@ -417,7 +419,9 @@ public class Worker extends LoggingMain {
 
   private void onStorageExpire(Iterable<Digest> digests) {
     try {
-      backplane.removeBlobsLocation(digests, config.getPublicName());
+      if (config.getEnableStorageExpire()) {
+        backplane.removeBlobsLocation(digests, config.getPublicName());
+      }
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }

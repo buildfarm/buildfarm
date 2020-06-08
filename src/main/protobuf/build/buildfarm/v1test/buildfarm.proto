@@ -341,6 +341,10 @@ message ShardWorkerConfig {
   
   //register the worker to the backplane
   bool enable_registration = 32;
+  
+  bool enable_storage_put = 33;
+  
+  bool enable_storage_expire = 34;
 }
 
 message ShardWorker {

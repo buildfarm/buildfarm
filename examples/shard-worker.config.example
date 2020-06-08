@@ -7,6 +7,8 @@ public_name: "localhost:8981"
 
 # register the worker to the backplane
 enable_registration: true
+enable_storage_put: true
+enable_storage_expire: true
 
 # the digest function for this worker, required
 # to match out of band between the client and server
