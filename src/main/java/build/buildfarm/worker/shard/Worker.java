@@ -538,7 +538,7 @@ public class Worker extends LoggingMain {
       if (config.getEnableRegistration()) {
         startFailsafeRegistration();
       } else {
-        logger.log(INFO, "Skipping Worker Registration");
+        logger.log(INFO, "Skipping worker registration");
       }
 
     } catch (Exception e) {
