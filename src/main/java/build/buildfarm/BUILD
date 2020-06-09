@@ -456,6 +456,7 @@ container_image(
     files = [
         ":buildfarm-shard-worker_deploy.jar",
     ],
+    tags = ["manual"],
     visibility = ["//visibility:public"],
 )
 
