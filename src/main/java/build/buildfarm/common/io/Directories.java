@@ -18,6 +18,7 @@ import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 
 import com.google.common.util.concurrent.ListenableFuture;
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
@@ -61,6 +62,14 @@ public class Directories {
     Files.walkFileTree(
         directory,
         new SimpleFileVisitor<Path>() {
+
+          @Override
+          public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
+              throws IOException {
+            new File(dir.toString()).setWritable(true);
+            return FileVisitResult.CONTINUE;
+          }
+
           @Override
           public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
               throws IOException {
@@ -70,12 +79,55 @@ public class Directories {
 
           @Override
           public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
-            if (e == null) {
-              Files.delete(dir);
-              return FileVisitResult.CONTINUE;
+            if (e != null) {
+              throw e;
             }
-            // directory iteration failed
-            throw e;
+            Files.delete(dir);
+            return FileVisitResult.CONTINUE;
+          }
+        });
+  }
+
+  public static void disableAllWriteAccess(Path directory) throws IOException {
+    Files.walkFileTree(
+        directory,
+        new SimpleFileVisitor<Path>() {
+          @Override
+          public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+              throws IOException {
+            new File(file.toString()).setWritable(false);
+            return FileVisitResult.CONTINUE;
+          }
+
+          @Override
+          public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
+            if (e != null) {
+              throw e;
+            }
+            new File(dir.toString()).setWritable(false);
+            return FileVisitResult.CONTINUE;
+          }
+        });
+  }
+
+  public static void enableAllWriteAccess(Path directory) throws IOException {
+    Files.walkFileTree(
+        directory,
+        new SimpleFileVisitor<Path>() {
+          @Override
+          public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+              throws IOException {
+            new File(file.toString()).setWritable(true);
+            return FileVisitResult.CONTINUE;
+          }
+
+          @Override
+          public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
+            if (e != null) {
+              throw e;
+            }
+            new File(dir.toString()).setWritable(true);
+            return FileVisitResult.CONTINUE;
           }
         });
   }
