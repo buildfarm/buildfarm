@@ -52,6 +52,29 @@ class DirectoriesTest {
     assertThat(Files.exists(tree)).isFalse();
   }
 
+  @Test
+  public void changePermissionsForDelete() throws IOException {
+
+    // establish directory tree
+    Path tree = root.resolve("tree2");
+    Files.createDirectory(tree);
+    Files.write(tree.resolve("file"), ImmutableList.of("Top level file"), StandardCharsets.UTF_8);
+    Path subdir = tree.resolve("subdir");
+    Files.createDirectory(subdir);
+    Files.write(
+        subdir.resolve("file"),
+        ImmutableList.of("A file in a subdirectory"),
+        StandardCharsets.UTF_8);
+
+    // remove write permissions
+    Directories.disableAllWriteAccess(tree);
+
+    // directories are able to be removed, because the algorithm
+    // changes the write permissions before performing the delete.
+    Directories.remove(tree);
+    assertThat(Files.exists(tree)).isFalse();
+  }
+
   @RunWith(JUnit4.class)
   public static class NativeDirectoriesTest extends DirectoriesTest {
     public NativeDirectoriesTest() throws IOException {
@@ -64,6 +87,37 @@ class DirectoriesTest {
       }
       Path path = Files.createTempDirectory("native-utils-test");
       return path;
+    }
+
+    @Test
+    public void checkWriteDisabled() throws IOException {
+
+      // establish directory tree
+      Path root = Files.createTempDirectory("native-utils-test");
+      Path tree = root.resolve("tree3");
+      Files.createDirectory(tree);
+      Files.write(tree.resolve("file"), ImmutableList.of("Top level file"), StandardCharsets.UTF_8);
+      Path subdir = tree.resolve("subdir");
+      Files.createDirectory(subdir);
+      Files.write(
+          subdir.resolve("file"),
+          ImmutableList.of("A file in a subdirectory"),
+          StandardCharsets.UTF_8);
+
+      // check initial write conditions
+      assertThat(Files.isWritable(tree)).isTrue();
+      assertThat(Files.isWritable(subdir)).isTrue();
+      assertThat(Files.isWritable(tree.resolve("file"))).isTrue();
+      assertThat(Files.isWritable(subdir.resolve("file"))).isTrue();
+
+      // remove write permissions
+      Directories.disableAllWriteAccess(tree);
+
+      // check that write conditions have changed
+      assertThat(Files.isWritable(tree)).isFalse();
+      assertThat(Files.isWritable(subdir)).isFalse();
+      assertThat(Files.isWritable(tree.resolve("file"))).isFalse();
+      assertThat(Files.isWritable(subdir.resolve("file"))).isFalse();
     }
   }
 
