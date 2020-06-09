@@ -843,7 +843,14 @@ class CASFileCacheTest {
   public static class OsXCASFileCacheTest extends CASFileCacheTest {
     public OsXCASFileCacheTest() {
       super(
-          Iterables.getFirst(Jimfs.newFileSystem(Configuration.osX()).getRootDirectories(), null));
+          Iterables.getFirst(
+              Jimfs.newFileSystem(
+                      Configuration.osX()
+                          .toBuilder()
+                          .setAttributeViews("basic", "owner", "posix", "unix")
+                          .build())
+                  .getRootDirectories(),
+              null));
     }
   }
 
@@ -851,7 +858,14 @@ class CASFileCacheTest {
   public static class UnixCASFileCacheTest extends CASFileCacheTest {
     public UnixCASFileCacheTest() {
       super(
-          Iterables.getFirst(Jimfs.newFileSystem(Configuration.unix()).getRootDirectories(), null));
+          Iterables.getFirst(
+              Jimfs.newFileSystem(
+                      Configuration.unix()
+                          .toBuilder()
+                          .setAttributeViews("basic", "owner", "posix", "unix")
+                          .build())
+                  .getRootDirectories(),
+              null));
     }
   }
 
@@ -860,7 +874,13 @@ class CASFileCacheTest {
     public WindowsCASFileCacheTest() {
       super(
           Iterables.getFirst(
-              Jimfs.newFileSystem(Configuration.windows()).getRootDirectories(), null));
+              Jimfs.newFileSystem(
+                      Configuration.windows()
+                          .toBuilder()
+                          .setAttributeViews("basic", "owner", "dos", "acl", "posix", "user")
+                          .build())
+                  .getRootDirectories(),
+              null));
     }
   }
 }

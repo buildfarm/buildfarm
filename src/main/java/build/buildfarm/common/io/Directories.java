@@ -18,13 +18,22 @@ import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 
 import com.google.common.util.concurrent.ListenableFuture;
-import java.io.File;
 import java.io.IOException;
+import java.nio.file.FileStore;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
+import java.nio.file.attribute.AclEntry;
+import java.nio.file.attribute.AclEntryPermission;
+import java.nio.file.attribute.AclEntryType;
+import java.nio.file.attribute.AclFileAttributeView;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.nio.file.attribute.UserPrincipal;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.logging.Level;
@@ -33,7 +42,44 @@ import java.util.logging.Logger;
 public class Directories {
   private static final Logger logger = Logger.getLogger(Directories.class.getName());
 
+  private static final Set<PosixFilePermission> writablePerms =
+      PosixFilePermissions.fromString("rwxr-xr-x");
+  private static final Set<PosixFilePermission> nonWritablePerms =
+      PosixFilePermissions.fromString("r-xr-xr-x");
+
   private Directories() {}
+
+  private static void makeWritable(Path dir, boolean writable) throws IOException {
+    FileStore fileStore = Files.getFileStore(dir);
+    if (fileStore.supportsFileAttributeView("posix")) {
+      if (writable) {
+        Files.setPosixFilePermissions(dir, writablePerms);
+      } else {
+        Files.setPosixFilePermissions(dir, nonWritablePerms);
+      }
+    } else if (fileStore.supportsFileAttributeView("acl")) {
+      // windows, we hope
+      UserPrincipal authenticatedUsers =
+          dir.getFileSystem()
+              .getUserPrincipalLookupService()
+              .lookupPrincipalByName("Authenticated Users");
+      AclEntry entry =
+          AclEntry.newBuilder()
+              .setType(writable ? AclEntryType.ALLOW : AclEntryType.DENY)
+              .setPrincipal(authenticatedUsers)
+              .setPermissions(
+                  AclEntryPermission.DELETE,
+                  AclEntryPermission.DELETE_CHILD,
+                  AclEntryPermission.ADD_FILE,
+                  AclEntryPermission.ADD_SUBDIRECTORY)
+              .build();
+
+      AclFileAttributeView view = Files.getFileAttributeView(dir, AclFileAttributeView.class);
+      List<AclEntry> acl = view.getAcl();
+      acl.add(0, entry);
+      view.setAcl(acl);
+    }
+  }
 
   public static ListenableFuture<Void> remove(Path path, ExecutorService service) {
     String suffix = UUID.randomUUID().toString();
@@ -66,7 +112,7 @@ public class Directories {
           @Override
           public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
               throws IOException {
-            new File(dir.toString()).setWritable(true);
+            makeWritable(dir, true);
             return FileVisitResult.CONTINUE;
           }
 
@@ -93,18 +139,11 @@ public class Directories {
         directory,
         new SimpleFileVisitor<Path>() {
           @Override
-          public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
-              throws IOException {
-            new File(file.toString()).setWritable(false);
-            return FileVisitResult.CONTINUE;
-          }
-
-          @Override
           public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
             if (e != null) {
               throw e;
             }
-            new File(dir.toString()).setWritable(false);
+            makeWritable(dir, false);
             return FileVisitResult.CONTINUE;
           }
         });
@@ -115,18 +154,11 @@ public class Directories {
         directory,
         new SimpleFileVisitor<Path>() {
           @Override
-          public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
-              throws IOException {
-            new File(file.toString()).setWritable(true);
-            return FileVisitResult.CONTINUE;
-          }
-
-          @Override
           public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
             if (e != null) {
               throw e;
             }
-            new File(dir.toString()).setWritable(true);
+            makeWritable(dir, true);
             return FileVisitResult.CONTINUE;
           }
         });

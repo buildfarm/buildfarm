@@ -107,8 +107,6 @@ class DirectoriesTest {
       // check initial write conditions
       assertThat(Files.isWritable(tree)).isTrue();
       assertThat(Files.isWritable(subdir)).isTrue();
-      assertThat(Files.isWritable(tree.resolve("file"))).isTrue();
-      assertThat(Files.isWritable(subdir.resolve("file"))).isTrue();
 
       // remove write permissions
       Directories.disableAllWriteAccess(tree);
@@ -116,8 +114,6 @@ class DirectoriesTest {
       // check that write conditions have changed
       assertThat(Files.isWritable(tree)).isFalse();
       assertThat(Files.isWritable(subdir)).isFalse();
-      assertThat(Files.isWritable(tree.resolve("file"))).isFalse();
-      assertThat(Files.isWritable(subdir.resolve("file"))).isFalse();
     }
   }
 
