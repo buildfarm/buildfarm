@@ -11,6 +11,9 @@ operation_queue: {
   # the instance domain that this worker will execute work in
   # all requests will be tagged with this instance name
   instance_name: "default_memory_instance"
+
+  # the deadline in seconds for requests (default or <= 0 is unlimited)
+  deadline_after_seconds: 60
 }
 
 # the endpoint used for cas interactions
@@ -20,6 +23,9 @@ content_addressable_storage: {
   # the instance domain that this worker will make resource requests in
   # all requests will be tagged with this instance name
   instance_name: "default_memory_instance"
+
+  # the deadline in seconds for requests (default or <= 0 is unlimited)
+  deadline_after_seconds: 60
 }
 
 # the endpoint used for action cache interactions
@@ -29,6 +35,9 @@ action_cache: {
   # the instance domain that this worker will make resource requests in
   # all requests will be tagged with this instance name
   instance_name: "default_memory_instance"
+
+  # the deadline in seconds for requests (default or <= 0 is unlimited)
+  deadline_after_seconds: 60
 }
 
 # all content for the operations will be stored under this path
@@ -83,9 +92,19 @@ platform: {
   # 'platform' is a sufficient starting point without specifying
   # any platform requirements on the actions' side
   ###
-  # property: {
+  # properties: {
   #   name: "key_name"
   #   value: "value_string"
+  # }
+}
+
+# this platform is applied to any executed command to fill in
+# default values for any fields that are not populated on match
+default_platform: {
+  ###
+  # properties: {
+  #   name: "cores"
+  #   value: "1"
   # }
 }
 
@@ -103,6 +122,14 @@ execute_stage_width: 1
 # the number of concurrently available slots in the input fetch phase
 input_fetch_stage_width: 1
 
+# Use an input directory creation strategy which creates a single
+# directory tree at the highest level of the input tree containing
+# no output paths of any kind, and symlinks that directory into an
+# action's execroot, potentially saving large amounts of time
+# spent manufacturing the same read-only input hierarchy over
+# multiple actions' executions.
+link_input_directories: true
+
 # an imposed action-key-invariant timeout used in the unspecified timeout case
 default_action_timeout: {
   seconds: 600
@@ -116,10 +143,18 @@ maximum_action_timeout: {
   nanos: 0
 }
 
+# execution policies are automatically added to the advertised
+# platform for a worker
 # prefix command executions with this path
+# arguments are repeated here in order, with '<field>' substituted
+# with a value from the Platform properties list with a matching
+# name. Wrappers with substitutions without matching properties
+# are discarded and not applied to the executed command
 #execution_policies: {
 #  name: "test"
 #  wrapper: {
 #    path: "/path/to/execution/wrapper"
+#    arguments: "-c"
+#    arguments: "<cores>"
 #  }
 #}

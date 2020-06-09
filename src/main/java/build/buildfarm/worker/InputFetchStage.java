@@ -15,11 +15,9 @@
 package build.buildfarm.worker;
 
 import com.google.common.collect.Sets;
-import java.io.IOException;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
 public class InputFetchStage extends SuperscalarPipelineStage {
@@ -29,12 +27,7 @@ public class InputFetchStage extends SuperscalarPipelineStage {
   private final BlockingQueue<OperationContext> queue = new ArrayBlockingQueue<>(1);
 
   public InputFetchStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
-    super(
-        "InputFetchStage",
-        workerContext,
-        output,
-        error,
-        workerContext.getInputFetchStageWidth());
+    super("InputFetchStage", workerContext, output, error, workerContext.getInputFetchStageWidth());
   }
 
   @Override
@@ -56,17 +49,22 @@ public class InputFetchStage extends SuperscalarPipelineStage {
     if (!fetchers.remove(Thread.currentThread())) {
       throw new IllegalStateException("tried to remove unknown fetcher thread");
     }
-    releaseClaim(operationName);
+    releaseClaim(operationName, 1);
     return fetchers.size();
   }
 
-  public void releaseInputFetcher(String operationName, long usecs, long stallUSecs, boolean success) {
+  public void releaseInputFetcher(
+      String operationName, long usecs, long stallUSecs, boolean success) {
     int size = removeAndRelease(operationName);
     logComplete(
         operationName,
         usecs,
         stallUSecs,
         String.format("%s, %s", success ? "Success" : "Failure", getUsage(size)));
+  }
+
+  public int getSlotUsage() {
+    return fetchers.size();
   }
 
   @Override

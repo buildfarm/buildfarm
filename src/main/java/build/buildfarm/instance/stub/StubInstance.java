@@ -17,14 +17,15 @@ package build.buildfarm.instance.stub;
 import static build.buildfarm.common.grpc.Retrier.NO_RETRIES;
 import static build.buildfarm.common.grpc.TracingMetadataUtils.attachMetadataInterceptor;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.util.concurrent.Futures.catching;
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
 import static java.lang.String.format;
-import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.ActionCacheGrpc;
 import build.bazel.remote.execution.v2.ActionCacheGrpc.ActionCacheBlockingStub;
+import build.bazel.remote.execution.v2.ActionCacheGrpc.ActionCacheFutureStub;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.BatchReadBlobsRequest;
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
@@ -38,14 +39,11 @@ import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddr
 import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageFutureStub;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
-import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecutionGrpc;
 import build.bazel.remote.execution.v2.ExecutionGrpc.ExecutionStub;
-import build.bazel.remote.execution.v2.ExecutionStage;
-import build.bazel.remote.execution.v2.WaitExecutionRequest;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
+import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
-import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
 import build.bazel.remote.execution.v2.GetActionResultRequest;
 import build.bazel.remote.execution.v2.GetCapabilitiesRequest;
 import build.bazel.remote.execution.v2.GetTreeRequest;
@@ -54,23 +52,28 @@ import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ServerCapabilities;
-import build.bazel.remote.execution.v2.Tree;
 import build.bazel.remote.execution.v2.UpdateActionResultRequest;
-import build.buildfarm.common.Write;
+import build.bazel.remote.execution.v2.WaitExecutionRequest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.Watcher;
-import build.buildfarm.common.function.InterruptingPredicate;
+import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.ByteStreamHelper;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.StubWriteOutputStream;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.instance.Utils;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.OperationQueueGrpc.OperationQueueBlockingStub;
+import build.buildfarm.v1test.OperationsStatus;
+import build.buildfarm.v1test.OperationsStatusRequest;
 import build.buildfarm.v1test.PollOperationRequest;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.TakeOperationRequest;
+import build.buildfarm.v1test.Tree;
+import build.buildfarm.v1test.WorkerProfileGrpc;
+import build.buildfarm.v1test.WorkerProfileGrpc.WorkerProfileBlockingStub;
+import build.buildfarm.v1test.WorkerProfileMessage;
+import build.buildfarm.v1test.WorkerProfileRequest;
 import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamBlockingStub;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamStub;
@@ -80,7 +83,6 @@ import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
-import com.google.common.collect.Maps;
 import com.google.common.hash.HashCode;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
@@ -94,24 +96,25 @@ import com.google.longrunning.ListOperationsResponse;
 import com.google.longrunning.Operation;
 import com.google.longrunning.OperationsGrpc;
 import com.google.longrunning.OperationsGrpc.OperationsBlockingStub;
-import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
-import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.rpc.Code;
 import io.grpc.Channel;
 import io.grpc.ManagedChannel;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
-import io.grpc.protobuf.StatusProto;
+import io.grpc.stub.AbstractStub;
+import io.grpc.stub.ClientCallStreamObserver;
+import io.grpc.stub.ClientResponseObserver;
+import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
-import java.io.IOException;
 import java.io.InputStream;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
 
@@ -131,18 +134,12 @@ public class StubInstance implements Instance {
   private boolean isStopped = false;
   private final int maxBatchUpdateBlobsSize = 3 * 1024 * 1024;
 
-  public StubInstance(
-      String name,
-      DigestUtil digestUtil,
-      ManagedChannel channel) {
+  public StubInstance(String name, DigestUtil digestUtil, ManagedChannel channel) {
     this(name, "no-identifier", digestUtil, channel, DEFAULT_DEADLINE_DAYS, TimeUnit.DAYS);
   }
 
   public StubInstance(
-      String name,
-      String identifier,
-      DigestUtil digestUtil,
-      ManagedChannel channel) {
+      String name, String identifier, DigestUtil digestUtil, ManagedChannel channel) {
     this(name, identifier, digestUtil, channel, DEFAULT_DEADLINE_DAYS, TimeUnit.DAYS);
   }
 
@@ -151,8 +148,17 @@ public class StubInstance implements Instance {
       String identifier,
       DigestUtil digestUtil,
       ManagedChannel channel,
-      long deadlineAfter, TimeUnit deadlineAfterUnits) {
-    this(name, identifier, digestUtil, channel, deadlineAfter, deadlineAfterUnits, NO_RETRIES, /* retryService=*/ null);
+      long deadlineAfter,
+      TimeUnit deadlineAfterUnits) {
+    this(
+        name,
+        identifier,
+        digestUtil,
+        channel,
+        deadlineAfter,
+        deadlineAfterUnits,
+        NO_RETRIES,
+        /* retryService=*/ null);
   }
 
   public StubInstance(
@@ -160,7 +166,8 @@ public class StubInstance implements Instance {
       String identifier,
       DigestUtil digestUtil,
       ManagedChannel channel,
-      long deadlineAfter, TimeUnit deadlineAfterUnits,
+      long deadlineAfter,
+      TimeUnit deadlineAfterUnits,
       Retrier retrier,
       @Nullable ListeningScheduledExecutorService retryService) {
     this.name = name;
@@ -191,6 +198,15 @@ public class StubInstance implements Instance {
             }
           });
 
+  private final Supplier<ActionCacheFutureStub> actionCacheFutureStub =
+      Suppliers.memoize(
+          new Supplier<ActionCacheFutureStub>() {
+            @Override
+            public ActionCacheFutureStub get() {
+              return ActionCacheGrpc.newFutureStub(channel);
+            }
+          });
+
   private final Supplier<CapabilitiesBlockingStub> capsBlockingStub =
       Suppliers.memoize(
           new Supplier<CapabilitiesBlockingStub>() {
@@ -218,12 +234,12 @@ public class StubInstance implements Instance {
             }
           });
 
-  private final Supplier<ContentAddressableStorageFutureStub> contentAddressableStorageFutureStub =
+  private final Supplier<ByteStreamStub> bsStub =
       Suppliers.memoize(
-          new Supplier<ContentAddressableStorageFutureStub>() {
+          new Supplier<ByteStreamStub>() {
             @Override
-            public ContentAddressableStorageFutureStub get() {
-              return ContentAddressableStorageGrpc.newFutureStub(channel);
+            public ByteStreamStub get() {
+              return ByteStreamGrpc.newStub(channel);
             }
           });
 
@@ -235,11 +251,6 @@ public class StubInstance implements Instance {
               return ByteStreamGrpc.newBlockingStub(channel);
             }
           });
-
-  private ByteStreamStub newBSStub() {
-    return ByteStreamGrpc.newStub(channel)
-        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits);
-  }
 
   private final Supplier<OperationsBlockingStub> operationsBlockingStub =
       Suppliers.memoize(
@@ -259,6 +270,23 @@ public class StubInstance implements Instance {
             }
           });
 
+  private final Supplier<WorkerProfileBlockingStub> WorkerProfileBlockingStub =
+      Suppliers.memoize(
+          new Supplier<WorkerProfileBlockingStub>() {
+            @Override
+            public WorkerProfileBlockingStub get() {
+              return WorkerProfileGrpc.newBlockingStub(channel);
+            }
+          });
+
+  private <T extends AbstractStub<T>> T deadlined(Supplier<T> getter) {
+    T stub = getter.get();
+    if (deadlineAfter > 0) {
+      stub = stub.withDeadlineAfter(deadlineAfter, deadlineAfterUnits);
+    }
+    return stub;
+  }
+
   @Override
   public String getName() {
     return name;
@@ -270,7 +298,7 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public void start() { }
+  public void start() {}
 
   @Override
   public void stop() throws InterruptedException {
@@ -278,7 +306,7 @@ public class StubInstance implements Instance {
     channel.shutdownNow();
     channel.awaitTermination(0, TimeUnit.SECONDS);
     if (retryService != null && !shutdownAndAwaitTermination(retryService, 10, TimeUnit.SECONDS)) {
-      logger.severe("Could not shut down retry service for " + identifier);
+      logger.log(Level.SEVERE, format("Could not shut down retry service for %s", identifier));
     }
   }
 
@@ -289,49 +317,54 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public ActionResult getActionResult(ActionKey actionKey) {
+  public ListenableFuture<ActionResult> getActionResult(
+      ActionKey actionKey, RequestMetadata requestMetadata) {
     throwIfStopped();
-    try {
-      return actionCacheBlockingStub.get()
-          .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
-          .getActionResult(GetActionResultRequest.newBuilder()
-              .setInstanceName(getName())
-              .setActionDigest(actionKey.getDigest())
-              .build());
-    } catch (StatusRuntimeException e) {
-      if (e.getStatus().equals(Status.NOT_FOUND)) {
-        return null;
-      }
-      throw e;
-    }
+    return catching(
+        deadlined(actionCacheFutureStub)
+            .withInterceptors(attachMetadataInterceptor(requestMetadata))
+            .getActionResult(
+                GetActionResultRequest.newBuilder()
+                    .setInstanceName(getName())
+                    .setActionDigest(actionKey.getDigest())
+                    .build()),
+        StatusRuntimeException.class,
+        (e) -> {
+          if (e.getStatus().equals(Status.NOT_FOUND)) {
+            return null;
+          }
+          throw e;
+        },
+        directExecutor());
   }
 
   @Override
   public void putActionResult(ActionKey actionKey, ActionResult actionResult) {
     throwIfStopped();
     // should we be checking the ActionResult return value?
-    actionCacheBlockingStub.get()
-        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
-        .updateActionResult(UpdateActionResultRequest.newBuilder()
-            .setInstanceName(getName())
-            .setActionDigest(actionKey.getDigest())
-            .setActionResult(actionResult)
-            .build());
+    deadlined(actionCacheBlockingStub)
+        .updateActionResult(
+            UpdateActionResultRequest.newBuilder()
+                .setInstanceName(getName())
+                .setActionDigest(actionKey.getDigest())
+                .setActionResult(actionResult)
+                .build());
   }
 
   @Override
-  public ListenableFuture<Iterable<Digest>> findMissingBlobs(Iterable<Digest> digests, Executor executor, RequestMetadata requestMetadata) {
+  public ListenableFuture<Iterable<Digest>> findMissingBlobs(
+      Iterable<Digest> digests, Executor executor, RequestMetadata requestMetadata) {
     throwIfStopped();
-    FindMissingBlobsRequest request = FindMissingBlobsRequest.newBuilder()
-        .setInstanceName(getName())
-        .addAllBlobDigests(digests)
-        .build();
+    FindMissingBlobsRequest request =
+        FindMissingBlobsRequest.newBuilder()
+            .setInstanceName(getName())
+            .addAllBlobDigests(digests)
+            .build();
     if (request.getSerializedSize() > 4 * 1024 * 1024) {
       throw new IllegalStateException("FINDMISSINGBLOBS IS TOO LARGE");
     }
     return transform(
-        contentAddressableStorageFutureStub.get()
-            .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
+        deadlined(casFutureStub)
             .withInterceptors(attachMetadataInterceptor(requestMetadata))
             .findMissingBlobs(request),
         (response) -> response.getMissingBlobDigestsList(),
@@ -344,20 +377,18 @@ public class StubInstance implements Instance {
     ImmutableList.Builder<Request> requests = ImmutableList.builder();
     for (ByteString blob : blobs) {
       checkState(totalSize + blob.size() <= maxBatchUpdateBlobsSize);
-      requests.add(Request.newBuilder()
-          .setDigest(digestUtil.compute(blob))
-          .setData(blob)
-          .build());
+      requests.add(Request.newBuilder().setDigest(digestUtil.compute(blob)).setData(blob).build());
       totalSize += blob.size();
     }
-    BatchUpdateBlobsRequest batchRequest = BatchUpdateBlobsRequest.newBuilder()
-        .setInstanceName(getName())
-        .addAllRequests(requests.build())
-        .build();
-    BatchUpdateBlobsResponse batchResponse = casBlockingStub.get()
-        .withInterceptors(attachMetadataInterceptor(requestMetadata))
-        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
-        .batchUpdateBlobs(batchRequest);
+    BatchUpdateBlobsRequest batchRequest =
+        BatchUpdateBlobsRequest.newBuilder()
+            .setInstanceName(getName())
+            .addAllRequests(requests.build())
+            .build();
+    BatchUpdateBlobsResponse batchResponse =
+        deadlined(casBlockingStub)
+            .withInterceptors(attachMetadataInterceptor(requestMetadata))
+            .batchUpdateBlobs(batchRequest);
     PutAllBlobsException exception = null;
     for (BatchUpdateBlobsResponse.Response response : batchResponse.getResponsesList()) {
       com.google.rpc.Status status = response.getStatus();
@@ -371,11 +402,16 @@ public class StubInstance implements Instance {
     if (exception != null) {
       throw exception;
     }
-    return Iterables.transform(batchResponse.getResponsesList(), (response) -> response.getDigest());
+    return Iterables.transform(
+        batchResponse.getResponsesList(), (response) -> response.getDigest());
   }
 
   public Write getOperationStreamWrite(String name) {
-    return getWrite(name, StubWriteOutputStream.UNLIMITED_EXPECTED_SIZE, /* autoflush=*/ true, RequestMetadata.getDefaultInstance());
+    return getWrite(
+        name,
+        StubWriteOutputStream.UNLIMITED_EXPECTED_SIZE,
+        /* autoflush=*/ true,
+        RequestMetadata.getDefaultInstance());
   }
 
   @Override
@@ -397,9 +433,7 @@ public class StubInstance implements Instance {
     return ByteStreamHelper.newInput(
         resourceName,
         offset,
-        Suppliers.memoize(() -> ByteStreamGrpc.newStub(channel)
-            .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
-            .withInterceptors(attachMetadataInterceptor(requestMetadata))),
+        () -> deadlined(bsStub).withInterceptors(attachMetadataInterceptor(requestMetadata)),
         retrier::newBackoff,
         retrier::isRetriable,
         retryService);
@@ -407,10 +441,7 @@ public class StubInstance implements Instance {
 
   @Override
   public String getBlobName(Digest blobDigest) {
-    return format(
-        "%s/blobs/%s",
-        getName(),
-        DigestUtil.toString(blobDigest));
+    return format("%s/blobs/%s", getName(), DigestUtil.toString(blobDigest));
   }
 
   @Override
@@ -418,28 +449,81 @@ public class StubInstance implements Instance {
       Digest blobDigest,
       long offset,
       long limit,
-      StreamObserver<ByteString> blobObserver) {
+      ServerCallStreamObserver<ByteString> blobObserver,
+      RequestMetadata requestMetadata) {
     throwIfStopped();
-    newBSStub()
+    bsStub
+        .get()
+        .withInterceptors(attachMetadataInterceptor(requestMetadata))
         .read(
             ReadRequest.newBuilder()
                 .setResourceName(getBlobName(blobDigest))
                 .setReadOffset(offset)
                 .setReadLimit(limit)
                 .build(),
-            new StreamObserver<ReadResponse>() {
+            new ClientResponseObserver<ReadRequest, ReadResponse>() {
+              ClientCallStreamObserver<ReadRequest> requestStream;
+              // Guard against spurious onReady() calls caused by a race between onNext() and
+              // onReady(). If the transport
+              // toggles isReady() from false to true while onNext() is executing, but before
+              // onNext() checks isReady(),
+              // request(1) would be called twice - once by onNext() and once by the onReady()
+              // scheduled during onNext()'s
+              // execution.
+              AtomicBoolean wasReady = new AtomicBoolean(false);
+              // We must not attempt to call request(1) on the stub until the call has been started.
+              AtomicBoolean wasStarted = new AtomicBoolean(false);
+              // Indicator for request completion, so that callbacks throw or are ignored
+              AtomicBoolean wasCompleted = new AtomicBoolean(false);
+
+              @Override
+              public void beforeStart(final ClientCallStreamObserver<ReadRequest> requestStream) {
+                this.requestStream = requestStream;
+
+                requestStream.disableAutoInboundFlowControl();
+
+                blobObserver.setOnCancelHandler(
+                    () -> {
+                      if (!wasCompleted.get()) {
+                        requestStream.onError(Status.CANCELLED.asException());
+                      }
+                    });
+                blobObserver.setOnReadyHandler(this::onReady);
+              }
+
+              void onReady() {
+                if (wasCompleted.get()) {
+                  throw Status.CANCELLED
+                      .withDescription("request was completed")
+                      .asRuntimeException();
+                }
+                if (wasStarted.get()
+                    && blobObserver.isReady()
+                    && wasReady.compareAndSet(false, true)) {
+                  requestStream.request(1);
+                }
+              }
+
               @Override
               public void onNext(ReadResponse response) {
                 blobObserver.onNext(response.getData());
+                if (blobObserver.isReady()) {
+                  requestStream.request(1);
+                } else {
+                  wasReady.set(false);
+                }
+                wasStarted.set(true);
               }
 
               @Override
               public void onCompleted() {
+                wasCompleted.set(true);
                 blobObserver.onCompleted();
               }
 
               @Override
               public void onError(Throwable t) {
+                wasCompleted.set(true);
                 blobObserver.onError(t);
               }
             });
@@ -452,18 +536,19 @@ public class StubInstance implements Instance {
       long deadlineAfter,
       TimeUnit deadlineAfterUnits,
       RequestMetadata requestMetadata) {
-    return newInput(getBlobName(digest), offset, deadlineAfter, deadlineAfterUnits, requestMetadata);
+    return newInput(
+        getBlobName(digest), offset, deadlineAfter, deadlineAfterUnits, requestMetadata);
   }
 
   @Override
-  public ListenableFuture<Iterable<Response>> getAllBlobsFuture(
-      Iterable<Digest> digests) {
+  public ListenableFuture<Iterable<Response>> getAllBlobsFuture(Iterable<Digest> digests) {
     return transform(
-        casFutureStub.get()
-            .batchReadBlobs(BatchReadBlobsRequest.newBuilder()
-                .setInstanceName(getName())
-                .addAllDigests(digests)
-                .build()),
+        deadlined(casFutureStub)
+            .batchReadBlobs(
+                BatchReadBlobsRequest.newBuilder()
+                    .setInstanceName(getName())
+                    .addAllDigests(digests)
+                    .build()),
         (response) -> response.getResponsesList(),
         directExecutor());
   }
@@ -471,7 +556,8 @@ public class StubInstance implements Instance {
   @Override
   public boolean containsBlob(Digest digest, RequestMetadata requestMetadata) {
     try {
-      return Iterables.isEmpty(findMissingBlobs(ImmutableList.of(digest), directExecutor(), requestMetadata).get());
+      return Iterables.isEmpty(
+          findMissingBlobs(ImmutableList.of(digest), directExecutor(), requestMetadata).get());
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
       if (cause instanceof RuntimeException) {
@@ -484,59 +570,54 @@ public class StubInstance implements Instance {
     }
   }
 
-  Write getWrite(String resourceName, long expectedSize, boolean autoflush, RequestMetadata requestMetadata) {
+  Write getWrite(
+      String resourceName, long expectedSize, boolean autoflush, RequestMetadata requestMetadata) {
     return new StubWriteOutputStream(
-        () -> bsBlockingStub.get()
-            .withInterceptors(attachMetadataInterceptor(requestMetadata)),
+        () ->
+            deadlined(bsBlockingStub).withInterceptors(attachMetadataInterceptor(requestMetadata)),
         Suppliers.memoize(
-            () -> ByteStreamGrpc.newStub(channel)
-                .withInterceptors(attachMetadataInterceptor(requestMetadata))), // explicitly avoiding deadline due to client cancellation determination
+            () ->
+                ByteStreamGrpc.newStub(channel)
+                    .withInterceptors(
+                        attachMetadataInterceptor(
+                            requestMetadata))), // explicitly avoiding deadline due to client
+        // cancellation determination
         resourceName,
         expectedSize,
         autoflush);
   }
 
   /**
-   * no express synchronization, callers are expected to register listeners
-   * prior to initiating writes
+   * no express synchronization, callers are expected to register listeners prior to initiating
+   * writes
    */
   @Override
   public Write getBlobWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata) {
-    String resourceName = ByteStreamUploader.uploadResourceName(
-        getName(),
-        uuid,
-        HashCode.fromString(digest.getHash()),
-        digest.getSizeBytes());
+    String resourceName =
+        ByteStreamUploader.uploadResourceName(
+            getName(), uuid, HashCode.fromString(digest.getHash()), digest.getSizeBytes());
     return getWrite(resourceName, digest.getSizeBytes(), /* autoflush=*/ false, requestMetadata);
   }
 
   @Override
-  public String getTree(
-      Digest rootDigest,
-      int pageSize,
-      String pageToken,
-      Tree.Builder tree) {
+  public String getTree(Digest rootDigest, int pageSize, String pageToken, Tree.Builder tree) {
+    tree.setRootDigest(rootDigest);
     throwIfStopped();
-    Iterator<GetTreeResponse> replies = casBlockingStub.get()
-        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
-        .getTree(GetTreeRequest.newBuilder()
-            .setInstanceName(getName())
-            .setRootDigest(rootDigest)
-            .setPageSize(pageSize)
-            .setPageToken(pageToken)
-            .build());
+    Iterator<GetTreeResponse> replies =
+        deadlined(casBlockingStub)
+            .getTree(
+                GetTreeRequest.newBuilder()
+                    .setInstanceName(getName())
+                    .setRootDigest(rootDigest)
+                    .setPageSize(pageSize)
+                    .setPageToken(pageToken)
+                    .build());
     // new streaming interface doesn't really fit with what we're trying to do here...
     String nextPageToken = "";
-    boolean rootIsSet = false;
     while (replies.hasNext()) {
       GetTreeResponse response = replies.next();
       for (Directory directory : response.getDirectoriesList()) {
-        if (!rootIsSet && digestUtil.compute(directory).equals(rootDigest)) {
-          tree.setRoot(directory);
-          rootIsSet = true;
-        } else {
-          tree.addChildren(directory);
-        }
+        tree.putDirectories(digestUtil.compute(directory).getHash(), directory);
       }
       nextPageToken = response.getNextPageToken();
     }
@@ -557,25 +638,42 @@ public class StubInstance implements Instance {
   @Override
   public void match(Platform platform, MatchListener listener) throws InterruptedException {
     throwIfStopped();
-    TakeOperationRequest request = TakeOperationRequest.newBuilder()
-        .setInstanceName(getName())
-        .setPlatform(platform)
-        .build();
-    listener.onWaitStart();
-    QueueEntry queueEntry = operationQueueBlockingStub.get()
-        .take(request);
-    listener.onWaitEnd();
-    listener.onEntry(queueEntry);
+    TakeOperationRequest request =
+        TakeOperationRequest.newBuilder().setInstanceName(getName()).setPlatform(platform).build();
+    boolean complete = false;
+    while (!complete) {
+      listener.onWaitStart();
+      try {
+        QueueEntry queueEntry;
+        try {
+          queueEntry = deadlined(operationQueueBlockingStub).take(request);
+        } finally {
+          listener.onWaitEnd();
+        }
+        listener.onEntry(queueEntry);
+        complete = true;
+      } catch (Exception e) {
+        Status status = Status.fromThrowable(e);
+        if (status.getCode() != Status.Code.DEADLINE_EXCEEDED) {
+          listener.onError(e);
+          complete = true;
+        }
+        // ignore DEADLINE_EXCEEDED to prevent long running request behavior
+      }
+    }
+  }
+
+  @Override
+  public OperationsStatus operationsStatus() {
+    throwIfStopped();
+    return deadlined(operationQueueBlockingStub)
+        .status(OperationsStatusRequest.newBuilder().setInstanceName(getName()).build());
   }
 
   @Override
   public boolean putOperation(Operation operation) {
     throwIfStopped();
-    return operationQueueBlockingStub
-        .get()
-        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
-        .put(operation)
-        .getCode() == Code.OK.getNumber();
+    return deadlined(operationQueueBlockingStub).put(operation).getCode() == Code.OK.getNumber();
   }
 
   @Override
@@ -584,63 +682,57 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public boolean pollOperation(
-      String operationName,
-      ExecutionStage.Value stage) {
+  public boolean pollOperation(String operationName, ExecutionStage.Value stage) {
     throwIfStopped();
-    return operationQueueBlockingStub
-        .get()
-        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
-        .poll(PollOperationRequest.newBuilder()
-            .setOperationName(operationName)
-            .setStage(stage)
-            .build())
-        .getCode() == Code.OK.getNumber();
+    return deadlined(operationQueueBlockingStub)
+            .poll(
+                PollOperationRequest.newBuilder()
+                    .setOperationName(operationName)
+                    .setStage(stage)
+                    .build())
+            .getCode()
+        == Code.OK.getNumber();
   }
 
   @Override
-  public ListenableFuture<Void> watchOperation(
-      String operationName,
-      Watcher watcher) {
-    WaitExecutionRequest request = WaitExecutionRequest.newBuilder()
-        .setName(operationName)
-        .build();
+  public ListenableFuture<Void> watchOperation(String operationName, Watcher watcher) {
+    WaitExecutionRequest request = WaitExecutionRequest.newBuilder().setName(operationName).build();
     SettableFuture<Void> result = SettableFuture.create();
-    newExStub().waitExecution(
-        request,
-        new StreamObserver<Operation>() {
-          @Override
-          public void onNext(Operation operation) {
-            watcher.observe(operation);
-          }
+    newExStub()
+        .waitExecution(
+            request,
+            new StreamObserver<Operation>() {
+              @Override
+              public void onNext(Operation operation) {
+                watcher.observe(operation);
+              }
 
-          @Override
-          public void onError(Throwable t) {
-            result.setException(t);
-          }
+              @Override
+              public void onError(Throwable t) {
+                result.setException(t);
+              }
 
-          @Override
-          public void onCompleted() {
-            result.set(null);
-          }
-        });
+              @Override
+              public void onCompleted() {
+                result.set(null);
+              }
+            });
     return result;
   }
 
   @Override
   public String listOperations(
-      int pageSize, String pageToken, String filter,
-      ImmutableList.Builder<Operation> operations) {
+      int pageSize, String pageToken, String filter, ImmutableList.Builder<Operation> operations) {
     throwIfStopped();
     ListOperationsResponse response =
-        operationsBlockingStub.get()
-            .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
-            .listOperations(ListOperationsRequest.newBuilder()
-            .setName(getName() + "/operations")
-            .setPageSize(pageSize)
-            .setPageToken(pageToken)
-            .setFilter(filter)
-            .build());
+        deadlined(operationsBlockingStub)
+            .listOperations(
+                ListOperationsRequest.newBuilder()
+                    .setName(getName() + "/operations")
+                    .setPageSize(pageSize)
+                    .setPageToken(pageToken)
+                    .setFilter(filter)
+                    .build());
     operations.addAll(response.getOperationsList());
     return response.getNextPageToken();
   }
@@ -648,40 +740,34 @@ public class StubInstance implements Instance {
   @Override
   public Operation getOperation(String operationName) {
     throwIfStopped();
-    return operationsBlockingStub.get()
-        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
-        .getOperation(GetOperationRequest.newBuilder()
-            .setName(operationName)
-            .build());
+    return deadlined(operationsBlockingStub)
+        .getOperation(GetOperationRequest.newBuilder().setName(operationName).build());
   }
 
   @Override
   public void deleteOperation(String operationName) {
     throwIfStopped();
-    operationsBlockingStub.get()
-        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
-        .deleteOperation(DeleteOperationRequest.newBuilder()
-            .setName(operationName)
-            .build());
+    deadlined(operationsBlockingStub)
+        .deleteOperation(DeleteOperationRequest.newBuilder().setName(operationName).build());
   }
 
   @Override
   public void cancelOperation(String operationName) {
     throwIfStopped();
-    operationsBlockingStub.get()
-        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
-        .cancelOperation(CancelOperationRequest.newBuilder()
-            .setName(operationName)
-            .build());
+    deadlined(operationsBlockingStub)
+        .cancelOperation(CancelOperationRequest.newBuilder().setName(operationName).build());
   }
 
   @Override
   public ServerCapabilities getCapabilities() {
     throwIfStopped();
-    return capsBlockingStub.get()
-        .withDeadlineAfter(deadlineAfter, deadlineAfterUnits)
-        .getCapabilities(GetCapabilitiesRequest.newBuilder()
-            .setInstanceName(getName())
-            .build());
+    return deadlined(capsBlockingStub)
+        .getCapabilities(GetCapabilitiesRequest.newBuilder().setInstanceName(getName()).build());
+  }
+
+  @Override
+  public WorkerProfileMessage getWorkerProfile() {
+    return WorkerProfileBlockingStub.get()
+        .getWorkerProfile(WorkerProfileRequest.newBuilder().build());
   }
 }

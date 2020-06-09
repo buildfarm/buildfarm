@@ -1,18 +1,17 @@
-[![Build status](https://badge.buildkite.com/45f4fd4c0cfb95f7705156a4119641c6d5d6c310452d6e65a4.svg)](https://buildkite.com/bazel/buildfarm-postsubmit)
+[![Build status](https://badge.buildkite.com/45f4fd4c0cfb95f7705156a4119641c6d5d6c310452d6e65a4.svg?branch=master)](https://buildkite.com/bazel/buildfarm-postsubmit)
 
 # Bazel Buildfarm
 
 This repository hosts the [Bazel](https://bazel.build) remote caching and execution system.
 
-This project is just getting started; background information on the status of caching and remote execution in bazel can be
-found in the [bazel documentation](https://github.com/bazelbuild/bazel/blob/master/src/main/java/com/google/devtools/build/lib/remote/README.md#remote-caching-using-the-grpc-protocol).
+Background information on the status of caching and remote execution in bazel can be
+found in the [bazel documentation](https://docs.bazel.build/versions/master/remote-caching.html).
 
-Read the [meeting notes](https://docs.google.com/document/d/1EtQMTn-7sKFMTxIMlb0oDGpvGCMAuzphVcfx58GWuEM/edit).
-Get involved by joining the discussion on the [dedicated mailing list](https://groups.google.com/forum/#!forum/bazel-buildfarm).
+File issues here for bugs or feature requests, and ask questions via build team [slack](https://join.slack.com/t/buildteamworld/shared_invite/zt-4zy8f5j5-KwiJuBoAAUorB_mdQHwF7Q) in the #buildfarm channel.
+
+[Buildfarm Wiki](https://github.com/bazelbuild/bazel-buildfarm/wiki)
 
 ## Usage
-
-In general do not execute server binaries with bazel run, since bazel does not support running multiple targets.
 
 All commandline options override corresponding config settings.
 
@@ -20,11 +19,13 @@ All commandline options override corresponding config settings.
 
 Run via
 
-    bazel run //src/main/java/build/buildfarm:buildfarm-server <configfile> [-p PORT] [--port PORT]
+```
+bazel run //src/main/java/build/buildfarm:buildfarm-server <configfile> [<-p|--port> PORT]
+```
 
-- **`configfile`** has to be in (undocumented) Protocol Buffer text format.
+- **`configfile`** has to be in Protocol Buffer text format, corresponding to a [BuildFarmServerConfig](https://github.com/bazelbuild/bazel-buildfarm/blob/master/src/main/protobuf/build/buildfarm/v1test/buildfarm.proto#L55) definition.
 
-  For an example, see the [examples](examples) directory, which contains the working example [examples/worker.config.example](config).
+  For an example, see the [examples](examples) directory, which contains the working example [examples/server.config.example](examples/server.config.example).
   For format details see [here](https://stackoverflow.com/questions/18873924/what-does-the-protobuf-text-format-look-like). Protocol Buffer structure at [src/main/protobuf/build/buildfarm/v1test/buildfarm.proto](src/main/protobuf/build/buildfarm/v1test/buildfarm.proto)
 
 - **`PORT`** to expose service endpoints on
@@ -33,25 +34,26 @@ Run via
 
 Run via
 
-    bazel run //src/main/java/build/buildfarm:buildfarm-operationqueue-worker <configfile> [--root ROOT] [--cas_cache_directory CAS_CACHE_DIRECTORY]
+```
+bazel run //src/main/java/build/buildfarm:buildfarm-operationqueue-worker <configfile> [--root ROOT] [--cas_cache_directory CAS_CACHE_DIRECTORY]
+```
 
-- **`configfile`** has to be in (undocumented) Protocol Buffer text format.
+- **`configfile`** has to be in Protocol Buffer text format, corresponding to a [WorkerConfig](https://github.com/bazelbuild/bazel-buildfarm/blob/master/src/main/protobuf/build/buildfarm/v1test/buildfarm.proto#L459) definition.
 
-  For an example, see the [examples](examples) directory, which contains the working example [examples/server.config.example](config).
+  For an example, see the [examples](examples) directory, which contains the working example [examples/worker.config.example](examples/worker.config.example).
   For format details see [here](https://stackoverflow.com/questions/18873924/what-does-the-protobuf-text-format-look-like). Protocol Buffer structure at [src/main/protobuf/build/buildfarm/v1test/buildfarm.proto](src/main/protobuf/build/buildfarm/v1test/buildfarm.proto)
 
 - **`ROOT`** base directory path for all work being performed.
 
 - **`CAS_CACHE_DIRECTORY`** is (absolute or relative) directory path to cached files from CAS.
 
-### Bazel Itself
+### Bazel Client
 
-To have bazel use the bazel buildfarm configured using the example configs provided in the [examples](examples) directory, you could configure your
-`.bazelrc` as follows:
+To use the example configured buildfarm with bazel (version 1.0 or higher), you can configure your `.bazelrc` as follows:
 
 ```
 $ cat .bazelrc
-build --spawn_strategy=remote --genrule_strategy=remote --strategy=Javac=remote --strategy=Closure=remote --remote_executor=localhost:8980
+build --remote_executor=grpc://localhost:8980
 ```
 
 Then run your build as you would normally do.
@@ -63,16 +65,22 @@ Buildfarm uses [Java's Logging framework](https://docs.oracle.com/javase/10/core
 You can use typical Java logging configuration to filter these results and observe the flow of executions through your running services.
 An example `logging.properties` file has been provided at [examples/debug.logging.properties](examples/debug.logging.properties) for use as follows:
 
-    bazel-bin/src/main/java/build/buildfarm/buildfarm-server --jvm_flag=-Djava.util.logging.config.file=examples/debug.logging.properties ...
+```
+bazel run //src/main/java/build/buildfarm:buildfarm-server --jvm_flag=-Djava.util.logging.config.file=examples/debug.logging.properties ...
+```
 
 and
 
-    bazel run //src/main/java/build/buildfarm/buildfarm-operationqueue-worker --jvm_flag=-Djava.util.logging.config.file=examples/debug.logging.properties ...
+```
+bazel run //src/main/java/build/buildfarm/buildfarm-operationqueue-worker --jvm_flag=-Djava.util.logging.config.file=examples/debug.logging.properties ...
+```
 
 To attach a remote debugger, run the executable with the `--debug=<PORT>` flag. For example:
 
-    bazel run src/main/java/build/buildfarm/buildfarm-server --debug=5005 \
-        $PWD/config/server.config
+```
+bazel run src/main/java/build/buildfarm/buildfarm-server --debug=5005 \
+    $PWD/config/server.config
+```
 
 ## Developer Information
 
@@ -84,16 +92,44 @@ To attach a remote debugger, run the executable with the `--debug=<PORT>` flag. 
 ### Third-party Dependencies
 
 Most third-party dependencies (e.g. protobuf, gRPC, ...) are managed automatically via
-[bazel-deps](https://github.com/johnynek/bazel-deps). After changing the `dependencies.yaml` file,
-just run this to regenerate the 3rdparty folder:
+[rules_jvm_external](https://github.com/bazelbuild/rules_jvm_external). These dependencies are enumerated in
+the WORKSPACE with a `maven_install` `artifacts` parameter.
 
-```bash
-git clone https://github.com/johnynek/bazel-deps.git ../bazel-deps
-cd ../bazel-deps
-bazel build //src/scala/com/github/johnynek/bazel_deps:parseproject_deploy.jar
-cd ../bazel-buildfarm
-../bazel-deps/gen_maven_deps.sh generate -r `pwd` -s 3rdparty/workspace.bzl -d dependencies.yaml
+Things that aren't supported by `rules_jvm_external` are being imported as manually managed remote repos via
+the `WORKSPACE` file.
+
+### Deployments
+
+Buildfarm can be used as an external repository for composition into a deployment of your choice.
+
+Add the following to your WORKSPACE to get access to buildfarm targets, filling in the commit and sha256 values:
+
+```starlark
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+BUILDFARM_EXTERNAL_COMMIT = "<revision commit id>"
+BUILDFARM_EXTERNAL_SHA256 = "<sha256 digest of url below>"
+
+http_archive(
+    name = "build_buildfarm",
+    strip_prefix = "bazel-buildfarm-%s" % BUILDFARM_EXTERNAL_COMMIT,
+    sha256 = BUILDFARM_EXTERNAL_SHA256,
+    url = "https://github.com/bazelbuild/bazel-buildfarm/archive/%s.zip" % BUILDFARM_EXTERNAL_COMMIT,
+)
+
+load("@build_buildfarm//:deps.bzl", "buildfarm_dependencies")
+
+buildfarm_dependencies()
+
+load("@build_buildfarm//:defs.bzl", "buildfarm_init")
+
+buildfarm_init()
 ```
 
-Things that aren't supported by bazel-deps are being imported as manually managed remote repos via
-the `WORKSPACE` file.
+Optionally, if you want to use the buildfarm docker container image targets, you can add this:
+
+```starlark
+load("@build_buildfarm//:images.bzl", "buildfarm_images")
+
+buildfarm_images()
+```

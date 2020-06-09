@@ -15,14 +15,14 @@
 package build.buildfarm;
 
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.EXECUTING;
+import static build.buildfarm.common.IOUtils.stat;
 import static build.buildfarm.instance.stub.ByteStreamUploader.uploadResourceName;
-import static build.buildfarm.worker.Utils.stat;
 import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
 import static com.google.common.collect.Iterables.all;
+import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
+import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest;
 import build.bazel.remote.execution.v2.BatchUpdateBlobsRequest.Request;
@@ -38,22 +38,19 @@ import build.bazel.remote.execution.v2.ExecutionGrpc.ExecutionStub;
 import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
 import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
 import build.buildfarm.common.DigestUtil;
-import build.buildfarm.worker.Dirent;
-import build.buildfarm.worker.FileStatus;
+import build.buildfarm.common.FileStatus;
 import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamStub;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Lists;
 import com.google.common.hash.HashCode;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.rpc.Code;
-import com.google.rpc.Status;
 import io.grpc.Channel;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.NegotiationType;
@@ -83,6 +80,7 @@ class Executor {
     private final Stopwatch stopwatch;
     private final ScheduledExecutorService service;
 
+    private boolean complete = false;
     private String operationName = null;
     private ScheduledFuture<?> noticeFuture;
 
@@ -113,22 +111,25 @@ class Executor {
       noticeFuture = service.schedule(this::printStillWaiting, 30, SECONDS);
     }
 
-    void print(int code, long micros) {
+    void print(int code, String responseType, long micros) {
       System.out.println(
           String.format(
-              "Action: %s -> %s: %s in %gms",
+              "Action: %s -> %s: %s %s in %gms",
               DigestUtil.toString(actionDigest),
               operationName,
+              responseType,
               Code.forNumber(code),
               micros / 1000.0f));
     }
 
     void printStillWaiting() {
-      noticeFuture = service.schedule(this::printStillWaiting, 30, SECONDS);
-      if (operationName == null) {
-        System.out.println("StillWaitingFor Operation => " + DigestUtil.toString(actionDigest));
-      } else {
-        System.out.println("StillWaitingFor Results => " + operationName);
+      if (!complete) {
+        noticeFuture = service.schedule(this::printStillWaiting, 30, SECONDS);
+        if (operationName == null) {
+          System.out.println("StillWaitingFor Operation => " + DigestUtil.toString(actionDigest));
+        } else {
+          System.out.println("StillWaitingFor Results => " + operationName);
+        }
       }
     }
 
@@ -141,44 +142,59 @@ class Executor {
       long micros = stopwatch.elapsed(MICROSECONDS);
       if (operation.getResponse().is(ExecuteResponse.class)) {
         try {
+          complete = true;
           ExecuteResponse response = operation.getResponse().unpack(ExecuteResponse.class);
           int code = response.getStatus().getCode();
-          print(code, micros);
+          String responseType = "response";
+          if (code == Code.OK.getNumber()) {
+            responseType += " exit code " + response.getResult().getExitCode();
+          }
+          print(code, responseType, micros);
           statusCounts[code].incrementAndGet();
         } catch (InvalidProtocolBufferException e) {
-          System.err.println("An unlikely error has occurred: " + e.getMessage());
+          System.err.println(
+              "An unlikely error has occurred for " + operationName + ": " + e.getMessage());
         }
-      } else {
+      } else if (operation.getMetadata().is(ExecuteOperationMetadata.class)) {
         try {
-          ExecuteOperationMetadata metadata = operation.getMetadata().unpack(ExecuteOperationMetadata.class);
+          ExecuteOperationMetadata metadata =
+              operation.getMetadata().unpack(ExecuteOperationMetadata.class);
           if (metadata.getStage() == EXECUTING) {
             stopwatch.reset().start();
           }
         } catch (InvalidProtocolBufferException e) {
           e.printStackTrace();
+          System.err.println(
+              "An unlikely error has occurred for " + operationName + ": " + e.getMessage());
         }
+        noticeFuture = service.schedule(this::printStillWaiting, 30, SECONDS);
+      } else {
+        noticeFuture = service.schedule(this::printStillWaiting, 30, SECONDS);
       }
-      noticeFuture = service.schedule(this::printStillWaiting, 30, SECONDS);
     }
 
     @Override
     public void onError(Throwable t) {
+      complete = true;
       noticeFuture.cancel(false);
       long micros = stopwatch.elapsed(MICROSECONDS);
       int code = io.grpc.Status.fromThrowable(t).getCode().value();
-      print(code, micros);
+      print(code, "error", micros);
       statusCounts[code].incrementAndGet();
       countdown.decrementAndGet();
     }
 
     @Override
     public void onCompleted() {
+      complete = true;
       noticeFuture.cancel(false);
       countdown.decrementAndGet();
     }
   }
 
-  static void executeActions(String instanceName, List<Digest> actionDigests, ExecutionStub execStub) throws InterruptedException {
+  static void executeActions(
+      String instanceName, List<Digest> actionDigests, ExecutionStub execStub)
+      throws InterruptedException {
     ScheduledExecutorService service = newSingleThreadScheduledExecutor();
 
     AtomicInteger[] statusCounts = new AtomicInteger[18];
@@ -188,8 +204,10 @@ class Executor {
     AtomicLong countdown = new AtomicLong(actionDigests.size());
     for (Digest actionDigest : actionDigests) {
       ExecutionObserver executionObserver =
-          new ExecutionObserver(countdown, statusCounts, execStub, instanceName, actionDigest, service);
+          new ExecutionObserver(
+              countdown, statusCounts, execStub, instanceName, actionDigest, service);
       executionObserver.execute();
+      MICROSECONDS.sleep(1);
     }
     while (countdown.get() != 0) {
       SECONDS.sleep(1);
@@ -197,7 +215,8 @@ class Executor {
     for (int i = 0; i < statusCounts.length; i++) {
       AtomicInteger statusCount = statusCounts[i];
       if (statusCount.get() != 0) {
-        System.out.println("Status " + Code.forNumber(i) + " : " + statusCount.get() + " responses");
+        System.out.println(
+            "Status " + Code.forNumber(i) + " : " + statusCount.get() + " responses");
       }
     }
 
@@ -206,13 +225,14 @@ class Executor {
 
   private static ManagedChannel createChannel(String target) {
     NettyChannelBuilder builder =
-        NettyChannelBuilder.forTarget(target)
-            .negotiationType(NegotiationType.PLAINTEXT);
+        NettyChannelBuilder.forTarget(target).negotiationType(NegotiationType.PLAINTEXT);
     return builder.build();
   }
 
-  private static void loadFilesIntoCAS(String instanceName, Channel channel, Path blobsDir) throws Exception {
-    ContentAddressableStorageBlockingStub casStub = ContentAddressableStorageGrpc.newBlockingStub(channel);
+  private static void loadFilesIntoCAS(String instanceName, Channel channel, Path blobsDir)
+      throws Exception {
+    ContentAddressableStorageBlockingStub casStub =
+        ContentAddressableStorageGrpc.newBlockingStub(channel);
     List<Digest> missingDigests = findMissingBlobs(instanceName, blobsDir, casStub);
     UUID uploadId = UUID.randomUUID();
 
@@ -220,18 +240,18 @@ class Executor {
     BatchUpdateBlobsRequest.Builder[] buckets = new BatchUpdateBlobsRequest.Builder[128];
     for (int i = 0; i < 128; i++) {
       bucketSizes[i] = 0;
-      buckets[i] = BatchUpdateBlobsRequest.newBuilder()
-          .setInstanceName(instanceName);
+      buckets[i] = BatchUpdateBlobsRequest.newBuilder().setInstanceName(instanceName);
     }
 
     ByteStreamStub bsStub = ByteStreamGrpc.newStub(channel);
     for (Digest missingDigest : missingDigests) {
-      Path path = blobsDir.resolve(missingDigest.getHash());
+      Path path = blobsDir.resolve(missingDigest.getHash() + "_" + missingDigest.getSizeBytes());
       if (missingDigest.getSizeBytes() < 1024 * 1024) {
-        Request request = Request.newBuilder()
-            .setDigest(missingDigest)
-            .setData(ByteString.copyFrom(Files.readAllBytes(path)))
-            .build();
+        Request request =
+            Request.newBuilder()
+                .setDigest(missingDigest)
+                .setData(ByteString.copyFrom(Files.readAllBytes(path)))
+                .build();
         boolean foundBucket = false;
         int maxBucketSize = 0;
         int minBucketSize = 2 * 1024 * 1024 + 1;
@@ -257,11 +277,20 @@ class Executor {
           Stopwatch stopwatch = Stopwatch.createStarted();
           BatchUpdateBlobsResponse batchResponse = casStub.batchUpdateBlobs(batchRequest);
           long usecs = stopwatch.elapsed(MICROSECONDS);
-          checkState(all(batchResponse.getResponsesList(), response -> Code.forNumber(response.getStatus().getCode()) == Code.OK));
-          System.out.println("Updated " + batchRequest.getRequestsCount() + " blobs in " + (usecs / 1000.0) + "ms");
-          buckets[maxBucketIndex] = BatchUpdateBlobsRequest.newBuilder()
-              .setInstanceName(instanceName)
-              .addRequests(request);
+          checkState(
+              all(
+                  batchResponse.getResponsesList(),
+                  response -> Code.forNumber(response.getStatus().getCode()) == Code.OK));
+          System.out.println(
+              "Updated "
+                  + batchRequest.getRequestsCount()
+                  + " blobs in "
+                  + (usecs / 1000.0)
+                  + "ms");
+          buckets[maxBucketIndex] =
+              BatchUpdateBlobsRequest.newBuilder()
+                  .setInstanceName(instanceName)
+                  .addRequests(request);
         } else {
           bucketSizes[minBucketIndex] += size;
           buckets[minBucketIndex].addRequests(request);
@@ -269,24 +298,25 @@ class Executor {
       } else {
         Stopwatch stopwatch = Stopwatch.createStarted();
         SettableFuture<WriteResponse> writtenFuture = SettableFuture.create();
-        StreamObserver<WriteRequest> requestObserver = bsStub.write(new StreamObserver<WriteResponse>() {
-          @Override
-          public void onNext(WriteResponse response) {
-            writtenFuture.set(response);
-          }
+        StreamObserver<WriteRequest> requestObserver =
+            bsStub.write(
+                new StreamObserver<WriteResponse>() {
+                  @Override
+                  public void onNext(WriteResponse response) {
+                    writtenFuture.set(response);
+                  }
 
-          @Override
-          public void onCompleted() {
-          }
+                  @Override
+                  public void onCompleted() {}
 
-          @Override
-          public void onError(Throwable t) {
-            writtenFuture.setException(t);
-          }
-        });
+                  @Override
+                  public void onError(Throwable t) {
+                    writtenFuture.setException(t);
+                  }
+                });
         HashCode hash = HashCode.fromString(missingDigest.getHash());
-        String resourceName = uploadResourceName(
-            instanceName, uploadId, hash, missingDigest.getSizeBytes());
+        String resourceName =
+            uploadResourceName(instanceName, uploadId, hash, missingDigest.getSizeBytes());
         try (InputStream in = Files.newInputStream(path)) {
           boolean first = true;
           long writtenBytes = 0;
@@ -297,9 +327,7 @@ class Executor {
             if (first) {
               request.setResourceName(resourceName);
             }
-            request
-                .setData(ByteString.copyFrom(buf, 0, len))
-                .setWriteOffset(writtenBytes);
+            request.setData(ByteString.copyFrom(buf, 0, len)).setWriteOffset(writtenBytes);
             if (writtenBytes + len == missingDigest.getSizeBytes()) {
               request.setFinishWrite(true);
             }
@@ -307,7 +335,12 @@ class Executor {
             writtenBytes += len;
           }
           WriteResponse response = writtenFuture.get();
-          System.out.println("Wrote long " + DigestUtil.toString(missingDigest) + " in " + (stopwatch.elapsed(MICROSECONDS) / 1000.0) + "us");
+          System.out.println(
+              "Wrote long "
+                  + DigestUtil.toString(missingDigest)
+                  + " in "
+                  + (stopwatch.elapsed(MICROSECONDS) / 1000.0)
+                  + "ms");
         }
       }
     }
@@ -317,22 +350,29 @@ class Executor {
         Stopwatch stopwatch = Stopwatch.createStarted();
         BatchUpdateBlobsResponse batchResponse = casStub.batchUpdateBlobs(batchRequest);
         long usecs = stopwatch.elapsed(MICROSECONDS);
-        checkState(all(batchResponse.getResponsesList(), response -> Code.forNumber(response.getStatus().getCode()) == Code.OK));
-        System.out.println("Updated " + batchRequest.getRequestsCount() + " blobs in " + (usecs / 1000.0) + "ms");
+        checkState(
+            all(
+                batchResponse.getResponsesList(),
+                response -> Code.forNumber(response.getStatus().getCode()) == Code.OK));
+        System.out.println(
+            "Updated " + batchRequest.getRequestsCount() + " blobs in " + (usecs / 1000.0) + "ms");
       }
     }
   }
 
   private static List<Digest> findMissingBlobs(
-      String instanceName,
-      Path blobsDir,
-      ContentAddressableStorageBlockingStub casStub) throws IOException {
-    FindMissingBlobsRequest.Builder request = FindMissingBlobsRequest.newBuilder()
-        .setInstanceName(instanceName);
+      String instanceName, Path blobsDir, ContentAddressableStorageBlockingStub casStub)
+      throws IOException {
+    FindMissingBlobsRequest.Builder request =
+        FindMissingBlobsRequest.newBuilder().setInstanceName(instanceName);
 
     int size = 0;
 
     ImmutableList.Builder<Digest> missingDigests = ImmutableList.builder();
+
+    System.out.println("Looking for missing blobs");
+
+    final int messagesPerRequest = 2 * 1024 * 1024 / 80;
 
     System.out.println("Looking for missing blobs");
 
@@ -341,15 +381,22 @@ class Executor {
       for (Path file : stream) {
         FileStatus stat = stat(file, /* followSymlinks=*/ false);
 
-        request.addBlobDigests(DigestUtil.buildDigest(file.getFileName().toString(), stat.getSize()));
+        Digest digest =
+            DigestUtil.buildDigest(file.getFileName().toString().split("_")[0], stat.getSize());
+
+        request.addBlobDigests(digest);
         size++;
-        if (size == 2 * 1024 * 1024 / 48) {
+        if (size == messagesPerRequest) {
           stopwatch.reset().start();
           FindMissingBlobsResponse response = casStub.findMissingBlobs(request.build());
-          System.out.println("Found " + response.getMissingBlobDigestsCount() + " missing digests in " + (stopwatch.elapsed(MICROSECONDS) / 1000.0) + "ms");
+          System.out.println(
+              "Found "
+                  + response.getMissingBlobDigestsCount()
+                  + " missing digests in "
+                  + (stopwatch.elapsed(MICROSECONDS) / 1000.0)
+                  + "ms");
           missingDigests.addAll(response.getMissingBlobDigestsList());
-          request = FindMissingBlobsRequest.newBuilder()
-              .setInstanceName(instanceName);
+          request = FindMissingBlobsRequest.newBuilder().setInstanceName(instanceName);
           size = 0;
         }
       }

@@ -16,18 +16,21 @@ package build.buildfarm.server;
 
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
-import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
-import build.buildfarm.instance.Instance;
+import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.common.metrics.log.LogMetricsPublisher;
 import build.buildfarm.server.ExecutionService.KeepaliveWatcher;
+import build.buildfarm.v1test.MetricsConfig;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import io.grpc.stub.ServerCallStreamObserver;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.function.Consumer;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -46,16 +49,20 @@ public class ExecutionServiceTest {
   @Test
   public void keepaliveIsCancelledWithContext() throws Exception {
     ScheduledExecutorService keepaliveScheduler = newSingleThreadScheduledExecutor();
-    ExecutionService service = new ExecutionService(
-        instances,
-        /* keepaliveAfter=*/ 1,
-        /* keepaliveUnit=*/ SECONDS, // far enough in the future that we'll get scheduled and cancelled without executing
-        keepaliveScheduler);
+    Consumer<String> snsMetricsPublisher = requestMetadata -> {};
+    ExecutionService service =
+        new ExecutionService(
+            instances,
+            /* keepaliveAfter=*/ 1,
+            /* keepaliveUnit=*/ SECONDS, // far enough in the future that we'll get scheduled and
+            keepaliveScheduler,
+            new LogMetricsPublisher(
+                MetricsConfig.getDefaultInstance())); // cancelled without executing
     ServerCallStreamObserver<Operation> response = mock(ServerCallStreamObserver.class);
-    Operation operation = Operation.newBuilder()
-        .setName("immediately-cancelled-watch-operation")
-        .build();
-    KeepaliveWatcher watcher = service.createWatcher(response);
+    RequestMetadata requestMetadata = RequestMetadata.newBuilder().build();
+    Operation operation =
+        Operation.newBuilder().setName("immediately-cancelled-watch-operation").build();
+    KeepaliveWatcher watcher = service.createWatcher(response, requestMetadata);
     watcher.observe(operation);
     ListenableFuture<?> future = watcher.getFuture();
     assertThat(future).isNotNull();

@@ -17,8 +17,6 @@ package build.buildfarm.instance.shard;
 import static build.buildfarm.instance.shard.RedisShardBackplane.parseOperationChange;
 import static build.buildfarm.instance.shard.RedisShardBackplane.parseWorkerChange;
 import static java.lang.String.format;
-import static java.util.logging.Level.FINE;
-import static java.util.logging.Level.WARNING;
 
 import build.buildfarm.instance.WatchFuture;
 import build.buildfarm.v1test.OperationChange;
@@ -35,6 +33,7 @@ import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
 import redis.clients.jedis.Client;
@@ -145,13 +144,14 @@ class RedisShardSubscriber extends JedisPubSub {
   }
 
   public ListenableFuture<Void> watch(String channel, TimedWatcher watcher) {
-    TimedWatchFuture watchFuture = new TimedWatchFuture(watcher) {
-      @Override
-      public void unwatch() {
-        logger.fine("unwatching " + channel);
-        RedisShardSubscriber.this.unwatch(channel, this);
-      }
-    };
+    TimedWatchFuture watchFuture =
+        new TimedWatchFuture(watcher) {
+          @Override
+          public void unwatch() {
+            logger.log(Level.FINE, format("unwatching %s", channel));
+            RedisShardSubscriber.this.unwatch(channel, this);
+          }
+        };
     boolean hasSubscribed;
     synchronized (watchers) {
       // use prefix
@@ -166,8 +166,7 @@ class RedisShardSubscriber extends JedisPubSub {
 
   public void unwatch(String channel, TimedWatchFuture watchFuture) {
     synchronized (watchers) {
-      if (watchers.remove(channel, watchFuture) &&
-          !watchers.containsKey(channel)) {
+      if (watchers.remove(channel, watchFuture) && !watchers.containsKey(channel)) {
         unsubscribe(channel);
       }
     }
@@ -189,13 +188,11 @@ class RedisShardSubscriber extends JedisPubSub {
         (watcher) -> {
           boolean expired = force || watcher.isExpiredAt(now);
           if (expired) {
-            logger.severe(
+            logger.log(
+                Level.SEVERE,
                 format(
                     "Terminating expired watcher of %s because: %s >= %s%s",
-                    channel,
-                    now,
-                    watcher.getExpiresAt(),
-                    force ? " with force" : ""));
+                    channel, now, watcher.getExpiresAt(), force ? " with force" : ""));
           }
           return expired;
         },
@@ -213,7 +210,7 @@ class RedisShardSubscriber extends JedisPubSub {
       @Nullable Instant expiresAt) {
     List<TimedWatchFuture> operationWatchers = watchers.get(channel);
     boolean observe = operation == null || operation.hasMetadata() || operation.getDone();
-    logger.fine(format("onOperation %s: %s", channel, operation));
+    logger.log(Level.FINE, format("onOperation %s: %s", channel, operation));
     synchronized (watchers) {
       ImmutableList.Builder<Consumer<Operation>> observers = ImmutableList.builder();
       for (TimedWatchFuture watchFuture : operationWatchers) {
@@ -226,12 +223,13 @@ class RedisShardSubscriber extends JedisPubSub {
         }
       }
       for (Consumer<Operation> observer : observers.build()) {
-        executor.execute(() -> {
-          if (observe) {
-            logger.fine("observing " + operation);
-            observer.accept(operation);
-          }
-        });
+        executor.execute(
+            () -> {
+              if (observe) {
+                logger.log(Level.FINE, "observing " + operation);
+                observer.accept(operation);
+              }
+            });
       }
     }
   }
@@ -249,18 +247,18 @@ class RedisShardSubscriber extends JedisPubSub {
     try {
       onWorkerChange(parseWorkerChange(message));
     } catch (InvalidProtocolBufferException e) {
-      logger.log(WARNING, format("invalid worker change message: %s", message), e);
+      logger.log(Level.INFO, format("invalid worker change message: %s", message), e);
     }
   }
 
   void onWorkerChange(WorkerChange workerChange) {
     switch (workerChange.getTypeCase()) {
       case TYPE_NOT_SET:
-        logger.warning(
+        logger.log(
+            Level.SEVERE,
             format(
                 "WorkerChange oneof type is not set from %s at %s",
-                workerChange.getName(),
-                workerChange.getEffectiveAt()));
+                workerChange.getName(), workerChange.getEffectiveAt()));
         break;
       case ADD:
         addWorker(workerChange.getName());
@@ -287,7 +285,8 @@ class RedisShardSubscriber extends JedisPubSub {
     try {
       onOperationChange(channel, parseOperationChange(message));
     } catch (InvalidProtocolBufferException e) {
-      logger.log(FINE, format("invalid operation change message for %s: %s", channel, message), e);
+      logger.log(
+          Level.INFO, format("invalid operation change message for %s: %s", channel, message), e);
     }
   }
 
@@ -304,11 +303,11 @@ class RedisShardSubscriber extends JedisPubSub {
     switch (operationChange.getTypeCase()) {
       case TYPE_NOT_SET:
         // FIXME present nice timestamp
-        logger.severe(
+        logger.log(
+            Level.SEVERE,
             format(
                 "OperationChange oneof type is not set from %s at %s",
-                operationChange.getSource(),
-                operationChange.getEffectiveAt()));
+                operationChange.getSource(), operationChange.getEffectiveAt()));
         break;
       case RESET:
         resetOperation(channel, operationChange.getReset());
@@ -323,8 +322,7 @@ class RedisShardSubscriber extends JedisPubSub {
   }
 
   @Override
-  public void onSubscribe(String channel, int subscribedChannels) {
-  }
+  public void onSubscribe(String channel, int subscribedChannels) {}
 
   @Override
   public void onUnsubscribe(String channel, int subscribedChannels) {

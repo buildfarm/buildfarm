@@ -54,9 +54,9 @@ public class Poller {
       try {
         Duration waitTime = getWaitTime();
         if (waitTime.getSeconds() != 0 || waitTime.getNanos() != 0) {
-            wait(
-                waitTime.getSeconds() * 1000 + waitTime.getNanos() / 1000000,
-                waitTime.getNanos() % 1000000);
+          wait(
+              waitTime.getSeconds() * 1000 + waitTime.getNanos() / 1000000,
+              waitTime.getNanos() % 1000000);
         }
       } catch (InterruptedException e) {
         running = false;

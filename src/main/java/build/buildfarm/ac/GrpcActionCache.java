@@ -14,15 +14,18 @@
 
 package build.buildfarm.ac;
 
+import build.bazel.remote.execution.v2.ActionCacheGrpc;
+import build.bazel.remote.execution.v2.ActionCacheGrpc.ActionCacheBlockingStub;
+import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.GetActionResultRequest;
+import build.bazel.remote.execution.v2.UpdateActionResultRequest;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
-import build.bazel.remote.execution.v2.ActionResult;
-import build.bazel.remote.execution.v2.ActionCacheGrpc;
-import build.bazel.remote.execution.v2.ActionCacheGrpc.ActionCacheBlockingStub;
-import build.bazel.remote.execution.v2.GetActionResultRequest;
-import build.bazel.remote.execution.v2.UpdateActionResultRequest;
 import io.grpc.Channel;
+import io.grpc.Status;
+import io.grpc.Status.Code;
+import io.grpc.StatusRuntimeException;
 
 public class GrpcActionCache implements ActionCache {
   private final String instanceName;
@@ -44,18 +47,32 @@ public class GrpcActionCache implements ActionCache {
 
   @Override
   public ActionResult get(ActionKey actionKey) {
-    return actionCacheBlockingStub.get().getActionResult(GetActionResultRequest.newBuilder()
-        .setInstanceName(instanceName)
-        .setActionDigest(actionKey.getDigest())
-        .build());
+    try {
+      return actionCacheBlockingStub
+          .get()
+          .getActionResult(
+              GetActionResultRequest.newBuilder()
+                  .setInstanceName(instanceName)
+                  .setActionDigest(actionKey.getDigest())
+                  .build());
+    } catch (StatusRuntimeException e) {
+      Status status = Status.fromThrowable(e);
+      if (status.getCode() == Code.NOT_FOUND) {
+        return null;
+      }
+      throw e;
+    }
   }
 
   @Override
   public void put(ActionKey actionKey, ActionResult actionResult) {
-    actionCacheBlockingStub.get().updateActionResult(UpdateActionResultRequest.newBuilder()
-        .setInstanceName(instanceName)
-        .setActionDigest(actionKey.getDigest())
-        .setActionResult(actionResult)
-        .build());
+    actionCacheBlockingStub
+        .get()
+        .updateActionResult(
+            UpdateActionResultRequest.newBuilder()
+                .setInstanceName(instanceName)
+                .setActionDigest(actionKey.getDigest())
+                .setActionResult(actionResult)
+                .build());
   }
 }

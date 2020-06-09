@@ -23,6 +23,7 @@ import build.buildfarm.common.UrlPath.InvalidResourceNameException;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 class BlobWriteObserver implements WriteObserver {
@@ -37,20 +38,23 @@ class BlobWriteObserver implements WriteObserver {
   private boolean complete = false;
   private Throwable error = null;
 
-  BlobWriteObserver(String resourceName, SimpleBlobStore simpleBlobStore) throws InvalidResourceNameException {
+  BlobWriteObserver(String resourceName, SimpleBlobStore simpleBlobStore)
+      throws InvalidResourceNameException {
     Digest digest = parseUploadBlobDigest(resourceName);
     this.resourceName = resourceName;
     this.size = digest.getSizeBytes();
     buffer = new RingBufferInputStream((int) Math.min(size, BLOB_BUFFER_SIZE));
-    putThread = new Thread(() -> {
-      try {
-        simpleBlobStore.put(digest.getHash(), size, buffer);
-      } catch (IOException e) {
-        buffer.shutdown();
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      }
-    });
+    putThread =
+        new Thread(
+            () -> {
+              try {
+                simpleBlobStore.put(digest.getHash(), size, buffer);
+              } catch (IOException e) {
+                buffer.shutdown();
+              } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+              }
+            });
     putThread.start();
   }
 
@@ -58,45 +62,40 @@ class BlobWriteObserver implements WriteObserver {
     checkState(error == null);
     String requestResourceName = request.getResourceName();
     if (!requestResourceName.isEmpty() && !resourceName.equals(requestResourceName)) {
-      logger.warning(
+      logger.log(
+          Level.WARNING,
           String.format(
               "ByteStreamServer:write:%s: resource name %s does not match first request",
-              resourceName,
-              requestResourceName));
+              resourceName, requestResourceName));
       throw new IllegalArgumentException(
           String.format(
               "Previous resource name changed while handling request. %s -> %s",
-              resourceName,
-              requestResourceName));
+              resourceName, requestResourceName));
     }
     if (complete) {
-      logger.warning(
+      logger.log(
+          Level.WARNING,
           String.format(
               "ByteStreamServer:write:%s: write received after finish_write specified",
               resourceName));
-      throw new IllegalArgumentException(
-          String.format(
-              "request sent after finish_write request"));
+      throw new IllegalArgumentException(String.format("request sent after finish_write request"));
     }
     long committedSize = getCommittedSize();
     if (request.getWriteOffset() != committedSize) {
-      logger.warning(
+      logger.log(
+          Level.WARNING,
           String.format(
               "ByteStreamServer:write:%s: offset %d != committed_size %d",
-              resourceName,
-              request.getWriteOffset(),
-              getCommittedSize()));
+              resourceName, request.getWriteOffset(), getCommittedSize()));
       throw new IllegalArgumentException("Write offset invalid: " + request.getWriteOffset());
     }
     long sizeAfterWrite = committedSize + request.getData().size();
     if (request.getFinishWrite() && sizeAfterWrite != size) {
-      logger.warning(
+      logger.log(
+          Level.WARNING,
           String.format(
               "ByteStreamServer:write:%s: finish_write request of size %d for write size %d != expected %d",
-              resourceName,
-              request.getData().size(),
-              sizeAfterWrite,
-              size));
+              resourceName, request.getData().size(), sizeAfterWrite, size));
       throw new IllegalArgumentException("Write size invalid: " + sizeAfterWrite);
     }
   }

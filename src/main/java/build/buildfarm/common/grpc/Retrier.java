@@ -69,7 +69,7 @@ public class Retrier {
   public interface Backoff {
 
     /** Indicates that no more retries should be made for use in {@link #nextDelayMillis()}. */
-    static final long STOP = -1L;
+    long STOP = -1L;
 
     /** Returns the next delay in milliseconds, or < 0 if we should not continue retrying. */
     long nextDelayMillis();
@@ -84,7 +84,7 @@ public class Retrier {
      * Creates a Backoff supplier for a Backoff which does not support any retries. Both the
      * Supplier and the Backoff are stateless and thread-safe.
      */
-    static final Supplier<Backoff> NO_RETRIES =
+    Supplier<Backoff> NO_RETRIES =
         () ->
             new Backoff() {
               @Override
@@ -164,12 +164,12 @@ public class Retrier {
   public static final Predicate<Status> REDIS_IS_RETRIABLE =
       st -> {
         switch (st.getCode()) {
-        case CANCELLED:
-          return !Thread.currentThread().isInterrupted();
-        case DEADLINE_EXCEEDED:
-          return true;
-        default:
-          return false;
+          case CANCELLED:
+            return !Thread.currentThread().isInterrupted();
+          case DEADLINE_EXCEEDED:
+            return true;
+          default:
+            return false;
         }
       };
 
@@ -181,9 +181,7 @@ public class Retrier {
   private final Predicate<Status> isRetriable;
   private final ListeningScheduledExecutorService retryScheduler;
 
-  public Retrier(
-      Supplier<Backoff> backoffSupplier,
-      Predicate<Status> isRetriable) {
+  public Retrier(Supplier<Backoff> backoffSupplier, Predicate<Status> isRetriable) {
     this(backoffSupplier, isRetriable, /* retryScheduler=*/ null);
   }
 
@@ -196,9 +194,7 @@ public class Retrier {
     this.retryScheduler = retryScheduler;
   }
 
-  /**
-   * Returns {@code true} if the {@link Status} is retriable.
-   */
+  /** Returns {@code true} if the {@link Status} is retriable. */
   public boolean isRetriable(Status s) {
     return isRetriable.apply(s);
   }
@@ -220,7 +216,7 @@ public class Retrier {
       } catch (PassThroughException e) {
         throw (StatusRuntimeException) e.getCause();
       } catch (RetryException e) {
-        throw e;  // Nested retries are always pass-through.
+        throw e; // Nested retries are always pass-through.
       } catch (StatusException | StatusRuntimeException e) {
         Status st = Status.fromThrowable(e);
         long delay = backoff.nextDelayMillis();

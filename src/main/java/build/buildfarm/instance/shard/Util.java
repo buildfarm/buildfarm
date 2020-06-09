@@ -15,14 +15,8 @@
 package build.buildfarm.instance.shard;
 
 import static com.google.common.util.concurrent.Futures.addCallback;
-import static com.google.common.util.concurrent.Futures.allAsList;
-import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
-import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.transform;
-import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
-import static com.google.common.base.Predicates.notNull;
 import static java.lang.String.format;
-import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
@@ -30,9 +24,8 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.instance.Instance;
-import com.google.common.base.Predicate;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -46,6 +39,8 @@ import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class Util {
@@ -53,9 +48,9 @@ public class Util {
   public static final Predicate<Status> SHARD_IS_RETRIABLE =
       st -> st.getCode() != Code.CANCELLED && Retrier.DEFAULT_IS_RETRIABLE.apply(st);
 
-  private Util() { }
+  private Util() {}
 
-  static abstract class AggregateCallback<T> implements FutureCallback<T> {
+  abstract static class AggregateCallback<T> implements FutureCallback<T> {
     private final AtomicInteger outstanding;
 
     AggregateCallback(int completions) {
@@ -85,30 +80,33 @@ public class Util {
     ListenableFuture<Void> foundFuture;
     Set<String> foundWorkers = Sets.newConcurrentHashSet();
     synchronized (workerSet) {
-      foundFuture = correctMissingBlobSynchronized(
-          backplane,
-          workerSet,
-          originalLocationSet,
-          workerInstanceFactory,
-          digest,
-          executor,
-          foundWorkers,
-          requestMetadata);
+      foundFuture =
+          correctMissingBlobSynchronized(
+              backplane,
+              workerSet,
+              originalLocationSet,
+              workerInstanceFactory,
+              digest,
+              executor,
+              foundWorkers,
+              requestMetadata);
     }
     return transform(
         foundFuture,
         (result) -> {
           Set<String> newLocationSet;
           synchronized (workerSet) {
-            newLocationSet = Sets.difference(Sets.intersection(originalLocationSet, workerSet), foundWorkers).immutableCopy();
+            newLocationSet =
+                Sets.difference(Sets.intersection(originalLocationSet, workerSet), foundWorkers)
+                    .immutableCopy();
           }
           try {
-            backplane.adjustBlobLocations(
-                digest,
-                foundWorkers,
-                newLocationSet);
+            backplane.adjustBlobLocations(digest, foundWorkers, newLocationSet);
           } catch (IOException e) {
-            logger.log(SEVERE, format("error adjusting blob location for %s", DigestUtil.toString(digest)), e);
+            logger.log(
+                Level.SEVERE,
+                format("error adjusting blob location for %s", DigestUtil.toString(digest)),
+                e);
           }
           return foundWorkers;
         },
@@ -125,31 +123,36 @@ public class Util {
       Set<String> foundWorkers,
       RequestMetadata requestMetadata) {
     SettableFuture<Void> foundFuture = SettableFuture.create();
-    AggregateCallback<String> foundCallback = new AggregateCallback<String>(workerSet.size() + 1) {
-      @Override
-      public boolean complete() {
-        return super.complete() && foundFuture.set(null);
-      }
+    AggregateCallback<String> foundCallback =
+        new AggregateCallback<String>(workerSet.size() + 1) {
+          @Override
+          public boolean complete() {
+            return super.complete() && foundFuture.set(null);
+          }
 
-      protected void fail(StatusRuntimeException e) {
-        super.fail();
-        foundFuture.setException(e);
-      }
+          protected void fail(StatusRuntimeException e) {
+            super.fail();
+            foundFuture.setException(e);
+          }
 
-      @Override
-      public void onSuccess(String worker) {
-        if (worker != null) {
-          foundWorkers.add(worker);
-        }
-        complete();
-      }
+          @Override
+          public void onSuccess(String worker) {
+            if (worker != null) {
+              foundWorkers.add(worker);
+            }
+            complete();
+          }
 
-      @Override
-      public void onFailure(Throwable t) {
-        fail(Status.fromThrowable(t).asRuntimeException());
-      }
-    };
-    logger.info(format("scanning through %d workers to find %s", workerSet.size(), DigestUtil.toString(digest)));
+          @Override
+          public void onFailure(Throwable t) {
+            fail(Status.fromThrowable(t).asRuntimeException());
+          }
+        };
+    logger.log(
+        Level.INFO,
+        format(
+            "scanning through %d workers to find %s",
+            workerSet.size(), DigestUtil.toString(digest)));
     for (String worker : workerSet) {
       Instance instance = workerInstanceFactory.apply(worker);
       checkMissingBlobOnInstance(
@@ -189,7 +192,11 @@ public class Util {
           @Override
           public void onSuccess(Iterable<Digest> missingDigests) {
             boolean found = Iterables.isEmpty(missingDigests);
-            logger.info(format("check missing response for %s to %s was %sfound", DigestUtil.toString(digest), worker, found ? "" : "not "));
+            logger.log(
+                Level.INFO,
+                format(
+                    "check missing response for %s to %s was %sfound",
+                    DigestUtil.toString(digest), worker, found ? "" : "not "));
             foundCallback.onSuccess(found);
           }
 
@@ -197,21 +204,24 @@ public class Util {
           public void onFailure(Throwable t) {
             Status status = Status.fromThrowable(t);
             if (status.getCode() == Code.UNAVAILABLE) {
-              logger.info(format("check missing response for %s to %s was not found for unavailable", DigestUtil.toString(digest), worker));
+              logger.log(
+                  Level.INFO,
+                  format(
+                      "check missing response for %s to %s was not found for unavailable",
+                      DigestUtil.toString(digest), worker));
               foundCallback.onSuccess(false);
-            } else if (status.getCode() == Code.CANCELLED || Context.current().isCancelled()
+            } else if (status.getCode() == Code.CANCELLED
+                || Context.current().isCancelled()
                 || status.getCode() == Code.DEADLINE_EXCEEDED
                 || !SHARD_IS_RETRIABLE.test(status)) {
-              logger.log(SEVERE, format("error checking for %s on %s", DigestUtil.toString(digest), worker), t);
+              logger.log(
+                  Level.SEVERE,
+                  format("error checking for %s on %s", DigestUtil.toString(digest), worker),
+                  t);
               foundCallback.onFailure(t);
             } else {
               checkMissingBlobOnInstance(
-                  digest,
-                  worker,
-                  instance,
-                  foundCallback,
-                  executor,
-                  requestMetadata);
+                  digest, worker, instance, foundCallback, executor, requestMetadata);
             }
           }
         },

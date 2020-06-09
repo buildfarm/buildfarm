@@ -15,10 +15,10 @@
 package build.buildfarm.worker.shard;
 
 import build.bazel.remote.execution.v2.Digest;
+import build.buildfarm.cas.CASFileCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.InputStreamFactory;
-import build.buildfarm.worker.CASFileCache;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.io.InputStream;
@@ -49,29 +49,31 @@ class ShardCASFileCache extends CASFileCache {
         expireService,
         accessRecorder,
         /* storage=*/ Maps.newConcurrentMap(),
+        DEFAULT_DIRECTORIES_INDEX_NAME,
         onPut,
         onExpire,
         delegate);
-    this.inputStreamFactory = createInputStreamFactory(this::newTransparentInput, shardInputStreamFactory);
+    this.inputStreamFactory =
+        createInputStreamFactory(this::newTransparentInput, shardInputStreamFactory);
   }
 
   /**
-   * this convolution of the use of the CFC as an InputStreamFactory is due to
-   * the likelihood that it contains a copy, and possibly the only copy, of a blob,
-   * but in an executable state. We resolve first any empty input streams automatically,
-   * then attempt to find the blob locally, then fall back to remote download
+   * this convolution of the use of the CFC as an InputStreamFactory is due to the likelihood that
+   * it contains a copy, and possibly the only copy, of a blob, but in an executable state. We
+   * resolve first any empty input streams automatically, then attempt to find the blob locally,
+   * then fall back to remote download
    *
-   * Emprically, this is meant to maintain the fact that we can exist in the only-copy
-   * state, with that satisfied by the executable copy, and not cycle.
+   * <p>Emprically, this is meant to maintain the fact that we can exist in the only-copy state,
+   * with that satisfied by the executable copy, and not cycle.
    */
   private static InputStreamFactory createInputStreamFactory(
       InputStreamFactory primary, InputStreamFactory fallback) {
-    return new EmptyInputStreamFactory(
-        new FailoverInputStreamFactory(primary, fallback));
+    return new EmptyInputStreamFactory(new FailoverInputStreamFactory(primary, fallback));
   }
 
   @Override
-  protected InputStream newExternalInput(Digest digest, long offset) throws IOException, InterruptedException {
+  protected InputStream newExternalInput(Digest digest, long offset)
+      throws IOException, InterruptedException {
     return inputStreamFactory.newInput(digest, offset);
   }
 }

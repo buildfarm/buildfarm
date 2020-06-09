@@ -16,13 +16,13 @@ package build.buildfarm;
 
 import build.buildfarm.Classpath.ClassPathException;
 import com.google.common.collect.Sets;
-import org.junit.runner.RunWith;
-import org.junit.runners.Suite;
 import java.lang.reflect.Modifier;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import junit.framework.TestCase;
+import org.junit.runner.RunWith;
+import org.junit.runners.Suite;
 
 final class TestSuiteBuilder {
   private static class TestClassNameComparator implements Comparator<Class<?>> {
@@ -35,8 +35,8 @@ final class TestSuiteBuilder {
   private Set<Class<?>> testClasses = Sets.newTreeSet(new TestClassNameComparator());
 
   /**
-   * Adds the tests found (directly) in class {@code c} to the set of tests
-   * this builder will search.
+   * Adds the tests found (directly) in class {@code c} to the set of tests this builder will
+   * search.
    */
   public TestSuiteBuilder addTestClass(Class<?> c) {
     testClasses.add(c);
@@ -44,9 +44,8 @@ final class TestSuiteBuilder {
   }
 
   /**
-   * Adds all the test classes (top-level or nested) found in package
-   * {@code pkgName} or its subpackages to the set of tests this builder will
-   * search.
+   * Adds all the test classes (top-level or nested) found in package {@code pkgName} or its
+   * subpackages to the set of tests this builder will search.
    */
   public TestSuiteBuilder addPackageRecursive(String pkgName) {
     for (Class<?> c : getClassesRecursive(pkgName)) {
@@ -91,21 +90,18 @@ final class TestSuiteBuilder {
   }
 
   /**
-   * Classes that have a {@code RunWith} annotation for {@link Suite} or
-   * are automatically excluded to avoid picking up the suite class itself.
+   * Classes that have a {@code RunWith} annotation for {@link Suite} or are automatically excluded
+   * to avoid picking up the suite class itself.
    */
   private static boolean isSuite(Class<?> container) {
     RunWith runWith = container.getAnnotation(RunWith.class);
-    return (runWith != null)
-        && ((runWith.value() == CustomSuite.class));
+    return (runWith != null) && ((runWith.value() == CustomSuite.class));
   }
 
   /**
-   * Creates and returns a TestSuite containing the tests from the given
-   * classes and/or packages.
+   * Creates and returns a TestSuite containing the tests from the given classes and/or packages.
    */
   public Set<Class<?>> create() {
     return testClasses;
   }
 }
-

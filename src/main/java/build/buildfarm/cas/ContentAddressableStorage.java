@@ -23,16 +23,19 @@ import build.buildfarm.common.ThreadSafety.ThreadSafe;
 import build.buildfarm.common.Write;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.protobuf.ByteString;
+import io.grpc.stub.ServerCallStreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.UUID;
 
 public interface ContentAddressableStorage extends InputStreamFactory {
+  long UNLIMITED_ENTRY_SIZE_MAX = -1;
+
   /**
-   * Blob storage for the CAS. This class should be used at all times when interacting with
-   * complete blobs in order to cut down on independent digest computation.
+   * Blob storage for the CAS. This class should be used at all times when interacting with complete
+   * blobs in order to cut down on independent digest computation.
    */
-  public static final class Blob {
+  final class Blob {
     private final Digest digest;
     private final ByteString data;
 
@@ -63,7 +66,7 @@ public interface ContentAddressableStorage extends InputStreamFactory {
     }
   }
 
-  public class EntryLimitException extends IOException {
+  class EntryLimitException extends IOException {
     private final Digest digest;
 
     public EntryLimitException(Digest digest) {
@@ -94,6 +97,15 @@ public interface ContentAddressableStorage extends InputStreamFactory {
   @ThreadSafe
   InputStream newInput(Digest digest, long offset) throws IOException;
 
+  /** Retrieve a value from the CAS by streaming content when ready */
+  @ThreadSafe
+  void get(
+      Digest digest,
+      long offset,
+      long count,
+      ServerCallStreamObserver<ByteString> blobObserver,
+      RequestMetadata requestMetadata);
+
   @ThreadSafe
   Write getWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata);
 
@@ -104,12 +116,13 @@ public interface ContentAddressableStorage extends InputStreamFactory {
   /**
    * Insert a value into the CAS with expiration callback.
    *
-   * <p>The callback provided will be run after the value is expired
-   * and removed from the storage. Successive calls to this method
-   * for a unique blob digest will register additional callbacks, does
-   * not deduplicate by callback, and the order of which is not
-   * guaranteed for invocation.
+   * <p>The callback provided will be run after the value is expired and removed from the storage.
+   * Successive calls to this method for a unique blob digest will register additional callbacks,
+   * does not deduplicate by callback, and the order of which is not guaranteed for invocation.
    */
   @ThreadSafe
   void put(Blob blob, Runnable onExpiration) throws InterruptedException;
+
+  @ThreadSafe
+  long maxEntrySize();
 }

@@ -17,56 +17,79 @@ package build.buildfarm.cas;
 import static build.buildfarm.common.grpc.Retrier.NO_RETRIES;
 import static com.google.common.collect.Multimaps.synchronizedListMultimap;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Write;
 import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.v1test.ContentAddressableStorageConfig;
+import build.buildfarm.v1test.FilesystemCASConfig;
 import build.buildfarm.v1test.GrpcCASConfig;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.MultimapBuilder;
-import com.google.protobuf.ByteString;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.protobuf.ByteString;
 import io.grpc.Channel;
+import io.grpc.Status;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
+import io.grpc.stub.ServerCallStreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.NoSuchFileException;
+import java.nio.file.Paths;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 
 public final class ContentAddressableStorages {
   private static Channel createChannel(String target) {
     NettyChannelBuilder builder =
-        NettyChannelBuilder.forTarget(target)
-            .negotiationType(NegotiationType.PLAINTEXT);
+        NettyChannelBuilder.forTarget(target).negotiationType(NegotiationType.PLAINTEXT);
     return builder.build();
   }
 
   public static ContentAddressableStorage createGrpcCAS(GrpcCASConfig config) {
     Channel channel = createChannel(config.getTarget());
-    ByteStreamUploader byteStreamUploader
-        = new ByteStreamUploader("", channel, null, 300, NO_RETRIES);
-    ListMultimap<Digest, Runnable> onExpirations = synchronizedListMultimap(
-        MultimapBuilder
-            .hashKeys()
-            .arrayListValues()
-            .build());
+    ByteStreamUploader byteStreamUploader =
+        new ByteStreamUploader("", channel, null, 300, NO_RETRIES);
+    ListMultimap<Digest, Runnable> onExpirations =
+        synchronizedListMultimap(MultimapBuilder.hashKeys().arrayListValues().build());
 
     return new GrpcCAS(config.getInstanceName(), channel, byteStreamUploader, onExpirations);
+  }
+
+  public static ContentAddressableStorage createFilesystemCAS(FilesystemCASConfig config) {
+    CASFileCache cas =
+        new CASFileCache(
+            Paths.get(config.getPath()),
+            config.getMaxSizeBytes(),
+            config.getMaxEntrySizeBytes(),
+            DigestUtil.forHash("SHA256"),
+            /* expireService=*/ newDirectExecutorService(),
+            /* accessRecorder=*/ directExecutor()) {
+          @Override
+          protected InputStream newExternalInput(Digest digest, long offset) throws IOException {
+            throw new NoSuchFileException(digest.getHash());
+          }
+        };
+    try {
+      cas.start();
+    } catch (IOException | InterruptedException e) {
+      throw new RuntimeException("error starting filesystem cas", e);
+    }
+    return cas;
   }
 
   public static ContentAddressableStorage create(ContentAddressableStorageConfig config) {
     switch (config.getTypeCase()) {
       default:
+      case FILESYSTEM:
+        return createFilesystemCAS(config.getFilesystem());
       case TYPE_NOT_SET:
         throw new IllegalArgumentException("CAS config not set in config");
       case GRPC:
@@ -76,10 +99,7 @@ public final class ContentAddressableStorages {
     }
   }
 
-  /**
-   * decorates a map with a CAS interface, does not react
-   * to removals with expirations
-   */
+  /** decorates a map with a CAS interface, does not react to removals with expirations */
   public static ContentAddressableStorage casMapDecorator(Map<Digest, ByteString> map) {
     return new ContentAddressableStorage() {
       final Writes writes = new Writes(this);
@@ -117,8 +137,23 @@ public final class ContentAddressableStorages {
       }
 
       @Override
-      public ListenableFuture<Iterable<Response>> getAllFuture(
-          Iterable<Digest> digests) {
+      public void get(
+          Digest digest,
+          long offset,
+          long count,
+          ServerCallStreamObserver<ByteString> responseObserver,
+          RequestMetadata requestMetadata) {
+        ByteString data = map.get(digest);
+        if (data == null) {
+          responseObserver.onError(Status.NOT_FOUND.asException());
+        } else {
+          responseObserver.onNext(map.get(digest));
+          responseObserver.onCompleted();
+        }
+      }
+
+      @Override
+      public ListenableFuture<Iterable<Response>> getAllFuture(Iterable<Digest> digests) {
         return immediateFuture(MemoryCAS.getAll(digests, map::get));
       }
 
@@ -141,6 +176,11 @@ public final class ContentAddressableStorages {
       @Override
       public void put(Blob blob, Runnable onExpiration) {
         put(blob);
+      }
+
+      @Override
+      public long maxEntrySize() {
+        return UNLIMITED_ENTRY_SIZE_MAX;
       }
     };
   }

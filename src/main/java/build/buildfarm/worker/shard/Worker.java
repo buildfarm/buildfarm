@@ -21,24 +21,30 @@ import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.FINER;
+import static java.util.logging.Level.INFO;
 import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.Digest;
+import build.buildfarm.cas.CASFileCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.cas.MemoryCAS;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
+import build.buildfarm.common.LoggingMain;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.RedisShardBackplane;
 import build.buildfarm.instance.shard.RemoteInputStreamFactory;
 import build.buildfarm.instance.shard.WorkerStubs;
-import build.buildfarm.server.Instances;
-import build.buildfarm.server.ContentAddressableStorageService;
 import build.buildfarm.server.ByteStreamService;
-import build.buildfarm.worker.CASFileCache;
+import build.buildfarm.server.ContentAddressableStorageService;
+import build.buildfarm.server.Instances;
+import build.buildfarm.v1test.ContentAddressableStorageConfig;
+import build.buildfarm.v1test.FilesystemCASConfig;
+import build.buildfarm.v1test.ShardWorker;
+import build.buildfarm.v1test.ShardWorkerConfig;
 import build.buildfarm.worker.ExecuteActionStage;
 import build.buildfarm.worker.FuseCAS;
 import build.buildfarm.worker.InputFetchStage;
@@ -47,15 +53,10 @@ import build.buildfarm.worker.Pipeline;
 import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.ReportResultStage;
-import build.buildfarm.worker.WorkerContext;
-import build.buildfarm.v1test.ContentAddressableStorageConfig;
-import build.buildfarm.v1test.FilesystemCASConfig;
-import build.buildfarm.v1test.ShardWorkerConfig;
-import build.buildfarm.v1test.ShardWorker;
 import com.google.common.base.Strings;
+import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-import com.google.common.cache.LoadingCache;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.devtools.common.options.OptionsParser;
 import com.google.longrunning.Operation;
@@ -80,8 +81,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
 
-public class Worker {
-  private static final java.util.logging.Logger nettyLogger = java.util.logging.Logger.getLogger("io.grpc.netty");
+public class Worker extends LoggingMain {
+  private static final java.util.logging.Logger nettyLogger =
+      java.util.logging.Logger.getLogger("io.grpc.netty");
   private static final Logger logger = Logger.getLogger(Worker.class.getName());
 
   private static final int shutdownWaitTimeInSeconds = 10;
@@ -112,7 +114,8 @@ public class Worker {
     return root;
   }
 
-  private static Path getValidFilesystemCASPath(FilesystemCASConfig config, Path root) throws ConfigurationException {
+  private static Path getValidFilesystemCASPath(FilesystemCASConfig config, Path root)
+      throws ConfigurationException {
     String pathValue = config.getPath();
     if (Strings.isNullOrEmpty(pathValue)) {
       throw new ConfigurationException("Cas cache directory value in config missing");
@@ -120,7 +123,8 @@ public class Worker {
     return root.resolve(pathValue);
   }
 
-  private static HashFunction getValidHashFunction(ShardWorkerConfig config) throws ConfigurationException {
+  private static HashFunction getValidHashFunction(ShardWorkerConfig config)
+      throws ConfigurationException {
     try {
       return HashFunction.get(config.getDigestFunction());
     } catch (IllegalArgumentException e) {
@@ -136,10 +140,15 @@ public class Worker {
     return instance.stripQueuedOperation(operation);
   }
 
-  public Worker(String session, ServerBuilder<?> serverBuilder, ShardWorkerConfig config) throws ConfigurationException {
+  public Worker(String session, ServerBuilder<?> serverBuilder, ShardWorkerConfig config)
+      throws ConfigurationException {
+    super("BuildFarmShardWorker");
     this.config = config;
     String identifier = "buildfarm-worker-" + config.getPublicName() + "-" + session;
     root = getValidRoot(config);
+    if (config.getPublicName().isEmpty()) {
+      throw new ConfigurationException("worker's public name should not be empty");
+    }
 
     digestUtil = new DigestUtil(getValidHashFunction(config));
 
@@ -149,13 +158,14 @@ public class Worker {
       case BACKPLANE_NOT_SET:
         throw new IllegalArgumentException("Shard Backplane not set in config");
       case REDIS_SHARD_BACKPLANE_CONFIG:
-        backplane = new RedisShardBackplane(
-            config.getRedisShardBackplaneConfig(),
-            identifier,
-            this::stripOperation,
-            this::stripQueuedOperation,
-            (o) -> false,
-            (o) -> false);
+        backplane =
+            new RedisShardBackplane(
+                config.getRedisShardBackplaneConfig(),
+                identifier,
+                this::stripOperation,
+                this::stripQueuedOperation,
+                (o) -> false,
+                (o) -> false);
         break;
     }
 
@@ -174,60 +184,56 @@ public class Worker {
             new Random(),
             workerStubs,
             (worker, t, context) -> {});
-    ContentAddressableStorage storage = createStorages(
-        remoteInputStreamFactory, removeDirectoryService, accessRecorder, config.getCasList());
-    execFileSystem = createExecFileSystem(
-        remoteInputStreamFactory,
-        removeDirectoryService,
-        accessRecorder,
-        storage);
+    ContentAddressableStorage storage =
+        createStorages(
+            remoteInputStreamFactory, removeDirectoryService, accessRecorder, config.getCasList());
+    execFileSystem =
+        createExecFileSystem(
+            remoteInputStreamFactory, removeDirectoryService, accessRecorder, storage);
 
-    instance = new ShardWorkerInstance(
-        config.getPublicName(),
-        digestUtil,
-        backplane,
-        storage,
-        execFileSystem,
-        config.getShardWorkerInstanceConfig());
+    instance =
+        new ShardWorkerInstance(
+            config.getPublicName(),
+            digestUtil,
+            backplane,
+            storage,
+            config.getShardWorkerInstanceConfig());
 
     Instances instances = Instances.singular(instance);
-    server = serverBuilder
-        .addService(new ContentAddressableStorageService(
-            instances,
-            /* deadlineAfter=*/ 1, DAYS,
-            /* requestLogLevel=*/ FINER))
-        .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, DAYS))
-        .build();
 
-    WorkerContext context = new ShardWorkerContext(
-        config.getPublicName(),
-        config.getPlatform(),
-        config.getOperationPollPeriod(),
-        backplane::pollOperation,
-        config.getInlineContentLimit(),
-        config.getInputFetchStageWidth(),
-        config.getExecuteStageWidth(),
-        backplane,
-        execFileSystem,
-        new EmptyInputStreamFactory(
-            new FailoverInputStreamFactory(
-                execFileSystem.getStorage(),
-                remoteInputStreamFactory)),
-        config.getExecutionPoliciesList(),
-        instance,
-        /* deadlineAfter=*/ 1, /* deadlineAfterUnits=*/ DAYS,
-        config.getDefaultActionTimeout(),
-        config.getMaximumActionTimeout());
+    ShardWorkerContext context =
+        new ShardWorkerContext(
+            config.getPublicName(),
+            config.getPlatform(),
+            config.getOperationPollPeriod(),
+            backplane::pollOperation,
+            config.getInlineContentLimit(),
+            config.getInputFetchStageWidth(),
+            config.getExecuteStageWidth(),
+            backplane,
+            execFileSystem,
+            new EmptyInputStreamFactory(
+                new FailoverInputStreamFactory(
+                    execFileSystem.getStorage(), remoteInputStreamFactory)),
+            config.getExecutionPoliciesList(),
+            instance,
+            /* deadlineAfter=*/ 1,
+            /* deadlineAfterUnits=*/ DAYS,
+            config.getDefaultActionTimeout(),
+            config.getMaximumActionTimeout(),
+            config.getLimitExecution(),
+            config.getLimitGlobalExecution(),
+            config.getOnlyMulticoreTests());
 
-    PipelineStage completeStage = new PutOperationStage((operation) -> context.deactivate(operation.getName()));
+    PipelineStage completeStage =
+        new PutOperationStage((operation) -> context.deactivate(operation.getName()));
     PipelineStage errorStage = completeStage; /* new ErrorStage(); */
     PipelineStage reportResultStage = new ReportResultStage(context, completeStage, errorStage);
-    PipelineStage executeActionStage = new ExecuteActionStage(context, reportResultStage, errorStage);
-    reportResultStage.setInput(executeActionStage);
-    PipelineStage inputFetchStage = new InputFetchStage(context, executeActionStage, new PutOperationStage(context::requeue));
-    executeActionStage.setInput(inputFetchStage);
+    PipelineStage executeActionStage =
+        new ExecuteActionStage(context, reportResultStage, errorStage);
+    PipelineStage inputFetchStage =
+        new InputFetchStage(context, executeActionStage, new PutOperationStage(context::requeue));
     PipelineStage matchStage = new MatchStage(context, inputFetchStage, errorStage);
-    inputFetchStage.setInput(matchStage);
 
     pipeline = new Pipeline();
     // pipeline.add(errorStage, 0);
@@ -236,35 +242,51 @@ public class Worker {
     pipeline.add(executeActionStage, 2);
     pipeline.add(reportResultStage, 1);
 
-    logger.info(String.format("%s initialized", identifier));
+    server =
+        serverBuilder
+            .addService(
+                new ContentAddressableStorageService(
+                    instances, /* deadlineAfter=*/ 1, DAYS, /* requestLogLevel=*/ FINER))
+            .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, DAYS))
+            .addService(
+                new WorkerProfileService(
+                    storage, inputFetchStage, executeActionStage, context, completeStage))
+            .build();
+
+    logger.log(INFO, String.format("%s initialized", identifier));
   }
 
   private ExecFileSystem createFuseExecFileSystem(
-      InputStreamFactory remoteInputStreamFactory,
-      ContentAddressableStorage storage) {
-    InputStreamFactory storageInputStreamFactory = (digest, offset) -> storage.get(digest).getData().substring((int) offset).newInput();
+      InputStreamFactory remoteInputStreamFactory, ContentAddressableStorage storage) {
+    InputStreamFactory storageInputStreamFactory =
+        (digest, offset) -> storage.get(digest).getData().substring((int) offset).newInput();
 
-    InputStreamFactory localPopulatingInputStreamFactory = new InputStreamFactory() {
-      @Override
-      public InputStream newInput(Digest blobDigest, long offset) throws IOException, InterruptedException {
-        // FIXME use write
-        ByteString content = ByteString.readFrom(remoteInputStreamFactory.newInput(blobDigest, offset));
+    InputStreamFactory localPopulatingInputStreamFactory =
+        new InputStreamFactory() {
+          @Override
+          public InputStream newInput(Digest blobDigest, long offset)
+              throws IOException, InterruptedException {
+            // FIXME use write
+            ByteString content =
+                ByteString.readFrom(remoteInputStreamFactory.newInput(blobDigest, offset));
 
-        if (offset == 0) {
-          // extra computations
-          Blob blob = new Blob(content, digestUtil);
-          // here's hoping that our digest matches...
-          storage.put(blob);
-        }
+            if (offset == 0) {
+              // extra computations
+              Blob blob = new Blob(content, digestUtil);
+              // here's hoping that our digest matches...
+              storage.put(blob);
+            }
 
-        return content.newInput();
-      }
-    };
+            return content.newInput();
+          }
+        };
     return new FuseExecFileSystem(
         root,
-        new FuseCAS(root,
+        new FuseCAS(
+            root,
             new EmptyInputStreamFactory(
-                new FailoverInputStreamFactory(storageInputStreamFactory, localPopulatingInputStreamFactory))),
+                new FailoverInputStreamFactory(
+                    storageInputStreamFactory, localPopulatingInputStreamFactory))),
         storage);
   }
 
@@ -275,7 +297,8 @@ public class Worker {
       ContentAddressableStorage storage) {
     checkState(storage != null, "no exec fs cas specified");
     if (storage instanceof CASFileCache) {
-      return createCFCExecFileSystem(removeDirectoryService, accessRecorder, (CASFileCache) storage);
+      return createCFCExecFileSystem(
+          removeDirectoryService, accessRecorder, (CASFileCache) storage);
     } else {
       // FIXME not the only fuse backing capacity...
       return createFuseExecFileSystem(remoteInputStreamFactory, storage);
@@ -287,7 +310,8 @@ public class Worker {
       ExecutorService removeDirectoryService,
       Executor accessRecorder,
       ContentAddressableStorageConfig config,
-      ContentAddressableStorage delegate) throws ConfigurationException {
+      ContentAddressableStorage delegate)
+      throws ConfigurationException {
     switch (config.getTypeCase()) {
       default:
       case TYPE_NOT_SET:
@@ -318,12 +342,15 @@ public class Worker {
       InputStreamFactory remoteInputStreamFactory,
       ExecutorService removeDirectoryService,
       Executor accessRecorder,
-      List<ContentAddressableStorageConfig> configs) throws ConfigurationException {
+      List<ContentAddressableStorageConfig> configs)
+      throws ConfigurationException {
     ImmutableList.Builder<ContentAddressableStorage> storages = ImmutableList.builder();
     // must construct delegates first
     ContentAddressableStorage storage = null, delegate = null;
     for (ContentAddressableStorageConfig config : Lists.reverse(configs)) {
-      storage = createStorage(remoteInputStreamFactory, removeDirectoryService, accessRecorder, config, delegate);
+      storage =
+          createStorage(
+              remoteInputStreamFactory, removeDirectoryService, accessRecorder, config, delegate);
       storages.add(storage);
       delegate = storage;
     }
@@ -340,22 +367,23 @@ public class Worker {
         config.getLinkInputDirectories(),
         removeDirectoryService,
         accessRecorder,
-        /* deadlineAfter=*/ 1, /* deadlineAfterUnits=*/ DAYS);
+        /* deadlineAfter=*/ 1,
+        /* deadlineAfterUnits=*/ DAYS);
   }
 
   public void stop() throws InterruptedException {
     boolean interrupted = Thread.interrupted();
-    logger.info("Closing the pipeline");
+    logger.log(INFO, "Closing the pipeline");
     try {
       pipeline.close();
     } catch (InterruptedException e) {
       Thread.interrupted();
       interrupted = true;
     }
-    logger.info("Stopping exec filesystem");
+    logger.log(INFO, "Stopping exec filesystem");
     execFileSystem.stop();
     if (server != null) {
-      logger.info("Shutting down the server");
+      logger.log(INFO, "Shutting down the server");
       server.shutdown();
 
       try {
@@ -407,13 +435,13 @@ public class Worker {
 
   private void removeWorker(String name) {
     try {
-      backplane.removeWorker(name);
+      backplane.removeWorker(name, "removing self prior to initialization");
     } catch (IOException e) {
       Status status = Status.fromThrowable(e);
       if (status.getCode() != Code.UNAVAILABLE && status.getCode() != Code.DEADLINE_EXCEEDED) {
         throw status.asRuntimeException();
       }
-      logger.info("backplane was unavailable or overloaded, deferring removeWorker");
+      logger.log(INFO, "backplane was unavailable or overloaded, deferring removeWorker");
     }
   }
 
@@ -449,50 +477,49 @@ public class Worker {
 
   private void startFailsafeRegistration() {
     String endpoint = config.getPublicName();
-    ShardWorker.Builder worker = ShardWorker.newBuilder()
-        .setEndpoint(endpoint);
+    ShardWorker.Builder worker = ShardWorker.newBuilder().setEndpoint(endpoint);
     int registrationIntervalMillis = 10000;
     int registrationOffsetMillis = registrationIntervalMillis * 3;
-    new Thread(new Runnable() {
-      long workerRegistrationExpiresAt = 0;
+    new Thread(
+            new Runnable() {
+              long workerRegistrationExpiresAt = 0;
 
-      ShardWorker nextRegistration(long now) {
-        return worker
-            .setExpireAt(now + registrationOffsetMillis)
-            .build();
-      }
+              ShardWorker nextRegistration(long now) {
+                return worker.setExpireAt(now + registrationOffsetMillis).build();
+              }
 
-      long nextInterval(long now) {
-        return now + registrationIntervalMillis;
-      }
+              long nextInterval(long now) {
+                return now + registrationIntervalMillis;
+              }
 
-      void registerIfExpired() {
-        long now = System.currentTimeMillis();
-        if (now >= workerRegistrationExpiresAt) {
-          // worker must be registered to match
-          addWorker(nextRegistration(now));
-          // update every 10 seconds
-          workerRegistrationExpiresAt = nextInterval(now);
-        }
-      }
+              void registerIfExpired() {
+                long now = System.currentTimeMillis();
+                if (now >= workerRegistrationExpiresAt) {
+                  // worker must be registered to match
+                  addWorker(nextRegistration(now));
+                  // update every 10 seconds
+                  workerRegistrationExpiresAt = nextInterval(now);
+                }
+              }
 
-      @Override
-      public void run() {
-        try {
-          while (!server.isShutdown()) {
-            registerIfExpired();
-            SECONDS.sleep(1);
-          }
-        } catch (InterruptedException e) {
-          try {
-            stop();
-          } catch (InterruptedException ie) {
-            logger.log(SEVERE, "interrupted while stopping worker", ie);
-            // ignore
-          }
-        }
-      }
-    }).start();
+              @Override
+              public void run() {
+                try {
+                  while (!server.isShutdown()) {
+                    registerIfExpired();
+                    SECONDS.sleep(1);
+                  }
+                } catch (InterruptedException e) {
+                  try {
+                    stop();
+                  } catch (InterruptedException ie) {
+                    logger.log(SEVERE, "interrupted while stopping worker", ie);
+                    // ignore
+                  }
+                }
+              }
+            })
+        .start();
   }
 
   public void start() throws InterruptedException {
@@ -510,22 +537,18 @@ public class Worker {
       logger.log(SEVERE, "error starting worker", e);
       return;
     }
-    Runtime.getRuntime().addShutdownHook(new Thread() {
-      @Override
-      public void run() {
-        logger.severe("*** shutting down gRPC server since JVM is shutting down");
-        try {
-          Worker.this.stop();
-          logger.severe("*** server shut down");
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-        }
-      }
-    });
     pipeline.start();
   }
 
-  private static ShardWorkerConfig toShardWorkerConfig(Readable input, WorkerOptions options) throws IOException {
+  @Override
+  protected void onShutdown() throws InterruptedException {
+    logger.log(SEVERE, "*** shutting down gRPC server since JVM is shutting down");
+    stop();
+    logger.log(SEVERE, "*** server shut down");
+  }
+
+  private static ShardWorkerConfig toShardWorkerConfig(Readable input, WorkerOptions options)
+      throws IOException {
     ShardWorkerConfig.Builder builder = ShardWorkerConfig.newBuilder();
     TextFormat.merge(input, builder);
     if (!Strings.isNullOrEmpty(options.root)) {
@@ -534,17 +557,25 @@ public class Worker {
     if (!Strings.isNullOrEmpty(options.publicName)) {
       builder.setPublicName(options.publicName);
     }
-
     return builder.build();
   }
 
   private static void printUsage(OptionsParser parser) {
-    logger.info("Usage: CONFIG_PATH");
-    logger.info(parser.describeOptions(Collections.<String, String>emptyMap(),
-                                              OptionsParser.HelpVerbosity.LONG));
+    logger.log(INFO, "Usage: CONFIG_PATH");
+    logger.log(
+        INFO, parser.describeOptions(Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
   }
 
-  public static void main(String[] args) throws Exception {
+  public static void main(String[] args) {
+    try {
+      startWorker(args);
+    } catch (Exception e) {
+      logger.log(SEVERE, "exception caught", e);
+      System.exit(1);
+    }
+  }
+
+  public static void startWorker(String[] args) throws Exception {
     // Only log severe log messages from Netty. Otherwise it logs warnings that look like this:
     //
     // 170714 08:16:28.552:WT 18 [io.grpc.netty.NettyServerHandler.onStreamError] Stream Error
@@ -563,7 +594,12 @@ public class Worker {
     String session = UUID.randomUUID().toString();
     Worker worker;
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
-      worker = new Worker(session, toShardWorkerConfig(new InputStreamReader(configInputStream), parser.getOptions(WorkerOptions.class)));
+      worker =
+          new Worker(
+              session,
+              toShardWorkerConfig(
+                  new InputStreamReader(configInputStream),
+                  parser.getOptions(WorkerOptions.class)));
     }
     worker.start();
     worker.blockUntilShutdown();

@@ -32,12 +32,11 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.instance.Instance;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.grpc.Status;
 import io.grpc.Status.Code;
-import io.grpc.StatusRuntimeException;
 import java.io.IOException;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
@@ -56,48 +55,50 @@ public class UtilTest {
     String worker3Name = "worker3";
     Set<String> workerSet = ImmutableSet.of(worker1Name, worker2Name, worker3Name);
 
-    Digest digest = Digest.newBuilder()
-        .setHash("digest")
-        .setSizeBytes(1)
-        .build();
+    Digest digest = Digest.newBuilder().setHash("digest").setSizeBytes(1).build();
     ImmutableList<Digest> digests = ImmutableList.of(digest);
 
     Instance foundInstance = mock(Instance.class);
-    when(foundInstance.findMissingBlobs(eq(digests), any(Executor.class), any(RequestMetadata.class)))
+    when(foundInstance.findMissingBlobs(
+            eq(digests), any(Executor.class), any(RequestMetadata.class)))
         .thenReturn(immediateFuture(ImmutableList.of()));
     Instance missingInstance = mock(Instance.class);
-    when(missingInstance.findMissingBlobs(eq(digests), any(Executor.class), any(RequestMetadata.class)))
+    when(missingInstance.findMissingBlobs(
+            eq(digests), any(Executor.class), any(RequestMetadata.class)))
         .thenReturn(immediateFuture(ImmutableList.of(digest)));
 
     ShardBackplane backplane = mock(ShardBackplane.class);
 
-    Function<String, Instance> workerInstanceFactory = new Function<String, Instance>() {
-      @Override
-      public Instance apply(String worker) {
-        if (worker.equals(worker1Name)) {
-          return missingInstance;
-        }
-        if (worker.equals(worker2Name) || worker.equals(worker3Name)) {
-          return foundInstance;
-        }
-        return null;
-      }
-    };
-    ListenableFuture<Set<String>> correctFuture = correctMissingBlob(
-        backplane,
-        workerSet,
-        /* originalLocationSet=*/ ImmutableSet.of(),
-        workerInstanceFactory,
-        digest,
-        directExecutor(),
-        RequestMetadata.getDefaultInstance());
+    Function<String, Instance> workerInstanceFactory =
+        new Function<String, Instance>() {
+          @Override
+          public Instance apply(String worker) {
+            if (worker.equals(worker1Name)) {
+              return missingInstance;
+            }
+            if (worker.equals(worker2Name) || worker.equals(worker3Name)) {
+              return foundInstance;
+            }
+            return null;
+          }
+        };
+    ListenableFuture<Set<String>> correctFuture =
+        correctMissingBlob(
+            backplane,
+            workerSet,
+            /* originalLocationSet=*/ ImmutableSet.of(),
+            workerInstanceFactory,
+            digest,
+            directExecutor(),
+            RequestMetadata.getDefaultInstance());
     assertThat(correctFuture.get()).isEqualTo(ImmutableSet.of(worker2Name, worker3Name));
-    verify(foundInstance, times(2)).findMissingBlobs(eq(digests), any(Executor.class), any(RequestMetadata.class));
-    verify(missingInstance, times(1)).findMissingBlobs(eq(digests), any(Executor.class), any(RequestMetadata.class));
-    verify(backplane, times(1)).adjustBlobLocations(
-        eq(digest),
-        eq(ImmutableSet.of(worker2Name, worker3Name)),
-        eq(ImmutableSet.of()));
+    verify(foundInstance, times(2))
+        .findMissingBlobs(eq(digests), any(Executor.class), any(RequestMetadata.class));
+    verify(missingInstance, times(1))
+        .findMissingBlobs(eq(digests), any(Executor.class), any(RequestMetadata.class));
+    verify(backplane, times(1))
+        .adjustBlobLocations(
+            eq(digest), eq(ImmutableSet.of(worker2Name, worker3Name)), eq(ImmutableSet.of()));
   }
 
   @Test
@@ -105,33 +106,36 @@ public class UtilTest {
     String workerName = "worker";
     ShardBackplane backplane = mock(ShardBackplane.class);
     Set<String> workerSet = ImmutableSet.of(workerName);
-    Digest digest = Digest.newBuilder()
-        .setHash("digest-throws-exception-on-find-missing")
-        .setSizeBytes(1)
-        .build();
+    Digest digest =
+        Digest.newBuilder()
+            .setHash("digest-throws-exception-on-find-missing")
+            .setSizeBytes(1)
+            .build();
     ImmutableList<Digest> digests = ImmutableList.of(digest);
 
     Instance instance = mock(Instance.class);
     when(instance.findMissingBlobs(eq(digests), any(Executor.class), any(RequestMetadata.class)))
         .thenReturn(immediateFailedFuture(Status.INVALID_ARGUMENT.asRuntimeException()));
 
-    Function<String, Instance> workerInstanceFactory = new Function<String, Instance>() {
-      @Override
-      public Instance apply(String worker) {
-        if (worker.equals(workerName)) {
-          return instance;
-        }
-        return null;
-      }
-    };
-    ListenableFuture<Set<String>> correctFuture = correctMissingBlob(
-        backplane,
-        workerSet,
-        /* originalLocationSet=*/ ImmutableSet.of(),
-        workerInstanceFactory,
-        digest,
-        directExecutor(),
-        RequestMetadata.getDefaultInstance());
+    Function<String, Instance> workerInstanceFactory =
+        new Function<String, Instance>() {
+          @Override
+          public Instance apply(String worker) {
+            if (worker.equals(workerName)) {
+              return instance;
+            }
+            return null;
+          }
+        };
+    ListenableFuture<Set<String>> correctFuture =
+        correctMissingBlob(
+            backplane,
+            workerSet,
+            /* originalLocationSet=*/ ImmutableSet.of(),
+            workerInstanceFactory,
+            digest,
+            directExecutor(),
+            RequestMetadata.getDefaultInstance());
     boolean caughtException = false;
     try {
       correctFuture.get();
@@ -140,7 +144,8 @@ public class UtilTest {
       Status status = Status.fromThrowable(e.getCause());
       assertThat(status.getCode()).isEqualTo(Code.INVALID_ARGUMENT);
     }
-    verify(instance, times(1)).findMissingBlobs(eq(digests), any(Executor.class), any(RequestMetadata.class));
+    verify(instance, times(1))
+        .findMissingBlobs(eq(digests), any(Executor.class), any(RequestMetadata.class));
     assertThat(caughtException).isTrue();
     verifyZeroInteractions(backplane);
   }
@@ -152,10 +157,7 @@ public class UtilTest {
     ShardBackplane backplane = mock(ShardBackplane.class);
     Set<String> workerSet = ImmutableSet.of(workerName, unavailableWorkerName);
 
-    Digest digest = Digest.newBuilder()
-        .setHash("digest")
-        .setSizeBytes(1)
-        .build();
+    Digest digest = Digest.newBuilder().setHash("digest").setSizeBytes(1).build();
     ImmutableList<Digest> digests = ImmutableList.of(digest);
 
     Instance instance = mock(Instance.class);
@@ -163,36 +165,39 @@ public class UtilTest {
         .thenReturn(immediateFuture(ImmutableList.of()));
 
     Instance unavailableInstance = mock(Instance.class);
-    when(unavailableInstance.findMissingBlobs(eq(digests), any(Executor.class), any(RequestMetadata.class)))
+    when(unavailableInstance.findMissingBlobs(
+            eq(digests), any(Executor.class), any(RequestMetadata.class)))
         .thenReturn(immediateFailedFuture(Status.UNAVAILABLE.asRuntimeException()));
 
-    Function<String, Instance> workerInstanceFactory = new Function<String, Instance>() {
-      @Override
-      public Instance apply(String worker) {
-        if (worker.equals(workerName)) {
-          return instance;
-        }
-        if (worker.equals(unavailableWorkerName)) {
-          return unavailableInstance;
-        }
-        return null;
-      }
-    };
-    ListenableFuture<Set<String>> correctFuture = correctMissingBlob(
-        backplane,
-        workerSet,
-        /* originalLocationSet=*/ ImmutableSet.of(),
-        workerInstanceFactory,
-        digest,
-        directExecutor(),
-        RequestMetadata.getDefaultInstance());
+    Function<String, Instance> workerInstanceFactory =
+        new Function<String, Instance>() {
+          @Override
+          public Instance apply(String worker) {
+            if (worker.equals(workerName)) {
+              return instance;
+            }
+            if (worker.equals(unavailableWorkerName)) {
+              return unavailableInstance;
+            }
+            return null;
+          }
+        };
+    ListenableFuture<Set<String>> correctFuture =
+        correctMissingBlob(
+            backplane,
+            workerSet,
+            /* originalLocationSet=*/ ImmutableSet.of(),
+            workerInstanceFactory,
+            digest,
+            directExecutor(),
+            RequestMetadata.getDefaultInstance());
     assertThat(correctFuture.get()).isEqualTo(ImmutableSet.of(workerName));
-    verify(instance, times(1)).findMissingBlobs(eq(digests), any(Executor.class), any(RequestMetadata.class));
-    verify(unavailableInstance, times(1)).findMissingBlobs(eq(digests), any(Executor.class), any(RequestMetadata.class));
-    verify(backplane, times(1)).adjustBlobLocations(
-        eq(digest),
-        eq(ImmutableSet.of(workerName)),
-        eq(ImmutableSet.of()));
+    verify(instance, times(1))
+        .findMissingBlobs(eq(digests), any(Executor.class), any(RequestMetadata.class));
+    verify(unavailableInstance, times(1))
+        .findMissingBlobs(eq(digests), any(Executor.class), any(RequestMetadata.class));
+    verify(backplane, times(1))
+        .adjustBlobLocations(eq(digest), eq(ImmutableSet.of(workerName)), eq(ImmutableSet.of()));
   }
 
   @Test
@@ -201,10 +206,7 @@ public class UtilTest {
     ShardBackplane backplane = mock(ShardBackplane.class);
     Set<String> workerSet = ImmutableSet.of(workerName);
 
-    Digest digest = Digest.newBuilder()
-        .setHash("digest")
-        .setSizeBytes(1)
-        .build();
+    Digest digest = Digest.newBuilder().setHash("digest").setSizeBytes(1).build();
     ImmutableList<Digest> digests = ImmutableList.of(digest);
 
     Instance instance = mock(Instance.class);
@@ -212,29 +214,30 @@ public class UtilTest {
         .thenReturn(immediateFailedFuture(Status.UNKNOWN.asRuntimeException()))
         .thenReturn(immediateFuture(ImmutableList.of()));
 
-    Function<String, Instance> workerInstanceFactory = new Function<String, Instance>() {
-      @Override
-      public Instance apply(String worker) {
-        if (worker.equals(workerName)) {
-          return instance;
-        }
-        return null;
-      }
-    };
-    ListenableFuture<Set<String>> correctFuture = correctMissingBlob(
-        backplane,
-        workerSet,
-        /* originalLocationSet=*/ ImmutableSet.of(),
-        workerInstanceFactory,
-        digest,
-        directExecutor(),
-        RequestMetadata.getDefaultInstance());
+    Function<String, Instance> workerInstanceFactory =
+        new Function<String, Instance>() {
+          @Override
+          public Instance apply(String worker) {
+            if (worker.equals(workerName)) {
+              return instance;
+            }
+            return null;
+          }
+        };
+    ListenableFuture<Set<String>> correctFuture =
+        correctMissingBlob(
+            backplane,
+            workerSet,
+            /* originalLocationSet=*/ ImmutableSet.of(),
+            workerInstanceFactory,
+            digest,
+            directExecutor(),
+            RequestMetadata.getDefaultInstance());
     assertThat(correctFuture.get()).isEqualTo(ImmutableSet.of(workerName));
-    verify(instance, times(2)).findMissingBlobs(eq(digests), any(Executor.class), any(RequestMetadata.class));
-    verify(backplane, times(1)).adjustBlobLocations(
-        eq(digest),
-        eq(ImmutableSet.of(workerName)),
-        eq(ImmutableSet.of()));
+    verify(instance, times(2))
+        .findMissingBlobs(eq(digests), any(Executor.class), any(RequestMetadata.class));
+    verify(backplane, times(1))
+        .adjustBlobLocations(eq(digest), eq(ImmutableSet.of(workerName)), eq(ImmutableSet.of()));
   }
 
   @Test
@@ -242,10 +245,7 @@ public class UtilTest {
     String workerName = "worker";
     Set<String> workerSet = ImmutableSet.of(workerName);
 
-    Digest digest = Digest.newBuilder()
-        .setHash("digest")
-        .setSizeBytes(1)
-        .build();
+    Digest digest = Digest.newBuilder().setHash("digest").setSizeBytes(1).build();
     ImmutableList<Digest> digests = ImmutableList.of(digest);
 
     Instance instance = mock(Instance.class);
@@ -256,33 +256,31 @@ public class UtilTest {
     ShardBackplane backplane = mock(ShardBackplane.class);
     doThrow(new IOException("failed to adjustBlobLocations"))
         .when(backplane)
-        .adjustBlobLocations(
-            eq(digest),
-            eq(ImmutableSet.of(workerName)),
-            eq(ImmutableSet.of()));
+        .adjustBlobLocations(eq(digest), eq(ImmutableSet.of(workerName)), eq(ImmutableSet.of()));
 
-    Function<String, Instance> workerInstanceFactory = new Function<String, Instance>() {
-      @Override
-      public Instance apply(String worker) {
-        if (worker.equals(workerName)) {
-          return instance;
-        }
-        return null;
-      }
-    };
-    ListenableFuture<Set<String>> correctFuture = correctMissingBlob(
-        backplane,
-        workerSet,
-        /* originalLocationSet=*/ ImmutableSet.of(),
-        workerInstanceFactory,
-        digest,
-        directExecutor(),
-        RequestMetadata.getDefaultInstance());
+    Function<String, Instance> workerInstanceFactory =
+        new Function<String, Instance>() {
+          @Override
+          public Instance apply(String worker) {
+            if (worker.equals(workerName)) {
+              return instance;
+            }
+            return null;
+          }
+        };
+    ListenableFuture<Set<String>> correctFuture =
+        correctMissingBlob(
+            backplane,
+            workerSet,
+            /* originalLocationSet=*/ ImmutableSet.of(),
+            workerInstanceFactory,
+            digest,
+            directExecutor(),
+            RequestMetadata.getDefaultInstance());
     assertThat(correctFuture.get()).isEqualTo(ImmutableSet.of(workerName));
-    verify(instance, times(2)).findMissingBlobs(eq(digests), any(Executor.class), any(RequestMetadata.class));
-    verify(backplane, times(1)).adjustBlobLocations(
-        eq(digest),
-        eq(ImmutableSet.of(workerName)),
-        eq(ImmutableSet.of()));
+    verify(instance, times(2))
+        .findMissingBlobs(eq(digests), any(Executor.class), any(RequestMetadata.class));
+    verify(backplane, times(1))
+        .adjustBlobLocations(eq(digest), eq(ImmutableSet.of(workerName)), eq(ImmutableSet.of()));
   }
 }

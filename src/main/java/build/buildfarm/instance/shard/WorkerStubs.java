@@ -35,49 +35,54 @@ import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
 public class WorkerStubs {
-  private WorkerStubs() { }
+  private WorkerStubs() {}
 
   public static LoadingCache create(DigestUtil digestUtil) {
     return CacheBuilder.newBuilder()
         .expireAfterAccess(10, TimeUnit.MINUTES)
-        .removalListener(new RemovalListener<String, Instance>() {
-          @Override
-          public void onRemoval(RemovalNotification<String, Instance> notification) {
-            stopInstance(notification.getValue());
-          }
-        })
-        .build(new CacheLoader<String, Instance>() {
-          @Override
-          public Instance load(String worker) {
-            return newStubInstance(worker, digestUtil);
-          }
-        });
+        .removalListener(
+            new RemovalListener<String, Instance>() {
+              @Override
+              public void onRemoval(RemovalNotification<String, Instance> notification) {
+                stopInstance(notification.getValue());
+              }
+            })
+        .build(
+            new CacheLoader<String, Instance>() {
+              @Override
+              public Instance load(String worker) {
+                return newStubInstance(worker, digestUtil);
+              }
+            });
   }
 
   private static Instance newStubInstance(String worker, DigestUtil digestUtil) {
     return new StubInstance(
-        "", worker, digestUtil, createChannel(worker),
-        60 /* FIXME CONFIG */, TimeUnit.SECONDS,
+        "",
+        worker,
+        digestUtil,
+        createChannel(worker),
+        60 /* FIXME CONFIG */,
+        TimeUnit.SECONDS,
         newStubRetrier(),
         newStubRetryService());
   }
 
   private static ManagedChannel createChannel(String target) {
     NettyChannelBuilder builder =
-        NettyChannelBuilder.forTarget(target)
-            .negotiationType(NegotiationType.PLAINTEXT);
+        NettyChannelBuilder.forTarget(target).negotiationType(NegotiationType.PLAINTEXT);
     return builder.build();
   }
 
   private static Retrier newStubRetrier() {
     return new Retrier(
-      Backoff.exponential(
-          Duration.ofMillis(/*options.experimentalRemoteRetryStartDelayMillis=*/ 100),
-          Duration.ofMillis(/*options.experimentalRemoteRetryMaxDelayMillis=*/ 5000),
-          /*options.experimentalRemoteRetryMultiplier=*/ 2,
-          /*options.experimentalRemoteRetryJitter=*/ 0.1,
-          /*options.experimentalRemoteRetryMaxAttempts=*/ 5),
-      Retrier.DEFAULT_IS_RETRIABLE);
+        Backoff.exponential(
+            Duration.ofMillis(/*options.experimentalRemoteRetryStartDelayMillis=*/ 100),
+            Duration.ofMillis(/*options.experimentalRemoteRetryMaxDelayMillis=*/ 5000),
+            /*options.experimentalRemoteRetryMultiplier=*/ 2,
+            /*options.experimentalRemoteRetryJitter=*/ 0.1,
+            /*options.experimentalRemoteRetryMaxAttempts=*/ 5),
+        Retrier.DEFAULT_IS_RETRIABLE);
   }
 
   private static ListeningScheduledExecutorService newStubRetryService() {

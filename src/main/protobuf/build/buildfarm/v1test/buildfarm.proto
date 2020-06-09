@@ -27,6 +27,14 @@ service OperationQueue {
   rpc Poll(PollOperationRequest) returns (google.rpc.Status) {
     option (google.api.http) = { get: "/v1test/{instance_name=**}/operation:poll" };
   }
+
+  rpc Status(OperationsStatusRequest) returns (OperationsStatus) {
+    option (google.api.http) = { get: "/v1test/{instance_name=**}/operation:status" };
+  }
+}
+
+message OperationsStatusRequest {
+  string instance_name = 1;
 }
 
 message TakeOperationRequest {
@@ -59,9 +67,41 @@ message BuildFarmServerConfig {
 
   int32 port = 3;
 
-  string aws_namespace = 4;
+  int32 execute_keepalive_after_seconds = 4;
 
-  int32 execute_keepalive_after_seconds = 5;
+  MetricsConfig metrics_config = 5;
+}
+
+message MetricsConfig {
+  string metrics_destination = 1;
+
+  string cluster_id = 2;
+
+  oneof type {
+    AwsMetricsConfig aws_metrics_config = 3;
+    GcpMetricsConfig gcp_metrics_config = 4;
+    LogMetricsConfig log_metrics_config = 5;
+  }
+}
+
+message AwsMetricsConfig {
+  string operations_metrics_topic = 1;
+
+  int32 sns_client_max_connections = 2;
+
+  string aws_access_key_id = 3;
+
+  string aws_secret_key = 4;
+
+  string region = 5;
+}
+
+message GcpMetricsConfig {
+  string operations_metrics_topic = 1;
+}
+
+message LogMetricsConfig {
+  string log_level = 1;
 }
 
 message MemoryCASConfig {
@@ -89,6 +129,11 @@ message FilesystemCASConfig {
   // limit for contents of a single file retained
   // from CAS in the cache
   int64 max_entry_size_bytes = 3;
+}
+
+message FilesystemACConfig {
+  // path to action cache files from AC
+  string path = 1;
 }
 
 message FuseCASConfig {
@@ -119,6 +164,7 @@ message GrpcACConfig {
 message ActionCacheConfig {
   oneof type {
     DelegateCASConfig delegate_cas = 1;
+    FilesystemACConfig filesystem = 3;
     GrpcACConfig grpc = 2;
   }
 }
@@ -200,6 +246,11 @@ message ShardInstanceConfig {
   }
 
   int64 max_blob_size = 5;
+
+  // maximum selectable timeout
+  // a maximum threshold for an action's specified timeout,
+  // beyond which an action will be rejected for execution
+  google.protobuf.Duration maximum_action_timeout = 7;
 }
 
 message ShardWorkerInstanceConfig {
@@ -220,17 +271,6 @@ message ShardWorkerInstanceConfig {
 
   // page size for getTree request
   uint32 tree_page_size = 12;
-
-  // default timeout for actions
-  // if a timeout is unspecified for an action, this value
-  // is imposed on it, after which the operation will
-  // be killed
-  google.protobuf.Duration default_action_timeout = 13;
-
-  // maximum selectable timeout
-  // a maximum threshold for an action's specified timeout,
-  // beyond which an action will be rejected for execution
-  google.protobuf.Duration maximum_action_timeout = 14;
 }
 
 message ShardWorkerConfig {
@@ -251,6 +291,9 @@ message ShardWorkerConfig {
 
   // initial platform used to match operations
   build.bazel.remote.execution.v2.Platform platform = 14;
+
+  // default platform to populate matched commands
+  build.bazel.remote.execution.v2.Platform default_platform = 28;
 
   // total size of the inline content for
   // action results
@@ -286,6 +329,15 @@ message ShardWorkerConfig {
   // available execution policies, will be used to match
   // with an action's platform for selection
   repeated ExecutionPolicy execution_policies = 25;
+
+  // support any execution limiting, whether global or specified
+  bool limit_execution = 31;
+
+  // limit the available cores to execute_stage_width for unmetered execution if set
+  bool limit_global_execution = 29;
+
+  // only allow test executions to be multicore (min-cores > 1), limiting both to 1 if not a test
+  bool only_multicore_tests = 30;
 }
 
 message ShardWorker {
@@ -300,6 +352,8 @@ message WorkerChange {
 
   message Remove {
     string source = 1;
+
+    string reason = 2;
   }
 
   string name = 1;
@@ -339,8 +393,6 @@ message DispatchedOperation {
   QueueEntry queue_entry = 1;
 
   int64 requeue_at = 2;
-
-  int64 expire_at = 3;
 }
 
 message ProfiledQueuedOperationMetadata {
@@ -379,6 +431,32 @@ message QueueEntry {
   ExecuteEntry execute_entry = 1;
 
   build.bazel.remote.execution.v2.Digest queued_operation_digest = 2;
+
+  build.bazel.remote.execution.v2.Platform platform = 3;
+}
+
+message QueueStatus {
+  int64 size = 1;
+
+  repeated int64 internal_sizes = 2;
+  
+  string name = 3;
+}
+
+message OperationQueueStatus {
+  repeated QueueStatus provisions = 1;
+  
+  int64 size = 2;
+}
+
+message OperationsStatus {
+  QueueStatus prequeue = 1;
+
+  OperationQueueStatus operation_queue = 2;
+
+  int64 dispatched_size = 3;
+
+  repeated string active_workers = 4;
 }
 
 message QueuedOperationMetadata {
@@ -389,12 +467,25 @@ message QueuedOperationMetadata {
   build.bazel.remote.execution.v2.RequestMetadata request_metadata = 3;
 }
 
+// A `Tree` contains all the
+// [Directory][build.bazel.remote.execution.v2.Directory] protos in a
+// single directory Merkle tree, compressed into one message, with a map
+// to index the directories.
+message Tree {
+  // The digest of the root directory in the tree.
+  build.bazel.remote.execution.v2.Digest rootDigest = 1;
+
+  map<string, build.bazel.remote.execution.v2.Directory> directories = 2;
+}
+
 message QueuedOperation {
   build.bazel.remote.execution.v2.Action action = 1;
 
   build.bazel.remote.execution.v2.Command command = 2;
 
-  build.bazel.remote.execution.v2.Tree tree = 4;
+  build.bazel.remote.execution.v2.Tree legacy_tree = 4;
+
+  Tree tree = 5;
 }
 
 message ExecutingOperationMetadata {
@@ -413,6 +504,20 @@ message CompletedOperationMetadata {
   build.bazel.remote.execution.v2.RequestMetadata request_metadata = 2;
 
   reserved 3 to 8; // fields now in ExecutedActionMetadata
+}
+
+message OperationRequestMetadata {
+  string operation_name = 1;
+
+  bool done = 2;
+
+  build.bazel.remote.execution.v2.RequestMetadata request_metadata = 3;
+
+  build.bazel.remote.execution.v2.ExecuteOperationMetadata execute_operation_metadata = 4;
+
+  build.bazel.remote.execution.v2.ExecuteResponse execute_response = 5;
+
+  string cluster_id = 6;
 }
 
 message InstanceConfig {
@@ -440,10 +545,15 @@ message InstanceEndpoint {
 
   // instance to be used
   string instance_name = 2;
+
+  // deadline for requests in seconds
+  int32 deadline_after_seconds = 3;
 }
 
 message ExecutionWrapper {
   string path = 1;
+
+  repeated string arguments = 2;
 }
 
 // selectable controls for executions
@@ -513,6 +623,9 @@ message WorkerConfig {
   // initial platform used to match operations
   build.bazel.remote.execution.v2.Platform platform = 17;
 
+  // default platform to populate matched commands
+  build.bazel.remote.execution.v2.Platform default_platform = 25;
+
   // input fetch width
   int32 input_fetch_stage_width = 23;
 
@@ -550,4 +663,53 @@ message BlobWriteKey {
   build.bazel.remote.execution.v2.Digest digest = 1;
 
   string identifier = 2;
+}
+
+message OperationTimesBetweenStages {
+  google.protobuf.Duration queued_to_match = 1;
+
+  google.protobuf.Duration match_to_input_fetch_start = 2;
+
+  google.protobuf.Duration input_fetch_start_to_complete = 3;
+
+  google.protobuf.Duration input_fetch_complete_to_execution_start = 4;
+
+  google.protobuf.Duration execution_start_to_complete = 5;
+
+  google.protobuf.Duration execution_complete_to_output_upload_start = 6;
+
+  google.protobuf.Duration output_upload_start_to_complete = 7;
+
+  google.protobuf.Duration period = 8;
+
+  int32 operation_count = 9;
+}
+
+message WorkerProfileMessage {
+  // number of Entry in CAS
+  int64 cas_entry_count = 1;
+
+  // number of DirectoryEntry in CAS
+  int64 cas_directory_entry_count = 2;
+
+  // number of evicted Entries since last profile request
+  int32 cas_evicted_entry_count = 5;
+
+  // the total size of evicted Entries since last profile request
+  int64 cas_evicted_entry_size = 6;
+
+  // ${number of slots used} / ${number of slots configured} in InputFetchStage
+  string input_fetch_stage_slots_used_over_configured = 7;
+
+  // ${number of slots used} / ${number of slots configured} in ExecuteActionStage
+  string execute_action_stage_slots_used_over_configured = 8;
+
+  repeated OperationTimesBetweenStages times = 10;
+}
+
+message WorkerProfileRequest {
+}
+
+service WorkerProfile {
+  rpc getWorkerProfile(WorkerProfileRequest) returns (WorkerProfileMessage) {}
 }

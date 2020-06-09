@@ -16,12 +16,12 @@ package build.buildfarm.common.cache;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
+import build.buildfarm.common.cache.LocalCache.Strength;
 import com.google.common.annotations.GwtIncompatible;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Objects;
 import com.google.common.base.Splitter;
-import build.buildfarm.common.cache.LocalCache.Strength;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.List;

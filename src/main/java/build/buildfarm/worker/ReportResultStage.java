@@ -16,15 +16,13 @@ package build.buildfarm.worker;
 
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.COMPLETED;
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.EXECUTING;
-import static build.buildfarm.common.Actions.invalidActionMessage;
-import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
+import static build.buildfarm.common.Actions.asExecutionStatus;
+import static build.buildfarm.common.Actions.isRetriable;
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteResponse;
-import build.buildfarm.cas.ContentAddressableStorage.EntryLimitException;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
@@ -34,13 +32,15 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.Timestamps;
 import com.google.rpc.Code;
-import com.google.rpc.PreconditionFailure;
 import com.google.rpc.Status;
 import io.grpc.Deadline;
+import io.grpc.StatusException;
+import io.grpc.protobuf.StatusProto;
 import java.io.IOException;
 import java.nio.channels.ClosedByInterruptException;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class ReportResultStage extends PipelineStage {
@@ -67,10 +67,6 @@ public class ReportResultStage extends PipelineStage {
     queue.put(operationContext);
   }
 
-  private DigestUtil getDigestUtil() {
-    return workerContext.getDigestUtil();
-  }
-
   @Override
   protected OperationContext tick(OperationContext operationContext) throws InterruptedException {
     workerContext.resumePoller(
@@ -87,101 +83,119 @@ public class ReportResultStage extends PipelineStage {
     }
   }
 
-  private OperationContext reportPolled(OperationContext operationContext) throws InterruptedException {
+  private OperationContext reportPolled(OperationContext operationContext)
+      throws InterruptedException {
     String operationName = operationContext.operation.getName();
 
     ActionResult.Builder resultBuilder = operationContext.executeResponse.getResultBuilder();
-    resultBuilder.getExecutionMetadataBuilder()
+    resultBuilder
+        .getExecutionMetadataBuilder()
         .setOutputUploadStartTimestamp(Timestamps.fromMillis(System.currentTimeMillis()));
 
     boolean blacklist = false;
     try {
       workerContext.uploadOutputs(
+          operationContext.queueEntry.getExecuteEntry().getActionDigest(),
           resultBuilder,
           operationContext.execDir,
           operationContext.command.getOutputFilesList(),
           operationContext.command.getOutputDirectoriesList());
-    } catch (EntryLimitException e) {
-      if (operationContext.executeResponse.build().getStatus().getCode() == Code.OK.getNumber()) {
-        // if the status was already a failure, let them get to this failure on their own
-        PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
-        preconditionFailure.addViolationsBuilder()
-            .setType(VIOLATION_TYPE_MISSING)
-            .setSubject("blobs/" + DigestUtil.toString(e.getDigest()))
-            .setDescription("An output could not be uploaded because it exceeded the maximum size of an entry");
-        Status status = Status.newBuilder()
-            .setCode(Code.FAILED_PRECONDITION.getNumber())
-            .setMessage(invalidActionMessage(operationContext.queueEntry.getExecuteEntry().getActionDigest()))
-            .addDetails(Any.pack(preconditionFailure.build()))
-            .build();
+    } catch (StatusException e) {
+      ExecuteResponse executeResponse = operationContext.executeResponse.build();
+      if (executeResponse.getStatus().getCode() == Code.OK.getNumber()
+          && executeResponse.getResult().getExitCode() == 0) {
+        // something about the outputs was malformed - fail the operation with this status if not
+        // already failing
+        Status status = StatusProto.fromThrowable(e);
+        if (status == null) {
+          logger.log(
+              Level.SEVERE, String.format("no rpc status from exception for %s", operationName), e);
+          status = asExecutionStatus(e);
+        }
         operationContext.executeResponse.setStatus(status);
+        if (isRetriable(status)) {
+          blacklist = true;
+        }
       }
-      blacklist = true;
-    } catch (InterruptedException|ClosedByInterruptException e) {
+    } catch (InterruptedException | ClosedByInterruptException e) {
       // cancellation here should not be logged
       return null;
     } catch (IOException e) {
-      logger.log(SEVERE, "error while uploading outputs for " + operationName, e);
+      logger.log(Level.SEVERE, String.format("error uploading outputs for %s", operationName), e);
       return null;
     }
 
+    Operation operation = operationContext.operation;
     ExecuteOperationMetadata metadata;
     try {
-      metadata = operationContext.operation.getMetadata()
-          .unpack(ExecutingOperationMetadata.class)
-          .getExecuteOperationMetadata();
+      metadata =
+          operation
+              .getMetadata()
+              .unpack(ExecutingOperationMetadata.class)
+              .getExecuteOperationMetadata();
     } catch (InvalidProtocolBufferException e) {
-      logger.log(SEVERE, "invalid execute operation metadata for " + operationName, e);
+      logger.log(
+          Level.SEVERE,
+          String.format("invalid execute operation metadata for %s", operationName),
+          e);
       return null;
     }
 
     Timestamp now = Timestamps.fromMillis(System.currentTimeMillis());
-    resultBuilder.getExecutionMetadataBuilder()
+    resultBuilder
+        .getExecutionMetadataBuilder()
         .setWorkerCompletedTimestamp(now)
         .setOutputUploadCompletedTimestamp(now);
 
     ExecuteResponse executeResponse = operationContext.executeResponse.build();
 
-    if (blacklist || (!operationContext.action.getDoNotCache() && executeResponse.getResult().getExitCode() == 0)) {
+    if (blacklist
+        || (!operationContext.action.getDoNotCache()
+            && executeResponse.getStatus().getCode() == Code.OK.getNumber()
+            && executeResponse.getResult().getExitCode() == 0)) {
       try {
         if (blacklist) {
           workerContext.blacklistAction(metadata.getActionDigest().getHash());
         } else {
-          workerContext.putActionResult(DigestUtil.asActionKey(metadata.getActionDigest()), executeResponse.getResult());
+          workerContext.putActionResult(
+              DigestUtil.asActionKey(metadata.getActionDigest()), executeResponse.getResult());
         }
       } catch (IOException e) {
-        logger.log(SEVERE, "error reporting action result for " + operationName, e);
+        logger.log(
+            Level.SEVERE, String.format("error reporting action result for %s", operationName), e);
         return null;
       }
     }
 
-    CompletedOperationMetadata completedMetadata = CompletedOperationMetadata.newBuilder()
-        .setExecuteOperationMetadata(metadata.toBuilder()
-            .setStage(COMPLETED)
-            .build())
-        .setRequestMetadata(operationContext.queueEntry.getExecuteEntry().getRequestMetadata())
-        .build();
+    CompletedOperationMetadata completedMetadata =
+        CompletedOperationMetadata.newBuilder()
+            .setExecuteOperationMetadata(metadata.toBuilder().setStage(COMPLETED).build())
+            .setRequestMetadata(operationContext.queueEntry.getExecuteEntry().getRequestMetadata())
+            .build();
 
-    Operation operation = operationContext.operation.toBuilder()
-        .setDone(true)
-        .setMetadata(Any.pack(completedMetadata))
-        .setResponse(Any.pack(executeResponse))
-        .build();
+    Operation completedOperation =
+        operation
+            .toBuilder()
+            .setDone(true)
+            .setMetadata(Any.pack(completedMetadata))
+            .setResponse(Any.pack(executeResponse))
+            .build();
 
     operationContext.poller.pause();
 
     try {
-      if (!workerContext.putOperation(operation, operationContext.action)) {
+      if (!workerContext.putOperation(completedOperation, operationContext.action)) {
         return null;
       }
     } catch (IOException e) {
-      logger.log(SEVERE, "error reporting complete operation for " + operationName, e);
+      logger.log(
+          Level.SEVERE,
+          String.format("error reporting operation complete for %s", operationName),
+          e);
       return null;
     }
 
-    return operationContext.toBuilder()
-        .setOperation(operation)
-        .build();
+    return operationContext.toBuilder().setOperation(completedOperation).build();
   }
 
   @Override
@@ -191,7 +205,10 @@ public class ReportResultStage extends PipelineStage {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     } catch (IOException e) {
-      logger.log(SEVERE, "error destroying exec dir " + operationContext.execDir.toString(), e);
+      logger.log(
+          Level.SEVERE,
+          String.format("error destroying exec dir %s", operationContext.execDir.toString()),
+          e);
     }
   }
 }

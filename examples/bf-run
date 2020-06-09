@@ -1,0 +1,43 @@
+#!/bin/bash
+
+set -e
+
+# Start Buildfarm Cluster
+start_buildfarm () {
+  # Run Redis Container
+  docker run -d --name buildfarm-redis -p 6379:6379 redis:5.0.9
+
+  # Run Buildfarm Server Container
+  docker run -d --name buildfarm-server -v $(pwd)/examples:/var/lib/buildfarm-server -p 8980:8980 --network host \
+  80dw/buildfarm-server:latest /var/lib/buildfarm-server/shard-server.config.example -p 8980
+
+  # Run Buildfarm Shard Worker Container
+  mkdir -p /tmp/worker
+  docker run -d --name buildfarm-worker --privileged -v $(pwd)/examples:/var/lib/buildfarm-shard-worker \
+  -v /tmp/worker:/tmp/worker -p 8981:8981 --network host \
+  80dw/buildfarm-worker:latest /var/lib/buildfarm-shard-worker/shard-worker.config.example --public_name=localhost:8981
+
+  echo "Buildfarm cluster started with endpoint: localhost:8980"
+}
+
+stop_buildfarm () {
+  docker stop buildfarm-server && docker rm buildfarm-server
+  docker stop buildfarm-worker && docker rm buildfarm-worker
+  docker stop buildfarm-redis && docker rm buildfarm-redis
+}
+
+init () {
+  case "$1" in
+  start)
+    start_buildfarm
+    ;;
+  stop)
+    stop_buildfarm
+    ;;
+  *)
+    echo $"Usage: $0 {start|stop}"
+    exit 1
+esac
+}
+
+init $1

@@ -16,13 +16,12 @@ package build.buildfarm.ac;
 
 import static com.google.common.truth.Truth.assertThat;
 
-import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.ActionCacheGrpc.ActionCacheImplBase;
+import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.GetActionResultRequest;
 import build.bazel.remote.execution.v2.UpdateActionResultRequest;
 import build.buildfarm.common.DigestUtil;
-import build.buildfarm.common.DigestUtil.ActionKey;
 import com.google.protobuf.ByteString;
 import io.grpc.Server;
 import io.grpc.Status;
@@ -59,12 +58,9 @@ public class GrpcActionCacheTest {
             .build()
             .start();
 
-    ac = new GrpcActionCache(
-        instanceName,
-        InProcessChannelBuilder
-            .forName(fakeServerName)
-            .directExecutor()
-            .build());
+    ac =
+        new GrpcActionCache(
+            instanceName, InProcessChannelBuilder.forName(fakeServerName).directExecutor().build());
   }
 
   @After
@@ -75,16 +71,16 @@ public class GrpcActionCacheTest {
 
   @Test
   public void getSuppliesResponse() {
-    ActionResult result = ActionResult.newBuilder()
-        .setStdoutRaw(ByteString.copyFromUtf8("out"))
-        .build();
+    ActionResult result =
+        ActionResult.newBuilder().setStdoutRaw(ByteString.copyFromUtf8("out")).build();
     Digest actionDigest = DIGEST_UTIL.compute(ByteString.copyFromUtf8("in"));
     serviceRegistry.addService(
         new ActionCacheImplBase() {
           @Override
-          public void getActionResult(GetActionResultRequest request, StreamObserver<ActionResult> responseObserver) {
-            if (request.getInstanceName().equals(instanceName) &&
-                request.getActionDigest().equals(actionDigest)) {
+          public void getActionResult(
+              GetActionResultRequest request, StreamObserver<ActionResult> responseObserver) {
+            if (request.getInstanceName().equals(instanceName)
+                && request.getActionDigest().equals(actionDigest)) {
               responseObserver.onNext(result);
               responseObserver.onCompleted();
             } else {
@@ -96,18 +92,32 @@ public class GrpcActionCacheTest {
   }
 
   @Test
+  public void getNotFoundIsNull() {
+    Digest actionDigest = DIGEST_UTIL.compute(ByteString.copyFromUtf8("not-found"));
+    serviceRegistry.addService(
+        new ActionCacheImplBase() {
+          @Override
+          public void getActionResult(
+              GetActionResultRequest request, StreamObserver<ActionResult> responseObserver) {
+            responseObserver.onError(Status.NOT_FOUND.asException());
+          }
+        });
+    assertThat(ac.get(DigestUtil.asActionKey(actionDigest))).isNull();
+  }
+
+  @Test
   public void putUpdatesResult() throws InterruptedException {
-    ActionResult result = ActionResult.newBuilder()
-        .setStdoutRaw(ByteString.copyFromUtf8("out"))
-        .build();
+    ActionResult result =
+        ActionResult.newBuilder().setStdoutRaw(ByteString.copyFromUtf8("out")).build();
     Digest actionDigest = DIGEST_UTIL.compute(ByteString.copyFromUtf8("in"));
     serviceRegistry.addService(
         new ActionCacheImplBase() {
           @Override
-          public void updateActionResult(UpdateActionResultRequest request, StreamObserver<ActionResult> responseObserver) {
-            if (request.getInstanceName().equals(instanceName) &&
-                request.getActionDigest().equals(actionDigest) &&
-                request.getActionResult().equals(result)) {
+          public void updateActionResult(
+              UpdateActionResultRequest request, StreamObserver<ActionResult> responseObserver) {
+            if (request.getInstanceName().equals(instanceName)
+                && request.getActionDigest().equals(actionDigest)
+                && request.getActionResult().equals(result)) {
               responseObserver.onNext(result);
               responseObserver.onCompleted();
             } else {

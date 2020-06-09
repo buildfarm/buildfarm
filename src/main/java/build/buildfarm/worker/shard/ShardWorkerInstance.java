@@ -14,34 +14,34 @@
 
 package build.buildfarm.worker.shard;
 
-import static com.google.common.util.concurrent.Futures.transform;
-import static com.google.common.util.concurrent.Futures.allAsList;
-import static java.util.logging.Level.SEVERE;
+import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
-import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.ExecutionStage;
-import build.bazel.remote.execution.v2.ResultsCachePolicy;
+import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
-import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
 import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
+import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ShardWorkerInstanceConfig;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
@@ -49,10 +49,13 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.grpc.Status;
 import io.grpc.Status.Code;
-import io.grpc.stub.StreamObserver;
+import io.grpc.stub.ServerCallStreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
 
@@ -61,24 +64,23 @@ public class ShardWorkerInstance extends AbstractServerInstance {
 
   private final ShardWorkerInstanceConfig config;
   private final ShardBackplane backplane;
-  private final InputStreamFactory inputStreamFactory;
 
   public ShardWorkerInstance(
       String name,
       DigestUtil digestUtil,
       ShardBackplane backplane,
       ContentAddressableStorage contentAddressableStorage,
-      InputStreamFactory inputStreamFactory,
-      ShardWorkerInstanceConfig config) throws ConfigurationException {
+      ShardWorkerInstanceConfig config)
+      throws ConfigurationException {
     super(name, digestUtil, contentAddressableStorage, null, null, null, null);
     this.config = config;
     this.backplane = backplane;
-    this.inputStreamFactory = inputStreamFactory;
   }
 
   @Override
-  public ActionResult getActionResult(ActionKey actionKey) {
-    throw new UnsupportedOperationException();
+  public ListenableFuture<ActionResult> getActionResult(
+      ActionKey actionKey, RequestMetadata requestMetadata) {
+    return immediateFailedFuture(new UnsupportedOperationException());
   }
 
   @Override
@@ -91,56 +93,70 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  protected TokenizableIterator<Operation> createOperationsIterator(String pageToken) { throw new UnsupportedOperationException(); }
+  protected TokenizableIterator<Operation> createOperationsIterator(String pageToken) {
+    throw new UnsupportedOperationException();
+  }
 
   @Override
-  protected int getListOperationsDefaultPageSize() { return 1024; }
+  protected int getListOperationsDefaultPageSize() {
+    return 1024;
+  }
 
   @Override
-  protected int getListOperationsMaxPageSize() { return 1024; }
+  protected int getListOperationsMaxPageSize() {
+    return 1024;
+  }
 
   @Override
   public String getBlobName(Digest blobDigest) {
     throw new UnsupportedOperationException();
   }
 
-  private void getBlob(InputStream input, long remaining, long limit, StreamObserver<ByteString> blobObserver) {
-    try {
-      if (limit == 0 || limit > remaining) {
-        limit = remaining;
-      }
-      // slice up into 1M chunks
-      long chunkSize = Math.min(1024 * 1024, limit);
-      byte[] chunk = new byte[(int) chunkSize];
-      while (limit > 0) {
-        int n = input.read(chunk);
-        blobObserver.onNext(ByteString.copyFrom(chunk, 0, n));
-        limit -= n;
-      }
-      blobObserver.onCompleted();
-    } catch (IOException e) {
-      blobObserver.onError(e);
-    }
-  }
-
   @Override
   public void getBlob(
-      Digest blobDigest,
+      Digest digest,
       long offset,
-      long limit,
-      StreamObserver<ByteString> blobObserver) {
-    try (InputStream input = inputStreamFactory.newInput(blobDigest, offset)) {
-      getBlob(input, blobDigest.getSizeBytes() - offset, limit, blobObserver);
-    } catch (IOException e) {
-      blobObserver.onError(Status.NOT_FOUND.withCause(e).asException());
-      try {
-        backplane.removeBlobLocation(blobDigest, getName());
-      } catch (IOException backplaneException) {
-        logger.log(SEVERE, "error removing blob location for " + DigestUtil.toString(blobDigest), backplaneException);
-      }
-    } catch (InterruptedException e) {
-      blobObserver.onError(Status.CANCELLED.withCause(e).asException());
-    }
+      long count,
+      ServerCallStreamObserver<ByteString> blobObserver,
+      RequestMetadata requestMetadata) {
+    Preconditions.checkState(count != 0);
+    contentAddressableStorage.get(
+        digest,
+        offset,
+        count,
+        new UniformDelegateServerCallStreamObserver<ByteString>(blobObserver) {
+          @Override
+          public void onNext(ByteString data) {
+            blobObserver.onNext(data);
+          }
+
+          void removeBlobLocation() {
+            try {
+              backplane.removeBlobLocation(digest, getName());
+            } catch (IOException backplaneException) {
+              logger.log(
+                  Level.SEVERE,
+                  String.format("error removing blob location for %s", DigestUtil.toString(digest)),
+                  backplaneException);
+            }
+          }
+
+          @Override
+          public void onError(Throwable t) {
+            if (t instanceof IOException) {
+              blobObserver.onError(Status.NOT_FOUND.withCause(t).asException());
+              removeBlobLocation();
+            } else {
+              blobObserver.onError(t);
+            }
+          }
+
+          @Override
+          public void onCompleted() {
+            blobObserver.onCompleted();
+          }
+        },
+        requestMetadata);
   }
 
   protected TokenizableIterator<DirectoryEntry> createTreeIterator(
@@ -165,21 +181,24 @@ public class ShardWorkerInstance extends AbstractServerInstance {
 
   @Override
   public ListenableFuture<Void> execute(
-      Digest actionDigest, 
-      boolean skipCacheLookup, 
-      ExecutionPolicy executionPolicy, 
-      ResultsCachePolicy resultsCachePolicy, 
+      Digest actionDigest,
+      boolean skipCacheLookup,
+      ExecutionPolicy executionPolicy,
+      ResultsCachePolicy resultsCachePolicy,
       RequestMetadata requestMetadata,
       Watcher watcher) {
     throw new UnsupportedOperationException();
   }
 
   @VisibleForTesting
-  public QueueEntry dispatchOperation(MatchListener listener) throws IOException, InterruptedException {
+  public QueueEntry dispatchOperation(MatchListener listener)
+      throws IOException, InterruptedException {
     while (!backplane.isStopped()) {
       listener.onWaitStart();
       try {
-        QueueEntry queueEntry = backplane.dispatchOperation();
+
+        List<Platform.Property> provisions = new ArrayList<>();
+        QueueEntry queueEntry = backplane.dispatchOperation(provisions);
         if (queueEntry != null) {
           return queueEntry;
         }
@@ -191,8 +210,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
       }
       listener.onWaitEnd();
     }
-    throw new IOException(
-        Status.UNAVAILABLE.withDescription("backplane is stopped").asException());
+    throw new IOException(Status.UNAVAILABLE.withDescription("backplane is stopped").asException());
   }
 
   @Override
@@ -201,9 +219,15 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
+  public OperationsStatus operationsStatus() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public boolean putOperation(Operation operation) {
     try {
-      return backplane.putOperation(operation, expectExecuteOperationMetadata(operation).getStage());
+      return backplane.putOperation(
+          operation, expectExecuteOperationMetadata(operation).getStage());
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }
@@ -215,22 +239,34 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  protected boolean matchOperation(Operation operation) { throw new UnsupportedOperationException(); }
+  protected boolean matchOperation(Operation operation) {
+    throw new UnsupportedOperationException();
+  }
 
   @Override
-  protected void enqueueOperation(Operation operation) { throw new UnsupportedOperationException(); }
+  protected void enqueueOperation(Operation operation) {
+    throw new UnsupportedOperationException();
+  }
 
   @Override
-  protected Object operationLock(String operationName) { throw new UnsupportedOperationException(); }
+  protected Object operationLock(String operationName) {
+    throw new UnsupportedOperationException();
+  }
 
   @Override
-  protected Operation createOperation(ActionKey actionKey) { throw new UnsupportedOperationException(); }
+  protected Operation createOperation(ActionKey actionKey) {
+    throw new UnsupportedOperationException();
+  }
 
   @Override
-  protected int getTreeDefaultPageSize() { return 1024; }
+  protected int getTreeDefaultPageSize() {
+    return 1024;
+  }
 
   @Override
-  protected int getTreeMaxPageSize() { return 1024; }
+  protected int getTreeMaxPageSize() {
+    return 1024;
+  }
 
   @Override
   public Operation getOperation(String name) {
@@ -258,33 +294,50 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  public ListenableFuture<Void> watchOperation(
-      String operationName,
-      Watcher watcher) {
+  public ListenableFuture<Void> watchOperation(String operationName, Watcher watcher) {
     throw new UnsupportedOperationException();
   }
 
-  protected static ExecuteOperationMetadata expectExecuteOperationMetadata(
-      Operation operation) {
+  protected static ExecuteOperationMetadata expectExecuteOperationMetadata(Operation operation) {
     if (operation.getMetadata().is(QueuedOperationMetadata.class)) {
       try {
-        return operation.getMetadata().unpack(QueuedOperationMetadata.class).getExecuteOperationMetadata();
-      } catch(InvalidProtocolBufferException e) {
-        logger.log(SEVERE, "error unpacking queued operation metadata from " + operation.getName(), e);
+        return operation
+            .getMetadata()
+            .unpack(QueuedOperationMetadata.class)
+            .getExecuteOperationMetadata();
+      } catch (InvalidProtocolBufferException e) {
+        logger.log(
+            Level.SEVERE,
+            String.format("error unpacking queued operation metadata from %s", operation.getName()),
+            e);
         return null;
       }
     } else if (operation.getMetadata().is(ExecutingOperationMetadata.class)) {
       try {
-        return operation.getMetadata().unpack(ExecutingOperationMetadata.class).getExecuteOperationMetadata();
-      } catch(InvalidProtocolBufferException e) {
-        logger.log(SEVERE, "error unpacking executing operation metadata from " + operation.getName(), e);
+        return operation
+            .getMetadata()
+            .unpack(ExecutingOperationMetadata.class)
+            .getExecuteOperationMetadata();
+      } catch (InvalidProtocolBufferException e) {
+        logger.log(
+            Level.SEVERE,
+            String.format(
+                "error unpacking executing operation metadata from %s", operation.getName()),
+            e);
         return null;
       }
     } else if (operation.getMetadata().is(CompletedOperationMetadata.class)) {
       try {
-        return operation.getMetadata().unpack(CompletedOperationMetadata.class).getExecuteOperationMetadata();
-      } catch(InvalidProtocolBufferException e) {
-        logger.log(SEVERE, "error unpacking completed operation metadata from " + operation.getName(), e);
+        return operation
+            .getMetadata()
+            .unpack(CompletedOperationMetadata.class)
+            .getExecuteOperationMetadata();
+      } catch (InvalidProtocolBufferException e) {
+        logger.log(
+            Level.SEVERE,
+            String.format(
+                "error unpacking completed operation metadata from %s", operation.getName()),
+            e);
         return null;
       }
     } else {
@@ -293,16 +346,19 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   public Operation stripOperation(Operation operation) {
-    return operation.toBuilder()
+    return operation
+        .toBuilder()
         .setMetadata(Any.pack(expectExecuteOperationMetadata(operation)))
         .build();
   }
 
   public Operation stripQueuedOperation(Operation operation) {
     if (operation.getMetadata().is(QueuedOperationMetadata.class)) {
-      operation = operation.toBuilder()
-          .setMetadata(Any.pack(expectExecuteOperationMetadata(operation)))
-          .build();
+      operation =
+          operation
+              .toBuilder()
+              .setMetadata(Any.pack(expectExecuteOperationMetadata(operation)))
+              .build();
     }
     return operation;
   }

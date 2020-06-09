@@ -20,7 +20,6 @@ import build.bazel.remote.execution.v2.GetActionResultRequest;
 import build.bazel.remote.execution.v2.UpdateActionResultRequest;
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.grpc.Status;
-import io.grpc.StatusException;
 import io.grpc.stub.StreamObserver;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -34,8 +33,7 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
 
   @Override
   public void getActionResult(
-      GetActionResultRequest request,
-      StreamObserver<ActionResult> responseObserver) {
+      GetActionResultRequest request, StreamObserver<ActionResult> responseObserver) {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     try {
       if (simpleBlobStore.getActionResult(request.getActionDigest().getHash(), out)) {
@@ -58,13 +56,11 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
 
   @Override
   public void updateActionResult(
-      UpdateActionResultRequest request,
-      StreamObserver<ActionResult> responseObserver) {
+      UpdateActionResultRequest request, StreamObserver<ActionResult> responseObserver) {
     ActionResult actionResult = request.getActionResult();
     try {
       simpleBlobStore.putActionResult(
-          request.getActionDigest().getHash(),
-          actionResult.toByteArray());
+          request.getActionDigest().getHash(), actionResult.toByteArray());
       responseObserver.onNext(actionResult);
       responseObserver.onCompleted();
     } catch (IOException e) {

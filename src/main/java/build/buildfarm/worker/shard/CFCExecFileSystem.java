@@ -14,23 +14,19 @@
 
 package build.buildfarm.worker.shard;
 
-import static build.buildfarm.worker.CASFileCache.getInterruptiblyOrIOException;
-import static build.buildfarm.worker.Utils.readdir;
-import static build.buildfarm.worker.Utils.removeDirectory;
+import static build.buildfarm.cas.CASFileCache.getInterruptiblyOrIOException;
+import static build.buildfarm.common.IOUtils.readdir;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Iterables.concat;
 import static com.google.common.util.concurrent.Futures.allAsList;
-import static com.google.common.util.concurrent.Futures.catchingAsync;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.transform;
 import static com.google.common.util.concurrent.Futures.transformAsync;
-import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
 import static java.util.concurrent.Executors.newWorkStealingPool;
 import static java.util.concurrent.TimeUnit.MINUTES;
-import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
@@ -38,29 +34,26 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.FileNode;
-import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.cas.CASFileCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
-import build.buildfarm.common.DigestUtil.ActionKey;
-import build.buildfarm.worker.CASFileCache;
-import build.buildfarm.worker.Dirent;
+import build.buildfarm.common.Dirent;
+import build.buildfarm.common.io.Directories;
 import build.buildfarm.worker.OutputDirectory;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 class CFCExecFileSystem implements ExecFileSystem {
@@ -68,8 +61,10 @@ class CFCExecFileSystem implements ExecFileSystem {
 
   private final Path root;
   private final CASFileCache fileCache;
-  private final boolean linkInputDirectories; // perform first-available non-output symlinking and retain directories in cache
-  private final Map<Path, Iterable<Path>> rootInputFiles = new ConcurrentHashMap<>();
+  private final boolean
+      linkInputDirectories; // perform first-available non-output symlinking and retain directories
+  // in cache
+  private final Map<Path, Iterable<String>> rootInputFiles = new ConcurrentHashMap<>();
   private final Map<Path, Iterable<Digest>> rootInputDirectories = new ConcurrentHashMap<>();
   private final ExecutorService fetchService = newWorkStealingPool(128);
   private final ExecutorService removeDirectoryService;
@@ -100,7 +95,7 @@ class CFCExecFileSystem implements ExecFileSystem {
     try {
       dirents = readdir(root, /* followSymlinks= */ false);
     } catch (IOException e) {
-      logger.log(SEVERE, "error reading directory " + root.toString(), e);
+      logger.log(Level.SEVERE, "error reading directory " + root.toString(), e);
     }
 
     ImmutableList.Builder<ListenableFuture<Void>> removeDirectoryFutures = ImmutableList.builder();
@@ -110,7 +105,7 @@ class CFCExecFileSystem implements ExecFileSystem {
       String name = dirent.getName();
       Path child = root.resolve(name);
       if (!child.equals(fileCache.getRoot())) {
-        removeDirectoryFutures.add(removeDirectory(root.resolve(name), removeDirectoryService));
+        removeDirectoryFutures.add(Directories.remove(root.resolve(name), removeDirectoryService));
       }
     }
 
@@ -124,13 +119,13 @@ class CFCExecFileSystem implements ExecFileSystem {
   @Override
   public void stop() {
     if (!shutdownAndAwaitTermination(fetchService, 1, MINUTES)) {
-      logger.severe("could not terminate fetchService");
+      logger.log(Level.SEVERE, "could not terminate fetchService");
     }
     if (!shutdownAndAwaitTermination(removeDirectoryService, 1, MINUTES)) {
-      logger.severe("could not terminate removeDirectoryService");
+      logger.log(Level.SEVERE, "could not terminate removeDirectoryService");
     }
     if (!shutdownAndAwaitTermination(accessRecorder, 1, MINUTES)) {
-      logger.severe("could not terminate accessRecorder");
+      logger.log(Level.SEVERE, "could not terminate accessRecorder");
     }
   }
 
@@ -145,38 +140,35 @@ class CFCExecFileSystem implements ExecFileSystem {
   }
 
   private ListenableFuture<Void> put(
-      Path path,
-      FileNode fileNode,
-      ImmutableList.Builder<Path> inputFiles) {
+      Path path, FileNode fileNode, ImmutableList.Builder<String> inputFiles) {
     Path filePath = path.resolve(fileNode.getName());
     Digest digest = fileNode.getDigest();
     if (digest.getSizeBytes() == 0) {
-      return listeningDecorator(fetchService).submit(() -> {
-        Files.createFile(filePath);
-        // ignore executable
-        return null;
-      });
+      return listeningDecorator(fetchService)
+          .submit(
+              () -> {
+                Files.createFile(filePath);
+                // ignore executable
+                return null;
+              });
     }
+    String key = fileCache.getKey(digest, fileNode.getIsExecutable());
     return transformAsync(
-        fileCache.put(
-            digest,
-            fileNode.getIsExecutable(),
-            /* containingDirectory=*/ null,
-            fetchService),
-        (fileCacheKey) -> {
-          checkNotNull(fileCacheKey);
+        fileCache.put(digest, fileNode.getIsExecutable(), fetchService),
+        (fileCachePath) -> {
+          checkNotNull(key);
           // we saw null entries in the built immutable list without synchronization
           synchronized (inputFiles) {
-            inputFiles.add(fileCacheKey);
+            inputFiles.add(key);
           }
           if (fileNode.getDigest().getSizeBytes() != 0) {
             try {
-              Files.createLink(filePath, fileCacheKey);
+              Files.createLink(filePath, fileCachePath);
             } catch (IOException e) {
               return immediateFailedFuture(e);
             }
           }
-          return immediateFuture((Void) null);
+          return immediateFuture(null);
         },
         fetchService);
   }
@@ -186,40 +178,54 @@ class CFCExecFileSystem implements ExecFileSystem {
       Digest directoryDigest,
       Map<Digest, Directory> directoriesIndex,
       OutputDirectory outputDirectory,
-      ImmutableList.Builder<Path> inputFiles,
+      ImmutableList.Builder<String> inputFiles,
       ImmutableList.Builder<Digest> inputDirectories)
       throws IOException {
     Directory directory = directoriesIndex.get(directoryDigest);
     if (directory == null) {
       // not quite IO...
-      throw new IOException("Directory " + DigestUtil.toString(directoryDigest) + " is not in directories index");
+      throw new IOException(
+          "Directory " + DigestUtil.toString(directoryDigest) + " is not in directories index");
     }
 
-    Iterable<ListenableFuture<Void>> downloads = directory.getFilesList()
-        .stream()
-        .map((fileNode) -> put(path, fileNode, inputFiles))
-        .collect(ImmutableList.<ListenableFuture<Void>>toImmutableList());
+    Iterable<ListenableFuture<Void>> downloads =
+        directory.getFilesList().stream()
+            .map((fileNode) -> put(path, fileNode, inputFiles))
+            .collect(ImmutableList.toImmutableList());
 
     for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
       Digest digest = directoryNode.getDigest();
       String name = directoryNode.getName();
-      OutputDirectory childOutputDirectory = outputDirectory != null
-          ? outputDirectory.getChild(name) : null;
+      OutputDirectory childOutputDirectory =
+          outputDirectory != null ? outputDirectory.getChild(name) : null;
       Path dirPath = path.resolve(name);
       if (childOutputDirectory != null || !linkInputDirectories || name.equals("external")) {
         Files.createDirectories(dirPath);
-        downloads = concat(downloads, fetchInputs(dirPath, digest, directoriesIndex, childOutputDirectory, inputFiles, inputDirectories));
+        downloads =
+            concat(
+                downloads,
+                fetchInputs(
+                    dirPath,
+                    digest,
+                    directoriesIndex,
+                    childOutputDirectory,
+                    inputFiles,
+                    inputDirectories));
       } else {
-        downloads = concat(downloads, ImmutableList.of(transform(
-            linkDirectory(dirPath, digest, directoriesIndex),
-            (result) -> {
-              // we saw null entries in the built immutable list without synchronization
-              synchronized (inputDirectories) {
-                inputDirectories.add(digest);
-              }
-              return null;
-            },
-            fetchService)));
+        downloads =
+            concat(
+                downloads,
+                ImmutableList.of(
+                    transform(
+                        linkDirectory(dirPath, digest, directoriesIndex),
+                        (result) -> {
+                          // we saw null entries in the built immutable list without synchronization
+                          synchronized (inputDirectories) {
+                            inputDirectories.add(digest);
+                          }
+                          return null;
+                        },
+                        fetchService)));
       }
       if (Thread.currentThread().isInterrupted()) {
         break;
@@ -229,9 +235,7 @@ class CFCExecFileSystem implements ExecFileSystem {
   }
 
   private ListenableFuture<Void> linkDirectory(
-      Path execPath,
-      Digest digest,
-      Map<Digest, Directory> directoriesIndex) {
+      Path execPath, Digest digest, Map<Digest, Directory> directoriesIndex) {
     return transformAsync(
         fileCache.putDirectory(digest, directoriesIndex, fetchService),
         (cachePath) -> {
@@ -270,21 +274,23 @@ class CFCExecFileSystem implements ExecFileSystem {
   }
 
   @Override
-  public Path createExecDir(String operationName, Map<Digest, Directory> directoriesIndex, Action action, Command command) throws IOException, InterruptedException {
-    OutputDirectory outputDirectory = OutputDirectory.parse(
-        command.getOutputFilesList(),
-        command.getOutputDirectoriesList());
+  public Path createExecDir(
+      String operationName, Map<Digest, Directory> directoriesIndex, Action action, Command command)
+      throws IOException, InterruptedException {
+    OutputDirectory outputDirectory =
+        OutputDirectory.parse(command.getOutputFilesList(), command.getOutputDirectoriesList());
 
     Path execDir = root.resolve(operationName);
     if (Files.exists(execDir)) {
-      removeDirectory(execDir);
+      Directories.remove(execDir);
     }
     Files.createDirectories(execDir);
 
-    ImmutableList.Builder<Path> inputFiles = new ImmutableList.Builder<>();
+    ImmutableList.Builder<String> inputFiles = new ImmutableList.Builder<>();
     ImmutableList.Builder<Digest> inputDirectories = new ImmutableList.Builder<>();
 
-    logger.info("ExecFileSystem::createExecDir(" + operationName + ") calling fetchInputs");
+    logger.log(
+        Level.INFO, "ExecFileSystem::createExecDir(" + operationName + ") calling fetchInputs");
     Iterable<ListenableFuture<Void>> fetchedFutures =
         fetchInputs(
             execDir,
@@ -329,27 +335,31 @@ class CFCExecFileSystem implements ExecFileSystem {
     } finally {
       if (!success) {
         fileCache.decrementReferences(inputFiles.build(), inputDirectories.build());
-        removeDirectory(execDir);
+        Directories.remove(execDir);
       }
     }
 
     rootInputFiles.put(execDir, inputFiles.build());
     rootInputDirectories.put(execDir, inputDirectories.build());
 
-    logger.info("ExecFileSystem::createExecDir(" + operationName + ") stamping output directories");
+    logger.log(
+        Level.INFO,
+        "ExecFileSystem::createExecDir(" + operationName + ") stamping output directories");
     boolean stamped = false;
     try {
       outputDirectory.stamp(execDir);
-    } catch (IOException e) {
-      destroyExecDir(execDir);
-      throw e;
+      stamped = true;
+    } finally {
+      if (!stamped) {
+        destroyExecDir(execDir);
+      }
     }
     return execDir;
   }
 
   @Override
   public void destroyExecDir(Path execDir) throws IOException, InterruptedException {
-    Iterable<Path> inputFiles = rootInputFiles.remove(execDir);
+    Iterable<String> inputFiles = rootInputFiles.remove(execDir);
     Iterable<Digest> inputDirectories = rootInputDirectories.remove(execDir);
     if (inputFiles != null || inputDirectories != null) {
       fileCache.decrementReferences(
@@ -357,7 +367,7 @@ class CFCExecFileSystem implements ExecFileSystem {
           inputDirectories == null ? ImmutableList.of() : inputDirectories);
     }
     if (Files.exists(execDir)) {
-      removeDirectory(execDir);
+      Directories.remove(execDir);
     }
   }
 }

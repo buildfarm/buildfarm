@@ -42,8 +42,8 @@ public final class GoogleAuthUtils {
    *
    * @throws IOException in case the channel can't be constructed.
    */
-  public static ManagedChannel newChannel(String target, AuthAndTLSOptions options,
-      ClientInterceptor... interceptors)
+  public static ManagedChannel newChannel(
+      String target, AuthAndTLSOptions options, ClientInterceptor... interceptors)
       throws IOException {
     Preconditions.checkNotNull(target);
     Preconditions.checkNotNull(options);

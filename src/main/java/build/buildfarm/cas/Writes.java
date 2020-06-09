@@ -23,8 +23,6 @@ import build.buildfarm.common.Write.CompleteWrite;
 import build.buildfarm.v1test.BlobWriteKey;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import com.google.common.util.concurrent.FutureCallback;
-import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.protobuf.ByteString;
@@ -34,12 +32,10 @@ import java.util.concurrent.TimeUnit;
 
 public class Writes {
   private final ContentAddressableStorage storage;
-  private final Cache<BlobWriteKey, Write> blobWrites = CacheBuilder.newBuilder()
-      .expireAfterWrite(10, TimeUnit.MINUTES)
-      .build();
-  private final Cache<Digest, SettableFuture<ByteString>> writesInProgress = CacheBuilder.newBuilder()
-      .expireAfterWrite(10, TimeUnit.MINUTES)
-      .build();
+  private final Cache<BlobWriteKey, Write> blobWrites =
+      CacheBuilder.newBuilder().expireAfterWrite(10, TimeUnit.MINUTES).build();
+  private final Cache<Digest, SettableFuture<ByteString>> writesInProgress =
+      CacheBuilder.newBuilder().expireAfterWrite(10, TimeUnit.MINUTES).build();
 
   Writes(ContentAddressableStorage storage) {
     this.storage = storage;
@@ -57,10 +53,7 @@ public class Writes {
     if (blob != null) {
       return new CompleteWrite(digest.getSizeBytes());
     }
-    return get(BlobWriteKey.newBuilder()
-        .setDigest(digest)
-        .setIdentifier(uuid.toString())
-        .build());
+    return get(BlobWriteKey.newBuilder().setDigest(digest).setIdentifier(uuid.toString()).build());
   }
 
   private Write get(BlobWriteKey key) {
@@ -73,13 +66,8 @@ public class Writes {
 
   private Write newWrite(BlobWriteKey key) {
     Digest digest = key.getDigest();
-    MemoryWriteOutputStream write = new MemoryWriteOutputStream(
-        storage,
-        digest,
-        getFuture(digest));
-    write.getFuture().addListener(
-        () -> blobWrites.invalidate(key),
-        directExecutor());
+    MemoryWriteOutputStream write = new MemoryWriteOutputStream(storage, digest, getFuture(digest));
+    write.getFuture().addListener(() -> blobWrites.invalidate(key), directExecutor());
     return write;
   }
 
@@ -89,9 +77,7 @@ public class Writes {
           digest,
           () -> {
             SettableFuture<ByteString> blobWritten = SettableFuture.create();
-            blobWritten.addListener(
-                () -> writesInProgress.invalidate(digest),
-                directExecutor());
+            blobWritten.addListener(() -> writesInProgress.invalidate(digest), directExecutor());
             return blobWritten;
           });
     } catch (ExecutionException e) {

@@ -14,11 +14,9 @@
 
 package build.buildfarm.instance.shard;
 
-import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.successfulAsList;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.lang.String.format;
-import static java.util.logging.Level.SEVERE;
 
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.v1test.DispatchedOperation;
@@ -26,17 +24,15 @@ import build.buildfarm.v1test.QueueEntry;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
-import com.google.rpc.Code;
-import com.google.rpc.Status;
-import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 class DispatchedMonitor implements Runnable {
-  private final static Logger logger = Logger.getLogger(DispatchedMonitor.class.getName());
+  private static final Logger logger = Logger.getLogger(DispatchedMonitor.class.getName());
 
   private final ShardBackplane backplane;
   private final Function<QueueEntry, ListenableFuture<Void>> requeuer;
@@ -54,14 +50,19 @@ class DispatchedMonitor implements Runnable {
   private ListenableFuture<Void> requeueDispatchedOperation(DispatchedOperation o, long now) {
     QueueEntry queueEntry = o.getQueueEntry();
     String operationName = queueEntry.getExecuteEntry().getOperationName();
-    logger.info(format("DispatchedMonitor: Testing %s because %d >= %d", operationName, now, o.getRequeueAt()));
+    logger.log(
+        Level.INFO,
+        format(
+            "DispatchedMonitor: Testing %s because %d >= %d",
+            operationName, now, o.getRequeueAt()));
     ListenableFuture<Void> requeuedFuture = requeuer.apply(queueEntry);
     long startTime = System.nanoTime();
     requeuedFuture.addListener(
         () -> {
           long endTime = System.nanoTime();
           float ms = (endTime - startTime) / 1000000.0f;
-          logger.info(format("DispatchedMonitor::run: requeue(%s) %gms", operationName, ms));
+          logger.log(
+              Level.INFO, format("DispatchedMonitor::run: requeue(%s) %gms", operationName, ms));
         },
         directExecutor());
     return requeuedFuture;
@@ -90,7 +91,7 @@ class DispatchedMonitor implements Runnable {
       }
     } catch (Exception e) {
       if (!backplane.isStopped()) {
-        logger.log(SEVERE, "error during dispatch evaluation", e);
+        logger.log(Level.SEVERE, "error during dispatch evaluation", e);
       }
     }
     return successfulAsList(requeuedFutures.build());
@@ -102,7 +103,7 @@ class DispatchedMonitor implements Runnable {
     } catch (ExecutionException e) {
       // unlikely, successfulAsList prevents this as the only return
       Throwable cause = e.getCause();
-      logger.log(SEVERE, "unexpected exception", cause);
+      logger.log(Level.SEVERE, "unexpected exception", cause);
       if (cause instanceof RuntimeException) {
         throw (RuntimeException) cause;
       }
@@ -123,13 +124,13 @@ class DispatchedMonitor implements Runnable {
 
   @Override
   public synchronized void run() {
-    logger.info("DispatchedMonitor: Running");
+    logger.log(Level.INFO, "DispatchedMonitor: Running");
     try {
       runInterruptibly();
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     } finally {
-      logger.info("DispatchedMonitor: Exiting");
+      logger.log(Level.INFO, "DispatchedMonitor: Exiting");
     }
   }
 }

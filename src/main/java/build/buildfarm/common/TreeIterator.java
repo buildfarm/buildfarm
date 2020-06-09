@@ -14,15 +14,11 @@
 
 package build.buildfarm.common;
 
-import build.buildfarm.common.DigestUtil;
-import build.buildfarm.common.TokenizableIterator;
+import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.Directory;
 import build.buildfarm.v1test.TreeIteratorToken;
 import com.google.common.collect.Iterators;
 import com.google.common.io.BaseEncoding;
-import com.google.common.util.concurrent.ListenableFuture;
-import build.bazel.remote.execution.v2.Digest;
-import build.bazel.remote.execution.v2.Directory;
-import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.MessageLite;
 import java.util.ArrayDeque;
@@ -30,47 +26,27 @@ import java.util.Deque;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Stack;
-import java.util.concurrent.ExecutionException;
-import java.util.function.Function;
 import javax.annotation.Nullable;
 
 public class TreeIterator implements TokenizableIterator<TreeIterator.DirectoryEntry> {
-  private final Function<Digest, ListenableFuture<Directory>> getDirectoryFuture;
+  private final DirectoryFetcher directoryFetcher;
   private Deque<Digest> path;
   private final ArrayDeque<Digest> parentPath;
   private final Stack<Iterator<Digest>> pointers;
-  private boolean interrupted;
 
-  static <V> V getUnchecked(ListenableFuture<V> future) throws InterruptedException {
-    try {
-      return future.get();
-    } catch (ExecutionException e) {
-      return null;
-    }
+  @FunctionalInterface
+  public interface DirectoryFetcher {
+    Directory fetch(Digest digest);
   }
 
-  public TreeIterator(
-      Function<Digest, ListenableFuture<Directory>> getDirectoryFuture,
-      Digest rootDigest,
-      String pageToken) {
-    this.getDirectoryFuture = getDirectoryFuture;
+  public TreeIterator(DirectoryFetcher directoryFetcher, Digest rootDigest, String pageToken) {
+    this.directoryFetcher = directoryFetcher;
     parentPath = new ArrayDeque<Digest>();
     pointers = new Stack<Iterator<Digest>>();
 
-    try {
-      initializePointers(rootDigest, pageToken);
-      this.interrupted = false;
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      this.interrupted = true;
-    }
-  }
-
-  void initializePointers(Digest rootDigest, String pageToken) throws InterruptedException {
     Iterator<Digest> iter = Iterators.singletonIterator(rootDigest);
 
-    Directory directory = getUnchecked(getDirectoryFuture.apply(rootDigest));
-
+    // initial page token is empty
     if (!pageToken.isEmpty()) {
       TreeIteratorToken token = parseToken(BaseEncoding.base64().decode(pageToken));
 
@@ -86,17 +62,18 @@ public class TreeIterator implements TokenizableIterator<TreeIterator.DirectoryE
         }
         parentPath.addLast(digest);
         pointers.push(iter);
-        directory = getUnchecked(getDirectoryFuture.apply(digest));
+        Directory directory = getDirectory(digest);
         if (directory == null) {
           // some directory data has disappeared, current iter
           // is correct and will be next directory fetched
           break;
         }
-        iter = Iterators.transform(
-            directory.getDirectoriesList().iterator(),
-            directoryNode -> {
-              return directoryNode.getDigest();
-            });
+        iter =
+            Iterators.transform(
+                directory.getDirectoriesList().iterator(),
+                directoryNode -> {
+                  return directoryNode.getDigest();
+                });
       }
     }
     pointers.push(iter);
@@ -106,7 +83,7 @@ public class TreeIterator implements TokenizableIterator<TreeIterator.DirectoryE
 
   @Override
   public boolean hasNext() {
-    return !interrupted && !pointers.isEmpty() && pointers.peek().hasNext();
+    return !pointers.isEmpty() && pointers.peek().hasNext();
   }
 
   private void advanceIterator() {
@@ -122,11 +99,11 @@ public class TreeIterator implements TokenizableIterator<TreeIterator.DirectoryE
     }
   }
 
-  public class DirectoryEntry {
+  public static class DirectoryEntry {
     private final Digest digest;
     @Nullable private final Directory directory;
 
-    DirectoryEntry(Digest digest, @Nullable Directory directory) {
+    public DirectoryEntry(Digest digest, @Nullable Directory directory) {
       this.digest = digest;
       this.directory = directory;
     }
@@ -143,9 +120,6 @@ public class TreeIterator implements TokenizableIterator<TreeIterator.DirectoryE
 
   @Override
   public DirectoryEntry next() throws NoSuchElementException {
-    if (interrupted) {
-      return null;
-    }
     Iterator<Digest> iter = pointers.peek();
     if (!iter.hasNext()) {
       throw new NoSuchElementException();
@@ -156,24 +130,25 @@ public class TreeIterator implements TokenizableIterator<TreeIterator.DirectoryE
      * (and simplify the interface) that they have been
      * removed. */
     Digest digest = iter.next();
-    try {
-      Directory directory = getUnchecked(getDirectoryFuture.apply(digest));
-      DirectoryEntry entry = new DirectoryEntry(digest, directory);
-      if (directory != null) {
-        /* the path to a new iter set is the path to its parent */
-        parentPath.addLast(digest);
-        path = parentPath.clone();
-        pointers.push(Iterators.transform(
-            directory.getDirectoriesList().iterator(),
-            directoryNode -> directoryNode.getDigest()));
-      }
-      advanceIterator();
-      return entry;
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      interrupted = true;
-      return null;
+    Directory directory = getDirectory(digest);
+    if (directory != null) {
+      /* the path to a new iter set is the path to its parent */
+      parentPath.addLast(digest);
+      path = parentPath.clone();
+      pointers.push(
+          Iterators.transform(
+              directory.getDirectoriesList().iterator(),
+              directoryNode -> directoryNode.getDigest()));
     }
+    advanceIterator();
+    return new DirectoryEntry(digest, directory);
+  }
+
+  private @Nullable Directory getDirectory(Digest digest) {
+    if (digest.getSizeBytes() == 0) {
+      return Directory.getDefaultInstance();
+    }
+    return directoryFetcher.fetch(digest);
   }
 
   private TreeIteratorToken parseToken(byte[] bytes) {
@@ -185,9 +160,7 @@ public class TreeIterator implements TokenizableIterator<TreeIterator.DirectoryE
   }
 
   private MessageLite toToken() {
-    return TreeIteratorToken.newBuilder()
-        .addAllDirectories(path)
-        .build();
+    return TreeIteratorToken.newBuilder().addAllDirectories(path).build();
   }
 
   public String toNextPageToken() {

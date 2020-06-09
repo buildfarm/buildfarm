@@ -16,31 +16,31 @@ package build.buildfarm.worker.shard;
 
 import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import build.bazel.remote.execution.v2.ActionResult;
+import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
-import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.ShardWorkerInstanceConfig;
-import com.google.longrunning.Operation;
+import build.buildfarm.v1test.Tree;
+import com.google.common.base.Throwables;
 import com.google.protobuf.ByteString;
 import io.grpc.StatusRuntimeException;
 import java.io.IOException;
 import java.net.SocketException;
-import java.net.SocketTimeoutException;
+import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import javax.naming.ConfigurationException;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -52,66 +52,63 @@ import org.mockito.MockitoAnnotations;
 public class ShardWorkerInstanceTest {
   private final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
 
-  @Mock
-  private ShardBackplane backplane;
+  @Mock private ShardBackplane backplane;
 
-  @Mock
-  private ContentAddressableStorage storage;
-
-  @Mock
-  private InputStreamFactory inputStreamFactory;
+  @Mock private ContentAddressableStorage storage;
 
   private ShardWorkerInstance instance;
 
   @Before
   public void setUp() throws Exception {
     MockitoAnnotations.initMocks(this);
-    instance = new ShardWorkerInstance(
-        "test",
-        DIGEST_UTIL,
-        backplane,
-        storage,
-        inputStreamFactory,
-        ShardWorkerInstanceConfig.getDefaultInstance());
+    instance =
+        new ShardWorkerInstance(
+            "test",
+            DIGEST_UTIL,
+            backplane,
+            storage,
+            ShardWorkerInstanceConfig.getDefaultInstance());
   }
 
   @Test(expected = SocketException.class)
   public void dispatchOperationThrowsOnSocketException() throws IOException, InterruptedException {
-    when(backplane.dispatchOperation())
-        .thenThrow(SocketException.class);
+    when(backplane.dispatchOperation(any(List.class))).thenThrow(SocketException.class);
     MatchListener listener = mock(MatchListener.class);
     instance.dispatchOperation(listener);
   }
 
   @Test
   public void dispatchOperationIgnoresNull() throws IOException, InterruptedException {
-    QueueEntry queueEntry = QueueEntry.newBuilder()
-        .setExecuteEntry(ExecuteEntry.newBuilder()
-            .setOperationName("op"))
-        .build();
-    when(backplane.dispatchOperation())
-        .thenReturn(null)
-        .thenReturn(queueEntry);
+    QueueEntry queueEntry =
+        QueueEntry.newBuilder()
+            .setExecuteEntry(ExecuteEntry.newBuilder().setOperationName("op"))
+            .build();
+    when(backplane.dispatchOperation(any(List.class))).thenReturn(null).thenReturn(queueEntry);
     MatchListener listener = mock(MatchListener.class);
     assertThat(instance.dispatchOperation(listener)).isEqualTo(queueEntry);
-    verify(backplane, times(2)).dispatchOperation();
+    verify(backplane, times(2)).dispatchOperation(any(List.class));
   }
 
   @Test(expected = StatusRuntimeException.class)
   public void getOperationThrowsOnSocketException() throws IOException, InterruptedException {
-    when(backplane.getOperation(any(String.class)))
-        .thenThrow(SocketException.class);
+    when(backplane.getOperation(any(String.class))).thenThrow(SocketException.class);
     instance.getOperation("op");
   }
 
   @Test(expected = UnsupportedOperationException.class)
-  public void getActionResultIsUnsupported() {
-    instance.getActionResult(null);
+  public void getActionResultIsUnsupported() throws InterruptedException {
+    try {
+      instance.getActionResult(null, null).get();
+    } catch (ExecutionException e) {
+      Throwable cause = e.getCause();
+      Throwables.propagateIfInstanceOf(cause, RuntimeException.class);
+      throw new RuntimeException(cause);
+    }
   }
 
   @Test
   public void putActionResultDelegatesToBackplane() throws IOException {
-    DigestUtil.ActionKey key = 
+    DigestUtil.ActionKey key =
         DigestUtil.asActionKey(DIGEST_UTIL.compute(ByteString.copyFromUtf8("Hello, World")));
     ActionResult result = ActionResult.getDefaultInstance();
     instance.putActionResult(key, result);
@@ -121,10 +118,7 @@ public class ShardWorkerInstanceTest {
   @Test(expected = UnsupportedOperationException.class)
   public void listOperationsIsUnsupported() {
     instance.listOperations(
-        /* pageSize=*/ 0,
-        /* pageToken=*/ "",
-        /* filter=*/ "",
-        /* operations=*/ null);
+        /* pageSize=*/ 0, /* pageToken=*/ "", /* filter=*/ "", /* operations=*/ null);
   }
 
   @Test(expected = UnsupportedOperationException.class)
@@ -135,10 +129,10 @@ public class ShardWorkerInstanceTest {
   @Test(expected = UnsupportedOperationException.class)
   public void getTreeIsUnsupported() {
     instance.getTree(
-        /* rootDigest=*/ null,
+        /* rootDigest=*/ Digest.getDefaultInstance(),
         /* pageSize=*/ 0,
         /* pageToken=*/ "",
-        /* tree=*/ null);
+        /* tree=*/ Tree.newBuilder());
   }
 
   @Test(expected = UnsupportedOperationException.class)
