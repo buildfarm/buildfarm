@@ -14,8 +14,6 @@
 
 package build.buildfarm.common;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import java.io.File;
@@ -172,8 +170,12 @@ public class IOUtils {
   }
 
   private static NamedFileKey pathToInode(Path path) throws IOException {
-    BasicFileAttributes attrs = Files.readAttributes(path, BasicFileAttributes.class);
-    return new NamedFileKey(path.getFileName().toString(), checkNotNull(attrs.fileKey()));
+    FileStatus stat = statNullable(path, false);
+    Object fileKey = stat.fileKey();
+    if (fileKey == null) {
+      fileKey = Files.readAttributes(path, BasicFileAttributes.class);
+    }
+    return new NamedFileKey(path.getFileName().toString(), fileKey);
   }
 
   private static List<NamedFileKey> listNIOdirentSorted(Path path) throws IOException {
@@ -194,6 +196,14 @@ public class IOUtils {
     }
     dirents.sort(Comparator.comparing(NamedFileKey::getName));
     return dirents;
+  }
+
+  public static Object getFileKey(Path path, FileStatus stat) throws IOException {
+    Object fileKey = stat.fileKey();
+    if (fileKey == null) {
+      fileKey = Files.readAttributes(path, BasicFileAttributes.class);
+    }
+    return fileKey;
   }
 
   /*

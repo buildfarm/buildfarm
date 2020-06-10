@@ -14,6 +14,7 @@
 
 package build.buildfarm.cas;
 
+import static build.buildfarm.common.IOUtils.getFileKey;
 import static build.buildfarm.common.IOUtils.listDir;
 import static build.buildfarm.common.IOUtils.listDirentSorted;
 import static build.buildfarm.common.IOUtils.stat;
@@ -85,7 +86,6 @@ import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -1388,103 +1388,57 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
     // ignore our directories index database
     // indexes will be removed and rebuilt for compute
-    if (basename.equals(directoriesIndexDbName)) {
-      return;
-    }
+    if (!basename.equals(directoriesIndexDbName)) {
+      FileStatus stat = stat(file, false);
 
-    // mark directory for later key compute
-    // we avoid stating the file by observing the path name to determine if it is a directory.
-    if (file.toString().endsWith("_dir")) {
-      synchronized (computeDirs) {
-        computeDirs.add(file);
+      // mark directory for later key compute
+      if (file.toString().endsWith("_dir")) {
+        if (stat.isDirectory()) {
+          synchronized (computeDirs) {
+            computeDirs.add(file);
+          }
+        } else {
+          synchronized (deleteFiles) {
+            deleteFiles.add(file);
+          }
+        }
+      } else if (stat.isDirectory()) {
+        synchronized (deleteFiles) {
+          deleteFiles.add(file);
+        }
+      } else {
+        // if cas is full or entry is oversized or empty, mark file for later deletion.
+        long size = stat.getSize();
+        if (sizeInBytes + size > maxSizeInBytes || size > maxEntrySizeInBytes || size == 0) {
+          synchronized (deleteFiles) {
+            deleteFiles.add(file);
+          }
+        } else {
+          // get the key entry from the file name.
+          FileEntryKey fileEntryKey = parseFileEntryKey(basename, stat.getSize());
+
+          // if key entry file name cannot be parsed, mark file for later deletion.
+          if (fileEntryKey == null) {
+            synchronized (deleteFiles) {
+              deleteFiles.add(file);
+            }
+          } else {
+            // populate key it is not currently stored.
+            String key = fileEntryKey.getKey();
+            Entry e = new Entry(key, size, Deadline.after(10, SECONDS));
+            synchronized (fileKeys) {
+              fileKeys.put(getFileKey(root.resolve(key), stat), e);
+            }
+            storage.put(e.key, e);
+            onPut.accept(fileEntryKey.getDigest());
+            synchronized (CASFileCache.this) {
+              e.decrementReference(header);
+            }
+            sizeInBytes += size;
+          }
+        }
       }
-      return;
     }
-
-    FileStatus stat = stat(file, false);
-
-    // cas is full or entry is oversized or empty. mark file for later deletion.
-    long size = stat.getSize();
-    if (sizeInBytes + size > maxSizeInBytes || size > maxEntrySizeInBytes || size == 0) {
-      synchronized (deleteFiles) {
-        deleteFiles.add(file);
-      }
-      return;
-    }
-
-    // get the key entry from the file name.
-    FileEntryKey fileEntryKey = parseFileEntryKey(basename, stat.getSize());
-
-    // key entry file name cannot be parsed. mark file for later deletion.
-    if (fileEntryKey == null) {
-      synchronized (deleteFiles) {
-        deleteFiles.add(file);
-      }
-      return;
-    }
-
-    // populate key it is not currently stored.
-    String key = fileEntryKey.getKey();
-    Entry e = new Entry(key, size, Deadline.after(10, SECONDS));
-    synchronized (fileKeys) {
-      fileKeys.put(stat.fileKey(), e);
-    }
-    storage.put(e.key, e);
-    onPut.accept(fileEntryKey.getDigest());
-    synchronized (CASFileCache.this) {
-      e.decrementReference(header);
-    }
-    sizeInBytes += size;
-  }
-
-  private void processRootFileUnchecked(
-      NamedFileKey file,
-      ImmutableList.Builder<Path> computeDirs,
-      ImmutableList.Builder<Path> deleteFiles,
-      ImmutableMap.Builder<Object, Entry> fileKeys)
-      throws IOException, InterruptedException {
-
-    // mark directory for later key compute
-    // we avoid stating the file by observing the path name to determine if it is a directory.
-    if (file.getName().endsWith("_dir")) {
-      synchronized (computeDirs) {
-        computeDirs.add(getPath(file.getName()));
-      }
-      return;
-    }
-
-    // get the key entry from the file name.
-    FileEntryKey fileEntryKey = parseFileEntryKey(file.getName());
-
-    // cas is full.  mark directory for later deletion.
-    long size = fileEntryKey.getSize();
-    if (sizeInBytes + size > maxSizeInBytes || size > maxEntrySizeInBytes) {
-      synchronized (deleteFiles) {
-        deleteFiles.add(Paths.get(file.getName()));
-      }
-      return;
-    }
-
-    // key entry file name cannot be parsed; mark file for later deletion.
-    if (fileEntryKey == null) {
-      synchronized (deleteFiles) {
-        deleteFiles.add(Paths.get(file.getName()));
-      }
-      return;
-    }
-
-    // populate key it is not currently stored.
-    String key = fileEntryKey.getKey();
-    Entry e = new Entry(key, size, Deadline.after(10, SECONDS));
-    synchronized (fileKeys) {
-      fileKeys.put(file.fileKey(), e);
-    }
-    storage.put(e.key, e);
-    onPut.accept(fileEntryKey.getDigest());
-    synchronized (CASFileCache.this) {
-      e.decrementReference(header);
-    }
-    sizeInBytes += size;
   }
 
   private List<Path> computeDirectories(CacheScanResults cacheScanResults)
