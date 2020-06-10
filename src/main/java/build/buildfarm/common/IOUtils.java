@@ -31,6 +31,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.annotation.Nullable;
 import jnr.constants.platform.OpenFlags;
 import jnr.ffi.LibraryLoader;
 import jnr.ffi.Pointer;
@@ -169,19 +170,23 @@ public class IOUtils {
     return files;
   }
 
-  private static NamedFileKey pathToInode(Path path) throws IOException {
-    FileStatus stat = statNullable(path, false);
-    Object fileKey = stat.fileKey();
+  public static Object getFileKey(Path path, @Nullable FileStatus stat) throws IOException {
+    Object fileKey = stat == null ? null : stat.fileKey();
     if (fileKey == null) {
       fileKey = Files.readAttributes(path, BasicFileAttributes.class);
     }
-    return new NamedFileKey(path.getFileName().toString(), fileKey);
+    return fileKey;
+  }
+
+  private static NamedFileKey pathToNamedFileKey(Path path) throws IOException {
+    return new NamedFileKey(
+        path.getFileName().toString(), getFileKey(path, statNullable(path, false)));
   }
 
   private static List<NamedFileKey> listNIOdirentSorted(Path path) throws IOException {
     List<NamedFileKey> dirents = new ArrayList();
     for (Path entry : listDir(path)) {
-      dirents.add(pathToInode(path));
+      dirents.add(pathToNamedFileKey(path));
     }
     return dirents;
   }
@@ -196,14 +201,6 @@ public class IOUtils {
     }
     dirents.sort(Comparator.comparing(NamedFileKey::getName));
     return dirents;
-  }
-
-  public static Object getFileKey(Path path, FileStatus stat) throws IOException {
-    Object fileKey = stat.fileKey();
-    if (fileKey == null) {
-      fileKey = Files.readAttributes(path, BasicFileAttributes.class);
-    }
-    return fileKey;
   }
 
   /*
