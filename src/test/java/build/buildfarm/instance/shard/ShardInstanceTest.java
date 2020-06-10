@@ -17,7 +17,7 @@ package build.buildfarm.instance.shard;
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.CACHE_CHECK;
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.COMPLETED;
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.QUEUED;
-import static build.buildfarm.common.Actions.invalidActionMessage;
+import static build.buildfarm.common.Actions.invalidActionVerboseMessage;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static build.buildfarm.instance.AbstractServerInstance.MISSING_ACTION;
 import static build.buildfarm.instance.AbstractServerInstance.MISSING_COMMAND;
@@ -73,6 +73,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
+import com.google.protobuf.Duration;
 import com.google.rpc.Code;
 import com.google.rpc.PreconditionFailure;
 import com.google.rpc.PreconditionFailure.Violation;
@@ -130,6 +131,7 @@ public class ShardInstanceTest {
             /* dispatchedMonitorIntervalSeconds=*/ 0,
             /* runOperationQueuer=*/ false,
             /* maxBlobSize=*/ 0,
+            /* maxActionTimeout=*/ Duration.getDefaultInstance(),
             mockOnStop,
             CacheBuilder.newBuilder().build(mockInstanceLoader));
     instance.start();
@@ -281,21 +283,21 @@ public class ShardInstanceTest {
     }
     assertThat(failedPreconditionExceptionCaught).isTrue();
 
+    PreconditionFailure preconditionFailure =
+        PreconditionFailure.newBuilder()
+            .addViolations(
+                Violation.newBuilder()
+                    .setType(VIOLATION_TYPE_MISSING)
+                    .setSubject("blobs/" + DigestUtil.toString(actionDigest))
+                    .setDescription(MISSING_ACTION))
+            .build();
     ExecuteResponse executeResponse =
         ExecuteResponse.newBuilder()
             .setStatus(
                 com.google.rpc.Status.newBuilder()
                     .setCode(Code.FAILED_PRECONDITION.getNumber())
-                    .setMessage(invalidActionMessage(actionDigest))
-                    .addDetails(
-                        Any.pack(
-                            PreconditionFailure.newBuilder()
-                                .addViolations(
-                                    Violation.newBuilder()
-                                        .setType(VIOLATION_TYPE_MISSING)
-                                        .setSubject("blobs/" + DigestUtil.toString(actionDigest))
-                                        .setDescription(MISSING_ACTION))
-                                .build())))
+                    .setMessage(invalidActionVerboseMessage(actionDigest, preconditionFailure))
+                    .addDetails(Any.pack(preconditionFailure)))
             .build();
     assertResponse(executeResponse);
     verify(poller, atLeastOnce()).pause();
@@ -329,23 +331,21 @@ public class ShardInstanceTest {
       }
     }
     assertThat(failedPreconditionExceptionCaught).isTrue();
+    PreconditionFailure preconditionFailure =
+        PreconditionFailure.newBuilder()
+            .addViolations(
+                Violation.newBuilder()
+                    .setType(VIOLATION_TYPE_MISSING)
+                    .setSubject("blobs/" + DigestUtil.toString(action.getCommandDigest()))
+                    .setDescription(MISSING_COMMAND))
+            .build();
     ExecuteResponse executeResponse =
         ExecuteResponse.newBuilder()
             .setStatus(
                 com.google.rpc.Status.newBuilder()
                     .setCode(Code.FAILED_PRECONDITION.getNumber())
-                    .setMessage(invalidActionMessage(actionDigest))
-                    .addDetails(
-                        Any.pack(
-                            PreconditionFailure.newBuilder()
-                                .addViolations(
-                                    Violation.newBuilder()
-                                        .setType(VIOLATION_TYPE_MISSING)
-                                        .setSubject(
-                                            "blobs/"
-                                                + DigestUtil.toString(action.getCommandDigest()))
-                                        .setDescription(MISSING_COMMAND))
-                                .build())))
+                    .setMessage(invalidActionVerboseMessage(actionDigest, preconditionFailure))
+                    .addDetails(Any.pack(preconditionFailure)))
             .build();
     assertResponse(executeResponse);
 
@@ -409,22 +409,21 @@ public class ShardInstanceTest {
     }
     assertThat(failedPreconditionExceptionCaught).isTrue();
 
+    PreconditionFailure preconditionFailure =
+        PreconditionFailure.newBuilder()
+            .addViolations(
+                Violation.newBuilder()
+                    .setType(VIOLATION_TYPE_MISSING)
+                    .setSubject("blobs/" + DigestUtil.toString(subdirDigest))
+                    .setDescription("The directory `/missing-subdir` was not found in the CAS."))
+            .build();
     ExecuteResponse executeResponse =
         ExecuteResponse.newBuilder()
             .setStatus(
                 com.google.rpc.Status.newBuilder()
                     .setCode(Code.FAILED_PRECONDITION.getNumber())
-                    .setMessage(invalidActionMessage(actionDigest))
-                    .addDetails(
-                        Any.pack(
-                            PreconditionFailure.newBuilder()
-                                .addViolations(
-                                    Violation.newBuilder()
-                                        .setType(VIOLATION_TYPE_MISSING)
-                                        .setSubject("blobs/" + DigestUtil.toString(subdirDigest))
-                                        .setDescription(
-                                            "The directory `/missing-subdir` was not found in the CAS."))
-                                .build())))
+                    .setMessage(invalidActionVerboseMessage(actionDigest, preconditionFailure))
+                    .addDetails(Any.pack(preconditionFailure)))
             .build();
     assertResponse(executeResponse);
     verify(poller, atLeastOnce()).pause();
@@ -660,19 +659,19 @@ public class ShardInstanceTest {
     assertThat(operation.getResponse().is(ExecuteResponse.class)).isTrue();
     ExecuteResponse executeResponse = operation.getResponse().unpack(ExecuteResponse.class);
     com.google.rpc.Status status = executeResponse.getStatus();
+    PreconditionFailure preconditionFailure =
+        PreconditionFailure.newBuilder()
+            .addViolations(
+                Violation.newBuilder()
+                    .setType(VIOLATION_TYPE_MISSING)
+                    .setSubject("blobs/" + DigestUtil.toString(missingDirectoryDigest))
+                    .setDescription("The directory `/` was not found in the CAS."))
+            .build();
     com.google.rpc.Status expectedStatus =
         com.google.rpc.Status.newBuilder()
             .setCode(Code.FAILED_PRECONDITION.getNumber())
-            .setMessage(invalidActionMessage(actionDigest))
-            .addDetails(
-                Any.pack(
-                    PreconditionFailure.newBuilder()
-                        .addViolations(
-                            Violation.newBuilder()
-                                .setType(VIOLATION_TYPE_MISSING)
-                                .setSubject("blobs/" + DigestUtil.toString(missingDirectoryDigest))
-                                .setDescription("The directory `/` was not found in the CAS."))
-                        .build()))
+            .setMessage(invalidActionVerboseMessage(actionDigest, preconditionFailure))
+            .addDetails(Any.pack(preconditionFailure))
             .build();
     assertThat(status).isEqualTo(expectedStatus);
   }

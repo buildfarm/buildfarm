@@ -213,6 +213,16 @@ class Executor {
       return 0;
     }
 
+    // switch poller to disable deadline
+    operationContext.poller.pause();
+    workerContext.resumePoller(
+        operationContext.poller,
+        "Executor(claim)",
+        operationContext.queueEntry,
+        ExecutionStage.Value.EXECUTING,
+        () -> {},
+        Deadline.after(10, DAYS));
+
     resultBuilder
         .getExecutionMetadataBuilder()
         .setExecutionCompletedTimestamp(Timestamps.fromMillis(System.currentTimeMillis()));
@@ -297,6 +307,8 @@ class Executor {
 
     arguments.add(wrapper.getPath());
     for (String argument : wrapper.getArgumentsList()) {
+      // If the argument is of the form <propertyName>, substitute the value of
+      // the property from the platform specification.
       if (!argument.equals("<>")
           && argument.charAt(0) == '<'
           && argument.charAt(argument.length() - 1) == '>') {
@@ -308,8 +320,10 @@ class Executor {
           return ImmutableList.of();
         }
         arguments.add(property.getValue());
+      } else {
+        // If the argument isn't of the form <propertyName>, add the argument directly:
+        arguments.add(argument);
       }
-      arguments.add(argument);
     }
     return arguments.build();
   }

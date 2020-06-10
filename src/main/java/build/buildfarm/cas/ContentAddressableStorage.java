@@ -23,6 +23,7 @@ import build.buildfarm.common.ThreadSafety.ThreadSafe;
 import build.buildfarm.common.Write;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.protobuf.ByteString;
+import io.grpc.stub.ServerCallStreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.UUID;
@@ -95,6 +96,15 @@ public interface ContentAddressableStorage extends InputStreamFactory {
 
   @ThreadSafe
   InputStream newInput(Digest digest, long offset) throws IOException;
+
+  /** Retrieve a value from the CAS by streaming content when ready */
+  @ThreadSafe
+  void get(
+      Digest digest,
+      long offset,
+      long count,
+      ServerCallStreamObserver<ByteString> blobObserver,
+      RequestMetadata requestMetadata);
 
   @ThreadSafe
   Write getWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata);

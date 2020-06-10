@@ -40,9 +40,11 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
+import build.buildfarm.v1test.OperationTimesBetweenStages;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.Tree;
+import build.buildfarm.v1test.WorkerProfileMessage;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
@@ -51,8 +53,10 @@ import com.google.common.io.ByteStreams;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
+import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Message;
+import com.google.protobuf.util.Durations;
 import com.google.protobuf.util.Timestamps;
 import com.google.rpc.Code;
 import com.google.rpc.PreconditionFailure;
@@ -69,6 +73,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
@@ -604,6 +609,116 @@ class Cat {
     return 10;
   }
 
+  private static void getWorkerProfile(Instance instance) {
+    WorkerProfileMessage response = instance.getWorkerProfile();
+    System.out.println("\nWorkerProfile:");
+    String strNumFormat = "%-50s : %d";
+    System.out.println(
+        String.format(strNumFormat, "Current Entry Count", response.getCasEntryCount()));
+    System.out.println(
+        String.format(
+            strNumFormat, "Current DirectoryEntry Count", response.getCasDirectoryEntryCount()));
+    System.out.println(
+        String.format(
+            strNumFormat, "Number of Evicted Entries", response.getCasEvictedEntryCount()));
+    System.out.println(
+        String.format(
+            strNumFormat,
+            "Total Evicted Entries size in Bytes",
+            response.getCasEvictedEntrySize()));
+
+    String strStrFormat = "%-50s : %s";
+    System.out.println(
+        String.format(
+            strStrFormat,
+            "Slots usage/configured in InputFetchStage",
+            response.getInputFetchStageSlotsUsedOverConfigured()));
+    System.out.println(
+        String.format(
+            strStrFormat,
+            "Slots usage/configured in ExecuteActionStage",
+            response.getExecuteActionStageSlotsUsedOverConfigured()));
+
+    List<OperationTimesBetweenStages> times = response.getTimesList();
+    for (OperationTimesBetweenStages time : times) {
+      printOperationTime(time);
+    }
+  }
+
+  private static void printOperationTime(OperationTimesBetweenStages time) {
+    String periodInfo = "\nIn last ";
+    switch ((int) time.getPeriod().getSeconds()) {
+      case 60:
+        periodInfo += "1 minute";
+        break;
+      case 600:
+        periodInfo += "10 minutes";
+        break;
+      case 3600:
+        periodInfo += "1 hour";
+        break;
+      case 10800:
+        periodInfo += "3 hours";
+        break;
+      case 86400:
+        periodInfo += "24 hours";
+        break;
+      default:
+        System.out.println("The period is UNKNOWN: " + time.getPeriod().getSeconds());
+        periodInfo = periodInfo + time.getPeriod().getSeconds() + " seconds";
+        break;
+    }
+
+    periodInfo += ":";
+    System.out.println(periodInfo);
+    System.out.println("Number of operations completed: " + time.getOperationCount());
+    String strStrNumFormat = "%-28s -> %-28s : %12.2f ms";
+    System.out.println(
+        String.format(
+            strStrNumFormat, "Queued", "MatchStage", durationToMillis(time.getQueuedToMatch())));
+    System.out.println(
+        String.format(
+            strStrNumFormat,
+            "MatchStage",
+            "InputFetchStage start",
+            durationToMillis(time.getMatchToInputFetchStart())));
+    System.out.println(
+        String.format(
+            strStrNumFormat,
+            "InputFetchStage Start",
+            "InputFetchStage Completed",
+            durationToMillis(time.getInputFetchStartToComplete())));
+    System.out.println(
+        String.format(
+            strStrNumFormat,
+            "InputFetchStage Completed",
+            "ExecutionStage Start",
+            durationToMillis(time.getInputFetchCompleteToExecutionStart())));
+    System.out.println(
+        String.format(
+            strStrNumFormat,
+            "ExecutionStage Start",
+            "ExecutionStage Completed",
+            durationToMillis(time.getExecutionStartToComplete())));
+    System.out.println(
+        String.format(
+            strStrNumFormat,
+            "ExecutionStage Completed",
+            "ReportResultStage Started",
+            durationToMillis(time.getExecutionCompleteToOutputUploadStart())));
+    System.out.println(
+        String.format(
+            strStrNumFormat,
+            "OutputUploadStage Started",
+            "OutputUploadStage Completed",
+            durationToMillis(time.getOutputUploadStartToComplete())));
+    System.out.println();
+  }
+
+  private static float durationToMillis(Duration d) {
+    return Durations.toNanos(d) / (1000.0f * 1000.0f);
+  }
+
   public static void main(String[] args) throws Exception {
     String host = args[0];
     String instanceName = args[1];
@@ -640,6 +755,9 @@ class Cat {
   }
 
   static void instanceMain(Instance instance, String type, String[] args) throws Exception {
+    if (type.equals("WorkerProfile")) {
+      getWorkerProfile(instance);
+    }
     if (type.equals("Capabilities")) {
       ServerCapabilities capabilities = instance.getCapabilities();
       printCapabilities(capabilities);

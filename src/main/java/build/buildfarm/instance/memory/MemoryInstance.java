@@ -14,7 +14,7 @@
 
 package build.buildfarm.instance.memory;
 
-import static build.buildfarm.common.Actions.invalidActionMessage;
+import static build.buildfarm.common.Actions.invalidActionVerboseMessage;
 import static build.buildfarm.common.Actions.satisfiesRequirements;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
@@ -39,6 +39,7 @@ import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.ac.ActionCache;
+import build.buildfarm.ac.FilesystemActionCache;
 import build.buildfarm.ac.GrpcActionCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorages;
@@ -60,6 +61,7 @@ import build.buildfarm.instance.WorkerQueueConfigurations;
 import build.buildfarm.instance.WorkerQueues;
 import build.buildfarm.v1test.ActionCacheConfig;
 import build.buildfarm.v1test.ExecuteEntry;
+import build.buildfarm.v1test.FilesystemACConfig;
 import build.buildfarm.v1test.GrpcACConfig;
 import build.buildfarm.v1test.MemoryInstanceConfig;
 import build.buildfarm.v1test.OperationIteratorToken;
@@ -100,6 +102,7 @@ import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Paths;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -250,6 +253,8 @@ public class MemoryInstance extends AbstractServerInstance {
         return createGrpcActionCache(config.getGrpc());
       case DELEGATE_CAS:
         return createDelegateCASActionCache(cas, digestUtil);
+      case FILESYSTEM:
+        return createFilesystemActionCache(config.getFilesystem());
     }
   }
 
@@ -280,6 +285,10 @@ public class MemoryInstance extends AbstractServerInstance {
         map.put(actionKey, actionResult);
       }
     };
+  }
+
+  private static ActionCache createFilesystemActionCache(FilesystemACConfig config) {
+    return new FilesystemActionCache(Paths.get(config.getPath()));
   }
 
   private static OperationsMap createCompletedOperationMap(
@@ -486,16 +495,17 @@ public class MemoryInstance extends AbstractServerInstance {
           format(
               "Action %s for operation %s went missing, cannot initiate execution monitoring",
               DigestUtil.toString(actionDigest), operation.getName()));
-      PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
-      preconditionFailure
+      PreconditionFailure.Builder preconditionFailureBuilder = PreconditionFailure.newBuilder();
+      preconditionFailureBuilder
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_MISSING)
           .setSubject("blobs/" + DigestUtil.toString(actionDigest))
           .setDescription(MISSING_ACTION);
+      PreconditionFailure preconditionFailure = preconditionFailureBuilder.build();
       status
           .setCode(com.google.rpc.Code.FAILED_PRECONDITION.getNumber())
-          .setMessage(invalidActionMessage(actionDigest))
-          .addDetails(Any.pack(preconditionFailure.build()))
+          .setMessage(invalidActionVerboseMessage(actionDigest, preconditionFailure))
+          .addDetails(Any.pack(preconditionFailure))
           .build();
       return null;
     }
@@ -508,16 +518,17 @@ public class MemoryInstance extends AbstractServerInstance {
               "Could not parse Action %s for Operation %s",
               DigestUtil.toString(actionDigest), operation.getName()),
           e);
-      PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
-      preconditionFailure
+      PreconditionFailure.Builder preconditionFailureBuilder = PreconditionFailure.newBuilder();
+      preconditionFailureBuilder
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
           .setSubject(INVALID_ACTION)
           .setDescription("Action " + DigestUtil.toString(actionDigest));
+      PreconditionFailure preconditionFailure = preconditionFailureBuilder.build();
       status
           .setCode(com.google.rpc.Code.FAILED_PRECONDITION.getNumber())
-          .setMessage(invalidActionMessage(actionDigest))
-          .addDetails(Any.pack(preconditionFailure.build()))
+          .setMessage(invalidActionVerboseMessage(actionDigest, preconditionFailure))
+          .addDetails(Any.pack(preconditionFailure))
           .build();
       return null;
     }

@@ -14,9 +14,8 @@
 
 package build.buildfarm.worker.shard;
 
+import static build.buildfarm.cas.CASFileCache.getInterruptiblyOrIOException;
 import static build.buildfarm.common.IOUtils.readdir;
-import static build.buildfarm.worker.CASFileCache.getInterruptiblyOrIOException;
-import static build.buildfarm.worker.Utils.removeDirectory;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Iterables.concat;
 import static com.google.common.util.concurrent.Futures.allAsList;
@@ -35,10 +34,11 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.FileNode;
+import build.buildfarm.cas.CASFileCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Dirent;
-import build.buildfarm.worker.CASFileCache;
+import build.buildfarm.common.io.Directories;
 import build.buildfarm.worker.OutputDirectory;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -64,7 +64,7 @@ class CFCExecFileSystem implements ExecFileSystem {
   private final boolean
       linkInputDirectories; // perform first-available non-output symlinking and retain directories
   // in cache
-  private final Map<Path, Iterable<Path>> rootInputFiles = new ConcurrentHashMap<>();
+  private final Map<Path, Iterable<String>> rootInputFiles = new ConcurrentHashMap<>();
   private final Map<Path, Iterable<Digest>> rootInputDirectories = new ConcurrentHashMap<>();
   private final ExecutorService fetchService = newWorkStealingPool(128);
   private final ExecutorService removeDirectoryService;
@@ -105,7 +105,7 @@ class CFCExecFileSystem implements ExecFileSystem {
       String name = dirent.getName();
       Path child = root.resolve(name);
       if (!child.equals(fileCache.getRoot())) {
-        removeDirectoryFutures.add(removeDirectory(root.resolve(name), removeDirectoryService));
+        removeDirectoryFutures.add(Directories.remove(root.resolve(name), removeDirectoryService));
       }
     }
 
@@ -140,7 +140,7 @@ class CFCExecFileSystem implements ExecFileSystem {
   }
 
   private ListenableFuture<Void> put(
-      Path path, FileNode fileNode, ImmutableList.Builder<Path> inputFiles) {
+      Path path, FileNode fileNode, ImmutableList.Builder<String> inputFiles) {
     Path filePath = path.resolve(fileNode.getName());
     Digest digest = fileNode.getDigest();
     if (digest.getSizeBytes() == 0) {
@@ -152,18 +152,18 @@ class CFCExecFileSystem implements ExecFileSystem {
                 return null;
               });
     }
+    String key = fileCache.getKey(digest, fileNode.getIsExecutable());
     return transformAsync(
-        fileCache.put(
-            digest, fileNode.getIsExecutable(), /* containingDirectory=*/ null, fetchService),
-        (fileCacheKey) -> {
-          checkNotNull(fileCacheKey);
+        fileCache.put(digest, fileNode.getIsExecutable(), fetchService),
+        (fileCachePath) -> {
+          checkNotNull(key);
           // we saw null entries in the built immutable list without synchronization
           synchronized (inputFiles) {
-            inputFiles.add(fileCacheKey);
+            inputFiles.add(key);
           }
           if (fileNode.getDigest().getSizeBytes() != 0) {
             try {
-              Files.createLink(filePath, fileCacheKey);
+              Files.createLink(filePath, fileCachePath);
             } catch (IOException e) {
               return immediateFailedFuture(e);
             }
@@ -178,7 +178,7 @@ class CFCExecFileSystem implements ExecFileSystem {
       Digest directoryDigest,
       Map<Digest, Directory> directoriesIndex,
       OutputDirectory outputDirectory,
-      ImmutableList.Builder<Path> inputFiles,
+      ImmutableList.Builder<String> inputFiles,
       ImmutableList.Builder<Digest> inputDirectories)
       throws IOException {
     Directory directory = directoriesIndex.get(directoryDigest);
@@ -282,11 +282,11 @@ class CFCExecFileSystem implements ExecFileSystem {
 
     Path execDir = root.resolve(operationName);
     if (Files.exists(execDir)) {
-      removeDirectory(execDir);
+      Directories.remove(execDir);
     }
     Files.createDirectories(execDir);
 
-    ImmutableList.Builder<Path> inputFiles = new ImmutableList.Builder<>();
+    ImmutableList.Builder<String> inputFiles = new ImmutableList.Builder<>();
     ImmutableList.Builder<Digest> inputDirectories = new ImmutableList.Builder<>();
 
     logger.log(
@@ -335,7 +335,7 @@ class CFCExecFileSystem implements ExecFileSystem {
     } finally {
       if (!success) {
         fileCache.decrementReferences(inputFiles.build(), inputDirectories.build());
-        removeDirectory(execDir);
+        Directories.remove(execDir);
       }
     }
 
@@ -359,7 +359,7 @@ class CFCExecFileSystem implements ExecFileSystem {
 
   @Override
   public void destroyExecDir(Path execDir) throws IOException, InterruptedException {
-    Iterable<Path> inputFiles = rootInputFiles.remove(execDir);
+    Iterable<String> inputFiles = rootInputFiles.remove(execDir);
     Iterable<Digest> inputDirectories = rootInputDirectories.remove(execDir);
     if (inputFiles != null || inputDirectories != null) {
       fileCache.decrementReferences(
@@ -367,7 +367,7 @@ class CFCExecFileSystem implements ExecFileSystem {
           inputDirectories == null ? ImmutableList.of() : inputDirectories);
     }
     if (Files.exists(execDir)) {
-      removeDirectory(execDir);
+      Directories.remove(execDir);
     }
   }
 }

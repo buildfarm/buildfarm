@@ -12,17 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker;
+package build.buildfarm.cas;
 
-import static build.buildfarm.worker.CASFileCache.getInterruptiblyOrIOException;
+import static build.buildfarm.cas.CASFileCache.getInterruptiblyOrIOException;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
-import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.eq;
@@ -37,18 +35,17 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.RequestMetadata;
-import build.buildfarm.cas.ContentAddressableStorage;
+import build.buildfarm.cas.CASFileCache.Entry;
+import build.buildfarm.cas.CASFileCache.PutDirectoryException;
+import build.buildfarm.cas.CASFileCache.StartupCacheResults;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
-import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.NullWrite;
+import build.buildfarm.common.io.Directories;
 import build.buildfarm.common.io.FeedbackOutputStream;
-import build.buildfarm.worker.CASFileCache.Entry;
-import build.buildfarm.worker.CASFileCache.PutDirectoryException;
-import build.buildfarm.worker.CASFileCache.StartupCacheResults;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -104,10 +101,10 @@ class CASFileCacheTest {
 
   private ExecutorService expireService;
 
-  private ConcurrentMap<Path, Entry> storage;
+  private ConcurrentMap<String, Entry> storage;
 
-  protected CASFileCacheTest(Path root) {
-    this.root = root;
+  protected CASFileCacheTest(Path fileSystemRoot) {
+    this.root = fileSystemRoot.resolve("cache");
   }
 
   @Before
@@ -121,6 +118,8 @@ class CASFileCacheTest {
     putService = newSingleThreadExecutor();
     storage = Maps.newConcurrentMap();
     expireService = newSingleThreadExecutor();
+    // do this so that we can remove the cache root dir
+    Files.createDirectories(root);
     fileCache =
         new CASFileCache(
             root,
@@ -130,6 +129,7 @@ class CASFileCacheTest {
             expireService,
             /* accessRecorder=*/ directExecutor(),
             storage,
+            /* directoriesIndexDbName=*/ ":memory:",
             onPut,
             onExpire,
             delegate) {
@@ -145,7 +145,11 @@ class CASFileCacheTest {
   }
 
   @After
-  public void tearDown() throws InterruptedException {
+  public void tearDown() throws IOException, InterruptedException {
+    // bazel appears to have a problem with us creating directories under
+    // windows that are marked as no-delete. clean up after ourselves with
+    // our utils
+    Directories.remove(root);
     if (!shutdownAndAwaitTermination(putService, 1, SECONDS)) {
       throw new RuntimeException("could not shut down put service");
     }
@@ -166,21 +170,6 @@ class CASFileCacheTest {
   @Test(expected = IllegalStateException.class)
   public void putEmptyFileThrowsIllegalStateException() throws IOException, InterruptedException {
     InputStreamFactory mockInputStreamFactory = mock(InputStreamFactory.class);
-    CASFileCache fileCache =
-        new CASFileCache(
-            root,
-            /* maxSizeInBytes=*/ 1024,
-            /* maxEntrySizeInBytes=*/ 1024,
-            DIGEST_UTIL,
-            /* expireService=*/ newDirectExecutorService(),
-            /* accessRecorder=*/ directExecutor()) {
-          @Override
-          protected InputStream newExternalInput(Digest digest, long offset)
-              throws IOException, InterruptedException {
-            return mockInputStreamFactory.newInput(digest, offset);
-          }
-        };
-
     ByteString blob = ByteString.copyFromUtf8("");
     Digest blobDigest = DIGEST_UTIL.compute(blob);
     // supply an empty input stream if called for test clarity
@@ -284,37 +273,30 @@ class CASFileCacheTest {
     // the cache should start without any initial files in the cache.
     StartupCacheResults results = fileCache.start();
 
-    // jimfs adds an additional root folder which we do not want to consider
-    Boolean addedByJimFs = results.scan.deleteFiles.contains(root.resolve("work"));
-
     // check the startuo results to ensure no files were processed
-    assertEquals(results.scan.computeDirs.size(), 0);
-    assertEquals(results.scan.deleteFiles.size(), addedByJimFs ? 1 : 0);
-    assertEquals(results.scan.fileKeys.size(), 0);
-    assertEquals(results.invalidDirectories.size(), 0);
+    assertThat(results.scan.computeDirs.size()).isEqualTo(0);
+    assertThat(results.scan.deleteFiles.size()).isEqualTo(0);
+    assertThat(results.scan.fileKeys.size()).isEqualTo(0);
+    assertThat(results.invalidDirectories.size()).isEqualTo(0);
   }
 
   @Test
   public void startCasAssumeDirectory() throws IOException, InterruptedException {
 
     // create a "_dir" file on the root
-    ByteString blob = ByteString.copyFromUtf8("content");
-    Digest blobDigest = DIGEST_UTIL.compute(blob);
     Path path = root.resolve("foobar_dir");
+    ByteString blob = ByteString.copyFromUtf8("content");
     Files.write(path, blob.toByteArray());
 
     // start the CAS with a file whose name indicates its a directory
     // the cache should start and consider it a compute directory
     StartupCacheResults results = fileCache.start();
 
-    // jimfs adds an additional root folder which we do not want to consider
-    Boolean addedByJimFs = results.scan.deleteFiles.contains(root.resolve("work"));
-
-    // check the startuo results to ensure no files were processed
-    assertEquals(results.scan.computeDirs.size(), 1);
-    assertEquals(results.scan.deleteFiles.size(), addedByJimFs ? 1 : 0);
-    assertEquals(results.scan.fileKeys.size(), 0);
-    assertEquals(results.invalidDirectories.size(), 1);
+    // check the startup results to ensure no files were processed
+    assertThat(results.scan.computeDirs.size()).isEqualTo(0);
+    assertThat(results.scan.deleteFiles.size()).isEqualTo(1);
+    assertThat(results.scan.fileKeys.size()).isEqualTo(0);
+    assertThat(results.invalidDirectories.size()).isEqualTo(0);
   }
 
   @Test
@@ -326,7 +308,13 @@ class CASFileCacheTest {
     Files.write(path, blob.toByteArray());
     Files.write(execPath, blob.toByteArray());
 
-    fileCache.start();
+    StartupCacheResults results = fileCache.start();
+
+    // check the startup results to ensure our two files were processed
+    assertThat(results.scan.computeDirs.size()).isEqualTo(0);
+    assertThat(results.scan.deleteFiles.size()).isEqualTo(0);
+    assertThat(results.scan.fileKeys.size()).isEqualTo(2);
+    assertThat(results.invalidDirectories.size()).isEqualTo(0);
 
     // explicitly not providing blob via blobs, this would throw if fetched from factory
     //
@@ -344,8 +332,10 @@ class CASFileCacheTest {
     Digest validDigest = DIGEST_UTIL.compute(ByteString.copyFromUtf8("valid"));
     Path invalidSize = root.resolve(validDigest.getHash() + "_ten");
     Path incorrectSize =
-        fileCache.getKey(
-            validDigest.toBuilder().setSizeBytes(validDigest.getSizeBytes() + 1).build(), false);
+        fileCache.getPath(
+            fileCache.getKey(
+                validDigest.toBuilder().setSizeBytes(validDigest.getSizeBytes() + 1).build(),
+                false));
     Path invalidExec = fileCache.getPath(CASFileCache.getFileName(validDigest, false) + "_regular");
 
     Files.write(tooFewComponents, ImmutableList.of("Too Few Components"), StandardCharsets.UTF_8);
@@ -370,8 +360,8 @@ class CASFileCacheTest {
   public void newInputRemovesNonExistentEntry() throws IOException, InterruptedException {
     Digest nonexistentDigest =
         Digest.newBuilder().setHash("file_does_not_exist").setSizeBytes(1).build();
-    Path nonexistentKey = fileCache.getKey(nonexistentDigest, false);
-    Entry entry = new Entry(nonexistentKey, 1, null, Deadline.after(10, SECONDS));
+    String nonexistentKey = fileCache.getKey(nonexistentDigest, false);
+    Entry entry = new Entry(nonexistentKey, 1, Deadline.after(10, SECONDS));
     entry.before = entry;
     entry.after = entry;
     storage.put(nonexistentKey, entry);
@@ -438,9 +428,10 @@ class CASFileCacheTest {
     Digest digestThree = DIGEST_UTIL.compute(contentThree);
     blobs.put(digestThree, contentThree);
 
-    Path pathOne = fileCache.put(digestOne, /* isExecutable=*/ false);
-    Path pathTwo = fileCache.put(digestTwo, /* isExecutable=*/ false);
-    Path pathThree = fileCache.put(digestThree, /* isExecutable=*/ false);
+    String pathOne = fileCache.put(digestOne, /* isExecutable=*/ false).getFileName().toString();
+    String pathTwo = fileCache.put(digestTwo, /* isExecutable=*/ false).getFileName().toString();
+    String pathThree =
+        fileCache.put(digestThree, /* isExecutable=*/ false).getFileName().toString();
     fileCache.decrementReferences(
         ImmutableList.of(pathOne, pathTwo, pathThree), ImmutableList.of());
     /* three -> two -> one */
@@ -469,9 +460,9 @@ class CASFileCacheTest {
       content.writeTo(out);
     }
     assertThat(notified.get()).isTrue();
-    Path key = fileCache.getKey(digest, false);
+    String key = fileCache.getKey(digest, false);
     assertThat(storage.get(key)).isNotNull();
-    try (InputStream in = Files.newInputStream(key)) {
+    try (InputStream in = Files.newInputStream(fileCache.getPath(key))) {
       assertThat(ByteString.readFrom(in)).isEqualTo(content);
     }
   }
@@ -504,8 +495,8 @@ class CASFileCacheTest {
     Digest digest = DIGEST_UTIL.compute(content);
 
     UUID writeId = UUID.randomUUID();
-    Path key = fileCache.getKey(digest, false);
-    Path writePath = key.resolveSibling(key.getFileName() + "." + writeId);
+    String key = fileCache.getKey(digest, false);
+    Path writePath = fileCache.getPath(key).resolveSibling(key + "." + writeId);
     try (OutputStream out = Files.newOutputStream(writePath)) {
       content.substring(0, 6).writeTo(out);
     }
@@ -538,18 +529,18 @@ class CASFileCacheTest {
     Blob blob = new Blob(content, DIGEST_UTIL);
 
     fileCache.put(blob);
-    Path path = fileCache.getKey(blob.getDigest(), /* isExecutable=*/ false);
+    String key = fileCache.getKey(blob.getDigest(), /* isExecutable=*/ false);
     // putCreatesFile verifies this
-    Files.delete(path);
+    Files.delete(fileCache.getPath(key));
     // update entry with expired deadline
-    storage.get(path).existsDeadline = Deadline.after(0, SECONDS);
+    storage.get(key).existsDeadline = Deadline.after(0, SECONDS);
 
     try (InputStream in = fileCache.newInput(blob.getDigest(), /* offset=*/ 0)) {
       fail("should not get here");
     } catch (NoSuchFileException e) {
       // success
     }
-    assertThat(storage.containsKey(path)).isFalse();
+    assertThat(storage.containsKey(key)).isFalse();
   }
 
   @Test
@@ -627,7 +618,8 @@ class CASFileCacheTest {
   }
 
   void decrementReference(Path path) {
-    fileCache.decrementReferences(ImmutableList.of(path), ImmutableList.of());
+    fileCache.decrementReferences(
+        ImmutableList.of(path.getFileName().toString()), ImmutableList.of());
   }
 
   @Test
@@ -653,9 +645,9 @@ class CASFileCacheTest {
 
     verifyZeroInteractions(onExpire);
     // assert expiration of non-executable digest
-    Path expiringKey = fileCache.getKey(expiringBlob.getDigest(), /* isExecutable=*/ false);
+    String expiringKey = fileCache.getKey(expiringBlob.getDigest(), /* isExecutable=*/ false);
     assertThat(storage.containsKey(expiringKey)).isFalse();
-    assertThat(Files.exists(expiringKey)).isFalse();
+    assertThat(Files.exists(fileCache.getPath(expiringKey))).isFalse();
   }
 
   @Test
@@ -856,7 +848,14 @@ class CASFileCacheTest {
   public static class OsXCASFileCacheTest extends CASFileCacheTest {
     public OsXCASFileCacheTest() {
       super(
-          Iterables.getFirst(Jimfs.newFileSystem(Configuration.osX()).getRootDirectories(), null));
+          Iterables.getFirst(
+              Jimfs.newFileSystem(
+                      Configuration.osX()
+                          .toBuilder()
+                          .setAttributeViews("basic", "owner", "posix", "unix")
+                          .build())
+                  .getRootDirectories(),
+              null));
     }
   }
 
@@ -864,7 +863,14 @@ class CASFileCacheTest {
   public static class UnixCASFileCacheTest extends CASFileCacheTest {
     public UnixCASFileCacheTest() {
       super(
-          Iterables.getFirst(Jimfs.newFileSystem(Configuration.unix()).getRootDirectories(), null));
+          Iterables.getFirst(
+              Jimfs.newFileSystem(
+                      Configuration.unix()
+                          .toBuilder()
+                          .setAttributeViews("basic", "owner", "posix", "unix")
+                          .build())
+                  .getRootDirectories(),
+              null));
     }
   }
 
@@ -873,7 +879,13 @@ class CASFileCacheTest {
     public WindowsCASFileCacheTest() {
       super(
           Iterables.getFirst(
-              Jimfs.newFileSystem(Configuration.windows()).getRootDirectories(), null));
+              Jimfs.newFileSystem(
+                      Configuration.windows()
+                          .toBuilder()
+                          .setAttributeViews("basic", "owner", "dos", "acl", "posix", "user")
+                          .build())
+                  .getRootDirectories(),
+              null));
     }
   }
 }

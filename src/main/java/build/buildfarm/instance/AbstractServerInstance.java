@@ -63,6 +63,7 @@ import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.Tree;
+import build.buildfarm.v1test.WorkerProfileMessage;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -352,17 +353,7 @@ public abstract class AbstractServerInstance implements Instance {
       long count,
       ServerCallStreamObserver<ByteString> blobObserver,
       RequestMetadata requestMetadata) {
-    try {
-      ByteString blob = getBlob(blobDigest, offset, count);
-      if (blob == null) {
-        blobObserver.onError(Status.NOT_FOUND.asException());
-      } else {
-        blobObserver.onNext(blob);
-        blobObserver.onCompleted();
-      }
-    } catch (InterruptedException e) {
-      blobObserver.onError(e);
-    }
+    contentAddressableStorage.get(blobDigest, offset, count, blobObserver, requestMetadata);
   }
 
   @Override
@@ -907,7 +898,7 @@ public abstract class AbstractServerInstance implements Instance {
     }
   }
 
-  private void validateAction(
+  protected void validateAction(
       Action action,
       @Nullable Command command,
       Map<Digest, Directory> directoriesIndex,
@@ -1637,6 +1628,12 @@ public abstract class AbstractServerInstance implements Instance {
         .setCacheCapabilities(getCacheCapabilities())
         .setExecutionCapabilities(getExecutionCapabilities())
         .build();
+  }
+
+  @Override
+  public WorkerProfileMessage getWorkerProfile() {
+    throw new UnsupportedOperationException(
+        "AbstractServerInstance doesn't support getWorkerProfile() method.");
   }
 
   protected abstract Logger getLogger();

@@ -9,6 +9,8 @@ found in the [bazel documentation](https://docs.bazel.build/versions/master/remo
 
 File issues here for bugs or feature requests, and ask questions via build team [slack](https://join.slack.com/t/buildteamworld/shared_invite/zt-4zy8f5j5-KwiJuBoAAUorB_mdQHwF7Q) in the #buildfarm channel.
 
+[Buildfarm Wiki](https://github.com/bazelbuild/bazel-buildfarm/wiki)
+
 ## Usage
 
 All commandline options override corresponding config settings.
