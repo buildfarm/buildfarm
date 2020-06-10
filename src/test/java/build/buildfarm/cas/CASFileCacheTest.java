@@ -45,6 +45,7 @@ import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.NullWrite;
+import build.buildfarm.common.io.Directories;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -103,8 +104,8 @@ class CASFileCacheTest {
 
   private ConcurrentMap<String, Entry> storage;
 
-  protected CASFileCacheTest(Path root) {
-    this.root = root;
+  protected CASFileCacheTest(Path fileSystemRoot) {
+    this.root = fileSystemRoot.resolve("cache");
   }
 
   @Before
@@ -118,6 +119,8 @@ class CASFileCacheTest {
     putService = newSingleThreadExecutor();
     storage = Maps.newConcurrentMap();
     expireService = newSingleThreadExecutor();
+    // do this so that we can remove the cache root dir
+    Files.createDirectories(root);
     fileCache =
         new CASFileCache(
             root,
@@ -143,7 +146,11 @@ class CASFileCacheTest {
   }
 
   @After
-  public void tearDown() throws InterruptedException {
+  public void tearDown() throws IOException, InterruptedException {
+    // bazel appears to have a problem with us creating directories under
+    // windows that are marked as no-delete. clean up after ourselves with
+    // our utils
+    Directories.remove(root);
     if (!shutdownAndAwaitTermination(putService, 1, SECONDS)) {
       throw new RuntimeException("could not shut down put service");
     }
