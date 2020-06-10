@@ -55,4 +55,21 @@ class IOUtilsTest {
     Object secondKey = files.get(1).fileKey();
     assertThat(firstKey).isEqualTo(secondKey);
   }
+
+  @Test
+  public void fileKeysVerifyDifferentFiles() throws IOException {
+    Path pathA = root.resolve("a");
+    ByteString blobA = ByteString.copyFromUtf8("content for a");
+    Files.write(pathA, blobA.toByteArray());
+
+    Path pathB = root.resolve("b");
+    ByteString blobB = ByteString.copyFromUtf8("content for b");
+    Files.write(pathB, blobB.toByteArray());
+
+    List<NamedFileKey> files = IOUtils.listDirentSorted(root);
+    assertThat(files.size()).isEqualTo(2);
+    Object firstKey = files.get(0).fileKey();
+    Object secondKey = files.get(1).fileKey();
+    assertThat(firstKey).isNotEqualTo(secondKey);
+  }
 }
