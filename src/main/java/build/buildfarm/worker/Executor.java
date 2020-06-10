@@ -271,6 +271,8 @@ class Executor {
         Thread.currentThread().interrupt();
       }
     } catch (Exception e) {
+      // clear interrupt flag for error put
+      boolean wasInterrupted = Thread.interrupted();
       logger.log(Level.SEVERE, format("errored during execution of %s", operationName), e);
       try {
         owner.error().put(operationContext);
@@ -282,6 +284,9 @@ class Executor {
       } catch (Exception errorEx) {
         logger.log(
             Level.SEVERE, format("errored while erroring %s after error", operationName), errorEx);
+      }
+      if (wasInterrupted) {
+        Thread.currentThread().interrupt();
       }
       throw e;
     } finally {

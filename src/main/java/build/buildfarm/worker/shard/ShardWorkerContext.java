@@ -921,10 +921,15 @@ class ShardWorkerContext implements WorkerContext {
           cpu.setShares(mincores * 1024);
         }
       } catch (IOException e) {
+        // clear interrupt flag if set due to ClosedByInterruptException
+        boolean wasInterrupted = Thread.interrupted();
         try {
           cpu.close();
         } catch (IOException closeEx) {
           e.addSuppressed(closeEx);
+        }
+        if (wasInterrupted) {
+          Thread.currentThread().interrupt();
         }
         throw new RuntimeException(e);
       }
