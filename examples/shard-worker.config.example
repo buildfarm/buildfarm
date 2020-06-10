@@ -5,11 +5,10 @@ port: 8981
 # by all shard cluster servers
 public_name: "localhost:8981"
 
-# register the worker to the backplane
-enable_registration: true
-enable_storage_put: true
-enable_storage_expire: true
-keep_insert_files: true
+# This determines whether the shard instance will participate in the backplane
+# and cache it's operation outputs in its own cache file CAS.
+# When not caching locally, the worker will send its output to another worker's CAS.
+cache_locally: true
 
 # the digest function for this worker, required
 # to match out of band between the client and server

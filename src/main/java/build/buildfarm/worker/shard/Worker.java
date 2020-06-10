@@ -224,7 +224,7 @@ public class Worker extends LoggingMain {
             config.getLimitExecution(),
             config.getLimitGlobalExecution(),
             config.getOnlyMulticoreTests(),
-            config.getKeepInsertFiles());
+            config.getCacheLocally());
 
     PipelineStage completeStage =
         new PutOperationStage((operation) -> context.deactivate(operation.getName()));
@@ -410,7 +410,7 @@ public class Worker extends LoggingMain {
 
   private void onStoragePut(Digest digest) {
     try {
-      if (config.getEnableStoragePut()) {
+      if (config.getCacheLocally()) {
         backplane.addBlobLocation(digest, config.getPublicName());
       }
     } catch (IOException e) {
@@ -420,7 +420,7 @@ public class Worker extends LoggingMain {
 
   private void onStorageExpire(Iterable<Digest> digests) {
     try {
-      if (config.getEnableStorageExpire()) {
+      if (config.getCacheLocally()) {
         backplane.removeBlobsLocation(digests, config.getPublicName());
       }
     } catch (IOException e) {
@@ -540,7 +540,7 @@ public class Worker extends LoggingMain {
       // Not all workers need to be registered and visible in the backplane.
       // For example, a GPU worker may perform work that we do not want cached for other workers.
       // All the workers have the ability to opt out of registration of the backplane.
-      if (config.getEnableRegistration()) {
+      if (config.getCacheLocally()) {
         startFailsafeRegistration();
       } else {
         logger.log(INFO, "Skipping worker registration");

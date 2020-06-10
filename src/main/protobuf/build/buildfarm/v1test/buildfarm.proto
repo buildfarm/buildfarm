@@ -339,14 +339,10 @@ message ShardWorkerConfig {
   // only allow test executions to be multicore (min-cores > 1), limiting both to 1 if not a test
   bool only_multicore_tests = 30;
   
-  //register the worker to the backplane
-  bool enable_registration = 32;
-  
-  bool enable_storage_put = 33;
-  
-  bool enable_storage_expire = 34;
-  
-  bool keep_insert_files = 35;
+  // This determines whether the shard instance will participate in the backplane
+  // and cache it's operation outputs in its own cache file CAS.
+  // When not caching locally, the worker will send its output to another worker's CAS.
+  bool cache_locally = 32;
 }
 
 message ShardWorker {
