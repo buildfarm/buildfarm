@@ -16,7 +16,7 @@ package build.buildfarm.instance.shard;
 
 import static build.buildfarm.common.Actions.asExecutionStatus;
 import static build.buildfarm.common.Actions.checkPreconditionFailure;
-import static build.buildfarm.common.Actions.invalidActionMessage;
+import static build.buildfarm.common.Actions.invalidActionVerboseMessage;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static build.buildfarm.instance.shard.Util.SHARD_IS_RETRIABLE;
@@ -1738,18 +1738,19 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   private static ExecuteResponse blacklistResponse(Digest actionDigest) {
-    PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
-    preconditionFailure
+    PreconditionFailure.Builder preconditionFailureBuilder = PreconditionFailure.newBuilder();
+    preconditionFailureBuilder
         .addViolationsBuilder()
         .setType(VIOLATION_TYPE_MISSING)
         .setSubject("blobs/" + DigestUtil.toString(actionDigest))
         .setDescription("This execute request is forbidden");
+    PreconditionFailure preconditionFailure = preconditionFailureBuilder.build();
     return ExecuteResponse.newBuilder()
         .setStatus(
             com.google.rpc.Status.newBuilder()
                 .setCode(Code.FAILED_PRECONDITION.value())
-                .setMessage(invalidActionMessage(actionDigest))
-                .addDetails(Any.pack(preconditionFailure.build()))
+                .setMessage(invalidActionVerboseMessage(actionDigest, preconditionFailure))
+                .addDetails(Any.pack(preconditionFailure))
                 .build())
         .build();
   }
