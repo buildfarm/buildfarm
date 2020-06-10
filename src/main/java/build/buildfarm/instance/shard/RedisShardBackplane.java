@@ -513,14 +513,14 @@ public class RedisShardBackplane implements ShardBackplane {
     // eligibility and placement of operations.
     // Therefore, it is recommended to have a final provision queue with no actual platform
     // requirements.  This will ensure that all operations are eligible for the final queue.
-    List<ProvisionedRedisQueue> allprovisionedQueues = new ArrayList<ProvisionedRedisQueue>();
+    ImmutableList.Builder<ProvisionedRedisQueue> provisionedQueues = new ImmutableList.Builder<>();
     for (ProvisionedQueue queueConfig : config.getProvisionedQueues().getQueuesList()) {
       ProvisionedRedisQueue provisionedQueue =
           new ProvisionedRedisQueue(
               queueConfig.getName(),
               hashtags,
               toMultimap(queueConfig.getPlatform().getPropertiesList()));
-      allprovisionedQueues.add(provisionedQueue);
+      provisionedQueues.add(provisionedQueue);
     }
 
     // If there is no configuration for provisioned queues, we might consider that an error.
@@ -534,10 +534,10 @@ public class RedisShardBackplane implements ShardBackplane {
       ProvisionedRedisQueue defaultQueue =
           new ProvisionedRedisQueue(
               config.getQueuedOperationsListName(), hashtags, LinkedHashMultimap.create());
-      allprovisionedQueues.add(defaultQueue);
+      provisionedQueues.add(defaultQueue);
     }
 
-    this.operationQueue = new OperationQueue(allprovisionedQueues);
+    this.operationQueue = new OperationQueue(provisionedQueues.build());
 
     if (config.getSubscribeToBackplane()) {
       startSubscriptionThread();
