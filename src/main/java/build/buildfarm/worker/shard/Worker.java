@@ -223,7 +223,8 @@ public class Worker extends LoggingMain {
             config.getMaximumActionTimeout(),
             config.getLimitExecution(),
             config.getLimitGlobalExecution(),
-            config.getOnlyMulticoreTests());
+            config.getOnlyMulticoreTests(),
+            config.getKeepInsertFiles());
 
     PipelineStage completeStage =
         new PutOperationStage((operation) -> context.deactivate(operation.getName()));

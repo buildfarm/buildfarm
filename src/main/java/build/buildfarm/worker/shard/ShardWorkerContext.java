@@ -123,6 +123,7 @@ class ShardWorkerContext implements WorkerContext {
   private final boolean limitExecution;
   private final boolean limitGlobalExecution;
   private final boolean onlyMulticoreTests;
+  private final boolean keepInsertFiles;
   private final Map<String, QueueEntry> activeOperations = Maps.newConcurrentMap();
   private final Group executionsGroup = Group.getRoot().getChild("executions");
   private final Group operationsGroup = executionsGroup.getChild("operations");
@@ -162,7 +163,8 @@ class ShardWorkerContext implements WorkerContext {
       Duration maximumActionTimeout,
       boolean limitExecution,
       boolean limitGlobalExecution,
-      boolean onlyMulticoreTests) {
+      boolean onlyMulticoreTests,
+      boolean keepInsertFiles) {
     this.name = name;
     this.platform = platform;
     this.matchProvisions = getMatchProvisions(platform, policies, executeStageWidth);
@@ -183,6 +185,7 @@ class ShardWorkerContext implements WorkerContext {
     this.limitExecution = limitExecution;
     this.limitGlobalExecution = limitGlobalExecution;
     this.onlyMulticoreTests = onlyMulticoreTests;
+    this.keepInsertFiles = keepInsertFiles;
     Preconditions.checkState(
         !limitGlobalExecution || limitExecution,
         "limit_global_execution is meaningless without limit_execution");
@@ -488,6 +491,16 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   private void insertFile(Digest digest, Path file) throws IOException, InterruptedException {
+
+    if (keepInsertFiles) {
+      insertFileToLocalStorage(digest, file);
+    } else {
+      insertFileToCasMember(digest, file);
+    }
+  }
+
+  private void insertFileToLocalStorage(Digest digest, Path file)
+      throws IOException, InterruptedException {
     Write write =
         execFileSystem
             .getStorage()
@@ -506,6 +519,9 @@ class ShardWorkerContext implements WorkerContext {
       }
     }
   }
+
+  private void insertFileToCasMember(Digest digest, Path file)
+      throws IOException, InterruptedException {}
 
   private void updateActionResultStdOutputs(ActionResult.Builder resultBuilder)
       throws InterruptedException {

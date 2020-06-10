@@ -97,7 +97,8 @@ public class ShardWorkerContextTest {
         /* maximumActionTimeout=*/ Duration.getDefaultInstance(),
         /* limitExecution=*/ false,
         /* limitGlobalExecution=*/ false,
-        /* onlyMulticoreTests=*/ false);
+        /* onlyMulticoreTests=*/ false,
+        /* keepInsertFiles=*/ true);
   }
 
   @Test(expected = StatusException.class)

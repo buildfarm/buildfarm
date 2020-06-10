@@ -345,6 +345,8 @@ message ShardWorkerConfig {
   bool enable_storage_put = 33;
   
   bool enable_storage_expire = 34;
+  
+  bool keep_insert_files = 35;
 }
 
 message ShardWorker {
