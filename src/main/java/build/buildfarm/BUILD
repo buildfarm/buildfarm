@@ -370,6 +370,7 @@ container_image(
     files = [
         ":buildfarm-server_deploy.jar",
     ],
+    tags = ["manual"],
     visibility = ["//visibility:public"],
 )
 
@@ -455,6 +456,7 @@ container_image(
     files = [
         ":buildfarm-shard-worker_deploy.jar",
     ],
+    tags = ["manual"],
     visibility = ["//visibility:public"],
 )
 
@@ -587,6 +589,7 @@ container_image(
     files = [
         ":buildfarm-operationqueue-worker_deploy.jar",
     ],
+    tags = ["manual"],
     visibility = ["//visibility:public"],
 )
 

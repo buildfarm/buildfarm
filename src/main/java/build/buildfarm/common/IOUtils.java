@@ -14,10 +14,13 @@
 
 package build.buildfarm.common;
 
+import com.google.common.base.Supplier;
+import com.google.common.base.Suppliers;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
+import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
@@ -28,13 +31,22 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.annotation.Nullable;
 import jnr.constants.platform.OpenFlags;
+import jnr.ffi.LibraryLoader;
 import jnr.ffi.Pointer;
 import jnr.posix.FileStat;
 import jnr.posix.POSIX;
 
 public class IOUtils {
   private static final Logger logger = Logger.getLogger(IOUtils.class.getName());
+
+  private static final Supplier<LibC> libc =
+      Suppliers.memoize(() -> LibraryLoader.create(LibC.class).load("c"));
+
+  private static final jnr.ffi.Runtime runtime() {
+    return jnr.ffi.Runtime.getRuntime(libc.get());
+  }
 
   private IOUtils() {}
 
@@ -115,10 +127,10 @@ public class IOUtils {
     return dirents;
   }
 
-  public static List<Inode> ffiReaddir(LibC libc, jnr.ffi.Runtime runtime, Path path)
+  public static List<NamedFileKey> ffiReaddir(LibC libc, jnr.ffi.Runtime runtime, Path path)
       throws IOException {
 
-    List<Inode> dirents = new ArrayList<>();
+    List<NamedFileKey> dirents = new ArrayList<>();
 
     // open the directory and prepare to iterate over dirents
     Pointer DIR = libc.opendir(path.toString());
@@ -139,7 +151,7 @@ public class IOUtils {
 
       if (!dirent.d_name.toString().equals(".") && !dirent.d_name.toString().equals("..")) {
 
-        dirents.add(new Inode(dirent.d_name.toString(), dirent.d_ino.longValue()));
+        dirents.add(new NamedFileKey(dirent.d_name.toString(), dirent.d_ino.longValue()));
       }
       direntPtr = libc.readdir(DIR);
     }
@@ -158,48 +170,37 @@ public class IOUtils {
     return files;
   }
 
-  /* getting paths / dirents sorted */
-  public static List<Path> listDirSorted(Path path) {
-    try {
-      List<Path> files = listDir(path);
-      files.sort(Comparator.comparing(Path::toString));
-      return files;
-    } catch (IOException e) {
+  public static Object getFileKey(Path path, @Nullable FileStatus stat) throws IOException {
+    Object fileKey = stat == null ? null : stat.fileKey();
+    if (fileKey == null) {
+      fileKey = Files.readAttributes(path, BasicFileAttributes.class);
     }
-    return null;
+    return fileKey;
   }
 
-  public static List<PosixDirent> listDirentSorted(Path path) {
-    List<PosixDirent> sortedDirent;
-    try {
-      sortedDirent = posixReaddir(path, /* followSymlinks= */ false);
-    } catch (IOException e) {
-      return null;
-    }
-    sortedDirent.sort(Comparator.comparing(PosixDirent::getName));
-    return sortedDirent;
+  private static NamedFileKey pathToNamedFileKey(Path path) throws IOException {
+    return new NamedFileKey(
+        path.getFileName().toString(), getFileKey(path, statNullable(path, false)));
   }
 
-  public static List<JnrDirent> listJnrDirentSorted(POSIX posix, Path path) {
-    List<JnrDirent> sortedDirent;
-    try {
-      sortedDirent = jnrReaddir(posix, path);
-    } catch (IOException e) {
-      return null;
+  private static List<NamedFileKey> listNIOdirentSorted(Path path) throws IOException {
+    List<NamedFileKey> dirents = new ArrayList();
+    for (Path entry : listDir(path)) {
+      dirents.add(pathToNamedFileKey(path));
     }
-    sortedDirent.sort(Comparator.comparing(JnrDirent::getName));
-    return sortedDirent;
+    return dirents;
   }
 
-  public static List<Inode> listFFIdirentSorted(LibC libc, jnr.ffi.Runtime runtime, Path path) {
-    List<Inode> sortedDirent;
-    try {
-      sortedDirent = ffiReaddir(libc, runtime, path);
-    } catch (IOException e) {
-      return null;
+  public static List<NamedFileKey> listDirentSorted(Path path) throws IOException {
+    final List<NamedFileKey> dirents;
+    FileStore fileStore = Files.getFileStore(path);
+    if (fileStore.supportsFileAttributeView("posix")) {
+      dirents = ffiReaddir(libc.get(), runtime(), path);
+    } else {
+      dirents = listNIOdirentSorted(path);
     }
-    sortedDirent.sort(Comparator.comparing(Inode::getName));
-    return sortedDirent;
+    dirents.sort(Comparator.comparing(NamedFileKey::getName));
+    return dirents;
   }
 
   /*
@@ -253,7 +254,18 @@ public class IOUtils {
 
           @Override
           public Object fileKey() {
-            return attributes.fileKey();
+            // UnixFileKeys will correspond to a supported "posix" FileAttributeView
+            // This will mean that NamedFileKeys are populated with inodes
+            // We cannot construct UnixFileKeys, so this is our best option to use
+            // fast directory reads.
+            // Windows will leave the fileKey verbatim via NIO for comparison and hashing
+            try {
+              String keyStr = attributes.fileKey().toString();
+              String inode = keyStr.substring(keyStr.indexOf("ino=") + 4, keyStr.indexOf(")"));
+              return Long.parseLong(inode);
+            } catch (Exception e) {
+              return attributes.fileKey();
+            }
           }
         };
 

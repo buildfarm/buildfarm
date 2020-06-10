@@ -21,7 +21,6 @@ import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTe
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.eq;
@@ -45,6 +44,7 @@ import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.NullWrite;
+import build.buildfarm.common.io.Directories;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -103,8 +103,8 @@ class CASFileCacheTest {
 
   private ConcurrentMap<String, Entry> storage;
 
-  protected CASFileCacheTest(Path root) {
-    this.root = root;
+  protected CASFileCacheTest(Path fileSystemRoot) {
+    this.root = fileSystemRoot.resolve("cache");
   }
 
   @Before
@@ -118,6 +118,8 @@ class CASFileCacheTest {
     putService = newSingleThreadExecutor();
     storage = Maps.newConcurrentMap();
     expireService = newSingleThreadExecutor();
+    // do this so that we can remove the cache root dir
+    Files.createDirectories(root);
     fileCache =
         new CASFileCache(
             root,
@@ -143,7 +145,11 @@ class CASFileCacheTest {
   }
 
   @After
-  public void tearDown() throws InterruptedException {
+  public void tearDown() throws IOException, InterruptedException {
+    // bazel appears to have a problem with us creating directories under
+    // windows that are marked as no-delete. clean up after ourselves with
+    // our utils
+    Directories.remove(root);
     if (!shutdownAndAwaitTermination(putService, 1, SECONDS)) {
       throw new RuntimeException("could not shut down put service");
     }
@@ -267,37 +273,30 @@ class CASFileCacheTest {
     // the cache should start without any initial files in the cache.
     StartupCacheResults results = fileCache.start();
 
-    // jimfs adds an additional root folder which we do not want to consider
-    Boolean addedByJimFs = results.scan.deleteFiles.contains(root.resolve("work"));
-
     // check the startuo results to ensure no files were processed
-    assertEquals(results.scan.computeDirs.size(), 0);
-    assertEquals(results.scan.deleteFiles.size(), addedByJimFs ? 1 : 0);
-    assertEquals(results.scan.fileKeys.size(), 0);
-    assertEquals(results.invalidDirectories.size(), 0);
+    assertThat(results.scan.computeDirs.size()).isEqualTo(0);
+    assertThat(results.scan.deleteFiles.size()).isEqualTo(0);
+    assertThat(results.scan.fileKeys.size()).isEqualTo(0);
+    assertThat(results.invalidDirectories.size()).isEqualTo(0);
   }
 
   @Test
   public void startCasAssumeDirectory() throws IOException, InterruptedException {
 
     // create a "_dir" file on the root
-    ByteString blob = ByteString.copyFromUtf8("content");
-    Digest blobDigest = DIGEST_UTIL.compute(blob);
     Path path = root.resolve("foobar_dir");
+    ByteString blob = ByteString.copyFromUtf8("content");
     Files.write(path, blob.toByteArray());
 
     // start the CAS with a file whose name indicates its a directory
     // the cache should start and consider it a compute directory
     StartupCacheResults results = fileCache.start();
 
-    // jimfs adds an additional root folder which we do not want to consider
-    Boolean addedByJimFs = results.scan.deleteFiles.contains(root.resolve("work"));
-
-    // check the startuo results to ensure no files were processed
-    assertEquals(results.scan.computeDirs.size(), 1);
-    assertEquals(results.scan.deleteFiles.size(), addedByJimFs ? 1 : 0);
-    assertEquals(results.scan.fileKeys.size(), 0);
-    assertEquals(results.invalidDirectories.size(), 1);
+    // check the startup results to ensure no files were processed
+    assertThat(results.scan.computeDirs.size()).isEqualTo(0);
+    assertThat(results.scan.deleteFiles.size()).isEqualTo(1);
+    assertThat(results.scan.fileKeys.size()).isEqualTo(0);
+    assertThat(results.invalidDirectories.size()).isEqualTo(0);
   }
 
   @Test
@@ -309,7 +308,13 @@ class CASFileCacheTest {
     Files.write(path, blob.toByteArray());
     Files.write(execPath, blob.toByteArray());
 
-    fileCache.start();
+    StartupCacheResults results = fileCache.start();
+
+    // check the startup results to ensure our two files were processed
+    assertThat(results.scan.computeDirs.size()).isEqualTo(0);
+    assertThat(results.scan.deleteFiles.size()).isEqualTo(0);
+    assertThat(results.scan.fileKeys.size()).isEqualTo(2);
+    assertThat(results.invalidDirectories.size()).isEqualTo(0);
 
     // explicitly not providing blob via blobs, this would throw if fetched from factory
     //
@@ -843,7 +848,14 @@ class CASFileCacheTest {
   public static class OsXCASFileCacheTest extends CASFileCacheTest {
     public OsXCASFileCacheTest() {
       super(
-          Iterables.getFirst(Jimfs.newFileSystem(Configuration.osX()).getRootDirectories(), null));
+          Iterables.getFirst(
+              Jimfs.newFileSystem(
+                      Configuration.osX()
+                          .toBuilder()
+                          .setAttributeViews("basic", "owner", "posix", "unix")
+                          .build())
+                  .getRootDirectories(),
+              null));
     }
   }
 
@@ -851,7 +863,14 @@ class CASFileCacheTest {
   public static class UnixCASFileCacheTest extends CASFileCacheTest {
     public UnixCASFileCacheTest() {
       super(
-          Iterables.getFirst(Jimfs.newFileSystem(Configuration.unix()).getRootDirectories(), null));
+          Iterables.getFirst(
+              Jimfs.newFileSystem(
+                      Configuration.unix()
+                          .toBuilder()
+                          .setAttributeViews("basic", "owner", "posix", "unix")
+                          .build())
+                  .getRootDirectories(),
+              null));
     }
   }
 
@@ -860,7 +879,13 @@ class CASFileCacheTest {
     public WindowsCASFileCacheTest() {
       super(
           Iterables.getFirst(
-              Jimfs.newFileSystem(Configuration.windows()).getRootDirectories(), null));
+              Jimfs.newFileSystem(
+                      Configuration.windows()
+                          .toBuilder()
+                          .setAttributeViews("basic", "owner", "dos", "acl", "posix", "user")
+                          .build())
+                  .getRootDirectories(),
+              null));
     }
   }
 }
