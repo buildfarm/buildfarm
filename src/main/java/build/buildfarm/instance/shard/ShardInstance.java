@@ -1425,6 +1425,7 @@ public class ShardInstance extends AbstractServerInstance {
                       "property '%s' value was not a valid integer: %s",
                       property.getName(), property.getValue()));
         }
+      } else if (property.getName().equals("gpu")) {
       } else {
         preconditionFailure
             .addViolationsBuilder()
