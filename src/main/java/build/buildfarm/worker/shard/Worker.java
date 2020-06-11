@@ -224,7 +224,7 @@ public class Worker extends LoggingMain {
             config.getLimitExecution(),
             config.getLimitGlobalExecution(),
             config.getOnlyMulticoreTests(),
-            config.getCacheLocally());
+            config.getIsCasMember());
 
     PipelineStage completeStage =
         new PutOperationStage((operation) -> context.deactivate(operation.getName()));
@@ -413,7 +413,7 @@ public class Worker extends LoggingMain {
 
       // if the worker is caching locally, it will also be participating in blob storage of the
       // backplane.
-      if (config.getCacheLocally()) {
+      if (config.getIsCasMember()) {
         backplane.addBlobLocation(digest, config.getPublicName());
       }
     } catch (IOException e) {
@@ -426,7 +426,7 @@ public class Worker extends LoggingMain {
 
       // if the worker is caching locally, it will also be participating in blob storage of the
       // backplane.
-      if (config.getCacheLocally()) {
+      if (config.getIsCasMember()) {
         backplane.removeBlobsLocation(digests, config.getPublicName());
       }
     } catch (IOException e) {
@@ -547,7 +547,7 @@ public class Worker extends LoggingMain {
       // For example, a GPU worker may perform work that we do not want cached for other workers.
       // All the workers have the ability to opt out of registration of the backplane, by refusing
       // to cache locally.
-      if (config.getCacheLocally()) {
+      if (config.getIsCasMember()) {
         startFailsafeRegistration();
       } else {
         logger.log(INFO, "Skipping worker registration");

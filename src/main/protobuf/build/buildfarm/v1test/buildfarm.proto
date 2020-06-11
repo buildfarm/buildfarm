@@ -342,7 +342,7 @@ message ShardWorkerConfig {
   // This determines whether the shard instance will participate in the backplane
   // and cache it's operation outputs in its own cache file CAS.
   // When not caching locally, the worker will send its output to another worker's CAS.
-  bool cache_locally = 32;
+  bool is_cas_member = 32;
 }
 
 message ShardWorker {
