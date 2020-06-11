@@ -46,8 +46,10 @@ import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.Retrier.Backoff;
+import build.buildfarm.instance.ExcessiveWriteSizeException;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Instance.MatchListener;
+import build.buildfarm.instance.shard.WorkerStubs;
 import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.QueueEntry;
@@ -91,11 +93,14 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 import java.util.Stack;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -103,6 +108,7 @@ import java.util.logging.Logger;
 class ShardWorkerContext implements WorkerContext {
   private static final Logger logger = Logger.getLogger(ShardWorkerContext.class.getName());
 
+  private final com.google.common.cache.LoadingCache<String, Instance> workerStubs;
   private final String name;
   private final Platform platform;
   private final SetMultimap<String, String> matchProvisions;
@@ -192,6 +198,7 @@ class ShardWorkerContext implements WorkerContext {
     Preconditions.checkState(
         !onlyMulticoreTests || limitExecution,
         "only_multicore_tests is meaningless without limit_execution");
+    workerStubs = WorkerStubs.create(getDigestUtil());
   }
 
   private static Retrier createBackplaneRetrier() {
@@ -521,7 +528,61 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   private void insertFileToCasMember(Digest digest, Path file)
-      throws IOException, InterruptedException {}
+      throws IOException, InterruptedException {
+
+    // select a CAS member to store the file in
+    String workerName = getRandomWorker();
+    Instance casMember = workerStub(workerName);
+
+    // write the file to that elected CAS member
+    try {
+      Write write =
+          casMember.getBlobWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
+
+      try (OutputStream out = write.getOutput(deadlineAfter, deadlineAfterUnits, () -> {});
+          InputStream in = Files.newInputStream(file)) {
+        ByteStreams.copy(in, out);
+      } catch (IOException e) {
+        // complete writes should be ignored
+        if (!write.isComplete()) {
+          write.reset(); // we will not attempt retry with current behavior, abandon progress
+          if (e.getCause() != null) {
+            Throwables.propagateIfInstanceOf(e.getCause(), InterruptedException.class);
+          }
+          throw e;
+        }
+      }
+    } catch (ExcessiveWriteSizeException e) {
+      Throwables.propagateIfInstanceOf(e.getCause(), InterruptedException.class);
+    }
+  }
+
+  private String getRandomWorker() throws IOException {
+    Set<String> workerSet = backplane.getWorkers();
+    synchronized (workerSet) {
+      if (workerSet.isEmpty()) {
+        throw new RuntimeException("no available workers");
+      }
+      Random rand = new Random();
+      int index = rand.nextInt(workerSet.size());
+      // best case no allocation average n / 2 selection
+      Iterator<String> iter = workerSet.iterator();
+      String worker = null;
+      while (iter.hasNext() && index-- >= 0) {
+        worker = iter.next();
+      }
+      return worker;
+    }
+  }
+
+  private Instance workerStub(String worker) {
+    try {
+      return workerStubs.get(worker);
+    } catch (ExecutionException e) {
+      logger.log(Level.SEVERE, "error getting worker stub for " + worker, e);
+      throw new IllegalStateException("stub instance creation must not fail");
+    }
+  }
 
   private void updateActionResultStdOutputs(ActionResult.Builder resultBuilder)
       throws InterruptedException {
