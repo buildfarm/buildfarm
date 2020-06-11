@@ -411,8 +411,7 @@ public class Worker extends LoggingMain {
   private void onStoragePut(Digest digest) {
     try {
 
-      // if the worker is caching locally, it will also be participating in blob storage of the
-      // backplane.
+      // if the worker is a CAS member, it can send/modify blobs in the backplane.
       if (config.getIsCasMember()) {
         backplane.addBlobLocation(digest, config.getPublicName());
       }
@@ -424,8 +423,7 @@ public class Worker extends LoggingMain {
   private void onStorageExpire(Iterable<Digest> digests) {
     try {
 
-      // if the worker is caching locally, it will also be participating in blob storage of the
-      // backplane.
+      // if the worker is a CAS member, it can send/modify blobs in the backplane.
       if (config.getIsCasMember()) {
         backplane.removeBlobsLocation(digests, config.getPublicName());
       }
@@ -544,9 +542,8 @@ public class Worker extends LoggingMain {
       server.start();
 
       // Not all workers need to be registered and visible in the backplane.
-      // For example, a GPU worker may perform work that we do not want cached for other workers.
-      // All the workers have the ability to opt out of registration of the backplane, by refusing
-      // to cache locally.
+      // For example, a GPU worker may wish to perform work that we do not want to cache locally for
+      // other workers.
       if (config.getIsCasMember()) {
         startFailsafeRegistration();
       } else {
