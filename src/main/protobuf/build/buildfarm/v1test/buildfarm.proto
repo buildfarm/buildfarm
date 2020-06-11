@@ -214,6 +214,7 @@ message RedisShardBackplaneConfig {
   int32 action_cache_expire = 4;
   string action_blacklist_prefix = 28;
   int32 action_blacklist_expire = 29;
+  string invocation_blacklist_prefix = 30;
   string operation_prefix = 5;
   int32 operation_expire = 6;
   string pre_queued_operations_list_name = 18;

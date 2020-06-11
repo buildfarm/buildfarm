@@ -1260,8 +1260,12 @@ public class RedisShardBackplane implements ShardBackplane {
     return config.getDispatchingPrefix() + ":" + operationName;
   }
 
-  public String actionBlacklistKey(String actionId) {
+  private String actionBlacklistKey(String actionId) {
     return config.getActionBlacklistPrefix() + ":" + actionId;
+  }
+
+  private String invocationBlacklistKey(String toolInvocationId) {
+    return config.getInvocationBlacklistPrefix() + ":" + toolInvocationId;
   }
 
   public static String parseOperationChannel(String channel) {
@@ -1270,11 +1274,18 @@ public class RedisShardBackplane implements ShardBackplane {
 
   @Override
   public boolean isBlacklisted(RequestMetadata requestMetadata) throws IOException {
-    // TODO build blacklisting?
-    if (requestMetadata.getActionId().isEmpty()) {
+    if (requestMetadata.getToolInvocationId().isEmpty()
+        && requestMetadata.getActionId().isEmpty()) {
       return false;
     }
-    return client.call(jedis -> jedis.exists(actionBlacklistKey(requestMetadata.getActionId())));
+    return client.call(jedis -> isBlacklisted(jedis, requestMetadata));
+  }
+
+  private boolean isBlacklisted(JedisCluster jedis, RequestMetadata requestMetadata) {
+    return (!requestMetadata.getActionId().isEmpty()
+            && jedis.exists(actionBlacklistKey(requestMetadata.getActionId())))
+        || (!requestMetadata.getToolInvocationId().isEmpty()
+            && jedis.exists(invocationBlacklistKey(requestMetadata.getToolInvocationId())));
   }
 
   @Override
