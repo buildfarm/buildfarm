@@ -686,6 +686,17 @@ message OperationTimesBetweenStages {
   int32 operation_count = 9;
 }
 
+message StageInformation {
+  // name of the stage this message represent, i.e. InputFetchStage
+  string name = 1;
+
+  // number of slots configured for this stage
+  int32 slots_configured = 2;
+
+  // number of slots used for this stage
+  int32 slots_used = 3;
+}
+
 message WorkerProfileMessage {
   // number of Entry in CAS
   int64 cas_entry_count = 1;
@@ -699,11 +710,10 @@ message WorkerProfileMessage {
   // the total size of evicted Entries since last profile request
   int64 cas_evicted_entry_size = 6;
 
-  // ${number of slots used} / ${number of slots configured} in InputFetchStage
-  string input_fetch_stage_slots_used_over_configured = 7;
+  // used for removed fields representing composed used/configured slots
+  reserved 7 to 8;
 
-  // ${number of slots used} / ${number of slots configured} in ExecuteActionStage
-  string execute_action_stage_slots_used_over_configured = 8;
+  repeated StageInformation stages = 9;
 
   repeated OperationTimesBetweenStages times = 10;
 }
@@ -712,5 +722,5 @@ message WorkerProfileRequest {
 }
 
 service WorkerProfile {
-  rpc getWorkerProfile(WorkerProfileRequest) returns (WorkerProfileMessage) {}
+  rpc GetWorkerProfile(WorkerProfileRequest) returns (WorkerProfileMessage) {}
 }
