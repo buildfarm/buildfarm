@@ -87,6 +87,16 @@ instances {
       # than a catastrophic failure.
       action_blacklist_prefix: "ActionBlacklist"
 
+      # A redis key prefix for all blacklisted invocations, suffixed
+      # with the tool invocation id. Requests on behalf of an invocation
+      # which is blacklisted should be rejected where it is identified via
+      # its RequestMetadata
+      # To meet API standards, a request which matches this condition
+      # receives a transient UNAVAILABLE response, which, in bazel's
+      # case, can induce a fallback to non-remote recovery, rather
+      # than a catastrophic failure.
+      invocation_blacklist_prefix: "InvocationBlacklist"
+
       # The ttl maintained for action_blacklist entries.
       action_blacklist_expire: 3600 # 1 hour
 

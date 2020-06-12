@@ -22,6 +22,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.OperationChange;
 import build.buildfarm.v1test.QueueEntry;
@@ -31,6 +32,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.longrunning.Operation;
 import com.google.protobuf.util.JsonFormat;
 import java.io.IOException;
+import java.util.UUID;
 import java.util.function.Supplier;
 import org.junit.Before;
 import org.junit.Test;
@@ -252,5 +254,40 @@ public class RedisShardBackplaneTest {
     verify(jedisCluster, times(1)).hdel(config.getDispatchedOperationsHashName(), opName);
     verify(jedisCluster, times(1)).del(backplane.operationKey(opName));
     verifyChangePublished(jedisCluster, opName);
+  }
+
+  @Test
+  public void invocationsCanBeBlacklisted() throws IOException {
+    RedisShardBackplaneConfig config =
+        RedisShardBackplaneConfig.newBuilder()
+            .setInvocationBlacklistPrefix("InvocationBlacklist")
+            .build();
+    UUID toolInvocationId = UUID.randomUUID();
+    JedisCluster jedisCluster = mock(JedisCluster.class);
+    String invocationBlacklistKey = config.getInvocationBlacklistPrefix() + ":" + toolInvocationId;
+    when(jedisCluster.exists(invocationBlacklistKey)).thenReturn(true);
+    when(mockJedisClusterFactory.get()).thenReturn(jedisCluster);
+    backplane =
+        new RedisShardBackplane(
+            config,
+            "invocation-blacklist-test",
+            o -> o,
+            o -> o,
+            o -> false,
+            o -> false,
+            mockJedisClusterFactory);
+    backplane.start();
+
+    final String opName = "op";
+
+    assertThat(
+            backplane.isBlacklisted(
+                RequestMetadata.newBuilder()
+                    .setToolInvocationId(toolInvocationId.toString())
+                    .build()))
+        .isTrue();
+
+    verify(mockJedisClusterFactory, times(1)).get();
+    verify(jedisCluster, times(1)).exists(invocationBlacklistKey);
   }
 }
