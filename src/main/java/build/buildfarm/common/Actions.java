@@ -36,13 +36,28 @@ public final class Actions {
     return format("Action %s is invalid", DigestUtil.toString(actionDigest));
   }
 
+  public static String invalidActionVerboseMessage(
+      Digest actionDigest, PreconditionFailure failure) {
+    // if the list of violations get very long, display 3 at most
+    int maxNumOfViolation = 3;
+    String format =
+        "Action %s is invalid: %s"
+            + (failure.getViolationsList().size() > maxNumOfViolation ? " ..." : ".");
+    String[] errorMessages =
+        failure.getViolationsList().stream()
+            .map(Violation::getDescription)
+            .limit(maxNumOfViolation)
+            .toArray(String[]::new);
+    return format(format, DigestUtil.toString(actionDigest), String.join("; ", errorMessages));
+  }
+
   public static void checkPreconditionFailure(
       Digest actionDigest, PreconditionFailure preconditionFailure) throws StatusException {
     if (preconditionFailure.getViolationsCount() != 0) {
       throw StatusProto.toStatusException(
           Status.newBuilder()
               .setCode(Code.FAILED_PRECONDITION.getNumber())
-              .setMessage(invalidActionMessage(actionDigest))
+              .setMessage(invalidActionVerboseMessage(actionDigest, preconditionFailure))
               .addDetails(Any.pack(preconditionFailure))
               .build());
     }

@@ -20,7 +20,7 @@ import static build.bazel.remote.execution.v2.ExecutionStage.Value.EXECUTING;
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.QUEUED;
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.UNKNOWN;
 import static build.buildfarm.cas.ContentAddressableStorages.casMapDecorator;
-import static build.buildfarm.common.Actions.invalidActionMessage;
+import static build.buildfarm.common.Actions.invalidActionVerboseMessage;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static build.buildfarm.instance.AbstractServerInstance.MISSING_ACTION;
@@ -364,22 +364,22 @@ public class MemoryInstanceTest {
     CompletedOperationMetadata completedMetadata =
         erroredOperation.getMetadata().unpack(CompletedOperationMetadata.class);
     assertThat(completedMetadata.getExecuteOperationMetadata().getStage()).isEqualTo(COMPLETED);
+    PreconditionFailure preconditionFailure =
+        PreconditionFailure.newBuilder()
+            .addViolations(
+                Violation.newBuilder()
+                    .setType(VIOLATION_TYPE_MISSING)
+                    .setSubject("blobs/" + DigestUtil.toString(simpleActionDigest))
+                    .setDescription(MISSING_ACTION))
+            .build();
     ExecuteResponse executeResponse =
         ExecuteResponse.newBuilder()
             .setStatus(
                 Status.newBuilder()
                     .setCode(Code.FAILED_PRECONDITION.getNumber())
-                    .setMessage(invalidActionMessage(simpleActionDigest))
-                    .addDetails(
-                        Any.pack(
-                            PreconditionFailure.newBuilder()
-                                .addViolations(
-                                    Violation.newBuilder()
-                                        .setType(VIOLATION_TYPE_MISSING)
-                                        .setSubject(
-                                            "blobs/" + DigestUtil.toString(simpleActionDigest))
-                                        .setDescription(MISSING_ACTION))
-                                .build())))
+                    .setMessage(
+                        invalidActionVerboseMessage(simpleActionDigest, preconditionFailure))
+                    .addDetails(Any.pack(preconditionFailure)))
             .build();
     assertThat(erroredOperation.getResponse().unpack(ExecuteResponse.class))
         .isEqualTo(executeResponse);

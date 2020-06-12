@@ -14,7 +14,7 @@
 
 package build.buildfarm.instance.memory;
 
-import static build.buildfarm.common.Actions.invalidActionMessage;
+import static build.buildfarm.common.Actions.invalidActionVerboseMessage;
 import static build.buildfarm.common.Actions.satisfiesRequirements;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
@@ -495,16 +495,17 @@ public class MemoryInstance extends AbstractServerInstance {
           format(
               "Action %s for operation %s went missing, cannot initiate execution monitoring",
               DigestUtil.toString(actionDigest), operation.getName()));
-      PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
-      preconditionFailure
+      PreconditionFailure.Builder preconditionFailureBuilder = PreconditionFailure.newBuilder();
+      preconditionFailureBuilder
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_MISSING)
           .setSubject("blobs/" + DigestUtil.toString(actionDigest))
           .setDescription(MISSING_ACTION);
+      PreconditionFailure preconditionFailure = preconditionFailureBuilder.build();
       status
           .setCode(com.google.rpc.Code.FAILED_PRECONDITION.getNumber())
-          .setMessage(invalidActionMessage(actionDigest))
-          .addDetails(Any.pack(preconditionFailure.build()))
+          .setMessage(invalidActionVerboseMessage(actionDigest, preconditionFailure))
+          .addDetails(Any.pack(preconditionFailure))
           .build();
       return null;
     }
@@ -517,16 +518,17 @@ public class MemoryInstance extends AbstractServerInstance {
               "Could not parse Action %s for Operation %s",
               DigestUtil.toString(actionDigest), operation.getName()),
           e);
-      PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
-      preconditionFailure
+      PreconditionFailure.Builder preconditionFailureBuilder = PreconditionFailure.newBuilder();
+      preconditionFailureBuilder
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
           .setSubject(INVALID_ACTION)
           .setDescription("Action " + DigestUtil.toString(actionDigest));
+      PreconditionFailure preconditionFailure = preconditionFailureBuilder.build();
       status
           .setCode(com.google.rpc.Code.FAILED_PRECONDITION.getNumber())
-          .setMessage(invalidActionMessage(actionDigest))
-          .addDetails(Any.pack(preconditionFailure.build()))
+          .setMessage(invalidActionVerboseMessage(actionDigest, preconditionFailure))
+          .addDetails(Any.pack(preconditionFailure))
           .build();
       return null;
     }

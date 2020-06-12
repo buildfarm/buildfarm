@@ -373,15 +373,19 @@ public class Worker extends LoggingMain {
 
   public void stop() throws InterruptedException {
     boolean interrupted = Thread.interrupted();
-    logger.log(INFO, "Closing the pipeline");
-    try {
-      pipeline.close();
-    } catch (InterruptedException e) {
-      Thread.interrupted();
-      interrupted = true;
+    if (pipeline != null) {
+      logger.log(INFO, "Closing the pipeline");
+      try {
+        pipeline.close();
+      } catch (InterruptedException e) {
+        Thread.interrupted();
+        interrupted = true;
+      }
     }
-    logger.log(INFO, "Stopping exec filesystem");
-    execFileSystem.stop();
+    if (execFileSystem != null) {
+      logger.log(INFO, "Stopping exec filesystem");
+      execFileSystem.stop();
+    }
     if (server != null) {
       logger.log(INFO, "Shutting down the server");
       server.shutdown();
@@ -395,12 +399,16 @@ public class Worker extends LoggingMain {
         server.shutdownNow();
       }
     }
-    try {
-      backplane.stop();
-    } catch (InterruptedException e) {
-      interrupted = true;
+    if (backplane != null) {
+      try {
+        backplane.stop();
+      } catch (InterruptedException e) {
+        interrupted = true;
+      }
     }
-    workerStubs.invalidateAll();
+    if (workerStubs != null) {
+      workerStubs.invalidateAll();
+    }
     if (interrupted) {
       Thread.currentThread().interrupt();
       throw new InterruptedException();
