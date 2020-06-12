@@ -1301,6 +1301,11 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   @Override
+  public Boolean validQueueProperties(List<Platform.Property> provisions) {
+    return operationQueue.validProperties(provisions);
+  }
+
+  @Override
   public boolean isBlacklisted(RequestMetadata requestMetadata) throws IOException {
     // TODO build blacklisting?
     if (requestMetadata.getActionId().isEmpty()) {

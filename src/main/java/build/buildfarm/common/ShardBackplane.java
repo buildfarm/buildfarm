@@ -292,4 +292,7 @@ public interface ShardBackplane {
 
   @ThreadSafe
   OperationsStatus operationsStatus() throws IOException;
+
+  @ThreadSafe
+  Boolean validQueueProperties(List<Platform.Property> provisions);
 }

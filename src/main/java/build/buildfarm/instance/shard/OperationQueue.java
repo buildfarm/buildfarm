@@ -188,6 +188,20 @@ public class OperationQueue {
     return queue.status(jedis);
   }
   ///
+  /// @brief   Decide if the properties are valid based on having eligibility into a queue
+  /// @param   provisions Provisions to check validity of.
+  /// @return  Whether the provisions are valid for a queue.
+  /// @note    Suggested return identifier: validProperties.
+  ///
+  public Boolean validProperties(List<Platform.Property> provisions) {
+    for (ProvisionedRedisQueue provisionedQueue : queues) {
+      if (provisionedQueue.isEligible(toMultimap(provisions))) {
+        return true;
+      }
+    }
+    return false;
+  }
+  ///
   /// @brief   Choose an eligible queue based on given properties.
   /// @details We use the platform execution properties of a queue entry to
   ///          determine the appropriate queue. If there no eligible queues, an
