@@ -95,6 +95,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatcher;
+import org.mockito.Matchers;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.invocation.InvocationOnMock;
@@ -392,6 +393,8 @@ public class ShardInstanceTest {
             .setSkipCacheLookup(true)
             .build();
 
+    when(mockBackplane.validQueueProperties(Matchers.anyList())).thenReturn(true);
+
     when(mockBackplane.canQueue()).thenReturn(true);
 
     Poller poller = mock(Poller.class);
@@ -457,6 +460,8 @@ public class ShardInstanceTest {
             .setSkipCacheLookup(true)
             .build();
 
+    when(mockBackplane.validQueueProperties(Matchers.anyList())).thenReturn(true);
+
     when(mockBackplane.canQueue()).thenReturn(true);
 
     Poller poller = mock(Poller.class);
@@ -518,6 +523,8 @@ public class ShardInstanceTest {
             .setOperationName("operation-with-erroring-action-result")
             .setActionDigest(actionKey.getDigest())
             .build();
+
+    when(mockBackplane.validQueueProperties(Matchers.anyList())).thenReturn(true);
 
     when(mockBackplane.canQueue()).thenReturn(true);
 
@@ -633,6 +640,8 @@ public class ShardInstanceTest {
 
     Digest missingDirectoryDigest =
         Digest.newBuilder().setHash("missing-directory").setSizeBytes(1).build();
+
+    when(mockBackplane.validQueueProperties(Matchers.anyList())).thenReturn(true);
 
     when(mockBackplane.getOperation(eq(operationName)))
         .thenReturn(
