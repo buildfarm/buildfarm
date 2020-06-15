@@ -78,6 +78,8 @@ public class Directories {
       List<AclEntry> acl = view.getAcl();
       acl.add(0, entry);
       view.setAcl(acl);
+    } else {
+      throw new UnsupportedOperationException("no recognized attribute view");
     }
   }
 
@@ -134,7 +136,13 @@ public class Directories {
         });
   }
 
-  public static void disableAllWriteAccess(Path directory) throws IOException {
+  @FunctionalInterface
+  public interface DirectoryConsumer {
+    void accept(Path dir) throws IOException;
+  }
+
+  private static void forAllPostDirs(Path directory, DirectoryConsumer onPostVisit)
+      throws IOException {
     Files.walkFileTree(
         directory,
         new SimpleFileVisitor<Path>() {
@@ -143,24 +151,21 @@ public class Directories {
             if (e != null) {
               throw e;
             }
-            makeWritable(dir, false);
+            onPostVisit.accept(dir);
             return FileVisitResult.CONTINUE;
           }
         });
   }
 
+  public static void disableAllWriteAccess(Path directory) throws IOException {
+    forAllPostDirs(directory, dir -> makeWritable(dir, false));
+  }
+
   public static void enableAllWriteAccess(Path directory) throws IOException {
-    Files.walkFileTree(
-        directory,
-        new SimpleFileVisitor<Path>() {
-          @Override
-          public FileVisitResult postVisitDirectory(Path dir, IOException e) throws IOException {
-            if (e != null) {
-              throw e;
-            }
-            makeWritable(dir, true);
-            return FileVisitResult.CONTINUE;
-          }
-        });
+    forAllPostDirs(directory, dir -> makeWritable(dir, true));
+  }
+
+  public static void setAllOwner(Path directory, UserPrincipal owner) throws IOException {
+    forAllPostDirs(directory, dir -> Files.setOwner(dir, owner));
   }
 }

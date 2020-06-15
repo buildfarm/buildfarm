@@ -339,6 +339,9 @@ message ShardWorkerConfig {
 
   // only allow test executions to be multicore (min-cores > 1), limiting both to 1 if not a test
   bool only_multicore_tests = 30;
+
+  // user principal name for executions
+  string exec_owner = 32;
 }
 
 message ShardWorker {
