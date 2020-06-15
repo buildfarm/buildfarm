@@ -418,10 +418,11 @@ java_library(
         ":stub-instance",
         ":worker",
         ":worker-cgroup",
-        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_rpc_error_details_java_proto",
         "@maven//:com_github_pcj_google_options",
+        "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java",
         "@maven//:com_google_protobuf_protobuf_java_util",
@@ -440,10 +441,10 @@ java_binary(
         ":configs",
     ],
     main_class = "build.buildfarm.worker.shard.Worker",
+    visibility = ["//visibility:public"],
     runtime_deps = [
         ":shard-worker",
     ],
-    visibility = ["//visibility:public"],
 )
 
 container_image(
@@ -526,6 +527,9 @@ java_library(
 java_library(
     name = "cas",
     srcs = glob(["cas/*.java"]),
+    runtime_deps = [
+        "@maven//:org_xerial_sqlite_jdbc",
+    ],
     deps = [
         ":common",
         ":common-grpc",
@@ -546,9 +550,6 @@ java_library(
         "@maven//:io_grpc_grpc_stub",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
-    ],
-    runtime_deps = [
-        "@maven//:org_xerial_sqlite_jdbc",
     ],
 )
 
@@ -597,6 +598,7 @@ java_binary(
     name = "bf-mount",
     srcs = ["Mount.java"],
     main_class = "build.buildfarm.Mount",
+    visibility = ["//visibility:public"],
     deps = [
         ":common",
         ":instance",
@@ -613,7 +615,6 @@ java_binary(
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
     ],
-    visibility = ["//visibility:public"],
 )
 
 java_binary(
@@ -623,6 +624,7 @@ java_binary(
         ":configs",
     ],
     main_class = "build.buildfarm.CASTest",
+    visibility = ["//visibility:public"],
     deps = [
         ":cas",
         ":common",
@@ -632,7 +634,6 @@ java_binary(
         "@maven//:com_google_guava_guava",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
-    visibility = ["//visibility:public"],
 )
 
 java_plugin(
@@ -649,6 +650,7 @@ java_binary(
     srcs = ["IOBenchmark.java"],
     main_class = "build.buildfarm.IOBenchmark",
     plugins = [":io-benchmark-plugins"],
+    visibility = ["//visibility:public"],
     deps = [
         ":common",
         "@maven//:com_github_jnr_jnr_constants",
@@ -656,13 +658,13 @@ java_binary(
         "@maven//:com_github_jnr_jnr_posix",
         "@maven//:org_openjdk_jmh_jmh_core",
     ],
-    visibility = ["//visibility:public"],
 )
 
 java_binary(
     name = "bf-executor",
     srcs = ["Executor.java"],
     main_class = "build.buildfarm.Executor",
+    visibility = ["//visibility:public"],
     deps = [
         ":common",
         ":stub-instance",
@@ -682,13 +684,13 @@ java_binary(
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
-    visibility = ["//visibility:public"],
 )
 
 java_binary(
     name = "bf-extractor",
     srcs = ["Extract.java"],
     main_class = "build.buildfarm.Extract",
+    visibility = ["//visibility:public"],
     deps = [
         ":common",
         ":common-grpc",
@@ -704,7 +706,6 @@ java_binary(
         "@maven//:io_grpc_grpc_stub",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
-    visibility = ["//visibility:public"],
 )
 
 java_binary(
@@ -714,6 +715,7 @@ java_binary(
         ":configs",
     ],
     main_class = "build.buildfarm.Cat",
+    visibility = ["//visibility:public"],
     deps = [
         ":common",
         ":instance",
@@ -731,13 +733,13 @@ java_binary(
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
     ],
-    visibility = ["//visibility:public"],
 )
 
 java_binary(
     name = "bf-hist",
     srcs = ["Hist.java"],
     main_class = "build.buildfarm.Hist",
+    visibility = ["//visibility:public"],
     deps = [
         ":common",
         ":instance",
@@ -754,14 +756,13 @@ java_binary(
         "@maven//:io_grpc_grpc_stub",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
-    visibility = ["//visibility:public"],
 )
 
 java_binary(
     name = "buildfarm-http-proxy",
     main_class = "build.buildfarm.proxy.http.HttpProxy",
-    runtime_deps = [":http-proxy"],
     visibility = ["//visibility:public"],
+    runtime_deps = [":http-proxy"],
 )
 
 java_library(
@@ -804,6 +805,7 @@ java_binary(
     name = "bf-cancel",
     srcs = ["Cancel.java"],
     main_class = "build.buildfarm.Cancel",
+    visibility = ["//visibility:public"],
     deps = [
         ":common",
         ":instance",
@@ -815,5 +817,4 @@ java_binary(
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
     ],
-    visibility = ["//visibility:public"],
 )

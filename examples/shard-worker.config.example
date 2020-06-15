@@ -212,3 +212,9 @@ redis_shard_backplane_config: {
   # When in doubt, leave this enabled.
   subscribe_to_backplane: true
 }
+
+# Create exec trees containing directories that are owned by
+# this user
+# The default (empty) value does not change the owner
+#exec_owner: "nobody"
+exec_owner: ""

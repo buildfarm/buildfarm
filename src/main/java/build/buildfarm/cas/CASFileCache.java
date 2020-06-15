@@ -19,6 +19,7 @@ import static build.buildfarm.common.IOUtils.listDir;
 import static build.buildfarm.common.IOUtils.listDirentSorted;
 import static build.buildfarm.common.IOUtils.stat;
 import static build.buildfarm.common.io.Directories.disableAllWriteAccess;
+import static build.buildfarm.common.io.EvenMoreFiles.setReadOnlyPerms;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.io.ByteStreams.nullOutputStream;
@@ -75,7 +76,6 @@ import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.protobuf.ByteString;
 import io.grpc.Deadline;
 import io.grpc.stub.ServerCallStreamObserver;
-import java.io.File;
 import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -1915,7 +1915,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                 .submit(
                     () -> {
                       Files.createFile(filePath);
-                      setPermissions(filePath, fileNode.getIsExecutable());
+                      setReadOnlyPerms(filePath, fileNode.getIsExecutable());
                       return filePath;
                     });
       }
@@ -2642,7 +2642,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           throw new DigestMismatchException(actual, expected);
         }
         try {
-          setPermissions(writePath, isExecutable);
+          setReadOnlyPerms(writePath, isExecutable);
         } catch (IOException e) {
           dischargeAndNotify(blobSizeInBytes);
           throw e;
@@ -2700,10 +2700,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         }
       }
     };
-  }
-
-  private static void setPermissions(Path path, boolean isExecutable) throws IOException {
-    new File(path.toString()).setExecutable(isExecutable, true);
   }
 
   @VisibleForTesting

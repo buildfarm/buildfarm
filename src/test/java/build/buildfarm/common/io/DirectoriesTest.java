@@ -121,7 +121,14 @@ class DirectoriesTest {
   public static class OsXDirectoriesTest extends DirectoriesTest {
     public OsXDirectoriesTest() {
       super(
-          Iterables.getFirst(Jimfs.newFileSystem(Configuration.osX()).getRootDirectories(), null));
+          Iterables.getFirst(
+              Jimfs.newFileSystem(
+                      Configuration.osX()
+                          .toBuilder()
+                          .setAttributeViews("basic", "owner", "posix", "unix")
+                          .build())
+                  .getRootDirectories(),
+              null));
     }
   }
 
@@ -129,7 +136,14 @@ class DirectoriesTest {
   public static class UnixDirectoriesTest extends DirectoriesTest {
     public UnixDirectoriesTest() {
       super(
-          Iterables.getFirst(Jimfs.newFileSystem(Configuration.unix()).getRootDirectories(), null));
+          Iterables.getFirst(
+              Jimfs.newFileSystem(
+                      Configuration.unix()
+                          .toBuilder()
+                          .setAttributeViews("basic", "owner", "posix", "unix")
+                          .build())
+                  .getRootDirectories(),
+              null));
     }
   }
 
@@ -138,7 +152,13 @@ class DirectoriesTest {
     public WindowsDirectoriesTest() {
       super(
           Iterables.getFirst(
-              Jimfs.newFileSystem(Configuration.windows()).getRootDirectories(), null));
+              Jimfs.newFileSystem(
+                      Configuration.windows()
+                          .toBuilder()
+                          .setAttributeViews("basic", "owner", "dos", "acl", "posix", "user")
+                          .build())
+                  .getRootDirectories(),
+              null));
     }
   }
 }

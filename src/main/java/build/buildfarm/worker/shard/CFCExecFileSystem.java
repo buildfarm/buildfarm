@@ -46,6 +46,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.UserPrincipal;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -55,12 +56,14 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.annotation.Nullable;
 
 class CFCExecFileSystem implements ExecFileSystem {
   private static final Logger logger = Logger.getLogger(Worker.class.getName());
 
   private final Path root;
   private final CASFileCache fileCache;
+  private final @Nullable UserPrincipal owner;
   private final boolean
       linkInputDirectories; // perform first-available non-output symlinking and retain directories
   // in cache
@@ -75,6 +78,7 @@ class CFCExecFileSystem implements ExecFileSystem {
   CFCExecFileSystem(
       Path root,
       CASFileCache fileCache,
+      @Nullable UserPrincipal owner,
       boolean linkInputDirectories,
       ExecutorService removeDirectoryService,
       ExecutorService accessRecorder,
@@ -82,6 +86,7 @@ class CFCExecFileSystem implements ExecFileSystem {
       TimeUnit deadlineAfterUnits) {
     this.root = root;
     this.fileCache = fileCache;
+    this.owner = owner;
     this.linkInputDirectories = linkInputDirectories;
     this.removeDirectoryService = removeDirectoryService;
     this.accessRecorder = accessRecorder;
@@ -353,6 +358,9 @@ class CFCExecFileSystem implements ExecFileSystem {
       if (!stamped) {
         destroyExecDir(execDir);
       }
+    }
+    if (owner != null) {
+      Directories.setAllOwner(execDir, owner);
     }
     return execDir;
   }

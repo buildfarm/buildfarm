@@ -1,0 +1,75 @@
+// Copyright 2019 The Bazel Authors. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package build.buildfarm.common.io;
+
+import java.io.IOException;
+import java.nio.file.FileStore;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.AclEntry;
+import java.nio.file.attribute.AclEntryPermission;
+import java.nio.file.attribute.AclEntryType;
+import java.nio.file.attribute.AclFileAttributeView;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.nio.file.attribute.UserPrincipal;
+import java.util.List;
+import java.util.Set;
+
+/** Named in the theme of Files (nio) -> MoreFiles (guava) -> EvenMoreFiles */
+public class EvenMoreFiles {
+
+  private static final Set<PosixFilePermission> readOnlyPerms =
+      PosixFilePermissions.fromString("r--r--r--");
+  private static final Set<PosixFilePermission> readOnlyExecPerms =
+      PosixFilePermissions.fromString("r-xr-xr-x");
+
+  public static void setReadOnlyPerms(Path dir, boolean executable) throws IOException {
+    FileStore fileStore = Files.getFileStore(dir);
+    if (fileStore.supportsFileAttributeView("posix")) {
+      if (executable) {
+        Files.setPosixFilePermissions(dir, readOnlyExecPerms);
+      } else {
+        Files.setPosixFilePermissions(dir, readOnlyPerms);
+      }
+    } else if (fileStore.supportsFileAttributeView("acl")) {
+      // windows, we hope
+      UserPrincipal authenticatedUsers =
+          dir.getFileSystem()
+              .getUserPrincipalLookupService()
+              .lookupPrincipalByName("Authenticated Users");
+      AclEntry denyWriteEntry =
+          AclEntry.newBuilder()
+              .setType(AclEntryType.DENY)
+              .setPrincipal(authenticatedUsers)
+              .setPermissions(AclEntryPermission.APPEND_DATA, AclEntryPermission.WRITE_DATA)
+              .build();
+      AclEntry execEntry =
+          AclEntry.newBuilder()
+              .setType(executable ? AclEntryType.ALLOW : AclEntryType.DENY)
+              .setPrincipal(authenticatedUsers)
+              .setPermissions(AclEntryPermission.EXECUTE)
+              .build();
+
+      AclFileAttributeView view = Files.getFileAttributeView(dir, AclFileAttributeView.class);
+      List<AclEntry> acl = view.getAcl();
+      acl.add(0, execEntry);
+      acl.add(0, denyWriteEntry);
+      view.setAcl(acl);
+    } else {
+      throw new UnsupportedOperationException("no recognized attribute view");
+    }
+  }
+}
