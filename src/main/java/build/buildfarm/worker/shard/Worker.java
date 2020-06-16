@@ -72,6 +72,7 @@ import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.attribute.UserPrincipal;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
@@ -79,6 +80,7 @@ import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.logging.Logger;
+import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
 
 public class Worker extends LoggingMain {
@@ -295,11 +297,29 @@ public class Worker extends LoggingMain {
       InputStreamFactory remoteInputStreamFactory,
       ExecutorService removeDirectoryService,
       ExecutorService accessRecorder,
-      ContentAddressableStorage storage) {
+      ContentAddressableStorage storage)
+      throws ConfigurationException {
     checkState(storage != null, "no exec fs cas specified");
     if (storage instanceof CASFileCache) {
-      return createCFCExecFileSystem(
-          removeDirectoryService, accessRecorder, (CASFileCache) storage);
+      CASFileCache cfc = (CASFileCache) storage;
+      final @Nullable UserPrincipal owner;
+      if (!config.getExecOwner().isEmpty()) {
+        try {
+          owner =
+              cfc.getRoot()
+                  .getFileSystem()
+                  .getUserPrincipalLookupService()
+                  .lookupPrincipalByName(config.getExecOwner());
+        } catch (IOException e) {
+          ConfigurationException configException =
+              new ConfigurationException("Could not locate exec_owner");
+          configException.initCause(e);
+          throw configException;
+        }
+      } else {
+        owner = null;
+      }
+      return createCFCExecFileSystem(removeDirectoryService, accessRecorder, cfc, owner);
     } else {
       // FIXME not the only fuse backing capacity...
       return createFuseExecFileSystem(remoteInputStreamFactory, storage);
@@ -361,10 +381,12 @@ public class Worker extends LoggingMain {
   private ExecFileSystem createCFCExecFileSystem(
       ExecutorService removeDirectoryService,
       ExecutorService accessRecorder,
-      CASFileCache fileCache) {
+      CASFileCache fileCache,
+      @Nullable UserPrincipal owner) {
     return new CFCExecFileSystem(
         root,
         fileCache,
+        owner,
         config.getLinkInputDirectories(),
         removeDirectoryService,
         accessRecorder,
@@ -374,15 +396,19 @@ public class Worker extends LoggingMain {
 
   public void stop() throws InterruptedException {
     boolean interrupted = Thread.interrupted();
-    logger.log(INFO, "Closing the pipeline");
-    try {
-      pipeline.close();
-    } catch (InterruptedException e) {
-      Thread.interrupted();
-      interrupted = true;
+    if (pipeline != null) {
+      logger.log(INFO, "Closing the pipeline");
+      try {
+        pipeline.close();
+      } catch (InterruptedException e) {
+        Thread.interrupted();
+        interrupted = true;
+      }
     }
-    logger.log(INFO, "Stopping exec filesystem");
-    execFileSystem.stop();
+    if (execFileSystem != null) {
+      logger.log(INFO, "Stopping exec filesystem");
+      execFileSystem.stop();
+    }
     if (server != null) {
       logger.log(INFO, "Shutting down the server");
       server.shutdown();
@@ -396,12 +422,16 @@ public class Worker extends LoggingMain {
         server.shutdownNow();
       }
     }
-    try {
-      backplane.stop();
-    } catch (InterruptedException e) {
-      interrupted = true;
+    if (backplane != null) {
+      try {
+        backplane.stop();
+      } catch (InterruptedException e) {
+        interrupted = true;
+      }
     }
-    workerStubs.invalidateAll();
+    if (workerStubs != null) {
+      workerStubs.invalidateAll();
+    }
     if (interrupted) {
       Thread.currentThread().interrupt();
       throw new InterruptedException();

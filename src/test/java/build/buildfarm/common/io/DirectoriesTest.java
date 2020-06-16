@@ -107,8 +107,6 @@ class DirectoriesTest {
       // check initial write conditions
       assertThat(Files.isWritable(tree)).isTrue();
       assertThat(Files.isWritable(subdir)).isTrue();
-      assertThat(Files.isWritable(tree.resolve("file"))).isTrue();
-      assertThat(Files.isWritable(subdir.resolve("file"))).isTrue();
 
       // remove write permissions
       Directories.disableAllWriteAccess(tree);
@@ -116,8 +114,6 @@ class DirectoriesTest {
       // check that write conditions have changed
       assertThat(Files.isWritable(tree)).isFalse();
       assertThat(Files.isWritable(subdir)).isFalse();
-      assertThat(Files.isWritable(tree.resolve("file"))).isFalse();
-      assertThat(Files.isWritable(subdir.resolve("file"))).isFalse();
     }
   }
 
@@ -125,7 +121,14 @@ class DirectoriesTest {
   public static class OsXDirectoriesTest extends DirectoriesTest {
     public OsXDirectoriesTest() {
       super(
-          Iterables.getFirst(Jimfs.newFileSystem(Configuration.osX()).getRootDirectories(), null));
+          Iterables.getFirst(
+              Jimfs.newFileSystem(
+                      Configuration.osX()
+                          .toBuilder()
+                          .setAttributeViews("basic", "owner", "posix", "unix")
+                          .build())
+                  .getRootDirectories(),
+              null));
     }
   }
 
@@ -133,7 +136,14 @@ class DirectoriesTest {
   public static class UnixDirectoriesTest extends DirectoriesTest {
     public UnixDirectoriesTest() {
       super(
-          Iterables.getFirst(Jimfs.newFileSystem(Configuration.unix()).getRootDirectories(), null));
+          Iterables.getFirst(
+              Jimfs.newFileSystem(
+                      Configuration.unix()
+                          .toBuilder()
+                          .setAttributeViews("basic", "owner", "posix", "unix")
+                          .build())
+                  .getRootDirectories(),
+              null));
     }
   }
 
@@ -142,7 +152,13 @@ class DirectoriesTest {
     public WindowsDirectoriesTest() {
       super(
           Iterables.getFirst(
-              Jimfs.newFileSystem(Configuration.windows()).getRootDirectories(), null));
+              Jimfs.newFileSystem(
+                      Configuration.windows()
+                          .toBuilder()
+                          .setAttributeViews("basic", "owner", "dos", "acl", "posix", "user")
+                          .build())
+                  .getRootDirectories(),
+              null));
     }
   }
 }

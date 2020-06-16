@@ -43,6 +43,7 @@ import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.OperationTimesBetweenStages;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
+import build.buildfarm.v1test.StageInformation;
 import build.buildfarm.v1test.Tree;
 import build.buildfarm.v1test.WorkerProfileMessage;
 import com.google.common.base.Stopwatch;
@@ -627,22 +628,21 @@ class Cat {
             "Total Evicted Entries size in Bytes",
             response.getCasEvictedEntrySize()));
 
-    String strStrFormat = "%-50s : %s";
-    System.out.println(
-        String.format(
-            strStrFormat,
-            "Slots usage/configured in InputFetchStage",
-            response.getInputFetchStageSlotsUsedOverConfigured()));
-    System.out.println(
-        String.format(
-            strStrFormat,
-            "Slots usage/configured in ExecuteActionStage",
-            response.getExecuteActionStageSlotsUsedOverConfigured()));
+    List<StageInformation> stages = response.getStagesList();
+    for (StageInformation stage : stages) {
+      printStageInformation(stage);
+    }
 
     List<OperationTimesBetweenStages> times = response.getTimesList();
     for (OperationTimesBetweenStages time : times) {
       printOperationTime(time);
     }
+  }
+
+  private static void printStageInformation(StageInformation stage) {
+    System.out.println(
+        format("%s slots configured: %d", stage.getName(), stage.getSlotsConfigured()));
+    System.out.println(format("%s slots used %d", stage.getName(), stage.getSlotsUsed()));
   }
 
   private static void printOperationTime(OperationTimesBetweenStages time) {
@@ -686,31 +686,31 @@ class Cat {
         String.format(
             strStrNumFormat,
             "InputFetchStage Start",
-            "InputFetchStage Completed",
+            "InputFetchStage Complete",
             durationToMillis(time.getInputFetchStartToComplete())));
     System.out.println(
         String.format(
             strStrNumFormat,
-            "InputFetchStage Completed",
+            "InputFetchStage Complete",
             "ExecutionStage Start",
             durationToMillis(time.getInputFetchCompleteToExecutionStart())));
     System.out.println(
         String.format(
             strStrNumFormat,
             "ExecutionStage Start",
-            "ExecutionStage Completed",
+            "ExecutionStage Complete",
             durationToMillis(time.getExecutionStartToComplete())));
     System.out.println(
         String.format(
             strStrNumFormat,
-            "ExecutionStage Completed",
-            "ReportResultStage Started",
+            "ExecutionStage Complete",
+            "ReportResultStage Start",
             durationToMillis(time.getExecutionCompleteToOutputUploadStart())));
     System.out.println(
         String.format(
             strStrNumFormat,
-            "OutputUploadStage Started",
-            "OutputUploadStage Completed",
+            "OutputUploadStage Start",
+            "OutputUploadStage Complete",
             durationToMillis(time.getOutputUploadStartToComplete())));
     System.out.println();
   }

@@ -14,10 +14,13 @@
 
 package build.buildfarm.cas;
 
+import static build.buildfarm.common.IOUtils.getFileKey;
 import static build.buildfarm.common.IOUtils.listDir;
-import static build.buildfarm.common.IOUtils.listFFIdirentSorted;
+import static build.buildfarm.common.IOUtils.listDirentSorted;
 import static build.buildfarm.common.IOUtils.stat;
 import static build.buildfarm.common.io.Directories.disableAllWriteAccess;
+import static build.buildfarm.common.io.EvenMoreFiles.isReadOnlyExecutable;
+import static build.buildfarm.common.io.EvenMoreFiles.setReadOnlyPerms;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.io.ByteStreams.nullOutputStream;
@@ -47,8 +50,7 @@ import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.FileStatus;
-import build.buildfarm.common.Inode;
-import build.buildfarm.common.LibC;
+import build.buildfarm.common.NamedFileKey;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
 import build.buildfarm.common.io.Directories;
@@ -75,7 +77,6 @@ import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.protobuf.ByteString;
 import io.grpc.Deadline;
 import io.grpc.stub.ServerCallStreamObserver;
-import java.io.File;
 import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -86,7 +87,6 @@ import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -110,7 +110,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
-import jnr.ffi.LibraryLoader;
 
 public abstract class CASFileCache implements ContentAddressableStorage {
   private static final Logger logger = Logger.getLogger(CASFileCache.class.getName());
@@ -132,8 +131,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private final DirectoriesIndex directoriesIndex;
   private final String directoriesIndexDbName;
   private final LockMap locks = new LockMap();
-  private final LibC libc = LibraryLoader.create(LibC.class).load("c");
-  private final jnr.ffi.Runtime runtime = jnr.ffi.Runtime.getRuntime(libc);
   @Nullable private final ContentAddressableStorage delegate;
   private final LoadingCache<BlobWriteKey, Write> writes =
       CacheBuilder.newBuilder()
@@ -1392,113 +1389,58 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
     // ignore our directories index database
     // indexes will be removed and rebuilt for compute
-    if (basename.equals(directoriesIndexDbName)) {
-      return;
-    }
+    if (!basename.equals(directoriesIndexDbName)) {
+      FileStatus stat = stat(file, false);
 
-    // mark directory for later key compute
-    // we avoid stating the file by observing the path name to determine if it is a directory.
-    if (file.toString().endsWith("_dir")) {
-      synchronized (computeDirs) {
-        computeDirs.add(file);
+      // mark directory for later key compute
+      if (file.toString().endsWith("_dir")) {
+        if (stat.isDirectory()) {
+          synchronized (computeDirs) {
+            computeDirs.add(file);
+          }
+        } else {
+          synchronized (deleteFiles) {
+            deleteFiles.add(file);
+          }
+        }
+      } else if (stat.isDirectory()) {
+        synchronized (deleteFiles) {
+          deleteFiles.add(file);
+        }
+      } else {
+        // if cas is full or entry is oversized or empty, mark file for later deletion.
+        long size = stat.getSize();
+        if (sizeInBytes + size > maxSizeInBytes || size > maxEntrySizeInBytes || size == 0) {
+          synchronized (deleteFiles) {
+            deleteFiles.add(file);
+          }
+        } else {
+          // get the key entry from the file name.
+          FileEntryKey fileEntryKey = parseFileEntryKey(basename, stat.getSize());
+
+          // if key entry file name cannot be parsed, mark file for later deletion.
+          if (fileEntryKey == null
+              || stat.isReadOnlyExecutable() != fileEntryKey.getIsExecutable()) {
+            synchronized (deleteFiles) {
+              deleteFiles.add(file);
+            }
+          } else {
+            // populate key it is not currently stored.
+            String key = fileEntryKey.getKey();
+            Entry e = new Entry(key, size, Deadline.after(10, SECONDS));
+            synchronized (fileKeys) {
+              fileKeys.put(getFileKey(root.resolve(key), stat), e);
+            }
+            storage.put(e.key, e);
+            onPut.accept(fileEntryKey.getDigest());
+            synchronized (CASFileCache.this) {
+              e.decrementReference(header);
+            }
+            sizeInBytes += size;
+          }
+        }
       }
-      return;
     }
-
-    FileStatus stat = stat(file, false);
-
-    // cas is full.  mark directory for later deletion.
-    long size = stat.getSize();
-    if (sizeInBytes + size > maxSizeInBytes || size > maxEntrySizeInBytes) {
-      synchronized (deleteFiles) {
-        deleteFiles.add(file);
-      }
-      return;
-    }
-
-    // get the key entry from the file name.
-    FileEntryKey fileEntryKey = parseFileEntryKey(basename, stat.getSize());
-
-    // key entry file name cannot be parsed; mark file for later deletion.
-    if (fileEntryKey == null) {
-      synchronized (deleteFiles) {
-        deleteFiles.add(file);
-      }
-      return;
-    }
-
-    // populate key it is not currently stored.
-    String key = fileEntryKey.getKey();
-    Entry e = new Entry(key, size, Deadline.after(10, SECONDS));
-    synchronized (fileKeys) {
-      fileKeys.put(FileKeyAsInode(stat.fileKey()), e);
-    }
-    storage.put(e.key, e);
-    onPut.accept(fileEntryKey.getDigest());
-    synchronized (CASFileCache.this) {
-      e.decrementReference(header);
-    }
-    sizeInBytes += size;
-  }
-
-  private Object FileKeyAsInode(Object fileKey) {
-    try {
-      String keyStr = fileKey.toString();
-      String inode = keyStr.substring(keyStr.indexOf("ino=") + 4, keyStr.indexOf(")"));
-      return Long.parseLong(inode);
-    } catch (Exception e) {
-      return fileKey;
-    }
-  }
-
-  private void processRootFileUnchecked(
-      Inode file,
-      ImmutableList.Builder<Path> computeDirs,
-      ImmutableList.Builder<Path> deleteFiles,
-      ImmutableMap.Builder<Object, Entry> fileKeys)
-      throws IOException, InterruptedException {
-
-    // mark directory for later key compute
-    // we avoid stating the file by observing the path name to determine if it is a directory.
-    if (file.getName().endsWith("_dir")) {
-      synchronized (computeDirs) {
-        computeDirs.add(getPath(file.getName()));
-      }
-      return;
-    }
-
-    // get the key entry from the file name.
-    FileEntryKey fileEntryKey = parseFileEntryKey(file.getName());
-
-    // cas is full.  mark directory for later deletion.
-    long size = fileEntryKey.getSize();
-    if (sizeInBytes + size > maxSizeInBytes || size > maxEntrySizeInBytes) {
-      synchronized (deleteFiles) {
-        deleteFiles.add(Paths.get(file.getName()));
-      }
-      return;
-    }
-
-    // key entry file name cannot be parsed; mark file for later deletion.
-    if (fileEntryKey == null) {
-      synchronized (deleteFiles) {
-        deleteFiles.add(Paths.get(file.getName()));
-      }
-      return;
-    }
-
-    // populate key it is not currently stored.
-    String key = fileEntryKey.getKey();
-    Entry e = new Entry(key, size, Deadline.after(10, SECONDS));
-    synchronized (fileKeys) {
-      fileKeys.put(file.inode, e);
-    }
-    storage.put(e.key, e);
-    onPut.accept(fileEntryKey.getDigest());
-    synchronized (CASFileCache.this) {
-      e.decrementReference(header);
-    }
-    sizeInBytes += size;
   }
 
   private List<Path> computeDirectories(CacheScanResults cacheScanResults)
@@ -1519,7 +1461,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             try {
               ImmutableList.Builder<String> inputsBuilder = ImmutableList.builder();
 
-              List<Inode> sortedDirent = listFFIdirentSorted(libc, runtime, path);
+              List<NamedFileKey> sortedDirent = listDirentSorted(path);
 
               Directory directory =
                   computeDirectory(path, sortedDirent, cacheScanResults.fileKeys, inputsBuilder);
@@ -1550,16 +1492,16 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   private Directory computeDirectory(
       Path path,
-      List<Inode> sortedDirent,
+      List<NamedFileKey> sortedDirent,
       Map<Object, Entry> fileKeys,
       ImmutableList.Builder<String> inputsBuilder)
       throws IOException, InterruptedException {
     Directory.Builder b = Directory.newBuilder();
 
-    for (Inode dirent : sortedDirent) {
+    for (NamedFileKey dirent : sortedDirent) {
 
       String name = dirent.getName();
-      Entry e = fileKeys.get(dirent.inode);
+      Entry e = fileKeys.get(dirent.fileKey());
 
       // decide if file is a directory or empty/non-empty file
       boolean isDirectory = false;
@@ -1582,14 +1524,14 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
       // directory
       if (isDirectory) {
-        List<Inode> childDirent = listFFIdirentSorted(libc, runtime, entryPath);
+        List<NamedFileKey> childDirent = listDirentSorted(entryPath);
         Directory dir = computeDirectory(entryPath, childDirent, fileKeys, inputsBuilder);
         b.addDirectoriesBuilder().setName(name).setDigest(digestUtil.compute(dir));
       }
 
       // empty file
       else if (isEmptyFile) {
-        boolean isExecutable = Files.isExecutable(entryPath);
+        boolean isExecutable = isReadOnlyExecutable(entryPath);
         b.addFilesBuilder()
             .setName(name)
             .setDigest(digestUtil.empty())
@@ -1975,7 +1917,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                 .submit(
                     () -> {
                       Files.createFile(filePath);
-                      setPermissions(filePath, fileNode.getIsExecutable());
+                      setReadOnlyPerms(filePath, fileNode.getIsExecutable());
                       return filePath;
                     });
       }
@@ -2702,7 +2644,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           throw new DigestMismatchException(actual, expected);
         }
         try {
-          setPermissions(writePath, isExecutable);
+          setReadOnlyPerms(writePath, isExecutable);
         } catch (IOException e) {
           dischargeAndNotify(blobSizeInBytes);
           throw e;
@@ -2760,10 +2702,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         }
       }
     };
-  }
-
-  private static void setPermissions(Path path, boolean isExecutable) throws IOException {
-    new File(path.toString()).setExecutable(isExecutable, true);
   }
 
   @VisibleForTesting
