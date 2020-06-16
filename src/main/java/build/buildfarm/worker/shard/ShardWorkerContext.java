@@ -46,6 +46,7 @@ import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.Retrier.Backoff;
+import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.ExcessiveWriteSizeException;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Instance.MatchListener;
@@ -534,14 +535,16 @@ class ShardWorkerContext implements WorkerContext {
     String workerName = getRandomWorker();
     Instance casMember = workerStub(workerName);
 
-    // write the file to that elected CAS member
+    // write the file to the elected CAS
     try {
       Write write =
           casMember.getBlobWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
 
-      try (OutputStream out = write.getOutput(deadlineAfter, deadlineAfterUnits, () -> {});
-          InputStream in = Files.newInputStream(file)) {
-        ByteStreams.copy(in, out);
+      FeedbackOutputStream out = write.getOutput(deadlineAfter, deadlineAfterUnits, () -> {});
+      try (InputStream in = Files.newInputStream(file)) {
+
+        bufferedCopy(in, out, 1024);
+
       } catch (IOException e) {
         // complete writes should be ignored
         if (!write.isComplete()) {
@@ -552,9 +555,26 @@ class ShardWorkerContext implements WorkerContext {
           throw e;
         }
       }
+
     } catch (ExcessiveWriteSizeException e) {
       Throwables.propagateIfInstanceOf(e.getCause(), InterruptedException.class);
     }
+  }
+
+  /**
+   * Reads all bytes from an input stream and writes them to an output stream. To manage
+   * flow-control, data is buffered according to the FeedbackOutputStream's ready state.
+   */
+  private static long bufferedCopy(InputStream input, FeedbackOutputStream output, int bufferSize)
+      throws IOException {
+    long totalBytes = 0L;
+    byte[] buf = new byte[bufferSize];
+    int n;
+    while ((n = input.read(buf)) > 0) {
+      output.write(buf, 0, n);
+      totalBytes += n;
+    }
+    return totalBytes;
   }
 
   private String getRandomWorker() throws IOException {
