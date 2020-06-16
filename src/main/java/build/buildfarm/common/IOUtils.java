@@ -14,6 +14,7 @@
 
 package build.buildfarm.common;
 
+import build.buildfarm.common.io.EvenMoreFiles;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import java.io.File;
@@ -209,8 +210,10 @@ public class IOUtils {
    */
   public static FileStatus stat(final Path path, final boolean followSymlinks) throws IOException {
     final BasicFileAttributes attributes;
+    boolean isReadOnlyExecutable;
     try {
       attributes = Files.readAttributes(path, BasicFileAttributes.class, linkOpts(followSymlinks));
+      isReadOnlyExecutable = EvenMoreFiles.isReadOnlyExecutable(path);
     } catch (java.nio.file.FileSystemException e) {
       throw new FileNotFoundException(path + ERR_NO_SUCH_FILE_OR_DIR);
     }
@@ -266,6 +269,11 @@ public class IOUtils {
             } catch (Exception e) {
               return attributes.fileKey();
             }
+          }
+
+          @Override
+          public boolean isReadOnlyExecutable() {
+            return isReadOnlyExecutable;
           }
         };
 

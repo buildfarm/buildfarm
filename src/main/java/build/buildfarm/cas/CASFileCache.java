@@ -19,6 +19,7 @@ import static build.buildfarm.common.IOUtils.listDir;
 import static build.buildfarm.common.IOUtils.listDirentSorted;
 import static build.buildfarm.common.IOUtils.stat;
 import static build.buildfarm.common.io.Directories.disableAllWriteAccess;
+import static build.buildfarm.common.io.EvenMoreFiles.isReadOnlyExecutable;
 import static build.buildfarm.common.io.EvenMoreFiles.setReadOnlyPerms;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
@@ -1418,7 +1419,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           FileEntryKey fileEntryKey = parseFileEntryKey(basename, stat.getSize());
 
           // if key entry file name cannot be parsed, mark file for later deletion.
-          if (fileEntryKey == null) {
+          if (fileEntryKey == null
+              || stat.isReadOnlyExecutable() != fileEntryKey.getIsExecutable()) {
             synchronized (deleteFiles) {
               deleteFiles.add(file);
             }
@@ -1529,7 +1531,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
       // empty file
       else if (isEmptyFile) {
-        boolean isExecutable = Files.isExecutable(entryPath);
+        boolean isExecutable = isReadOnlyExecutable(entryPath);
         b.addFilesBuilder()
             .setName(name)
             .setDigest(digestUtil.empty())
