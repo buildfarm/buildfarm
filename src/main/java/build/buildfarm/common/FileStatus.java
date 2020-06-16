@@ -69,4 +69,6 @@ public interface FileStatus {
 
   /** see BasicFileAttributes.fileKey() */
   Object fileKey();
+
+  boolean isReadOnlyExecutable();
 }

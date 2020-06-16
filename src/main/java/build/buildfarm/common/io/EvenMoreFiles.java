@@ -36,18 +36,18 @@ public class EvenMoreFiles {
   private static final Set<PosixFilePermission> readOnlyExecPerms =
       PosixFilePermissions.fromString("r-xr-xr-x");
 
-  public static void setReadOnlyPerms(Path dir, boolean executable) throws IOException {
-    FileStore fileStore = Files.getFileStore(dir);
+  public static void setReadOnlyPerms(Path path, boolean executable) throws IOException {
+    FileStore fileStore = Files.getFileStore(path);
     if (fileStore.supportsFileAttributeView("posix")) {
       if (executable) {
-        Files.setPosixFilePermissions(dir, readOnlyExecPerms);
+        Files.setPosixFilePermissions(path, readOnlyExecPerms);
       } else {
-        Files.setPosixFilePermissions(dir, readOnlyPerms);
+        Files.setPosixFilePermissions(path, readOnlyPerms);
       }
     } else if (fileStore.supportsFileAttributeView("acl")) {
       // windows, we hope
       UserPrincipal authenticatedUsers =
-          dir.getFileSystem()
+          path.getFileSystem()
               .getUserPrincipalLookupService()
               .lookupPrincipalByName("Authenticated Users");
       AclEntry denyWriteEntry =
@@ -63,13 +63,28 @@ public class EvenMoreFiles {
               .setPermissions(AclEntryPermission.EXECUTE)
               .build();
 
-      AclFileAttributeView view = Files.getFileAttributeView(dir, AclFileAttributeView.class);
+      AclFileAttributeView view = Files.getFileAttributeView(path, AclFileAttributeView.class);
       List<AclEntry> acl = view.getAcl();
       acl.add(0, execEntry);
       acl.add(0, denyWriteEntry);
       view.setAcl(acl);
     } else {
       throw new UnsupportedOperationException("no recognized attribute view");
+    }
+  }
+
+  public static boolean isReadOnlyExecutable(Path path) throws IOException {
+    FileStore fileStore = Files.getFileStore(path);
+    if (fileStore.supportsFileAttributeView("posix")) {
+      Set<PosixFilePermission> perms = Files.getPosixFilePermissions(path);
+      if (perms.contains(PosixFilePermission.OWNER_EXECUTE)
+          && !perms.contains(PosixFilePermission.GROUP_EXECUTE)
+          && !perms.contains(PosixFilePermission.OTHERS_EXECUTE)) {
+        setReadOnlyPerms(path, true);
+      }
+      return perms.contains(PosixFilePermission.OWNER_EXECUTE);
+    } else {
+      return Files.isExecutable(path);
     }
   }
 }

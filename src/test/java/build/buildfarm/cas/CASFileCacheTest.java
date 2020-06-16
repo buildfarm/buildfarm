@@ -45,6 +45,7 @@ import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.NullWrite;
 import build.buildfarm.common.io.Directories;
+import build.buildfarm.common.io.EvenMoreFiles;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -306,7 +307,9 @@ class CASFileCacheTest {
     Path path = root.resolve(fileCache.getKey(blobDigest, false));
     Path execPath = root.resolve(fileCache.getKey(blobDigest, true));
     Files.write(path, blob.toByteArray());
+    EvenMoreFiles.setReadOnlyPerms(path, false);
     Files.write(execPath, blob.toByteArray());
+    EvenMoreFiles.setReadOnlyPerms(execPath, true);
 
     StartupCacheResults results = fileCache.start();
 
