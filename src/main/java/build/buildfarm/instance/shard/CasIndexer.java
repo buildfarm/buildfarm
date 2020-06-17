@@ -103,6 +103,10 @@ public class CasIndexer {
 
       // update workers on scanned keys
       ScanResult scanResult = cluster.scan(nextCursor, params);
+      if (scanResult == null) {
+        // no CAS keys available to reindex
+        return;
+      }
       List<String> keys = scanResult.getResult();
       deleteWorkersThroughIntersection(cluster, keys);
 
