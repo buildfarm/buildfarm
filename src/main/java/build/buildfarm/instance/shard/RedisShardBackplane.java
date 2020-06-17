@@ -1311,4 +1311,19 @@ public class RedisShardBackplane implements ShardBackplane {
                 .addAllActiveWorkers(workerSet)
                 .build());
   }
+
+  @Override
+  public boolean takeIndexerLock() throws IOException {
+    return client.call(jedis -> jedis.setnx("indexLock", "1")) == 1;
+  }
+
+  @Override
+  public void releaseIndexerLock() throws IOException {
+    client.call(jedis -> jedis.del("indexLock"));
+  }
+
+  @Override
+  public void runIndexer() throws IOException {
+    client.run(CasIndexer::reindexWorkers);
+  }
 }

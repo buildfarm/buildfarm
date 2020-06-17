@@ -235,6 +235,15 @@ message RedisShardBackplaneConfig {
   int32 max_pre_queue_depth = 17;
 }
 
+message IndexSettings {
+  
+  //whether or not an instance should re-index worker keys
+  bool run_indexer = 1;
+  
+  //the frequency at which re-indexing should be done
+  int32 frequency_m = 2;
+}
+
 message ShardInstanceConfig {
   bool run_dispatched_monitor = 1;
 
@@ -252,6 +261,8 @@ message ShardInstanceConfig {
   // a maximum threshold for an action's specified timeout,
   // beyond which an action will be rejected for execution
   google.protobuf.Duration maximum_action_timeout = 7;
+  
+  IndexSettings index_settings = 8;
 }
 
 message ShardWorkerInstanceConfig {

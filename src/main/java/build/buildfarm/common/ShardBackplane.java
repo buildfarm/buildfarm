@@ -292,4 +292,13 @@ public interface ShardBackplane {
 
   @ThreadSafe
   OperationsStatus operationsStatus() throws IOException;
+
+  @ThreadSafe
+  boolean takeIndexerLock() throws IOException;
+
+  @ThreadSafe
+  void releaseIndexerLock() throws IOException;
+
+  @ThreadSafe
+  void runIndexer() throws IOException;
 }

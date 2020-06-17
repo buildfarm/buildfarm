@@ -74,6 +74,7 @@ import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.instance.ExcessiveWriteSizeException;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.ExecuteEntry;
+import build.buildfarm.v1test.IndexSettings;
 import build.buildfarm.v1test.OperationIteratorToken;
 import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.ProfiledQueuedOperationMetadata;
@@ -135,6 +136,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -183,8 +185,11 @@ public class ShardInstance extends AbstractServerInstance {
   private final ExecutorService operationDeletionService = newSingleThreadExecutor();
   private final BlockingQueue transformTokensQueue = new LinkedBlockingQueue(256);
   private Thread operationQueuer;
+  private final ScheduledExecutorService indexerService =
+      Executors.newSingleThreadScheduledExecutor();
   private boolean stopping = false;
   private boolean stopped = true;
+  private IndexSettings config;
 
   public ShardInstance(
       String name,
@@ -203,7 +208,8 @@ public class ShardInstance extends AbstractServerInstance {
         config.getMaxBlobSize(),
         config.getMaximumActionTimeout(),
         onStop,
-        WorkerStubs.create(digestUtil));
+        WorkerStubs.create(digestUtil),
+        config.getIndexSettings());
   }
 
   private static ShardBackplane createBackplane(ShardInstanceConfig config, String identifier)
@@ -252,7 +258,8 @@ public class ShardInstance extends AbstractServerInstance {
       long maxBlobSize,
       Duration maxActionTimeout,
       Runnable onStop,
-      com.google.common.cache.LoadingCache<String, Instance> workerStubs)
+      com.google.common.cache.LoadingCache<String, Instance> workerStubs,
+      IndexSettings config)
       throws InterruptedException {
     super(name, digestUtil, null, null, null, null, null);
     this.backplane = backplane;
@@ -261,6 +268,7 @@ public class ShardInstance extends AbstractServerInstance {
     this.maxBlobSize = maxBlobSize;
     this.maxActionTimeout = maxActionTimeout;
     this.actionResultCache = createActionResultCache(backplane);
+    this.config = config;
     backplane.setOnUnsubscribe(this::stop);
 
     remoteInputStreamFactory =
@@ -418,6 +426,26 @@ public class ShardInstance extends AbstractServerInstance {
     if (operationQueuer != null) {
       operationQueuer.start();
     }
+
+    if (config.getRunIndexer()) {
+      indexerService.scheduleAtFixedRate(
+          () -> {
+            try {
+
+              // ensure only one scheduler performs the re-indexing.
+              if (backplane.takeIndexerLock()) {
+                backplane.runIndexer();
+                backplane.releaseIndexerLock();
+              }
+
+            } catch (Exception e) {
+              logger.log(Level.SEVERE, "error while re-indexing the CAS", e);
+            }
+          },
+          config.getFrequencyM(),
+          config.getFrequencyM(),
+          TimeUnit.MINUTES);
+    }
   }
 
   @Override
@@ -433,6 +461,7 @@ public class ShardInstance extends AbstractServerInstance {
     if (dispatchedMonitor != null) {
       dispatchedMonitor.stop();
     }
+    indexerService.shutdown();
     contextDeadlineScheduler.shutdown();
     operationDeletionService.shutdown();
     operationTransformService.shutdown();

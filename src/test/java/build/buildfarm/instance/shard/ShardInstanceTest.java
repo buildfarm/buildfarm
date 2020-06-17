@@ -61,6 +61,7 @@ import build.buildfarm.common.Write.NullWrite;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecuteEntry;
+import build.buildfarm.v1test.IndexSettings;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import com.google.common.cache.CacheBuilder;
@@ -133,7 +134,8 @@ public class ShardInstanceTest {
             /* maxBlobSize=*/ 0,
             /* maxActionTimeout=*/ Duration.getDefaultInstance(),
             mockOnStop,
-            CacheBuilder.newBuilder().build(mockInstanceLoader));
+            CacheBuilder.newBuilder().build(mockInstanceLoader),
+            IndexSettings.newBuilder().setRunIndexer(false).build());
     instance.start();
   }
 
