@@ -571,6 +571,7 @@ class ShardWorkerContext implements WorkerContext {
     byte[] buf = new byte[bufferSize];
     int n;
     while ((n = input.read(buf)) > 0) {
+      while (!output.isReady()) {}
       output.write(buf, 0, n);
       totalBytes += n;
     }
