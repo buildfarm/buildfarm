@@ -70,7 +70,6 @@ import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.SetMultimap;
 import com.google.common.collect.Sets;
-import com.google.common.io.ByteStreams;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -504,8 +503,7 @@ class ShardWorkerContext implements WorkerContext {
     try (FeedbackOutputStream out = write.getOutput(deadlineAfter, deadlineAfterUnits, () -> {});
         InputStream in = Files.newInputStream(file)) {
 
-      ByteStreams.copy(in, out);
-      // ByteStreams.copy(in, out);
+      bufferedCopy(in, out, 1024);
     } catch (IOException e) {
       // complete writes should be ignored
       if (!write.isComplete()) {
@@ -552,7 +550,6 @@ class ShardWorkerContext implements WorkerContext {
     byte[] buf = new byte[bufferSize];
     int n;
     while ((n = input.read(buf)) > 0) {
-      while (!output.isReady()) {}
       output.write(buf, 0, n);
       totalBytes += n;
     }
