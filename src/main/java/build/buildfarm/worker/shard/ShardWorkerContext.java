@@ -84,7 +84,6 @@ import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
@@ -500,22 +499,13 @@ class ShardWorkerContext implements WorkerContext {
 
   private void insertFile(Digest digest, Path file) throws IOException, InterruptedException {
 
-    if (keepInsertFiles) {
-      insertFileToLocalStorage(digest, file);
-    } else {
-      insertFileToCasMember(digest, file);
-    }
-  }
+    Write write = chooseWrite(digest, file);
 
-  private void insertFileToLocalStorage(Digest digest, Path file)
-      throws IOException, InterruptedException {
-    Write write =
-        execFileSystem
-            .getStorage()
-            .getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
-    try (OutputStream out = write.getOutput(deadlineAfter, deadlineAfterUnits, () -> {});
+    try (FeedbackOutputStream out = write.getOutput(deadlineAfter, deadlineAfterUnits, () -> {});
         InputStream in = Files.newInputStream(file)) {
+
       ByteStreams.copy(in, out);
+      // ByteStreams.copy(in, out);
     } catch (IOException e) {
       // complete writes should be ignored
       if (!write.isComplete()) {
@@ -528,36 +518,27 @@ class ShardWorkerContext implements WorkerContext {
     }
   }
 
-  private void insertFileToCasMember(Digest digest, Path file)
-      throws IOException, InterruptedException {
+  private Write chooseWrite(Digest digest, Path file) throws IOException, InterruptedException {
 
-    // select a CAS member to store the file in
+    // choose a writer for local storage
+    if (keepInsertFiles) {
+      Write write =
+          execFileSystem
+              .getStorage()
+              .getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
+      return write;
+    }
+
+    // choose a writer for another cas member
     String workerName = getRandomWorker();
     Instance casMember = workerStub(workerName);
 
-    // write the file to the elected CAS
     try {
       Write write =
           casMember.getBlobWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
-
-      FeedbackOutputStream out = write.getOutput(deadlineAfter, deadlineAfterUnits, () -> {});
-      try (InputStream in = Files.newInputStream(file)) {
-
-        bufferedCopy(in, out, 1024);
-
-      } catch (IOException e) {
-        // complete writes should be ignored
-        if (!write.isComplete()) {
-          write.reset(); // we will not attempt retry with current behavior, abandon progress
-          if (e.getCause() != null) {
-            Throwables.propagateIfInstanceOf(e.getCause(), InterruptedException.class);
-          }
-          throw e;
-        }
-      }
-
+      return write;
     } catch (ExcessiveWriteSizeException e) {
-      Throwables.propagateIfInstanceOf(e.getCause(), InterruptedException.class);
+      throw new IOException("unable to obtain writer to cas member");
     }
   }
 
