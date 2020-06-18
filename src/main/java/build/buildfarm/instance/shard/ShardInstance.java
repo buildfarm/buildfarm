@@ -1440,7 +1440,6 @@ public class ShardInstance extends AbstractServerInstance {
                       "property '%s' value was not a valid integer: %s",
                       property.getName(), property.getValue()));
         }
-
         // An individual platform property may not be valid on its own,
         // but instead, valid in the context of the full platform where the configured
         // OperationQueue checks the eligibility.
