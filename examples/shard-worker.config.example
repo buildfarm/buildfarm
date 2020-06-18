@@ -30,7 +30,7 @@ operation_poll_period: {
   nanos: 0
 }
 
-# key/value set of definining capabilities of this worker
+# key/value set of defining capabilities of this worker
 # all execute requests must match perfectly with workers which
 # provide capabilities
 # so an action with a required platform: { arch: "x86_64" } must
