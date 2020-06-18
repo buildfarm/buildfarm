@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -75,7 +76,12 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
 
   @Override
   public void put(OperationContext operationContext) throws InterruptedException {
-    queue.put(operationContext);
+    while (!isClosed() && !output.isClosed()) {
+      if (queue.offer(operationContext, 10, TimeUnit.MILLISECONDS)) {
+        return;
+      }
+    }
+    throw new InterruptedException("stage closed");
   }
 
   synchronized int removeAndRelease(String operationName, int claims) {

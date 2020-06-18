@@ -49,7 +49,7 @@ abstract class SuperscalarPipelineStage extends PipelineStage {
         interruptAll();
       }
       try {
-        wait();
+        wait(/* timeout=*/ 10);
       } catch (InterruptedException e) {
         interrupted = Thread.interrupted() || interrupted;
         // ignore, we will throw it eventually
