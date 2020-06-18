@@ -249,8 +249,14 @@ class Executor {
     } else {
       // FIXME we need to release the action root
       workerContext.logInfo("Executor: Operation " + operationName + " Failed to claim output");
-
-      owner.error().put(operationContext);
+      boolean wasInterrupted = Thread.interrupted();
+      try {
+        owner.error().put(operationContext);
+      } finally {
+        if (wasInterrupted) {
+          Thread.currentThread().interrupt();
+        }
+      }
     }
     return stopwatch.elapsed(MICROSECONDS) - executeUSecs;
   }
