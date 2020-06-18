@@ -83,6 +83,7 @@ import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
@@ -500,11 +501,33 @@ class ShardWorkerContext implements WorkerContext {
 
     Write write = chooseWrite(digest, file);
 
-    try (FeedbackOutputStream out = write.getOutput(deadlineAfter, deadlineAfterUnits, () -> {});
-        InputStream in = Files.newInputStream(file)) {
+    // The following callback is performed each time the write stream is ready.
+    // For each callback we only transfer a small part of the input stream in order to avoid
+    // accumulating a large buffer.  When the file is done being transfered,
+    // the final callback will close the streams.
+    byte[] buf = new byte[1024];
+    InputStream in = Files.newInputStream(file);
+    try (OutputStream out =
+        write.getOutput(
+            deadlineAfter,
+            deadlineAfterUnits,
+            () -> {
+              FeedbackOutputStream outStream = (FeedbackOutputStream) write;
+              try {
 
-      bufferedCopy(in, out, 1024);
-    } catch (IOException e) {
+                int n = in.read(buf);
+                if (n > 0) {
+                  outStream.write(buf, 0, n);
+                } else {
+                  in.close();
+                  outStream.close();
+                }
+              } catch (IOException e) {
+                throw new RuntimeException(e);
+              }
+            })) {
+
+    } catch (Exception e) {
       // complete writes should be ignored
       if (!write.isComplete()) {
         write.reset(); // we will not attempt retry with current behavior, abandon progress
@@ -544,16 +567,13 @@ class ShardWorkerContext implements WorkerContext {
    * Reads all bytes from an input stream and writes them to an output stream. To manage
    * flow-control, data is buffered according to the FeedbackOutputStream's ready state.
    */
-  private static long bufferedCopy(InputStream input, FeedbackOutputStream output, int bufferSize)
+  private static void bufferedCopy(InputStream input, OutputStream output, int bufferSize)
       throws IOException {
-    long totalBytes = 0L;
     byte[] buf = new byte[bufferSize];
     int n;
     while ((n = input.read(buf)) > 0) {
       output.write(buf, 0, n);
-      totalBytes += n;
     }
-    return totalBytes;
   }
 
   private String getRandomWorker() throws IOException {
