@@ -205,6 +205,16 @@ message MemoryInstanceConfig {
   ActionCacheConfig action_cache_config = 10;
 }
 
+message ProvisionedQueue {
+  string name = 1;
+  
+  build.bazel.remote.execution.v2.Platform platform = 2;
+}
+
+message ProvisionedQueuesConfig {
+  repeated ProvisionedQueue queues = 1;
+}
+
 message RedisShardBackplaneConfig {
   string redis_uri = 1;
   int32 jedis_pool_max_total = 15;
@@ -233,6 +243,7 @@ message RedisShardBackplaneConfig {
   bool run_failsafe_operation = 27;
   int32 max_queue_depth = 16;
   int32 max_pre_queue_depth = 17;
+  ProvisionedQueuesConfig provisioned_queues = 30;
 }
 
 message ShardInstanceConfig {

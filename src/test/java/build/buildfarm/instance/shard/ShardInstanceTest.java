@@ -18,7 +18,9 @@ import static build.bazel.remote.execution.v2.ExecutionStage.Value.CACHE_CHECK;
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.COMPLETED;
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.QUEUED;
 import static build.buildfarm.common.Actions.invalidActionVerboseMessage;
+import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
+import static build.buildfarm.instance.AbstractServerInstance.INVALID_PLATFORM;
 import static build.buildfarm.instance.AbstractServerInstance.MISSING_ACTION;
 import static build.buildfarm.instance.AbstractServerInstance.MISSING_COMMAND;
 import static com.google.common.truth.Truth.assertThat;
@@ -95,6 +97,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatcher;
+import org.mockito.Matchers;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.invocation.InvocationOnMock;
@@ -304,6 +307,69 @@ public class ShardInstanceTest {
   }
 
   @Test
+  public void queueActionFailsQueueEligibility() throws Exception {
+    ByteString foo = ByteString.copyFromUtf8("foo");
+    Digest fooDigest = DIGEST_UTIL.compute(ByteString.copyFromUtf8("foo"));
+    // no need to provide foo, just want to make a non-default directory
+    Directory subdir =
+        Directory.newBuilder()
+            .addFiles(FileNode.newBuilder().setName("foo").setDigest(fooDigest))
+            .build();
+    Digest subdirDigest = DIGEST_UTIL.compute(foo);
+    Directory inputRoot = Directory.newBuilder().build();
+    ByteString inputRootContent = inputRoot.toByteString();
+    Digest inputRootDigest = DIGEST_UTIL.compute(inputRootContent);
+    provideBlob(inputRootDigest, inputRootContent);
+    Action action = createAction(true, true, inputRootDigest, SIMPLE_COMMAND);
+    Digest actionDigest = DIGEST_UTIL.compute(action);
+
+    ExecuteEntry executeEntry =
+        ExecuteEntry.newBuilder()
+            .setOperationName("missing-directory-operation")
+            .setActionDigest(actionDigest)
+            .setSkipCacheLookup(true)
+            .build();
+
+    when(mockBackplane.validQueueProperties(Matchers.anyList())).thenReturn(false);
+
+    when(mockBackplane.canQueue()).thenReturn(true);
+
+    Poller poller = mock(Poller.class);
+
+    boolean failedPreconditionExceptionCaught = false;
+    try {
+      instance.queue(executeEntry, poller).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
+    } catch (ExecutionException e) {
+      com.google.rpc.Status status = StatusProto.fromThrowable(e);
+      if (status.getCode() == Code.FAILED_PRECONDITION.getNumber()) {
+        failedPreconditionExceptionCaught = true;
+      } else {
+        e.getCause().printStackTrace();
+      }
+    }
+    assertThat(failedPreconditionExceptionCaught).isTrue();
+
+    PreconditionFailure preconditionFailure =
+        PreconditionFailure.newBuilder()
+            .addViolations(
+                Violation.newBuilder()
+                    .setType(VIOLATION_TYPE_INVALID)
+                    .setSubject(INVALID_PLATFORM)
+                    .setDescription("properties are not valid for queue eligibility: []"))
+            .build();
+    ExecuteResponse executeResponse =
+        ExecuteResponse.newBuilder()
+            .setStatus(
+                com.google.rpc.Status.newBuilder()
+                    .setCode(Code.FAILED_PRECONDITION.getNumber())
+                    .setMessage(invalidActionVerboseMessage(actionDigest, preconditionFailure))
+                    .addDetails(Any.pack(preconditionFailure)))
+            .build();
+    assertResponse(executeResponse);
+    verify(poller, atLeastOnce()).pause();
+  }
+
+  @Test
   public void queueCommandMissingErrorsOperation() throws Exception {
     Action action = createAction(true, false);
     Digest actionDigest = DIGEST_UTIL.compute(action);
@@ -392,6 +458,8 @@ public class ShardInstanceTest {
             .setSkipCacheLookup(true)
             .build();
 
+    when(mockBackplane.validQueueProperties(Matchers.anyList())).thenReturn(true);
+
     when(mockBackplane.canQueue()).thenReturn(true);
 
     Poller poller = mock(Poller.class);
@@ -457,6 +525,8 @@ public class ShardInstanceTest {
             .setSkipCacheLookup(true)
             .build();
 
+    when(mockBackplane.validQueueProperties(Matchers.anyList())).thenReturn(true);
+
     when(mockBackplane.canQueue()).thenReturn(true);
 
     Poller poller = mock(Poller.class);
@@ -518,6 +588,8 @@ public class ShardInstanceTest {
             .setOperationName("operation-with-erroring-action-result")
             .setActionDigest(actionKey.getDigest())
             .build();
+
+    when(mockBackplane.validQueueProperties(Matchers.anyList())).thenReturn(true);
 
     when(mockBackplane.canQueue()).thenReturn(true);
 
@@ -633,6 +705,8 @@ public class ShardInstanceTest {
 
     Digest missingDirectoryDigest =
         Digest.newBuilder().setHash("missing-directory").setSizeBytes(1).build();
+
+    when(mockBackplane.validQueueProperties(Matchers.anyList())).thenReturn(true);
 
     when(mockBackplane.getOperation(eq(operationName)))
         .thenReturn(

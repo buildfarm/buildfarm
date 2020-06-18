@@ -1396,6 +1396,21 @@ public class ShardInstance extends AbstractServerInstance {
       Platform platform, PreconditionFailure.Builder preconditionFailure) {
     int minCores = 0;
     int maxCores = -1;
+
+    // check that the platform properties correspond to valid provisions for the OperationQeueue.
+    // if the operation is eligible to be put anywhere in the OperationQueue, it passes validation.
+    boolean validForOperationQueue = backplane.validQueueProperties(platform.getPropertiesList());
+    if (!validForOperationQueue) {
+      preconditionFailure
+          .addViolationsBuilder()
+          .setType(VIOLATION_TYPE_INVALID)
+          .setSubject(INVALID_PLATFORM)
+          .setDescription(
+              format(
+                  "properties are not valid for queue eligibility: %s",
+                  platform.getPropertiesList()));
+    }
+
     for (Property property : platform.getPropertiesList()) {
       /* FIXME generalize with config */
       if (property.getName().equals("min-cores") || property.getName().equals("max-cores")) {
@@ -1425,6 +1440,12 @@ public class ShardInstance extends AbstractServerInstance {
                       "property '%s' value was not a valid integer: %s",
                       property.getName(), property.getValue()));
         }
+        // An individual platform property may not be valid on its own,
+        // but instead, valid in the context of the full platform where the configured
+        // OperationQueue checks the eligibility.
+        // Therefore, we do not consider an individual property invalid when it has been previously
+        // validated against the OperationQueue.
+      } else if (validForOperationQueue) {
       } else {
         preconditionFailure
             .addViolationsBuilder()
