@@ -1441,12 +1441,12 @@ public class ShardInstance extends AbstractServerInstance {
                       property.getName(), property.getValue()));
         }
 
-      } else if (validForOperationQueue) {
         // An individual platform property may not be valid on its own,
         // but instead, valid in the context of the full platform where the configured
         // OperationQueue checks the eligibility.
         // Therefore, we do not consider an individual property invalid when it has been previously
         // validated against the OperationQueue.
+      } else if (validForOperationQueue) {
       } else {
         preconditionFailure
             .addViolationsBuilder()
