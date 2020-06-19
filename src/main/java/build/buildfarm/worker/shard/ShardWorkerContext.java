@@ -519,7 +519,7 @@ class ShardWorkerContext implements WorkerContext {
                 do {
 
                   boolean success = CopyBytes(in, outStream, 1024);
-                  if (success) {
+                  if (!success) {
                     in.close();
                     outStream.close();
                     done = true;
