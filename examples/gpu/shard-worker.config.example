@@ -17,7 +17,7 @@ is_cas_member: false
 digest_function: SHA256
 
 # all content for the operations will be stored under this path
-root: "/tmp/worker"
+root: "/tmp/gpu_worker"
 
 # total size in bytes of inline content for action results
 # output files, stdout, and stderr content, in that order

@@ -70,6 +70,7 @@ import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.SetMultimap;
 import com.google.common.collect.Sets;
+import com.google.common.io.ByteStreams;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -505,7 +506,6 @@ class ShardWorkerContext implements WorkerContext {
     // For each callback we only transfer a small part of the input stream in order to avoid
     // accumulating a large buffer.  When the file is done being transfered,
     // the final callback will close the streams.
-    byte[] buf = new byte[1024];
     InputStream in = Files.newInputStream(file);
     try (OutputStream out =
         write.getOutput(
@@ -515,17 +515,26 @@ class ShardWorkerContext implements WorkerContext {
               FeedbackOutputStream outStream = (FeedbackOutputStream) write;
               try {
 
-                int n = in.read(buf);
-                if (n > 0) {
-                  outStream.write(buf, 0, n);
-                } else {
-                  in.close();
-                  outStream.close();
-                }
+                boolean done = false;
+                do {
+
+                  boolean success = CopyBytes(in, outStream, 1024);
+                  if (success) {
+                    in.close();
+                    outStream.close();
+                    done = true;
+                  }
+                } while (!done);
               } catch (IOException e) {
                 throw new RuntimeException(e);
               }
             })) {
+
+      if (keepInsertFiles) {
+        ByteStreams.copy(in, out);
+      } else {
+        CopyBytes(in, out, 1024);
+      }
 
     } catch (Exception e) {
       // complete writes should be ignored
@@ -537,6 +546,16 @@ class ShardWorkerContext implements WorkerContext {
         throw e;
       }
     }
+  }
+
+  private boolean CopyBytes(InputStream in, OutputStream out, int bytesAmount) throws IOException {
+    byte[] buf = new byte[bytesAmount];
+    int n = in.read(buf);
+    if (n > 0) {
+      out.write(buf, 0, n);
+      return true;
+    }
+    return false;
   }
 
   private Write chooseWrite(Digest digest, Path file) throws IOException, InterruptedException {
