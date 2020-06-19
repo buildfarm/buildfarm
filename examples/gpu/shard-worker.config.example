@@ -1,9 +1,9 @@
 # the listening port of the shard-worker grpc server
-port: 8981
+port: 8982
 
 # the host:port of this grpc server, required to be accessible
 # by all shard cluster servers
-public_name: "localhost:8981"
+public_name: "localhost:8982"
 
 # This determines whether the shard instance will participate in the backplane
 # and cache it's operation outputs in its own cache file CAS.

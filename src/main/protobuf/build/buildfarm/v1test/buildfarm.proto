@@ -243,7 +243,7 @@ message RedisShardBackplaneConfig {
   bool run_failsafe_operation = 27;
   int32 max_queue_depth = 16;
   int32 max_pre_queue_depth = 17;
-  ProvisionedQueuesConfig provisioned_queues = 30;
+  ProvisionedQueuesConfig provisioned_queues = 31;
 }
 
 message ShardInstanceConfig {
