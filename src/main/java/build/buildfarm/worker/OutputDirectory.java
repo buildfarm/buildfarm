@@ -14,8 +14,11 @@
 
 package build.buildfarm.worker;
 
+import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import java.io.IOException;
@@ -26,12 +29,28 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Stack;
 
 public class OutputDirectory {
-  private final Map<String, OutputDirectory> children;
-
   private static final OutputDirectory defaultInstance = new OutputDirectory(ImmutableMap.of());
+
+  // FIXME make this tool dependent
+  //
+  // Per the test encyclopedia initial conditions:
+  // https://docs.bazel.build/versions/master/test-encyclopedia.html#initial-conditions
+  private static Set<String> OUTPUT_DIRECTORY_ENV_VARS =
+      ImmutableSet.of(
+          "TEST_TMPDIR", "TEST_UNDECLARED_OUTPUTS_DIR", "TEST_UNDECLARED_OUTPUTS_ANNOTATIONS_DIR");
+
+  private static Set<String> OUTPUT_FILE_ENV_VARS =
+      ImmutableSet.of(
+          "TEST_PREMATURE_EXIT_FILE",
+          "TEST_LOGSPLITTER_OUTPUT_FILE",
+          "TEST_INFRASTRUCTURE_FAILURE_FILE",
+          "TEST_WARNINGS_OUTPUT_FILE");
+
+  private final Map<String, OutputDirectory> children;
 
   private static OutputDirectory getDefaultInstance() {
     return defaultInstance;
@@ -65,7 +84,25 @@ public class OutputDirectory {
     }
   }
 
-  public static OutputDirectory parse(Iterable<String> outputFiles, Iterable<String> outputDirs) {
+  private static Iterable<OutputDirectoryEntry> envVarOutputDirectoryEntries(
+      Iterable<EnvironmentVariable> envVars) {
+    ImmutableList.Builder<OutputDirectoryEntry> entries = ImmutableList.builder();
+    for (EnvironmentVariable envVar : envVars) {
+      if (OUTPUT_DIRECTORY_ENV_VARS.contains(envVar.getName())) {
+        entries.add(new OutputDirectoryEntry("/" + envVar.getValue() + "/", false));
+      } else if (OUTPUT_FILE_ENV_VARS.contains(envVar.getName())) {
+        String file = envVar.getValue();
+        entries.add(
+            new OutputDirectoryEntry("/" + file.substring(0, file.lastIndexOf('/') + 1), false));
+      }
+    }
+    return entries.build();
+  }
+
+  public static OutputDirectory parse(
+      Iterable<String> outputFiles,
+      Iterable<String> outputDirs,
+      Iterable<EnvironmentVariable> envVars) {
     return parseDirectories(
         Iterables.concat(
             Iterables.transform(
@@ -75,7 +112,8 @@ public class OutputDirectory {
                         "/" + file.substring(0, file.lastIndexOf('/') + 1), false)),
             Iterables.transform(
                 outputDirs,
-                (dir) -> new OutputDirectoryEntry(dir.isEmpty() ? "/" : "/" + dir + "/", true))));
+                (dir) -> new OutputDirectoryEntry(dir.isEmpty() ? "/" : ("/" + dir + "/"), true)),
+            envVarOutputDirectoryEntries(envVars)));
   }
 
   private static class Builder {

@@ -16,6 +16,7 @@ package build.buildfarm.worker;
 
 import static com.google.common.truth.Truth.assertThat;
 
+import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
 import com.google.common.collect.ImmutableList;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -27,7 +28,7 @@ public class OutputDirectoryTest {
   public void outputDirectoryParsesOutputFiles() {
     OutputDirectory outputDirectory =
         OutputDirectory.parse(
-            ImmutableList.<String>of("foo", "bar/baz"), ImmutableList.<String>of());
+            ImmutableList.of("foo", "bar/baz"), ImmutableList.of(), ImmutableList.of());
 
     assertThat(outputDirectory.getChild("foo")).isNull();
     assertThat(outputDirectory.getChild("bar").isLeaf()).isTrue();
@@ -37,7 +38,7 @@ public class OutputDirectoryTest {
   public void outputDirectoryParsesOutputDirs() {
     OutputDirectory outputDirectory =
         OutputDirectory.parse(
-            ImmutableList.<String>of(), ImmutableList.<String>of("bar/baz", "foo"));
+            ImmutableList.of(), ImmutableList.of("bar/baz", "foo"), ImmutableList.of());
 
     assertThat(outputDirectory.getChild("foo").isLeaf()).isFalse();
     assertThat(outputDirectory.getChild("bar").getChild("baz").isLeaf()).isFalse();
@@ -50,7 +51,7 @@ public class OutputDirectoryTest {
     // against subdirectories
     OutputDirectory outputDirectory =
         OutputDirectory.parse(
-            ImmutableList.<String>of("a/file"), ImmutableList.<String>of("a+b", "a/b/c"));
+            ImmutableList.of("a/file"), ImmutableList.of("a+b", "a/b/c"), ImmutableList.of());
 
     assertThat(outputDirectory.getChild("a").isLeaf()).isFalse();
     assertThat(outputDirectory.getChild("a+b").isLeaf()).isFalse();
@@ -63,7 +64,7 @@ public class OutputDirectoryTest {
     // create two references to output directory 'bar'
     OutputDirectory outputDirectory =
         OutputDirectory.parse(
-            ImmutableList.<String>of("bar/baz", "bar/foo"), ImmutableList.<String>of());
+            ImmutableList.of("bar/baz", "bar/foo"), ImmutableList.of(), ImmutableList.of());
 
     assertThat(outputDirectory.getChild("bar").isLeaf()).isTrue();
   }
@@ -71,7 +72,7 @@ public class OutputDirectoryTest {
   @Test
   public void recursiveOutputDirectoryIsRecursive() {
     OutputDirectory outputDirectory =
-        OutputDirectory.parse(ImmutableList.<String>of(), ImmutableList.<String>of("foo"));
+        OutputDirectory.parse(ImmutableList.of(), ImmutableList.of("foo"), ImmutableList.of());
 
     assertThat(outputDirectory.getChild("foo").isLeaf()).isFalse();
     assertThat(outputDirectory.getChild("foo").getChild("bar").isLeaf()).isFalse();
@@ -82,7 +83,7 @@ public class OutputDirectoryTest {
   @Test
   public void emptyDirectoryIsRecursive() {
     OutputDirectory outputDirectory =
-        OutputDirectory.parse(ImmutableList.<String>of(), ImmutableList.<String>of(""));
+        OutputDirectory.parse(ImmutableList.of(), ImmutableList.of(""), ImmutableList.of());
 
     assertThat(outputDirectory.isLeaf()).isFalse();
     assertThat(outputDirectory.getChild("foo").isLeaf()).isFalse();
@@ -91,6 +92,22 @@ public class OutputDirectoryTest {
   @Test(expected = IllegalArgumentException.class)
   public void duplicateDirectorySeparatorIsInvalid() {
     OutputDirectory outputDirectory =
-        OutputDirectory.parse(ImmutableList.<String>of(), ImmutableList.<String>of("a//b"));
+        OutputDirectory.parse(ImmutableList.of(), ImmutableList.of("a//b"), ImmutableList.of());
+  }
+
+  @Test
+  public void envVarDirsAreCreated() {
+    OutputDirectory outputDirectory =
+        OutputDirectory.parse(
+            ImmutableList.of(),
+            ImmutableList.of(),
+            ImmutableList.of(
+                EnvironmentVariable.newBuilder()
+                    .setName("TEST_TMPDIR")
+                    .setValue("_tmp/foo")
+                    .build()));
+
+    assertThat(outputDirectory.getChild("_tmp").isLeaf()).isFalse();
+    assertThat(outputDirectory.getChild("_tmp").getChild("foo").isLeaf()).isTrue();
   }
 }
