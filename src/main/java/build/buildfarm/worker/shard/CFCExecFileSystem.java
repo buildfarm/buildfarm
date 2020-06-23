@@ -283,7 +283,10 @@ class CFCExecFileSystem implements ExecFileSystem {
       String operationName, Map<Digest, Directory> directoriesIndex, Action action, Command command)
       throws IOException, InterruptedException {
     OutputDirectory outputDirectory =
-        OutputDirectory.parse(command.getOutputFilesList(), command.getOutputDirectoriesList());
+        OutputDirectory.parse(
+            command.getOutputFilesList(),
+            command.getOutputDirectoriesList(),
+            command.getEnvironmentVariablesList());
 
     Path execDir = root.resolve(operationName);
     if (Files.exists(execDir)) {
