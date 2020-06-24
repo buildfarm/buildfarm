@@ -46,6 +46,7 @@ import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.Retrier.Backoff;
+import build.buildfarm.common.grpc.StubWriteOutputStream;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.ExcessiveWriteSizeException;
 import build.buildfarm.instance.Instance;
@@ -500,44 +501,83 @@ class ShardWorkerContext implements WorkerContext {
 
   private void insertFile(Digest digest, Path file) throws IOException, InterruptedException {
 
-    Write write = chooseWrite(digest, file);
+    if (keepInsertFiles) {
+      insertFileLocally(digest, file);
+    } else {
+      insertFileToCasMember(digest, file);
+    }
+  }
 
-    // The following callback is performed each time the write stream is ready.
-    // For each callback we only transfer a small part of the input stream in order to avoid
-    // accumulating a large buffer.  When the file is done being transfered,
-    // the final callback will close the streams.
-    InputStream in = Files.newInputStream(file);
-    try (OutputStream out =
-        write.getOutput(
-            deadlineAfter,
-            deadlineAfterUnits,
-            () -> {
-              FeedbackOutputStream outStream = (FeedbackOutputStream) write;
-              try {
+  private void insertFileLocally(Digest digest, Path file)
+      throws IOException, InterruptedException {
 
-                boolean done = false;
-                do {
+    Write write = getLocalWrite(digest, file);
 
-                  boolean success = CopyBytes(in, outStream, 1024);
-                  if (!success) {
-                    in.close();
-                    outStream.close();
-                    done = true;
-                  }
-                } while (!done);
-              } catch (IOException e) {
-                throw new RuntimeException(e);
-              }
-            })) {
-
-      if (keepInsertFiles) {
-        ByteStreams.copy(in, out);
-      } else {
-        CopyBytes(in, out, 1024);
+    try (OutputStream out = write.getOutput(deadlineAfter, deadlineAfterUnits, () -> {});
+        InputStream in = Files.newInputStream(file)) {
+      ByteStreams.copy(in, out);
+    } catch (IOException e) {
+      if (!write.isComplete()) {
+        write.reset(); // we will not attempt retry with current behavior, abandon progress
+        if (e.getCause() != null) {
+          Throwables.propagateIfInstanceOf(e.getCause(), InterruptedException.class);
+        }
+        throw e;
       }
+    }
+  }
+
+  public static int MBtoBytes(int sizeMb) {
+    return sizeMb * 1024 * 1024;
+  }
+
+  private void insertFileToCasMember(Digest digest, Path file)
+      throws IOException, InterruptedException {
+
+    // create a write for inserting into another CAS member.
+    String workerName = getRandomWorker();
+    Instance casMember = workerStub(workerName);
+    Write write = getCasMemberWrite(digest, file, workerName);
+    int chunkSizeBytes = MBtoBytes(10);
+
+    try {
+
+      // The following callback is performed each time the write stream is ready.
+      // For each callback we only transfer a small part of the input stream in order to avoid
+      // accumulating a large buffer.  When the file is done being transfered,
+      // the final callback will close the streams.
+      InputStream in = Files.newInputStream(file);
+      OutputStream out =
+          write.getOutput(
+              deadlineAfter,
+              deadlineAfterUnits,
+              () -> {
+                try {
+
+                  FeedbackOutputStream outStream = (FeedbackOutputStream) write;
+                  boolean fileTransfered = false;
+                  while (outStream.isReady() && !fileTransfered) {
+                    if (!CopyBytes(in, outStream, chunkSizeBytes)) {
+                      fileTransfered = true;
+                      in.close();
+                      outStream.close();
+                    }
+                  }
+
+                } catch (IOException e) {
+                  logger.log(Level.SEVERE, "unexpected error transferring file: ", e);
+                }
+              });
+
+      // the "on ready" callback for the StubWriteOutputStream will not be called without
+      // first priming the write with data or explicitly initializing the write.
+      StubWriteOutputStream stubStream = (StubWriteOutputStream) write;
+      stubStream.initiateWrite();
+
+      // despite completing the write, the CAS member may not yet register the blob.
+      while (!casMember.containsBlob(digest, RequestMetadata.getDefaultInstance())) {}
 
     } catch (Exception e) {
-      // complete writes should be ignored
       if (!write.isComplete()) {
         write.reset(); // we will not attempt retry with current behavior, abandon progress
         if (e.getCause() != null) {
@@ -558,19 +598,17 @@ class ShardWorkerContext implements WorkerContext {
     return false;
   }
 
-  private Write chooseWrite(Digest digest, Path file) throws IOException, InterruptedException {
+  private Write getLocalWrite(Digest digest, Path file) throws IOException, InterruptedException {
+    Write write =
+        execFileSystem
+            .getStorage()
+            .getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
+    return write;
+  }
 
-    // choose a writer for local storage
-    if (keepInsertFiles) {
-      Write write =
-          execFileSystem
-              .getStorage()
-              .getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
-      return write;
-    }
+  private Write getCasMemberWrite(Digest digest, Path file, String workerName)
+      throws IOException, InterruptedException {
 
-    // choose a writer for another cas member
-    String workerName = getRandomWorker();
     Instance casMember = workerStub(workerName);
 
     try {
@@ -579,19 +617,6 @@ class ShardWorkerContext implements WorkerContext {
       return write;
     } catch (ExcessiveWriteSizeException e) {
       throw new IOException("unable to obtain writer to cas member");
-    }
-  }
-
-  /**
-   * Reads all bytes from an input stream and writes them to an output stream. To manage
-   * flow-control, data is buffered according to the FeedbackOutputStream's ready state.
-   */
-  private static void bufferedCopy(InputStream input, OutputStream output, int bufferSize)
-      throws IOException {
-    byte[] buf = new byte[bufferSize];
-    int n;
-    while ((n = input.read(buf)) > 0) {
-      output.write(buf, 0, n);
     }
   }
 
@@ -842,6 +867,7 @@ class ShardWorkerContext implements WorkerContext {
       Iterable<String> outputDirs)
       throws IOException, InterruptedException, StatusException {
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
+
     for (String outputFile : outputFiles) {
       uploadOutputFile(resultBuilder, outputFile, actionRoot, preconditionFailure);
     }
@@ -849,6 +875,7 @@ class ShardWorkerContext implements WorkerContext {
     for (String outputDir : outputDirs) {
       uploadOutputDirectory(resultBuilder, outputDir, actionRoot, preconditionFailure);
     }
+
     checkPreconditionFailure(actionDigest, preconditionFailure.build());
 
     /* put together our outputs and update the result */

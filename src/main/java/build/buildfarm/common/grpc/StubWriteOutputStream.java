@@ -178,7 +178,7 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
     }
   }
 
-  private synchronized void initiateWrite() throws IOException {
+  public synchronized void initiateWrite() throws IOException {
     if (writeObserver == null) {
       checkNotNull(deadlineAfterUnits);
       writeObserver =
