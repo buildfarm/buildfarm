@@ -540,14 +540,13 @@ class ShardWorkerContext implements WorkerContext {
     Write write = getCasMemberWrite(digest, file, workerName);
     int chunkSizeBytes = MBtoBytes(10);
 
-    try {
 
       // The following callback is performed each time the write stream is ready.
       // For each callback we only transfer a small part of the input stream in order to avoid
       // accumulating a large buffer.  When the file is done being transfered,
       // the final callback will close the streams.
       InputStream in = Files.newInputStream(file);
-      OutputStream out =
+      try (OutputStream out =
           write.getOutput(
               deadlineAfter,
               deadlineAfterUnits,
@@ -567,7 +566,7 @@ class ShardWorkerContext implements WorkerContext {
                 } catch (IOException e) {
                   logger.log(Level.SEVERE, "unexpected error transferring file: ", e);
                 }
-              });
+              })){
 
       // the "on ready" callback for the StubWriteOutputStream will not be called without
       // first priming the write with data or explicitly initializing the write.
