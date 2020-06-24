@@ -66,20 +66,19 @@ You can use typical Java logging configuration to filter these results and obser
 An example `logging.properties` file has been provided at [examples/debug.logging.properties](examples/debug.logging.properties) for use as follows:
 
 ```
-bazel run //src/main/java/build/buildfarm:buildfarm-server --jvm_flag=-Djava.util.logging.config.file=examples/debug.logging.properties ...
+bazel run //src/main/java/build/buildfarm:buildfarm-server -- --jvm_flag=-Djava.util.logging.config.file=$PWD/examples/debug.logging.properties $PWD/examples/server.config.example
 ```
 
 and
 
 ```
-bazel run //src/main/java/build/buildfarm/buildfarm-operationqueue-worker --jvm_flag=-Djava.util.logging.config.file=examples/debug.logging.properties ...
+bazel run //src/main/java/build/buildfarm:buildfarm-operationqueue-worker -- --jvm_flag=-Djava.util.logging.config.file=$PWD/examples/debug.logging.properties $PWD/examples/worker.config.example
 ```
 
 To attach a remote debugger, run the executable with the `--debug=<PORT>` flag. For example:
 
 ```
-bazel run src/main/java/build/buildfarm/buildfarm-server --debug=5005 \
-    $PWD/config/server.config
+bazel run //src/main/java/build/buildfarm:buildfarm-server -- --debug=5005 $PWD/examples/server.config.example
 ```
 
 ## Developer Information

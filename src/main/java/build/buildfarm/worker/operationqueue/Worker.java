@@ -562,7 +562,9 @@ public class Worker {
               throws IOException, InterruptedException {
             OutputDirectory outputDirectory =
                 OutputDirectory.parse(
-                    command.getOutputFilesList(), command.getOutputDirectoriesList());
+                    command.getOutputFilesList(),
+                    command.getOutputDirectoriesList(),
+                    command.getEnvironmentVariablesList());
 
             Path execDir = root.resolve(operationName);
             if (Files.exists(execDir)) {
