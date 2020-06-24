@@ -19,8 +19,8 @@ import build.bazel.remote.execution.v2.Platform.Property;
 import build.buildfarm.common.FileStatus;
 import build.buildfarm.common.IOUtils;
 import com.google.common.collect.Iterables;
-import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 
 public class Utils {
@@ -29,7 +29,7 @@ public class Utils {
   public static FileStatus statIfFound(Path path, boolean followSymlinks) {
     try {
       return IOUtils.stat(path, followSymlinks);
-    } catch (FileNotFoundException e) {
+    } catch (NoSuchFileException e) {
       return null;
     } catch (IOException e) {
       // If this codepath is ever hit, then this method should be rewritten to properly distinguish

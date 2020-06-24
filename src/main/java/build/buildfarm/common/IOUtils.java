@@ -18,12 +18,12 @@ import build.buildfarm.common.io.EvenMoreFiles;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.PosixFileAttributes;
@@ -215,7 +215,7 @@ public class IOUtils {
       attributes = Files.readAttributes(path, BasicFileAttributes.class, linkOpts(followSymlinks));
       isReadOnlyExecutable = EvenMoreFiles.isReadOnlyExecutable(path);
     } catch (java.nio.file.FileSystemException e) {
-      throw new FileNotFoundException(path + ERR_NO_SUCH_FILE_OR_DIR);
+      throw new NoSuchFileException(path + ERR_NO_SUCH_FILE_OR_DIR);
     }
     FileStatus status =
         new FileStatus() {

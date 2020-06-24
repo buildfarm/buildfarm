@@ -78,7 +78,6 @@ import io.grpc.Deadline;
 import io.grpc.Status;
 import io.grpc.Status.Code;
 import io.grpc.StatusException;
-import io.grpc.StatusRuntimeException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -260,11 +259,8 @@ class ShardWorkerContext implements WorkerContext {
   private ByteString getBlob(Digest digest) throws IOException, InterruptedException {
     try (InputStream in = inputStreamFactory.newInput(digest, 0)) {
       return ByteString.readFrom(in);
-    } catch (StatusRuntimeException e) {
-      if (e.getStatus().equals(Status.NOT_FOUND)) {
-        return null;
-      }
-      throw e;
+    } catch (NoSuchFileException e) {
+      return null;
     }
   }
 
