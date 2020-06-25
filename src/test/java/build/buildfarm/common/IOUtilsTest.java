@@ -19,6 +19,7 @@ import static com.google.common.truth.Truth.assertThat;
 import build.buildfarm.common.io.Directories;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
+import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -32,9 +33,12 @@ import org.junit.runners.JUnit4;
 class IOUtilsTest {
   private Path root;
 
+  private FileStore fileStore;
+
   @Before
   public void setUp() throws IOException {
     root = Files.createTempDirectory("native-cas-test");
+    fileStore = Files.getFileStore(root);
   }
 
   @After
@@ -49,7 +53,7 @@ class IOUtilsTest {
     Files.write(path, blob.toByteArray());
     Files.createLink(root.resolve("b"), path);
 
-    List<NamedFileKey> files = IOUtils.listDirentSorted(root);
+    List<NamedFileKey> files = IOUtils.listDirentSorted(root, fileStore);
     assertThat(files.size()).isEqualTo(2);
     Object firstKey = files.get(0).fileKey();
     Object secondKey = files.get(1).fileKey();
@@ -66,7 +70,7 @@ class IOUtilsTest {
     ByteString blobB = ByteString.copyFromUtf8("content for b");
     Files.write(pathB, blobB.toByteArray());
 
-    List<NamedFileKey> files = IOUtils.listDirentSorted(root);
+    List<NamedFileKey> files = IOUtils.listDirentSorted(root, fileStore);
     assertThat(files.size()).isEqualTo(2);
     Object firstKey = files.get(0).fileKey();
     Object secondKey = files.get(1).fileKey();

@@ -84,6 +84,7 @@ import java.io.OutputStream;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
@@ -118,6 +119,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   protected static final String DIRECTORIES_INDEX_NAME_MEMORY = ":memory:";
 
   private final Path root;
+  private final FileStore fileStore;
   private final long maxSizeInBytes;
   private final long maxEntrySizeInBytes;
   private final DigestUtil digestUtil;
@@ -269,6 +271,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Consumer<Iterable<Digest>> onExpire,
       @Nullable ContentAddressableStorage delegate) {
     this.root = root;
+    try {
+      this.fileStore = Files.getFileStore(root);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
     this.maxSizeInBytes = maxSizeInBytes;
     this.maxEntrySizeInBytes = maxEntrySizeInBytes;
     this.digestUtil = digestUtil;
@@ -1461,7 +1468,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             try {
               ImmutableList.Builder<String> inputsBuilder = ImmutableList.builder();
 
-              List<NamedFileKey> sortedDirent = listDirentSorted(path);
+              List<NamedFileKey> sortedDirent = listDirentSorted(path, fileStore);
 
               Directory directory =
                   computeDirectory(path, sortedDirent, cacheScanResults.fileKeys, inputsBuilder);
@@ -1524,7 +1531,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
       // directory
       if (isDirectory) {
-        List<NamedFileKey> childDirent = listDirentSorted(entryPath);
+        List<NamedFileKey> childDirent = listDirentSorted(entryPath, fileStore);
         Directory dir = computeDirectory(entryPath, childDirent, fileKeys, inputsBuilder);
         b.addDirectoriesBuilder().setName(name).setDigest(digestUtil.compute(dir));
       }
