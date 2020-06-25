@@ -122,7 +122,7 @@ class FileDirectoriesIndex implements DirectoriesIndex {
     return directories.build();
   }
 
-  private Path path(Digest digest) {
+  Path path(Digest digest) {
     return root.resolve(digest.getHash() + "_" + digest.getSizeBytes() + "_dir_inputs");
   }
 
@@ -157,9 +157,9 @@ class FileDirectoriesIndex implements DirectoriesIndex {
     String insertSql = "INSERT OR IGNORE INTO entries (path, directory)\n" + "    VALUES (?,?)";
     try (PreparedStatement insertStatement = conn.prepareStatement(insertSql)) {
       conn.setAutoCommit(false);
-      insertStatement.setString(1, digest);
+      insertStatement.setString(2, digest);
       for (String entry : entries) {
-        insertStatement.setString(2, entry);
+        insertStatement.setString(1, entry);
         insertStatement.addBatch();
       }
       insertStatement.executeBatch();

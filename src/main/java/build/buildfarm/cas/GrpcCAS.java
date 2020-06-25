@@ -99,7 +99,7 @@ public class GrpcCAS implements ContentAddressableStorage {
             }
           });
 
-  private InputStream newStreamInput(String resourceName, long offset) {
+  private InputStream newStreamInput(String resourceName, long offset) throws IOException {
     return ByteStreamHelper.newInput(
         resourceName,
         offset,
@@ -184,7 +184,7 @@ public class GrpcCAS implements ContentAddressableStorage {
   }
 
   @Override
-  public InputStream newInput(Digest digest, long offset) {
+  public InputStream newInput(Digest digest, long offset) throws IOException {
     return newStreamInput(getBlobName(digest), offset);
   }
 
