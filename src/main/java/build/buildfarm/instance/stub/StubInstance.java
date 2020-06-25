@@ -107,6 +107,7 @@ import io.grpc.stub.ClientCallStreamObserver;
 import io.grpc.stub.ClientResponseObserver;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.Iterator;
 import java.util.UUID;
@@ -420,7 +421,8 @@ public class StubInstance implements Instance {
       long offset,
       long deadlineAfter,
       TimeUnit deadlineAfterUnits,
-      RequestMetadata requestMetadata) {
+      RequestMetadata requestMetadata)
+      throws IOException {
     return newInput(resourceName, offset, deadlineAfter, deadlineAfterUnits, requestMetadata);
   }
 
@@ -429,7 +431,8 @@ public class StubInstance implements Instance {
       long offset,
       long deadlineAfter,
       TimeUnit deadlineAfterUnits,
-      RequestMetadata requestMetadata) {
+      RequestMetadata requestMetadata)
+      throws IOException {
     return ByteStreamHelper.newInput(
         resourceName,
         offset,
@@ -535,7 +538,8 @@ public class StubInstance implements Instance {
       long offset,
       long deadlineAfter,
       TimeUnit deadlineAfterUnits,
-      RequestMetadata requestMetadata) {
+      RequestMetadata requestMetadata)
+      throws IOException {
     return newInput(
         getBlobName(digest), offset, deadlineAfter, deadlineAfterUnits, requestMetadata);
   }

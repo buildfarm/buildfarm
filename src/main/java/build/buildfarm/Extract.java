@@ -44,11 +44,11 @@ import io.grpc.Status.Code;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.stub.StreamObserver;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
@@ -95,7 +95,8 @@ class Extract {
       String instanceName,
       Digest digest,
       ByteStreamStub bsStub,
-      ListeningScheduledExecutorService retryService) {
+      ListeningScheduledExecutorService retryService)
+      throws IOException {
     return ByteStreamHelper.newInput(
         blobName(instanceName, digest),
         0,
@@ -174,7 +175,7 @@ class Extract {
           public void onError(Throwable t) {
             Status status = Status.fromThrowable(t);
             if (status.getCode() == Code.NOT_FOUND) {
-              t = new FileNotFoundException(digest.getHash() + "/" + digest.getSizeBytes());
+              t = new NoSuchFileException(digest.getHash() + "/" + digest.getSizeBytes());
             }
             blobFuture.setException(t);
           }

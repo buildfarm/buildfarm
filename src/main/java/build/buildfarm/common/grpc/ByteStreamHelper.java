@@ -20,13 +20,18 @@ import com.google.bytestream.ByteStreamGrpc.ByteStreamStub;
 import com.google.bytestream.ByteStreamProto.ReadRequest;
 import com.google.bytestream.ByteStreamProto.ReadResponse;
 import com.google.common.base.Supplier;
+import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
+import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
+import java.io.IOException;
 import java.io.InputStream;
+import java.nio.channels.ClosedByInterruptException;
+import java.nio.file.NoSuchFileException;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutionException;
@@ -44,11 +49,17 @@ public final class ByteStreamHelper {
       Supplier<ByteStreamStub> bsStubSupplier,
       Supplier<Backoff> backoffSupplier,
       Predicate<Status> isRetriable,
-      @Nullable ListeningScheduledExecutorService retryService) {
+      @Nullable ListeningScheduledExecutorService retryService)
+      throws IOException {
     ReadRequest request =
         ReadRequest.newBuilder().setResourceName(resourceName).setReadOffset(offset).build();
     BlockingQueue<ByteString> queue = new ArrayBlockingQueue<>(1);
     ByteStringQueueInputStream inputStream = new ByteStringQueueInputStream(queue);
+    // this interface needs to operate similar to open, where it
+    // throws an exception on creation. We will need to wait around
+    // for the response to come back in order to supply the stream or
+    // throw the exception it receives
+    SettableFuture<InputStream> streamReadyFuture = SettableFuture.create();
     StreamObserver<ReadResponse> responseObserver =
         new StreamObserver<ReadResponse>() {
           long requestOffset = offset;
@@ -57,6 +68,7 @@ public final class ByteStreamHelper {
 
           @Override
           public void onNext(ReadResponse response) {
+            streamReadyFuture.set(inputStream);
             ByteString data = response.getData();
             try {
               queue.put(data);
@@ -83,6 +95,7 @@ public final class ByteStreamHelper {
               backoff = backoffSupplier.get();
               retryRequest();
             } else if (retryService == null || nextDelayMillis < 0 || !isRetriable.test(status)) {
+              streamReadyFuture.setException(t);
               inputStream.setException(t);
             } else {
               try {
@@ -112,6 +125,29 @@ public final class ByteStreamHelper {
           }
         };
     bsStubSupplier.get().read(request, responseObserver);
-    return inputStream;
+    // the interface is technically blocking (not aio) and is
+    // perfectly reasonable to be used as a wait point
+    try {
+      return streamReadyFuture.get();
+    } catch (InterruptedException e) {
+      try {
+        inputStream.close();
+      } catch (RuntimeException closeEx) {
+        e.addSuppressed(e);
+      }
+      IOException ioEx = new ClosedByInterruptException();
+      ioEx.addSuppressed(e);
+      throw ioEx;
+    } catch (ExecutionException e) {
+      Throwable cause = e.getCause();
+      Status status = Status.fromThrowable(cause);
+      if (status.getCode() == Status.Code.NOT_FOUND) {
+        IOException ioEx = new NoSuchFileException(resourceName);
+        ioEx.addSuppressed(cause);
+        throw ioEx;
+      }
+      Throwables.throwIfInstanceOf(cause, IOException.class);
+      throw new IOException(cause);
+    }
   }
 }
