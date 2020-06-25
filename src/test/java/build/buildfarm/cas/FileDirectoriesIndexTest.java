@@ -73,7 +73,7 @@ public class FileDirectoriesIndexTest {
     // remove entry-wise
     for (String entry : entries) {
       Set<Digest> digests = directoriesIndex.removeEntry(entry);
-      assertThat(digests.size()).containsExactly(directory);
+      assertThat(digests).containsExactly(directory);
     }
 
     // insert again to test remove directory-wise
