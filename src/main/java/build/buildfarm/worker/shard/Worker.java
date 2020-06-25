@@ -226,7 +226,7 @@ public class Worker extends LoggingMain {
             config.getLimitExecution(),
             config.getLimitGlobalExecution(),
             config.getOnlyMulticoreTests(),
-            config.getIsCasMember());
+            !config.getOmitFromCas());
 
     PipelineStage completeStage =
         new PutOperationStage((operation) -> context.deactivate(operation.getName()));
@@ -442,7 +442,7 @@ public class Worker extends LoggingMain {
     try {
 
       // if the worker is a CAS member, it can send/modify blobs in the backplane.
-      if (config.getIsCasMember()) {
+      if (!config.getOmitFromCas()) {
         backplane.addBlobLocation(digest, config.getPublicName());
       }
     } catch (IOException e) {
@@ -454,7 +454,7 @@ public class Worker extends LoggingMain {
     try {
 
       // if the worker is a CAS member, it can send/modify blobs in the backplane.
-      if (config.getIsCasMember()) {
+      if (!config.getOmitFromCas()) {
         backplane.removeBlobsLocation(digests, config.getPublicName());
       }
     } catch (IOException e) {
@@ -574,7 +574,7 @@ public class Worker extends LoggingMain {
       // Not all workers need to be registered and visible in the backplane.
       // For example, a GPU worker may wish to perform work that we do not want to cache locally for
       // other workers.
-      if (config.getIsCasMember()) {
+      if (!config.getOmitFromCas()) {
         startFailsafeRegistration();
       } else {
         logger.log(INFO, "Skipping worker registration");

@@ -8,7 +8,7 @@ public_name: "localhost:8981"
 # This determines whether the shard instance will participate in the backplane
 # and cache it's operation outputs in its own cache file CAS.
 # When not caching locally, the worker will send its output to another worker's CAS.
-is_cas_member: true
+omit_from_cas: false
 
 # the digest function for this worker, required
 # to match out of band between the client and server
