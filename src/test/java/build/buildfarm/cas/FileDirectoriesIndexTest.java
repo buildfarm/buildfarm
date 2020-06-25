@@ -32,26 +32,22 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-@RunWith(JUnit4.class)
 public class FileDirectoriesIndexTest {
   private final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
 
-  private final String jdbcIndexUrl = "jdbc:sqlite:test:";
+  private final String jdbcIndexUrlBase = "jdbc:sqlite:test:";
   private Path root;
   private FileDirectoriesIndex directoriesIndex;
+  private String system;
+
+  protected FileDirectoriesIndexTest(Path root, String system) {
+    this.root = root.resolve("cache");
+    this.system = system;
+  }
 
   @Before
   public void setUp() throws IOException {
-    Path fileSystemRoot =
-        Iterables.getFirst(
-            Jimfs.newFileSystem(
-                    Configuration.unix()
-                        .toBuilder()
-                        .setAttributeViews("basic", "owner", "posix", "unix")
-                        .build())
-                .getRootDirectories(),
-            null);
-    root = fileSystemRoot.resolve("cache");
+    String jdbcIndexUrl = jdbcIndexUrlBase + system + ":";
     directoriesIndex = new FileDirectoriesIndex(jdbcIndexUrl, root);
     Files.createDirectories(root);
   }
@@ -85,5 +81,57 @@ public class FileDirectoriesIndexTest {
     directoriesIndex.put(directory, entries);
     directoriesIndex.remove(directory);
     assertThat(Files.notExists(directoriesIndex.path(directory))).isTrue();
+    for (String entry : entries) {
+      Set<Digest> digests = directoriesIndex.removeEntry(entry);
+      assertThat(digests.isEmpty()).isTrue();
+    }
+  }
+
+  @RunWith(JUnit4.class)
+  public static class WindowsFileDirectoriesIndexTest extends FileDirectoriesIndexTest {
+    public WindowsFileDirectoriesIndexTest() {
+      super(
+          Iterables.getFirst(
+              Jimfs.newFileSystem(
+                      Configuration.windows()
+                          .toBuilder()
+                          .setAttributeViews("basic", "owner", "dos", "acl", "posix", "user")
+                          .build())
+                  .getRootDirectories(),
+              null),
+          "Windows");
+    }
+  }
+
+  @RunWith(JUnit4.class)
+  public static class UnixFileDirectoriesIndexTest extends FileDirectoriesIndexTest {
+    public UnixFileDirectoriesIndexTest() {
+      super(
+          Iterables.getFirst(
+              Jimfs.newFileSystem(
+                      Configuration.unix()
+                          .toBuilder()
+                          .setAttributeViews("basic", "owner", "posix", "unix")
+                          .build())
+                  .getRootDirectories(),
+              null),
+          "Unix");
+    }
+  }
+
+  @RunWith(JUnit4.class)
+  public static class OsFileDirectoriesIndexTest extends FileDirectoriesIndexTest {
+    public OsFileDirectoriesIndexTest() {
+      super(
+          Iterables.getFirst(
+              Jimfs.newFileSystem(
+                      Configuration.osX()
+                          .toBuilder()
+                          .setAttributeViews("basic", "owner", "posix", "unix")
+                          .build())
+                  .getRootDirectories(),
+              null),
+          "Os");
+    }
   }
 }
