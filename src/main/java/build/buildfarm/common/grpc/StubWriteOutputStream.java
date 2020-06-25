@@ -178,7 +178,7 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
     }
   }
 
-  public synchronized void initiateWrite() throws IOException {
+  private synchronized void initiateWrite() throws IOException {
     if (writeObserver == null) {
       checkNotNull(deadlineAfterUnits);
       writeObserver =
@@ -259,7 +259,7 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   @Override
   public synchronized boolean isReady() {
     if (writeObserver == null) {
-      return false;
+      return true;
     }
     ClientCallStreamObserver<WriteRequest> clientCallStreamObserver =
         (ClientCallStreamObserver<WriteRequest>) writeObserver;
@@ -291,10 +291,11 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
 
   @Override
   public FeedbackOutputStream getOutput(
-      long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+      long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) throws IOException {
     this.deadlineAfter = deadlineAfter;
     this.deadlineAfterUnits = deadlineAfterUnits;
     this.onReadyHandler = onReadyHandler;
+    initiateWrite();
     return this;
   }
 

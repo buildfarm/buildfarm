@@ -20,6 +20,7 @@ import static build.buildfarm.common.Actions.satisfiesRequirements;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static com.google.common.collect.Maps.uniqueIndex;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.DAYS;
 
@@ -46,7 +47,6 @@ import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.Retrier.Backoff;
-import build.buildfarm.common.grpc.StubWriteOutputStream;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.ExcessiveWriteSizeException;
 import build.buildfarm.instance.Instance;
@@ -72,6 +72,8 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.SetMultimap;
 import com.google.common.collect.Sets;
 import com.google.common.io.ByteStreams;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.SettableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -531,6 +533,79 @@ class ShardWorkerContext implements WorkerContext {
     return sizeMb * 1024 * 1024;
   }
 
+  public static int KBtoBytes(int sizeMb) {
+    return sizeMb * 1024;
+  }
+
+  // private ListenableFuture<Long> writeBlobFuture(
+  //     Digest digest, ByteString content, RequestMetadata requestMetadata)
+  //     throws ExcessiveWriteSizeException {
+  //   checkState(digest.getSizeBytes() == content.size());
+  //   SettableFuture<Long> writtenFuture = SettableFuture.create();
+  //   Write write = getBlobWrite(digest, UUID.randomUUID(), requestMetadata);
+  //   write.addListener(() -> writtenFuture.set(digest.getSizeBytes()), directExecutor());
+  //   try (OutputStream out = write.getOutput(60, SECONDS, () -> {})) {
+  //     content.writeTo(out);
+  //   } catch (IOException e) {
+  //     if (!writtenFuture.isDone()) {
+  //       writtenFuture.setException(e);
+  //     }
+  //   }
+  //   return writtenFuture;
+  // }
+
+  private ListenableFuture<Long> streamIntoWriteFuture(InputStream in, Write write, long size)
+      throws IOException {
+
+    SettableFuture<Long> writtenFuture = SettableFuture.create();
+    int chunkSizeBytes = KBtoBytes(128);
+
+    FeedbackOutputStream out =
+        write.getOutput(
+            deadlineAfter,
+            deadlineAfterUnits,
+            () -> {
+              try {
+
+                // todo(thickey): pass self into callback
+                FeedbackOutputStream outStream = (FeedbackOutputStream) write;
+                while (outStream.isReady()) {
+                  if (!CopyBytes(in, outStream, chunkSizeBytes)) {
+                    return;
+                  }
+                }
+
+              } catch (IOException e) {
+                logger.log(Level.SEVERE, "unexpected error transferring file: ", e);
+              }
+            });
+
+    write.addListener(
+        () -> {
+          try {
+
+            try {
+              out.close();
+            } catch (IOException e) {
+              // ignore
+            }
+            long committedSize = write.getCommittedSize();
+            if (committedSize != size) {
+              logger.warning(
+                  format(
+                      "committed size %d did not match expectation for digestUtil", committedSize));
+            }
+            writtenFuture.set(size);
+          } catch (RuntimeException e) {
+            // should we wrap with an additional exception?
+            writtenFuture.setException(e);
+          }
+        },
+        directExecutor());
+
+    return writtenFuture;
+  }
+
   private void insertFileToCasMember(Digest digest, Path file)
       throws IOException, InterruptedException {
 
@@ -538,53 +613,33 @@ class ShardWorkerContext implements WorkerContext {
     String workerName = getRandomWorker();
     Instance casMember = workerStub(workerName);
     Write write = getCasMemberWrite(digest, file, workerName);
-    int chunkSizeBytes = MBtoBytes(10);
 
+    // The following callback is performed each time the write stream is ready.
+    // For each callback we only transfer a small part of the input stream in order to avoid
+    // accumulating a large buffer.  When the file is done being transfered,
+    // the final callback will close the streams.
 
-      // The following callback is performed each time the write stream is ready.
-      // For each callback we only transfer a small part of the input stream in order to avoid
-      // accumulating a large buffer.  When the file is done being transfered,
-      // the final callback will close the streams.
-      InputStream in = Files.newInputStream(file);
-      try (OutputStream out =
-          write.getOutput(
-              deadlineAfter,
-              deadlineAfterUnits,
-              () -> {
-                try {
+    try (InputStream in = Files.newInputStream(file)) {
 
-                  FeedbackOutputStream outStream = (FeedbackOutputStream) write;
-                  boolean fileTransfered = false;
-                  while (outStream.isReady() && !fileTransfered) {
-                    if (!CopyBytes(in, outStream, chunkSizeBytes)) {
-                      fileTransfered = true;
-                      in.close();
-                      outStream.close();
-                    }
-                  }
-
-                } catch (IOException e) {
-                  logger.log(Level.SEVERE, "unexpected error transferring file: ", e);
-                }
-              })){
-
-      // the "on ready" callback for the StubWriteOutputStream will not be called without
-      // first priming the write with data or explicitly initializing the write.
-      StubWriteOutputStream stubStream = (StubWriteOutputStream) write;
-      stubStream.initiateWrite();
-
-      // despite completing the write, the CAS member may not yet register the blob.
-      while (!casMember.containsBlob(digest, RequestMetadata.getDefaultInstance())) {}
-
-    } catch (Exception e) {
-      if (!write.isComplete()) {
-        write.reset(); // we will not attempt retry with current behavior, abandon progress
-        if (e.getCause() != null) {
-          Throwables.propagateIfInstanceOf(e.getCause(), InterruptedException.class);
-        }
-        throw e;
-      }
+      streamIntoWriteFuture(in, write, digest.getSizeBytes()).get();
+    } catch (ExecutionException e) {
+      Throwables.propagateIfInstanceOf(e.getCause(), IOException.class);
+      throw new RuntimeException(e.getCause());
     }
+
+    // the "on ready" callback for the StubWriteOutputStream will not be called without
+    // first priming the write with data or explicitly initializing the write.
+    // StubWriteOutputStream stubStream = (StubWriteOutputStream) write;
+
+    // todo(thickey): move to getOutput
+    // todo(thickey): don't close stream / use addListener like: ShardInstance::writeBlobFuture
+    // (close stream & check for error (also check the size) & set a future)
+    // todo(thickey): back to private
+    // stubStream.initiateWrite();
+
+    // despite completing the write, the CAS member may not yet register the blob.
+    // while (!casMember.containsBlob(digest, RequestMetadata.getDefaultInstance())) {}
+
   }
 
   private boolean CopyBytes(InputStream in, OutputStream out, int bytesAmount) throws IOException {
