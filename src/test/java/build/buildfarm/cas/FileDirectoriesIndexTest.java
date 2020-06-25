@@ -19,6 +19,7 @@ import static com.google.common.truth.Truth.assertThat;
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.jimfs.Configuration;
 import com.google.common.jimfs.Jimfs;
@@ -56,26 +57,29 @@ public class FileDirectoriesIndexTest {
     Digest digest = DIGEST_UTIL.compute(coolBlob);
     String dirName = "cool_dir";
     Path path = root.resolve(dirName);
-    Files.write(path, coolBlob.toByteArray());
+    ImmutableList.Builder<String> entriesBuilder = new ImmutableList.Builder<>();
+    entriesBuilder.add(digest.getHash());
 
-    // test directoryEntries
+    // before inserting (entry, directory)
     Digest directory = DIGEST_UTIL.compute(coolBlob);
     Iterable<String> entries = directoriesIndex.directoryEntries(directory);
-    for (String e : entries) {
-      assertThat(e).matches(digest.getHash());
-    }
-    // test put method
-    directoriesIndex.put(directory, entries);
+    assertThat(entries).isEmpty();
 
-    // test entry-wise remove
+    // insert
+    directoriesIndex.put(directory, entriesBuilder.build());
+    entries = directoriesIndex.directoryEntries(directory);
+    assertThat(entries).contains(digest.getHash());
+
+    // remove entry-wise
     for (String entry : entries) {
       Set<Digest> digests = directoriesIndex.removeEntry(entry);
       assertThat(digests.size() == 1 && digests.contains(directory)).isTrue();
     }
 
-    // put again to test remove by directory
-    Files.write(path, coolBlob.toByteArray());
+    // insert again to test remove directory-wise
+    assertThat(entries).contains(digest.getHash());
     directoriesIndex.put(directory, entries);
+    assertThat(Files.exists(directoriesIndex.path(directory))).isTrue();
     directoriesIndex.remove(directory);
     assertThat(Files.notExists(directoriesIndex.path(directory))).isTrue();
     for (String entry : entries) {
