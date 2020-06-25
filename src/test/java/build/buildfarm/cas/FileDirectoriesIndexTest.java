@@ -35,19 +35,16 @@ import org.junit.runners.JUnit4;
 public class FileDirectoriesIndexTest {
   private final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
 
-  private final String jdbcIndexUrlBase = "jdbc:sqlite:memory:";
+  private final String jdbcIndexUrl= "jdbc:sqlite::memory:";
   private Path root;
   private FileDirectoriesIndex directoriesIndex;
-  private String system;
 
-  protected FileDirectoriesIndexTest(Path root, String system) {
+  protected FileDirectoriesIndexTest(Path root) {
     this.root = root.resolve("cache");
-    this.system = system;
   }
 
   @Before
   public void setUp() throws IOException {
-    String jdbcIndexUrl = jdbcIndexUrlBase + system + ":";
     directoriesIndex = new FileDirectoriesIndex(jdbcIndexUrl, root);
     Files.createDirectories(root);
   }
@@ -98,8 +95,7 @@ public class FileDirectoriesIndexTest {
                           .setAttributeViews("basic", "owner", "dos", "acl", "posix", "user")
                           .build())
                   .getRootDirectories(),
-              null),
-          "Windows");
+              null));
     }
   }
 
@@ -114,8 +110,7 @@ public class FileDirectoriesIndexTest {
                           .setAttributeViews("basic", "owner", "posix", "unix")
                           .build())
                   .getRootDirectories(),
-              null),
-          "Unix");
+              null));
     }
   }
 
@@ -130,8 +125,7 @@ public class FileDirectoriesIndexTest {
                           .setAttributeViews("basic", "owner", "posix", "unix")
                           .build())
                   .getRootDirectories(),
-              null),
-          "Os");
+              null));
     }
   }
 }
