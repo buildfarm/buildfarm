@@ -880,11 +880,9 @@ class ShardWorkerContext implements WorkerContext {
       Iterable<String> outputDirs)
       throws IOException, InterruptedException, StatusException {
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
-
     for (String outputFile : outputFiles) {
       uploadOutputFile(resultBuilder, outputFile, actionRoot, preconditionFailure);
     }
-
     for (String outputDir : outputDirs) {
       uploadOutputDirectory(resultBuilder, outputDir, actionRoot, preconditionFailure);
     }
