@@ -525,30 +525,9 @@ class ShardWorkerContext implements WorkerContext {
     }
   }
 
-  public static int MBtoBytes(int sizeMb) {
-    return sizeMb * 1024 * 1024;
+  public static int KBtoBytes(int sizeKb) {
+    return sizeKb * 1024;
   }
-
-  public static int KBtoBytes(int sizeMb) {
-    return sizeMb * 1024;
-  }
-
-  // private ListenableFuture<Long> writeBlobFuture(
-  //     Digest digest, ByteString content, RequestMetadata requestMetadata)
-  //     throws ExcessiveWriteSizeException {
-  //   checkState(digest.getSizeBytes() == content.size());
-  //   SettableFuture<Long> writtenFuture = SettableFuture.create();
-  //   Write write = getBlobWrite(digest, UUID.randomUUID(), requestMetadata);
-  //   write.addListener(() -> writtenFuture.set(digest.getSizeBytes()), directExecutor());
-  //   try (OutputStream out = write.getOutput(60, SECONDS, () -> {})) {
-  //     content.writeTo(out);
-  //   } catch (IOException e) {
-  //     if (!writtenFuture.isDone()) {
-  //       writtenFuture.setException(e);
-  //     }
-  //   }
-  //   return writtenFuture;
-  // }
 
   private ListenableFuture<Long> streamIntoWriteFuture(InputStream in, Write write, long size)
       throws IOException {
@@ -556,6 +535,10 @@ class ShardWorkerContext implements WorkerContext {
     SettableFuture<Long> writtenFuture = SettableFuture.create();
     int chunkSizeBytes = KBtoBytes(128);
 
+    // The following callback is performed each time the write stream is ready.
+    // For each callback we only transfer a small part of the input stream in order to avoid
+    // accumulating a large buffer.  When the file is done being transfered,
+    // the callback closes the stream and prepares the future.
     FeedbackOutputStream out =
         write.getOutput(
             deadlineAfter,
@@ -593,7 +576,6 @@ class ShardWorkerContext implements WorkerContext {
             }
             writtenFuture.set(size);
           } catch (RuntimeException e) {
-            // should we wrap with an additional exception?
             writtenFuture.setException(e);
           }
         },
@@ -610,11 +592,6 @@ class ShardWorkerContext implements WorkerContext {
     Instance casMember = workerStub(workerName);
     Write write = getCasMemberWrite(digest, file, workerName);
 
-    // The following callback is performed each time the write stream is ready.
-    // For each callback we only transfer a small part of the input stream in order to avoid
-    // accumulating a large buffer.  When the file is done being transfered,
-    // the final callback will close the streams.
-
     try (InputStream in = Files.newInputStream(file)) {
 
       streamIntoWriteFuture(in, write, digest.getSizeBytes()).get();
@@ -622,20 +599,6 @@ class ShardWorkerContext implements WorkerContext {
       Throwables.propagateIfInstanceOf(e.getCause(), IOException.class);
       throw new RuntimeException(e.getCause());
     }
-
-    // the "on ready" callback for the StubWriteOutputStream will not be called without
-    // first priming the write with data or explicitly initializing the write.
-    // StubWriteOutputStream stubStream = (StubWriteOutputStream) write;
-
-    // todo(thickey): move to getOutput
-    // todo(thickey): don't close stream / use addListener like: ShardInstance::writeBlobFuture
-    // (close stream & check for error (also check the size) & set a future)
-    // todo(thickey): back to private
-    // stubStream.initiateWrite();
-
-    // despite completing the write, the CAS member may not yet register the blob.
-    // while (!casMember.containsBlob(digest, RequestMetadata.getDefaultInstance())) {}
-
   }
 
   private boolean CopyBytes(InputStream in, OutputStream out, int bytesAmount) throws IOException {
