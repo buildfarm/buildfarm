@@ -1364,23 +1364,7 @@ public class ShardInstance extends AbstractServerInstance {
     checkState(digest.getSizeBytes() == content.size());
     SettableFuture<Long> writtenFuture = SettableFuture.create();
     Write write = getBlobWrite(digest, UUID.randomUUID(), requestMetadata);
-    write.addListener(
-        () -> {
-          try {
-            long committedSize = write.getCommittedSize();
-            if (committedSize != digest.getSizeBytes()) {
-              logger.warning(
-                  format(
-                      "committed size %d did not match expectation for %s, ignoring it",
-                      committedSize, DigestUtil.toString(digest)));
-            }
-            writtenFuture.set(digest.getSizeBytes());
-          } catch (RuntimeException e) {
-            // should we wrap with an additional exception?
-            writtenFuture.setException(e);
-          }
-        },
-        directExecutor());
+    write.addListener(() -> writtenFuture.set(digest.getSizeBytes()), directExecutor());
     try (OutputStream out = write.getOutput(60, SECONDS, () -> {})) {
       content.writeTo(out);
     } catch (IOException e) {
