@@ -34,7 +34,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Set;
 import javax.annotation.concurrent.GuardedBy;
-import jdk.internal.jline.internal.TestAccessible;
 
 /**
  * Ephemeral file manifestations of the entry/directory mappings Directory entries are stored in
@@ -123,7 +122,6 @@ class FileDirectoriesIndex implements DirectoriesIndex {
     return directories.build();
   }
 
-  @TestAccessible
   Path path(Digest digest) {
     return root.resolve(digest.getHash() + "_" + digest.getSizeBytes() + "_dir_inputs");
   }
