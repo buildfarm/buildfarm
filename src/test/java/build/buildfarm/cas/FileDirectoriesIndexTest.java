@@ -73,7 +73,7 @@ public class FileDirectoriesIndexTest {
     // remove entry-wise
     for (String entry : entries) {
       Set<Digest> digests = directoriesIndex.removeEntry(entry);
-      assertThat(digests.size() == 1 && digests.contains(directory)).isTrue();
+      assertThat(digests.size()).containsExactly(directory);
     }
 
     // insert again to test remove directory-wise
@@ -84,7 +84,7 @@ public class FileDirectoriesIndexTest {
     assertThat(Files.notExists(directoriesIndex.path(directory))).isTrue();
     for (String entry : entries) {
       Set<Digest> digests = directoriesIndex.removeEntry(entry);
-      assertThat(digests.isEmpty()).isTrue();
+      assertThat(digests).isEmpty();
     }
   }
 
