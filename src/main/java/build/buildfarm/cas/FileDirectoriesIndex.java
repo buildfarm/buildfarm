@@ -36,11 +36,8 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
 import java.util.Set;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Ephemeral file manifestations of the entry/directory mappings Directory entries are stored in
@@ -49,8 +46,6 @@ import java.util.logging.Logger;
  * <p>Sqlite db should be removed prior to using this index
  */
 class FileDirectoriesIndex implements DirectoriesIndex {
-  public static final Logger logger = Logger.getLogger(FileDirectoriesIndex.class.getName());
-
   protected static final String DIRECTORIES_INDEX_NAME_MEMORY = ":memory:";
 
   private static final Charset UTF_8 = Charset.forName("UTF-8");
@@ -100,7 +95,6 @@ class FileDirectoriesIndex implements DirectoriesIndex {
     for (int i = 0; i < isOpen.length; i++) {
       if (!isOpen[i]) {
         try {
-          logger.log(Level.WARNING, "Creating: " + i + " -> " + dbUrls[i]);
           conns[i] = DriverManager.getConnection(dbUrls[i]);
           try (Statement safetyStatement = conns[i].createStatement()) {
             safetyStatement.execute("PRAGMA synchronous=OFF");
@@ -118,7 +112,6 @@ class FileDirectoriesIndex implements DirectoriesIndex {
                 + ")";
 
         try (Statement stmt = conns[i].createStatement()) {
-          logger.log(Level.WARNING, "Creating: " + dbUrls[i]);
           stmt.execute(createEntriesSql);
         } catch (SQLException e) {
           throw new RuntimeException(e);
