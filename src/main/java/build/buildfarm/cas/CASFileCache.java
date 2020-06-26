@@ -115,6 +115,8 @@ import javax.annotation.concurrent.GuardedBy;
 public abstract class CASFileCache implements ContentAddressableStorage {
   private static final Logger logger = Logger.getLogger(CASFileCache.class.getName());
 
+  protected static final String DEFAULT_DIRECTORIES_INDEX_NAME = "directories.sqlite";
+
   private final Path root;
   private final FileStore fileStore;
   private final long maxSizeInBytes;
@@ -249,7 +251,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         expireService,
         accessRecorder,
         /* storage=*/ Maps.newConcurrentMap(),
-        /* directoriesIndexDbName=*/ FileDirectoriesIndex.DEFAULT_DIRECTORIES_INDEX_NAME,
+        /* directoriesIndexDbName=*/ DEFAULT_DIRECTORIES_INDEX_NAME,
         /* onPut=*/ (digest) -> {},
         /* onExpire=*/ (digests) -> {},
         /* delegate=*/ null);

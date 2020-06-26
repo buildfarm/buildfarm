@@ -51,7 +51,6 @@ import java.util.logging.Logger;
 class FileDirectoriesIndex implements DirectoriesIndex {
   public static final Logger logger = Logger.getLogger(FileDirectoriesIndex.class.getName());
 
-  protected static final String DEFAULT_DIRECTORIES_INDEX_NAME = "directories.sqlite";
   protected static final String DIRECTORIES_INDEX_NAME_MEMORY = ":memory:";
 
   private static final Charset UTF_8 = Charset.forName("UTF-8");
