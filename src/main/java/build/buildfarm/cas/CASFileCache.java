@@ -115,9 +115,6 @@ import javax.annotation.concurrent.GuardedBy;
 public abstract class CASFileCache implements ContentAddressableStorage {
   private static final Logger logger = Logger.getLogger(CASFileCache.class.getName());
 
-  protected static final String DEFAULT_DIRECTORIES_INDEX_NAME = "directories.sqlite";
-  protected static final String DIRECTORIES_INDEX_NAME_MEMORY = ":memory:";
-
   private final Path root;
   private final FileStore fileStore;
   private final long maxSizeInBytes;
@@ -252,7 +249,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         expireService,
         accessRecorder,
         /* storage=*/ Maps.newConcurrentMap(),
-        /* directoriesIndexDbName=*/ DEFAULT_DIRECTORIES_INDEX_NAME,
+        /* directoriesIndexDbName=*/ FileDirectoriesIndex.DEFAULT_DIRECTORIES_INDEX_NAME,
         /* onPut=*/ (digest) -> {},
         /* onExpire=*/ (digests) -> {},
         /* delegate=*/ null);
@@ -286,24 +283,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     this.onExpire = onExpire;
     this.delegate = delegate;
     this.directoriesIndexDbName = directoriesIndexDbName;
-
-    String directoriesIndexUrl = "jdbc:sqlite:";
-    if (directoriesIndexDbName.equals(DIRECTORIES_INDEX_NAME_MEMORY)) {
-      directoriesIndexUrl += directoriesIndexDbName;
-    } else {
-      // db is ephemeral for now, no reuse occurs to match it, computation
-      // occurs each time anyway, and expected use of put is noop on collision
-      Path path = getPath(directoriesIndexDbName);
-      try {
-        if (Files.exists(path)) {
-          Files.delete(path);
-        }
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-      directoriesIndexUrl += path.toString();
-    }
-    this.directoriesIndex = new FileDirectoriesIndex(directoriesIndexUrl, root);
+    this.directoriesIndex = new FileDirectoriesIndex(directoriesIndexDbName, root);
 
     header.before = header.after = header;
   }

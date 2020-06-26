@@ -36,7 +36,7 @@ import org.junit.runners.JUnit4;
 public class FileDirectoriesIndexTest {
   private final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
 
-  private final String jdbcIndexUrl = "jdbc:sqlite::memory:";
+  private final String jdbcIndexUrl = ":memory:";
   private Path root;
   private FileDirectoriesIndex directoriesIndex;
 
