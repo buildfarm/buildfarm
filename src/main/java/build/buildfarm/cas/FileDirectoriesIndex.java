@@ -72,19 +72,28 @@ class FileDirectoriesIndex implements DirectoriesIndex {
       String createEntriesSql =
           "CREATE TABLE entries (\n"
               + "    path TEXT NOT NULL,\n"
-              + "    directory TEXT NOT NULL,\n"
-              + "    PRIMARY KEY (path, directory)\n"
+              + "    directory TEXT NOT NULL\n"
               + ")";
-      String createIndexSql = "CREATE INDEX path_idx ON entries (path)";
 
       try (Statement stmt = conn.createStatement()) {
         stmt.execute(createEntriesSql);
-        stmt.execute(createIndexSql);
       } catch (SQLException e) {
         throw new RuntimeException(e);
       }
 
       opened = true;
+    }
+  }
+
+  @Override
+  public synchronized void start() {
+    open();
+
+    String createIndexSql = "CREATE INDEX path_idx ON entries (path)";
+    try (Statement stmt = conn.createStatement()) {
+      stmt.execute(createIndexSql);
+    } catch (SQLException e) {
+      throw new RuntimeException(e);
     }
   }
 
@@ -150,11 +159,11 @@ class FileDirectoriesIndex implements DirectoriesIndex {
     }
   }
 
-  private synchronized void addEntriesDirectory(Iterable<String> entries, Digest directory) {
+  private synchronized void addEntriesDirectory(Set<String> entries, Digest directory) {
     open();
 
     String digest = DigestUtil.toString(directory);
-    String insertSql = "INSERT OR IGNORE INTO entries (path, directory)\n" + "    VALUES (?,?)";
+    String insertSql = "INSERT INTO entries (path, directory) VALUES (?,?)";
     try (PreparedStatement insertStatement = conn.prepareStatement(insertSql)) {
       conn.setAutoCommit(false);
       insertStatement.setString(2, digest);
@@ -176,7 +185,7 @@ class FileDirectoriesIndex implements DirectoriesIndex {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-    addEntriesDirectory(entries, directory);
+    addEntriesDirectory(ImmutableSet.copyOf(entries), directory);
   }
 
   @GuardedBy("this")

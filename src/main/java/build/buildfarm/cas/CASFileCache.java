@@ -1302,6 +1302,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     LogComputeDirectoriesResults(invalidDirectories);
     deleteInvalidFileContent(invalidDirectories, removeDirectoryService);
 
+    logger.log(Level.INFO, "Creating Index");
+    directoriesIndex.start();
+    logger.log(Level.INFO, "Index Created");
+
     // Calculate Startup time
     Instant endTime = Instant.now();
     Duration startupTime = Duration.between(startTime, endTime);
