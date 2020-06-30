@@ -113,6 +113,8 @@ import java.util.Iterator;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
@@ -132,6 +134,7 @@ public class StubInstance implements Instance {
   private final TimeUnit deadlineAfterUnits;
   private final Retrier retrier;
   private final @Nullable ListeningScheduledExecutorService retryService;
+  private final ExecutorService byteStreamExecutorService;
   private boolean isStopped = false;
   private final int maxBatchUpdateBlobsSize = 3 * 1024 * 1024;
 
@@ -179,6 +182,7 @@ public class StubInstance implements Instance {
     this.deadlineAfterUnits = deadlineAfterUnits;
     this.retrier = retrier;
     this.retryService = retryService;
+    this.byteStreamExecutorService = Executors.newSingleThreadExecutor();
   }
 
   public Channel getChannel() {
@@ -308,6 +312,11 @@ public class StubInstance implements Instance {
     channel.awaitTermination(0, TimeUnit.SECONDS);
     if (retryService != null && !shutdownAndAwaitTermination(retryService, 10, TimeUnit.SECONDS)) {
       logger.log(Level.SEVERE, format("Could not shut down retry service for %s", identifier));
+    }
+    byteStreamExecutorService.shutdown();
+    if (!byteStreamExecutorService.awaitTermination(5, TimeUnit.SECONDS)) {
+      logger.log(
+          Level.SEVERE, String.format("Failed to shutdown blockStore executor for %s", identifier));
     }
   }
 
@@ -467,15 +476,11 @@ public class StubInstance implements Instance {
             new ClientResponseObserver<ReadRequest, ReadResponse>() {
               ClientCallStreamObserver<ReadRequest> requestStream;
               // Guard against spurious onReady() calls caused by a race between onNext() and
-              // onReady(). If the transport
-              // toggles isReady() from false to true while onNext() is executing, but before
-              // onNext() checks isReady(),
-              // request(1) would be called twice - once by onNext() and once by the onReady()
-              // scheduled during onNext()'s
+              // onReady(). If the transport toggles isReady() from false to true while onNext()
+              // is executing, but before onNext() checks isReady(). request(1) would be called
+              // twice - once by onNext() and once by the onReady() scheduled during onNext()'s
               // execution.
-              AtomicBoolean wasReady = new AtomicBoolean(false);
-              // We must not attempt to call request(1) on the stub until the call has been started.
-              AtomicBoolean wasStarted = new AtomicBoolean(false);
+              boolean wasReady = false;
               // Indicator for request completion, so that callbacks throw or are ignored
               AtomicBoolean wasCompleted = new AtomicBoolean(false);
 
@@ -494,41 +499,52 @@ public class StubInstance implements Instance {
                 blobObserver.setOnReadyHandler(this::onReady);
               }
 
+              // Called by the server inbound event loop
               void onReady() {
-                if (wasCompleted.get()) {
-                  throw Status.CANCELLED
-                      .withDescription("request was completed")
-                      .asRuntimeException();
-                }
-                if (wasStarted.get()
-                    && blobObserver.isReady()
-                    && wasReady.compareAndSet(false, true)) {
-                  requestStream.request(1);
-                }
+                // Ensure that onReady and onNext are executed sequentially by moving them
+                // both to a separate single threaded executor.
+                byteStreamExecutorService.execute(() -> {
+                  if (wasCompleted.get()) {
+                    // onReady enqueued after onComplete enequeued.
+                    return;
+                  }
+                  if (blobObserver.isReady() && !wasReady) {
+                    wasReady = true;
+                    requestStream.request(1);
+                  }
+                });
               }
 
+              // Called from the event loop handling client-inbound events.
               @Override
               public void onNext(ReadResponse response) {
-                blobObserver.onNext(response.getData());
-                if (blobObserver.isReady()) {
-                  requestStream.request(1);
-                } else {
-                  wasReady.set(false);
-                }
-                wasStarted.set(true);
-              }
+                // Ensure that onReady and onNext are executed sequentially by moving them
+                // both to a separate single threaded executor.
+                byteStreamExecutorService.execute(() -> {
+                  blobObserver.onNext(response.getData());
+                  if (blobObserver.isReady()) {
+                    requestStream.request(1);
+                  } else {
+                    wasReady = false;
+                  }
+                });
+               }
 
               @Override
               public void onCompleted() {
-                wasCompleted.set(true);
-                blobObserver.onCompleted();
+                byteStreamExecutorService.execute(() -> {
+                  wasCompleted.set(true);
+                  blobObserver.onCompleted();
+                });
               }
 
               @Override
               public void onError(Throwable t) {
-                wasCompleted.set(true);
-                blobObserver.onError(t);
-              }
+                byteStreamExecutorService.execute(() -> {
+                  wasCompleted.set(true);
+                  blobObserver.onError(t);
+                });
+               }
             });
   }
 
