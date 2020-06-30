@@ -22,7 +22,6 @@ import build.buildfarm.common.DigestUtil;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
@@ -35,9 +34,12 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
+import java.util.LinkedList;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Ephemeral file manifestations of the entry/directory mappings Directory entries are stored in
@@ -50,6 +52,7 @@ class FileDirectoriesIndex implements DirectoriesIndex {
 
   private static final Charset UTF_8 = Charset.forName("UTF-8");
   private static final int DEFAULT_NUM_OF_DB = 100;
+  private static final int QUEUE_SIZE = 100;
 
   private final Path root;
   private final int numOfdb;
@@ -57,6 +60,9 @@ class FileDirectoriesIndex implements DirectoriesIndex {
   private String[] dbUrls;
   private boolean[] isOpen;
   private Connection[] conns;
+
+  private boolean batchMode = false;
+  private Queue<MapEntry>[] queues;
 
   FileDirectoriesIndex(String directoriesIndexDbName, Path root, int numOfdb) {
     this.root = root;
@@ -84,6 +90,12 @@ class FileDirectoriesIndex implements DirectoriesIndex {
 
     isOpen = new boolean[this.numOfdb];
     conns = new Connection[this.numOfdb];
+    queues = new Queue[this.numOfdb];
+
+    for (int i = 0; i < queues.length; i++) {
+      queues[i] = new LinkedList<>();
+    }
+
     open();
   }
 
@@ -129,9 +141,9 @@ class FileDirectoriesIndex implements DirectoriesIndex {
     String createIndexSql = "CREATE INDEX path_idx ON entries (path)";
     int nThread = Runtime.getRuntime().availableProcessors();
     String threadNameFormat = "create-sqlite-index-%d";
-    ExecutorService pool = Executors.newFixedThreadPool(
-        nThread, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build()
-    );
+    ExecutorService pool =
+        Executors.newFixedThreadPool(
+            nThread, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
 
     for (Connection conn : conns) {
       pool.execute(
@@ -141,8 +153,42 @@ class FileDirectoriesIndex implements DirectoriesIndex {
             } catch (SQLException e) {
               throw new RuntimeException(e);
             }
-          }
-      );
+          });
+    }
+
+    pool.shutdown();
+    while (!pool.isTerminated()) {
+      try {
+        pool.awaitTermination(10, TimeUnit.SECONDS);
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
+    }
+  }
+
+  @Override
+  public void setBatchMode(boolean batchMode) throws InterruptedException {
+    this.batchMode = batchMode;
+    if (batchMode) {
+      return;
+    }
+    int nThread = Runtime.getRuntime().availableProcessors();
+    String threadNameFormat = "drain-queue-%d";
+    ExecutorService pool =
+        Executors.newFixedThreadPool(
+            nThread, new ThreadFactoryBuilder().setNameFormat(threadNameFormat).build());
+    for (int i = 0; i < queues.length; i++) {
+      int index = i;
+      pool.execute(() -> addEntriesDirectory(index));
+    }
+
+    pool.shutdown();
+    while (!pool.isTerminated()) {
+      try {
+        pool.awaitTermination(1, TimeUnit.SECONDS);
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
     }
   }
 
@@ -224,9 +270,28 @@ class FileDirectoriesIndex implements DirectoriesIndex {
     int dbIndex = Math.abs(entry.hashCode()) % numOfdb;
     try (PreparedStatement insertStatement = conns[dbIndex].prepareStatement(insertSql)) {
       conns[dbIndex].setAutoCommit(false);
-      insertStatement.setString(2, digest);
       insertStatement.setString(1, entry);
+      insertStatement.setString(2, digest);
       insertStatement.executeUpdate();
+      conns[dbIndex].commit();
+    } catch (SQLException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private void addEntriesDirectory(int dbIndex) {
+    open();
+
+    String insertSql = "INSERT INTO entries (path, directory)\n" + "    VALUES (?,?)";
+    try (PreparedStatement insertStatement = conns[dbIndex].prepareStatement(insertSql)) {
+      conns[dbIndex].setAutoCommit(false);
+      while (!queues[dbIndex].isEmpty()) {
+        MapEntry e = queues[dbIndex].poll();
+        insertStatement.setString(1, e.entry);
+        insertStatement.setString(2, e.digest);
+        insertStatement.addBatch();
+      }
+      insertStatement.executeBatch();
       conns[dbIndex].commit();
     } catch (SQLException e) {
       throw new RuntimeException(e);
@@ -242,8 +307,18 @@ class FileDirectoriesIndex implements DirectoriesIndex {
     }
     Set<String> uniqueEntries = ImmutableSet.copyOf(entries);
     for (String entry : uniqueEntries) {
-      synchronized (conns[Math.abs(entry.hashCode()) % numOfdb]) {
-        addEntriesDirectory(entry, directory);
+      int index = Math.abs(entry.hashCode()) % numOfdb;
+      if (batchMode) {
+        synchronized (queues[index]) {
+          queues[index].add(new MapEntry(entry, DigestUtil.toString(directory)));
+          if (queues[index].size() >= QUEUE_SIZE) {
+            addEntriesDirectory(index);
+          }
+        }
+      } else {
+        synchronized (conns[index]) {
+          addEntriesDirectory(entry, directory);
+        }
       }
     }
   }
@@ -281,6 +356,16 @@ class FileDirectoriesIndex implements DirectoriesIndex {
       synchronized (conns[Math.abs(entry.hashCode()) % numOfdb]) {
         removeEntriesDirectory(entry, directory);
       }
+    }
+  }
+
+  private static class MapEntry {
+    String entry;
+    String digest;
+
+    MapEntry(String entry, String digest) {
+      this.entry = entry;
+      this.digest = digest;
     }
   }
 }

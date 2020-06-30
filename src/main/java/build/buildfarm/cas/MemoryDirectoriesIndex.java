@@ -40,6 +40,9 @@ class MemoryDirectoriesIndex implements DirectoriesIndex {
   public void start() {}
 
   @Override
+  public void setBatchMode(boolean batchMode) {}
+
+  @Override
   public synchronized Set<Digest> removeEntry(String entry) {
     Set<Digest> directories = entryDirectories.removeAll(entry);
     for (Digest directory : directories) {

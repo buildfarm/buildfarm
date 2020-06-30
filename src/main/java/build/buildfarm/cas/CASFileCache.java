@@ -1448,6 +1448,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
     ImmutableList.Builder<Path> invalidDirectories = new ImmutableList.Builder<>();
 
+    directoriesIndex.setBatchMode(true);
     for (Path path : cacheScanResults.computeDirs) {
       pool.execute(
           () -> {
@@ -1479,6 +1480,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
 
     joinThreads(pool, "Populating Directories...", 1, MINUTES);
+    directoriesIndex.setBatchMode(false);
 
     return invalidDirectories.build();
   }

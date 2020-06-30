@@ -34,4 +34,6 @@ interface DirectoriesIndex {
   void remove(Digest directory);
 
   void start();
+
+  void setBatchMode(boolean batchMode) throws InterruptedException;
 }
