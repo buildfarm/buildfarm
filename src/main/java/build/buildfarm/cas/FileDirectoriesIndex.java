@@ -287,11 +287,18 @@ class FileDirectoriesIndex implements DirectoriesIndex {
   private void addEntriesDirectory(int dbIndex) {
     open();
 
+    if (queues[dbIndex].isEmpty()) {
+      return;
+    }
+
     String insertSql = "INSERT INTO entries (path, directory)\n" + "    VALUES (?,?)";
     try (PreparedStatement insertStatement = conns[dbIndex].prepareStatement(insertSql)) {
       conns[dbIndex].setAutoCommit(false);
       while (!queues[dbIndex].isEmpty()) {
         MapEntry e = queues[dbIndex].poll();
+        if (e == null) {
+          continue;
+        }
         insertStatement.setString(1, e.entry);
         insertStatement.setString(2, e.digest);
         insertStatement.addBatch();
