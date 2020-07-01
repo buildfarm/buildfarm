@@ -52,7 +52,7 @@ class FileDirectoriesIndex implements DirectoriesIndex {
 
   private static final Charset UTF_8 = Charset.forName("UTF-8");
   private static final int DEFAULT_NUM_OF_DB = 100;
-  private static final int QUEUE_SIZE = 100;
+  private static final int QUEUE_SIZE = 1000;
 
   private final Path root;
   private final int numOfdb;

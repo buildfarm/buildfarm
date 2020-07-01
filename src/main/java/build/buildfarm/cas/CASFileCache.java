@@ -1277,6 +1277,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     CacheScanResults cacheScanResults = scanRoot();
     LogCacheScanResults(cacheScanResults);
     deleteInvalidFileContent(cacheScanResults.deleteFiles, removeDirectoryService);
+    Instant phase1Ending = Instant.now();
+    logger.log(
+        Level.INFO,
+        "TIME_LOGGING: Phase 1 done: "
+            + Duration.between(startTime, phase1Ending).getSeconds()
+            + "s");
 
     // Phase 2: Compute
     // recursively construct all directory structures.
@@ -1284,14 +1290,19 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     LogComputeDirectoriesResults(invalidDirectories);
     deleteInvalidFileContent(invalidDirectories, removeDirectoryService);
 
-    Instant beforeIndexTime= Instant.now();
-    logger.log(Level.INFO, "Inserting done: " + Duration.between(startTime, beforeIndexTime).getSeconds() + "s");
+    Instant beforeIndexing = Instant.now();
+    logger.log(
+        Level.INFO,
+        "TIME_LOGGING: Phase 2 Inserting done: "
+            + Duration.between(phase1Ending, beforeIndexing).getSeconds()
+            + "s");
 
-    logger.log(Level.INFO, "Creating Index");
     directoriesIndex.start();
-    logger.log(Level.INFO, "Index Created");
-    Instant afterIndexTime= Instant.now();
-    logger.log(Level.INFO, "Inserting done: " + Duration.between(beforeIndexTime, afterIndexTime).getSeconds() + "s");
+    Instant afterIndexing = Instant.now();
+    logger.log(
+        Level.INFO,
+        "TIME_LOGGING: Index Created: " + Duration.between(beforeIndexing, afterIndexing));
+    Instant afterIndexTime = Instant.now();
 
     // Calculate Startup time
     Instant endTime = Instant.now();
@@ -1387,7 +1398,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
     // ignore our directories index database
     // indexes will be removed and rebuilt for compute
-    if (!basename.equals(directoriesIndexDbName)) {
+    if (!basename.startsWith(directoriesIndexDbName)) {
       FileStatus stat = stat(file, false);
 
       // mark directory for later key compute

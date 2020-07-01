@@ -65,8 +65,8 @@ class CASTest {
     CASFileCache fileCache =
         new LocalCASFileCache(
             root,
-            /* maxSizeInBytes=*/ GBtoBytes(500),
-            new DigestUtil(HashFunction.SHA1),
+            /* maxSizeInBytes=*/ GBtoBytes(2 * 1024),
+            new DigestUtil(HashFunction.SHA256),
             /* expireService=*/ newDirectExecutorService(),
             /* accessRecorder=*/ directExecutor());
 
