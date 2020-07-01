@@ -40,6 +40,9 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Ephemeral file manifestations of the entry/directory mappings Directory entries are stored in
@@ -48,11 +51,13 @@ import java.util.concurrent.TimeUnit;
  * <p>Sqlite db should be removed prior to using this index
  */
 class FileDirectoriesIndex implements DirectoriesIndex {
+  private static final Logger logger = Logger.getLogger(CASFileCache.class.getName());
+
   protected static final String DIRECTORIES_INDEX_NAME_MEMORY = ":memory:";
 
   private static final Charset UTF_8 = Charset.forName("UTF-8");
   private static final int DEFAULT_NUM_OF_DB = 100;
-  private static final int QUEUE_SIZE = 1000;
+  private static final int MAX_QUEUE_SIZE = 10000;
 
   private final Path root;
   private final int numOfdb;
@@ -63,6 +68,7 @@ class FileDirectoriesIndex implements DirectoriesIndex {
 
   private boolean batchMode = false;
   private Queue<MapEntry>[] queues;
+  private AtomicInteger queueSize = new AtomicInteger(0);
 
   FileDirectoriesIndex(String directoriesIndexDbName, Path root, int numOfdb) {
     this.root = root;
@@ -85,6 +91,7 @@ class FileDirectoriesIndex implements DirectoriesIndex {
           throw new RuntimeException(e);
         }
         dbUrls[i] = directoriesIndexUrl + path.toString();
+        logger.log(Level.INFO, "Database url: " + dbUrls[i]);
       }
     }
 
@@ -173,9 +180,10 @@ class FileDirectoriesIndex implements DirectoriesIndex {
       return;
     }
     drainQueues();
+    queueSize.set(0);
   }
 
-  private void drainQueues() {
+  private synchronized void drainQueues() {
     int nThread = Runtime.getRuntime().availableProcessors();
     String threadNameFormat = "drain-queue-%d";
     ExecutorService pool =
@@ -186,15 +194,16 @@ class FileDirectoriesIndex implements DirectoriesIndex {
       pool.execute(() -> addEntriesDirectory(index));
     }
 
+    logger.log(Level.INFO, "Start to drain the queue.");
     pool.shutdown();
     while (!pool.isTerminated()) {
       try {
-        pool.awaitTermination(1, TimeUnit.SECONDS);
+        pool.awaitTermination(5, TimeUnit.SECONDS);
       } catch (InterruptedException e) {
         throw new RuntimeException(e);
       }
     }
-
+    logger.log(Level.INFO, "Queue Empty");
   }
 
   @Override
@@ -321,13 +330,12 @@ class FileDirectoriesIndex implements DirectoriesIndex {
     for (String entry : uniqueEntries) {
       int index = Math.abs(entry.hashCode()) % numOfdb;
       if (batchMode) {
+        if (queueSize.get() >= MAX_QUEUE_SIZE) {
+          drainQueues();
+        }
         synchronized (queues[index]) {
           queues[index].add(new MapEntry(entry, DigestUtil.toString(directory)));
-          if (queues[index].size() >= QUEUE_SIZE) {
-            synchronized (this) {
-              drainQueues();
-            }
-          }
+          queueSize.incrementAndGet();
         }
       } else {
         synchronized (conns[index]) {
