@@ -134,9 +134,9 @@ public class StubInstance implements Instance {
   private final TimeUnit deadlineAfterUnits;
   private final Retrier retrier;
   private final @Nullable ListeningScheduledExecutorService retryService;
-  private final ExecutorService byteStreamExecutorService;
   private boolean isStopped = false;
   private final int maxBatchUpdateBlobsSize = 3 * 1024 * 1024;
+  private final ExecutorService byteStreamExecutorService = Executors.newSingleThreadExecutor();
 
   public StubInstance(String name, DigestUtil digestUtil, ManagedChannel channel) {
     this(name, "no-identifier", digestUtil, channel, DEFAULT_DEADLINE_DAYS, TimeUnit.DAYS);
@@ -182,7 +182,6 @@ public class StubInstance implements Instance {
     this.deadlineAfterUnits = deadlineAfterUnits;
     this.retrier = retrier;
     this.retryService = retryService;
-    this.byteStreamExecutorService = Executors.newSingleThreadExecutor();
   }
 
   public Channel getChannel() {
@@ -313,8 +312,7 @@ public class StubInstance implements Instance {
     if (retryService != null && !shutdownAndAwaitTermination(retryService, 10, TimeUnit.SECONDS)) {
       logger.log(Level.SEVERE, format("Could not shut down retry service for %s", identifier));
     }
-    byteStreamExecutorService.shutdown();
-    if (!byteStreamExecutorService.awaitTermination(5, TimeUnit.SECONDS)) {
+    if (!shutdownAndAwaitTermination(byteStreamExecutorService, 5, TimeUnit.SECONDS)) {
       logger.log(
           Level.SEVERE, String.format("Failed to shutdown blockStore executor for %s", identifier));
     }
@@ -503,16 +501,17 @@ public class StubInstance implements Instance {
               void onReady() {
                 // Ensure that onReady and onNext are executed sequentially by moving them
                 // both to a separate single threaded executor.
-                byteStreamExecutorService.execute(() -> {
-                  if (wasCompleted.get()) {
-                    // onReady enqueued after onComplete enequeued.
-                    return;
-                  }
-                  if (blobObserver.isReady() && !wasReady) {
-                    wasReady = true;
-                    requestStream.request(1);
-                  }
-                });
+                byteStreamExecutorService.execute(
+                    () -> {
+                      if (wasCompleted.get()) {
+                        // onReady enqueued after onComplete enequeued.
+                        return;
+                      }
+                      if (blobObserver.isReady() && !wasReady) {
+                        wasReady = true;
+                        requestStream.request(1);
+                      }
+                    });
               }
 
               // Called from the event loop handling client-inbound events.
@@ -520,31 +519,34 @@ public class StubInstance implements Instance {
               public void onNext(ReadResponse response) {
                 // Ensure that onReady and onNext are executed sequentially by moving them
                 // both to a separate single threaded executor.
-                byteStreamExecutorService.execute(() -> {
-                  blobObserver.onNext(response.getData());
-                  if (blobObserver.isReady()) {
-                    requestStream.request(1);
-                  } else {
-                    wasReady = false;
-                  }
-                });
-               }
+                byteStreamExecutorService.execute(
+                    () -> {
+                      blobObserver.onNext(response.getData());
+                      if (blobObserver.isReady()) {
+                        requestStream.request(1);
+                      } else {
+                        wasReady = false;
+                      }
+                    });
+              }
 
               @Override
               public void onCompleted() {
-                byteStreamExecutorService.execute(() -> {
-                  wasCompleted.set(true);
-                  blobObserver.onCompleted();
-                });
+                byteStreamExecutorService.execute(
+                    () -> {
+                      wasCompleted.set(true);
+                      blobObserver.onCompleted();
+                    });
               }
 
               @Override
               public void onError(Throwable t) {
-                byteStreamExecutorService.execute(() -> {
-                  wasCompleted.set(true);
-                  blobObserver.onError(t);
-                });
-               }
+                byteStreamExecutorService.execute(
+                    () -> {
+                      wasCompleted.set(true);
+                      blobObserver.onError(t);
+                    });
+              }
             });
   }
 
