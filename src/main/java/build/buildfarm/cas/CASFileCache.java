@@ -1470,7 +1470,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               List<NamedFileKey> sortedDirent = listDirentSorted(path, fileStore);
 
               Directory directory =
-                  computeDirectory(path, sortedDirent, cacheScanResults.fileKeys, inputsBuilder, fileStore);
+                  computeDirectory(
+                      path, sortedDirent, cacheScanResults.fileKeys, inputsBuilder, fileStore);
 
               Digest digest = directory == null ? null : digestUtil.compute(directory);
 
@@ -1532,7 +1533,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       // directory
       if (isDirectory) {
         List<NamedFileKey> childDirent = listDirentSorted(entryPath, fileStore);
-        Directory dir = computeDirectory(entryPath, childDirent, fileKeys, inputsBuilder, fileStore);
+        Directory dir =
+            computeDirectory(entryPath, childDirent, fileKeys, inputsBuilder, fileStore);
         b.addDirectoriesBuilder().setName(name).setDigest(digestUtil.compute(dir));
       }
 
