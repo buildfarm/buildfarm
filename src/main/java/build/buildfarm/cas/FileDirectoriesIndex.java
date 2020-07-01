@@ -172,6 +172,10 @@ class FileDirectoriesIndex implements DirectoriesIndex {
     if (batchMode) {
       return;
     }
+    drainQueues();
+  }
+
+  private void drainQueues() {
     int nThread = Runtime.getRuntime().availableProcessors();
     String threadNameFormat = "drain-queue-%d";
     ExecutorService pool =
@@ -190,6 +194,7 @@ class FileDirectoriesIndex implements DirectoriesIndex {
         throw new RuntimeException(e);
       }
     }
+
   }
 
   @Override
@@ -312,7 +317,9 @@ class FileDirectoriesIndex implements DirectoriesIndex {
         synchronized (queues[index]) {
           queues[index].add(new MapEntry(entry, DigestUtil.toString(directory)));
           if (queues[index].size() >= QUEUE_SIZE) {
-            addEntriesDirectory(index);
+            synchronized (this) {
+              drainQueues();
+            }
           }
         }
       } else {
