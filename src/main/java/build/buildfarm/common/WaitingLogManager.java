@@ -29,6 +29,7 @@ public class WaitingLogManager extends LogManager {
     }
   }
 
+  @SuppressWarnings("GuardedBy")
   private synchronized void releaseReset() {
     released = true;
     instance.reset0();

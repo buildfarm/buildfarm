@@ -1699,6 +1699,7 @@ class LocalCache<K, V> extends AbstractMap<K, V> implements ConcurrentMap<K, V> 
    */
   // Guarded By Segment.this
   @VisibleForTesting
+  @SuppressWarnings("GuardedBy")
   ReferenceEntry<K, V> copyEntry(ReferenceEntry<K, V> original, ReferenceEntry<K, V> newNext) {
     int hash = original.getHash();
     return segmentFor(hash).copyEntry(original, newNext);
