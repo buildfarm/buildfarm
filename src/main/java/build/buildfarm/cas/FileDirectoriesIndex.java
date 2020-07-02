@@ -57,7 +57,7 @@ class FileDirectoriesIndex implements DirectoriesIndex {
 
   private static final Charset UTF_8 = Charset.forName("UTF-8");
   private static final int DEFAULT_NUM_OF_DB = Runtime.getRuntime().availableProcessors();
-  private static final int MAX_QUEUE_SIZE = 1000 * 1000 * 1000;
+  private static final int MAX_QUEUE_SIZE = 10 * 1000;
 
   private final Path root;
   private final int numOfdb;
@@ -334,12 +334,12 @@ class FileDirectoriesIndex implements DirectoriesIndex {
     Set<String> uniqueEntries = ImmutableSet.copyOf(entries);
     for (String entry : uniqueEntries) {
       int index = Math.abs(entry.hashCode()) % numOfdb;
+      // BatchMode is only used in the worker startup.
       if (batchMode) {
         synchronized (queues[index]) {
           queues[index].add(new MapEntry(entry, DigestUtil.toString(directory)));
-          int current = queueSize.incrementAndGet();
-          if (current % 100000 == 0) {
-            logger.log(Level.INFO, "Current queue Size:" + current);
+          if (queues[index].size() > MAX_QUEUE_SIZE) {
+            addEntriesDirectory(index);
           }
         }
       } else {
