@@ -57,7 +57,7 @@ class FileDirectoriesIndex implements DirectoriesIndex {
 
   private static final Charset UTF_8 = Charset.forName("UTF-8");
   private static final int DEFAULT_NUM_OF_DB = Runtime.getRuntime().availableProcessors();
-  private static final int MAX_QUEUE_SIZE = 10 * 1000 * 1000;
+  private static final int MAX_QUEUE_SIZE = 1000 * 1000 * 1000;
 
   private final Path root;
   private final int numOfdb;
@@ -319,11 +319,13 @@ class FileDirectoriesIndex implements DirectoriesIndex {
   }
 
   @Override
-  public synchronized  void put(Digest directory, Iterable<String> entries) {
-    if (queueSize.get() >= MAX_QUEUE_SIZE) {
-      drainQueues();
-      queueSize.set(0);
-    }
+  public void put(Digest directory, Iterable<String> entries) {
+    //synchronized (this) {
+    //  if (queueSize.get() >= MAX_QUEUE_SIZE) {
+    //    drainQueues();
+    //    queueSize.set(0);
+    //  }
+    //}
     try {
       asCharSink(path(directory), UTF_8).writeLines(entries);
     } catch (IOException e) {
@@ -333,11 +335,16 @@ class FileDirectoriesIndex implements DirectoriesIndex {
     for (String entry : uniqueEntries) {
       int index = Math.abs(entry.hashCode()) % numOfdb;
       if (batchMode) {
+        synchronized (queues[index]) {
           queues[index].add(new MapEntry(entry, DigestUtil.toString(directory)));
-          queueSize.incrementAndGet();
+          int current = queueSize.incrementAndGet();
+          logger.log(Level.INFO, "Current queue Size:" + current);
+        }
       } else {
+        synchronized (conns[index]) {
           addEntriesDirectory(entry, directory);
         }
+      }
     }
   }
 
