@@ -319,11 +319,10 @@ class FileDirectoriesIndex implements DirectoriesIndex {
   }
 
   @Override
-  public void put(Digest directory, Iterable<String> entries) {
-    synchronized (this) {
-      if (queueSize.get() >= MAX_QUEUE_SIZE) {
-        drainQueues();
-      }
+  public synchronized  void put(Digest directory, Iterable<String> entries) {
+    if (queueSize.get() >= MAX_QUEUE_SIZE) {
+      drainQueues();
+      queueSize.set(0);
     }
     try {
       asCharSink(path(directory), UTF_8).writeLines(entries);
@@ -334,15 +333,11 @@ class FileDirectoriesIndex implements DirectoriesIndex {
     for (String entry : uniqueEntries) {
       int index = Math.abs(entry.hashCode()) % numOfdb;
       if (batchMode) {
-        synchronized (queues[index]) {
           queues[index].add(new MapEntry(entry, DigestUtil.toString(directory)));
           queueSize.incrementAndGet();
-        }
       } else {
-        synchronized (conns[index]) {
           addEntriesDirectory(entry, directory);
         }
-      }
     }
   }
 
