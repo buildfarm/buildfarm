@@ -224,13 +224,11 @@ public class Worker extends LoggingMain {
     if (config.getOmitFromCas()) {
       writer =
           (digest, file) -> {
-            // Digest digest = instance.getDigestUtil().compute(file);
             insertFileToCasMember(digest, file);
           };
     } else {
       writer =
           (digest, file) -> {
-            // Digest digest = instance.getDigestUtil().compute(file);
             insertFileLocally(digest, file);
           };
     }
