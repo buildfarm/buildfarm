@@ -16,6 +16,8 @@ package build.buildfarm.worker.shard;
 
 import static build.buildfarm.cas.ContentAddressableStorages.createGrpcCAS;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+import static java.lang.String.format;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.DAYS;
@@ -25,6 +27,7 @@ import static java.util.logging.Level.INFO;
 import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.Digest;
+import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.cas.CASFileCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
@@ -34,6 +37,9 @@ import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.LoggingMain;
 import build.buildfarm.common.ShardBackplane;
+import build.buildfarm.common.Write;
+import build.buildfarm.common.io.FeedbackOutputStream;
+import build.buildfarm.instance.ExcessiveWriteSizeException;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.RedisShardBackplane;
 import build.buildfarm.instance.shard.RemoteInputStreamFactory;
@@ -54,9 +60,13 @@ import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.ReportResultStage;
 import com.google.common.base.Strings;
+import com.google.common.base.Throwables;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import com.google.common.io.ByteStreams;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.devtools.common.options.OptionsParser;
 import com.google.longrunning.Operation;
@@ -69,16 +79,22 @@ import io.grpc.Status.Code;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.UserPrincipal;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
+import java.util.function.Supplier;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
@@ -203,6 +219,27 @@ public class Worker extends LoggingMain {
 
     Instances instances = Instances.singular(instance);
 
+    // Create the appropriate writer for the context
+    CasWriter writer;
+    if (config.getOmitFromCas()) {
+      writer =
+          (digest, file) -> {
+            // Digest digest = instance.getDigestUtil().compute(file);
+            insertFileToCasMember(digest, file);
+          };
+    } else {
+      writer =
+          (digest, file) -> {
+            // Digest digest = instance.getDigestUtil().compute(file);
+            insertFileLocally(digest, file);
+          };
+    }
+
+    Supplier<CasWriter> suppliedWriter =
+        () -> {
+          return writer;
+        };
+
     ShardWorkerContext context =
         new ShardWorkerContext(
             config.getPublicName(),
@@ -226,7 +263,7 @@ public class Worker extends LoggingMain {
             config.getLimitExecution(),
             config.getLimitGlobalExecution(),
             config.getOnlyMulticoreTests(),
-            !config.getOmitFromCas());
+            suppliedWriter);
 
     PipelineStage completeStage =
         new PutOperationStage((operation) -> context.deactivate(operation.getName()));
@@ -257,6 +294,161 @@ public class Worker extends LoggingMain {
             .build();
 
     logger.log(INFO, String.format("%s initialized", identifier));
+  }
+
+  private void insertFileLocally(Digest digest, Path file)
+      throws IOException, InterruptedException {
+
+    Write write = getLocalWrite(digest);
+
+    try (OutputStream out =
+            write.getOutput(/* deadlineAfter=*/ 1, /* deadlineAfterUnits=*/ DAYS, () -> {});
+        InputStream in = Files.newInputStream(file)) {
+      ByteStreams.copy(in, out);
+    } catch (IOException e) {
+      if (!write.isComplete()) {
+        write.reset(); // we will not attempt retry with current behavior, abandon progress
+        if (e.getCause() != null) {
+          Throwables.propagateIfInstanceOf(e.getCause(), InterruptedException.class);
+        }
+        throw e;
+      }
+    }
+  }
+
+  private Write getLocalWrite(Digest digest) throws IOException, InterruptedException {
+    Write write =
+        execFileSystem
+            .getStorage()
+            .getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
+    return write;
+  }
+
+  private void insertFileToCasMember(Digest digest, Path file)
+      throws IOException, InterruptedException {
+
+    // create a write for inserting into another CAS member.
+    String workerName = getRandomWorker();
+    Instance casMember = workerStub(workerName);
+    Write write = getCasMemberWrite(digest, workerName);
+
+    try (InputStream in = Files.newInputStream(file)) {
+
+      streamIntoWriteFuture(in, write, digest.getSizeBytes()).get();
+    } catch (ExecutionException e) {
+      Throwables.propagateIfInstanceOf(e.getCause(), IOException.class);
+      throw new RuntimeException(e.getCause());
+    }
+  }
+
+  public static int KBtoBytes(int sizeKb) {
+    return sizeKb * 1024;
+  }
+
+  private ListenableFuture<Long> streamIntoWriteFuture(InputStream in, Write write, long size)
+      throws IOException {
+
+    SettableFuture<Long> writtenFuture = SettableFuture.create();
+    int chunkSizeBytes = KBtoBytes(128);
+
+    // The following callback is performed each time the write stream is ready.
+    // For each callback we only transfer a small part of the input stream in order to avoid
+    // accumulating a large buffer.  When the file is done being transfered,
+    // the callback closes the stream and prepares the future.
+    FeedbackOutputStream out =
+        write.getOutput(
+            /* deadlineAfter=*/ 1,
+            /* deadlineAfterUnits=*/ DAYS,
+            () -> {
+              try {
+
+                // todo(thickey): pass self into callback
+                FeedbackOutputStream outStream = (FeedbackOutputStream) write;
+                while (outStream.isReady()) {
+                  if (!CopyBytes(in, outStream, chunkSizeBytes)) {
+                    return;
+                  }
+                }
+
+              } catch (IOException e) {
+                logger.log(Level.SEVERE, "unexpected error transferring file: ", e);
+              }
+            });
+
+    write.addListener(
+        () -> {
+          try {
+
+            try {
+              out.close();
+            } catch (IOException e) {
+              // ignore
+            }
+            long committedSize = write.getCommittedSize();
+            if (committedSize != size) {
+              logger.warning(
+                  format(
+                      "committed size %d did not match expectation for digestUtil", committedSize));
+            }
+            writtenFuture.set(size);
+          } catch (RuntimeException e) {
+            writtenFuture.setException(e);
+          }
+        },
+        directExecutor());
+
+    return writtenFuture;
+  }
+
+  private boolean CopyBytes(InputStream in, OutputStream out, int bytesAmount) throws IOException {
+    byte[] buf = new byte[bytesAmount];
+    int n = in.read(buf);
+    if (n > 0) {
+      out.write(buf, 0, n);
+      return true;
+    }
+    return false;
+  }
+
+  private Write getCasMemberWrite(Digest digest, String workerName)
+      throws IOException, InterruptedException {
+
+    Instance casMember = workerStub(workerName);
+
+    try {
+      Write write =
+          casMember.getBlobWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
+      return write;
+    } catch (ExcessiveWriteSizeException e) {
+      throw new IOException("unable to obtain writer to cas member");
+    }
+  }
+
+  private String getRandomWorker() throws IOException {
+    Set<String> workerSet = backplane.getWorkers();
+    synchronized (workerSet) {
+      if (workerSet.isEmpty()) {
+        throw new RuntimeException("no available workers");
+      }
+      Random rand = new Random();
+      int index = rand.nextInt(workerSet.size());
+      // best case no allocation average n / 2 selection
+      Iterator<String> iter = workerSet.iterator();
+      String worker = null;
+      while (iter.hasNext() && index-- >= 0) {
+        worker = iter.next();
+      }
+      return worker;
+    }
+  }
+
+  private Instance workerStub(String worker) {
+    try {
+      return workerStubs.get(worker);
+    } catch (ExecutionException e) {
+      logger.log(Level.SEVERE, "error getting worker stub for " + worker, e);
+      throw new IllegalStateException("stub instance creation must not fail");
+    }
   }
 
   private ExecFileSystem createFuseExecFileSystem(

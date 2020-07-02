@@ -20,7 +20,6 @@ import static build.buildfarm.common.Actions.satisfiesRequirements;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static com.google.common.collect.Maps.uniqueIndex;
-import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.DAYS;
 
@@ -35,7 +34,6 @@ import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.Platform;
-import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.Tree;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.cas.ContentAddressableStorage.EntryLimitException;
@@ -47,11 +45,8 @@ import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.Retrier.Backoff;
-import build.buildfarm.common.io.FeedbackOutputStream;
-import build.buildfarm.instance.ExcessiveWriteSizeException;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Instance.MatchListener;
-import build.buildfarm.instance.shard.WorkerStubs;
 import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.QueueEntry;
@@ -71,9 +66,6 @@ import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.SetMultimap;
 import com.google.common.collect.Sets;
-import com.google.common.io.ByteStreams;
-import com.google.common.util.concurrent.ListenableFuture;
-import com.google.common.util.concurrent.SettableFuture;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -86,7 +78,6 @@ import io.grpc.Status.Code;
 import io.grpc.StatusException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
@@ -96,22 +87,18 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.Set;
 import java.util.Stack;
-import java.util.UUID;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 class ShardWorkerContext implements WorkerContext {
   private static final Logger logger = Logger.getLogger(ShardWorkerContext.class.getName());
 
-  private final com.google.common.cache.LoadingCache<String, Instance> workerStubs;
   private final String name;
   private final Platform platform;
   private final SetMultimap<String, String> matchProvisions;
@@ -132,10 +119,10 @@ class ShardWorkerContext implements WorkerContext {
   private final boolean limitExecution;
   private final boolean limitGlobalExecution;
   private final boolean onlyMulticoreTests;
-  private final boolean keepInsertFiles;
   private final Map<String, QueueEntry> activeOperations = Maps.newConcurrentMap();
   private final Group executionsGroup = Group.getRoot().getChild("executions");
   private final Group operationsGroup = executionsGroup.getChild("operations");
+  private final Supplier<CasWriter> writer;
 
   static SetMultimap<String, String> getMatchProvisions(
       Platform platform, Iterable<ExecutionPolicy> policyNames, int executeStageWidth) {
@@ -173,7 +160,7 @@ class ShardWorkerContext implements WorkerContext {
       boolean limitExecution,
       boolean limitGlobalExecution,
       boolean onlyMulticoreTests,
-      boolean keepInsertFiles) {
+      Supplier<CasWriter> writer) {
     this.name = name;
     this.platform = platform;
     this.matchProvisions = getMatchProvisions(platform, policies, executeStageWidth);
@@ -194,14 +181,13 @@ class ShardWorkerContext implements WorkerContext {
     this.limitExecution = limitExecution;
     this.limitGlobalExecution = limitGlobalExecution;
     this.onlyMulticoreTests = onlyMulticoreTests;
-    this.keepInsertFiles = keepInsertFiles;
+    this.writer = writer;
     Preconditions.checkState(
         !limitGlobalExecution || limitExecution,
         "limit_global_execution is meaningless without limit_execution");
     Preconditions.checkState(
         !onlyMulticoreTests || limitExecution,
         "only_multicore_tests is meaningless without limit_execution");
-    workerStubs = WorkerStubs.create(getDigestUtil());
   }
 
   private static Retrier createBackplaneRetrier() {
@@ -499,165 +485,7 @@ class ShardWorkerContext implements WorkerContext {
 
   private void insertFile(Digest digest, Path file) throws IOException, InterruptedException {
 
-    if (keepInsertFiles) {
-      insertFileLocally(digest, file);
-    } else {
-      insertFileToCasMember(digest, file);
-    }
-  }
-
-  private void insertFileLocally(Digest digest, Path file)
-      throws IOException, InterruptedException {
-
-    Write write = getLocalWrite(digest, file);
-
-    try (OutputStream out = write.getOutput(deadlineAfter, deadlineAfterUnits, () -> {});
-        InputStream in = Files.newInputStream(file)) {
-      ByteStreams.copy(in, out);
-    } catch (IOException e) {
-      if (!write.isComplete()) {
-        write.reset(); // we will not attempt retry with current behavior, abandon progress
-        if (e.getCause() != null) {
-          Throwables.propagateIfInstanceOf(e.getCause(), InterruptedException.class);
-        }
-        throw e;
-      }
-    }
-  }
-
-  public static int KBtoBytes(int sizeKb) {
-    return sizeKb * 1024;
-  }
-
-  private ListenableFuture<Long> streamIntoWriteFuture(InputStream in, Write write, long size)
-      throws IOException {
-
-    SettableFuture<Long> writtenFuture = SettableFuture.create();
-    int chunkSizeBytes = KBtoBytes(128);
-
-    // The following callback is performed each time the write stream is ready.
-    // For each callback we only transfer a small part of the input stream in order to avoid
-    // accumulating a large buffer.  When the file is done being transfered,
-    // the callback closes the stream and prepares the future.
-    FeedbackOutputStream out =
-        write.getOutput(
-            deadlineAfter,
-            deadlineAfterUnits,
-            () -> {
-              try {
-
-                // todo(thickey): pass self into callback
-                FeedbackOutputStream outStream = (FeedbackOutputStream) write;
-                while (outStream.isReady()) {
-                  if (!CopyBytes(in, outStream, chunkSizeBytes)) {
-                    return;
-                  }
-                }
-
-              } catch (IOException e) {
-                logger.log(Level.SEVERE, "unexpected error transferring file: ", e);
-              }
-            });
-
-    write.addListener(
-        () -> {
-          try {
-
-            try {
-              out.close();
-            } catch (IOException e) {
-              // ignore
-            }
-            long committedSize = write.getCommittedSize();
-            if (committedSize != size) {
-              logger.warning(
-                  format(
-                      "committed size %d did not match expectation for digestUtil", committedSize));
-            }
-            writtenFuture.set(size);
-          } catch (RuntimeException e) {
-            writtenFuture.setException(e);
-          }
-        },
-        directExecutor());
-
-    return writtenFuture;
-  }
-
-  private void insertFileToCasMember(Digest digest, Path file)
-      throws IOException, InterruptedException {
-
-    // create a write for inserting into another CAS member.
-    String workerName = getRandomWorker();
-    Instance casMember = workerStub(workerName);
-    Write write = getCasMemberWrite(digest, file, workerName);
-
-    try (InputStream in = Files.newInputStream(file)) {
-
-      streamIntoWriteFuture(in, write, digest.getSizeBytes()).get();
-    } catch (ExecutionException e) {
-      Throwables.propagateIfInstanceOf(e.getCause(), IOException.class);
-      throw new RuntimeException(e.getCause());
-    }
-  }
-
-  private boolean CopyBytes(InputStream in, OutputStream out, int bytesAmount) throws IOException {
-    byte[] buf = new byte[bytesAmount];
-    int n = in.read(buf);
-    if (n > 0) {
-      out.write(buf, 0, n);
-      return true;
-    }
-    return false;
-  }
-
-  private Write getLocalWrite(Digest digest, Path file) throws IOException, InterruptedException {
-    Write write =
-        execFileSystem
-            .getStorage()
-            .getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
-    return write;
-  }
-
-  private Write getCasMemberWrite(Digest digest, Path file, String workerName)
-      throws IOException, InterruptedException {
-
-    Instance casMember = workerStub(workerName);
-
-    try {
-      Write write =
-          casMember.getBlobWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
-      return write;
-    } catch (ExcessiveWriteSizeException e) {
-      throw new IOException("unable to obtain writer to cas member");
-    }
-  }
-
-  private String getRandomWorker() throws IOException {
-    Set<String> workerSet = backplane.getWorkers();
-    synchronized (workerSet) {
-      if (workerSet.isEmpty()) {
-        throw new RuntimeException("no available workers");
-      }
-      Random rand = new Random();
-      int index = rand.nextInt(workerSet.size());
-      // best case no allocation average n / 2 selection
-      Iterator<String> iter = workerSet.iterator();
-      String worker = null;
-      while (iter.hasNext() && index-- >= 0) {
-        worker = iter.next();
-      }
-      return worker;
-    }
-  }
-
-  private Instance workerStub(String worker) {
-    try {
-      return workerStubs.get(worker);
-    } catch (ExecutionException e) {
-      logger.log(Level.SEVERE, "error getting worker stub for " + worker, e);
-      throw new IllegalStateException("stub instance creation must not fail");
-    }
+    writer.get().write(digest, file);
   }
 
   private void updateActionResultStdOutputs(ActionResult.Builder resultBuilder)
