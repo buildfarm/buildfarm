@@ -338,7 +338,9 @@ class FileDirectoriesIndex implements DirectoriesIndex {
         synchronized (queues[index]) {
           queues[index].add(new MapEntry(entry, DigestUtil.toString(directory)));
           int current = queueSize.incrementAndGet();
-          logger.log(Level.INFO, "Current queue Size:" + current);
+          if (current % 100000 == 0) {
+            logger.log(Level.INFO, "Current queue Size:" + current);
+          }
         }
       } else {
         synchronized (conns[index]) {
