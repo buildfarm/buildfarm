@@ -56,8 +56,8 @@ class FileDirectoriesIndex implements DirectoriesIndex {
   protected static final String DIRECTORIES_INDEX_NAME_MEMORY = ":memory:";
 
   private static final Charset UTF_8 = Charset.forName("UTF-8");
-  private static final int DEFAULT_NUM_OF_DB = Runtime.getRuntime().availableProcessors();
-  private static final int MAX_QUEUE_SIZE = 100 * 1000;
+  private static final int DEFAULT_NUM_OF_DB = Runtime.getRuntime().availableProcessors() * 10;
+  private static final int MAX_QUEUE_SIZE = 10 * 1000;
 
   private final Path root;
   private final int numOfdb;
@@ -197,7 +197,7 @@ class FileDirectoriesIndex implements DirectoriesIndex {
     pool.shutdown();
     while (!pool.isTerminated()) {
       try {
-        pool.awaitTermination(5, TimeUnit.SECONDS);
+        pool.awaitTermination(1, TimeUnit.SECONDS);
       } catch (InterruptedException e) {
         throw new RuntimeException(e);
       }
@@ -341,8 +341,8 @@ class FileDirectoriesIndex implements DirectoriesIndex {
         synchronized (queues[index]) {
           queues[index].add(new MapEntry(entry, DigestUtil.toString(directory)));
           int current = queueSize.incrementAndGet();
-          if (current % (1000 * 10) == 0) {
-            logger.log(Level.INFO, "Entry added: " + current);
+          if (current % (1000 * 1000) == 0) {
+            logger.log(Level.INFO, "Entry added: " + current / (1000 * 1000) + "million");
           }
           if (queues[index].size() > MAX_QUEUE_SIZE) {
             addEntriesDirectory(index);
