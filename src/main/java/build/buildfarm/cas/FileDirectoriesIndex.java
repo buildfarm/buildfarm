@@ -299,6 +299,7 @@ class FileDirectoriesIndex implements DirectoriesIndex {
       return;
     }
 
+    logger.log(Level.INFO, "Start draining separate queue: " + dbIndex);
     String insertSql = "INSERT INTO entries (path, directory)\n" + "    VALUES (?,?)";
     try (PreparedStatement insertStatement = conns[dbIndex].prepareStatement(insertSql)) {
       conns[dbIndex].setAutoCommit(false);
@@ -316,6 +317,7 @@ class FileDirectoriesIndex implements DirectoriesIndex {
     } catch (SQLException e) {
       throw new RuntimeException(e);
     }
+    logger.log(Level.INFO, "Drained separate queue: " + dbIndex);
   }
 
   @Override
@@ -338,6 +340,10 @@ class FileDirectoriesIndex implements DirectoriesIndex {
       if (batchMode) {
         synchronized (queues[index]) {
           queues[index].add(new MapEntry(entry, DigestUtil.toString(directory)));
+          int current = queueSize.incrementAndGet();
+          if (current % (1000 * 10) == 0) {
+            logger.log(Level.INFO, "Entry added: " + current);
+          }
           if (queues[index].size() > MAX_QUEUE_SIZE) {
             addEntriesDirectory(index);
           }
