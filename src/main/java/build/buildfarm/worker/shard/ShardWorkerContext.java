@@ -886,7 +886,6 @@ class ShardWorkerContext implements WorkerContext {
     for (String outputDir : outputDirs) {
       uploadOutputDirectory(resultBuilder, outputDir, actionRoot, preconditionFailure);
     }
-
     checkPreconditionFailure(actionDigest, preconditionFailure.build());
 
     /* put together our outputs and update the result */
