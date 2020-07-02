@@ -295,7 +295,11 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
     this.deadlineAfter = deadlineAfter;
     this.deadlineAfterUnits = deadlineAfterUnits;
     this.onReadyHandler = onReadyHandler;
-    initiateWrite();
+    synchronized (this) {
+      if (writeObserver == null) {
+        initiateWrite();
+      }
+    }
     return this;
   }
 
