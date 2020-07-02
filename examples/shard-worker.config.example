@@ -5,9 +5,8 @@ port: 8981
 # by all shard cluster servers
 public_name: "localhost:8981"
 
-# This determines whether the shard instance will participate in the backplane
-# and cache it's operation outputs in its own cache file CAS.
-# When not caching locally, the worker will send its output to another worker's CAS.
+# This determines whether the worker is a shard of the cas.
+# When not a shard, it will upload into the Sharded CAS
 omit_from_cas: false
 
 # the digest function for this worker, required
@@ -121,6 +120,22 @@ redis_shard_backplane_config: {
 
   # The size of the redis connection pool
   jedis_pool_max_total: 4000
+  
+  # the operation queue can be configured to store
+  # operations in specific queues based on platform properties
+  #provisioned_queues: {
+  #  queues: [
+  #    {
+  #      name: "queue1"
+  #      platform: {
+  #        properties: [{name: "key" value: "value"}]
+  #      }
+  #    },
+  #    {
+  #        name: "queue2"
+  #    }
+  #  ]
+  #}
 
   # The redis key used to store a hash of registered Workers
   # to their registration expiration time. After a worker's
