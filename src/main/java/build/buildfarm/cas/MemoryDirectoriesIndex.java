@@ -37,6 +37,9 @@ class MemoryDirectoriesIndex implements DirectoriesIndex {
   public void close() {}
 
   @Override
+  public void start() {}
+
+  @Override
   public synchronized Set<Digest> removeEntry(String entry) {
     Set<Digest> directories = entryDirectories.removeAll(entry);
     for (Digest directory : directories) {

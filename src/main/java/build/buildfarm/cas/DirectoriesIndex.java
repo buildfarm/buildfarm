@@ -32,4 +32,6 @@ interface DirectoriesIndex {
   void put(Digest directory, Iterable<String> entries);
 
   void remove(Digest directory);
+
+  void start();
 }

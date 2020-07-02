@@ -84,6 +84,7 @@ import java.io.OutputStream;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.ClosedChannelException;
 import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
@@ -1283,6 +1284,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     logger.log(Level.INFO, "Initializing cache at: " + root);
     Instant startTime = Instant.now();
 
+    Files.createDirectories(root);
+
+    FileStore fileStore = Files.getFileStore(root);
+
     // Phase 1: Scan
     // build scan cache results by analyzing each file on the root.
     CacheScanResults cacheScanResults = scanRoot();
@@ -1291,9 +1296,13 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
     // Phase 2: Compute
     // recursively construct all directory structures.
-    List<Path> invalidDirectories = computeDirectories(cacheScanResults);
+    List<Path> invalidDirectories = computeDirectories(cacheScanResults, fileStore);
     LogComputeDirectoriesResults(invalidDirectories);
     deleteInvalidFileContent(invalidDirectories, removeDirectoryService);
+
+    logger.log(Level.INFO, "Creating Index");
+    directoriesIndex.start();
+    logger.log(Level.INFO, "Index Created");
 
     // Calculate Startup time
     Instant endTime = Instant.now();
@@ -1340,9 +1349,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   private CacheScanResults scanRoot() throws IOException, InterruptedException {
-
-    Files.createDirectories(root);
-
     // create thread pool
     int nThreads = Runtime.getRuntime().availableProcessors();
     String threadNameFormat = "scan-cache-pool-%d";
@@ -1443,7 +1449,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
-  private List<Path> computeDirectories(CacheScanResults cacheScanResults)
+  private List<Path> computeDirectories(CacheScanResults cacheScanResults, FileStore fileStore)
       throws IOException, InterruptedException {
 
     // create thread pool
@@ -1461,10 +1467,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             try {
               ImmutableList.Builder<String> inputsBuilder = ImmutableList.builder();
 
-              List<NamedFileKey> sortedDirent = listDirentSorted(path);
+              List<NamedFileKey> sortedDirent = listDirentSorted(path, fileStore);
 
               Directory directory =
-                  computeDirectory(path, sortedDirent, cacheScanResults.fileKeys, inputsBuilder);
+                  computeDirectory(
+                      path, sortedDirent, cacheScanResults.fileKeys, inputsBuilder, fileStore);
 
               Digest digest = directory == null ? null : digestUtil.compute(directory);
 
@@ -1494,7 +1501,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Path path,
       List<NamedFileKey> sortedDirent,
       Map<Object, Entry> fileKeys,
-      ImmutableList.Builder<String> inputsBuilder)
+      ImmutableList.Builder<String> inputsBuilder,
+      FileStore fileStore)
       throws IOException, InterruptedException {
     Directory.Builder b = Directory.newBuilder();
 
@@ -1524,8 +1532,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
       // directory
       if (isDirectory) {
-        List<NamedFileKey> childDirent = listDirentSorted(entryPath);
-        Directory dir = computeDirectory(entryPath, childDirent, fileKeys, inputsBuilder);
+        List<NamedFileKey> childDirent = listDirentSorted(entryPath, fileStore);
+        Directory dir =
+            computeDirectory(entryPath, childDirent, fileKeys, inputsBuilder, fileStore);
         b.addDirectoriesBuilder().setName(name).setDigest(digestUtil.compute(dir));
       }
 
