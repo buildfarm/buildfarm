@@ -618,7 +618,7 @@ public class StubInstance implements Instance {
     String resourceName =
         ByteStreamUploader.uploadResourceName(
             getName(), uuid, HashCode.fromString(digest.getHash()), digest.getSizeBytes());
-    return getWrite(resourceName, digest.getSizeBytes(), /* autoflush=*/ true, requestMetadata);
+    return getWrite(resourceName, digest.getSizeBytes(), /* autoflush=*/ false, requestMetadata);
   }
 
   @Override
