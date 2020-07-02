@@ -56,7 +56,7 @@ class FileDirectoriesIndex implements DirectoriesIndex {
   protected static final String DIRECTORIES_INDEX_NAME_MEMORY = ":memory:";
 
   private static final Charset UTF_8 = Charset.forName("UTF-8");
-  private static final int DEFAULT_NUM_OF_DB = 100;
+  private static final int DEFAULT_NUM_OF_DB = Runtime.getRuntime().availableProcessors();
   private static final int MAX_QUEUE_SIZE = 1000 * 1000;
 
   private final Path root;
@@ -91,7 +91,6 @@ class FileDirectoriesIndex implements DirectoriesIndex {
           throw new RuntimeException(e);
         }
         dbUrls[i] = directoriesIndexUrl + path.toString();
-        logger.log(Level.INFO, "Database url: " + dbUrls[i]);
       }
     }
 
@@ -183,7 +182,7 @@ class FileDirectoriesIndex implements DirectoriesIndex {
     queueSize.set(0);
   }
 
-  private synchronized void drainQueues() {
+  private void drainQueues() {
     int nThread = Runtime.getRuntime().availableProcessors();
     String threadNameFormat = "drain-queue-%d";
     ExecutorService pool =
@@ -330,8 +329,10 @@ class FileDirectoriesIndex implements DirectoriesIndex {
     for (String entry : uniqueEntries) {
       int index = Math.abs(entry.hashCode()) % numOfdb;
       if (batchMode) {
-        if (queueSize.get() >= MAX_QUEUE_SIZE) {
-          drainQueues();
+        synchronized (this) {
+          if (queueSize.get() >= MAX_QUEUE_SIZE) {
+            drainQueues();
+          }
         }
         synchronized (queues[index]) {
           queues[index].add(new MapEntry(entry, DigestUtil.toString(directory)));
