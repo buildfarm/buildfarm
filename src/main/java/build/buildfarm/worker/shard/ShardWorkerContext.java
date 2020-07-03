@@ -35,7 +35,6 @@ import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.Tree;
-import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.cas.ContentAddressableStorage.EntryLimitException;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
@@ -122,6 +121,7 @@ class ShardWorkerContext implements WorkerContext {
   private final Map<String, QueueEntry> activeOperations = Maps.newConcurrentMap();
   private final Group executionsGroup = Group.getRoot().getChild("executions");
   private final Group operationsGroup = executionsGroup.getChild("operations");
+  private final boolean omitFromCas;
   private final Supplier<CasWriter> writer;
 
   static SetMultimap<String, String> getMatchProvisions(
@@ -160,6 +160,7 @@ class ShardWorkerContext implements WorkerContext {
       boolean limitExecution,
       boolean limitGlobalExecution,
       boolean onlyMulticoreTests,
+      boolean omitFromCas,
       Supplier<CasWriter> writer) {
     this.name = name;
     this.platform = platform;
@@ -181,6 +182,7 @@ class ShardWorkerContext implements WorkerContext {
     this.limitExecution = limitExecution;
     this.limitGlobalExecution = limitGlobalExecution;
     this.onlyMulticoreTests = onlyMulticoreTests;
+    this.omitFromCas = omitFromCas;
     this.writer = writer;
     Preconditions.checkState(
         !limitGlobalExecution || limitExecution,
@@ -477,14 +479,18 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   private void insertBlob(Digest digest, ByteString content) throws InterruptedException {
+
     if (digest.getSizeBytes() > 0) {
-      Blob blob = new Blob(content, digest);
-      execFileSystem.getStorage().put(blob);
+      try {
+        writer.get().insertBlob(digest, content);
+      } catch (IOException e) {
+      }
     }
   }
 
   private void insertFile(Digest digest, Path file) throws IOException, InterruptedException {
 
+    System.out.println(file.toString());
     writer.get().write(digest, file);
   }
 

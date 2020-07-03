@@ -15,9 +15,13 @@
 package build.buildfarm.worker.shard;
 
 import build.bazel.remote.execution.v2.Digest;
+import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.nio.file.Path;
 
 public interface CasWriter {
   public void write(Digest digest, Path file) throws IOException, InterruptedException;
+
+  public void insertBlob(Digest digest, ByteString content)
+      throws IOException, InterruptedException;
 }

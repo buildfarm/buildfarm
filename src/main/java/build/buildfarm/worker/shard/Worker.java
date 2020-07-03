@@ -116,6 +116,28 @@ public class Worker extends LoggingMain {
   private final ShardBackplane backplane;
   private final LoadingCache<String, Instance> workerStubs;
 
+  class LocalCasWriter implements CasWriter {
+    public void write(Digest digest, Path file) throws IOException, InterruptedException {
+      insertFileLocally(digest, file);
+    }
+
+    public void insertBlob(Digest digest, ByteString content)
+        throws IOException, InterruptedException {
+      insertBlobLocally(digest, content);
+    }
+  }
+
+  class RemoteCasWriter implements CasWriter {
+    public void write(Digest digest, Path file) throws IOException, InterruptedException {
+      insertFileToCasMember(digest, file);
+    }
+
+    public void insertBlob(Digest digest, ByteString content)
+        throws IOException, InterruptedException {
+      insertBlobToCasMember(digest, content);
+    }
+  }
+
   public Worker(String session, ShardWorkerConfig config) throws ConfigurationException {
     this(session, ServerBuilder.forPort(config.getPort()), config);
   }
@@ -222,15 +244,9 @@ public class Worker extends LoggingMain {
     // Create the appropriate writer for the context
     CasWriter writer;
     if (config.getOmitFromCas()) {
-      writer =
-          (digest, file) -> {
-            insertFileToCasMember(digest, file);
-          };
+      writer = new RemoteCasWriter();
     } else {
-      writer =
-          (digest, file) -> {
-            insertFileLocally(digest, file);
-          };
+      writer = new LocalCasWriter();
     }
 
     Supplier<CasWriter> suppliedWriter =
@@ -261,6 +277,7 @@ public class Worker extends LoggingMain {
             config.getLimitExecution(),
             config.getLimitGlobalExecution(),
             config.getOnlyMulticoreTests(),
+            config.getOmitFromCas(),
             suppliedWriter);
 
     PipelineStage completeStage =
@@ -314,14 +331,6 @@ public class Worker extends LoggingMain {
     }
   }
 
-  private Write getLocalWrite(Digest digest) throws IOException, InterruptedException {
-    Write write =
-        execFileSystem
-            .getStorage()
-            .getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
-    return write;
-  }
-
   private void insertFileToCasMember(Digest digest, Path file)
       throws IOException, InterruptedException {
 
@@ -337,6 +346,51 @@ public class Worker extends LoggingMain {
       Throwables.propagateIfInstanceOf(e.getCause(), IOException.class);
       throw new RuntimeException(e.getCause());
     }
+  }
+
+  public void insertBlobLocally(Digest digest, ByteString content)
+      throws IOException, InterruptedException {
+
+    Write write = getLocalWrite(digest);
+
+    try (OutputStream out =
+            write.getOutput(/* deadlineAfter=*/ 1, /* deadlineAfterUnits=*/ DAYS, () -> {});
+        InputStream in = content.newInput()) {
+      ByteStreams.copy(in, out);
+    } catch (IOException e) {
+      if (!write.isComplete()) {
+        write.reset(); // we will not attempt retry with current behavior, abandon progress
+        if (e.getCause() != null) {
+          Throwables.propagateIfInstanceOf(e.getCause(), InterruptedException.class);
+        }
+        throw e;
+      }
+    }
+  }
+
+  public void insertBlobToCasMember(Digest digest, ByteString content)
+      throws IOException, InterruptedException {
+
+    // create a write for inserting into another CAS member.
+    String workerName = getRandomWorker();
+    Instance casMember = workerStub(workerName);
+    Write write = getCasMemberWrite(digest, workerName);
+
+    try (InputStream in = content.newInput()) {
+
+      streamIntoWriteFuture(in, write, digest.getSizeBytes()).get();
+    } catch (ExecutionException e) {
+      Throwables.propagateIfInstanceOf(e.getCause(), IOException.class);
+      throw new RuntimeException(e.getCause());
+    }
+  }
+
+  private Write getLocalWrite(Digest digest) throws IOException, InterruptedException {
+    Write write =
+        execFileSystem
+            .getStorage()
+            .getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
+    return write;
   }
 
   public static int KBtoBytes(int sizeKb) {
