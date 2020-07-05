@@ -56,8 +56,9 @@ class FileDirectoriesIndex implements DirectoriesIndex {
   protected static final String DIRECTORIES_INDEX_NAME_MEMORY = ":memory:";
 
   private static final Charset UTF_8 = Charset.forName("UTF-8");
-  private static final int DEFAULT_NUM_OF_DB = Runtime.getRuntime().availableProcessors() * 10;
+  private static final int DEFAULT_NUM_OF_DB = Runtime.getRuntime().availableProcessors() * 2;
   private static final int MAX_QUEUE_SIZE = 10 * 1000;
+  private static final int MAX_TOTAL_QUEUE_SIZE = 2 * 1000 * 1000;
 
   private final Path root;
   private final int numOfdb;
@@ -333,6 +334,11 @@ class FileDirectoriesIndex implements DirectoriesIndex {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
+    synchronized (this) {
+      if (queueSize.get() > MAX_TOTAL_QUEUE_SIZE) {
+        drainQueues();
+      }
+    }
     Set<String> uniqueEntries = ImmutableSet.copyOf(entries);
     for (String entry : uniqueEntries) {
       int index = Math.abs(entry.hashCode()) % numOfdb;
@@ -344,9 +350,9 @@ class FileDirectoriesIndex implements DirectoriesIndex {
           if (current % (1000 * 1000) == 0) {
             logger.log(Level.INFO, "Entry added: " + current / (1000 * 1000) + "million");
           }
-          if (queues[index].size() > MAX_QUEUE_SIZE) {
-            addEntriesDirectory(index);
-          }
+          //if (queues[index].size() > MAX_QUEUE_SIZE) {
+          //  addEntriesDirectory(index);
+          //}
         }
       } else {
         synchronized (conns[index]) {
