@@ -57,7 +57,7 @@ class FileDirectoriesIndex implements DirectoriesIndex {
 
   private static final Charset UTF_8 = Charset.forName("UTF-8");
   private static final int DEFAULT_NUM_OF_DB = Runtime.getRuntime().availableProcessors() * 10;
-  private static final int MAX_QUEUE_SIZE = 10 * 1000;
+  private static final int MAX_QUEUE_SIZE = 100 * 1000;
   private static final int MAX_TOTAL_QUEUE_SIZE = 20 * 1000 * 1000;
 
   private final Path root;
