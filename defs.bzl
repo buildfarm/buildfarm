@@ -100,16 +100,9 @@ def buildfarm_init(name="buildfarm"):
 
     protobuf_deps()
 
-    grpc_java_repositories(
-        omit_com_google_guava = True,
-        omit_com_google_guava_failureaccess = True,
-    )
+    grpc_java_repositories()
 
     native.bind(
         name = "jar/redis/clients/jedis",
         actual = "@jedis//jar",
     )
-
-    grpc_java_repositories()
-
-    protobuf_deps()
