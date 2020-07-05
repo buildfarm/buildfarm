@@ -1625,6 +1625,19 @@ public class ShardInstance extends AbstractServerInstance {
   public ListenableFuture<Void> requeueOperation(QueueEntry queueEntry) {
     ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
     String operationName = executeEntry.getOperationName();
+    try {
+      if (backplane.isBlacklisted(executeEntry.getRequestMetadata())) {
+        putOperation(
+            Operation.newBuilder()
+                .setName(operationName)
+                .setDone(true)
+                .setResponse(Any.pack(blacklistResponse(executeEntry.getActionDigest())))
+                .build());
+        return IMMEDIATE_VOID_FUTURE;
+      }
+    } catch (IOException e) {
+      return immediateFailedFuture(e);
+    }
     Operation operation;
     try {
       operation = getOperation(operationName);
@@ -2169,7 +2182,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @Override
-  public boolean putOperation(Operation operation) throws InterruptedException {
+  public boolean putOperation(Operation operation) {
     if (isErrored(operation)) {
       try {
         return backplane.putOperation(operation, ExecutionStage.Value.COMPLETED);
