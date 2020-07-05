@@ -334,27 +334,20 @@ class FileDirectoriesIndex implements DirectoriesIndex {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-    synchronized (this) {
-      if (queueSize.get() > MAX_TOTAL_QUEUE_SIZE) {
-        drainQueues();
-        queueSize.set(0);
-      }
-    }
     Set<String> uniqueEntries = ImmutableSet.copyOf(entries);
     for (String entry : uniqueEntries) {
       int index = Math.abs(entry.hashCode()) % numOfdb;
       // BatchMode is only used in the worker startup.
       if (batchMode) {
         synchronized (queues[index]) {
-          int current = queueSize.get();
-          if (current % (1000 * 1000) == 0) {
-            logger.log(Level.INFO, "Entry added: " + current / (1000 * 1000) + "million");
-          }
           queues[index].add(new MapEntry(entry, DigestUtil.toString(directory)));
-          queueSize.incrementAndGet();
-          //if (queues[index].size() > MAX_QUEUE_SIZE) {
-          //  addEntriesDirectory(index);
-          //}
+          int current = queueSize.incrementAndGet();
+          if (current % (1000 * 1000) == 0) {
+            logger.log(Level.INFO, "Entry added: " + current / (1000 * 1000) + " million");
+          }
+          if (queues[index].size() > MAX_QUEUE_SIZE) {
+            addEntriesDirectory(index);
+          }
         }
       } else {
         synchronized (conns[index]) {
