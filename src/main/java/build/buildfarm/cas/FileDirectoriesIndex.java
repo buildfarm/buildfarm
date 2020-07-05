@@ -56,7 +56,7 @@ class FileDirectoriesIndex implements DirectoriesIndex {
   protected static final String DIRECTORIES_INDEX_NAME_MEMORY = ":memory:";
 
   private static final Charset UTF_8 = Charset.forName("UTF-8");
-  private static final int DEFAULT_NUM_OF_DB = Runtime.getRuntime().availableProcessors() * 2;
+  private static final int DEFAULT_NUM_OF_DB = Runtime.getRuntime().availableProcessors() * 10;
   private static final int MAX_QUEUE_SIZE = 10 * 1000;
   private static final int MAX_TOTAL_QUEUE_SIZE = 20 * 1000 * 1000;
 
@@ -346,11 +346,12 @@ class FileDirectoriesIndex implements DirectoriesIndex {
       // BatchMode is only used in the worker startup.
       if (batchMode) {
         synchronized (queues[index]) {
-          queues[index].add(new MapEntry(entry, DigestUtil.toString(directory)));
-          int current = queueSize.incrementAndGet();
+          int current = queueSize.get();
           if (current % (1000 * 1000) == 0) {
             logger.log(Level.INFO, "Entry added: " + current / (1000 * 1000) + "million");
           }
+          queues[index].add(new MapEntry(entry, DigestUtil.toString(directory)));
+          queueSize.incrementAndGet();
           //if (queues[index].size() > MAX_QUEUE_SIZE) {
           //  addEntriesDirectory(index);
           //}
