@@ -1166,7 +1166,12 @@ public class RedisShardBackplane implements ShardBackplane {
     String queueEntryJson = JsonFormat.printer().print(queueEntry);
     client.run(
         jedis -> {
-          if (jedis.hdel(config.getDispatchedOperationsHashName(), operationName) == 1) {
+          Operation operation = parseOperationJson(getOperation(jedis, operationName));
+          boolean requeue =
+              !isBlacklisted(jedis, queueEntry.getExecuteEntry().getRequestMetadata())
+                  && operation != null
+                  && !operation.getDone(); // operation removed or completed somehow
+          if (jedis.hdel(config.getDispatchedOperationsHashName(), operationName) == 1 && requeue) {
             operationQueue.push(
                 jedis, queueEntry.getPlatform().getPropertiesList(), queueEntryJson);
           }
