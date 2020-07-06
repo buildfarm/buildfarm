@@ -57,8 +57,7 @@ class FileDirectoriesIndex implements DirectoriesIndex {
 
   private static final Charset UTF_8 = Charset.forName("UTF-8");
   private static final int DEFAULT_NUM_OF_DB = Runtime.getRuntime().availableProcessors() * 10;
-  private static final int MAX_QUEUE_SIZE = 100 * 1000;
-  private static final int MAX_TOTAL_QUEUE_SIZE = 20 * 1000 * 1000;
+  private static final int MAX_QUEUE_SIZE = 10 * 1000;
 
   private final Path root;
   private final int numOfdb;
@@ -68,7 +67,7 @@ class FileDirectoriesIndex implements DirectoriesIndex {
   private Connection[] conns;
 
   private boolean batchMode = false;
-  private Queue<MapEntry>[] queues;
+  private Queue<String[]>[] queues;
   private AtomicInteger queueSize = new AtomicInteger(0);
 
   FileDirectoriesIndex(String directoriesIndexDbName, Path root, int numOfdb) {
@@ -167,6 +166,7 @@ class FileDirectoriesIndex implements DirectoriesIndex {
     while (!pool.isTerminated()) {
       try {
         pool.awaitTermination(10, TimeUnit.SECONDS);
+        logger.log(Level.INFO, "Creating Index ...");
       } catch (InterruptedException e) {
         throw new RuntimeException(e);
       }
@@ -198,7 +198,8 @@ class FileDirectoriesIndex implements DirectoriesIndex {
     pool.shutdown();
     while (!pool.isTerminated()) {
       try {
-        pool.awaitTermination(1, TimeUnit.SECONDS);
+        pool.awaitTermination(10, TimeUnit.SECONDS);
+        logger.log(Level.INFO, "Draining all queues ...");
       } catch (InterruptedException e) {
         throw new RuntimeException(e);
       }
@@ -305,12 +306,12 @@ class FileDirectoriesIndex implements DirectoriesIndex {
     try (PreparedStatement insertStatement = conns[dbIndex].prepareStatement(insertSql)) {
       conns[dbIndex].setAutoCommit(false);
       while (!queues[dbIndex].isEmpty()) {
-        MapEntry e = queues[dbIndex].poll();
-        if (e == null) {
+        String[] entry = queues[dbIndex].poll();
+        if (entry == null) {
           continue;
         }
-        insertStatement.setString(1, e.entry);
-        insertStatement.setString(2, e.digest);
+        insertStatement.setString(1, entry[0]);
+        insertStatement.setString(2, entry[1]);
         insertStatement.addBatch();
       }
       insertStatement.executeBatch();
@@ -323,12 +324,6 @@ class FileDirectoriesIndex implements DirectoriesIndex {
 
   @Override
   public void put(Digest directory, Iterable<String> entries) {
-    //synchronized (this) {
-    //  if (queueSize.get() >= MAX_QUEUE_SIZE) {
-    //    drainQueues();
-    //    queueSize.set(0);
-    //  }
-    //}
     try {
       asCharSink(path(directory), UTF_8).writeLines(entries);
     } catch (IOException e) {
@@ -340,7 +335,7 @@ class FileDirectoriesIndex implements DirectoriesIndex {
       // BatchMode is only used in the worker startup.
       if (batchMode) {
         synchronized (queues[index]) {
-          queues[index].add(new MapEntry(entry, DigestUtil.toString(directory)));
+          queues[index].add(new String[]{entry, DigestUtil.toString(directory)});
           int current = queueSize.incrementAndGet();
           if (current % (1000 * 1000) == 0) {
             logger.log(Level.INFO, "Entry added: " + current / (1000 * 1000) + " million");
@@ -390,16 +385,6 @@ class FileDirectoriesIndex implements DirectoriesIndex {
       synchronized (conns[Math.abs(entry.hashCode()) % numOfdb]) {
         removeEntriesDirectory(entry, directory);
       }
-    }
-  }
-
-  private static class MapEntry {
-    String entry;
-    String digest;
-
-    MapEntry(String entry, String digest) {
-      this.entry = entry;
-      this.digest = digest;
     }
   }
 }
