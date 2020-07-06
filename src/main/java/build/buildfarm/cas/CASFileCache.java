@@ -1280,7 +1280,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     Instant phase1Ending = Instant.now();
     logger.log(
         Level.INFO,
-        "TIME_LOGGING: Phase 1 done: "
+        "Phase 1 Time: "
             + Duration.between(startTime, phase1Ending).getSeconds()
             + "s");
 
@@ -1293,7 +1293,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     Instant beforeIndexing = Instant.now();
     logger.log(
         Level.INFO,
-        "TIME_LOGGING: Phase 2 Inserting done: "
+        "Phase 2 Inserting Time: "
             + Duration.between(phase1Ending, beforeIndexing).getSeconds()
             + "s");
 
@@ -1301,7 +1301,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     Instant afterIndexing = Instant.now();
     logger.log(
         Level.INFO,
-        "TIME_LOGGING: Index Created: "
+        "Phase 2 Building Index Time: "
             + Duration.between(beforeIndexing, afterIndexing).getSeconds()
             + "s");
 
