@@ -334,18 +334,32 @@ public class Worker extends LoggingMain {
   private void insertFileToCasMember(Digest digest, Path file)
       throws IOException, InterruptedException {
 
+    try (InputStream in = Files.newInputStream(file)) {
+      writeToCasMember(digest, in);
+    } catch (ExecutionException e) {
+      throw new IOException(Status.RESOURCE_EXHAUSTED.withCause(e).asRuntimeException());
+    }
+  }
+
+  public void insertBlobToCasMember(Digest digest, ByteString content)
+      throws IOException, InterruptedException {
+
+    try (InputStream in = content.newInput()) {
+      writeToCasMember(digest, in);
+    } catch (ExecutionException e) {
+      throw new IOException(Status.RESOURCE_EXHAUSTED.withCause(e).asRuntimeException());
+    }
+  }
+
+  public void writeToCasMember(Digest digest, InputStream in)
+      throws IOException, InterruptedException, ExecutionException {
+
     // create a write for inserting into another CAS member.
     String workerName = getRandomWorker();
     Instance casMember = workerStub(workerName);
     Write write = getCasMemberWrite(digest, workerName);
 
-    try (InputStream in = Files.newInputStream(file)) {
-
-      streamIntoWriteFuture(in, write, digest.getSizeBytes()).get();
-    } catch (ExecutionException e) {
-      Throwables.propagateIfInstanceOf(e.getCause(), IOException.class);
-      throw new IOException(Status.RESOURCE_EXHAUSTED.withCause(e).asRuntimeException());
-    }
+    streamIntoWriteFuture(in, write, digest.getSizeBytes()).get();
   }
 
   public void insertBlobLocally(Digest digest, ByteString content)
@@ -362,23 +376,6 @@ public class Worker extends LoggingMain {
         write.reset(); // we will not attempt retry with current behavior, abandon progress
         throw new IOException(Status.RESOURCE_EXHAUSTED.withCause(e).asRuntimeException());
       }
-    }
-  }
-
-  public void insertBlobToCasMember(Digest digest, ByteString content)
-      throws IOException, InterruptedException {
-
-    // create a write for inserting into another CAS member.
-    String workerName = getRandomWorker();
-    Instance casMember = workerStub(workerName);
-    Write write = getCasMemberWrite(digest, workerName);
-
-    try (InputStream in = content.newInput()) {
-
-      streamIntoWriteFuture(in, write, digest.getSizeBytes()).get();
-    } catch (ExecutionException e) {
-      Throwables.propagateIfInstanceOf(e.getCause(), IOException.class);
-      throw new RuntimeException(e.getCause());
     }
   }
 
