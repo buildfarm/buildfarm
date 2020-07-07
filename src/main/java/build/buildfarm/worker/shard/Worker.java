@@ -414,7 +414,6 @@ public class Worker extends LoggingMain {
             () -> {
               try {
 
-                // todo(thickey): pass self into callback
                 FeedbackOutputStream outStream = (FeedbackOutputStream) write;
                 while (outStream.isReady()) {
                   if (!CopyBytes(in, outStream, chunkSizeBytes)) {
