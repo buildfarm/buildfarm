@@ -14,8 +14,12 @@
 
 package build.buildfarm.common.redis;
 
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.SetMultimap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 ///
 /// @class   ProvisionedRedisQueue
@@ -42,6 +46,12 @@ import java.util.List;
 ///
 public class ProvisionedRedisQueue {
 
+  public static final String WILDCARD_VALUE = "*";
+
+  private final boolean isFullyWildcard;
+
+  private final Set<String> wildcardProvisions;
+
   ///
   /// @field   requiredProvisions
   /// @brief   The required provisions of the queue.
@@ -49,7 +59,7 @@ public class ProvisionedRedisQueue {
   ///          added to the queue. These often match the remote api's command
   ///          platform properties.
   ///
-  private SetMultimap<String, String> requiredProvisions;
+  private final Set<Map.Entry<String, String>> requiredProvisions;
 
   ///
   /// @field   queue
@@ -57,35 +67,56 @@ public class ProvisionedRedisQueue {
   /// @details A balanced redis queue designed to hold particularly provisioned
   ///          elements.
   ///
-  private BalancedRedisQueue queue;
+  private final BalancedRedisQueue queue;
 
   ///
   /// @brief   Constructor.
   /// @details Construct the provision queue.
-  /// @param   name               The global name of the queue.
-  /// @param   hashtags           Hashtags to distribute queue data.
-  /// @param   requiredProvisions The required provisions of the queue.
+  /// @param   name             The global name of the queue.
+  /// @param   hashtags         Hashtags to distribute queue data.
+  /// @param   filterProvisions The filtered provisions of the queue.
   ///
   public ProvisionedRedisQueue(
-      String name, List<String> hashtags, SetMultimap<String, String> requiredProvisions) {
+      String name, List<String> hashtags, SetMultimap<String, String> filterProvisions) {
     this.queue = new BalancedRedisQueue(name, hashtags);
-    this.requiredProvisions = requiredProvisions;
+    isFullyWildcard = filterProvisions.containsKey(WILDCARD_VALUE);
+    wildcardProvisions =
+        isFullyWildcard
+            ? ImmutableSet.of()
+            : filterProvisions.asMap().entrySet().stream()
+                .filter(e -> e.getValue().contains(WILDCARD_VALUE))
+                .map(e -> e.getKey())
+                .collect(ImmutableSet.toImmutableSet());
+    requiredProvisions =
+        isFullyWildcard
+            ? ImmutableSet.of()
+            : filterProvisions.entries().stream()
+                .filter(e -> !wildcardProvisions.contains(e.getKey()))
+                .collect(ImmutableSet.toImmutableSet());
   }
+
   ///
-  /// @brief   Checks required provisions.
-  /// @details Checks whether the provisions given fulfill all of the required
+  /// @brief   Checks required properties.
+  /// @details Checks whether the properties given fulfill all of the required
   ///          provisions of the queue.
-  /// @param   provisions Provisions to check that requirements are met.
-  /// @return  Whether the queue is eligible based on the provisions given.
+  /// @param   properties Properties to check that requirements are met.
+  /// @return  Whether the queue is eligible based on the properties given.
   /// @note    Suggested return identifier: isEligible.
   ///
-  public boolean isEligible(SetMultimap<String, String> provisions) {
-    for (String checkedProvision : requiredProvisions.asMap().keySet()) {
-      if (!provisions.asMap().containsKey(checkedProvision)) {
+  public boolean isEligible(SetMultimap<String, String> properties) {
+    // set intersection of requirements and properties with wildcarding
+    if (isFullyWildcard) {
+      return true;
+    }
+    // all required non-wildcard provisions must be matched
+    Set<Map.Entry<String, String>> requirements = new HashSet<>(requiredProvisions);
+    for (Map.Entry<String, String> property : properties.entries()) {
+      // for each of the properties specified, we must match requirements
+      if (!wildcardProvisions.contains(property.getKey()) && !requirements.remove(property)) {
         return false;
       }
     }
-    return true;
+    return requirements.isEmpty();
   }
   ///
   /// @brief   Get queue.
@@ -95,14 +126,5 @@ public class ProvisionedRedisQueue {
   ///
   public BalancedRedisQueue queue() {
     return queue;
-  }
-  ///
-  /// @brief   Get provisions.
-  /// @details Obtain the required provisions.
-  /// @return  The required provisions.
-  /// @note    Suggested return identifier: provisions.
-  ///
-  public SetMultimap<String, String> provisions() {
-    return requiredProvisions;
   }
 }

@@ -505,8 +505,9 @@ public class RedisShardBackplane implements ShardBackplane {
     client = new RedisClient(jedisClusterFactory.get());
 
     // Construct the prequeue so that elements are balanced across all redis nodes.
-    List<String> hashtags = client.call(jedis -> RedisNodeHashes.getEvenlyDistributedHashes(jedis));
-    this.prequeue = new BalancedRedisQueue(config.getPreQueuedOperationsListName(), hashtags);
+    List<String> clusterHashes =
+        client.call(jedis -> RedisNodeHashes.getEvenlyDistributedHashes(jedis));
+    this.prequeue = new BalancedRedisQueue(config.getPreQueuedOperationsListName(), clusterHashes);
 
     // Construct an operation queue based on configuration.
     // An operation queue consists of multiple provisioned queues in which the order dictates the
@@ -518,7 +519,7 @@ public class RedisShardBackplane implements ShardBackplane {
       ProvisionedRedisQueue provisionedQueue =
           new ProvisionedRedisQueue(
               queueConfig.getName(),
-              hashtags,
+              clusterHashes,
               toMultimap(queueConfig.getPlatform().getPropertiesList()));
       provisionedQueues.add(provisionedQueue);
     }
@@ -531,9 +532,12 @@ public class RedisShardBackplane implements ShardBackplane {
     // This will ensure the expected behavior for the paradigm in which all work is put on the same
     // queue.
     if (config.getProvisionedQueues().getQueuesList().isEmpty()) {
+      SetMultimap defaultProvisions = LinkedHashMultimap.create();
+      defaultProvisions.put(
+          ProvisionedRedisQueue.WILDCARD_VALUE, ProvisionedRedisQueue.WILDCARD_VALUE);
       ProvisionedRedisQueue defaultQueue =
           new ProvisionedRedisQueue(
-              config.getQueuedOperationsListName(), hashtags, LinkedHashMultimap.create());
+              config.getQueuedOperationsListName(), clusterHashes, defaultProvisions);
       provisionedQueues.add(defaultQueue);
     }
 
