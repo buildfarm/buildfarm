@@ -1456,18 +1456,6 @@ public class ShardInstance extends AbstractServerInstance {
                       "property '%s' value was not a valid integer: %s",
                       property.getName(), property.getValue()));
         }
-        // An individual platform property may not be valid on its own,
-        // but instead, valid in the context of the full platform where the configured
-        // OperationQueue checks the eligibility.
-        // Therefore, we do not consider an individual property invalid when it has been previously
-        // validated against the OperationQueue.
-      } else if (validForOperationQueue) {
-      } else {
-        preconditionFailure
-            .addViolationsBuilder()
-            .setType(VIOLATION_TYPE_INVALID)
-            .setSubject(INVALID_PLATFORM)
-            .setDescription(format("property name '%s' is invalid", property.getName()));
       }
     }
     if (maxCores != -1 && minCores > 0 && maxCores < minCores) {
