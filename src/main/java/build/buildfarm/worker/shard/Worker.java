@@ -344,7 +344,7 @@ public class Worker extends LoggingMain {
       streamIntoWriteFuture(in, write, digest.getSizeBytes()).get();
     } catch (ExecutionException e) {
       Throwables.propagateIfInstanceOf(e.getCause(), IOException.class);
-      throw new RuntimeException(e.getCause());
+      throw new IOException(Status.RESOURCE_EXHAUSTED.withCause(e).asRuntimeException());
     }
   }
 
@@ -360,10 +360,7 @@ public class Worker extends LoggingMain {
     } catch (IOException e) {
       if (!write.isComplete()) {
         write.reset(); // we will not attempt retry with current behavior, abandon progress
-        if (e.getCause() != null) {
-          Throwables.propagateIfInstanceOf(e.getCause(), InterruptedException.class);
-        }
-        throw e;
+        throw new IOException(Status.RESOURCE_EXHAUSTED.withCause(e).asRuntimeException());
       }
     }
   }
