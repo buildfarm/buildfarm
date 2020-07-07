@@ -1456,18 +1456,6 @@ public class ShardInstance extends AbstractServerInstance {
                       "property '%s' value was not a valid integer: %s",
                       property.getName(), property.getValue()));
         }
-        // An individual platform property may not be valid on its own,
-        // but instead, valid in the context of the full platform where the configured
-        // OperationQueue checks the eligibility.
-        // Therefore, we do not consider an individual property invalid when it has been previously
-        // validated against the OperationQueue.
-      } else if (validForOperationQueue) {
-      } else {
-        preconditionFailure
-            .addViolationsBuilder()
-            .setType(VIOLATION_TYPE_INVALID)
-            .setSubject(INVALID_PLATFORM)
-            .setDescription(format("property name '%s' is invalid", property.getName()));
       }
     }
     if (maxCores != -1 && minCores > 0 && maxCores < minCores) {
@@ -1625,6 +1613,19 @@ public class ShardInstance extends AbstractServerInstance {
   public ListenableFuture<Void> requeueOperation(QueueEntry queueEntry) {
     ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
     String operationName = executeEntry.getOperationName();
+    try {
+      if (backplane.isBlacklisted(executeEntry.getRequestMetadata())) {
+        putOperation(
+            Operation.newBuilder()
+                .setName(operationName)
+                .setDone(true)
+                .setResponse(Any.pack(blacklistResponse(executeEntry.getActionDigest())))
+                .build());
+        return IMMEDIATE_VOID_FUTURE;
+      }
+    } catch (IOException e) {
+      return immediateFailedFuture(e);
+    }
     Operation operation;
     try {
       operation = getOperation(operationName);
@@ -2169,7 +2170,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @Override
-  public boolean putOperation(Operation operation) throws InterruptedException {
+  public boolean putOperation(Operation operation) {
     if (isErrored(operation)) {
       try {
         return backplane.putOperation(operation, ExecutionStage.Value.COMPLETED);

@@ -168,6 +168,16 @@ redis_shard_backplane_config: {
   # The ttl maintained for action_blacklist entries.
   action_blacklist_expire: 3600 # 1 hour
 
+  # A redis key prefix for all blacklisted invocations, suffixed
+  # with the tool invocation id. Requests on behalf of an invocation
+  # which is blacklisted should be rejected where it is identified via
+  # its RequestMetadata
+  # To meet API standards, a request which matches this condition
+  # receives a transient UNAVAILABLE response, which, in bazel's
+  # case, can induce a fallback to non-remote recovery, rather
+  # than a catastrophic failure.
+  invocation_blacklist_prefix: "InvocationBlacklist"
+
   # A redis key prefix for all Operations, suffixed with the
   # operation's name and mapping to an Operation which reflects
   # the cluster perceived state of that Operation
@@ -231,6 +241,27 @@ redis_shard_backplane_config: {
   # CAS is reduced.
   # When in doubt, leave this enabled.
   subscribe_to_backplane: true
+
+  ## Specify a queue that supports min/max cpu core specification
+  provisioned_queues: {
+    queues: {
+      name: "cpu"
+
+      platform: {
+        # Any specification (including non-specification) of min/max-cores
+        # will be allowed to support cpu controls and worker resource
+        # delegation.
+        properties: {
+          name: "min-cores"
+          value: "*"
+        }
+        properties: {
+          name: "max-cores"
+          value: "*"
+        }
+      }
+    }
+  }
 }
 
 # Create exec trees containing directories that are owned by

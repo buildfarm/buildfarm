@@ -505,8 +505,9 @@ public class RedisShardBackplane implements ShardBackplane {
     client = new RedisClient(jedisClusterFactory.get());
 
     // Construct the prequeue so that elements are balanced across all redis nodes.
-    List<String> hashtags = client.call(jedis -> RedisNodeHashes.getEvenlyDistributedHashes(jedis));
-    this.prequeue = new BalancedRedisQueue(config.getPreQueuedOperationsListName(), hashtags);
+    List<String> clusterHashes =
+        client.call(jedis -> RedisNodeHashes.getEvenlyDistributedHashes(jedis));
+    this.prequeue = new BalancedRedisQueue(config.getPreQueuedOperationsListName(), clusterHashes);
 
     // Construct an operation queue based on configuration.
     // An operation queue consists of multiple provisioned queues in which the order dictates the
@@ -518,7 +519,7 @@ public class RedisShardBackplane implements ShardBackplane {
       ProvisionedRedisQueue provisionedQueue =
           new ProvisionedRedisQueue(
               queueConfig.getName(),
-              hashtags,
+              clusterHashes,
               toMultimap(queueConfig.getPlatform().getPropertiesList()));
       provisionedQueues.add(provisionedQueue);
     }
@@ -531,9 +532,12 @@ public class RedisShardBackplane implements ShardBackplane {
     // This will ensure the expected behavior for the paradigm in which all work is put on the same
     // queue.
     if (config.getProvisionedQueues().getQueuesList().isEmpty()) {
+      SetMultimap defaultProvisions = LinkedHashMultimap.create();
+      defaultProvisions.put(
+          ProvisionedRedisQueue.WILDCARD_VALUE, ProvisionedRedisQueue.WILDCARD_VALUE);
       ProvisionedRedisQueue defaultQueue =
           new ProvisionedRedisQueue(
-              config.getQueuedOperationsListName(), hashtags, LinkedHashMultimap.create());
+              config.getQueuedOperationsListName(), clusterHashes, defaultProvisions);
       provisionedQueues.add(defaultQueue);
     }
 
@@ -1160,15 +1164,32 @@ public class RedisShardBackplane implements ShardBackplane {
         });
   }
 
+  String printPollOperation(QueueEntry queueEntry, ExecutionStage.Value stage, long requeueAt)
+      throws InvalidProtocolBufferException {
+    DispatchedOperation o =
+        DispatchedOperation.newBuilder().setQueueEntry(queueEntry).setRequeueAt(requeueAt).build();
+    return JsonFormat.printer().print(o);
+  }
+
   @Override
   public void rejectOperation(QueueEntry queueEntry) throws IOException {
     String operationName = queueEntry.getExecuteEntry().getOperationName();
     String queueEntryJson = JsonFormat.printer().print(queueEntry);
+    String dispatchedEntryJson = printPollOperation(queueEntry, ExecutionStage.Value.QUEUED, 0);
     client.run(
         jedis -> {
-          if (jedis.hdel(config.getDispatchedOperationsHashName(), operationName) == 1) {
-            operationQueue.push(
-                jedis, queueEntry.getPlatform().getPropertiesList(), queueEntryJson);
+          if (isBlacklisted(jedis, queueEntry.getExecuteEntry().getRequestMetadata())) {
+            pollOperation(
+                jedis, operationName, dispatchedEntryJson); // complete our lease to error operation
+          } else {
+            Operation operation = parseOperationJson(getOperation(jedis, operationName));
+            boolean requeue =
+                operation != null && !operation.getDone(); // operation removed or completed somehow
+            if (jedis.hdel(config.getDispatchedOperationsHashName(), operationName) == 1
+                && requeue) {
+              operationQueue.push(
+                  jedis, queueEntry.getPlatform().getPropertiesList(), queueEntryJson);
+            }
           }
         });
   }
@@ -1177,26 +1198,27 @@ public class RedisShardBackplane implements ShardBackplane {
   public boolean pollOperation(QueueEntry queueEntry, ExecutionStage.Value stage, long requeueAt)
       throws IOException {
     String operationName = queueEntry.getExecuteEntry().getOperationName();
-    DispatchedOperation o =
-        DispatchedOperation.newBuilder().setQueueEntry(queueEntry).setRequeueAt(requeueAt).build();
     String json;
     try {
-      json = JsonFormat.printer().print(o);
+      json = printPollOperation(queueEntry, stage, requeueAt);
     } catch (InvalidProtocolBufferException e) {
       logger.log(Level.SEVERE, "error printing dispatched operation " + operationName, e);
       return false;
     }
-    return client.call(
-        jedis -> {
-          if (jedis.hexists(config.getDispatchedOperationsHashName(), operationName)) {
-            if (jedis.hset(config.getDispatchedOperationsHashName(), operationName, json) == 0) {
-              return true;
-            }
-            /* someone else beat us to the punch, delete our incorrectly added key */
-            jedis.hdel(config.getDispatchedOperationsHashName(), operationName);
-          }
-          return false;
-        });
+    return client.call(jedis -> pollOperation(jedis, operationName, json));
+  }
+
+  boolean pollOperation(JedisCluster jedis, String operationName, String dispatchedOperationJson) {
+    if (jedis.hexists(config.getDispatchedOperationsHashName(), operationName)) {
+      if (jedis.hset(
+              config.getDispatchedOperationsHashName(), operationName, dispatchedOperationJson)
+          == 0) {
+        return true;
+      }
+      /* someone else beat us to the punch, delete our incorrectly added key */
+      jedis.hdel(config.getDispatchedOperationsHashName(), operationName);
+    }
+    return false;
   }
 
   @Override

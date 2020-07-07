@@ -189,13 +189,13 @@ public class OperationQueue {
   }
   ///
   /// @brief   Decide if the properties are valid based on having eligibility into a queue
-  /// @param   provisions Provisions to check validity of.
-  /// @return  Whether the provisions are valid for a queue.
+  /// @param   properties Properties to check validity of.
+  /// @return  Whether the properties are valid for a queue.
   /// @note    Suggested return identifier: validProperties.
   ///
-  public Boolean validProperties(List<Platform.Property> provisions) {
+  public Boolean validProperties(List<Platform.Property> properties) {
     for (ProvisionedRedisQueue provisionedQueue : queues) {
-      if (provisionedQueue.isEligible(toMultimap(provisions))) {
+      if (provisionedQueue.isEligible(toMultimap(properties))) {
         return true;
       }
     }
