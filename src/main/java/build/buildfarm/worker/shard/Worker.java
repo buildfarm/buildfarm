@@ -277,7 +277,6 @@ public class Worker extends LoggingMain {
             config.getLimitExecution(),
             config.getLimitGlobalExecution(),
             config.getOnlyMulticoreTests(),
-            config.getOmitFromCas(),
             suppliedWriter);
 
     PipelineStage completeStage =

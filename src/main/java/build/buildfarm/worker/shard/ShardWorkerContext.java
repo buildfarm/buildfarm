@@ -121,7 +121,6 @@ class ShardWorkerContext implements WorkerContext {
   private final Map<String, QueueEntry> activeOperations = Maps.newConcurrentMap();
   private final Group executionsGroup = Group.getRoot().getChild("executions");
   private final Group operationsGroup = executionsGroup.getChild("operations");
-  private final boolean omitFromCas;
   private final Supplier<CasWriter> writer;
 
   static SetMultimap<String, String> getMatchProvisions(
@@ -160,7 +159,6 @@ class ShardWorkerContext implements WorkerContext {
       boolean limitExecution,
       boolean limitGlobalExecution,
       boolean onlyMulticoreTests,
-      boolean omitFromCas,
       Supplier<CasWriter> writer) {
     this.name = name;
     this.platform = platform;
@@ -182,7 +180,6 @@ class ShardWorkerContext implements WorkerContext {
     this.limitExecution = limitExecution;
     this.limitGlobalExecution = limitGlobalExecution;
     this.onlyMulticoreTests = onlyMulticoreTests;
-    this.omitFromCas = omitFromCas;
     this.writer = writer;
     Preconditions.checkState(
         !limitGlobalExecution || limitExecution,
