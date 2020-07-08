@@ -56,8 +56,8 @@ class FileDirectoriesIndex implements DirectoriesIndex {
   protected static final String DIRECTORIES_INDEX_NAME_MEMORY = ":memory:";
 
   private static final Charset UTF_8 = Charset.forName("UTF-8");
-  private static final int DEFAULT_NUM_OF_DB = Runtime.getRuntime().availableProcessors() * 40;
-  private static final int MAX_QUEUE_SIZE = 10 * 1000;
+  private static final int DEFAULT_NUM_OF_DB = Runtime.getRuntime().availableProcessors() * 2;
+  private static final int MAX_QUEUE_SIZE = 1000 * 1000;
 
   private final Path root;
   private final int numOfdb;
@@ -329,17 +329,21 @@ class FileDirectoriesIndex implements DirectoriesIndex {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-    Set<String> uniqueEntries = ImmutableSet.copyOf(entries);
-    for (String entry : uniqueEntries) {
+
+    synchronized (this) {
+      if (queueSize.get() > MAX_QUEUE_SIZE) {
+        drainQueues();
+        queueSize.set(0);
+      }
+    }
+
+    for (String entry : entries) {
       int index = Math.abs(entry.hashCode()) % numOfdb;
       // BatchMode is only used in the worker startup.
       if (batchMode) {
         synchronized (queues[index]) {
           queues[index].add(new String[]{entry, DigestUtil.toString(directory)});
           queueSize.incrementAndGet();
-          if (queues[index].size() > MAX_QUEUE_SIZE) {
-            addEntriesDirectory(index);
-          }
         }
       } else {
         synchronized (conns[index]) {
