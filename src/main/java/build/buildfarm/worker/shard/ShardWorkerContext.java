@@ -475,24 +475,20 @@ class ShardWorkerContext implements WorkerContext {
     return maximumActionTimeout;
   }
 
-  private void insertBlob(Digest digest, ByteString content) throws InterruptedException {
-
+  private void insertBlob(Digest digest, ByteString content)
+      throws IOException, InterruptedException {
     if (digest.getSizeBytes() > 0) {
-      try {
-        writer.get().insertBlob(digest, content);
-      } catch (IOException e) {
-      }
+      writer.get().insertBlob(digest, content);
     }
   }
 
   private void insertFile(Digest digest, Path file) throws IOException, InterruptedException {
 
-    System.out.println(file.toString());
     writer.get().write(digest, file);
   }
 
   private void updateActionResultStdOutputs(ActionResult.Builder resultBuilder)
-      throws InterruptedException {
+      throws IOException, InterruptedException {
     ByteString stdoutRaw = resultBuilder.getStdoutRaw();
     if (stdoutRaw.size() > 0) {
       // reset to allow policy to determine inlining
