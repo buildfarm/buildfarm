@@ -56,7 +56,7 @@ class FileDirectoriesIndex implements DirectoriesIndex {
   protected static final String DIRECTORIES_INDEX_NAME_MEMORY = ":memory:";
 
   private static final Charset UTF_8 = Charset.forName("UTF-8");
-  private static final int DEFAULT_NUM_OF_DB = Runtime.getRuntime().availableProcessors() * 10;
+  private static final int DEFAULT_NUM_OF_DB = Runtime.getRuntime().availableProcessors() * 40;
   private static final int MAX_QUEUE_SIZE = 10 * 1000;
 
   private final Path root;
