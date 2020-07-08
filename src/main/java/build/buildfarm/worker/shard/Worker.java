@@ -142,6 +142,14 @@ public class Worker extends LoggingMain {
       }
     }
 
+    private Write getLocalWrite(Digest digest) throws IOException, InterruptedException {
+      Write write =
+          execFileSystem
+              .getStorage()
+              .getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
+      return write;
+    }
+
     public void insertBlob(Digest digest, ByteString content)
         throws IOException, InterruptedException {
       insertBlobLocally(digest, content);
@@ -189,6 +197,20 @@ public class Worker extends LoggingMain {
       Write write = getCasMemberWrite(digest, workerName);
 
       streamIntoWriteFuture(in, write, digest.getSizeBytes()).get();
+    }
+
+    private Write getCasMemberWrite(Digest digest, String workerName)
+        throws IOException, InterruptedException {
+
+      Instance casMember = workerStub(workerName);
+
+      try {
+        Write write =
+            casMember.getBlobWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
+        return write;
+      } catch (ExcessiveWriteSizeException e) {
+        throw new IOException("unable to obtain writer to cas member");
+      }
     }
 
     public void insertBlob(Digest digest, ByteString content)
@@ -375,14 +397,6 @@ public class Worker extends LoggingMain {
     logger.log(INFO, String.format("%s initialized", identifier));
   }
 
-  private Write getLocalWrite(Digest digest) throws IOException, InterruptedException {
-    Write write =
-        execFileSystem
-            .getStorage()
-            .getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
-    return write;
-  }
-
   public static int KBtoBytes(int sizeKb) {
     return sizeKb * 1024;
   }
@@ -449,20 +463,6 @@ public class Worker extends LoggingMain {
       return true;
     }
     return false;
-  }
-
-  private Write getCasMemberWrite(Digest digest, String workerName)
-      throws IOException, InterruptedException {
-
-    Instance casMember = workerStub(workerName);
-
-    try {
-      Write write =
-          casMember.getBlobWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
-      return write;
-    } catch (ExcessiveWriteSizeException e) {
-      throw new IOException("unable to obtain writer to cas member");
-    }
   }
 
   private String getRandomWorker() throws IOException {
