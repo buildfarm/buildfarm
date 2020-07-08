@@ -60,6 +60,7 @@ import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.ReportResultStage;
 import com.google.common.base.Strings;
+import com.google.common.base.Suppliers;
 import com.google.common.base.Throwables;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
@@ -93,7 +94,6 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
@@ -249,11 +249,6 @@ public class Worker extends LoggingMain {
       writer = new LocalCasWriter();
     }
 
-    Supplier<CasWriter> suppliedWriter =
-        () -> {
-          return writer;
-        };
-
     ShardWorkerContext context =
         new ShardWorkerContext(
             config.getPublicName(),
@@ -277,7 +272,7 @@ public class Worker extends LoggingMain {
             config.getLimitExecution(),
             config.getLimitGlobalExecution(),
             config.getOnlyMulticoreTests(),
-            suppliedWriter);
+            Suppliers.ofInstance(writer));
 
     PipelineStage completeStage =
         new PutOperationStage((operation) -> context.deactivate(operation.getName()));
