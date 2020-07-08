@@ -303,21 +303,23 @@ class FileDirectoriesIndex implements DirectoriesIndex {
 
     logger.log(Level.INFO, "Start draining separate queue: " + dbIndex);
     String insertSql = "INSERT INTO entries (path, directory)\n" + "    VALUES (?,?)";
-    try (PreparedStatement insertStatement = conns[dbIndex].prepareStatement(insertSql)) {
-      conns[dbIndex].setAutoCommit(false);
-      while (!queues[dbIndex].isEmpty()) {
-        String[] entry = queues[dbIndex].poll();
-        if (entry == null) {
-          continue;
+    synchronized (queues[dbIndex]) {
+      try (PreparedStatement insertStatement = conns[dbIndex].prepareStatement(insertSql)) {
+        conns[dbIndex].setAutoCommit(false);
+        while (!queues[dbIndex].isEmpty()) {
+          String[] entry = queues[dbIndex].poll();
+          if (entry == null) {
+            continue;
+          }
+          insertStatement.setString(1, entry[0]);
+          insertStatement.setString(2, entry[1]);
+          insertStatement.addBatch();
         }
-        insertStatement.setString(1, entry[0]);
-        insertStatement.setString(2, entry[1]);
-        insertStatement.addBatch();
+        insertStatement.executeBatch();
+        conns[dbIndex].commit();
+      } catch (SQLException e) {
+        throw new RuntimeException(e);
       }
-      insertStatement.executeBatch();
-      conns[dbIndex].commit();
-    } catch (SQLException e) {
-      throw new RuntimeException(e);
     }
     logger.log(Level.INFO, "Drained separate queue: " + dbIndex);
   }
