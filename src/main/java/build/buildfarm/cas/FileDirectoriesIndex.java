@@ -184,7 +184,7 @@ class FileDirectoriesIndex implements DirectoriesIndex {
   }
 
   private void drainQueues() {
-    int nThread = Runtime.getRuntime().availableProcessors();
+    int nThread = queues.length;
     String threadNameFormat = "drain-queue-%d";
     ExecutorService pool =
         Executors.newFixedThreadPool(
@@ -330,6 +330,8 @@ class FileDirectoriesIndex implements DirectoriesIndex {
       throw new RuntimeException(e);
     }
 
+    Set<String> uniqueEntries = ImmutableSet.copyOf(entries);
+
     synchronized (this) {
       if (queueSize.get() > MAX_QUEUE_SIZE) {
         drainQueues();
@@ -337,7 +339,7 @@ class FileDirectoriesIndex implements DirectoriesIndex {
       }
     }
 
-    for (String entry : entries) {
+    for (String entry : uniqueEntries) {
       int index = Math.abs(entry.hashCode()) % numOfdb;
       // BatchMode is only used in the worker startup.
       if (batchMode) {
@@ -349,10 +351,6 @@ class FileDirectoriesIndex implements DirectoriesIndex {
         synchronized (conns[index]) {
           addEntriesDirectory(entry, directory);
         }
-      }
-      int current = queueSize.get();
-      if (current % (1000 * 1000) == 0) {
-        logger.log(Level.INFO, "Entry added: " + current / (1000 * 1000) + " million");
       }
     }
   }
