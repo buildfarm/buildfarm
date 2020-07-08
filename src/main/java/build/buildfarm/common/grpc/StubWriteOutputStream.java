@@ -258,9 +258,7 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
 
   @Override
   public synchronized boolean isReady() {
-    if (writeObserver == null) {
-      throw new RuntimeException("isReady should not be called before getOutput");
-    }
+    checkNotNull(writeObserver);
     ClientCallStreamObserver<WriteRequest> clientCallStreamObserver =
         (ClientCallStreamObserver<WriteRequest>) writeObserver;
     return clientCallStreamObserver.isReady();
