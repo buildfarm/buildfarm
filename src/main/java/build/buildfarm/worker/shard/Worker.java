@@ -105,6 +105,7 @@ public class Worker extends LoggingMain {
   private static final Logger logger = Logger.getLogger(Worker.class.getName());
 
   private static final int shutdownWaitTimeInSeconds = 10;
+  private final boolean isCasShard;
 
   private final ShardWorkerConfig config;
   private final ShardWorkerInstance instance;
@@ -184,6 +185,7 @@ public class Worker extends LoggingMain {
       throws ConfigurationException {
     super("BuildFarmShardWorker");
     this.config = config;
+    isCasShard = !config.getOmitFromCas();
     String identifier = "buildfarm-worker-" + config.getPublicName() + "-" + session;
     root = getValidRoot(config);
     if (config.getPublicName().isEmpty()) {
@@ -243,7 +245,7 @@ public class Worker extends LoggingMain {
 
     // Create the appropriate writer for the context
     CasWriter writer;
-    if (config.getOmitFromCas()) {
+    if (!isCasShard) {
       writer = new RemoteCasWriter();
     } else {
       writer = new LocalCasWriter();
@@ -673,7 +675,7 @@ public class Worker extends LoggingMain {
     try {
 
       // if the worker is a CAS member, it can send/modify blobs in the backplane.
-      if (!config.getOmitFromCas()) {
+      if (isCasShard) {
         backplane.addBlobLocation(digest, config.getPublicName());
       }
     } catch (IOException e) {
@@ -685,7 +687,7 @@ public class Worker extends LoggingMain {
     try {
 
       // if the worker is a CAS member, it can send/modify blobs in the backplane.
-      if (!config.getOmitFromCas()) {
+      if (isCasShard) {
         backplane.removeBlobsLocation(digests, config.getPublicName());
       }
     } catch (IOException e) {
@@ -805,7 +807,7 @@ public class Worker extends LoggingMain {
       // Not all workers need to be registered and visible in the backplane.
       // For example, a GPU worker may wish to perform work that we do not want to cache locally for
       // other workers.
-      if (!config.getOmitFromCas()) {
+      if (isCasShard) {
         startFailsafeRegistration();
       } else {
         logger.log(INFO, "Skipping worker registration");
