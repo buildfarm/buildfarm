@@ -336,10 +336,7 @@ class FileDirectoriesIndex implements DirectoriesIndex {
       if (batchMode) {
         synchronized (queues[index]) {
           queues[index].add(new String[]{entry, DigestUtil.toString(directory)});
-          int current = queueSize.incrementAndGet();
-          if (current % (1000 * 1000) == 0) {
-            logger.log(Level.INFO, "Entry added: " + current / (1000 * 1000) + " million");
-          }
+          queueSize.incrementAndGet();
           if (queues[index].size() > MAX_QUEUE_SIZE) {
             addEntriesDirectory(index);
           }
@@ -348,6 +345,10 @@ class FileDirectoriesIndex implements DirectoriesIndex {
         synchronized (conns[index]) {
           addEntriesDirectory(entry, directory);
         }
+      }
+      int current = queueSize.get();
+      if (current % (1000 * 1000) == 0) {
+        logger.log(Level.INFO, "Entry added: " + current / (1000 * 1000) + " million");
       }
     }
   }
