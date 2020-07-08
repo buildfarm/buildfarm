@@ -1855,6 +1855,16 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       }
       if (removedEntry == null) {
         logger.log(Level.SEVERE, format("entry %s was already removed during expiration", e.key));
+        if (e.isLinked()) {
+          logger.log(Level.SEVERE, format("removing spuriously non-existent entry %s", e.key));
+          e.unlink();
+        } else {
+          logger.log(
+              Level.SEVERE,
+              format(
+                  "spuriously non-existent entry %s was somehow unlinked, should not appear again",
+                  e.key));
+        }
       } else {
         logger.log(
             Level.SEVERE,
@@ -2733,6 +2743,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       this.size = size;
       referenceCount = 1;
       this.existsDeadline = existsDeadline;
+    }
+
+    public boolean isLinked() {
+      return before != null && after != null;
     }
 
     public void unlink() {
