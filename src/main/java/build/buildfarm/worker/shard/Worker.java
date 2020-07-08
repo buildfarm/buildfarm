@@ -122,9 +122,46 @@ public class Worker extends LoggingMain {
       insertFileLocally(digest, file);
     }
 
+    private void insertFileLocally(Digest digest, Path file)
+        throws IOException, InterruptedException {
+
+      Write write = getLocalWrite(digest);
+
+      try (OutputStream out =
+              write.getOutput(/* deadlineAfter=*/ 1, /* deadlineAfterUnits=*/ DAYS, () -> {});
+          InputStream in = Files.newInputStream(file)) {
+        ByteStreams.copy(in, out);
+      } catch (IOException e) {
+        if (!write.isComplete()) {
+          write.reset(); // we will not attempt retry with current behavior, abandon progress
+          if (e.getCause() != null) {
+            Throwables.propagateIfInstanceOf(e.getCause(), InterruptedException.class);
+          }
+          throw e;
+        }
+      }
+    }
+
     public void insertBlob(Digest digest, ByteString content)
         throws IOException, InterruptedException {
       insertBlobLocally(digest, content);
+    }
+
+    private void insertBlobLocally(Digest digest, ByteString content)
+        throws IOException, InterruptedException {
+
+      Write write = getLocalWrite(digest);
+
+      try (OutputStream out =
+              write.getOutput(/* deadlineAfter=*/ 1, /* deadlineAfterUnits=*/ DAYS, () -> {});
+          InputStream in = content.newInput()) {
+        ByteStreams.copy(in, out);
+      } catch (IOException e) {
+        if (!write.isComplete()) {
+          write.reset(); // we will not attempt retry with current behavior, abandon progress
+          throw new IOException(Status.RESOURCE_EXHAUSTED.withCause(e).asRuntimeException());
+        }
+      }
     }
   }
 
@@ -133,9 +170,40 @@ public class Worker extends LoggingMain {
       insertFileToCasMember(digest, file);
     }
 
+    private void insertFileToCasMember(Digest digest, Path file)
+        throws IOException, InterruptedException {
+
+      try (InputStream in = Files.newInputStream(file)) {
+        writeToCasMember(digest, in);
+      } catch (ExecutionException e) {
+        throw new IOException(Status.RESOURCE_EXHAUSTED.withCause(e).asRuntimeException());
+      }
+    }
+
+    private void writeToCasMember(Digest digest, InputStream in)
+        throws IOException, InterruptedException, ExecutionException {
+
+      // create a write for inserting into another CAS member.
+      String workerName = getRandomWorker();
+      Instance casMember = workerStub(workerName);
+      Write write = getCasMemberWrite(digest, workerName);
+
+      streamIntoWriteFuture(in, write, digest.getSizeBytes()).get();
+    }
+
     public void insertBlob(Digest digest, ByteString content)
         throws IOException, InterruptedException {
       insertBlobToCasMember(digest, content);
+    }
+
+    private void insertBlobToCasMember(Digest digest, ByteString content)
+        throws IOException, InterruptedException {
+
+      try (InputStream in = content.newInput()) {
+        writeToCasMember(digest, in);
+      } catch (ExecutionException e) {
+        throw new IOException(Status.RESOURCE_EXHAUSTED.withCause(e).asRuntimeException());
+      }
     }
   }
 
@@ -305,74 +373,6 @@ public class Worker extends LoggingMain {
             .build();
 
     logger.log(INFO, String.format("%s initialized", identifier));
-  }
-
-  private void insertFileLocally(Digest digest, Path file)
-      throws IOException, InterruptedException {
-
-    Write write = getLocalWrite(digest);
-
-    try (OutputStream out =
-            write.getOutput(/* deadlineAfter=*/ 1, /* deadlineAfterUnits=*/ DAYS, () -> {});
-        InputStream in = Files.newInputStream(file)) {
-      ByteStreams.copy(in, out);
-    } catch (IOException e) {
-      if (!write.isComplete()) {
-        write.reset(); // we will not attempt retry with current behavior, abandon progress
-        if (e.getCause() != null) {
-          Throwables.propagateIfInstanceOf(e.getCause(), InterruptedException.class);
-        }
-        throw e;
-      }
-    }
-  }
-
-  private void insertFileToCasMember(Digest digest, Path file)
-      throws IOException, InterruptedException {
-
-    try (InputStream in = Files.newInputStream(file)) {
-      writeToCasMember(digest, in);
-    } catch (ExecutionException e) {
-      throw new IOException(Status.RESOURCE_EXHAUSTED.withCause(e).asRuntimeException());
-    }
-  }
-
-  public void insertBlobToCasMember(Digest digest, ByteString content)
-      throws IOException, InterruptedException {
-
-    try (InputStream in = content.newInput()) {
-      writeToCasMember(digest, in);
-    } catch (ExecutionException e) {
-      throw new IOException(Status.RESOURCE_EXHAUSTED.withCause(e).asRuntimeException());
-    }
-  }
-
-  public void writeToCasMember(Digest digest, InputStream in)
-      throws IOException, InterruptedException, ExecutionException {
-
-    // create a write for inserting into another CAS member.
-    String workerName = getRandomWorker();
-    Instance casMember = workerStub(workerName);
-    Write write = getCasMemberWrite(digest, workerName);
-
-    streamIntoWriteFuture(in, write, digest.getSizeBytes()).get();
-  }
-
-  public void insertBlobLocally(Digest digest, ByteString content)
-      throws IOException, InterruptedException {
-
-    Write write = getLocalWrite(digest);
-
-    try (OutputStream out =
-            write.getOutput(/* deadlineAfter=*/ 1, /* deadlineAfterUnits=*/ DAYS, () -> {});
-        InputStream in = content.newInput()) {
-      ByteStreams.copy(in, out);
-    } catch (IOException e) {
-      if (!write.isComplete()) {
-        write.reset(); // we will not attempt retry with current behavior, abandon progress
-        throw new IOException(Status.RESOURCE_EXHAUSTED.withCause(e).asRuntimeException());
-      }
-    }
   }
 
   private Write getLocalWrite(Digest digest) throws IOException, InterruptedException {
