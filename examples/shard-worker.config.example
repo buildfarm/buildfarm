@@ -120,22 +120,6 @@ redis_shard_backplane_config: {
 
   # The size of the redis connection pool
   jedis_pool_max_total: 4000
-  
-  # the operation queue can be configured to store
-  # operations in specific queues based on platform properties
-  #provisioned_queues: {
-  #  queues: [
-  #    {
-  #      name: "queue1"
-  #      platform: {
-  #        properties: [{name: "key" value: "value"}]
-  #      }
-  #    },
-  #    {
-  #        name: "queue2"
-  #    }
-  #  ]
-  #}
 
   # The redis key used to store a hash of registered Workers
   # to their registration expiration time. After a worker's
