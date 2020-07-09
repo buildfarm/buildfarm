@@ -347,12 +347,15 @@ class FileDirectoriesIndex implements DirectoriesIndex {
       if (batchMode) {
         synchronized (queues[index]) {
           queues[index].add(new String[]{entry, DigestUtil.toString(directory)});
-          queueSize.incrementAndGet();
         }
       } else {
         synchronized (conns[index]) {
           addEntriesDirectory(entry, directory);
         }
+      }
+      int current = queueSize.incrementAndGet();
+      if (current % (1000000) == 0) {
+        logger.log(Level.INFO, current / 1000000 + " million");
       }
     }
   }
