@@ -30,7 +30,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
-class IOUtilsTest {
+public class IOUtilsTest {
   private Path root;
 
   private FileStore fileStore;

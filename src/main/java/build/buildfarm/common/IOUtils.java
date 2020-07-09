@@ -38,6 +38,7 @@ import jnr.ffi.LibraryLoader;
 import jnr.ffi.Pointer;
 import jnr.posix.FileStat;
 import jnr.posix.POSIX;
+import java.nio.file.attribute.PosixFileAttributeView;
 
 public class IOUtils {
   private static final Logger logger = Logger.getLogger(IOUtils.class.getName());
@@ -195,7 +196,7 @@ public class IOUtils {
   public static List<NamedFileKey> listDirentSorted(Path path, FileStore fileStore)
       throws IOException {
     final List<NamedFileKey> dirents;
-    if (fileStore.supportsFileAttributeView("posix")) {
+    if (fileStore.supportsFileAttributeView(PosixFileAttributeView.class)) {
       dirents = ffiReaddir(libc.get(), runtime(), path);
     } else {
       dirents = listNIOdirentSorted(path);
