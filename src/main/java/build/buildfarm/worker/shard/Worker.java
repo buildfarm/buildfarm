@@ -61,7 +61,6 @@ import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.ReportResultStage;
 import com.google.common.base.Strings;
 import com.google.common.base.Suppliers;
-import com.google.common.base.Throwables;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
@@ -94,6 +93,7 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
@@ -119,27 +119,10 @@ public class Worker extends LoggingMain {
 
   class LocalCasWriter implements CasWriter {
     public void write(Digest digest, Path file) throws IOException, InterruptedException {
-      insertFileLocally(digest, file);
-    }
-
-    private void insertFileLocally(Digest digest, Path file)
-        throws IOException, InterruptedException {
 
       Write write = getLocalWrite(digest);
-
-      try (OutputStream out =
-              write.getOutput(/* deadlineAfter=*/ 1, /* deadlineAfterUnits=*/ DAYS, () -> {});
-          InputStream in = Files.newInputStream(file)) {
-        ByteStreams.copy(in, out);
-      } catch (IOException e) {
-        if (!write.isComplete()) {
-          write.reset(); // we will not attempt retry with current behavior, abandon progress
-          if (e.getCause() != null) {
-            Throwables.propagateIfInstanceOf(e.getCause(), InterruptedException.class);
-          }
-          throw e;
-        }
-      }
+      InputStream inputStream = Files.newInputStream(file);
+      insertStream(digest, Suppliers.ofInstance(inputStream));
     }
 
     private Write getLocalWrite(Digest digest) throws IOException, InterruptedException {
@@ -152,17 +135,20 @@ public class Worker extends LoggingMain {
 
     public void insertBlob(Digest digest, ByteString content)
         throws IOException, InterruptedException {
-      insertBlobLocally(digest, content);
+
+      Write write = getLocalWrite(digest);
+      Supplier<InputStream> suppliedStream = () -> content.newInput();
+      insertStream(digest, suppliedStream);
     }
 
-    private void insertBlobLocally(Digest digest, ByteString content)
+    private void insertStream(Digest digest, Supplier<InputStream> suppliedStream)
         throws IOException, InterruptedException {
 
       Write write = getLocalWrite(digest);
 
       try (OutputStream out =
               write.getOutput(/* deadlineAfter=*/ 1, /* deadlineAfterUnits=*/ DAYS, () -> {});
-          InputStream in = content.newInput()) {
+          InputStream in = suppliedStream.get()) {
         ByteStreams.copy(in, out);
       } catch (IOException e) {
         if (!write.isComplete()) {
