@@ -205,20 +205,14 @@ class FileDirectoriesIndex implements DirectoriesIndex {
   }
 
   @GuardedBy("this")
-  private void removeEntriesDirectory(Iterable<String> entries, Digest directory) {
+  private void removeEntriesDirectory(Digest directory) {
     open();
 
     String digest = DigestUtil.toString(directory);
-    String deleteSql = "DELETE FROM entries WHERE path = ? AND directory = ?";
+    String deleteSql = "DELETE FROM entries WHERE directory = ?";
     try (PreparedStatement deleteStatement = conn.prepareStatement(deleteSql)) {
-      conn.setAutoCommit(false);
-      // safe for multi delete
-      deleteStatement.setString(2, digest);
-      for (String entry : entries) {
-        deleteStatement.setString(1, entry);
-        deleteStatement.executeUpdate();
-      }
-      conn.commit();
+      deleteStatement.setString(1, digest);
+      deleteStatement.executeUpdate();
     } catch (SQLException e) {
       throw new RuntimeException(e);
     }
@@ -226,7 +220,6 @@ class FileDirectoriesIndex implements DirectoriesIndex {
 
   @Override
   public synchronized void remove(Digest directory) {
-    Iterable<String> entries = directoryEntries(directory);
     try {
       Files.delete(path(directory));
     } catch (NoSuchFileException e) {
@@ -234,6 +227,6 @@ class FileDirectoriesIndex implements DirectoriesIndex {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
-    removeEntriesDirectory(entries, directory);
+    removeEntriesDirectory(directory);
   }
 }
