@@ -87,7 +87,7 @@ class StubWorkerContext implements WorkerContext {
   }
 
   @Override
-  public ExecutionPolicy getExecutionPolicy(String name) {
+  public Iterable<ExecutionPolicy> getExecutionPolicies(String name) {
     throw new UnsupportedOperationException();
   }
 

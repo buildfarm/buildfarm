@@ -25,7 +25,6 @@ import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecutionStage;
-import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.Platform.Property;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.NullWrite;
@@ -70,6 +69,8 @@ class Executor {
   }
 
   private long runInterruptible(Stopwatch stopwatch) throws InterruptedException {
+    long startedAt = System.currentTimeMillis();
+
     ExecuteOperationMetadata metadata;
     try {
       metadata = operationContext.operation.getMetadata().unpack(ExecuteOperationMetadata.class);
@@ -80,7 +81,9 @@ class Executor {
     ExecuteOperationMetadata executingMetadata =
         metadata.toBuilder().setStage(ExecutionStage.Value.EXECUTING).build();
 
-    long startedAt = System.currentTimeMillis();
+    Iterable<ExecutionPolicy> policies =
+        ExecutionPolicies.forPlatform(
+            operationContext.command.getPlatform(), workerContext::getExecutionPolicies);
 
     Operation operation =
         operationContext
@@ -147,29 +150,21 @@ class Executor {
         pollDeadline);
 
     try {
-      return executePolled(operation, timeout, isDefaultTimeout, stopwatch);
+      return executePolled(operation, policies, timeout, isDefaultTimeout, stopwatch);
     } finally {
       operationContext.poller.pause();
     }
   }
 
   private long executePolled(
-      Operation operation, Duration timeout, boolean isDefaultTimeout, Stopwatch stopwatch)
+      Operation operation,
+      Iterable<ExecutionPolicy> policies,
+      Duration timeout,
+      boolean isDefaultTimeout,
+      Stopwatch stopwatch)
       throws InterruptedException {
     /* execute command */
     workerContext.logInfo("Executor: Operation " + operation.getName() + " Executing command");
-
-    Platform platform = operationContext.command.getPlatform();
-    ImmutableList.Builder<ExecutionPolicy> policies = ImmutableList.builder();
-    ExecutionPolicy defaultPolicy = workerContext.getExecutionPolicy("");
-    if (defaultPolicy != null) {
-      policies.add(defaultPolicy);
-    }
-    for (Property property : platform.getPropertiesList()) {
-      if (property.getName().equals("execution-policy")) {
-        policies.add(workerContext.getExecutionPolicy(property.getValue()));
-      }
-    }
 
     ActionResult.Builder resultBuilder = operationContext.executeResponse.getResultBuilder();
     resultBuilder
@@ -188,7 +183,7 @@ class Executor {
     final Code statusCode;
     try (IOResource resource =
         workerContext.limitExecution(operationName, arguments, operationContext.command)) {
-      for (ExecutionPolicy policy : policies.build()) {
+      for (ExecutionPolicy policy : policies) {
         if (policy.getPolicyCase() == WRAPPER) {
           arguments.addAll(transformWrapper(policy.getWrapper()));
         }
