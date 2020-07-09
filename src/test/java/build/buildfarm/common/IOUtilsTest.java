@@ -43,7 +43,7 @@ public class IOUtilsTest {
 
   @After
   public void tearDown() throws IOException {
-    Directories.remove(root);
+    //Directories.remove(root);
   }
 
   @Test
