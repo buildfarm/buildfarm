@@ -12,7 +12,7 @@ then
       target="//src/test/...:all"
 fi
 
-bazel="$(pwd)/ci/bazelisk"
+bazel=bazelisk
 COVERAGE=bazel-testlogs/coverage
 
 "${bazel}" coverage $target --test_tag_filters="-redis"
