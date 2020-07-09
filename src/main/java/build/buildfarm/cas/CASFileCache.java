@@ -1457,7 +1457,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       throws IOException, InterruptedException {
 
     // create thread pool
-    int nThreads = Runtime.getRuntime().availableProcessors();
+    int nThreads = Runtime.getRuntime().availableProcessors() * 2;
     String threadNameFormat = "compute-cache-pool-%d";
     ExecutorService pool =
         Executors.newFixedThreadPool(
