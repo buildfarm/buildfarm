@@ -57,7 +57,7 @@ class FileDirectoriesIndex implements DirectoriesIndex {
 
   private static final Charset UTF_8 = Charset.forName("UTF-8");
   private static final int DEFAULT_NUM_OF_DB = Runtime.getRuntime().availableProcessors() * 2;
-  private static final int MAX_QUEUE_SIZE = 1000 * 1000;
+  private static final int MAX_QUEUE_SIZE = 1000 * 1000 * 1000;
 
   private final Path root;
   private final int numOfdb;
@@ -334,12 +334,12 @@ class FileDirectoriesIndex implements DirectoriesIndex {
 
     Set<String> uniqueEntries = ImmutableSet.copyOf(entries);
 
-    synchronized (this) {
-      if (queueSize.get() > MAX_QUEUE_SIZE) {
-        drainQueues();
-        queueSize.set(0);
-      }
-    }
+    //synchronized (this) {
+    //  if (queueSize.get() > MAX_QUEUE_SIZE) {
+    //    drainQueues();
+    //    queueSize.set(0);
+    //  }
+    //}
 
     for (String entry : uniqueEntries) {
       int index = Math.abs(entry.hashCode()) % numOfdb;
