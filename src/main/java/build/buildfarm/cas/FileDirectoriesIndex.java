@@ -107,8 +107,8 @@ class FileDirectoriesIndex implements DirectoriesIndex {
     opened = false;
   }
 
-  @GuardedBy("this")
-  private Set<Digest> removeEntryDirectories(String entry) {
+  @Override
+  public synchronized Set<Digest> removeEntry(String entry) {
     open();
 
     String selectSql = "SELECT directory FROM entries WHERE path = ?";
@@ -133,19 +133,6 @@ class FileDirectoriesIndex implements DirectoriesIndex {
 
   Path path(Digest digest) {
     return root.resolve(digest.getHash() + "_" + digest.getSizeBytes() + "_dir_inputs");
-  }
-
-  @Override
-  public synchronized Set<Digest> removeEntry(String entry) {
-    Set<Digest> directories = removeEntryDirectories(entry);
-    try {
-      for (Digest directory : directories) {
-        Files.delete(path(directory));
-      }
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-    return directories;
   }
 
   @Override

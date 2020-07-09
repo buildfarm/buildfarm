@@ -1727,7 +1727,15 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   @GuardedBy("this")
   List<ListenableFuture<Void>> unlinkAndExpireDirectories(Entry entry, ExecutorService service) {
     ImmutableList.Builder<ListenableFuture<Void>> builder = ImmutableList.builder();
-    for (Digest containingDirectory : directoriesIndex.removeEntry(entry.key)) {
+    Iterable<Digest> containingDirectories;
+    try {
+      containingDirectories = directoriesIndex.removeEntry(entry.key);
+    } catch (Exception e) {
+      logger.log(
+          Level.SEVERE, format("error removing entry %s from directoriesIndex", entry.key), e);
+      containingDirectories = ImmutableList.of();
+    }
+    for (Digest containingDirectory : containingDirectories) {
       builder.add(expireDirectory(containingDirectory, service));
     }
     entry.unlink();
