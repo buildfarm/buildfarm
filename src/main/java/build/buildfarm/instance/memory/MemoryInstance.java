@@ -93,6 +93,7 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.Durations;
+import com.google.protobuf.util.Timestamps;
 import com.google.rpc.PreconditionFailure;
 import io.grpc.Channel;
 import io.grpc.Status;
@@ -718,7 +719,8 @@ public class MemoryInstance extends AbstractServerInstance {
                           .setOperationName(operationName)
                           .setActionDigest(metadata.getActionDigest())
                           .setStdoutStreamName(metadata.getStdoutStreamName())
-                          .setStderrStreamName(metadata.getStderrStreamName()))
+                          .setStderrStreamName(metadata.getStderrStreamName())
+                          .setQueuedTimestamp(Timestamps.fromMillis(System.currentTimeMillis())))
                   .setQueuedOperationDigest(queuedOperationDigest)
                   .setPlatform(command.getPlatform())
                   .build();
@@ -819,7 +821,8 @@ public class MemoryInstance extends AbstractServerInstance {
                           .setOperationName(operationName)
                           .setActionDigest(metadata.getActionDigest())
                           .setStdoutStreamName(metadata.getStdoutStreamName())
-                          .setStderrStreamName(metadata.getStderrStreamName()))
+                          .setStderrStreamName(metadata.getStderrStreamName())
+                          .setQueuedTimestamp(Timestamps.fromMillis(System.currentTimeMillis())))
                   .setQueuedOperationDigest(queuedOperationDigest)
                   .setPlatform(command.getPlatform())
                   .build();
