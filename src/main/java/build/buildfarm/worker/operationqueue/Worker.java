@@ -17,7 +17,6 @@ package build.buildfarm.worker.operationqueue;
 import static build.buildfarm.cas.CASFileCache.getInterruptiblyOrIOException;
 import static build.buildfarm.common.IOUtils.formatIOError;
 import static build.buildfarm.instance.Utils.getBlob;
-import static com.google.common.collect.Maps.uniqueIndex;
 import static com.google.common.util.concurrent.Futures.allAsList;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
@@ -60,6 +59,7 @@ import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.WorkerConfig;
 import build.buildfarm.worker.ExecuteActionStage;
+import build.buildfarm.worker.ExecutionPolicies;
 import build.buildfarm.worker.InputFetchStage;
 import build.buildfarm.worker.MatchStage;
 import build.buildfarm.worker.OutputDirectory;
@@ -74,6 +74,7 @@ import com.google.common.base.Strings;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
+import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Maps;
 import com.google.common.hash.HashCode;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
@@ -390,8 +391,8 @@ public class Worker {
 
     WorkerContext context =
         new WorkerContext() {
-          Map<String, ExecutionPolicy> policies =
-              uniqueIndex(config.getExecutionPoliciesList(), (policy) -> policy.getName());
+          ListMultimap<String, ExecutionPolicy> policies =
+              ExecutionPolicies.toMultimap(config.getExecutionPoliciesList());
 
           @Override
           public String getName() {
@@ -617,7 +618,7 @@ public class Worker {
           }
 
           @Override
-          public ExecutionPolicy getExecutionPolicy(String name) {
+          public Iterable<ExecutionPolicy> getExecutionPolicies(String name) {
             return policies.get(name);
           }
 

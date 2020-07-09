@@ -67,7 +67,7 @@ public interface WorkerContext {
 
   DigestUtil getDigestUtil();
 
-  ExecutionPolicy getExecutionPolicy(String name);
+  Iterable<ExecutionPolicy> getExecutionPolicies(String name);
 
   int getExecuteStageWidth();
 

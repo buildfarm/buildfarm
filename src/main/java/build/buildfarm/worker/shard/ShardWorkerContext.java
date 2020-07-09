@@ -19,7 +19,6 @@ import static build.buildfarm.common.Actions.checkPreconditionFailure;
 import static build.buildfarm.common.Actions.satisfiesRequirements;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
-import static com.google.common.collect.Maps.uniqueIndex;
 import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.DAYS;
 
@@ -51,6 +50,7 @@ import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
+import build.buildfarm.worker.ExecutionPolicies;
 import build.buildfarm.worker.RetryingMatchListener;
 import build.buildfarm.worker.Utils;
 import build.buildfarm.worker.WorkerContext;
@@ -62,6 +62,7 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSetMultimap;
+import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.SetMultimap;
 import com.google.common.collect.Sets;
@@ -98,6 +99,8 @@ import java.util.logging.Logger;
 class ShardWorkerContext implements WorkerContext {
   private static final Logger logger = Logger.getLogger(ShardWorkerContext.class.getName());
 
+  private static final String PROVISION_CORES_NAME = "cores";
+
   private final String name;
   private final Platform platform;
   private final SetMultimap<String, String> matchProvisions;
@@ -109,7 +112,7 @@ class ShardWorkerContext implements WorkerContext {
   private final ShardBackplane backplane;
   private final ExecFileSystem execFileSystem;
   private final InputStreamFactory inputStreamFactory;
-  private final Map<String, ExecutionPolicy> policies;
+  private final ListMultimap<String, ExecutionPolicy> policies;
   private final Instance instance;
   private final long deadlineAfter;
   private final TimeUnit deadlineAfterUnits;
@@ -124,18 +127,13 @@ class ShardWorkerContext implements WorkerContext {
   private final Supplier<CasWriter> writer;
 
   static SetMultimap<String, String> getMatchProvisions(
-      Platform platform, Iterable<ExecutionPolicy> policyNames, int executeStageWidth) {
+      Platform platform, Iterable<ExecutionPolicy> policies, int executeStageWidth) {
     ImmutableSetMultimap.Builder<String, String> provisions = ImmutableSetMultimap.builder();
-    for (Platform.Property property : platform.getPropertiesList()) {
+    Platform matchPlatform = ExecutionPolicies.getMatchPlatform(platform, policies);
+    for (Platform.Property property : matchPlatform.getPropertiesList()) {
       provisions.put(property.getName(), property.getValue());
     }
-    for (ExecutionPolicy policy : policyNames) {
-      String name = policy.getName();
-      if (!name.isEmpty()) {
-        provisions.put("execution-policy", name);
-      }
-    }
-    provisions.put("cores", String.format("%d", executeStageWidth));
+    provisions.put(PROVISION_CORES_NAME, String.format("%d", executeStageWidth));
     return provisions.build();
   }
 
@@ -171,7 +169,7 @@ class ShardWorkerContext implements WorkerContext {
     this.backplane = backplane;
     this.execFileSystem = execFileSystem;
     this.inputStreamFactory = inputStreamFactory;
-    this.policies = uniqueIndex(policies, (policy) -> policy.getName());
+    this.policies = ExecutionPolicies.toMultimap(policies);
     this.instance = instance;
     this.deadlineAfter = deadlineAfter;
     this.deadlineAfterUnits = deadlineAfterUnits;
@@ -724,7 +722,7 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
-  public ExecutionPolicy getExecutionPolicy(String name) {
+  public Iterable<ExecutionPolicy> getExecutionPolicies(String name) {
     return policies.get(name);
   }
 
