@@ -89,9 +89,11 @@ class FileDirectoriesIndex implements DirectoriesIndex {
   public synchronized void start() {
     open();
 
-    String createIndexSql = "CREATE INDEX path_idx ON entries (path)";
+    String createPathIndexSql = "CREATE INDEX path_idx ON entries (path)";
+    String createDirectoryIndexSql = "CREATE INDEX directory_idx ON entries (directory)";
     try (Statement stmt = conn.createStatement()) {
-      stmt.execute(createIndexSql);
+      stmt.execute(createPathIndexSql);
+      stmt.execute(createDirectoryIndexSql);
     } catch (SQLException e) {
       throw new RuntimeException(e);
     }
@@ -112,23 +114,33 @@ class FileDirectoriesIndex implements DirectoriesIndex {
     open();
 
     String selectSql = "SELECT directory FROM entries WHERE path = ?";
-    String deleteSql = "DELETE FROM entries where path = ?";
 
-    ImmutableSet.Builder<Digest> directories = ImmutableSet.builder();
-    try (PreparedStatement selectStatement = conn.prepareStatement(selectSql);
-        PreparedStatement deleteStatement = conn.prepareStatement(deleteSql)) {
+    ImmutableSet.Builder<Digest> directoriesBuilder = ImmutableSet.builder();
+    try (PreparedStatement selectStatement = conn.prepareStatement(selectSql)) {
       selectStatement.setString(1, entry);
       try (ResultSet rs = selectStatement.executeQuery()) {
         while (rs.next()) {
-          directories.add(DigestUtil.parseDigest(rs.getString("directory")));
+          directoriesBuilder.add(DigestUtil.parseDigest(rs.getString("directory")));
         }
       }
-      deleteStatement.setString(1, entry);
-      deleteStatement.executeUpdate();
     } catch (SQLException e) {
       throw new RuntimeException(e);
     }
-    return directories.build();
+    // all directories featuring this entry are now invalid
+    ImmutableSet<Digest> directories = directoriesBuilder.build();
+    String deleteSql = "DELETE FROM entries where directory = ?";
+    try (PreparedStatement deleteStatement = conn.prepareStatement(deleteSql)) {
+      conn.setAutoCommit(false);
+      for (Digest directory : directories) {
+        deleteStatement.setString(1, DigestUtil.toString(directory));
+        deleteStatement.addBatch();
+      }
+      deleteStatement.executeBatch();
+      conn.commit();
+    } catch (SQLException e) {
+      throw new RuntimeException(e);
+    }
+    return directories;
   }
 
   Path path(Digest digest) {
