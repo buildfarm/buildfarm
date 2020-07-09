@@ -16,6 +16,7 @@ package build.buildfarm.common;
 
 import static com.google.common.truth.Truth.assertThat;
 
+import build.buildfarm.common.io.Directories;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.nio.file.FileStore;
@@ -42,7 +43,7 @@ public class IOUtilsTest {
 
   @After
   public void tearDown() throws IOException {
-    // Directories.remove(root);
+    Directories.remove(root);
   }
 
   @Test
