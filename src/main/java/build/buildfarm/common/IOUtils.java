@@ -26,6 +26,7 @@ import java.nio.file.LinkOption;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.PosixFileAttributeView;
 import java.nio.file.attribute.PosixFileAttributes;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -38,7 +39,6 @@ import jnr.ffi.LibraryLoader;
 import jnr.ffi.Pointer;
 import jnr.posix.FileStat;
 import jnr.posix.POSIX;
-import java.nio.file.attribute.PosixFileAttributeView;
 
 public class IOUtils {
   private static final Logger logger = Logger.getLogger(IOUtils.class.getName());
