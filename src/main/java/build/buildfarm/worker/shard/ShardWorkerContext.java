@@ -34,9 +34,7 @@ import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.Platform;
-import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.Tree;
-import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.cas.ContentAddressableStorage.EntryLimitException;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
@@ -67,7 +65,6 @@ import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.SetMultimap;
 import com.google.common.collect.Sets;
-import com.google.common.io.ByteStreams;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
@@ -80,7 +77,6 @@ import io.grpc.Status.Code;
 import io.grpc.StatusException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
@@ -94,8 +90,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -125,6 +121,7 @@ class ShardWorkerContext implements WorkerContext {
   private final Map<String, QueueEntry> activeOperations = Maps.newConcurrentMap();
   private final Group executionsGroup = Group.getRoot().getChild("executions");
   private final Group operationsGroup = executionsGroup.getChild("operations");
+  private final Supplier<CasWriter> writer;
 
   static SetMultimap<String, String> getMatchProvisions(
       Platform platform, Iterable<ExecutionPolicy> policyNames, int executeStageWidth) {
@@ -161,7 +158,8 @@ class ShardWorkerContext implements WorkerContext {
       Duration maximumActionTimeout,
       boolean limitExecution,
       boolean limitGlobalExecution,
-      boolean onlyMulticoreTests) {
+      boolean onlyMulticoreTests,
+      Supplier<CasWriter> writer) {
     this.name = name;
     this.platform = platform;
     this.matchProvisions = getMatchProvisions(platform, policies, executeStageWidth);
@@ -182,6 +180,7 @@ class ShardWorkerContext implements WorkerContext {
     this.limitExecution = limitExecution;
     this.limitGlobalExecution = limitGlobalExecution;
     this.onlyMulticoreTests = onlyMulticoreTests;
+    this.writer = writer;
     Preconditions.checkState(
         !limitGlobalExecution || limitExecution,
         "limit_global_execution is meaningless without limit_execution");
@@ -476,35 +475,20 @@ class ShardWorkerContext implements WorkerContext {
     return maximumActionTimeout;
   }
 
-  private void insertBlob(Digest digest, ByteString content) throws InterruptedException {
+  private void insertBlob(Digest digest, ByteString content)
+      throws IOException, InterruptedException {
     if (digest.getSizeBytes() > 0) {
-      Blob blob = new Blob(content, digest);
-      execFileSystem.getStorage().put(blob);
+      writer.get().insertBlob(digest, content);
     }
   }
 
   private void insertFile(Digest digest, Path file) throws IOException, InterruptedException {
-    Write write =
-        execFileSystem
-            .getStorage()
-            .getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
-    try (OutputStream out = write.getOutput(deadlineAfter, deadlineAfterUnits, () -> {});
-        InputStream in = Files.newInputStream(file)) {
-      ByteStreams.copy(in, out);
-    } catch (IOException e) {
-      // complete writes should be ignored
-      if (!write.isComplete()) {
-        write.reset(); // we will not attempt retry with current behavior, abandon progress
-        if (e.getCause() != null) {
-          Throwables.propagateIfInstanceOf(e.getCause(), InterruptedException.class);
-        }
-        throw e;
-      }
-    }
+
+    writer.get().write(digest, file);
   }
 
   private void updateActionResultStdOutputs(ActionResult.Builder resultBuilder)
-      throws InterruptedException {
+      throws IOException, InterruptedException {
     ByteString stdoutRaw = resultBuilder.getStdoutRaw();
     if (stdoutRaw.size() > 0) {
       // reset to allow policy to determine inlining
@@ -726,7 +710,6 @@ class ShardWorkerContext implements WorkerContext {
     for (String outputFile : outputFiles) {
       uploadOutputFile(resultBuilder, outputFile, actionRoot, preconditionFailure);
     }
-
     for (String outputDir : outputDirs) {
       uploadOutputDirectory(resultBuilder, outputDir, actionRoot, preconditionFailure);
     }

@@ -15,6 +15,7 @@
 package build.buildfarm.common.grpc;
 
 import static com.google.common.truth.Truth.assertThat;
+import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.AdditionalAnswers.delegatesTo;
 import static org.mockito.Mockito.any;
@@ -157,5 +158,34 @@ public class StubWriteOutputStreamTest {
     List<WriteRequest> requests = writeRequestCaptor.getAllValues();
     assertThat(requests.get(0).getWriteOffset()).isEqualTo(requests.get(1).getWriteOffset());
     assertThat(requests.get(2).getFinishWrite()).isTrue();
+  }
+
+  @Test
+  public void getOutputCallback() throws IOException {
+    String resourceName = "reset-resource";
+    StubWriteOutputStream write =
+        new StubWriteOutputStream(
+            Suppliers.ofInstance(ByteStreamGrpc.newBlockingStub(channel)),
+            Suppliers.ofInstance(ByteStreamGrpc.newStub(channel)),
+            resourceName,
+            /* expectedSize=*/ StubWriteOutputStream.UNLIMITED_EXPECTED_SIZE,
+            /* autoflush=*/ true);
+    ByteString content = ByteString.copyFromUtf8("Hello, World");
+
+    boolean callbackTimedOut = false;
+    try (OutputStream out =
+        write.getOutput(
+            1,
+            MICROSECONDS,
+            () -> {
+              try {
+                Thread.sleep(1000);
+              } catch (InterruptedException e) {
+              }
+            })) {
+    } catch (Exception e) {
+      callbackTimedOut = true;
+    }
+    assertThat(callbackTimedOut).isTrue();
   }
 }

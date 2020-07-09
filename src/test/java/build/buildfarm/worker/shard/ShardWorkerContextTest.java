@@ -43,6 +43,7 @@ import io.grpc.StatusException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.function.Supplier;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -63,6 +64,8 @@ public class ShardWorkerContextTest {
   @Mock private InputStreamFactory inputStreamFactory;
 
   @Mock private Instance instance;
+
+  @Mock private Supplier<CasWriter> writer;
 
   @Before
   public void setUp() throws Exception {
@@ -97,7 +100,8 @@ public class ShardWorkerContextTest {
         /* maximumActionTimeout=*/ Duration.getDefaultInstance(),
         /* limitExecution=*/ false,
         /* limitGlobalExecution=*/ false,
-        /* onlyMulticoreTests=*/ false);
+        /* onlyMulticoreTests=*/ false,
+        writer);
   }
 
   @Test(expected = StatusException.class)
