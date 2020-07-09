@@ -180,7 +180,7 @@ public class StubWriteOutputStreamTest {
             () -> {
               try {
                 Thread.sleep(1000);
-              } catch (Exception e) {
+              } catch (InterruptedException e) {
               }
             })) {
     } catch (Exception e) {

@@ -487,7 +487,7 @@ public class Worker extends LoggingMain {
     try {
       return workerStubs.get(worker);
     } catch (ExecutionException e) {
-      logger.log(Level.SEVERE, "error getting worker stub for " + worker, e);
+      logger.log(Level.SEVERE, "error getting worker stub for " + worker, e.getCause());
       throw new IllegalStateException("stub instance creation must not fail");
     }
   }
@@ -684,14 +684,14 @@ public class Worker extends LoggingMain {
   }
 
   private void onStorageExpire(Iterable<Digest> digests) {
-    try {
+    if (isCasShard) {
+      try {
 
-      // if the worker is a CAS member, it can send/modify blobs in the backplane.
-      if (isCasShard) {
+        // if the worker is a CAS member, it can send/modify blobs in the backplane.
         backplane.removeBlobsLocation(digests, config.getPublicName());
+      } catch (IOException e) {
+        throw Status.fromThrowable(e).asRuntimeException();
       }
-    } catch (IOException e) {
-      throw Status.fromThrowable(e).asRuntimeException();
     }
   }
 
