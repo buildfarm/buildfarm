@@ -194,8 +194,10 @@ public class IOUtils {
 
   public static List<NamedFileKey> listDirentSorted(Path path, FileStore fileStore)
       throws IOException {
+
     final List<NamedFileKey> dirents;
-    if (fileStore.supportsFileAttributeView("posix")) {
+    final String OS = System.getProperty("os.name");
+    if (OS.contains("Linux")) {
       dirents = ffiReaddir(libc.get(), runtime(), path);
     } else {
       dirents = listNIOdirentSorted(path);
