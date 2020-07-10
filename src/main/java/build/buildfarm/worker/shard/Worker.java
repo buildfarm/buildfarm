@@ -182,7 +182,7 @@ public class Worker extends LoggingMain {
       Instance casMember = workerStub(workerName);
       Write write = getCasMemberWrite(digest, workerName);
 
-      streamIntoWriteFuture(in, write, digest.getSizeBytes()).get();
+      streamIntoWriteFuture(in, write, digest, digest.getSizeBytes()).get();
     }
 
     private Write getCasMemberWrite(Digest digest, String workerName)
@@ -387,8 +387,8 @@ public class Worker extends LoggingMain {
     return sizeKb * 1024;
   }
 
-  private ListenableFuture<Long> streamIntoWriteFuture(InputStream in, Write write, long size)
-      throws IOException {
+  private ListenableFuture<Long> streamIntoWriteFuture(
+      InputStream in, Write write, Digest digest, long size) throws IOException {
 
     SettableFuture<Long> writtenFuture = SettableFuture.create();
     int chunkSizeBytes = KBtoBytes(128);
@@ -412,7 +412,10 @@ public class Worker extends LoggingMain {
                 }
 
               } catch (IOException e) {
-                logger.log(Level.SEVERE, "unexpected error transferring file: ", e);
+                if (!write.isComplete()) {
+                  write.reset();
+                  logger.log(Level.SEVERE, "unexpected error transferring file for " + digest, e);
+                }
               }
             });
 
