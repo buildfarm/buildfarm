@@ -187,7 +187,7 @@ public class IOUtils {
   private static List<NamedFileKey> listNIOdirentSorted(Path path) throws IOException {
     List<NamedFileKey> dirents = new ArrayList();
     for (Path entry : listDir(path)) {
-      dirents.add(pathToNamedFileKey(path));
+      dirents.add(pathToNamedFileKey(entry));
     }
     return dirents;
   }
