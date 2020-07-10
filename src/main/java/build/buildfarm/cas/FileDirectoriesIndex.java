@@ -57,7 +57,7 @@ class FileDirectoriesIndex implements DirectoriesIndex {
 
   private static final Charset UTF_8 = Charset.forName("UTF-8");
   private static final int DEFAULT_NUM_OF_DB = Runtime.getRuntime().availableProcessors() * 2;
-  private static final int MAX_QUEUE_SIZE = 1000 * 1000 * 1000;
+  private static final int MAX_QUEUE_SIZE = 10 * 1000;
 
   private final Path root;
   private final int numOfdb;
@@ -303,23 +303,21 @@ class FileDirectoriesIndex implements DirectoriesIndex {
 
     logger.log(Level.INFO, "Start draining separate queue: " + dbIndex);
     String insertSql = "INSERT INTO entries (path, directory)\n" + "    VALUES (?,?)";
-    synchronized (queues[dbIndex]) {
-      try (PreparedStatement insertStatement = conns[dbIndex].prepareStatement(insertSql)) {
-        conns[dbIndex].setAutoCommit(false);
-        while (!queues[dbIndex].isEmpty()) {
-          String[] entry = queues[dbIndex].poll();
-          if (entry == null) {
-            continue;
-          }
-          insertStatement.setString(1, entry[0]);
-          insertStatement.setString(2, entry[1]);
-          insertStatement.addBatch();
+    try (PreparedStatement insertStatement = conns[dbIndex].prepareStatement(insertSql)) {
+      conns[dbIndex].setAutoCommit(false);
+      while (!queues[dbIndex].isEmpty()) {
+        String[] entry = queues[dbIndex].poll();
+        if (entry == null) {
+          continue;
         }
-        insertStatement.executeBatch();
-        conns[dbIndex].commit();
-      } catch (SQLException e) {
-        throw new RuntimeException(e);
+        insertStatement.setString(1, entry[0]);
+        insertStatement.setString(2, entry[1]);
+        insertStatement.addBatch();
       }
+      insertStatement.executeBatch();
+      conns[dbIndex].commit();
+    } catch (SQLException e) {
+      throw new RuntimeException(e);
     }
     logger.log(Level.INFO, "Drained separate queue: " + dbIndex);
   }
@@ -334,19 +332,15 @@ class FileDirectoriesIndex implements DirectoriesIndex {
 
     Set<String> uniqueEntries = ImmutableSet.copyOf(entries);
 
-    //synchronized (this) {
-    //  if (queueSize.get() > MAX_QUEUE_SIZE) {
-    //    drainQueues();
-    //    queueSize.set(0);
-    //  }
-    //}
-
     for (String entry : uniqueEntries) {
       int index = Math.abs(entry.hashCode()) % numOfdb;
       // BatchMode is only used in the worker startup.
       if (batchMode) {
         synchronized (queues[index]) {
           queues[index].add(new String[]{entry, DigestUtil.toString(directory)});
+          if (queues[index].size() > MAX_QUEUE_SIZE) {
+            addEntriesDirectory(index);
+          }
         }
       } else {
         synchronized (conns[index]) {
