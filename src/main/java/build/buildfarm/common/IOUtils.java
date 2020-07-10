@@ -174,7 +174,7 @@ public class IOUtils {
   public static Object getFileKey(Path path, @Nullable FileStatus stat) throws IOException {
     Object fileKey = stat == null ? null : stat.fileKey();
     if (fileKey == null) {
-      fileKey = Files.readAttributes(path, BasicFileAttributes.class).fileKey();
+      fileKey = Files.readAttributes(path, BasicFileAttributes.class);
     }
     return fileKey;
   }
