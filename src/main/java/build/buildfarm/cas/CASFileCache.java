@@ -128,7 +128,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private final Executor accessRecorder;
   private final ExecutorService expireService;
 
-  private final Map<Digest, DirectoryEntry> directoryStorage = Maps.newHashMap();
+  private final Map<Digest, DirectoryEntry> directoryStorage = Maps.newConcurrentMap();
   private final DirectoriesIndex directoriesIndex;
   private final String directoriesIndexDbName;
   private final LockMap locks = new LockMap();
@@ -1478,9 +1478,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               if (digest != null && getDirectoryPath(digest).equals(path)) {
                 DirectoryEntry e = new DirectoryEntry(directory, Deadline.after(10, SECONDS));
                 directoriesIndex.put(digest, inputsBuilder.build());
-                synchronized (this) {
-                  directoryStorage.put(digest, e);
-                }
+                directoryStorage.put(digest, e);
               } else {
                 synchronized (invalidDirectories) {
                   invalidDirectories.add(path);
@@ -2242,9 +2240,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                       ? Directory.getDefaultInstance()
                       : directoriesByDigest.get(digest),
                   Deadline.after(10, SECONDS));
-          synchronized (this) {
-            directoryStorage.put(digest, e);
-          }
+          directoryStorage.put(digest, e);
           return path;
         },
         service);
