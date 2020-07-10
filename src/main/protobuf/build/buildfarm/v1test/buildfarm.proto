@@ -353,6 +353,11 @@ message ShardWorkerConfig {
 
   // user principal name for executions
   string exec_owner = 32;
+  
+  // This determines whether the shard instance will participate in the backplane
+  // and cache it's operation outputs in its own cache file CAS.
+  // When omitted from CAS, the worker will send its output to another worker's CAS.
+  bool omit_from_cas = 33;
 }
 
 message ShardWorker {

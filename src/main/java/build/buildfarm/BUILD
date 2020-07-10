@@ -419,6 +419,7 @@ java_library(
         ":worker",
         ":worker-cgroup",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
+        "//src/main/java/build/buildfarm:common-cache",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_rpc_error_details_java_proto",
         "@maven//:com_github_pcj_google_options",

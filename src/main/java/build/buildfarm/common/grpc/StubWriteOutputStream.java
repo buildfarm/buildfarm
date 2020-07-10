@@ -258,9 +258,7 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
 
   @Override
   public synchronized boolean isReady() {
-    if (writeObserver == null) {
-      return false;
-    }
+    checkNotNull(writeObserver);
     ClientCallStreamObserver<WriteRequest> clientCallStreamObserver =
         (ClientCallStreamObserver<WriteRequest>) writeObserver;
     return clientCallStreamObserver.isReady();
@@ -291,10 +289,15 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
 
   @Override
   public FeedbackOutputStream getOutput(
-      long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+      long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) throws IOException {
     this.deadlineAfter = deadlineAfter;
     this.deadlineAfterUnits = deadlineAfterUnits;
     this.onReadyHandler = onReadyHandler;
+    synchronized (this) {
+      if (writeObserver == null) {
+        initiateWrite();
+      }
+    }
     return this;
   }
 

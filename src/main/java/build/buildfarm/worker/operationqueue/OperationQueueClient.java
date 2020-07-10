@@ -26,6 +26,7 @@ import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperationMetadata;
+import build.buildfarm.worker.ExecutionPolicies;
 import build.buildfarm.worker.RetryingMatchListener;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
@@ -42,20 +43,9 @@ class OperationQueueClient {
   private final Platform matchPlatform;
   private final Set<String> activeOperations = new ConcurrentSkipListSet<>();
 
-  static Platform getMatchPlatform(Platform platform, Iterable<ExecutionPolicy> policies) {
-    Platform.Builder builder = platform.toBuilder();
-    for (ExecutionPolicy policy : policies) {
-      String name = policy.getName();
-      if (!name.isEmpty()) {
-        builder.addPropertiesBuilder().setName("execution-policy").setValue(policy.getName());
-      }
-    }
-    return builder.build();
-  }
-
   OperationQueueClient(Instance instance, Platform platform, Iterable<ExecutionPolicy> policies) {
     this.instance = instance;
-    matchPlatform = getMatchPlatform(platform, policies);
+    matchPlatform = ExecutionPolicies.getMatchPlatform(platform, policies);
   }
 
   void match(MatchListener listener) throws InterruptedException {

@@ -29,7 +29,7 @@ import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.exceptions.JedisConnectionException;
 
 @RunWith(JUnit4.class)
-class RedisClientTest {
+public class RedisClientTest {
   @Test
   public void runExceptionEndOfStreamIsUnavailable() throws IOException, InterruptedException {
     RedisClient client = new RedisClient(mock(JedisCluster.class));
