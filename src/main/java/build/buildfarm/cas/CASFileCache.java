@@ -102,6 +102,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.function.BooleanSupplier;
@@ -187,8 +188,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return sizeInBytes;
   }
 
-  public long storageCount() {
+  public long totalEntryCount() {
     return storage.size();
+  }
+
+  public long unreferencedEntryCount() {
+    return Entry.entryCount.get();
   }
 
   public long directoryStorageCount() {
@@ -2729,6 +2734,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   @VisibleForTesting
   public static class Entry {
+    public static AtomicLong entryCount = new AtomicLong(0);
     Entry before, after;
     final String key;
     final long size;
@@ -2758,6 +2764,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       after.before = before;
       before = null;
       after = null;
+      entryCount.decrementAndGet();
     }
 
     protected void addBefore(Entry existingEntry) {
@@ -2765,6 +2772,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       before = existingEntry.before;
       before.after = this;
       after.before = this;
+      entryCount.incrementAndGet();
     }
 
     public void incrementReference() {
@@ -2781,7 +2789,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               + " to "
               + (referenceCount + 1));
       if (referenceCount == 0) {
-        if (before == null || after == null) {
+        if (!isLinked()) {
           throw new IllegalStateException(
               "entry "
                   + key
@@ -2817,7 +2825,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
     public void recordAccess(Entry header) {
       if (referenceCount == 0) {
-        if (before == null || after == null) {
+        if (!isLinked()) {
           throw new IllegalStateException(
               "entry "
                   + key

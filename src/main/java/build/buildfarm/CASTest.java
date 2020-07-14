@@ -75,7 +75,8 @@ class CASTest {
 
     // Report information on started cache.
     System.out.println("CAS Started.");
-    System.out.println("Storage Count: " + fileCache.storageCount());
+    System.out.println("Total Entry Count: " + fileCache.totalEntryCount());
+    System.out.println("Unreferenced Entry Count: " + fileCache.unreferencedEntryCount());
     System.out.println("Directory Count: " + fileCache.directoryStorageCount());
     System.out.println("Current Size: " + BytestoGB(fileCache.size()) + "GB");
   }

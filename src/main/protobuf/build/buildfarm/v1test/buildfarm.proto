@@ -720,6 +720,9 @@ message WorkerProfileMessage {
   // number of Entry in CAS
   int64 cas_entry_count = 1;
 
+  // number of referenced Entry in CAS
+  int64 cas_unreferenced_entry_count = 11;
+
   // number of DirectoryEntry in CAS
   int64 cas_directory_entry_count = 2;
 
