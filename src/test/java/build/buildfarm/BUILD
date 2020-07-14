@@ -418,7 +418,7 @@ java_test(
         "common/redis/RedisNodeHashesMockTest.java",
         "common/redis/RedisQueueMockTest.java",
         "common/redis/RedisSlotToHashTest.java",
-        "common/redis/ProvisionedRedisQueueMockTest.java",
+        "common/redis/ProvisionedRedisQueueTest.java",
     ],
     test_class = "build.buildfarm.AllTests",
     deps = [
