@@ -14,6 +14,8 @@
 
 package build.buildfarm.common.redis;
 
+import static com.google.common.truth.Truth.assertThat;
+
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
 import org.junit.Test;
@@ -54,5 +56,27 @@ public class ProvisionedRedisQueueMockTest {
 
     ProvisionedRedisQueue queue =
         new ProvisionedRedisQueue("name", ImmutableList.of(), HashMultimap.create());
+  }
+
+  // Function under test: explainEligibility
+  // Reason for testing: the queue will accept work if no provisions are involved
+  // Failure explanation: the queue is unable to accept work with no provisions are the explanation
+  // is wrong
+  @Test
+  public void explainEligibilityNoProvisionsAccepted() throws Exception {
+
+    // ARRANGE
+    ProvisionedRedisQueue queue =
+        new ProvisionedRedisQueue("foo", ImmutableList.of(), HashMultimap.create());
+
+    // ACT
+    String explanation = queue.explainEligibility(HashMultimap.create());
+
+    // ASSERT
+    String expected_explanation = "The properties are eligible for the foo queue.\n";
+    expected_explanation += "matched: {}\n";
+    expected_explanation += "unmatched: {}\n";
+    expected_explanation += "still required: {}\n";
+    assertThat(explanation).isEqualTo(expected_explanation);
   }
 }

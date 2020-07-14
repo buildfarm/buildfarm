@@ -21,6 +21,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 ///
 /// @class   ProvisionedRedisQueue
@@ -134,9 +135,9 @@ public class ProvisionedRedisQueue {
     // is it eligible?
     String explanation = new String();
     if (isEligible(properties)) {
-      explanation += "The properties are eligible for the queue.\n";
+      explanation += "The properties are eligible for the " + queue.getName() + " queue.\n";
     } else {
-      explanation += "The properties are not eligible for the queue.\n";
+      explanation += "The properties are not eligible for the " + queue.getName() + " queue.\n";
     }
 
     // is it fully wildcard?
@@ -160,9 +161,9 @@ public class ProvisionedRedisQueue {
     stillRequired.putAll(requirements);
 
     // provide further explanation on individual properties
-    explanation += "matched: " + matched + "\n";
-    explanation += "unmatched: " + unmatched + "\n";
-    explanation += "still required: " + stillRequired + "\n";
+    explanation += "matched: " + toString(matched.build().asMap()) + "\n";
+    explanation += "unmatched: " + toString(unmatched.build().asMap()) + "\n";
+    explanation += "still required: " + toString(stillRequired.build().asMap()) + "\n";
     return explanation;
   }
   ///
@@ -194,5 +195,19 @@ public class ProvisionedRedisQueue {
             : filterProvisions.entries().stream()
                 .filter(e -> !wildcardProvisions.contains(e.getKey()))
                 .collect(ImmutableSet.toImmutableSet());
+  }
+  ///
+  /// @brief   Convert map to printable string.
+  /// @details Uses streams.
+  /// @param   map Map to convert to string.
+  /// @return  String representation of map.
+  /// @note    Suggested return identifier: str.
+  ///
+  private String toString(Map<String, ?> map) {
+    String mapAsString =
+        map.keySet().stream()
+            .map(key -> key + "=" + map.get(key))
+            .collect(Collectors.joining(", ", "{", "}"));
+    return mapAsString;
   }
 }
