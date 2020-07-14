@@ -15,6 +15,7 @@
 package build.buildfarm.common.redis;
 
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.SetMultimap;
 import java.util.HashSet;
 import java.util.List;
@@ -46,11 +47,27 @@ import java.util.Set;
 ///
 public class ProvisionedRedisQueue {
 
+  ///
+  /// @field   WILDCARD_VALUE
+  /// @brief   Wildcard value.
+  /// @details Symbol for identifying wildcard in both key/value of provisions.
+  ///
   public static final String WILDCARD_VALUE = "*";
 
+  ///
+  /// @field   isFullyWildcard
+  /// @brief   If the queue will deem any set of properties eligible.
+  /// @details If any of the provision keys has a wildcard, we consider
+  ///          anything for the queue to be eligible.
+  ///
   private final boolean isFullyWildcard;
 
-  private final Set<String> wildcardProvisions;
+  ///
+  /// @field   wildcardProvisions
+  /// @brief   The wildcard provisions of the queue.
+  /// @details A filtered set of all provisions that use wildcards.
+  ///
+  private Set<String> wildcardProvisions;
 
   ///
   /// @field   requiredProvisions
@@ -59,7 +76,7 @@ public class ProvisionedRedisQueue {
   ///          added to the queue. These often match the remote api's command
   ///          platform properties.
   ///
-  private final Set<Map.Entry<String, String>> requiredProvisions;
+  private Set<Map.Entry<String, String>> requiredProvisions;
 
   ///
   /// @field   queue
@@ -80,21 +97,8 @@ public class ProvisionedRedisQueue {
       String name, List<String> hashtags, SetMultimap<String, String> filterProvisions) {
     this.queue = new BalancedRedisQueue(name, hashtags);
     isFullyWildcard = filterProvisions.containsKey(WILDCARD_VALUE);
-    wildcardProvisions =
-        isFullyWildcard
-            ? ImmutableSet.of()
-            : filterProvisions.asMap().entrySet().stream()
-                .filter(e -> e.getValue().contains(WILDCARD_VALUE))
-                .map(e -> e.getKey())
-                .collect(ImmutableSet.toImmutableSet());
-    requiredProvisions =
-        isFullyWildcard
-            ? ImmutableSet.of()
-            : filterProvisions.entries().stream()
-                .filter(e -> !wildcardProvisions.contains(e.getKey()))
-                .collect(ImmutableSet.toImmutableSet());
+    filterProvisionsByWildcard(filterProvisions);
   }
-
   ///
   /// @brief   Checks required properties.
   /// @details Checks whether the properties given fulfill all of the required
@@ -119,6 +123,49 @@ public class ProvisionedRedisQueue {
     return requirements.isEmpty();
   }
   ///
+  /// @brief   Explain eligibility.
+  /// @details Returns an explanation as to why the properties provided are
+  ///          eligible / ineligible to be placed on the queue.
+  /// @param   properties Properties to get an eligibility explanation of.
+  /// @return  An explanation on the eligibility of the provided properties.
+  /// @note    Suggested return identifier: explanation.
+  ///
+  public String explainEligibility(SetMultimap<String, String> properties) {
+    // is it eligible?
+    String explanation = new String();
+    if (isEligible(properties)) {
+      explanation += "The properties are eligible for the queue.\n";
+    } else {
+      explanation += "The properties are not eligible for the queue.\n";
+    }
+
+    // is it fully wildcard?
+    if (isFullyWildcard) {
+      explanation += "The queue is fully wildcard.\n";
+      return explanation;
+    }
+
+    // gather matched, unmatched, and still required properties
+    ImmutableSetMultimap.Builder<String, String> matched = ImmutableSetMultimap.builder();
+    ImmutableSetMultimap.Builder<String, String> unmatched = ImmutableSetMultimap.builder();
+    ImmutableSetMultimap.Builder<String, String> stillRequired = ImmutableSetMultimap.builder();
+    Set<Map.Entry<String, String>> requirements = new HashSet<>(requiredProvisions);
+    for (Map.Entry<String, String> property : properties.entries()) {
+      if (!wildcardProvisions.contains(property.getKey()) && !requirements.remove(property)) {
+        unmatched.put(property);
+      } else {
+        matched.put(property);
+      }
+    }
+    stillRequired.putAll(requirements);
+
+    // provide further explanation on individual properties
+    explanation += "matched: " + matched + "\n";
+    explanation += "unmatched: " + unmatched + "\n";
+    explanation += "still required: " + stillRequired + "\n";
+    return explanation;
+  }
+  ///
   /// @brief   Get queue.
   /// @details Obtain the internal queue.
   /// @return  The internal queue.
@@ -126,5 +173,26 @@ public class ProvisionedRedisQueue {
   ///
   public BalancedRedisQueue queue() {
     return queue;
+  }
+  ///
+  /// @brief   Filter the provisions into separate sets by checking for the
+  ///          existence of wildcards.
+  /// @details This will organize the incoming provisions into separate sets.
+  /// @param   filterProvisions The filtered provisions of the queue.
+  ///
+  private void filterProvisionsByWildcard(SetMultimap<String, String> filterProvisions) {
+    wildcardProvisions =
+        isFullyWildcard
+            ? ImmutableSet.of()
+            : filterProvisions.asMap().entrySet().stream()
+                .filter(e -> e.getValue().contains(WILDCARD_VALUE))
+                .map(e -> e.getKey())
+                .collect(ImmutableSet.toImmutableSet());
+    requiredProvisions =
+        isFullyWildcard
+            ? ImmutableSet.of()
+            : filterProvisions.entries().stream()
+                .filter(e -> !wildcardProvisions.contains(e.getKey()))
+                .collect(ImmutableSet.toImmutableSet());
   }
 }
