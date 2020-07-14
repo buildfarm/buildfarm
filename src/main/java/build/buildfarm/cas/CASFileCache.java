@@ -103,6 +103,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.function.BooleanSupplier;
@@ -2735,6 +2736,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   @VisibleForTesting
   public static class Entry {
+    public static AtomicLong entryCount = new AtomicLong(0);
     Entry before, after;
     final String key;
     final long size;
@@ -2764,6 +2766,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       after.before = before;
       before = null;
       after = null;
+      entryCount.decrementAndGet();
     }
 
     protected void addBefore(Entry existingEntry) {
@@ -2771,6 +2774,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       before = existingEntry.before;
       before.after = this;
       after.before = this;
+      entryCount.incrementAndGet();
     }
 
     // return true iff the entry's state is changed from unreferenced to referenced
