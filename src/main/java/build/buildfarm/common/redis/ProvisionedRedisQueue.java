@@ -64,20 +64,11 @@ public class ProvisionedRedisQueue {
   private final boolean isFullyWildcard;
 
   ///
-  /// @field   wildcardProvisions
-  /// @brief   The wildcard provisions of the queue.
-  /// @details A filtered set of all provisions that use wildcards.
+  /// @field   provisions
+  /// @brief   Provisions enforced by the queue.
+  /// @details The provisions are filtered by wildcard.
   ///
-  private Set<String> wildcardProvisions;
-
-  ///
-  /// @field   requiredProvisions
-  /// @brief   The required provisions of the queue.
-  /// @details The required provisions to allow workers and operations to be
-  ///          added to the queue. These often match the remote api's command
-  ///          platform properties.
-  ///
-  private Set<Map.Entry<String, String>> requiredProvisions;
+  private final FilteredProvisions provisions;
 
   ///
   /// @field   queue
@@ -98,7 +89,7 @@ public class ProvisionedRedisQueue {
       String name, List<String> hashtags, SetMultimap<String, String> filterProvisions) {
     this.queue = new BalancedRedisQueue(name, hashtags);
     isFullyWildcard = filterProvisions.containsKey(WILDCARD_VALUE);
-    filterProvisionsByWildcard(filterProvisions);
+    provisions = filterProvisionsByWildcard(filterProvisions, isFullyWildcard, WILDCARD_VALUE);
   }
   ///
   /// @brief   Checks required properties.
@@ -114,10 +105,10 @@ public class ProvisionedRedisQueue {
       return true;
     }
     // all required non-wildcard provisions must be matched
-    Set<Map.Entry<String, String>> requirements = new HashSet<>(requiredProvisions);
+    Set<Map.Entry<String, String>> requirements = new HashSet<>(provisions.required);
     for (Map.Entry<String, String> property : properties.entries()) {
       // for each of the properties specified, we must match requirements
-      if (!wildcardProvisions.contains(property.getKey()) && !requirements.remove(property)) {
+      if (!provisions.wildcard.contains(property.getKey()) && !requirements.remove(property)) {
         return false;
       }
     }
@@ -132,39 +123,8 @@ public class ProvisionedRedisQueue {
   /// @note    Suggested return identifier: explanation.
   ///
   public String explainEligibility(SetMultimap<String, String> properties) {
-    // is it eligible?
-    String explanation = new String();
-    if (isEligible(properties)) {
-      explanation += "The properties are eligible for the " + queue.getName() + " queue.\n";
-    } else {
-      explanation += "The properties are not eligible for the " + queue.getName() + " queue.\n";
-    }
-
-    // is it fully wildcard?
-    if (isFullyWildcard) {
-      explanation += "The queue is fully wildcard.\n";
-      return explanation;
-    }
-
-    // gather matched, unmatched, and still required properties
-    ImmutableSetMultimap.Builder<String, String> matched = ImmutableSetMultimap.builder();
-    ImmutableSetMultimap.Builder<String, String> unmatched = ImmutableSetMultimap.builder();
-    ImmutableSetMultimap.Builder<String, String> stillRequired = ImmutableSetMultimap.builder();
-    Set<Map.Entry<String, String>> requirements = new HashSet<>(requiredProvisions);
-    for (Map.Entry<String, String> property : properties.entries()) {
-      if (!wildcardProvisions.contains(property.getKey()) && !requirements.remove(property)) {
-        unmatched.put(property);
-      } else {
-        matched.put(property);
-      }
-    }
-    stillRequired.putAll(requirements);
-
-    // provide further explanation on individual properties
-    explanation += "matched: " + toString(matched.build().asMap()) + "\n";
-    explanation += "unmatched: " + toString(unmatched.build().asMap()) + "\n";
-    explanation += "still required: " + toString(stillRequired.build().asMap()) + "\n";
-    return explanation;
+    EligibilityResult result = getEligibilityResult(properties);
+    return toString(result);
   }
   ///
   /// @brief   Get queue.
@@ -180,34 +140,102 @@ public class ProvisionedRedisQueue {
   ///          existence of wildcards.
   /// @details This will organize the incoming provisions into separate sets.
   /// @param   filterProvisions The filtered provisions of the queue.
+  /// @param   isFullyWildcard  If the queue will deem any set of properties eligible.
+  /// @param   wildcardValue    Symbol for identifying wildcard in both key/value of provisions.
+  /// @return  Provisions filtered by wildcard.
+  /// @note    Suggested return identifier: filteredProvisions.
   ///
-  private void filterProvisionsByWildcard(SetMultimap<String, String> filterProvisions) {
-    wildcardProvisions =
+  private static FilteredProvisions filterProvisionsByWildcard(
+      SetMultimap<String, String> filterProvisions, boolean isFullyWildcard, String wildcardValue) {
+    FilteredProvisions provisions = new FilteredProvisions();
+    provisions.wildcard =
         isFullyWildcard
             ? ImmutableSet.of()
             : filterProvisions.asMap().entrySet().stream()
-                .filter(e -> e.getValue().contains(WILDCARD_VALUE))
+                .filter(e -> e.getValue().contains(wildcardValue))
                 .map(e -> e.getKey())
                 .collect(ImmutableSet.toImmutableSet());
-    requiredProvisions =
+    provisions.required =
         isFullyWildcard
             ? ImmutableSet.of()
             : filterProvisions.entries().stream()
-                .filter(e -> !wildcardProvisions.contains(e.getKey()))
+                .filter(e -> !provisions.wildcard.contains(e.getKey()))
                 .collect(ImmutableSet.toImmutableSet());
+    return provisions;
+  }
+  ///
+  /// @brief   Get eligibility result.
+  /// @details Perform eligibility check with detailed information on
+  ///          evaluation.
+  /// @param   properties Properties to get an eligibility explanation of.
+  /// @return  Detailed results on the evaluation of an eligibility check.
+  /// @note    Suggested return identifier: eligibilityResult.
+  ///
+  private EligibilityResult getEligibilityResult(SetMultimap<String, String> properties) {
+    EligibilityResult result = new EligibilityResult();
+    result.queueName = queue.getName();
+    result.isEligible = isEligible(properties);
+    result.isFullyWildcard = isFullyWildcard;
+
+    // gather matched, unmatched, and still required properties
+    ImmutableSetMultimap.Builder<String, String> matched = ImmutableSetMultimap.builder();
+    ImmutableSetMultimap.Builder<String, String> unmatched = ImmutableSetMultimap.builder();
+    ImmutableSetMultimap.Builder<String, String> stillRequired = ImmutableSetMultimap.builder();
+    Set<Map.Entry<String, String>> requirements = new HashSet<>(provisions.required);
+    for (Map.Entry<String, String> property : properties.entries()) {
+      if (!provisions.wildcard.contains(property.getKey()) && !requirements.remove(property)) {
+        unmatched.put(property);
+      } else {
+        matched.put(property);
+      }
+    }
+    stillRequired.putAll(requirements);
+
+    result.matched = matched.build();
+    result.unmatched = unmatched.build();
+    result.stillRequired = stillRequired.build();
+
+    return result;
   }
   ///
   /// @brief   Convert map to printable string.
   /// @details Uses streams.
   /// @param   map Map to convert to string.
   /// @return  String representation of map.
+  /// @note    Overloaded.
   /// @note    Suggested return identifier: str.
   ///
-  private String toString(Map<String, ?> map) {
+  private static String toString(Map<String, ?> map) {
     String mapAsString =
         map.keySet().stream()
             .map(key -> key + "=" + map.get(key))
             .collect(Collectors.joining(", ", "{", "}"));
     return mapAsString;
+  }
+  ///
+  /// @brief   Convert eligibility result to printable string.
+  /// @details Used for visibility / debugging.
+  /// @param   result Detailed results on the evaluation of an eligibility check.
+  /// @return  An explanation on the eligibility of the provided properties.
+  /// @note    Overloaded.
+  /// @note    Suggested return identifier: explanation.
+  ///
+  private static String toString(EligibilityResult result) {
+    String explanation = new String();
+    if (result.isEligible) {
+      explanation += "The properties are eligible for the " + result.queueName + " queue.\n";
+    } else {
+      explanation += "The properties are not eligible for the " + result.queueName + " queue.\n";
+    }
+
+    if (result.isFullyWildcard) {
+      explanation += "The queue is fully wildcard.\n";
+      return explanation;
+    }
+
+    explanation += "matched: " + toString(result.matched.asMap()) + "\n";
+    explanation += "unmatched: " + toString(result.unmatched.asMap()) + "\n";
+    explanation += "still required: " + toString(result.stillRequired.asMap()) + "\n";
+    return explanation;
   }
 }
