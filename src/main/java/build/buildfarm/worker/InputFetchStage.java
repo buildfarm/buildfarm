@@ -75,6 +75,11 @@ public class InputFetchStage extends SuperscalarPipelineStage {
   }
 
   @Override
+  protected int claimsRequired(OperationContext operationContext) {
+    return 1;
+  }
+
+  @Override
   protected void iterate() throws InterruptedException {
     OperationContext operationContext = take();
     Thread fetcher = new Thread(new InputFetcher(workerContext, operationContext, this));
