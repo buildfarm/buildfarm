@@ -41,18 +41,25 @@ abstract class SuperscalarPipelineStage extends PipelineStage {
 
   protected abstract void interruptAll();
 
-  synchronized void waitForReleaseOrCatastrophe() {
+  protected abstract int claimsRequired(OperationContext operationContext);
+
+  synchronized void waitForReleaseOrCatastrophe(BlockingQueue<OperationContext> queue) {
     boolean interrupted = false;
     while (!catastrophic && isClaimed()) {
       if (output.isClosed()) {
         // interrupt the currently running threads, because they have nowhere to go
         interruptAll();
       }
-      try {
-        wait(/* timeout=*/ 10);
-      } catch (InterruptedException e) {
-        interrupted = Thread.interrupted() || interrupted;
-        // ignore, we will throw it eventually
+      OperationContext operationContext = queue.poll();
+      if (operationContext != null) {
+        releaseClaim(operationContext.operation.getName(), claimsRequired(operationContext));
+      } else {
+        try {
+          wait(/* timeout=*/ 10);
+        } catch (InterruptedException e) {
+          interrupted = Thread.interrupted() || interrupted;
+          // ignore, we will throw it eventually
+        }
       }
     }
     if (interrupted) {
@@ -78,7 +85,7 @@ abstract class SuperscalarPipelineStage extends PipelineStage {
       // clear interrupted flag
       interrupted = Thread.interrupted();
     }
-    waitForReleaseOrCatastrophe();
+    waitForReleaseOrCatastrophe(queue);
     if (interrupted) {
       Thread.currentThread().interrupt();
     }

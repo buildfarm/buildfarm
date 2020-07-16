@@ -61,6 +61,11 @@ public class SuperscalarPipelineStageTest {
       throw new UnsupportedOperationException();
     }
 
+    @Override
+    protected int claimsRequired(OperationContext operationContext) {
+      throw new UnsupportedOperationException();
+    }
+
     boolean isFull() {
       return claims.size() == width;
     }
