@@ -26,6 +26,7 @@ import static java.lang.String.format;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.cas.ContentAddressableStorage.EntryLimitException;
 import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.common.UrlPath.InvalidResourceNameException;
 import build.buildfarm.common.Write;
@@ -304,12 +305,23 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
     try {
       data.writeTo(getOutput());
       requestNextIfReady();
+    } catch (EntryLimitException e) {
+      RequestMetadata requestMetadata = TracingMetadataUtils.fromCurrentContext();
+      logger.warning(
+          format(
+              "%s-%s: %s -> %s -> %s: exceeded entry limit for %s",
+              requestMetadata.getToolDetails().getToolName(),
+              requestMetadata.getToolDetails().getToolVersion(),
+              requestMetadata.getCorrelatedInvocationsId(),
+              requestMetadata.getToolInvocationId(),
+              requestMetadata.getActionId(),
+              name));
+      responseObserver.onError(Status.OUT_OF_RANGE.withCause(e).asException());
     } catch (IOException e) {
       if (!committed) {
         logger.log(Level.SEVERE, format("error writing data for %s", name), e);
         responseObserver.onError(Status.fromThrowable(e).asException());
       }
-      // shouldn't we be erroring the stream at this point if !committed?
     }
   }
 
