@@ -121,7 +121,7 @@ abstract class SuperscalarPipelineStage extends PipelineStage {
     return String.format("%s/%d", size, width);
   }
 
-  protected boolean claim(int count) throws InterruptedException {
+  private boolean claim(int count) throws InterruptedException {
     Object handle = new Object();
     int claimed = 0;
     synchronized (claimLock) {
@@ -155,7 +155,7 @@ abstract class SuperscalarPipelineStage extends PipelineStage {
 
   @Override
   public boolean claim(OperationContext operationContext) throws InterruptedException {
-    return claim(1);
+    return claim(claimsRequired(operationContext));
   }
 
   @Override

@@ -60,11 +60,6 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
   }
 
   @Override
-  public boolean claim(OperationContext operationContext) throws InterruptedException {
-    return claim(workerContext.commandExecutionClaims(operationContext.command));
-  }
-
-  @Override
   protected Logger getLogger() {
     return logger;
   }
