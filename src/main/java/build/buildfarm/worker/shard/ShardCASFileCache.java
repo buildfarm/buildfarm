@@ -17,9 +17,9 @@ package build.buildfarm.worker.shard;
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.cas.CASFileCache;
 import build.buildfarm.cas.ContentAddressableStorage;
+import build.buildfarm.cas.EntryLRU;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.InputStreamFactory;
-import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
@@ -48,7 +48,7 @@ class ShardCASFileCache extends CASFileCache {
         digestUtil,
         expireService,
         accessRecorder,
-        /* storage=*/ Maps.newConcurrentMap(),
+        /* storage=*/ new EntryLRU(),
         DEFAULT_DIRECTORIES_INDEX_NAME,
         onPut,
         onExpire,

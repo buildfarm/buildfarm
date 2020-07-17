@@ -70,7 +70,6 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
@@ -103,7 +102,7 @@ class CASFileCacheTest {
 
   private ExecutorService expireService;
 
-  private ConcurrentMap<String, Entry> storage;
+  private LRU entryStorage;
 
   protected CASFileCacheTest(Path fileSystemRoot) {
     this.root = fileSystemRoot.resolve("cache");
@@ -118,7 +117,7 @@ class CASFileCacheTest {
         .thenThrow(new NoSuchFileException("null sink delegate"));
     blobs = Maps.newHashMap();
     putService = newSingleThreadExecutor();
-    storage = Maps.newConcurrentMap();
+    entryStorage = new EntryLRU();
     expireService = newSingleThreadExecutor();
     // do this so that we can remove the cache root dir
     Files.createDirectories(root);
@@ -130,7 +129,7 @@ class CASFileCacheTest {
             DIGEST_UTIL,
             expireService,
             /* accessRecorder=*/ directExecutor(),
-            storage,
+            entryStorage,
             /* directoriesIndexDbName=*/ ":memory:",
             onPut,
             onExpire,
@@ -368,7 +367,7 @@ class CASFileCacheTest {
     Entry entry = new Entry(nonexistentKey, 1, Deadline.after(10, SECONDS));
     entry.before = entry;
     entry.after = entry;
-    storage.put(nonexistentKey, entry);
+    entryStorage.put(entry);
     NoSuchFileException noSuchFileException = null;
     try (InputStream in = fileCache.newInput(nonexistentDigest, 0)) {
       fail("should not get here");
@@ -377,7 +376,7 @@ class CASFileCacheTest {
     }
 
     assertThat(noSuchFileException).isNotNull();
-    assertThat(storage.containsKey(nonexistentKey)).isFalse();
+    assertThat(entryStorage.containsKey(nonexistentKey)).isFalse();
   }
 
   @Test
@@ -439,13 +438,13 @@ class CASFileCacheTest {
     fileCache.decrementReferences(
         ImmutableList.of(pathOne, pathTwo, pathThree), ImmutableList.of());
     /* three -> two -> one */
-    assertThat(storage.get(pathOne).after).isEqualTo(storage.get(pathTwo));
-    assertThat(storage.get(pathTwo).after).isEqualTo(storage.get(pathThree));
+    assertThat(entryStorage.get(pathOne).after).isEqualTo(entryStorage.get(pathTwo));
+    assertThat(entryStorage.get(pathTwo).after).isEqualTo(entryStorage.get(pathThree));
 
     /* one -> three -> two */
     assertThat(fileCache.findMissingBlobs(ImmutableList.of(digestOne))).isEmpty();
-    assertThat(storage.get(pathTwo).after).isEqualTo(storage.get(pathThree));
-    assertThat(storage.get(pathThree).after).isEqualTo(storage.get(pathOne));
+    assertThat(entryStorage.get(pathTwo).after).isEqualTo(entryStorage.get(pathThree));
+    assertThat(entryStorage.get(pathThree).after).isEqualTo(entryStorage.get(pathOne));
   }
 
   Write getWrite(Digest digest) throws IOException {
@@ -465,7 +464,7 @@ class CASFileCacheTest {
     }
     assertThat(notified.get()).isTrue();
     String key = fileCache.getKey(digest, false);
-    assertThat(storage.get(key)).isNotNull();
+    assertThat(entryStorage.get(key)).isNotNull();
     try (InputStream in = Files.newInputStream(fileCache.getPath(key))) {
       assertThat(ByteString.readFrom(in)).isEqualTo(content);
     }
@@ -537,14 +536,14 @@ class CASFileCacheTest {
     // putCreatesFile verifies this
     Files.delete(fileCache.getPath(key));
     // update entry with expired deadline
-    storage.get(key).existsDeadline = Deadline.after(0, SECONDS);
+    entryStorage.get(key).existsDeadline = Deadline.after(0, SECONDS);
 
     try (InputStream in = fileCache.newInput(blob.getDigest(), /* offset=*/ 0)) {
       fail("should not get here");
     } catch (NoSuchFileException e) {
       // success
     }
-    assertThat(storage.containsKey(key)).isFalse();
+    assertThat(entryStorage.containsKey(key)).isFalse();
   }
 
   @Test
@@ -650,7 +649,7 @@ class CASFileCacheTest {
     verifyZeroInteractions(onExpire);
     // assert expiration of non-executable digest
     String expiringKey = fileCache.getKey(expiringBlob.getDigest(), /* isExecutable=*/ false);
-    assertThat(storage.containsKey(expiringKey)).isFalse();
+    assertThat(entryStorage.containsKey(expiringKey)).isFalse();
     assertThat(Files.exists(fileCache.getPath(expiringKey))).isFalse();
   }
 
