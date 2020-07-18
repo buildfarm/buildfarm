@@ -53,7 +53,6 @@ import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.AbstractServerInstance;
-import build.buildfarm.instance.ExcessiveWriteSizeException;
 import build.buildfarm.instance.OperationsMap;
 import build.buildfarm.instance.WatchFuture;
 import build.buildfarm.instance.WorkerQueue;
@@ -696,7 +695,7 @@ public class MemoryInstance extends AbstractServerInstance {
           60,
           SECONDS,
           RequestMetadata.getDefaultInstance());
-    } catch (StatusException | IOException | ExcessiveWriteSizeException e) {
+    } catch (StatusException | IOException e) {
       logger.log(Level.SEVERE, format("could not emplace queued operation: %s", operationName), e);
       return false;
     }
@@ -833,7 +832,7 @@ public class MemoryInstance extends AbstractServerInstance {
           } else {
             enqueueOperation(operation);
           }
-        } catch (StatusException | IOException | ExcessiveWriteSizeException e) {
+        } catch (StatusException | IOException e) {
           logger.log(
               Level.SEVERE, format("could not emplace queued operation: %s", operationName), e);
         }

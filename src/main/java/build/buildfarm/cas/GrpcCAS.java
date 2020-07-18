@@ -39,6 +39,7 @@ import com.google.bytestream.ByteStreamGrpc.ByteStreamBlockingStub;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamStub;
 import com.google.bytestream.ByteStreamProto.ReadRequest;
 import com.google.bytestream.ByteStreamProto.ReadResponse;
+import com.google.common.base.Functions;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
@@ -239,7 +240,12 @@ public class GrpcCAS implements ContentAddressableStorage {
                 ByteStreamGrpc.newStub(channel)
                     .withInterceptors(attachMetadataInterceptor(requestMetadata)));
     return new StubWriteOutputStream(
-        bsBlockingStub, bsStub, resourceName, digest.getSizeBytes(), /* autoflush=*/ false);
+        bsBlockingStub,
+        bsStub,
+        resourceName,
+        Functions.identity(),
+        digest.getSizeBytes(),
+        /* autoflush=*/ false);
   }
 
   @Override

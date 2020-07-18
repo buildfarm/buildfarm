@@ -49,6 +49,7 @@ import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.FileStatus;
 import build.buildfarm.common.NamedFileKey;
 import build.buildfarm.common.Write;
@@ -692,9 +693,13 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   @Override
-  public Write getWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata) {
+  public Write getWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata)
+      throws EntryLimitException {
     if (digest.getSizeBytes() == 0) {
       return new CompleteWrite(0);
+    }
+    if (digest.getSizeBytes() > maxEntrySizeInBytes) {
+      throw new EntryLimitException(digest.getSizeBytes(), maxEntrySizeInBytes);
     }
     try {
       return writes.get(
@@ -2495,15 +2500,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       throws IOException, InterruptedException {
 
     if (blobSizeInBytes > maxEntrySizeInBytes) {
-      FileEntryKey fileEntryKey = parseFileEntryKey(key);
-      Digest digest;
-      if (fileEntryKey == null) {
-        logger.log(Level.SEVERE, format("error parsing over limit key %s", key));
-        digest = Digest.newBuilder().setHash(key).setSizeBytes(blobSizeInBytes).build();
-      } else {
-        digest = fileEntryKey.getDigest();
-      }
-      throw new EntryLimitException(digest);
+      throw new EntryLimitException(blobSizeInBytes, maxEntrySizeInBytes);
     }
 
     final ListenableFuture<Set<Digest>> expiredDigestsFuture;

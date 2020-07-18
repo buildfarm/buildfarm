@@ -20,10 +20,10 @@ import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
 import build.buildfarm.common.io.FeedbackOutputStream;
-import build.buildfarm.instance.ExcessiveWriteSizeException;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.BlobWriteKey;
 import com.google.common.cache.CacheBuilder;
@@ -122,7 +122,7 @@ class Writes {
   }
 
   public Write get(Digest digest, UUID uuid, RequestMetadata requestMetadata)
-      throws ExcessiveWriteSizeException {
+      throws EntryLimitException {
     if (digest.getSizeBytes() == 0) {
       return new CompleteWrite(0);
     }

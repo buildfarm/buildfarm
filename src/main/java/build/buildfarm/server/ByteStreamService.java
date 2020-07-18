@@ -25,6 +25,7 @@ import static java.lang.String.format;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.UrlPath.InvalidResourceNameException;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
@@ -32,7 +33,6 @@ import build.buildfarm.common.grpc.DelegateServerCallStreamObserver;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
 import build.buildfarm.common.io.FeedbackOutputStream;
-import build.buildfarm.instance.ExcessiveWriteSizeException;
 import build.buildfarm.instance.Instance;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamImplBase;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
@@ -368,10 +368,9 @@ public class ByteStreamService extends ByteStreamImplBase {
     } catch (IllegalArgumentException | InvalidResourceNameException e) {
       logger.log(Level.SEVERE, format("queryWriteStatus(%s)", resourceName), e);
       responseObserver.onError(INVALID_ARGUMENT.withDescription(e.getMessage()).asException());
-    } catch (ExcessiveWriteSizeException e) {
+    } catch (EntryLimitException e) {
       logger.log(Level.WARNING, format("queryWriteStatus(%s)", resourceName), e);
-      responseObserver.onError(
-          Status.RESOURCE_EXHAUSTED.withDescription(e.getMessage()).asException());
+      responseObserver.onError(Status.OUT_OF_RANGE.withDescription(e.getMessage()).asException());
     } catch (RuntimeException e) {
       logger.log(Level.SEVERE, format("queryWriteStatus(%s)", resourceName), e);
       responseObserver.onError(Status.fromThrowable(e).asException());
@@ -410,7 +409,7 @@ public class ByteStreamService extends ByteStreamImplBase {
   }
 
   static Write getUploadBlobWrite(Instance instance, Digest digest, UUID uuid)
-      throws ExcessiveWriteSizeException {
+      throws EntryLimitException {
     if (digest.getSizeBytes() == 0) {
       return new CompleteWrite(0);
     }
@@ -422,7 +421,7 @@ public class ByteStreamService extends ByteStreamImplBase {
   }
 
   Write getWrite(String resourceName)
-      throws ExcessiveWriteSizeException, InstanceNotFoundException, InvalidResourceNameException {
+      throws EntryLimitException, InstanceNotFoundException, InvalidResourceNameException {
     switch (detectResourceOperation(resourceName)) {
       case Blob:
         return getBlobWrite(instances.getFromBlob(resourceName), parseBlobDigest(resourceName));

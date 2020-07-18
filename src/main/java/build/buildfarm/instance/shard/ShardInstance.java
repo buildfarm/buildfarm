@@ -57,6 +57,7 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.Poller;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.TokenizableIterator;
@@ -71,7 +72,6 @@ import build.buildfarm.common.cache.CacheLoader.InvalidCacheLoadException;
 import build.buildfarm.common.cache.LoadingCache;
 import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
 import build.buildfarm.instance.AbstractServerInstance;
-import build.buildfarm.instance.ExcessiveWriteSizeException;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.OperationIteratorToken;
@@ -993,7 +993,7 @@ public class ShardInstance extends AbstractServerInstance {
 
   @Override
   public Write getBlobWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata)
-      throws ExcessiveWriteSizeException {
+      throws EntryLimitException {
     try {
       if (backplane.isBlacklisted(requestMetadata)) {
         throw Status.UNAVAILABLE
@@ -1004,7 +1004,7 @@ public class ShardInstance extends AbstractServerInstance {
       throw Status.fromThrowable(e).asRuntimeException();
     }
     if (maxBlobSize > 0 && digest.getSizeBytes() > maxBlobSize) {
-      throw new ExcessiveWriteSizeException(requestMetadata, digest, maxBlobSize);
+      throw new EntryLimitException(digest.getSizeBytes(), maxBlobSize);
     }
     // FIXME small blob write to proto cache
     return writes.get(digest, uuid, requestMetadata);
@@ -1332,7 +1332,7 @@ public class ShardInstance extends AbstractServerInstance {
 
   private ListenableFuture<QueuedOperationResult> uploadQueuedOperation(
       QueuedOperation queuedOperation, ExecuteEntry executeEntry, ExecutorService service)
-      throws ExcessiveWriteSizeException {
+      throws EntryLimitException {
     ByteString queuedOperationBlob = queuedOperation.toByteString();
     Digest queuedOperationDigest = getDigestUtil().compute(queuedOperationBlob);
     QueuedOperationMetadata metadata =
@@ -1360,7 +1360,7 @@ public class ShardInstance extends AbstractServerInstance {
 
   private ListenableFuture<Long> writeBlobFuture(
       Digest digest, ByteString content, RequestMetadata requestMetadata)
-      throws ExcessiveWriteSizeException {
+      throws EntryLimitException {
     checkState(digest.getSizeBytes() == content.size());
     SettableFuture<Long> writtenFuture = SettableFuture.create();
     Write write = getBlobWrite(digest, UUID.randomUUID(), requestMetadata);

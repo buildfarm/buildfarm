@@ -26,13 +26,12 @@ import static java.lang.String.format;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
-import build.buildfarm.cas.ContentAddressableStorage.EntryLimitException;
 import build.buildfarm.cas.DigestMismatchException;
+import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.UrlPath.InvalidResourceNameException;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.common.io.FeedbackOutputStream;
-import build.buildfarm.instance.ExcessiveWriteSizeException;
 import build.buildfarm.instance.Instance;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
@@ -87,7 +86,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
     if (!committed) {
       try {
         onUncommittedNext(request);
-      } catch (ExcessiveWriteSizeException e) {
+      } catch (EntryLimitException e) {
         Status status = Status.UNAVAILABLE;
         logger.log(
             Level.FINE,
@@ -105,7 +104,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
     }
   }
 
-  void onUncommittedNext(WriteRequest request) throws ExcessiveWriteSizeException {
+  void onUncommittedNext(WriteRequest request) throws EntryLimitException {
     if (initialized) {
       handleRequest(request);
     } else {
@@ -114,7 +113,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   }
 
   private Write getWrite(String resourceName)
-      throws ExcessiveWriteSizeException, InstanceNotFoundException, InvalidResourceNameException {
+      throws EntryLimitException, InstanceNotFoundException, InvalidResourceNameException {
     switch (detectResourceOperation(resourceName)) {
       case UploadBlob:
         Digest uploadBlobDigest = parseUploadBlobDigest(resourceName);
@@ -191,7 +190,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
     }
   }
 
-  private void initialize(WriteRequest request) throws ExcessiveWriteSizeException {
+  private void initialize(WriteRequest request) throws EntryLimitException {
     String resourceName = request.getResourceName();
     if (resourceName.isEmpty()) {
       responseObserver.onError(

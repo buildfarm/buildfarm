@@ -447,7 +447,7 @@ class CASFileCacheTest {
     assertThat(storage.get(pathThree).after).isEqualTo(storage.get(pathOne));
   }
 
-  Write getWrite(Digest digest) {
+  Write getWrite(Digest digest) throws IOException {
     return fileCache.getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
   }
 
@@ -547,7 +547,7 @@ class CASFileCacheTest {
   }
 
   @Test
-  public void emptyWriteIsComplete() {
+  public void emptyWriteIsComplete() throws IOException {
     Write write =
         fileCache.getWrite(
             DIGEST_UTIL.compute(ByteString.EMPTY),

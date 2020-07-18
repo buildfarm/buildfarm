@@ -37,7 +37,6 @@ import build.bazel.remote.execution.v2.GetTreeRequest;
 import build.bazel.remote.execution.v2.GetTreeResponse;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
-import build.buildfarm.instance.ExcessiveWriteSizeException;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.Tree;
 import com.google.common.base.Function;
@@ -163,8 +162,7 @@ public class ContentAddressableStorageService
       Instance instance,
       Iterable<Request> requests,
       long writeDeadlineAfter,
-      TimeUnit writeDeadlineAfterUnits)
-      throws ExcessiveWriteSizeException {
+      TimeUnit writeDeadlineAfterUnits) {
     ImmutableList.Builder<ListenableFuture<Response>> responses = new ImmutableList.Builder<>();
     for (Request request : requests) {
       Digest digest = request.getDigest();
@@ -200,39 +198,35 @@ public class ContentAddressableStorageService
       return;
     }
 
-    try {
-      BatchUpdateBlobsResponse.Builder response = BatchUpdateBlobsResponse.newBuilder();
-      ListenableFuture<BatchUpdateBlobsResponse> responseFuture =
-          transform(
-              allAsList(
-                  Iterables.transform(
-                      putAllBlobs(
-                          instance,
-                          batchRequest.getRequestsList(),
-                          writeDeadlineAfter,
-                          writeDeadlineAfterUnits),
-                      (future) -> transform(future, response::addResponses, directExecutor()))),
-              (result) -> response.build(),
-              directExecutor());
+    BatchUpdateBlobsResponse.Builder response = BatchUpdateBlobsResponse.newBuilder();
+    ListenableFuture<BatchUpdateBlobsResponse> responseFuture =
+        transform(
+            allAsList(
+                Iterables.transform(
+                    putAllBlobs(
+                        instance,
+                        batchRequest.getRequestsList(),
+                        writeDeadlineAfter,
+                        writeDeadlineAfterUnits),
+                    (future) -> transform(future, response::addResponses, directExecutor()))),
+            (result) -> response.build(),
+            directExecutor());
 
-      addCallback(
-          responseFuture,
-          new FutureCallback<BatchUpdateBlobsResponse>() {
-            @Override
-            public void onSuccess(BatchUpdateBlobsResponse response) {
-              responseObserver.onNext(response);
-              responseObserver.onCompleted();
-            }
+    addCallback(
+        responseFuture,
+        new FutureCallback<BatchUpdateBlobsResponse>() {
+          @Override
+          public void onSuccess(BatchUpdateBlobsResponse response) {
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+          }
 
-            @Override
-            public void onFailure(Throwable t) {
-              responseObserver.onError(t);
-            }
-          },
-          directExecutor());
-    } catch (ExcessiveWriteSizeException e) {
-      responseObserver.onError(Status.UNAVAILABLE.asException());
-    }
+          @Override
+          public void onFailure(Throwable t) {
+            responseObserver.onError(t);
+          }
+        },
+        directExecutor());
   }
 
   private void getInstanceTree(
