@@ -418,26 +418,29 @@ public class Worker extends LoggingMain {
               }
             });
 
-    write.getFuture().addListener(
-        () -> {
-          try {
-            try {
-              out.close();
-            } catch (IOException e) {
-              // ignore
-            }
-            long committedSize = write.getCommittedSize();
-            if (committedSize != digest.getSizeBytes()) {
-              logger.warning(
-                  format(
-                      "committed size %d did not match expectation for digestUtil", committedSize));
-            }
-            writtenFuture.set(digest.getSizeBytes());
-          } catch (RuntimeException e) {
-            writtenFuture.setException(e);
-          }
-        },
-        directExecutor());
+    write
+        .getFuture()
+        .addListener(
+            () -> {
+              try {
+                try {
+                  out.close();
+                } catch (IOException e) {
+                  // ignore
+                }
+                long committedSize = write.getCommittedSize();
+                if (committedSize != digest.getSizeBytes()) {
+                  logger.warning(
+                      format(
+                          "committed size %d did not match expectation for digestUtil",
+                          committedSize));
+                }
+                writtenFuture.set(digest.getSizeBytes());
+              } catch (RuntimeException e) {
+                writtenFuture.setException(e);
+              }
+            },
+            directExecutor());
 
     return writtenFuture;
   }

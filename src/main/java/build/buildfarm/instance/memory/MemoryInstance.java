@@ -367,7 +367,8 @@ public class MemoryInstance extends AbstractServerInstance {
       @Override
       public ListenableFuture<Long> getFuture() {
         ByteStringStreamSource source = getStreamSource(name);
-        return Futures.transform(source.getClosedFuture(), result -> source.getCommittedSize(), directExecutor());
+        return Futures.transform(
+            source.getClosedFuture(), result -> source.getCommittedSize(), directExecutor());
       }
     };
   }

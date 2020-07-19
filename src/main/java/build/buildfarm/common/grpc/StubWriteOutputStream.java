@@ -39,7 +39,6 @@ import io.grpc.stub.ClientResponseObserver;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import javax.annotation.concurrent.GuardedBy;

@@ -21,7 +21,6 @@ import build.buildfarm.common.io.FeedbackOutputStream;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import java.io.IOException;
-import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 
 // still toying with the idea of just making a Write implement a ListenableFuture

@@ -72,7 +72,6 @@ import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -781,7 +780,8 @@ class CASFileCacheTest {
         new NullWrite() {
           @Override
           public ListenableFuture<Long> getFuture() {
-            return Futures.transform(writeComplete, result -> blob.getDigest().getSizeBytes(), directExecutor());
+            return Futures.transform(
+                writeComplete, result -> blob.getDigest().getSizeBytes(), directExecutor());
           }
 
           @Override

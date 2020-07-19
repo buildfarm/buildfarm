@@ -184,10 +184,10 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
 
     if (exception.compareAndSet(null, null)) {
       try {
-          logger.log(
-              Level.FINER, format("delivering committed_size for %s of %d", name, committedSize));
-          responseObserver.onNext(response);
-          responseObserver.onCompleted();
+        logger.log(
+            Level.FINER, format("delivering committed_size for %s of %d", name, committedSize));
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
       } catch (Exception e) {
         logger.log(Level.SEVERE, format("error delivering committed_size to %s", name), e);
       }
@@ -198,8 +198,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private void initialize(WriteRequest request) throws EntryLimitException {
     String resourceName = request.getResourceName();
     if (resourceName.isEmpty()) {
-      errorResponse(
-          INVALID_ARGUMENT.withDescription("resource_name is empty").asException());
+      errorResponse(INVALID_ARGUMENT.withDescription("resource_name is empty").asException());
     } else {
       name = resourceName;
       try {
@@ -287,7 +286,8 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   }
 
   @GuardedBy("this")
-  private void handleWrite(String resourceName, long offset, ByteString data, boolean finishWrite) throws EntryLimitException {
+  private void handleWrite(String resourceName, long offset, ByteString data, boolean finishWrite)
+      throws EntryLimitException {
     long committedSize = write.getCommittedSize();
     if (offset != 0 && offset != committedSize) {
       // we are synchronized here for delivery, but not for asynchronous completion
@@ -338,8 +338,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
     try {
       getOutput().close();
     } catch (DigestMismatchException e) {
-      errorResponse(
-          Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asException());
+      errorResponse(Status.INVALID_ARGUMENT.withDescription(e.getMessage()).asException());
     } catch (IOException e) {
       if (errorResponse(Status.fromThrowable(e).asException())) {
         logger.log(Level.SEVERE, format("error closing stream for %s", name), e);

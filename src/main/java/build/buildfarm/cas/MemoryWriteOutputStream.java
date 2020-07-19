@@ -26,7 +26,6 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
-import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 
 class MemoryWriteOutputStream extends FeedbackOutputStream implements Write {
