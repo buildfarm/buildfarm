@@ -27,6 +27,7 @@ import com.google.bytestream.ByteStreamProto.WriteResponse;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.base.Throwables;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.protobuf.ByteString;
@@ -173,7 +174,7 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
       Throwables.throwIfUnchecked(cause);
-      Throwables.throwIfInstanceOf(e, IOException.class);
+      Throwables.throwIfInstanceOf(cause, IOException.class);
       throw new UncheckedExecutionException(cause);
     } catch (InterruptedException e) {
       // unlikely, since we only get for isDone()
@@ -325,7 +326,7 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   }
 
   @Override
-  public void addListener(Runnable onCompleted, Executor executor) {
-    writeFuture.addListener(onCompleted, executor);
+  public ListenableFuture<Long> getFuture() {
+    return writeFuture;
   }
 }

@@ -29,6 +29,7 @@ import build.buildfarm.v1test.BlobWriteKey;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import java.io.IOException;
 import java.util.UUID;
@@ -48,7 +49,7 @@ class Writes {
     InvalidatingWrite(Write delegate, Runnable onInvalidation) {
       this.delegate = delegate;
       this.onInvalidation = onInvalidation;
-      addListener(onInvalidation, directExecutor());
+      getFuture().addListener(onInvalidation, directExecutor());
     }
 
     @Override
@@ -97,9 +98,9 @@ class Writes {
       }
     }
 
-    /** add a callback to be invoked when blob has been completed */
-    public void addListener(Runnable onCompleted, Executor executor) {
-      delegate.addListener(onCompleted, executor);
+    @Override
+    public ListenableFuture<Long> getFuture() {
+      return delegate.getFuture();
     }
   }
 

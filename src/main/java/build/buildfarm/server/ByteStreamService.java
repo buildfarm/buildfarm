@@ -41,6 +41,7 @@ import com.google.bytestream.ByteStreamProto.ReadRequest;
 import com.google.bytestream.ByteStreamProto.ReadResponse;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.Status.Code;
@@ -369,8 +370,9 @@ public class ByteStreamService extends ByteStreamImplBase {
       logger.log(Level.SEVERE, format("queryWriteStatus(%s)", resourceName), e);
       responseObserver.onError(INVALID_ARGUMENT.withDescription(e.getMessage()).asException());
     } catch (EntryLimitException e) {
-      logger.log(Level.WARNING, format("queryWriteStatus(%s)", resourceName), e);
-      responseObserver.onError(Status.OUT_OF_RANGE.withDescription(e.getMessage()).asException());
+      logger.warning(format("queryWriteStatus(%s): %s", resourceName, e.getMessage()));
+      responseObserver.onNext(QueryWriteStatusResponse.getDefaultInstance());
+      responseObserver.onCompleted();
     } catch (RuntimeException e) {
       logger.log(Level.SEVERE, format("queryWriteStatus(%s)", resourceName), e);
       responseObserver.onError(Status.fromThrowable(e).asException());
@@ -402,7 +404,7 @@ public class ByteStreamService extends ByteStreamImplBase {
       }
 
       @Override
-      public void addListener(Runnable onCompleted, Executor executor) {
+      public ListenableFuture<Long> getFuture() {
         throw new RuntimeException("cannot add listener to blob write");
       }
     };

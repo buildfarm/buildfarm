@@ -84,6 +84,7 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.MultimapBuilder;
 import com.google.common.collect.SetMultimap;
 import com.google.common.io.BaseEncoding;
+import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.longrunning.Operation;
@@ -364,8 +365,9 @@ public class MemoryInstance extends AbstractServerInstance {
       }
 
       @Override
-      public void addListener(Runnable onCompleted, Executor executor) {
-        getStreamSource(name).getClosedFuture().addListener(onCompleted, executor);
+      public ListenableFuture<Long> getFuture() {
+        ByteStringStreamSource source = getStreamSource(name);
+        return Futures.transform(source.getClosedFuture(), result -> source.getCommittedSize(), directExecutor());
       }
     };
   }

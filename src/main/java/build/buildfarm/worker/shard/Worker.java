@@ -418,10 +418,9 @@ public class Worker extends LoggingMain {
               }
             });
 
-    write.addListener(
+    write.getFuture().addListener(
         () -> {
           try {
-
             try {
               out.close();
             } catch (IOException e) {

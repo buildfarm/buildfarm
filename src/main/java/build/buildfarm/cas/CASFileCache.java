@@ -740,7 +740,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       skip = offset;
       remaining = digest.getSizeBytes();
       this.write = write;
-      write.addListener(this::switchToLocal, directExecutor());
+      write.getFuture().addListener(this::switchToLocal, directExecutor());
       out = write.getOutput(1, MINUTES, () -> {});
     }
 
@@ -1027,10 +1027,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                 || (out == null && containsLocal(key.getDigest(), (key) -> {}));
           }
 
-          public ListenableFuture<Long> getFuture() {
-            return future;
-          }
-
           public void onClosed() {
             out = null;
           }
@@ -1056,11 +1052,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           }
 
           @Override
-          public void addListener(Runnable onCompleted, Executor executor) {
-            getFuture().addListener(onCompleted, executor);
+          public ListenableFuture<Long> getFuture() {
+            return future;
           }
         };
-    write.addListener(write::reset, directExecutor());
+    write.getFuture().addListener(write::reset, directExecutor());
     return write;
   }
 
