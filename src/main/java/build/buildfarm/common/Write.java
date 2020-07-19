@@ -15,13 +15,15 @@
 package build.buildfarm.common;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.util.concurrent.Futures.immediateFuture;
 
 import build.buildfarm.common.io.FeedbackOutputStream;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import java.io.IOException;
-import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 
+// still toying with the idea of just making a Write implement a ListenableFuture
 public interface Write {
   long getCommittedSize();
 
@@ -32,8 +34,7 @@ public interface Write {
 
   void reset();
 
-  /** add a callback to be invoked when blob has been completed */
-  void addListener(Runnable onCompleted, Executor executor);
+  ListenableFuture<Long> getFuture();
 
   class CompleteWrite implements Write {
     private final long committedSize;
@@ -83,8 +84,8 @@ public interface Write {
     public void reset() {}
 
     @Override
-    public void addListener(Runnable onCompleted, Executor executor) {
-      executor.execute(onCompleted);
+    public ListenableFuture<Long> getFuture() {
+      return immediateFuture(committedSize);
     }
   }
 
@@ -138,8 +139,8 @@ public interface Write {
     }
 
     @Override
-    public void addListener(Runnable runnable, Executor executor) {
-      committedFuture.addListener(runnable, executor);
+    public ListenableFuture<Long> getFuture() {
+      return committedFuture;
     }
   }
 }

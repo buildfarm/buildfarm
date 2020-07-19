@@ -162,7 +162,6 @@ java_library(
 java_library(
     name = "instance",
     srcs = [
-        "instance/ExcessiveWriteSizeException.java",
         "instance/Instance.java",
         "instance/Utils.java",
     ],

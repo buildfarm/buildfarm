@@ -20,6 +20,8 @@ import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.Write;
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
@@ -69,26 +71,41 @@ public class Utils {
         String.format("digest size %d did not match content size %d", digestSize, contentSize));
   }
 
+  // TODO make this *actually* async with onReady for FeedbackOutputStream
   public static ListenableFuture<Digest> putBlobFuture(
       Instance instance,
       Digest digest,
       ByteString data,
       long writeDeadlineAfter,
       TimeUnit writeDeadlineAfterUnits,
-      RequestMetadata requestMetadata)
-      throws ExcessiveWriteSizeException {
+      RequestMetadata requestMetadata) {
     if (digest.getSizeBytes() != data.size()) {
       return immediateFailedFuture(
           invalidDigestSize(digest.getSizeBytes(), data.size()).asRuntimeException());
     }
-    Write write = instance.getBlobWrite(digest, UUID.randomUUID(), requestMetadata);
-    // indicate that we know this write is novel
-    write.reset();
     SettableFuture<Digest> future = SettableFuture.create();
-    write.addListener(() -> future.set(digest), directExecutor());
-    try (OutputStream out =
-        write.getOutput(writeDeadlineAfter, writeDeadlineAfterUnits, () -> {})) {
-      data.writeTo(out);
+    try {
+      Write write = instance.getBlobWrite(digest, UUID.randomUUID(), requestMetadata);
+      // indicate that we know this write is novel
+      write.reset();
+      Futures.addCallback(
+          write.getFuture(),
+          new FutureCallback<Long>() {
+            @Override
+            public void onSuccess(Long committedSize) {
+              future.set(digest);
+            }
+
+            @Override
+            public void onFailure(Throwable t) {
+              future.setException(t);
+            }
+          },
+          directExecutor());
+      try (OutputStream out =
+          write.getOutput(writeDeadlineAfter, writeDeadlineAfterUnits, () -> {})) {
+        data.writeTo(out);
+      }
     } catch (Exception e) {
       future.setException(e);
     }
@@ -102,7 +119,7 @@ public class Utils {
       long writeDeadlineAfter,
       TimeUnit writeDeadlineAfterUnits,
       RequestMetadata requestMetadata)
-      throws ExcessiveWriteSizeException, IOException, InterruptedException, StatusException {
+      throws IOException, InterruptedException, StatusException {
     try {
       return putBlobFuture(
               instance, digest, blob, writeDeadlineAfter, writeDeadlineAfterUnits, requestMetadata)

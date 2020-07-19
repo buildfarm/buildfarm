@@ -53,7 +53,6 @@ import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.AbstractServerInstance;
-import build.buildfarm.instance.ExcessiveWriteSizeException;
 import build.buildfarm.instance.OperationsMap;
 import build.buildfarm.instance.WatchFuture;
 import build.buildfarm.instance.WorkerQueue;
@@ -85,6 +84,7 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.MultimapBuilder;
 import com.google.common.collect.SetMultimap;
 import com.google.common.io.BaseEncoding;
+import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.longrunning.Operation;
@@ -365,8 +365,10 @@ public class MemoryInstance extends AbstractServerInstance {
       }
 
       @Override
-      public void addListener(Runnable onCompleted, Executor executor) {
-        getStreamSource(name).getClosedFuture().addListener(onCompleted, executor);
+      public ListenableFuture<Long> getFuture() {
+        ByteStringStreamSource source = getStreamSource(name);
+        return Futures.transform(
+            source.getClosedFuture(), result -> source.getCommittedSize(), directExecutor());
       }
     };
   }
@@ -696,7 +698,7 @@ public class MemoryInstance extends AbstractServerInstance {
           60,
           SECONDS,
           RequestMetadata.getDefaultInstance());
-    } catch (StatusException | IOException | ExcessiveWriteSizeException e) {
+    } catch (StatusException | IOException e) {
       logger.log(Level.SEVERE, format("could not emplace queued operation: %s", operationName), e);
       return false;
     }
@@ -833,7 +835,7 @@ public class MemoryInstance extends AbstractServerInstance {
           } else {
             enqueueOperation(operation);
           }
-        } catch (StatusException | IOException | ExcessiveWriteSizeException e) {
+        } catch (StatusException | IOException e) {
           logger.log(
               Level.SEVERE, format("could not emplace queued operation: %s", operationName), e);
         }

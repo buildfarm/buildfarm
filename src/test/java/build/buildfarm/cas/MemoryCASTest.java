@@ -22,6 +22,7 @@ import static org.mockito.Mockito.verify;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
 import com.google.protobuf.ByteString;
+import java.io.IOException;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -29,7 +30,7 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class MemoryCASTest {
   @Test
-  public void expireShouldCallOnExpiration() throws InterruptedException {
+  public void expireShouldCallOnExpiration() throws IOException, InterruptedException {
     ContentAddressableStorage storage = new MemoryCAS(10);
 
     DigestUtil digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
@@ -41,7 +42,7 @@ public class MemoryCASTest {
   }
 
   @Test
-  public void expireShouldOccurAtLimitExactly() throws InterruptedException {
+  public void expireShouldOccurAtLimitExactly() throws IOException, InterruptedException {
     ContentAddressableStorage storage = new MemoryCAS(11);
 
     DigestUtil digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
@@ -54,7 +55,8 @@ public class MemoryCASTest {
   }
 
   @Test
-  public void duplicateEntryRegistersMultipleOnExpiration() throws InterruptedException {
+  public void duplicateEntryRegistersMultipleOnExpiration()
+      throws IOException, InterruptedException {
     ContentAddressableStorage storage = new MemoryCAS(10);
 
     DigestUtil digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);
@@ -67,7 +69,7 @@ public class MemoryCASTest {
   }
 
   @Test(expected = IllegalArgumentException.class)
-  public void emptyPutThrowsIllegalArgumentException() throws InterruptedException {
+  public void emptyPutThrowsIllegalArgumentException() throws IOException, InterruptedException {
     ContentAddressableStorage storage = new MemoryCAS(10);
 
     DigestUtil digestUtil = new DigestUtil(DigestUtil.HashFunction.SHA256);

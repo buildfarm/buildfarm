@@ -53,6 +53,8 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.jimfs.Configuration;
 import com.google.common.jimfs.Jimfs;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
 import io.grpc.Deadline;
@@ -70,7 +72,6 @@ import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -447,7 +448,7 @@ class CASFileCacheTest {
     assertThat(storage.get(pathThree).after).isEqualTo(storage.get(pathOne));
   }
 
-  Write getWrite(Digest digest) {
+  Write getWrite(Digest digest) throws IOException {
     return fileCache.getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
   }
 
@@ -458,7 +459,7 @@ class CASFileCacheTest {
 
     AtomicBoolean notified = new AtomicBoolean(false);
     Write write = getWrite(digest);
-    write.addListener(() -> notified.set(true), directExecutor());
+    write.getFuture().addListener(() -> notified.set(true), directExecutor());
     try (OutputStream out = write.getOutput(1, SECONDS, () -> {})) {
       content.writeTo(out);
     }
@@ -479,7 +480,7 @@ class CASFileCacheTest {
     Write incompleteWrite = getWrite(digest);
     AtomicBoolean notified = new AtomicBoolean(false);
     // both should be size committed
-    incompleteWrite.addListener(() -> notified.set(true), directExecutor());
+    incompleteWrite.getFuture().addListener(() -> notified.set(true), directExecutor());
     OutputStream incompleteOut = incompleteWrite.getOutput(1, SECONDS, () -> {});
     try (OutputStream out = completingWrite.getOutput(1, SECONDS, () -> {})) {
       assertThat(fileCache.size()).isEqualTo(digest.getSizeBytes() * 2);
@@ -505,7 +506,7 @@ class CASFileCacheTest {
     }
     Write write = fileCache.getWrite(digest, writeId, RequestMetadata.getDefaultInstance());
     AtomicBoolean notified = new AtomicBoolean(false);
-    write.addListener(() -> notified.set(true), directExecutor());
+    write.getFuture().addListener(() -> notified.set(true), directExecutor());
     assertThat(write.getCommittedSize()).isEqualTo(6);
     try (OutputStream out = write.getOutput(1, SECONDS, () -> {})) {
       content.substring(6).writeTo(out);
@@ -547,7 +548,7 @@ class CASFileCacheTest {
   }
 
   @Test
-  public void emptyWriteIsComplete() {
+  public void emptyWriteIsComplete() throws IOException {
     Write write =
         fileCache.getWrite(
             DIGEST_UTIL.compute(ByteString.EMPTY),
@@ -599,7 +600,7 @@ class CASFileCacheTest {
           }
 
           @Override
-          public void addListener(Runnable onCompleted, Executor executor) {
+          public ListenableFuture<Long> getFuture() {
             throw new UnsupportedOperationException();
           }
         };
@@ -778,8 +779,9 @@ class CASFileCacheTest {
     Write write =
         new NullWrite() {
           @Override
-          public void addListener(Runnable onCompleted, Executor executor) {
-            writeComplete.addListener(onCompleted, executor);
+          public ListenableFuture<Long> getFuture() {
+            return Futures.transform(
+                writeComplete, result -> blob.getDigest().getSizeBytes(), directExecutor());
           }
 
           @Override

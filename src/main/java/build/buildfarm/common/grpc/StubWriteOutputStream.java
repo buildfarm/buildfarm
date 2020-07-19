@@ -26,6 +26,8 @@ import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
+import com.google.common.base.Throwables;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.protobuf.ByteString;
@@ -37,8 +39,8 @@ import io.grpc.stub.ClientResponseObserver;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import javax.annotation.concurrent.GuardedBy;
 
 public class StubWriteOutputStream extends FeedbackOutputStream implements Write {
@@ -52,10 +54,11 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   private final Supplier<ByteStreamBlockingStub> bsBlockingStub;
   private final Supplier<ByteStreamStub> bsStub;
   private final String resourceName;
-  private final SettableFuture<Long> writeFuture = SettableFuture.create();
+  private final Function<Throwable, Throwable> exceptionTranslator;
   private final long expectedSize;
   private final boolean autoflush;
   private final byte[] buf;
+  private final SettableFuture<Long> writeFuture = SettableFuture.create();
   private boolean wasReset = false;
   private final Supplier<QueryWriteStatusResponse> writeStatus =
       Suppliers.memoize(
@@ -103,10 +106,12 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
       Supplier<ByteStreamBlockingStub> bsBlockingStub,
       Supplier<ByteStreamStub> bsStub,
       String resourceName,
+      Function<Throwable, Throwable> exceptionTranslator,
       long expectedSize,
       boolean autoflush) {
     this.bsBlockingStub = bsBlockingStub;
     this.bsStub = bsStub;
+    this.exceptionTranslator = exceptionTranslator;
     this.resourceName = resourceName;
     this.expectedSize = expectedSize;
     this.autoflush = autoflush;
@@ -162,14 +167,13 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
     }
   }
 
-  private boolean checkComplete() {
+  private boolean checkComplete() throws IOException {
     try {
       return writeFuture.isDone() && writeFuture.get() >= 0;
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
-      if (cause instanceof RuntimeException) {
-        throw (RuntimeException) cause;
-      }
+      Throwables.throwIfUnchecked(cause);
+      Throwables.throwIfInstanceOf(cause, IOException.class);
       throw new UncheckedExecutionException(cause);
     } catch (InterruptedException e) {
       // unlikely, since we only get for isDone()
@@ -204,7 +208,7 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
 
                     @Override
                     public void onError(Throwable t) {
-                      writeFuture.setException(t);
+                      writeFuture.setException(exceptionTranslator.apply(t));
                     }
 
                     @Override
@@ -268,23 +272,33 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
 
   @Override
   public long getCommittedSize() {
-    if (checkComplete()) {
-      try {
-        return writeFuture.get();
-      } catch (InterruptedException e) {
-        // impossible, future must be done
-        throw new RuntimeException(e);
-      } catch (ExecutionException e) {
-        // impossible, future throws in checkComplete for this
-        throw new UncheckedExecutionException(e.getCause());
+    try {
+      if (checkComplete()) {
+        try {
+          return writeFuture.get();
+        } catch (InterruptedException e) {
+          // impossible, future must be done
+          throw new RuntimeException(e);
+        } catch (ExecutionException e) {
+          // impossible, future throws in checkComplete for this
+          throw new UncheckedExecutionException(e.getCause());
+        }
       }
+      return writeStatus.get().getCommittedSize() + writtenBytes;
+    } catch (IOException e) {
+      // errored write does not have any progress
+      return 0;
     }
-    return writeStatus.get().getCommittedSize() + writtenBytes;
   }
 
   @Override
   public boolean isComplete() {
-    return checkComplete() || getCommittedSize() == expectedSize;
+    try {
+      return checkComplete() || getCommittedSize() == expectedSize;
+    } catch (IOException e) {
+      // errored write is not complete
+      return false;
+    }
   }
 
   @Override
@@ -311,7 +325,7 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
   }
 
   @Override
-  public void addListener(Runnable onCompleted, Executor executor) {
-    writeFuture.addListener(onCompleted, executor);
+  public ListenableFuture<Long> getFuture() {
+    return writeFuture;
   }
 }

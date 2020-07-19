@@ -57,6 +57,7 @@ import build.bazel.remote.execution.v2.UpdateActionResultRequest;
 import build.bazel.remote.execution.v2.WaitExecutionRequest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.ByteStreamHelper;
@@ -80,6 +81,7 @@ import com.google.bytestream.ByteStreamGrpc.ByteStreamBlockingStub;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamStub;
 import com.google.bytestream.ByteStreamProto.ReadRequest;
 import com.google.bytestream.ByteStreamProto.ReadResponse;
+import com.google.common.base.Functions;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableList;
@@ -116,6 +118,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
@@ -412,6 +415,7 @@ public class StubInstance implements Instance {
   public Write getOperationStreamWrite(String name) {
     return getWrite(
         name,
+        Functions.identity(),
         StubWriteOutputStream.UNLIMITED_EXPECTED_SIZE,
         /* autoflush=*/ true,
         RequestMetadata.getDefaultInstance());
@@ -586,18 +590,20 @@ public class StubInstance implements Instance {
   }
 
   Write getWrite(
-      String resourceName, long expectedSize, boolean autoflush, RequestMetadata requestMetadata) {
+      String resourceName,
+      Function<Throwable, Throwable> exceptionTranslator,
+      long expectedSize,
+      boolean autoflush,
+      RequestMetadata requestMetadata) {
     return new StubWriteOutputStream(
         () ->
             deadlined(bsBlockingStub).withInterceptors(attachMetadataInterceptor(requestMetadata)),
         Suppliers.memoize(
             () ->
                 ByteStreamGrpc.newStub(channel)
-                    .withInterceptors(
-                        attachMetadataInterceptor(
-                            requestMetadata))), // explicitly avoiding deadline due to client
-        // cancellation determination
+                    .withInterceptors(attachMetadataInterceptor(requestMetadata))),
         resourceName,
+        exceptionTranslator,
         expectedSize,
         autoflush);
   }
@@ -611,7 +617,18 @@ public class StubInstance implements Instance {
     String resourceName =
         ByteStreamUploader.uploadResourceName(
             getName(), uuid, HashCode.fromString(digest.getHash()), digest.getSizeBytes());
-    return getWrite(resourceName, digest.getSizeBytes(), /* autoflush=*/ false, requestMetadata);
+    return getWrite(
+        resourceName,
+        t -> {
+          Status status = Status.fromThrowable(t);
+          if (status.getCode() == Status.Code.OUT_OF_RANGE) {
+            t = new EntryLimitException(status.getDescription());
+          }
+          return t;
+        },
+        digest.getSizeBytes(),
+        /* autoflush=*/ false,
+        requestMetadata);
   }
 
   @Override
