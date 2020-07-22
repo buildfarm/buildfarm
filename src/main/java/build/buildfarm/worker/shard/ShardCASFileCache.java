@@ -48,7 +48,7 @@ class ShardCASFileCache extends CASFileCache {
         digestUtil,
         expireService,
         accessRecorder,
-        /* storage=*/ new EntryLRU(),
+        /* storage=*/ new EntryLRU(maxSizeInBytes),
         DEFAULT_DIRECTORIES_INDEX_NAME,
         onPut,
         onExpire,

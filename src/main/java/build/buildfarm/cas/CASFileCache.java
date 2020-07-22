@@ -173,9 +173,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                 }
               });
 
-  private transient Entry header = new SentinelEntry();
-  private volatile long unreferencedEntryCount = 0;
-
   @GuardedBy("this")
   private long removedEntrySize = 0;
 
@@ -253,7 +250,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         digestUtil,
         expireService,
         accessRecorder,
-        /* entryStorage=*/ new EntryLRU(),
+        /* entryStorage=*/ new EntryLRU(maxSizeInBytes),
         /* directoriesIndexDbName=*/ DEFAULT_DIRECTORIES_INDEX_NAME,
         /* onPut=*/ (digest) -> {},
         /* onExpire=*/ (digests) -> {},
@@ -301,8 +298,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       directoriesIndexUrl += path.toString();
     }
     this.directoriesIndex = new FileDirectoriesIndex(directoriesIndexUrl, root);
-
-    header.before = header.after = header;
   }
 
   public static <T> T getInterruptiblyOrIOException(ListenableFuture<T> future)
@@ -427,7 +422,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     for (String key : keys) {
       Entry e = entryStorage.get(key);
       if (e != null) {
-        e.recordAccess(header);
+        e.recordAccess(SentinelEntry.getSingletonHeader());
       }
     }
   }
@@ -1443,11 +1438,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             }
             entryStorage.put(e);
             onPut.accept(fileEntryKey.getDigest());
-            synchronized (CASFileCache.this) {
-              if (e.decrementReference(header)) {
-                unreferencedEntryCount++;
-              }
-            }
           }
         }
       }
@@ -1592,31 +1582,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     decrementReferencesSynchronized(inputFiles, inputDirectories);
   }
 
-  private int decrementInputReferences(Iterable<String> inputFiles) {
-    int entriesDereferenced = 0;
-    for (String input : inputFiles) {
-      checkNotNull(input);
-      Entry e = entryStorage.get(input);
-      if (e == null) {
-        throw new IllegalStateException(input + " has been removed with references");
-      }
-      if (!e.key.equals(input)) {
-        throw new RuntimeException("ERROR: entry retrieved: " + e.key + " != " + input);
-      }
-      if (e.decrementReference(header)) {
-        entriesDereferenced++;
-        unreferencedEntryCount++;
-      }
-    }
-    return entriesDereferenced;
-  }
-
   @GuardedBy("this")
   private void decrementReferencesSynchronized(
       Iterable<String> inputFiles, Iterable<Digest> inputDirectories) {
     // decrement references and notify if any dropped to 0
     // insert after the last 0-reference count entry in list
-    int entriesDereferenced = decrementInputReferences(inputFiles);
+    int entriesDereferenced = entryStorage.decrementInputReferences(inputFiles);
     for (Digest inputDirectory : inputDirectories) {
       DirectoryEntry dirEntry = directoryStorage.get(inputDirectory);
       if (dirEntry == null) {
@@ -1626,7 +1597,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                 + " is not in directoryStorage");
       }
       entriesDereferenced +=
-          decrementInputReferences(directoriesIndex.directoryEntries(inputDirectory));
+          entryStorage.decrementInputReferences(directoriesIndex.directoryEntries(inputDirectory));
     }
     if (entriesDereferenced > 0) {
       notify();
@@ -1652,32 +1623,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   @GuardedBy("this")
-  private Entry waitForLastUnreferencedEntry(long blobSizeInBytes) throws InterruptedException {
-    while (header.after == header) {
-      logger.log(
-          Level.INFO,
-          format(
-              "CASFileCache::expireEntry(%d) header(%s): { after: %s, before: %s }",
-              blobSizeInBytes,
-              header.hashCode(),
-              header.after.hashCode(),
-              header.before.hashCode()));
-      logger.log(
-          Level.INFO,
-          format(
-              "CASFileCache::expireEntry(%d) unreferenced list is empty, %d bytes, %d keys.",
-              blobSizeInBytes,
-              entryStorage.getStorageSizeInBytes(),
-              entryStorage.totalEntryCount()));
-      wait();
-      if (entryStorage.getStorageSizeInBytes() <= maxSizeInBytes) {
-        return null;
-      }
-    }
-    return header.after;
-  }
-
-  @GuardedBy("this")
   List<ListenableFuture<Void>> expireDirectories(Entry entry, ExecutorService service) {
     ImmutableList.Builder<ListenableFuture<Void>> builder = ImmutableList.builder();
     Iterable<Digest> containingDirectories;
@@ -1695,42 +1640,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       logger.log(Level.SEVERE, "removed referenced entry " + entry.key);
     }
     return builder.build();
-  }
-
-  @GuardedBy("this")
-  private ListenableFuture<String> dischargeEntryFuture(Entry entry, ExecutorService service) {
-    List<ListenableFuture<Void>> directoryExpirationFutures = expireDirectories(entry, service);
-    entryStorage.discharge(entry.size);
-    return whenAllComplete(directoryExpirationFutures)
-        .call(
-            () -> {
-              Exception expirationException = null;
-              for (ListenableFuture<Void> directoryExpirationFuture : directoryExpirationFutures) {
-                try {
-                  directoryExpirationFuture.get();
-                } catch (ExecutionException e) {
-                  Throwable cause = e.getCause();
-                  if (cause instanceof Exception) {
-                    expirationException = (Exception) cause;
-                  } else {
-                    logger.log(
-                        Level.SEVERE,
-                        "undeferrable exception during discharge of " + entry.key,
-                        cause);
-                    // errors and the like, avoid any deferrals
-                    Throwables.throwIfUnchecked(cause);
-                    throw new RuntimeException(cause);
-                  }
-                } catch (InterruptedException e) {
-                  // unlikely, all futures must be complete
-                }
-              }
-              if (expirationException != null) {
-                throw expirationException;
-              }
-              return entry.key;
-            },
-            service);
   }
 
   @GuardedBy("this")
@@ -1764,82 +1673,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
-  @GuardedBy("this")
-  private ListenableFuture<String> expireEntry(long blobSizeInBytes, ExecutorService service)
-      throws IOException, InterruptedException {
-    for (Entry e = waitForLastUnreferencedEntry(blobSizeInBytes);
-        e != null;
-        e = waitForLastUnreferencedEntry(blobSizeInBytes)) {
-      if (e.referenceCount != 0) {
-        throw new IllegalStateException(
-            "ERROR: Reference counts lru ordering has not been maintained correctly, attempting to expire referenced (or negatively counted) content "
-                + e.key
-                + " with "
-                + e.referenceCount
-                + " references");
-      }
-      boolean interrupted = false;
-      if (delegate != null) {
-        FileEntryKey fileEntryKey = parseFileEntryKey(e.key);
-        if (fileEntryKey == null) {
-          logger.log(Level.SEVERE, format("error parsing expired key %s", e.key));
-        } else {
-          Write write =
-              delegate.getWrite(
-                  fileEntryKey.getDigest(),
-                  UUID.randomUUID(),
-                  RequestMetadata.getDefaultInstance());
-          try (OutputStream out = write.getOutput(1, MINUTES, () -> {});
-              InputStream in = Files.newInputStream(getPath(e.key))) {
-            ByteStreams.copy(in, out);
-          } catch (IOException ioEx) {
-            interrupted =
-                Thread.interrupted()
-                    || ioEx.getCause() instanceof InterruptedException
-                    || ioEx instanceof ClosedByInterruptException;
-            write.reset();
-            logger.log(Level.SEVERE, format("error delegating expired entry %s", e.key), ioEx);
-          }
-        }
-      }
-      Entry removedEntry = entryStorage.remove(e.key);
-      // reference compare on purpose
-      if (removedEntry == e) {
-        ListenableFuture<String> keyFuture = dischargeEntryFuture(e, service);
-        if (interrupted) {
-          Thread.currentThread().interrupt();
-        }
-        return keyFuture;
-      }
-      if (removedEntry == null) {
-        logger.log(Level.SEVERE, format("entry %s was already removed during expiration", e.key));
-        if (e.isLinked()) {
-          logger.log(Level.SEVERE, format("removing spuriously non-existent entry %s", e.key));
-          e.unlink();
-          unreferencedEntryCount--;
-        } else {
-          logger.log(
-              Level.SEVERE,
-              format(
-                  "spuriously non-existent entry %s was somehow unlinked, should not appear again",
-                  e.key));
-        }
-      } else {
-        logger.log(
-            Level.SEVERE,
-            "removed entry %s did not match last unreferenced entry, restoring it",
-            e.key);
-        entryStorage.put(removedEntry);
-      }
-      // possibly delegated, but no removal, if we're interrupted, abort loop
-      if (interrupted || Thread.currentThread().isInterrupted()) {
-        throw new InterruptedException();
-      }
-    }
-    return null;
-  }
-
-  @GuardedBy("this")
   private ListenableFuture<Void> expireDirectory(Digest digest, ExecutorService service) {
     DirectoryEntry e = directoryStorage.remove(digest);
     if (e == null) {
@@ -2411,9 +2244,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       return false;
     }
 
-    if (e.incrementReference()) {
-      unreferencedEntryCount--;
-    }
     return true;
   }
 
@@ -2464,13 +2294,83 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       if (referenceIfExists(key)) {
         return DUPLICATE_OUTPUT_STREAM;
       }
-      long newSize = entryStorage.getStorageSizeInBytes() + blobSizeInBytes;
 
       ImmutableList.Builder<ListenableFuture<Digest>> builder = ImmutableList.builder();
       try {
-        while (!interrupted && newSize > maxSizeInBytes) {
-          ListenableFuture<String> expiredFuture = expireEntry(blobSizeInBytes, expireService);
+        while (!interrupted
+            && (entryStorage.getStorageSizeInBytes() + blobSizeInBytes) > maxSizeInBytes) {
+          Entry expiredEntry =
+              entryStorage.expireEntry(
+                  blobSizeInBytes,
+                  expireService,
+                  (Entry e) -> {
+                    boolean isInterrupted = false;
+                    if (delegate != null) {
+                      CASFileCache.FileEntryKey fileEntryKey = parseFileEntryKey(e.key);
+                      if (fileEntryKey == null) {
+                        logger.log(Level.SEVERE, format("error parsing expired key %s", e.key));
+                        return isInterrupted;
+                      } else {
+                        Write write =
+                            delegate.getWrite(
+                                fileEntryKey.getDigest(),
+                                UUID.randomUUID(),
+                                RequestMetadata.getDefaultInstance());
+                        try (OutputStream out = write.getOutput(1, MINUTES, () -> {});
+                            InputStream in = Files.newInputStream(getPath(e.key))) {
+                          ByteStreams.copy(in, out);
+                        } catch (IOException ioEx) {
+                          isInterrupted =
+                              Thread.interrupted()
+                                  || ioEx.getCause() instanceof InterruptedException
+                                  || ioEx instanceof ClosedByInterruptException;
+                          write.reset();
+                          logger.log(
+                              Level.SEVERE,
+                              format("error delegating expired entry %s", e.key),
+                              ioEx);
+                        } finally {
+                          return isInterrupted;
+                        }
+                      }
+                    }
+                    return isInterrupted;
+                  });
           interrupted = Thread.interrupted();
+          List<ListenableFuture<Void>> directoryExpirationFutures =
+              expireDirectories(expiredEntry, expireService);
+          ListenableFuture<String> expiredFuture =
+              whenAllComplete(directoryExpirationFutures)
+                  .call(
+                      () -> {
+                        Exception expirationException = null;
+                        for (ListenableFuture<Void> directoryExpirationFuture :
+                            directoryExpirationFutures) {
+                          try {
+                            directoryExpirationFuture.get();
+                          } catch (ExecutionException e) {
+                            Throwable cause = e.getCause();
+                            if (cause instanceof Exception) {
+                              expirationException = (Exception) cause;
+                            } else {
+                              logger.log(
+                                  Level.SEVERE,
+                                  "undeferrable exception during discharge of " + expiredEntry.key,
+                                  cause);
+                              // errors and the like, avoid any deferrals
+                              Throwables.throwIfUnchecked(cause);
+                              throw new RuntimeException(cause);
+                            }
+                          } catch (InterruptedException e) {
+                            // unlikely, all futures must be complete
+                          }
+                        }
+                        if (expirationException != null) {
+                          throw expirationException;
+                        }
+                        return expiredEntry.key;
+                      },
+                      expireService);
           if (expiredFuture != null) {
             builder.add(
                 transformAsync(
@@ -2613,7 +2513,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         boolean inserted = false;
         try {
           Files.createLink(CASFileCache.this.getPath(key), writePath);
-          if (entryStorage.containsKey(key)) {
+          if (!entryStorage.containsKey(key)) {
             entryStorage.put(entry);
             inserted = true;
           }
@@ -2682,7 +2582,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     public Entry(String key, long size, Deadline existsDeadline) {
       this.key = key;
       this.size = size;
-      referenceCount = 1;
+      referenceCount = 0;
       this.existsDeadline = existsDeadline;
     }
 
@@ -2778,6 +2678,20 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   protected static class SentinelEntry extends Entry {
+
+    private static SentinelEntry singletonHeader;
+
+    private SentinelEntry() {
+      super();
+    }
+
+    public static SentinelEntry getSingletonHeader() {
+      if (singletonHeader == null) {
+        singletonHeader = new SentinelEntry();
+      }
+      return singletonHeader;
+    }
+
     @Override
     public void unlink() {
       throw new UnsupportedOperationException("sentinal cannot be unlinked");

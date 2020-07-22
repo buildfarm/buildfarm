@@ -117,14 +117,15 @@ class CASFileCacheTest {
         .thenThrow(new NoSuchFileException("null sink delegate"));
     blobs = Maps.newHashMap();
     putService = newSingleThreadExecutor();
-    entryStorage = new EntryLRU();
+    long maxSizeInBytes = 1024;
+    entryStorage = new EntryLRU(maxSizeInBytes);
     expireService = newSingleThreadExecutor();
     // do this so that we can remove the cache root dir
     Files.createDirectories(root);
     fileCache =
         new CASFileCache(
             root,
-            /* maxSizeInBytes=*/ 1024,
+            maxSizeInBytes,
             /* maxEntrySizeInBytes=*/ 1024,
             DIGEST_UTIL,
             expireService,

@@ -15,6 +15,8 @@
 package build.buildfarm.cas;
 
 import build.buildfarm.cas.CASFileCache.Entry;
+import java.util.concurrent.ExecutorService;
+import java.util.function.Predicate;
 
 public interface LRU {
 
@@ -35,4 +37,10 @@ public interface LRU {
   long unreferencedEntryCount();
 
   void discharge(long size);
+
+  int decrementInputReferences(Iterable<String> inputFiles);
+
+  Entry expireEntry(
+      long blobSizeInBytes, ExecutorService service, Predicate<Entry> delegateInterrupted)
+      throws InterruptedException;
 }
