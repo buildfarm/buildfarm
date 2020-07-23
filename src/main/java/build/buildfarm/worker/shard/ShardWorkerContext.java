@@ -74,7 +74,6 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.rpc.PreconditionFailure;
 import io.grpc.Deadline;
 import io.grpc.Status;
-import io.grpc.Status.Code;
 import io.grpc.StatusException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -289,10 +288,17 @@ class ShardWorkerContext implements WorkerContext {
       queueEntry = backplane.dispatchOperation(platform.getPropertiesList());
     } catch (IOException e) {
       Status status = Status.fromThrowable(e);
-      if (status.getCode() != Code.UNAVAILABLE) {
-        throw e;
+      switch (status.getCode()) {
+        case DEADLINE_EXCEEDED:
+          logger.log(Level.WARNING, "backplane timed out for match during bookkeeping");
+          break;
+        case UNAVAILABLE:
+          logger.log(Level.WARNING, "backplane was unavailable for match");
+          break;
+        default:
+          throw e;
       }
-      // unavailable backplane will propagate a null queueEntry
+      // transient backplane errors will propagate a null queueEntry
     }
     listener.onWaitEnd();
     if (queueEntry == null || satisfiesRequirements(matchProvisions, queueEntry.getPlatform())) {
