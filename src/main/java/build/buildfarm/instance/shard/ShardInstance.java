@@ -1703,6 +1703,11 @@ public class ShardInstance extends AbstractServerInstance {
       RequestMetadata requestMetadata,
       Watcher watcher) {
     try {
+      if (!backplane.canPrequeue()) {
+        return immediateFailedFuture(
+            Status.RESOURCE_EXHAUSTED.withDescription("Too many jobs pending").asException());
+      }
+
       String operationName = createOperationName(UUID.randomUUID().toString());
 
       logger.log(
