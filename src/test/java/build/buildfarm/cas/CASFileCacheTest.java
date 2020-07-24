@@ -673,9 +673,11 @@ class CASFileCacheTest {
     // 2 = delegate write
     AtomicInteger writeState = new AtomicInteger(0);
     // this will ensure that the discharge task is blocked until we release it
+    //ExecutorService service = newSingleThreadExecutor();
     Future<Void> blockingExpiration =
         expireService.submit(
             () -> {
+              assertThat(writeState.get()).isEqualTo(1);
               writeState.getAndIncrement();
               while (writeState.get() != 0) {
                 try {
@@ -705,6 +707,7 @@ class CASFileCacheTest {
                 return super.getOutput(deadlineAfter, deadlineAfterUnits, onReadyHandler);
               }
             });
+    assertThat(fileCache.entryCount()).isEqualTo(1);
     Thread expiringThread =
         new Thread(
             () -> {
@@ -719,6 +722,7 @@ class CASFileCacheTest {
     // wait for blocking state
     while (writeState.get() != 1) {
       MICROSECONDS.sleep(1);
+      writeState.incrementAndGet();
     }
     expiringThread.start();
     while (writeState.get() != 2) {
@@ -742,6 +746,7 @@ class CASFileCacheTest {
     while (!completedExpiration.isDone()) {
       MICROSECONDS.sleep(1);
     }
+    assertThat(fileCache.totalEntryCount()).isEqualTo(0);
     assertThat(fileCache.size()).isEqualTo(0);
     Throwable t = exRef.get();
     assertThat(t).isNotNull();

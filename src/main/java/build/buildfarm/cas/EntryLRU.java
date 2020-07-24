@@ -51,7 +51,6 @@ public class EntryLRU implements LRU {
     if (e.referenceCount == 0) {
       e.addBefore(header);
     }
-    sizeInBytes.addAndGet(e.size);
   }
 
   @Override
@@ -90,13 +89,13 @@ public class EntryLRU implements LRU {
     return entriesDereferenced;
   }
 
-  @GuardedBy("this")
-  public Entry expireEntry(
+  @Override
+  public synchronized Entry expireEntry(
       long blobSizeInBytes,
       ExecutorService service,
       Predicate<Entry> delegateInterrupted) // TODO: lambda name should be changed
       throws InterruptedException {
-    for (Entry e = waitForLastUnreferencedEntry(); e != null; e = waitForLastUnreferencedEntry()) {
+    for (Entry e = waitForLastUnreferencedEntry(blobSizeInBytes); e != null; e = waitForLastUnreferencedEntry(blobSizeInBytes)) {
       if (e.referenceCount != 0) {
         throw new IllegalStateException(
             "ERROR: Reference counts lru ordering has not been maintained correctly, attempting to expire referenced (or negatively counted) content "
@@ -109,7 +108,7 @@ public class EntryLRU implements LRU {
       Entry removedEntry = remove(e.key); // ?
       // reference compare on purpose
       if (removedEntry == e) {
-        discharge(e.size);
+        changeSize(-e.size);
         if (interrupted) {
           Thread.currentThread().interrupt();
         }
@@ -143,7 +142,7 @@ public class EntryLRU implements LRU {
   }
 
   @GuardedBy("this")
-  private Entry waitForLastUnreferencedEntry() throws InterruptedException {
+  private Entry waitForLastUnreferencedEntry(long blobSizeInBytes) throws InterruptedException {
     while (header.after == header) {
       logger.log(
           Level.INFO,
@@ -151,16 +150,11 @@ public class EntryLRU implements LRU {
               "CASFileCache::expireEntry() unreferenced list is empty, %d bytes, %d keys.",
               getStorageSizeInBytes(), totalEntryCount()));
       wait();
-      if (getStorageSizeInBytes() <= maxSizeInBytes) {
+      if (getStorageSizeInBytes() + blobSizeInBytes <= maxSizeInBytes) {
         return null;
       }
     }
     return header.after;
-  }
-
-  @Override
-  public synchronized Iterable<Entry> expire(long size) {
-    return null;
   }
 
   @Override
@@ -184,7 +178,7 @@ public class EntryLRU implements LRU {
   }
 
   @Override
-  public void discharge(long size) {
-    sizeInBytes.addAndGet(-size);
+  public void changeSize(long size) {
+    sizeInBytes.addAndGet(size);
   }
 }

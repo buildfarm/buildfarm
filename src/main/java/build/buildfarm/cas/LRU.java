@@ -26,8 +26,6 @@ public interface LRU {
 
   Entry remove(String key);
 
-  Iterable<Entry> expire(long size);
-
   long getStorageSizeInBytes();
 
   boolean containsKey(String key);
@@ -36,7 +34,7 @@ public interface LRU {
 
   long unreferencedEntryCount();
 
-  void discharge(long size);
+  void changeSize(long size);
 
   int decrementInputReferences(Iterable<String> inputFiles);
 
