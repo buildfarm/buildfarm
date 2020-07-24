@@ -677,7 +677,6 @@ class CASFileCacheTest {
     Future<Void> blockingExpiration =
         expireService.submit(
             () -> {
-              assertThat(writeState.get()).isEqualTo(1);
               writeState.getAndIncrement();
               while (writeState.get() != 0) {
                 try {
@@ -722,7 +721,6 @@ class CASFileCacheTest {
     // wait for blocking state
     while (writeState.get() != 1) {
       MICROSECONDS.sleep(1);
-      writeState.incrementAndGet();
     }
     expiringThread.start();
     while (writeState.get() != 2) {
