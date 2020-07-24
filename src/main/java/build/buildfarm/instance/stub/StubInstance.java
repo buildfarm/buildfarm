@@ -686,6 +686,11 @@ public class StubInstance implements Instance {
         complete = true;
       } catch (Exception e) {
         Status status = Status.fromThrowable(e);
+        if (status.getCode() == Status.Code.CANCELLED && Thread.currentThread().isInterrupted()) {
+          InterruptedException intEx = new InterruptedException();
+          intEx.addSuppressed(e);
+          throw intEx;
+        }
         if (status.getCode() != Status.Code.DEADLINE_EXCEEDED) {
           listener.onError(e);
           complete = true;
