@@ -17,6 +17,7 @@ package build.buildfarm.proxy.http;
 import static build.buildfarm.proxy.http.Utils.getFromFuture;
 
 import com.google.auth.Credentials;
+import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import io.netty.bootstrap.Bootstrap;
@@ -274,7 +275,16 @@ public final class HttpBlobStore implements SimpleBlobStore {
                   p.addLast(new HttpUploadHandler(creds));
                 }
 
-                channelReady.setSuccess(ch);
+                if (ch.eventLoop().inEventLoop()) {
+                  channelReady.setSuccess(ch);
+                } else {
+                  // If addLast is called outside an event loop, then it doesn't complete until the
+                  // event loop is run again. In that case, a message sent to the last handler gets
+                  // delivered to the last non-pending handler, which will most likely end up
+                  // throwing UnsupportedMessageTypeException. Therefore, we only complete the
+                  // promise in the event loop.
+                  ch.eventLoop().execute(() -> channelReady.setSuccess(ch));
+                }
               } catch (Throwable t) {
                 channelReady.setFailure(t);
               }
@@ -372,17 +382,25 @@ public final class HttpBlobStore implements SimpleBlobStore {
   }
 
   @Override
-  public boolean containsKey(String key) {
-    throw new UnsupportedOperationException("HTTP Caching does not use this method.");
+  public boolean containsKey(String key) throws IOException, InterruptedException {
+    try {
+      return get(key, /* out=*/ null, true, false).get();
+    } catch (ExecutionException e) {
+      Throwable cause = e.getCause();
+      Throwables.throwIfInstanceOf(e, IOException.class);
+      Throwables.throwIfInstanceOf(e, RuntimeException.class);
+      throw new IOException(cause);
+    }
   }
 
   @Override
   public ListenableFuture<Boolean> get(String key, OutputStream out) {
-    return get(key, out, true);
+    return get(key, out, true, true);
   }
 
   @SuppressWarnings("FutureReturnValueIgnored")
-  private ListenableFuture<Boolean> get(String key, final OutputStream out, boolean casDownload) {
+  private ListenableFuture<Boolean> get(
+      String key, final OutputStream out, boolean casDownload, boolean downloadContent) {
     final AtomicBoolean dataWritten = new AtomicBoolean();
     OutputStream wrappedOut =
         new OutputStream() {
@@ -407,7 +425,8 @@ public final class HttpBlobStore implements SimpleBlobStore {
             out.flush();
           }
         };
-    DownloadCommand download = new DownloadCommand(uri, casDownload, key, wrappedOut);
+    DownloadCommand download =
+        new DownloadCommand(uri, casDownload, key, wrappedOut, downloadContent);
     SettableFuture<Boolean> outerF = SettableFuture.create();
     acquireDownloadChannel()
         .addListener(
@@ -491,7 +510,7 @@ public final class HttpBlobStore implements SimpleBlobStore {
   @Override
   public boolean getActionResult(String actionKey, OutputStream out)
       throws IOException, InterruptedException {
-    return getFromFuture(get(actionKey, out, false));
+    return getFromFuture(get(actionKey, out, false, true));
   }
 
   @Override

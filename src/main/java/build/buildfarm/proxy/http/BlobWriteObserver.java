@@ -15,14 +15,14 @@
 package build.buildfarm.proxy.http;
 
 import static build.buildfarm.common.UrlPath.parseUploadBlobDigest;
-import static com.google.common.base.Preconditions.checkState;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.RingBufferInputStream;
 import build.buildfarm.common.UrlPath.InvalidResourceNameException;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
+import com.google.common.base.Throwables;
 import com.google.protobuf.ByteString;
-import java.io.IOException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -35,8 +35,8 @@ class BlobWriteObserver implements WriteObserver {
   private final RingBufferInputStream buffer;
   private final Thread putThread;
   private long committedSize = 0;
+  private final AtomicReference<Throwable> error = new AtomicReference<>(null);
   private boolean complete = false;
-  private Throwable error = null;
 
   BlobWriteObserver(String resourceName, SimpleBlobStore simpleBlobStore)
       throws InvalidResourceNameException {
@@ -49,17 +49,26 @@ class BlobWriteObserver implements WriteObserver {
             () -> {
               try {
                 simpleBlobStore.put(digest.getHash(), size, buffer);
-              } catch (IOException e) {
+              } catch (Exception e) {
+                if (!error.compareAndSet(null, e)) {
+                  error.get().addSuppressed(e);
+                }
                 buffer.shutdown();
-              } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
               }
             });
     putThread.start();
   }
 
+  private void checkError() {
+    Throwable t = error.get();
+    if (t != null) {
+      Throwables.throwIfUnchecked(t);
+      throw new RuntimeException(t);
+    }
+  }
+
   private void validateRequest(WriteRequest request) {
-    checkState(error == null);
+    checkError();
     String requestResourceName = request.getResourceName();
     if (!requestResourceName.isEmpty() && !resourceName.equals(requestResourceName)) {
       logger.log(
@@ -110,8 +119,9 @@ class BlobWriteObserver implements WriteObserver {
       committedSize += data.size();
       shutdownBuffer = false;
       if (request.getFinishWrite()) {
-        putThread.join();
         complete = true;
+        buffer.close();
+        putThread.join();
       }
     } catch (InterruptedException e) {
       // prevent buffer mitigation
@@ -126,10 +136,12 @@ class BlobWriteObserver implements WriteObserver {
 
   @Override
   public void onError(Throwable t) {
+    if (!error.compareAndSet(null, t)) {
+      error.get().addSuppressed(t);
+    }
     buffer.shutdown();
     try {
       putThread.join();
-      error = t;
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }

@@ -16,6 +16,7 @@ package build.buildfarm.common;
 
 import java.io.IOException;
 import java.io.InputStream;
+import javax.annotation.concurrent.GuardedBy;
 
 public class RingBufferInputStream extends InputStream {
   private final byte[] buffer;
@@ -31,10 +32,11 @@ public class RingBufferInputStream extends InputStream {
 
   public synchronized void close() {
     closed = true;
+    notify();
   }
 
   public synchronized void shutdown() {
-    close();
+    closed = true;
     shutdown = true;
     notify();
   }
@@ -44,6 +46,7 @@ public class RingBufferInputStream extends InputStream {
     return inAvailable();
   }
 
+  @GuardedBy("this")
   private int inAvailable() {
     if (!flipped) {
       return outIndex - inIndex;
@@ -58,6 +61,7 @@ public class RingBufferInputStream extends InputStream {
     return inIndex - outIndex;
   }
 
+  @GuardedBy("this")
   private int waitForInAvailable() throws InterruptedException {
     while (!shutdown) {
       int len = inAvailable();
@@ -105,7 +109,7 @@ public class RingBufferInputStream extends InputStream {
     if (waitForInAvailable() <= 0) {
       return -1;
     }
-    int b = buffer[inIndex];
+    int b = buffer[inIndex] & 0xff;
     if (++inIndex == buffer.length) {
       inIndex = 0;
       flipped = false;
@@ -128,6 +132,7 @@ public class RingBufferInputStream extends InputStream {
     return totalBytesRead;
   }
 
+  @GuardedBy("this")
   private int readPartial(byte[] buf, int off, int len) throws InterruptedException {
     if (len <= 0) {
       return 0;
