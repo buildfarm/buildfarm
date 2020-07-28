@@ -57,8 +57,8 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
         if (request.getFinishWrite()) {
           writeObserverSource.remove(request.getResourceName());
         }
-      } catch (Throwable t) {
-        onError(t);
+      } catch (Exception e) {
+        onError(e);
       }
     }
   }
