@@ -1109,12 +1109,12 @@ public abstract class AbstractServerInstance implements Instance {
     final ListenableFuture<ActionResult> actionResultFuture;
     final ExecuteOperationMetadata cacheCheckMetadata;
     if (skipCacheLookup) {
+      actionResultFuture = immediateFuture(null);
+      cacheCheckMetadata = metadata;
+    } else {
       cacheCheckMetadata = metadata.toBuilder().setStage(ExecutionStage.Value.CACHE_CHECK).build();
       putOperation(operationBuilder.setMetadata(Any.pack(metadata)).build());
       actionResultFuture = getActionResult(actionKey, requestMetadata);
-    } else {
-      actionResultFuture = immediateFuture(null);
-      cacheCheckMetadata = metadata;
     }
 
     Futures.addCallback(
