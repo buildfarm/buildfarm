@@ -25,6 +25,7 @@ import static java.lang.String.format;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.UrlPath.InvalidResourceNameException;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.Write.CompleteWrite;
@@ -32,7 +33,6 @@ import build.buildfarm.common.grpc.DelegateServerCallStreamObserver;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
 import build.buildfarm.common.io.FeedbackOutputStream;
-import build.buildfarm.instance.ExcessiveWriteSizeException;
 import build.buildfarm.instance.Instance;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamImplBase;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
@@ -41,6 +41,7 @@ import com.google.bytestream.ByteStreamProto.ReadRequest;
 import com.google.bytestream.ByteStreamProto.ReadResponse;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.protobuf.ByteString;
 import io.grpc.Status;
 import io.grpc.Status.Code;
@@ -51,7 +52,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.NoSuchFileException;
 import java.util.UUID;
-import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -368,10 +368,10 @@ public class ByteStreamService extends ByteStreamImplBase {
     } catch (IllegalArgumentException | InvalidResourceNameException e) {
       logger.log(Level.SEVERE, format("queryWriteStatus(%s)", resourceName), e);
       responseObserver.onError(INVALID_ARGUMENT.withDescription(e.getMessage()).asException());
-    } catch (ExcessiveWriteSizeException e) {
-      logger.log(Level.WARNING, format("queryWriteStatus(%s)", resourceName), e);
-      responseObserver.onError(
-          Status.RESOURCE_EXHAUSTED.withDescription(e.getMessage()).asException());
+    } catch (EntryLimitException e) {
+      logger.warning(format("queryWriteStatus(%s): %s", resourceName, e.getMessage()));
+      responseObserver.onNext(QueryWriteStatusResponse.getDefaultInstance());
+      responseObserver.onCompleted();
     } catch (RuntimeException e) {
       logger.log(Level.SEVERE, format("queryWriteStatus(%s)", resourceName), e);
       responseObserver.onError(Status.fromThrowable(e).asException());
@@ -403,14 +403,14 @@ public class ByteStreamService extends ByteStreamImplBase {
       }
 
       @Override
-      public void addListener(Runnable onCompleted, Executor executor) {
+      public ListenableFuture<Long> getFuture() {
         throw new RuntimeException("cannot add listener to blob write");
       }
     };
   }
 
   static Write getUploadBlobWrite(Instance instance, Digest digest, UUID uuid)
-      throws ExcessiveWriteSizeException {
+      throws EntryLimitException {
     if (digest.getSizeBytes() == 0) {
       return new CompleteWrite(0);
     }
@@ -422,7 +422,7 @@ public class ByteStreamService extends ByteStreamImplBase {
   }
 
   Write getWrite(String resourceName)
-      throws ExcessiveWriteSizeException, InstanceNotFoundException, InvalidResourceNameException {
+      throws EntryLimitException, InstanceNotFoundException, InvalidResourceNameException {
     switch (detectResourceOperation(resourceName)) {
       case Blob:
         return getBlobWrite(instances.getFromBlob(resourceName), parseBlobDigest(resourceName));

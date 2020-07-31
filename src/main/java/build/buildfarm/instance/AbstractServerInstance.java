@@ -54,6 +54,7 @@ import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watcher;
@@ -239,7 +240,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public Write getBlobWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata)
-      throws ExcessiveWriteSizeException {
+      throws EntryLimitException {
     return contentAddressableStorage.getWrite(digest, uuid, requestMetadata);
   }
 
@@ -363,7 +364,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs, RequestMetadata requestMetadata)
-      throws ExcessiveWriteSizeException, IOException, InterruptedException {
+      throws EntryLimitException, IOException, InterruptedException {
     ImmutableList.Builder<Digest> blobDigestsBuilder = new ImmutableList.Builder<Digest>();
     PutAllBlobsException exception = null;
     for (ByteString blob : blobs) {
@@ -1108,12 +1109,12 @@ public abstract class AbstractServerInstance implements Instance {
     final ListenableFuture<ActionResult> actionResultFuture;
     final ExecuteOperationMetadata cacheCheckMetadata;
     if (skipCacheLookup) {
+      actionResultFuture = immediateFuture(null);
+      cacheCheckMetadata = metadata;
+    } else {
       cacheCheckMetadata = metadata.toBuilder().setStage(ExecutionStage.Value.CACHE_CHECK).build();
       putOperation(operationBuilder.setMetadata(Any.pack(metadata)).build());
       actionResultFuture = getActionResult(actionKey, requestMetadata);
-    } else {
-      actionResultFuture = immediateFuture(null);
-      cacheCheckMetadata = metadata;
     }
 
     Futures.addCallback(

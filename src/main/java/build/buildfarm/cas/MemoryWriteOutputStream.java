@@ -21,11 +21,11 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import com.google.common.hash.HashingOutputStream;
+import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
-import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 
 class MemoryWriteOutputStream extends FeedbackOutputStream implements Write {
@@ -50,7 +50,7 @@ class MemoryWriteOutputStream extends FeedbackOutputStream implements Write {
     }
     out = ByteString.newOutput((int) digest.getSizeBytes());
     hashOut = DigestUtil.forDigest(digest).newHashingOutputStream(out);
-    addListener(
+    writtenFuture.addListener(
         () -> {
           future.set(null);
           try {
@@ -138,11 +138,7 @@ class MemoryWriteOutputStream extends FeedbackOutputStream implements Write {
   }
 
   @Override
-  public void addListener(Runnable onCompleted, Executor executor) {
-    writtenFuture.addListener(onCompleted, executor);
-  }
-
-  public ListenableFuture<Void> getFuture() {
-    return future;
+  public ListenableFuture<Long> getFuture() {
+    return Futures.transform(future, result -> digest.getSizeBytes(), directExecutor());
   }
 }

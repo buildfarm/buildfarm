@@ -39,7 +39,6 @@ import build.buildfarm.common.LoggingMain;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.io.FeedbackOutputStream;
-import build.buildfarm.instance.ExcessiveWriteSizeException;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.RedisShardBackplane;
 import build.buildfarm.instance.shard.RemoteInputStreamFactory;
@@ -61,6 +60,7 @@ import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.ReportResultStage;
 import com.google.common.base.Strings;
 import com.google.common.base.Suppliers;
+import com.google.common.base.Throwables;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
@@ -190,13 +190,8 @@ public class Worker extends LoggingMain {
 
       Instance casMember = workerStub(workerName);
 
-      try {
-        Write write =
-            casMember.getBlobWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
-        return write;
-      } catch (ExcessiveWriteSizeException e) {
-        throw new IOException("unable to obtain writer to cas member");
-      }
+      return casMember.getBlobWrite(
+          digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
     }
 
     public void insertBlob(Digest digest, ByteString content)
@@ -210,7 +205,11 @@ public class Worker extends LoggingMain {
       try (InputStream in = content.newInput()) {
         writeToCasMember(digest, in);
       } catch (ExecutionException e) {
-        throw new IOException(Status.RESOURCE_EXHAUSTED.withCause(e).asRuntimeException());
+        Throwable cause = e.getCause();
+        Throwables.throwIfUnchecked(cause);
+        Throwables.throwIfInstanceOf(cause, IOException.class);
+        Status status = Status.fromThrowable(cause);
+        throw new IOException(status.asException());
       }
     }
   }
@@ -419,27 +418,29 @@ public class Worker extends LoggingMain {
               }
             });
 
-    write.addListener(
-        () -> {
-          try {
-
-            try {
-              out.close();
-            } catch (IOException e) {
-              // ignore
-            }
-            long committedSize = write.getCommittedSize();
-            if (committedSize != digest.getSizeBytes()) {
-              logger.warning(
-                  format(
-                      "committed size %d did not match expectation for digestUtil", committedSize));
-            }
-            writtenFuture.set(digest.getSizeBytes());
-          } catch (RuntimeException e) {
-            writtenFuture.setException(e);
-          }
-        },
-        directExecutor());
+    write
+        .getFuture()
+        .addListener(
+            () -> {
+              try {
+                try {
+                  out.close();
+                } catch (IOException e) {
+                  // ignore
+                }
+                long committedSize = write.getCommittedSize();
+                if (committedSize != digest.getSizeBytes()) {
+                  logger.warning(
+                      format(
+                          "committed size %d did not match expectation for digestUtil",
+                          committedSize));
+                }
+                writtenFuture.set(digest.getSizeBytes());
+              } catch (RuntimeException e) {
+                writtenFuture.setException(e);
+              }
+            },
+            directExecutor());
 
     return writtenFuture;
   }

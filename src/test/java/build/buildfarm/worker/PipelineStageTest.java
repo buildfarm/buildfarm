@@ -27,12 +27,12 @@ import org.junit.runners.JUnit4;
 public class PipelineStageTest {
   private static final Logger logger = Logger.getLogger(PipelineStageTest.class.getName());
 
-  abstract static class AbstractPipelineStage extends PipelineStage {
-    public AbstractPipelineStage(String name) {
+  static class StubPipelineStage extends PipelineStage {
+    public StubPipelineStage(String name) {
       this(name, null, null, null);
     }
 
-    public AbstractPipelineStage(
+    public StubPipelineStage(
         String name, WorkerContext workerContext, PipelineStage output, PipelineStage error) {
       super(name, workerContext, output, error);
     }
@@ -56,7 +56,7 @@ public class PipelineStageTest {
   @Test
   public void cancelTickInterruptsOperation() throws InterruptedException {
     PipelineStage output =
-        new AbstractPipelineStage("singleOutput") {
+        new StubPipelineStage("singleOutput") {
           @Override
           public void put(OperationContext operationContext) {
             close();
@@ -64,7 +64,7 @@ public class PipelineStageTest {
         };
     AtomicInteger errorCount = new AtomicInteger();
     PipelineStage error =
-        new AbstractPipelineStage("error") {
+        new StubPipelineStage("error") {
           @Override
           public void put(OperationContext operationContext) {
             errorCount.getAndIncrement();
@@ -74,7 +74,7 @@ public class PipelineStageTest {
         OperationContext.newBuilder().setOperation(Operation.getDefaultInstance()).build();
     AtomicInteger count = new AtomicInteger();
     PipelineStage stage =
-        new AbstractPipelineStage("waiter", new StubWorkerContext(), output, error) {
+        new StubPipelineStage("waiter", new StubWorkerContext(), output, error) {
           Object lock = new Object();
 
           @Override

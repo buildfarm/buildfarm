@@ -162,7 +162,6 @@ java_library(
 java_library(
     name = "instance",
     srcs = [
-        "instance/ExcessiveWriteSizeException.java",
         "instance/Instance.java",
         "instance/Utils.java",
     ],
@@ -356,7 +355,7 @@ java_binary(
 
 container_image(
     name = "server.container",
-    base = "@java_base//image",
+    base = "@java_image_base//image",
     cmd = [
         "buildfarm-server_deploy.jar",
         "/config/server.config",
@@ -450,7 +449,7 @@ java_binary(
 
 container_image(
     name = "buildfarm-shard-worker.container",
-    base = "@java_base//image",
+    base = "@java_image_base//image",
     # leverage the implicit target of the buildfarm-shard-worker to get a fat jar.
     # this is simply a workaround for the fact that we have so many dependencies,
     # so we'd want some wrappy script. This seemed more straightforward.
@@ -579,7 +578,7 @@ java_binary(
 
 container_image(
     name = "buildfarm-operationqueue-worker.container",
-    base = "@java_base//image",
+    base = "@java_image_base//image",
     cmd = [
         "buildfarm-operationqueue-worker_deploy.jar",
         "/config/worker.config",

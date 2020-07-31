@@ -31,6 +31,7 @@ import com.google.bytestream.ByteStreamProto.QueryWriteStatusRequest;
 import com.google.bytestream.ByteStreamProto.QueryWriteStatusResponse;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
 import com.google.bytestream.ByteStreamProto.WriteResponse;
+import com.google.common.base.Functions;
 import com.google.common.base.Suppliers;
 import com.google.protobuf.ByteString;
 import io.grpc.Channel;
@@ -119,6 +120,7 @@ public class StubWriteOutputStreamTest {
             Suppliers.ofInstance(ByteStreamGrpc.newBlockingStub(channel)),
             Suppliers.ofInstance(ByteStreamGrpc.newStub(channel)),
             unimplementedResourceName,
+            Functions.identity(),
             /* expectedSize=*/ StubWriteOutputStream.UNLIMITED_EXPECTED_SIZE,
             /* autoflush=*/ true);
     assertThat(write.getCommittedSize()).isEqualTo(0);
@@ -130,6 +132,7 @@ public class StubWriteOutputStreamTest {
             Suppliers.ofInstance(ByteStreamGrpc.newBlockingStub(channel)),
             Suppliers.ofInstance(ByteStreamGrpc.newStub(channel)),
             notFoundResourceName,
+            Functions.identity(),
             /* expectedSize=*/ StubWriteOutputStream.UNLIMITED_EXPECTED_SIZE,
             /* autoflush=*/ true);
     assertThat(write.getCommittedSize()).isEqualTo(0);
@@ -144,6 +147,7 @@ public class StubWriteOutputStreamTest {
             Suppliers.ofInstance(ByteStreamGrpc.newBlockingStub(channel)),
             Suppliers.ofInstance(ByteStreamGrpc.newStub(channel)),
             resourceName,
+            Functions.identity(),
             /* expectedSize=*/ StubWriteOutputStream.UNLIMITED_EXPECTED_SIZE,
             /* autoflush=*/ true);
     ByteString content = ByteString.copyFromUtf8("Hello, World");
@@ -168,6 +172,7 @@ public class StubWriteOutputStreamTest {
             Suppliers.ofInstance(ByteStreamGrpc.newBlockingStub(channel)),
             Suppliers.ofInstance(ByteStreamGrpc.newStub(channel)),
             resourceName,
+            Functions.identity(),
             /* expectedSize=*/ StubWriteOutputStream.UNLIMITED_EXPECTED_SIZE,
             /* autoflush=*/ true);
     ByteString content = ByteString.copyFromUtf8("Hello, World");

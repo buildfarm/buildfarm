@@ -26,6 +26,7 @@ import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
 import build.buildfarm.v1test.OperationsStatus;
@@ -89,11 +90,10 @@ public interface Instance {
       throws IOException, InterruptedException;
 
   Write getBlobWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata)
-      throws ExcessiveWriteSizeException;
+      throws EntryLimitException;
 
   Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs, RequestMetadata requestMetadata)
-      throws ExcessiveWriteSizeException, IOException, IllegalArgumentException,
-          InterruptedException;
+      throws EntryLimitException, IOException, IllegalArgumentException, InterruptedException;
 
   Write getOperationStreamWrite(String name);
 

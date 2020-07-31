@@ -56,7 +56,6 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import org.junit.After;
 import org.junit.Before;
@@ -103,14 +102,14 @@ public class ByteStreamServiceTest {
     Digest digest = DIGEST_UTIL.compute(content);
     UUID uuid = UUID.randomUUID();
 
-    SettableFuture<ByteString> writtenFuture = SettableFuture.create();
+    SettableFuture<Long> writtenFuture = SettableFuture.create();
     ByteString.Output output = ByteString.newOutput((int) digest.getSizeBytes());
     FeedbackOutputStream out =
         new FeedbackOutputStream() {
           @Override
           public void close() {
             if (output.size() == digest.getSizeBytes()) {
-              writtenFuture.set(output.toByteString());
+              writtenFuture.set(digest.getSizeBytes());
             }
           }
 
@@ -154,12 +153,7 @@ public class ByteStreamServiceTest {
     when(write.getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class)))
         .thenReturn(out);
     doAnswer(invocation -> (long) output.size()).when(write).getCommittedSize();
-    doAnswer(
-            answerVoid(
-                (Runnable listener, Executor executor) ->
-                    writtenFuture.addListener(listener, executor)))
-        .when(write)
-        .addListener(any(Runnable.class), any(Executor.class));
+    when(write.getFuture()).thenReturn(writtenFuture);
 
     Instance instance = mock(Instance.class);
     when(instance.getBlobWrite(digest, uuid, RequestMetadata.getDefaultInstance()))
@@ -192,7 +186,7 @@ public class ByteStreamServiceTest {
     verify(write, atLeastOnce())
         .getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class));
     verify(write, times(1)).reset();
-    verify(write, times(1)).addListener(any(Runnable.class), any(Executor.class));
+    verify(write, times(1)).getFuture();
   }
 
   @Test
@@ -201,14 +195,14 @@ public class ByteStreamServiceTest {
     Digest digest = DIGEST_UTIL.compute(content);
     UUID uuid = UUID.randomUUID();
 
-    SettableFuture<ByteString> writtenFuture = SettableFuture.create();
+    SettableFuture<Long> writtenFuture = SettableFuture.create();
     ByteString.Output output = ByteString.newOutput((int) digest.getSizeBytes());
     FeedbackOutputStream out =
         new FeedbackOutputStream() {
           @Override
           public void close() {
             if (output.size() == digest.getSizeBytes()) {
-              writtenFuture.set(output.toByteString());
+              writtenFuture.set(digest.getSizeBytes());
             }
           }
 
@@ -232,12 +226,7 @@ public class ByteStreamServiceTest {
     when(write.getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class)))
         .thenReturn(out);
     doAnswer(invocation -> (long) output.size()).when(write).getCommittedSize();
-    doAnswer(
-            answerVoid(
-                (Runnable listener, Executor executor) ->
-                    writtenFuture.addListener(listener, executor)))
-        .when(write)
-        .addListener(any(Runnable.class), any(Executor.class));
+    when(write.getFuture()).thenReturn(writtenFuture);
 
     Instance instance = mock(Instance.class);
     when(instance.getBlobWrite(digest, uuid, RequestMetadata.getDefaultInstance()))
@@ -279,7 +268,7 @@ public class ByteStreamServiceTest {
     verify(write, atLeastOnce()).getCommittedSize();
     verify(write, atLeastOnce())
         .getOutput(any(Long.class), any(TimeUnit.class), any(Runnable.class));
-    verify(write, times(2)).addListener(any(Runnable.class), any(Executor.class));
+    verify(write, times(2)).getFuture();
   }
 
   class CountingReadObserver implements StreamObserver<ReadResponse> {
