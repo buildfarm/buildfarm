@@ -177,6 +177,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   private transient long sizeInBytes = 0;
   private transient Entry header = new SentinelEntry();
+  private final AtomicLong unreferencedEntryCount = new AtomicLong(0);
 
   @GuardedBy("this")
   private long removedEntrySize = 0;
@@ -193,7 +194,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   public long unreferencedEntryCount() {
-    return Entry.entryCount.get();
+    return unreferencedEntryCount.get();
   }
 
   public long directoryStorageCount() {
@@ -1446,6 +1447,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             onPut.accept(fileEntryKey.getDigest());
             synchronized (CASFileCache.this) {
               e.decrementReference(header);
+              if (e.referenceCount == 0) {
+                unreferencedEntryCount.incrementAndGet();
+              }
             }
             sizeInBytes += size;
           }
@@ -1606,6 +1610,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       e.decrementReference(header);
       if (e.referenceCount == 0) {
         entriesDereferenced++;
+        unreferencedEntryCount.incrementAndGet();
       }
     }
     return entriesDereferenced;
@@ -1742,6 +1747,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       builder.add(expireDirectory(containingDirectory, service));
     }
     entry.unlink();
+    unreferencedEntryCount.decrementAndGet();
     if (entry.referenceCount != 0) {
       logger.log(Level.SEVERE, "removed referenced entry " + entry.key);
     }
@@ -1869,6 +1875,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         if (e.isLinked()) {
           logger.log(Level.SEVERE, format("removing spuriously non-existent entry %s", e.key));
           e.unlink();
+          unreferencedEntryCount.decrementAndGet();
         } else {
           logger.log(
               Level.SEVERE,
@@ -2110,6 +2117,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             break;
           }
           fileEntry.incrementReference();
+          if (fileEntry.referenceCount == 1) {
+            unreferencedEntryCount.decrementAndGet();
+          }
           checkNotNull(input);
           inputsBuilder.add(input);
         }
@@ -2458,6 +2468,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
 
     e.incrementReference();
+    if (e.referenceCount == 1) {
+      unreferencedEntryCount.decrementAndGet();
+    }
     return true;
   }
 
@@ -2734,7 +2747,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   @VisibleForTesting
   public static class Entry {
-    public static AtomicLong entryCount = new AtomicLong(0);
     Entry before, after;
     final String key;
     final long size;
@@ -2764,7 +2776,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       after.before = before;
       before = null;
       after = null;
-      entryCount.decrementAndGet();
     }
 
     protected void addBefore(Entry existingEntry) {
@@ -2772,7 +2783,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       before = existingEntry.before;
       before.after = this;
       after.before = this;
-      entryCount.incrementAndGet();
     }
 
     public void incrementReference() {
