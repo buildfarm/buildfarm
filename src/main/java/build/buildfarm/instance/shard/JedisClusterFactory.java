@@ -47,7 +47,11 @@ public class JedisClusterFactory {
   ///
   public static Supplier<JedisCluster> create(RedisShardBackplaneConfig config)
       throws ConfigurationException {
-    return createJedisClusterFactory(parseUri(config.getRedisUri()), createJedisPoolConfig(config));
+    return createJedisClusterFactory(
+        parseUri(config.getRedisUri()),
+        config.getTimeout(),
+        config.getMaxAttempts(),
+        createJedisPoolConfig(config));
   }
   ///
   /// @brief   Create a test jedis cluster instance.
@@ -134,6 +138,26 @@ public class JedisClusterFactory {
       URI redisUri, JedisPoolConfig poolConfig) {
     return () ->
         new JedisCluster(new HostAndPort(redisUri.getHost(), redisUri.getPort()), poolConfig);
+  }
+  ///
+  /// @brief   Create a jedis cluster instance with connection settings.
+  /// @details Use the URI, pool and connection information to connect to a redis cluster
+  ///          server and provide a jedis client.
+  /// @param   redisUri   A valid uri to a redis instance.
+  /// @param   timeout Connection timeout
+  /// @param   maxAttempts Number of connection attempts
+  /// @param   poolConfig Configuration related to redis pools.
+  /// @return  An established jedis client used to operate on the redis cluster.
+  /// @note    Suggested return identifier: jedis.
+  ///
+  private static Supplier<JedisCluster> createJedisClusterFactory(
+      URI redisUri, int timeout, int maxAttempts, JedisPoolConfig poolConfig) {
+    return () ->
+        new JedisCluster(
+            new HostAndPort(redisUri.getHost(), redisUri.getPort()),
+            Integer.max(2000, timeout),
+            Integer.max(5, maxAttempts),
+            poolConfig);
   }
   ///
   /// @brief   Create a jedis pool config.
