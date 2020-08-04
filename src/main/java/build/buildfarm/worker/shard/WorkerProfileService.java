@@ -55,7 +55,7 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
     // get usage of CASFileCache
     WorkerProfileMessage.Builder replyBuilder =
         WorkerProfileMessage.newBuilder()
-            .setCasEntryCount(storage.totalEntryCount())
+            .setCasEntryCount(storage.entryCount())
             .setCasUnreferencedEntryCount(storage.unreferencedEntryCount())
             .setCasDirectoryEntryCount(storage.directoryStorageCount())
             .setCasEvictedEntryCount(storage.getEvictedCount())

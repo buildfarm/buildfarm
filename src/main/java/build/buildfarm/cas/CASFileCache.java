@@ -103,7 +103,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.function.BooleanSupplier;
@@ -178,7 +177,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   private transient long sizeInBytes = 0;
   private transient Entry header = new SentinelEntry();
-  private final AtomicLong unreferencedEntryCount = new AtomicLong(0);
+  private volatile long unreferencedEntryCount = 0;
 
   @GuardedBy("this")
   private long removedEntrySize = 0;
@@ -190,12 +189,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return sizeInBytes;
   }
 
-  public long totalEntryCount() {
+  public long entryCount() {
     return storage.size();
   }
 
   public long unreferencedEntryCount() {
-    return unreferencedEntryCount.get();
+    return unreferencedEntryCount;
   }
 
   public long directoryStorageCount() {
@@ -1447,9 +1446,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             storage.put(e.key, e);
             onPut.accept(fileEntryKey.getDigest());
             synchronized (CASFileCache.this) {
-              e.decrementReference(header);
-              if (e.referenceCount == 0) {
-                unreferencedEntryCount.incrementAndGet();
+              if (e.decrementReference(header)) {
+                unreferencedEntryCount++;
               }
             }
             sizeInBytes += size;
@@ -1608,10 +1606,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       if (!e.key.equals(input)) {
         throw new RuntimeException("ERROR: entry retrieved: " + e.key + " != " + input);
       }
-      e.decrementReference(header);
-      if (e.referenceCount == 0) {
+      if (e.decrementReference(header)) {
         entriesDereferenced++;
-        unreferencedEntryCount.incrementAndGet();
+        unreferencedEntryCount++;
       }
     }
     return entriesDereferenced;
@@ -1748,7 +1745,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       builder.add(expireDirectory(containingDirectory, service));
     }
     entry.unlink();
-    unreferencedEntryCount.decrementAndGet();
+    unreferencedEntryCount--;
     if (entry.referenceCount != 0) {
       logger.log(Level.SEVERE, "removed referenced entry " + entry.key);
     }
@@ -1876,7 +1873,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         if (e.isLinked()) {
           logger.log(Level.SEVERE, format("removing spuriously non-existent entry %s", e.key));
           e.unlink();
-          unreferencedEntryCount.decrementAndGet();
+          unreferencedEntryCount--;
         } else {
           logger.log(
               Level.SEVERE,
@@ -2117,9 +2114,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             e = null;
             break;
           }
-          fileEntry.incrementReference();
-          if (fileEntry.referenceCount == 1) {
-            unreferencedEntryCount.decrementAndGet();
+          if (fileEntry.incrementReference()) {
+            unreferencedEntryCount--;
           }
           checkNotNull(input);
           inputsBuilder.add(input);
@@ -2468,9 +2464,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       return false;
     }
 
-    e.incrementReference();
-    if (e.referenceCount == 1) {
-      unreferencedEntryCount.decrementAndGet();
+    if (e.incrementReference()) {
+      unreferencedEntryCount--;
     }
     return true;
   }
@@ -2778,7 +2773,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       after.before = this;
     }
 
-    public void incrementReference() {
+    // return true iff the entry's state is changed from unreferenced to referenced
+    public boolean incrementReference() {
       if (referenceCount < 0) {
         throw new IllegalStateException(
             "entry " + key + " has " + referenceCount + " references and is being incremented...");
@@ -2791,6 +2787,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               + referenceCount
               + " to "
               + (referenceCount + 1));
+      boolean becomeReferenced = false;
       if (referenceCount == 0) {
         if (!isLinked()) {
           throw new IllegalStateException(
@@ -2803,11 +2800,14 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                   + ") and is being incremented");
         }
         unlink();
+        becomeReferenced = true;
       }
       referenceCount++;
+      return becomeReferenced;
     }
 
-    public void decrementReference(Entry header) {
+    // return true iff the entry's state is changed from referenced to unreferenced
+    public boolean decrementReference(Entry header) {
       if (referenceCount == 0) {
         throw new IllegalStateException(
             "entry " + key + " has 0 references and is being decremented...");
@@ -2821,9 +2821,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               + " to "
               + (referenceCount - 1));
       referenceCount--;
+      boolean becomeUnreferenced = false;
       if (referenceCount == 0) {
         addBefore(header);
+        becomeUnreferenced = true;
       }
+      return becomeUnreferenced;
     }
 
     public void recordAccess(Entry header) {
@@ -2856,12 +2859,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
 
     @Override
-    public void incrementReference() {
+    public boolean incrementReference() {
       throw new UnsupportedOperationException("sentinal cannot be referenced");
     }
 
     @Override
-    public void decrementReference(Entry header) {
+    public boolean decrementReference(Entry header) {
       throw new UnsupportedOperationException("sentinal cannot be referenced");
     }
 
