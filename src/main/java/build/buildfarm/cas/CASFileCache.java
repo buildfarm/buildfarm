@@ -2787,7 +2787,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               + referenceCount
               + " to "
               + (referenceCount + 1));
-      boolean becomeReferenced = false;
       if (referenceCount == 0) {
         if (!isLinked()) {
           throw new IllegalStateException(
@@ -2800,10 +2799,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                   + ") and is being incremented");
         }
         unlink();
-        becomeReferenced = true;
       }
-      referenceCount++;
-      return becomeReferenced;
+      return referenceCount++ == 0;
     }
 
     // return true iff the entry's state is changed from referenced to unreferenced
@@ -2820,13 +2817,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               + referenceCount
               + " to "
               + (referenceCount - 1));
-      referenceCount--;
-      boolean becomeUnreferenced = false;
-      if (referenceCount == 0) {
+      if (--referenceCount == 0) {
         addBefore(header);
-        becomeUnreferenced = true;
+        return true;
       }
-      return becomeUnreferenced;
+      return false;
     }
 
     public void recordAccess(Entry header) {
