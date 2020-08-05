@@ -744,7 +744,7 @@ class CASFileCacheTest {
     while (!completedExpiration.isDone()) {
       MICROSECONDS.sleep(1);
     }
-    assertThat(fileCache.totalEntryCount()).isEqualTo(0);
+    assertThat(fileCache.entryCount()).isEqualTo(0);
     assertThat(fileCache.size()).isEqualTo(0);
     Throwable t = exRef.get();
     assertThat(t).isNotNull();
