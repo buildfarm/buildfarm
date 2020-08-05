@@ -177,6 +177,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   private transient long sizeInBytes = 0;
   private transient Entry header = new SentinelEntry();
+  private volatile long unreferencedEntryCount = 0;
 
   @GuardedBy("this")
   private long removedEntrySize = 0;
@@ -188,8 +189,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return sizeInBytes;
   }
 
-  public long storageCount() {
+  public long entryCount() {
     return storage.size();
+  }
+
+  public long unreferencedEntryCount() {
+    return unreferencedEntryCount;
   }
 
   public long directoryStorageCount() {
@@ -1441,7 +1446,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             storage.put(e.key, e);
             onPut.accept(fileEntryKey.getDigest());
             synchronized (CASFileCache.this) {
-              e.decrementReference(header);
+              if (e.decrementReference(header)) {
+                unreferencedEntryCount++;
+              }
             }
             sizeInBytes += size;
           }
@@ -1599,9 +1606,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       if (!e.key.equals(input)) {
         throw new RuntimeException("ERROR: entry retrieved: " + e.key + " != " + input);
       }
-      e.decrementReference(header);
-      if (e.referenceCount == 0) {
+      if (e.decrementReference(header)) {
         entriesDereferenced++;
+        unreferencedEntryCount++;
       }
     }
     return entriesDereferenced;
@@ -1738,6 +1745,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       builder.add(expireDirectory(containingDirectory, service));
     }
     entry.unlink();
+    unreferencedEntryCount--;
     if (entry.referenceCount != 0) {
       logger.log(Level.SEVERE, "removed referenced entry " + entry.key);
     }
@@ -1865,6 +1873,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         if (e.isLinked()) {
           logger.log(Level.SEVERE, format("removing spuriously non-existent entry %s", e.key));
           e.unlink();
+          unreferencedEntryCount--;
         } else {
           logger.log(
               Level.SEVERE,
@@ -2105,7 +2114,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             e = null;
             break;
           }
-          fileEntry.incrementReference();
+          if (fileEntry.incrementReference()) {
+            unreferencedEntryCount--;
+          }
           checkNotNull(input);
           inputsBuilder.add(input);
         }
@@ -2453,7 +2464,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       return false;
     }
 
-    e.incrementReference();
+    if (e.incrementReference()) {
+      unreferencedEntryCount--;
+    }
     return true;
   }
 
@@ -2760,7 +2773,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       after.before = this;
     }
 
-    public void incrementReference() {
+    // return true iff the entry's state is changed from unreferenced to referenced
+    public boolean incrementReference() {
       if (referenceCount < 0) {
         throw new IllegalStateException(
             "entry " + key + " has " + referenceCount + " references and is being incremented...");
@@ -2774,7 +2788,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               + " to "
               + (referenceCount + 1));
       if (referenceCount == 0) {
-        if (before == null || after == null) {
+        if (!isLinked()) {
           throw new IllegalStateException(
               "entry "
                   + key
@@ -2786,10 +2800,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         }
         unlink();
       }
-      referenceCount++;
+      return referenceCount++ == 0;
     }
 
-    public void decrementReference(Entry header) {
+    // return true iff the entry's state is changed from referenced to unreferenced
+    public boolean decrementReference(Entry header) {
       if (referenceCount == 0) {
         throw new IllegalStateException(
             "entry " + key + " has 0 references and is being decremented...");
@@ -2802,15 +2817,16 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               + referenceCount
               + " to "
               + (referenceCount - 1));
-      referenceCount--;
-      if (referenceCount == 0) {
+      if (--referenceCount == 0) {
         addBefore(header);
+        return true;
       }
+      return false;
     }
 
     public void recordAccess(Entry header) {
       if (referenceCount == 0) {
-        if (before == null || after == null) {
+        if (!isLinked()) {
           throw new IllegalStateException(
               "entry "
                   + key
@@ -2838,12 +2854,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
 
     @Override
-    public void incrementReference() {
+    public boolean incrementReference() {
       throw new UnsupportedOperationException("sentinal cannot be referenced");
     }
 
     @Override
-    public void decrementReference(Entry header) {
+    public boolean decrementReference(Entry header) {
       throw new UnsupportedOperationException("sentinal cannot be referenced");
     }
 
