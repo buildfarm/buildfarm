@@ -1586,13 +1586,20 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return getFileName(digest, isExecutable);
   }
 
-  private void decrementReference(String inputFile) {
-    decrementReferences(ImmutableList.of(inputFile), ImmutableList.of());
+  private synchronized void decrementReference(String inputFile) throws IOException {
+    decrementReferencesSynchronized(ImmutableList.of(inputFile), ImmutableList.of());
   }
 
   public synchronized void decrementReferences(
-      Iterable<String> inputFiles, Iterable<Digest> inputDirectories) {
-    decrementReferencesSynchronized(inputFiles, inputDirectories);
+      Iterable<String> inputFiles, Iterable<Digest> inputDirectories)
+      throws IOException, InterruptedException {
+    try {
+      decrementReferencesSynchronized(inputFiles, inputDirectories);
+    } catch (ClosedByInterruptException e) {
+      InterruptedException intEx = new InterruptedException();
+      intEx.addSuppressed(e);
+      throw intEx;
+    }
   }
 
   private int decrementInputReferences(Iterable<String> inputFiles) {
@@ -1614,8 +1621,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return entriesDereferenced;
   }
 
+  @GuardedBy("this")
   private void decrementReferencesSynchronized(
-      Iterable<String> inputFiles, Iterable<Digest> inputDirectories) {
+      Iterable<String> inputFiles, Iterable<Digest> inputDirectories) throws IOException {
     // decrement references and notify if any dropped to 0
     // insert after the last 0-reference count entry in list
     int entriesDereferenced = decrementInputReferences(inputFiles);
@@ -2140,11 +2148,15 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
 
     ListenableFuture<Void> deindexFuture =
-        transform(
+        transformAsync(
             expireFuture,
             result -> {
-              directoriesIndex.remove(digest);
-              return null;
+              try {
+                directoriesIndex.remove(digest);
+              } catch (IOException e) {
+                return immediateFailedFuture(e);
+              }
+              return immediateFuture(null);
             },
             service);
 
@@ -2189,7 +2201,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             },
             service);
 
-    ListenableFuture<Void> chmodFuture =
+    ListenableFuture<Void> chmodAndIndexFuture =
         transformAsync(
             fetchFuture,
             (result) -> {
@@ -2197,12 +2209,15 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               boolean failed = false;
               try {
                 disableAllWriteAccess(path);
-              } catch (IOException chmodException) {
-                logger.log(
-                    Level.SEVERE,
-                    "error while disabling write permissions on " + path,
-                    chmodException);
-                return immediateFailedFuture(chmodException);
+              } catch (IOException e) {
+                logger.log(Level.SEVERE, "error while disabling write permissions on " + path, e);
+                return immediateFailedFuture(e);
+              }
+              try {
+                directoriesIndex.put(digest, inputsBuilder.build());
+              } catch (IOException e) {
+                logger.log(Level.SEVERE, "error while indexing " + path, e);
+                return immediateFailedFuture(e);
               }
               return immediateFuture(null);
             },
@@ -2210,13 +2225,17 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
     ListenableFuture<Void> rollbackFuture =
         catchingAsync(
-            chmodFuture,
+            chmodAndIndexFuture,
             Throwable.class,
-            (e) -> {
+            e -> {
               ImmutableList<String> inputs = inputsBuilder.build();
               directoriesIndex.remove(digest);
               synchronized (this) {
-                decrementReferencesSynchronized(inputs, ImmutableList.of());
+                try {
+                  decrementReferencesSynchronized(inputs, ImmutableList.of());
+                } catch (IOException ioEx) {
+                  e.addSuppressed(ioEx);
+                }
               }
               try {
                 logger.log(Level.FINE, "removing directory to roll back " + path);
@@ -2226,22 +2245,14 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                     Level.SEVERE,
                     "error during directory removal after fetch failure of " + path,
                     removeException);
+                e.addSuppressed(e);
               }
               return immediateFailedFuture(e);
             },
             service);
 
-    ListenableFuture<Void> indexedFuture =
-        transform(
-            rollbackFuture,
-            result -> {
-              directoriesIndex.put(digest, inputsBuilder.build());
-              return null;
-            },
-            service);
-
     return transform(
-        indexedFuture,
+        rollbackFuture,
         (results) -> {
           logger.log(
               Level.FINE, format("directory fetch complete, inserting %s", path.getFileName()));

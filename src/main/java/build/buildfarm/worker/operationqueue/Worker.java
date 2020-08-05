@@ -613,7 +613,7 @@ public class Worker extends LoggingMain {
           }
 
           @Override
-          public void destroyExecDir(Path execDir) throws IOException {
+          public void destroyExecDir(Path execDir) throws IOException, InterruptedException {
             Iterable<String> inputFiles = rootInputFiles.remove(execDir);
             Iterable<Digest> inputDirectories = rootInputDirectories.remove(execDir);
 
