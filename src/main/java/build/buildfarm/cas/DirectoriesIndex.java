@@ -15,6 +15,7 @@
 package build.buildfarm.cas;
 
 import build.bazel.remote.execution.v2.Digest;
+import java.io.IOException;
 import java.util.Set;
 
 /**
@@ -25,13 +26,13 @@ import java.util.Set;
 interface DirectoriesIndex {
   void close();
 
-  Set<Digest> removeEntry(String entry);
+  Set<Digest> removeEntry(String entry) throws IOException;
 
-  Iterable<String> directoryEntries(Digest directory);
+  Iterable<String> directoryEntries(Digest directory) throws IOException;
 
-  void put(Digest directory, Iterable<String> entries);
+  void put(Digest directory, Iterable<String> entries) throws IOException;
 
-  void remove(Digest directory);
+  void remove(Digest directory) throws IOException;
 
   void start();
 }

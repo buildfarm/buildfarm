@@ -621,7 +621,7 @@ class CASFileCacheTest {
         .getWrite(eq(expiringDigest), any(UUID.class), any(RequestMetadata.class));
   }
 
-  void decrementReference(Path path) {
+  void decrementReference(Path path) throws IOException, InterruptedException {
     fileCache.decrementReferences(
         ImmutableList.of(path.getFileName().toString()), ImmutableList.of());
   }
