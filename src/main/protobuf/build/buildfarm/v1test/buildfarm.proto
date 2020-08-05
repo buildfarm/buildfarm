@@ -244,6 +244,8 @@ message RedisShardBackplaneConfig {
   int32 max_queue_depth = 16;
   int32 max_pre_queue_depth = 17;
   ProvisionedQueuesConfig provisioned_queues = 31;
+  int32 timeout = 32;
+  int32 max_attempts = 33;
 }
 
 message ShardInstanceConfig {
