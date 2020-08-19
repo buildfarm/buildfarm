@@ -14,6 +14,31 @@ option java_package = "build.buildfarm.v1test";
 option java_multiple_files = true;
 option java_outer_classname = "OperationQueueProto";
 
+// The Admin API is used to perform administrative functions on Buildfarm infrastructure
+service Admin {
+  rpc TerminateHost(TerminateHostRequest) returns (google.rpc.Status) {
+    option (google.api.http) = { get: "/v1test/admin:terminateHost" };
+  }
+
+  rpc StopContainer(StopContainerRequest) returns (google.rpc.Status) {
+    option (google.api.http) = { get: "/v1test/admin:stopContainer" };
+  }
+}
+
+message TerminateHostRequest {
+  string instance_name = 1;
+
+  string host_id = 2;
+}
+
+message StopContainerRequest {
+  string instance_name = 1;
+
+  string host_id = 2;
+
+  string container_name = 3;
+}
+
 // The OperationQueue API is used internally to communicate with Workers
 service OperationQueue {
   rpc Take(TakeOperationRequest) returns (QueueEntry) {
@@ -70,6 +95,8 @@ message BuildFarmServerConfig {
   int32 execute_keepalive_after_seconds = 4;
 
   MetricsConfig metrics_config = 5;
+
+  AdminConfig admin_config = 6;
 }
 
 message MetricsConfig {
@@ -102,6 +129,22 @@ message GcpMetricsConfig {
 
 message LogMetricsConfig {
   string log_level = 1;
+}
+
+message AdminConfig {
+  string deployment_environment = 1;
+
+  oneof type {
+    AwsAdminConfig aws_admin_config = 2;
+    GcpAdminConfig gcp_admin_config = 3;
+  }
+}
+
+message AwsAdminConfig {
+  string region = 1;
+}
+
+message GcpAdminConfig {
 }
 
 message MemoryCASConfig {
