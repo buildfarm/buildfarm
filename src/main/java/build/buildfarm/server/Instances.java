@@ -17,7 +17,7 @@ package build.buildfarm.server;
 import build.buildfarm.instance.Instance;
 
 public interface Instances {
-  void start();
+  void start(String publicName);
 
   void stop() throws InterruptedException;
 
@@ -69,7 +69,7 @@ public interface Instances {
       }
 
       @Override
-      public void start() {}
+      public void start(String publicName) {}
 
       @Override
       public void stop() {}

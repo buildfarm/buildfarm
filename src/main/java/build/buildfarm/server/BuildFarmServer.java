@@ -136,9 +136,9 @@ public class BuildFarmServer extends LoggingMain {
     }
   }
 
-  public void start() throws IOException {
+  public void start(String publicName) throws IOException {
     actionCacheRequestCounter.start();
-    instances.start();
+    instances.start(publicName);
     server.start();
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
@@ -223,7 +223,7 @@ public class BuildFarmServer extends LoggingMain {
           new BuildFarmServer(
               session, toBuildFarmServerConfig(new InputStreamReader(configInputStream), options));
       configInputStream.close();
-      server.start();
+      server.start(options.publicName);
       server.blockUntilShutdown();
       server.stop();
       return true;

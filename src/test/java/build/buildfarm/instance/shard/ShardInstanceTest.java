@@ -137,7 +137,7 @@ public class ShardInstanceTest {
             /* maxActionTimeout=*/ Duration.getDefaultInstance(),
             mockOnStop,
             CacheBuilder.newBuilder().build(mockInstanceLoader));
-    instance.start();
+    instance.start("test:0000");
   }
 
   @After

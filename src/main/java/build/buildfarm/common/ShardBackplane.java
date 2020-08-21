@@ -77,6 +77,10 @@ public interface ShardBackplane {
   @ThreadSafe
   boolean addWorker(ShardWorker shardWorker) throws IOException;
 
+  /** Records a worker start time. */
+  @ThreadSafe
+  void recordContainerStartTime(String keyName) throws IOException;
+
   /**
    * Removes a worker's name from the set of active workers.
    *

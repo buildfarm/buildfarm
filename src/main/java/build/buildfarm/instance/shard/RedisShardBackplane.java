@@ -62,6 +62,7 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.JsonFormat;
+import com.google.protobuf.util.Timestamps;
 import com.google.rpc.Code;
 import com.google.rpc.PreconditionFailure;
 import com.google.rpc.Status;
@@ -70,6 +71,7 @@ import java.time.Instant;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -616,6 +618,12 @@ public class RedisShardBackplane implements ShardBackplane {
           }
           return false;
         });
+  }
+
+  @Override
+  public void recordContainerStartTime(String keyName) throws IOException {
+    client.call(
+      jedis -> jedis.set(keyName, Long.toString(new Date().getTime())));
   }
 
   private boolean removeWorkerAndPublish(JedisCluster jedis, String name, String changeJson) {

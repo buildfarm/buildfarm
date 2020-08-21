@@ -405,10 +405,11 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @Override
-  public void start() {
+  public void start(String publicName) {
     stopped = false;
     try {
       backplane.start();
+      backplane.recordContainerStartTime(publicName);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }

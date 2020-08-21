@@ -53,7 +53,7 @@ public interface Instance {
 
   DigestUtil getDigestUtil();
 
-  void start();
+  void start(String publicName);
 
   void stop() throws InterruptedException;
 
