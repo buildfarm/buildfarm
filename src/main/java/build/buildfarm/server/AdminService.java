@@ -19,6 +19,8 @@ import build.buildfarm.common.admin.aws.AwsAdmin;
 import build.buildfarm.common.admin.gcp.GcpAdmin;
 import build.buildfarm.v1test.AdminConfig;
 import build.buildfarm.v1test.AdminGrpc;
+import build.buildfarm.v1test.GetHostsRequest;
+import build.buildfarm.v1test.GetHostsResult;
 import build.buildfarm.v1test.StopContainerRequest;
 import build.buildfarm.v1test.TerminateHostRequest;
 import com.google.rpc.Code;
@@ -59,6 +61,23 @@ public class AdminService extends AdminGrpc.AdminImplBase {
       responseObserver.onCompleted();
     } catch (Exception e) {
       logger.severe("Could not stop container." + e);
+      responseObserver.onError(io.grpc.Status.fromThrowable(e).asException());
+    }
+  }
+
+  @Override
+  public void getHosts(GetHostsRequest request, StreamObserver<GetHostsResult> responseObserver) {
+    try {
+      GetHostsResult result = null;
+      if (adminController != null) {
+        result =
+            adminController.getHosts(
+                request.getFilter(), request.getAgeInMinutes(), request.getStatus());
+      }
+      responseObserver.onNext(result);
+      responseObserver.onCompleted();
+    } catch (Exception e) {
+      logger.severe("Could not get hosts." + e);
       responseObserver.onError(io.grpc.Status.fromThrowable(e).asException());
     }
   }
