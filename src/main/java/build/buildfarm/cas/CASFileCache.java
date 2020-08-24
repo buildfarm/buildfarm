@@ -556,8 +556,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   @Override
   public Blob get(Digest digest) {
-    try {
-      return new Blob(ByteString.readFrom(newInput(digest, /* offset=*/ 0)), digest);
+    try (InputStream in = newInput(digest, /* offset=*/ 0)) {
+      return new Blob(ByteString.readFrom(in), digest);
     } catch (NoSuchFileException e) {
       return null;
     } catch (IOException e) {
