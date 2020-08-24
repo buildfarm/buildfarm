@@ -101,7 +101,7 @@ public class AwsAdmin implements Admin {
     }
     resultBuilder.addAllHosts(hosts);
     resultBuilder.setNumHosts(hosts.size());
-    logger.info(String.format("Got %d hosts for filter: %s", hosts.size(), filter));
+    logger.fine(String.format("Got %d hosts for filter: %s", hosts.size(), filter));
     return resultBuilder.build();
   }
 
