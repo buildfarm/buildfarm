@@ -556,7 +556,13 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   @Override
   public Blob get(Digest digest) {
-    throw new UnsupportedOperationException();
+    try {
+      return new Blob(ByteString.readFrom(newInput(digest, /* offset=*/ 0)), digest);
+    } catch (NoSuchFileException e) {
+      return null;
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private static final int CHUNK_SIZE = 128 * 1024;
