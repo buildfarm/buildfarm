@@ -26,6 +26,7 @@ import build.buildfarm.v1test.TerminateHostRequest;
 import com.google.rpc.Code;
 import com.google.rpc.Status;
 import io.grpc.stub.StreamObserver;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class AdminService extends AdminGrpc.AdminImplBase {
@@ -46,7 +47,7 @@ public class AdminService extends AdminGrpc.AdminImplBase {
       responseObserver.onNext(Status.newBuilder().setCode(Code.OK_VALUE).build());
       responseObserver.onCompleted();
     } catch (Exception e) {
-      logger.severe("Could not terminate host." + e);
+      logger.log(Level.SEVERE, "Could not terminate host.", e);
       responseObserver.onError(io.grpc.Status.fromThrowable(e).asException());
     }
   }
@@ -60,7 +61,7 @@ public class AdminService extends AdminGrpc.AdminImplBase {
       responseObserver.onNext(Status.newBuilder().setCode(Code.OK_VALUE).build());
       responseObserver.onCompleted();
     } catch (Exception e) {
-      logger.severe("Could not stop container." + e);
+      logger.log(Level.SEVERE, "Could not stop container.", e);
       responseObserver.onError(io.grpc.Status.fromThrowable(e).asException());
     }
   }
@@ -77,7 +78,7 @@ public class AdminService extends AdminGrpc.AdminImplBase {
       responseObserver.onNext(result);
       responseObserver.onCompleted();
     } catch (Exception e) {
-      logger.severe("Could not get hosts." + e);
+      logger.log(Level.SEVERE, "Could not get hosts.", e);
       responseObserver.onError(io.grpc.Status.fromThrowable(e).asException());
     }
   }
