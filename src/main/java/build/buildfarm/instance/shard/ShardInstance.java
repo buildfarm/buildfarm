@@ -408,8 +408,7 @@ public class ShardInstance extends AbstractServerInstance {
   public void start(String publicName) {
     stopped = false;
     try {
-      backplane.start();
-      backplane.recordContainerStartTime(publicName);
+      backplane.start(publicName);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }

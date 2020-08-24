@@ -737,14 +737,6 @@ public class Worker extends LoggingMain {
     throw Status.UNAVAILABLE.withDescription("backplane was stopped").asRuntimeException();
   }
 
-  private void recordWorkerStartTime(String workerName) {
-    try {
-      backplane.recordContainerStartTime(workerName);
-    } catch (IOException e) {
-        logger.severe("Could not record worker start time for " + workerName);
-    }
-  }
-
   private void startFailsafeRegistration() {
     String endpoint = config.getPublicName();
     ShardWorker.Builder worker = ShardWorker.newBuilder().setEndpoint(endpoint);
@@ -794,7 +786,7 @@ public class Worker extends LoggingMain {
 
   public void start() throws InterruptedException {
     try {
-      backplane.start();
+      backplane.start(config.getPublicName());
 
       removeWorker(config.getPublicName());
 
@@ -810,9 +802,6 @@ public class Worker extends LoggingMain {
       } else {
         logger.log(INFO, "Skipping worker registration");
       }
-
-      recordWorkerStartTime(config.getPublicName());
-
     } catch (Exception e) {
       stop();
       logger.log(SEVERE, "error starting worker", e);
