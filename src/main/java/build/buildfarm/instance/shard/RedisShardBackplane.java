@@ -553,7 +553,7 @@ public class RedisShardBackplane implements ShardBackplane {
 
     // Record client start time
     client.call(
-      jedis -> jedis.set("uptime/" + clientPublicName, Long.toString(new Date().getTime())));
+        jedis -> jedis.set("uptime/" + clientPublicName, Long.toString(new Date().getTime())));
   }
 
   @Override
