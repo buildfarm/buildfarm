@@ -8,7 +8,7 @@ LOCAL_FORMATTER="java_formatter.jar"
 # Print an error such that it will surface in the context of buildkite
 print_error () {
     >&2 echo "$1"
-if [[ -v BUILDKITE ]]; then
+if [ -v BUILDKITE ] ; then
         buildkite-agent annotate "$1" --style 'error' --context 'ctx-error'
     fi
 }
