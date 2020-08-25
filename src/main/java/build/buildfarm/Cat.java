@@ -144,6 +144,7 @@ class Cat {
       }
     }
     indentOut(level, "Platform: " + command.getPlatform());
+    indentOut(level, "WorkingDirectory: " + command.getWorkingDirectory());
   }
 
   private static void indentOut(int level, String msg) {

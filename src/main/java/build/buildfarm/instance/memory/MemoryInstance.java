@@ -118,6 +118,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
+import javax.naming.ConfigurationException;
 
 public class MemoryInstance extends AbstractServerInstance {
   private static final Logger logger = Logger.getLogger(MemoryInstance.class.getName());
@@ -197,7 +198,8 @@ public class MemoryInstance extends AbstractServerInstance {
     }
   }
 
-  public MemoryInstance(String name, DigestUtil digestUtil, MemoryInstanceConfig config) {
+  public MemoryInstance(String name, DigestUtil digestUtil, MemoryInstanceConfig config)
+      throws ConfigurationException {
     this(
         name,
         digestUtil,
