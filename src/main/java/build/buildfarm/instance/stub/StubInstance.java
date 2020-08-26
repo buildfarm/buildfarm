@@ -64,6 +64,7 @@ import build.buildfarm.common.grpc.ByteStreamHelper;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.StubWriteOutputStream;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.OperationQueueGrpc.OperationQueueBlockingStub;
 import build.buildfarm.v1test.OperationsStatus;
@@ -806,5 +807,10 @@ public class StubInstance implements Instance {
   public WorkerProfileMessage getWorkerProfile() {
     return WorkerProfileBlockingStub.get()
         .getWorkerProfile(WorkerProfileRequest.newBuilder().build());
+  }
+
+  @Override
+  public GetClientStartTimeResult getClientStartTime(String clientKey) {
+    throw new UnsupportedOperationException();
   }
 }

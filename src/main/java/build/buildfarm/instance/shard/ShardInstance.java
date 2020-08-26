@@ -74,6 +74,7 @@ import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
 import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.ExecuteEntry;
+import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationIteratorToken;
 import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.ProfiledQueuedOperationMetadata;
@@ -2335,5 +2336,14 @@ public class ShardInstance extends AbstractServerInstance {
   @Override
   protected Logger getLogger() {
     return logger;
+  }
+
+  @Override
+  public GetClientStartTimeResult getClientStartTime(String clientKey) {
+    try {
+      return backplane.getClientStartTime(clientKey);
+    } catch (IOException e) {
+      throw Status.fromThrowable(e).asRuntimeException();
+    }
   }
 }

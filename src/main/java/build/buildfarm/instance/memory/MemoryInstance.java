@@ -61,6 +61,7 @@ import build.buildfarm.instance.WorkerQueues;
 import build.buildfarm.v1test.ActionCacheConfig;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.FilesystemACConfig;
+import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.GrpcACConfig;
 import build.buildfarm.v1test.MemoryInstanceConfig;
 import build.buildfarm.v1test.OperationIteratorToken;
@@ -998,5 +999,10 @@ public class MemoryInstance extends AbstractServerInstance {
   @Override
   protected Logger getLogger() {
     return logger;
+  }
+
+  @Override
+  public GetClientStartTimeResult getClientStartTime(String clientKey) {
+    throw new UnsupportedOperationException();
   }
 }
