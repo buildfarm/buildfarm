@@ -14,8 +14,12 @@
 
 package build.buildfarm.common.admin;
 
+import build.buildfarm.v1test.GetHostsResult;
+
 public interface Admin {
   void terminateHost(String hostId);
 
   void stopContainer(String hostId, String containerName);
+
+  GetHostsResult getHosts(String filter, int ageInMinutes, String status);
 }

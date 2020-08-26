@@ -15,6 +15,7 @@
 package build.buildfarm.common.admin.gcp;
 
 import build.buildfarm.common.admin.Admin;
+import build.buildfarm.v1test.GetHostsResult;
 
 public class GcpAdmin implements Admin {
   @Override
@@ -24,6 +25,11 @@ public class GcpAdmin implements Admin {
 
   @Override
   public void stopContainer(String hostId, String containerName) {
+    throw new UnsupportedOperationException("Not Implemented.");
+  }
+
+  @Override
+  public GetHostsResult getHosts(String filter, int ageInMinutes, String status) {
     throw new UnsupportedOperationException("Not Implemented.");
   }
 }
