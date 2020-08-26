@@ -23,6 +23,10 @@ service Admin {
   rpc StopContainer(StopContainerRequest) returns (google.rpc.Status) {
     option (google.api.http) = { get: "/v1test/admin:stopContainer" };
   }
+
+  rpc GetHosts(GetHostsRequest) returns (GetHostsResult) {
+    option (google.api.http) = { get: "/v1test/admin:getHosts" };
+  }
 }
 
 message TerminateHostRequest {
@@ -37,6 +41,42 @@ message StopContainerRequest {
   string host_id = 2;
 
   string container_name = 3;
+}
+
+message GetHostsRequest {
+  string filter = 1;
+
+  int32 age_in_minutes = 2;
+
+  string status = 3;
+}
+
+message GetHostsResult {
+  int64 num_hosts = 1;
+
+  repeated Host hosts = 2;
+}
+
+message Host {
+  int64 host_num = 1;
+
+  string host_id = 2;
+
+  string ip_address = 3;
+
+  google.protobuf.Timestamp launch_time = 4;
+
+  string state = 5;
+
+  string dns_name = 6;
+
+  int64 uptime_minutes = 7;
+
+  int64 num_cores = 8;
+
+  string type = 9;
+
+  string lifecycle = 10;
 }
 
 // The OperationQueue API is used internally to communicate with Workers
