@@ -59,7 +59,7 @@ public interface ShardBackplane {
 
   /** Start the backplane's operation */
   @ThreadSafe
-  void start() throws IOException;
+  void start(String publicClientName) throws IOException;
 
   /** Stop the backplane's operation */
   @ThreadSafe

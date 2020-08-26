@@ -786,7 +786,7 @@ public class Worker extends LoggingMain {
 
   public void start() throws InterruptedException {
     try {
-      backplane.start();
+      backplane.start(config.getPublicName());
 
       removeWorker(config.getPublicName());
 
@@ -802,7 +802,6 @@ public class Worker extends LoggingMain {
       } else {
         logger.log(INFO, "Skipping worker registration");
       }
-
     } catch (Exception e) {
       stop();
       logger.log(SEVERE, "error starting worker", e);

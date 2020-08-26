@@ -70,6 +70,7 @@ import java.time.Instant;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -497,7 +498,7 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   @Override
-  public void start() throws IOException {
+  public void start(String clientPublicName) throws IOException {
 
     // Construct a single redis client to be used throughout the entire backplane.
     // We wish to avoid various synchronous and error handling issues that could occur when using
@@ -549,6 +550,10 @@ public class RedisShardBackplane implements ShardBackplane {
     if (config.getRunFailsafeOperation()) {
       startFailsafeOperationThread();
     }
+
+    // Record client start time
+    client.call(
+        jedis -> jedis.set("startTime/" + clientPublicName, Long.toString(new Date().getTime())));
   }
 
   @Override

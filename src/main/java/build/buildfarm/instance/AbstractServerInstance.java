@@ -193,7 +193,7 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public void start() {}
+  public void start(String publicName) {}
 
   @Override
   public void stop() throws InterruptedException {}
