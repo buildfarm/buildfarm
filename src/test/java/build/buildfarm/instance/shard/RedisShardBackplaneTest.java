@@ -75,7 +75,7 @@ public class RedisShardBackplaneTest {
             (o) -> false,
             (o) -> false,
             mockJedisClusterFactory);
-    backplane.start("test:0000");
+    backplane.start("startTime/test:0000");
 
     assertThat(backplane.getWorkers()).isEmpty();
     verify(jedisCluster, times(1)).hdel(config.getWorkersHashName(), "foo");
@@ -117,7 +117,7 @@ public class RedisShardBackplaneTest {
             (o) -> false,
             (o) -> false,
             mockJedisClusterFactory);
-    backplane.start("test:0000");
+    backplane.start("startTime/test:0000");
 
     final String opName = "op";
     ExecuteEntry executeEntry = ExecuteEntry.newBuilder().setOperationName(opName).build();
@@ -152,7 +152,7 @@ public class RedisShardBackplaneTest {
             (o) -> false,
             (o) -> false,
             mockJedisClusterFactory);
-    backplane.start("test:0000");
+    backplane.start("startTime/test:0000");
 
     final String opName = "op";
     backplane.queueing(opName);
@@ -180,7 +180,7 @@ public class RedisShardBackplaneTest {
             (o) -> false,
             (o) -> false,
             mockJedisClusterFactory);
-    backplane.start("test:0000");
+    backplane.start("startTime/test:0000");
 
     final String opName = "op";
     when(jedisCluster.hdel(config.getDispatchedOperationsHashName(), opName)).thenReturn(1l);
@@ -215,7 +215,7 @@ public class RedisShardBackplaneTest {
             (o) -> false,
             (o) -> false,
             mockJedisClusterFactory);
-    backplane.start("test:0000");
+    backplane.start("startTime/test:0000");
 
     final String opName = "op";
 
@@ -244,7 +244,7 @@ public class RedisShardBackplaneTest {
             (o) -> false,
             (o) -> false,
             mockJedisClusterFactory);
-    backplane.start("test:0000");
+    backplane.start("startTime/test:0000");
 
     final String opName = "op";
 
@@ -276,7 +276,7 @@ public class RedisShardBackplaneTest {
             o -> false,
             o -> false,
             mockJedisClusterFactory);
-    backplane.start("test:0000");
+    backplane.start("startTime/test:0000");
 
     final String opName = "op";
 
