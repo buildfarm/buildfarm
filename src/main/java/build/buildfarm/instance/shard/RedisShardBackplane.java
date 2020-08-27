@@ -1382,10 +1382,10 @@ public class RedisShardBackplane implements ShardBackplane {
   public GetClientStartTimeResult getClientStartTime(String clientKey) throws IOException {
     try {
       return client.call(
-        jedis ->
-          GetClientStartTimeResult.newBuilder()
-            .setClientStartTime(Timestamps.fromMillis(Long.parseLong(jedis.get(clientKey))))
-            .build());
+          jedis ->
+              GetClientStartTimeResult.newBuilder()
+                  .setClientStartTime(Timestamps.fromMillis(Long.parseLong(jedis.get(clientKey))))
+                  .build());
     } catch (NumberFormatException nfe) {
       return GetClientStartTimeResult.newBuilder().build();
     }

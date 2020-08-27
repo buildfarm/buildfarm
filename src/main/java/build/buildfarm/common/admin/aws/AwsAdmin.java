@@ -90,7 +90,8 @@ public class AwsAdmin implements Admin {
           hostBuilder.setHostId(e.getInstanceId());
           hostBuilder.setIpAddress(e.getPrivateIpAddress());
           hostBuilder.setLaunchTime(Timestamps.fromMillis(e.getLaunchTime().getTime()));
-          hostBuilder.setLifecycle(e.getInstanceLifecycle() != null ? e.getInstanceLifecycle() : "on demand");
+          hostBuilder.setLifecycle(
+              e.getInstanceLifecycle() != null ? e.getInstanceLifecycle() : "on demand");
           hostBuilder.setNumCores(e.getCpuOptions().getCoreCount());
           hostBuilder.setState(e.getState().getName());
           hostBuilder.setType(e.getInstanceType());

@@ -89,7 +89,9 @@ public class AdminService extends AdminGrpc.AdminImplBase {
   }
 
   @Override
-  public void getClientStartTime(GetClientStartTimeRequest request, StreamObserver<GetClientStartTimeResult> responseObserver) {
+  public void getClientStartTime(
+      GetClientStartTimeRequest request,
+      StreamObserver<GetClientStartTimeResult> responseObserver) {
     Instance instance;
     try {
       instance = instances.get(request.getInstanceName());
@@ -103,7 +105,10 @@ public class AdminService extends AdminGrpc.AdminImplBase {
       responseObserver.onNext(result);
       responseObserver.onCompleted();
     } catch (Exception e) {
-      logger.log(Level.SEVERE, String.format("Could not get client start time for %s.", request.getClientKey()), e);
+      logger.log(
+          Level.SEVERE,
+          String.format("Could not get client start time for %s.", request.getClientKey()),
+          e);
       responseObserver.onError(io.grpc.Status.fromThrowable(e).asException());
     }
   }
