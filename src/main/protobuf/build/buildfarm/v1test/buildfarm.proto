@@ -31,6 +31,10 @@ service Admin {
   rpc GetClientStartTime(GetClientStartTimeRequest) returns (GetClientStartTimeResult) {
     option (google.api.http) = { get: "/v1test/admin:getClientStartTime" };
   }
+
+  rpc ScaleCluster(ScaleClusterRequest) returns (google.rpc.Status) {
+    option (google.api.http) = { get: "/v1test/admin:scaleCluster" };
+  }
 }
 
 message TerminateHostRequest {
@@ -90,6 +94,18 @@ message GetClientStartTimeRequest {
 
 message GetClientStartTimeResult {
   google.protobuf.Timestamp client_start_time = 1;
+}
+
+message ScaleClusterRequest {
+  string scale_group_name = 1;
+
+  int32 min_hosts = 2;
+
+  int32 max_hosts = 3;
+
+  int32 target_hosts = 4;
+
+  int32 target_reserved_hosts_percent = 5;
 }
 
 // The OperationQueue API is used internally to communicate with Workers

@@ -17,6 +17,11 @@ package build.buildfarm.common.admin.aws;
 import build.buildfarm.common.admin.Admin;
 import build.buildfarm.v1test.GetHostsResult;
 import build.buildfarm.v1test.Host;
+import com.amazonaws.services.autoscaling.AmazonAutoScaling;
+import com.amazonaws.services.autoscaling.AmazonAutoScalingClientBuilder;
+import com.amazonaws.services.autoscaling.model.InstancesDistribution;
+import com.amazonaws.services.autoscaling.model.MixedInstancesPolicy;
+import com.amazonaws.services.autoscaling.model.UpdateAutoScalingGroupRequest;
 import com.amazonaws.services.ec2.AmazonEC2;
 import com.amazonaws.services.ec2.AmazonEC2ClientBuilder;
 import com.amazonaws.services.ec2.model.DescribeInstancesRequest;
@@ -41,10 +46,12 @@ import java.util.logging.Logger;
 
 public class AwsAdmin implements Admin {
   private static final Logger logger = Logger.getLogger(Admin.class.getName());
+  private final AmazonAutoScaling scale;
   private final AmazonEC2 ec2;
   private final AWSSimpleSystemsManagement ssm;
 
   public AwsAdmin(String region) {
+    scale = AmazonAutoScalingClientBuilder.standard().withRegion(region).build();
     ec2 = AmazonEC2ClientBuilder.standard().withRegion(region).build();
     ssm = AWSSimpleSystemsManagementClientBuilder.standard().withRegion(region).build();
   }
@@ -104,6 +111,26 @@ public class AwsAdmin implements Admin {
     resultBuilder.setNumHosts(hosts.size());
     logger.fine(String.format("Got %d hosts for filter: %s", hosts.size(), filter));
     return resultBuilder.build();
+  }
+
+  @Override
+  public void scaleCluster(String scaleGroupName, Integer minHosts, Integer maxHosts, Integer targetHosts, Integer targetReservedHostsPercent) {
+    UpdateAutoScalingGroupRequest request =
+      new UpdateAutoScalingGroupRequest().withAutoScalingGroupName(scaleGroupName);
+    if (minHosts != null) {
+      request.setMinSize(minHosts);
+    }
+    if (maxHosts != null) {
+      request.setMaxSize(maxHosts);
+    }
+    if (targetHosts != null) {
+      request.setMaxSize(targetHosts);
+    }
+    if (targetReservedHostsPercent != null) {
+      request.setMixedInstancesPolicy(new MixedInstancesPolicy().withInstancesDistribution(new InstancesDistribution().withOnDemandPercentageAboveBaseCapacity(targetReservedHostsPercent)));
+    }
+    scale.updateAutoScalingGroup(request);
+    logger.info(String.format("Scaled: %s", scaleGroupName));
   }
 
   private long getHostUptimeInMinutes(Date launchTime) {

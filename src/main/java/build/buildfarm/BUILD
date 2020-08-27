@@ -173,6 +173,7 @@ java_library(
         "@googleapis//:google_rpc_code_java_proto",
         "@googleapis//:google_rpc_error_details_java_proto",
         "@googleapis//:google_rpc_status_java_proto",
+        "@maven//:com_amazonaws_aws_java_sdk_autoscaling",
         "@maven//:com_amazonaws_aws_java_sdk_core",
         "@maven//:com_amazonaws_aws_java_sdk_ec2",
         "@maven//:com_amazonaws_aws_java_sdk_ssm",
