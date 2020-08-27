@@ -17,8 +17,11 @@ package build.buildfarm.server;
 import build.buildfarm.common.admin.Admin;
 import build.buildfarm.common.admin.aws.AwsAdmin;
 import build.buildfarm.common.admin.gcp.GcpAdmin;
+import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.AdminConfig;
 import build.buildfarm.v1test.AdminGrpc;
+import build.buildfarm.v1test.GetClientStartTimeRequest;
+import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.GetHostsRequest;
 import build.buildfarm.v1test.GetHostsResult;
 import build.buildfarm.v1test.StopContainerRequest;
@@ -33,9 +36,11 @@ public class AdminService extends AdminGrpc.AdminImplBase {
   private static final Logger logger = Logger.getLogger(AdminService.class.getName());
 
   private final Admin adminController;
+  private final Instances instances;
 
-  public AdminService(AdminConfig config) {
+  public AdminService(AdminConfig config, Instances instances) {
     this.adminController = getAdminController(config);
+    this.instances = instances;
   }
 
   @Override
@@ -79,6 +84,31 @@ public class AdminService extends AdminGrpc.AdminImplBase {
       responseObserver.onCompleted();
     } catch (Exception e) {
       logger.log(Level.SEVERE, "Could not get hosts.", e);
+      responseObserver.onError(io.grpc.Status.fromThrowable(e).asException());
+    }
+  }
+
+  @Override
+  public void getClientStartTime(
+      GetClientStartTimeRequest request,
+      StreamObserver<GetClientStartTimeResult> responseObserver) {
+    Instance instance;
+    try {
+      instance = instances.get(request.getInstanceName());
+    } catch (InstanceNotFoundException e) {
+      responseObserver.onError(BuildFarmInstances.toStatusException(e));
+      return;
+    }
+
+    try {
+      GetClientStartTimeResult result = instance.getClientStartTime(request.getClientKey());
+      responseObserver.onNext(result);
+      responseObserver.onCompleted();
+    } catch (Exception e) {
+      logger.log(
+          Level.SEVERE,
+          String.format("Could not get client start time for %s.", request.getClientKey()),
+          e);
       responseObserver.onError(io.grpc.Status.fromThrowable(e).asException());
     }
   }

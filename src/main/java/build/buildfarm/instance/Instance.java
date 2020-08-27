@@ -29,6 +29,7 @@ import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
+import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.Tree;
@@ -138,6 +139,8 @@ public interface Instance {
   ServerCapabilities getCapabilities();
 
   WorkerProfileMessage getWorkerProfile();
+
+  GetClientStartTimeResult getClientStartTime(String clientKey);
 
   interface MatchListener {
     // start/end pair called for each wait period

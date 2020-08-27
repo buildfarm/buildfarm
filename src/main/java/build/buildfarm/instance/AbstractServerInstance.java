@@ -61,6 +61,7 @@ import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
+import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.Tree;
@@ -1636,6 +1637,9 @@ public abstract class AbstractServerInstance implements Instance {
     throw new UnsupportedOperationException(
         "AbstractServerInstance doesn't support getWorkerProfile() method.");
   }
+
+  @Override
+  public abstract GetClientStartTimeResult getClientStartTime(String clientKey);
 
   protected abstract Logger getLogger();
 }

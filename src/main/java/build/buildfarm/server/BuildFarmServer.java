@@ -107,7 +107,7 @@ public class BuildFarmServer extends LoggingMain {
                     getMetricsPublisher(config.getMetricsConfig())))
             .addService(new OperationQueueService(instances))
             .addService(new OperationsService(instances))
-            .addService(new AdminService(config.getAdminConfig()))
+            .addService(new AdminService(config.getAdminConfig(), instances))
             .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
             .intercept(headersInterceptor)
             .build();

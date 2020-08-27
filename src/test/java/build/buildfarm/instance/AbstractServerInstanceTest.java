@@ -37,6 +37,7 @@ import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
+import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationsStatus;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -126,6 +127,11 @@ public class AbstractServerInstanceTest {
 
     @Override
     protected TokenizableIterator<Operation> createOperationsIterator(String pageToken) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public GetClientStartTimeResult getClientStartTime(String clientKey) {
       throw new UnsupportedOperationException();
     }
 

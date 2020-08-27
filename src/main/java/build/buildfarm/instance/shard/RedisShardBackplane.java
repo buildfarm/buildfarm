@@ -38,6 +38,7 @@ import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
+import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationChange;
 import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.ProvisionedQueue;
@@ -62,6 +63,7 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.JsonFormat;
+import com.google.protobuf.util.Timestamps;
 import com.google.rpc.Code;
 import com.google.rpc.PreconditionFailure;
 import com.google.rpc.Status;
@@ -1374,5 +1376,18 @@ public class RedisShardBackplane implements ShardBackplane {
                 .setDispatchedSize(jedis.hlen(config.getDispatchedOperationsHashName()))
                 .addAllActiveWorkers(workerSet)
                 .build());
+  }
+
+  @Override
+  public GetClientStartTimeResult getClientStartTime(String clientKey) throws IOException {
+    try {
+      return client.call(
+          jedis ->
+              GetClientStartTimeResult.newBuilder()
+                  .setClientStartTime(Timestamps.fromMillis(Long.parseLong(jedis.get(clientKey))))
+                  .build());
+    } catch (NumberFormatException nfe) {
+      return GetClientStartTimeResult.newBuilder().build();
+    }
   }
 }
