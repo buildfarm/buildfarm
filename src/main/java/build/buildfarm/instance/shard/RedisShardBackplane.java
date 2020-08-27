@@ -1380,10 +1380,14 @@ public class RedisShardBackplane implements ShardBackplane {
 
   @Override
   public GetClientStartTimeResult getClientStartTime(String clientKey) throws IOException {
-    return client.call(
-      jedis ->
-        GetClientStartTimeResult.newBuilder()
-          .setClientStartTime(Timestamps.fromMillis(Long.parseLong(jedis.get(clientKey))))
-          .build());
+    try {
+      return client.call(
+        jedis ->
+          GetClientStartTimeResult.newBuilder()
+            .setClientStartTime(Timestamps.fromMillis(Long.parseLong(jedis.get(clientKey))))
+            .build());
+    } catch (NumberFormatException nfe) {
+      return GetClientStartTimeResult.newBuilder().build();
+    }
   }
 }
