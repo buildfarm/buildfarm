@@ -23,5 +23,10 @@ public interface Admin {
 
   GetHostsResult getHosts(String filter, int ageInMinutes, String status);
 
-  void scaleCluster(String scaleGroupName, Integer minHosts, Integer maxHosts, Integer targetHosts, Integer targetReservedHostsPercent);
+  void scaleCluster(
+      String scaleGroupName,
+      Integer minHosts,
+      Integer maxHosts,
+      Integer targetHosts,
+      Integer targetReservedHostsPercent);
 }

@@ -118,9 +118,12 @@ public class AdminService extends AdminGrpc.AdminImplBase {
   public void scaleCluster(ScaleClusterRequest request, StreamObserver<Status> responseObserver) {
     try {
       if (adminController != null) {
-        adminController.scaleCluster(request.getScaleGroupName(), request.getMinHosts(),
-          request.getMaxHosts(), request.getTargetHosts(),
-          request.getTargetReservedHostsPercent());
+        adminController.scaleCluster(
+            request.getScaleGroupName(),
+            request.getMinHosts(),
+            request.getMaxHosts(),
+            request.getTargetHosts(),
+            request.getTargetReservedHostsPercent());
       }
       responseObserver.onNext(Status.newBuilder().setCode(Code.OK_VALUE).build());
       responseObserver.onCompleted();

@@ -34,7 +34,12 @@ public class GcpAdmin implements Admin {
   }
 
   @Override
-  public void scaleCluster(String scaleGroupName, Integer minHosts, Integer maxHosts, Integer targetHosts, Integer targetReservedHostsPercent) {
+  public void scaleCluster(
+      String scaleGroupName,
+      Integer minHosts,
+      Integer maxHosts,
+      Integer targetHosts,
+      Integer targetReservedHostsPercent) {
     throw new UnsupportedOperationException("Not Implemented.");
   }
 }

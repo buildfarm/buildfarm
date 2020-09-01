@@ -114,9 +114,14 @@ public class AwsAdmin implements Admin {
   }
 
   @Override
-  public void scaleCluster(String scaleGroupName, Integer minHosts, Integer maxHosts, Integer targetHosts, Integer targetReservedHostsPercent) {
+  public void scaleCluster(
+      String scaleGroupName,
+      Integer minHosts,
+      Integer maxHosts,
+      Integer targetHosts,
+      Integer targetReservedHostsPercent) {
     UpdateAutoScalingGroupRequest request =
-      new UpdateAutoScalingGroupRequest().withAutoScalingGroupName(scaleGroupName);
+        new UpdateAutoScalingGroupRequest().withAutoScalingGroupName(scaleGroupName);
     if (minHosts != null) {
       request.setMinSize(minHosts);
     }
@@ -127,7 +132,11 @@ public class AwsAdmin implements Admin {
       request.setMaxSize(targetHosts);
     }
     if (targetReservedHostsPercent != null) {
-      request.setMixedInstancesPolicy(new MixedInstancesPolicy().withInstancesDistribution(new InstancesDistribution().withOnDemandPercentageAboveBaseCapacity(targetReservedHostsPercent)));
+      request.setMixedInstancesPolicy(
+          new MixedInstancesPolicy()
+              .withInstancesDistribution(
+                  new InstancesDistribution()
+                      .withOnDemandPercentageAboveBaseCapacity(targetReservedHostsPercent)));
     }
     scale.updateAutoScalingGroup(request);
     logger.info(String.format("Scaled: %s", scaleGroupName));
