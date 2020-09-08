@@ -22,4 +22,11 @@ public interface Admin {
   void stopContainer(String hostId, String containerName);
 
   GetHostsResult getHosts(String filter, int ageInMinutes, String status);
+
+  void scaleCluster(
+      String scaleGroupName,
+      Integer minHosts,
+      Integer maxHosts,
+      Integer targetHosts,
+      Integer targetReservedHostsPercent);
 }

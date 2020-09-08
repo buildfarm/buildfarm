@@ -24,6 +24,7 @@ import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.GetHostsRequest;
 import build.buildfarm.v1test.GetHostsResult;
+import build.buildfarm.v1test.ScaleClusterRequest;
 import build.buildfarm.v1test.StopContainerRequest;
 import build.buildfarm.v1test.TerminateHostRequest;
 import com.google.rpc.Code;
@@ -109,6 +110,25 @@ public class AdminService extends AdminGrpc.AdminImplBase {
           Level.SEVERE,
           String.format("Could not get client start time for %s.", request.getClientKey()),
           e);
+      responseObserver.onError(io.grpc.Status.fromThrowable(e).asException());
+    }
+  }
+
+  @Override
+  public void scaleCluster(ScaleClusterRequest request, StreamObserver<Status> responseObserver) {
+    try {
+      if (adminController != null) {
+        adminController.scaleCluster(
+            request.getScaleGroupName(),
+            request.getMinHosts(),
+            request.getMaxHosts(),
+            request.getTargetHosts(),
+            request.getTargetReservedHostsPercent());
+      }
+      responseObserver.onNext(Status.newBuilder().setCode(Code.OK_VALUE).build());
+      responseObserver.onCompleted();
+    } catch (Exception e) {
+      logger.log(Level.SEVERE, "Could not scale cluster.", e);
       responseObserver.onError(io.grpc.Status.fromThrowable(e).asException());
     }
   }
