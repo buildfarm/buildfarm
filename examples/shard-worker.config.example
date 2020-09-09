@@ -7,7 +7,7 @@ public_name: "localhost:8981"
 
 # This determines whether the worker is a shard of the cas.
 # When not a shard, it will upload into the Sharded CAS
-omit_from_cas: false
+#omit_from_cas: false
 
 # the digest function for this worker, required
 # to match out of band between the client and server
@@ -227,25 +227,25 @@ redis_shard_backplane_config: {
   subscribe_to_backplane: true
 
   ## Specify a queue that supports min/max cpu core specification
-  provisioned_queues: {
-    queues: {
-      name: "cpu"
-
-      platform: {
-        # Any specification (including non-specification) of min/max-cores
-        # will be allowed to support cpu controls and worker resource
-        # delegation.
-        properties: {
-          name: "min-cores"
-          value: "*"
-        }
-        properties: {
-          name: "max-cores"
-          value: "*"
-        }
-      }
-    }
-  }
+ # provisioned_queues: {
+ #   queues: {
+ #     name: "cpu"
+ #
+ #     platform: {
+ #       # Any specification (including non-specification) of min/max-cores
+ #       # will be allowed to support cpu controls and worker resource
+ #       # delegation.
+ #       properties: {
+ #         name: "min-cores"
+ #         value: "1"
+ #       }
+ #       properties: {
+ #         name: "max-cores"
+ #         value: "16"
+ #       }
+ #     }
+ #   }
+ # }
 }
 
 # Create exec trees containing directories that are owned by
