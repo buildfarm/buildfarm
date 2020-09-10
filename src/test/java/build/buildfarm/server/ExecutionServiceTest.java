@@ -23,7 +23,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import build.bazel.remote.execution.v2.RequestMetadata;
-import build.buildfarm.common.metrics.log.LogMetricsPublisher;
+import build.buildfarm.metrics.log.LogMetricsPublisher;
 import build.buildfarm.server.ExecutionService.KeepaliveWatcher;
 import build.buildfarm.v1test.MetricsConfig;
 import com.google.common.util.concurrent.ListenableFuture;

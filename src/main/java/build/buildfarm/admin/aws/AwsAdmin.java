@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.common.admin.aws;
+package build.buildfarm.admin.aws;
 
-import build.buildfarm.common.admin.Admin;
+import build.buildfarm.admin.Admin;
 import build.buildfarm.v1test.GetHostsResult;
 import build.buildfarm.v1test.Host;
 import com.amazonaws.services.autoscaling.AmazonAutoScaling;

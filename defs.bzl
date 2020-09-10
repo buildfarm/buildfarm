@@ -55,6 +55,7 @@ def buildfarm_init(name="buildfarm"):
             "com.amazonaws:aws-java-sdk-autoscaling:1.11.729",
             "com.amazonaws:aws-java-sdk-core:1.11.729",
             "com.amazonaws:aws-java-sdk-ec2:1.11.729",
+            "com.amazonaws:aws-java-sdk-secretsmanager:1.11.729",
             "com.amazonaws:aws-java-sdk-sns:1.11.729",
             "com.amazonaws:aws-java-sdk-ssm:1.11.729",
             "com.github.jnr:jnr-constants:0.9.9",

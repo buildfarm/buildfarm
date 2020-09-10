@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.common.metrics.log;
+package build.buildfarm.metrics.log;
 
 import build.bazel.remote.execution.v2.RequestMetadata;
-import build.buildfarm.common.metrics.AbstractMetricsPublisher;
+import build.buildfarm.metrics.AbstractMetricsPublisher;
 import build.buildfarm.v1test.MetricsConfig;
 import com.google.longrunning.Operation;
 import java.util.logging.Level;

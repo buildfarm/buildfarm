@@ -12,21 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.common.metrics.gcp;
+package build.buildfarm.metrics;
 
-import build.buildfarm.common.metrics.AbstractMetricsPublisher;
-import build.buildfarm.v1test.MetricsConfig;
-import java.util.logging.Logger;
+import build.bazel.remote.execution.v2.RequestMetadata;
+import com.google.longrunning.Operation;
 
-public class GcpMetricsPublisher extends AbstractMetricsPublisher {
-  private static final Logger logger = Logger.getLogger(GcpMetricsPublisher.class.getName());
+public interface MetricsPublisher {
+  void publishRequestMetadata(Operation operation, RequestMetadata requestMetadata);
 
-  public GcpMetricsPublisher(MetricsConfig metricsConfig) {
-    super(metricsConfig.getClusterId());
-  }
-
-  @Override
-  public void publishMetric(String metricName, Object metricValue) {
-    throw new UnsupportedOperationException();
-  }
+  void publishMetric(String metricName, Object metricValue);
 }
