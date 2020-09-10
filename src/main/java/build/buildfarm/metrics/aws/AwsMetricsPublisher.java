@@ -131,7 +131,8 @@ public class AwsMetricsPublisher extends AbstractMetricsPublisher {
     if (getSecretValueResult.getSecretString() != null) {
       secret = getSecretValueResult.getSecretString();
     } else {
-      secret = new String(Base64.getDecoder().decode(getSecretValueResult.getSecretBinary()).array());
+      secret =
+          new String(Base64.getDecoder().decode(getSecretValueResult.getSecretBinary()).array());
     }
 
     if (secret != null) {
