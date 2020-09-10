@@ -185,11 +185,9 @@ message AwsMetricsConfig {
 
   int32 sns_client_max_connections = 2;
 
-  string access_key_id = 3;
+  string secret_name = 3;
 
-  string secret_name = 4;
-
-  string region = 5;
+  string region = 4;
 }
 
 message GcpMetricsConfig {
