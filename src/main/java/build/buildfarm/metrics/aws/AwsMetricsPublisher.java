@@ -141,7 +141,7 @@ public class AwsMetricsPublisher extends AbstractMetricsPublisher {
         accessKeyId = secretMap.get("access_key");
         secretKey = secretMap.get("secret_key");
       } catch (IOException e) {
-        logger.severe(String.format("Could not parse secret %s  from AWS", secretName));
+        logger.severe(String.format("Could not parse secret %s from AWS", secretName));
       }
     }
   }
