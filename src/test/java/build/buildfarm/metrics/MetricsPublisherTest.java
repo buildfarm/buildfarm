@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.common.metrics;
+package build.buildfarm.metrics;
 
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static com.google.common.truth.Truth.assertThat;
@@ -20,8 +20,8 @@ import static com.google.common.truth.Truth.assertThat;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.RequestMetadata;
-import build.buildfarm.common.metrics.aws.AwsMetricsPublisher;
-import build.buildfarm.common.metrics.log.LogMetricsPublisher;
+import build.buildfarm.metrics.aws.AwsMetricsPublisher;
+import build.buildfarm.metrics.log.LogMetricsPublisher;
 import build.buildfarm.v1test.AwsMetricsConfig;
 import build.buildfarm.v1test.MetricsConfig;
 import build.buildfarm.v1test.OperationRequestMetadata;

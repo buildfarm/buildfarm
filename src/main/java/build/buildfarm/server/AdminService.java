@@ -14,9 +14,9 @@
 
 package build.buildfarm.server;
 
-import build.buildfarm.common.admin.Admin;
-import build.buildfarm.common.admin.aws.AwsAdmin;
-import build.buildfarm.common.admin.gcp.GcpAdmin;
+import build.buildfarm.admin.Admin;
+import build.buildfarm.admin.aws.AwsAdmin;
+import build.buildfarm.admin.gcp.GcpAdmin;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.AdminConfig;
 import build.buildfarm.v1test.AdminGrpc;

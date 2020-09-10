@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.common.admin.gcp;
+package build.buildfarm.admin.gcp;
 
-import build.buildfarm.common.admin.Admin;
+import build.buildfarm.admin.Admin;
 import build.buildfarm.v1test.GetHostsResult;
 
 public class GcpAdmin implements Admin {

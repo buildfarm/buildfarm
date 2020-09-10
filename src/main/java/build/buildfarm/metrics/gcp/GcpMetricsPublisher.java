@@ -12,21 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.common.admin;
+package build.buildfarm.metrics.gcp;
 
-import build.buildfarm.v1test.GetHostsResult;
+import build.buildfarm.metrics.AbstractMetricsPublisher;
+import build.buildfarm.v1test.MetricsConfig;
+import java.util.logging.Logger;
 
-public interface Admin {
-  void terminateHost(String hostId);
+public class GcpMetricsPublisher extends AbstractMetricsPublisher {
+  private static final Logger logger = Logger.getLogger(GcpMetricsPublisher.class.getName());
 
-  void stopContainer(String hostId, String containerName);
+  public GcpMetricsPublisher(MetricsConfig metricsConfig) {
+    super(metricsConfig.getClusterId());
+  }
 
-  GetHostsResult getHosts(String filter, int ageInMinutes, String status);
-
-  void scaleCluster(
-      String scaleGroupName,
-      Integer minHosts,
-      Integer maxHosts,
-      Integer targetHosts,
-      Integer targetReservedHostsPercent);
+  @Override
+  public void publishMetric(String metricName, Object metricValue) {
+    throw new UnsupportedOperationException();
+  }
 }

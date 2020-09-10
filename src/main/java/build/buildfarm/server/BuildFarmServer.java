@@ -21,10 +21,10 @@ import static java.util.logging.Level.SEVERE;
 
 import build.buildfarm.common.LoggingMain;
 import build.buildfarm.common.grpc.TracingMetadataUtils.ServerHeadersInterceptor;
-import build.buildfarm.common.metrics.MetricsPublisher;
-import build.buildfarm.common.metrics.aws.AwsMetricsPublisher;
-import build.buildfarm.common.metrics.gcp.GcpMetricsPublisher;
-import build.buildfarm.common.metrics.log.LogMetricsPublisher;
+import build.buildfarm.metrics.MetricsPublisher;
+import build.buildfarm.metrics.aws.AwsMetricsPublisher;
+import build.buildfarm.metrics.gcp.GcpMetricsPublisher;
+import build.buildfarm.metrics.log.LogMetricsPublisher;
 import build.buildfarm.v1test.BuildFarmServerConfig;
 import build.buildfarm.v1test.MetricsConfig;
 import com.google.devtools.common.options.OptionsParser;

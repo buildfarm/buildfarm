@@ -12,21 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.common.metrics.aws;
+package build.buildfarm.metrics.aws;
 
 import build.bazel.remote.execution.v2.RequestMetadata;
-import build.buildfarm.common.metrics.AbstractMetricsPublisher;
+import build.buildfarm.metrics.AbstractMetricsPublisher;
 import build.buildfarm.v1test.MetricsConfig;
 import com.amazonaws.ClientConfiguration;
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.auth.AWSStaticCredentialsProvider;
 import com.amazonaws.handlers.AsyncHandler;
+import com.amazonaws.services.secretsmanager.AWSSecretsManager;
+import com.amazonaws.services.secretsmanager.AWSSecretsManagerClientBuilder;
+import com.amazonaws.services.secretsmanager.model.GetSecretValueRequest;
+import com.amazonaws.services.secretsmanager.model.GetSecretValueResult;
 import com.amazonaws.services.sns.AmazonSNSAsync;
 import com.amazonaws.services.sns.AmazonSNSAsyncClientBuilder;
 import com.amazonaws.services.sns.model.PublishRequest;
 import com.amazonaws.services.sns.model.PublishResult;
 import com.amazonaws.util.StringUtils;
 import com.google.longrunning.Operation;
+import java.util.Base64;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -35,22 +40,22 @@ public class AwsMetricsPublisher extends AbstractMetricsPublisher {
   private static AmazonSNSAsync snsClient;
 
   private String snsTopicOperations;
-  private String awsAccessKeyId;
-  private String awsSecretKey;
+  private String accessKeyId;
+  private String secretKey;
   private String region;
   private int snsClientMaxConnections;
 
   public AwsMetricsPublisher(MetricsConfig metricsConfig) {
     super(metricsConfig.getClusterId());
     snsTopicOperations = metricsConfig.getAwsMetricsConfig().getOperationsMetricsTopic();
-    awsAccessKeyId = metricsConfig.getAwsMetricsConfig().getAwsAccessKeyId();
-    awsSecretKey = metricsConfig.getAwsMetricsConfig().getAwsSecretKey();
     region = metricsConfig.getAwsMetricsConfig().getRegion();
+    accessKeyId = metricsConfig.getAwsMetricsConfig().getAccessKeyId();
+    secretKey = getAwsSecretKey(metricsConfig.getAwsMetricsConfig().getSecretName());
     snsClientMaxConnections = metricsConfig.getAwsMetricsConfig().getSnsClientMaxConnections();
     if (!StringUtils.isNullOrEmpty(snsTopicOperations)
         && snsClientMaxConnections > 0
-        && !StringUtils.isNullOrEmpty(awsAccessKeyId)
-        && !StringUtils.isNullOrEmpty(awsSecretKey)
+        && !StringUtils.isNullOrEmpty(accessKeyId)
+        && !StringUtils.isNullOrEmpty(secretKey)
         && !StringUtils.isNullOrEmpty(region)) {
       snsClient = initSnsClient();
     }
@@ -93,12 +98,12 @@ public class AwsMetricsPublisher extends AbstractMetricsPublisher {
                 new AWSCredentials() {
                   @Override
                   public String getAWSAccessKeyId() {
-                    return awsAccessKeyId;
+                    return accessKeyId;
                   }
 
                   @Override
                   public String getAWSSecretKey() {
-                    return awsSecretKey;
+                    return secretKey;
                   }
                 }))
         .build();
@@ -107,5 +112,23 @@ public class AwsMetricsPublisher extends AbstractMetricsPublisher {
   @Override
   public void publishMetric(String metricName, Object metricValue) {
     throw new UnsupportedOperationException();
+  }
+
+  private String getAwsSecretKey(String secretName) {
+    AWSSecretsManager client = AWSSecretsManagerClientBuilder.standard().withRegion(region).build();
+    GetSecretValueRequest getSecretValueRequest =
+        new GetSecretValueRequest().withSecretId(secretName);
+    GetSecretValueResult getSecretValueResult = null;
+    try {
+      getSecretValueResult = client.getSecretValue(getSecretValueRequest);
+    } catch (Exception e) {
+      logger.severe(String.format("Could not get secret %s from AWS.", secretName));
+      return null;
+    }
+    if (getSecretValueResult.getSecretString() != null) {
+      return getSecretValueResult.getSecretString();
+    } else {
+      return new String(Base64.getDecoder().decode(getSecretValueResult.getSecretBinary()).array());
+    }
   }
 }

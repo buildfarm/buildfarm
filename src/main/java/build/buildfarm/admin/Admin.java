@@ -12,13 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.common.metrics;
+package build.buildfarm.admin;
 
-import build.bazel.remote.execution.v2.RequestMetadata;
-import com.google.longrunning.Operation;
+import build.buildfarm.v1test.GetHostsResult;
 
-public interface MetricsPublisher {
-  void publishRequestMetadata(Operation operation, RequestMetadata requestMetadata);
+public interface Admin {
+  void terminateHost(String hostId);
 
-  void publishMetric(String metricName, Object metricValue);
+  void stopContainer(String hostId, String containerName);
+
+  GetHostsResult getHosts(String filter, int ageInMinutes, String status);
+
+  void scaleCluster(
+      String scaleGroupName,
+      Integer minHosts,
+      Integer maxHosts,
+      Integer targetHosts,
+      Integer targetReservedHostsPercent);
 }

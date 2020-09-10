@@ -185,9 +185,9 @@ message AwsMetricsConfig {
 
   int32 sns_client_max_connections = 2;
 
-  string aws_access_key_id = 3;
+  string access_key_id = 3;
 
-  string aws_secret_key = 4;
+  string secret_name = 4;
 
   string region = 5;
 }
