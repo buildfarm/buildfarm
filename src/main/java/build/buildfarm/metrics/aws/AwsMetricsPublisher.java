@@ -30,8 +30,11 @@ import com.amazonaws.services.sns.AmazonSNSAsyncClientBuilder;
 import com.amazonaws.services.sns.model.PublishRequest;
 import com.amazonaws.services.sns.model.PublishResult;
 import com.amazonaws.util.StringUtils;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.longrunning.Operation;
+import java.io.IOException;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -40,8 +43,8 @@ public class AwsMetricsPublisher extends AbstractMetricsPublisher {
   private static AmazonSNSAsync snsClient;
 
   private String snsTopicOperations;
-  private String accessKeyId;
-  private String secretKey;
+  private String accessKeyId = null;
+  private String secretKey = null;
   private String region;
   private int snsClientMaxConnections;
 
@@ -49,8 +52,7 @@ public class AwsMetricsPublisher extends AbstractMetricsPublisher {
     super(metricsConfig.getClusterId());
     snsTopicOperations = metricsConfig.getAwsMetricsConfig().getOperationsMetricsTopic();
     region = metricsConfig.getAwsMetricsConfig().getRegion();
-    accessKeyId = metricsConfig.getAwsMetricsConfig().getAccessKeyId();
-    secretKey = getAwsSecretKey(metricsConfig.getAwsMetricsConfig().getSecretName());
+    getAwsSecret(metricsConfig.getAwsMetricsConfig().getSecretName());
     snsClientMaxConnections = metricsConfig.getAwsMetricsConfig().getSnsClientMaxConnections();
     if (!StringUtils.isNullOrEmpty(snsTopicOperations)
         && snsClientMaxConnections > 0
@@ -114,7 +116,7 @@ public class AwsMetricsPublisher extends AbstractMetricsPublisher {
     throw new UnsupportedOperationException();
   }
 
-  private String getAwsSecretKey(String secretName) {
+  private void getAwsSecret(String secretName) {
     AWSSecretsManager client = AWSSecretsManagerClientBuilder.standard().withRegion(region).build();
     GetSecretValueRequest getSecretValueRequest =
         new GetSecretValueRequest().withSecretId(secretName);
@@ -123,12 +125,25 @@ public class AwsMetricsPublisher extends AbstractMetricsPublisher {
       getSecretValueResult = client.getSecretValue(getSecretValueRequest);
     } catch (Exception e) {
       logger.severe(String.format("Could not get secret %s from AWS.", secretName));
-      return null;
+      return;
     }
+    String secret = null;
     if (getSecretValueResult.getSecretString() != null) {
-      return getSecretValueResult.getSecretString();
+      secret = getSecretValueResult.getSecretString();
     } else {
-      return new String(Base64.getDecoder().decode(getSecretValueResult.getSecretBinary()).array());
+      secret =
+          new String(Base64.getDecoder().decode(getSecretValueResult.getSecretBinary()).array());
+    }
+
+    if (secret != null) {
+      try {
+        final ObjectMapper objectMapper = new ObjectMapper();
+        final HashMap<String, String> secretMap = objectMapper.readValue(secret, HashMap.class);
+        accessKeyId = secretMap.get("access_key");
+        secretKey = secretMap.get("secret_key");
+      } catch (IOException e) {
+        logger.severe(String.format("Could not parse secret %s from AWS", secretName));
+      }
     }
   }
 }
