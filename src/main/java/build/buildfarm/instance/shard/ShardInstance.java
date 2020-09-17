@@ -204,7 +204,7 @@ public class ShardInstance extends AbstractServerInstance {
         config.getMaxBlobSize(),
         config.getMaximumActionTimeout(),
         onStop,
-        WorkerStubs.create(digestUtil));
+        WorkerStubs.create(digestUtil, config.getGrpcTimeout()));
   }
 
   private static ShardBackplane createBackplane(ShardInstanceConfig config, String identifier)

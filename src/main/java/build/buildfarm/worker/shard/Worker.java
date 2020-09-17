@@ -286,7 +286,8 @@ public class Worker extends LoggingMain {
         break;
     }
 
-    workerStubs = WorkerStubs.create(digestUtil);
+    workerStubs =
+        WorkerStubs.create(digestUtil, config.getShardWorkerInstanceConfig().getGrpcTimeout());
 
     ExecutorService removeDirectoryService =
         newFixedThreadPool(
