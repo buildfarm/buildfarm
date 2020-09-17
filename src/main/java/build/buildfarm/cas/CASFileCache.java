@@ -91,6 +91,7 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -214,15 +215,15 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   public class CacheScanResults {
-    public List<Path> computeDirs;
-    public List<Path> deleteFiles;
-    public Map<Object, Entry> fileKeys;
+    public List<Path> computeDirs = Collections.emptyList();
+    public List<Path> deleteFiles = Collections.emptyList();
+    public Map<Object, Entry> fileKeys = Collections.emptyMap();
   }
 
   public class CacheLoadResults {
     public boolean loadSkipped;
-    public CacheScanResults scan;
-    public List<Path> invalidDirectories;
+    public CacheScanResults scan = new CacheScanResults();
+    public List<Path> invalidDirectories = Collections.emptyList();
   }
 
   public class StartupCacheResults {

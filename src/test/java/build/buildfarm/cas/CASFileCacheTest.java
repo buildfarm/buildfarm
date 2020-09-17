@@ -349,12 +349,6 @@ class CASFileCacheTest {
     assertThat(results.load.scan.deleteFiles.size()).isEqualTo(0);
     assertThat(results.load.scan.fileKeys.size()).isEqualTo(0);
     assertThat(results.load.invalidDirectories.size()).isEqualTo(0);
-
-    // explicitly not providing blob via blobs, this would throw if fetched from factory
-    //
-    // FIXME https://github.com/google/truth/issues/285 assertThat(Path) is ambiguous
-    assertThat(fileCache.put(blobDigest, false).equals(path)).isTrue();
-    assertThat(fileCache.put(blobDigest, true).equals(execPath)).isTrue();
   }
 
   @Test
