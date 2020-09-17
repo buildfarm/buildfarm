@@ -213,16 +213,21 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return size;
   }
 
-  class CacheScanResults {
+  public class CacheScanResults {
     public List<Path> computeDirs;
     public List<Path> deleteFiles;
     public Map<Object, Entry> fileKeys;
   }
 
-  class StartupCacheResults {
-    public Path cacheDirectory;
+  public class CacheLoadResults {
+    public boolean loadSkipped;
     public CacheScanResults scan;
     public List<Path> invalidDirectories;
+  }
+
+  public class StartupCacheResults {
+    public Path cacheDirectory;
+    public CacheLoadResults load;
     public Duration startupTime;
   }
 
@@ -1270,13 +1275,13 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
-  public StartupCacheResults start() throws IOException, InterruptedException {
-    return start(newDirectExecutorService());
+  public StartupCacheResults start(boolean skipLoad) throws IOException, InterruptedException {
+    return start(newDirectExecutorService(), skipLoad);
   }
 
-  public StartupCacheResults start(ExecutorService removeDirectoryService)
+  public StartupCacheResults start(ExecutorService removeDirectoryService, boolean skipLoad)
       throws IOException, InterruptedException {
-    return start(onPut, removeDirectoryService);
+    return start(onPut, removeDirectoryService, skipLoad);
   }
 
   /**
@@ -1284,33 +1289,35 @@ public abstract class CASFileCache implements ContentAddressableStorage {
    * exist under the root into the storage map. This call will create the root if it does not exist,
    * and will scale in cost with the number of files already present.
    */
-  public StartupCacheResults start(Consumer<Digest> onPut, ExecutorService removeDirectoryService)
+  public StartupCacheResults start(
+      Consumer<Digest> onPut, ExecutorService removeDirectoryService, boolean skipLoad)
       throws IOException, InterruptedException {
 
     // start delegate if it exists
     if (delegate != null && delegate instanceof CASFileCache) {
       CASFileCache fileCacheDelegate = (CASFileCache) delegate;
-      fileCacheDelegate.start(onPut, removeDirectoryService);
+      fileCacheDelegate.start(onPut, removeDirectoryService, skipLoad);
     }
 
     logger.log(Level.INFO, "Initializing cache at: " + root);
     Instant startTime = Instant.now();
 
-    Files.createDirectories(root);
+    CacheLoadResults loadResults = new CacheLoadResults();
+    loadResults.loadSkipped = skipLoad;
 
-    FileStore fileStore = Files.getFileStore(root);
+    // Load the cache
+    if (!skipLoad) {
+      Files.createDirectories(root);
+      FileStore fileStore = Files.getFileStore(root);
+      loadResults = loadCache(fileStore, removeDirectoryService);
+    }
 
-    // Phase 1: Scan
-    // build scan cache results by analyzing each file on the root.
-    CacheScanResults cacheScanResults = scanRoot();
-    LogCacheScanResults(cacheScanResults);
-    deleteInvalidFileContent(cacheScanResults.deleteFiles, removeDirectoryService);
+    // Skip loading the cache and ensure its empty
+    else {
 
-    // Phase 2: Compute
-    // recursively construct all directory structures.
-    List<Path> invalidDirectories = computeDirectories(cacheScanResults, fileStore);
-    LogComputeDirectoriesResults(invalidDirectories);
-    deleteInvalidFileContent(invalidDirectories, removeDirectoryService);
+      Directories.remove(root, removeDirectoryService);
+      Files.createDirectories(root);
+    }
 
     logger.log(Level.INFO, "Creating Index");
     directoriesIndex.start();
@@ -1324,10 +1331,29 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     // return information about the cache startup.
     StartupCacheResults startupResults = new StartupCacheResults();
     startupResults.cacheDirectory = root;
-    startupResults.scan = cacheScanResults;
-    startupResults.invalidDirectories = invalidDirectories;
+    startupResults.load = loadResults;
     startupResults.startupTime = startupTime;
     return startupResults;
+  }
+
+  private CacheLoadResults loadCache(FileStore fileStore, ExecutorService removeDirectoryService)
+      throws IOException, InterruptedException {
+
+    CacheLoadResults results = new CacheLoadResults();
+
+    // Phase 1: Scan
+    // build scan cache results by analyzing each file on the root.
+    results.scan = scanRoot();
+    LogCacheScanResults(results.scan);
+    deleteInvalidFileContent(results.scan.deleteFiles, removeDirectoryService);
+
+    // Phase 2: Compute
+    // recursively construct all directory structures.
+    results.invalidDirectories = computeDirectories(results.scan, fileStore);
+    LogComputeDirectoriesResults(results.invalidDirectories);
+    deleteInvalidFileContent(results.invalidDirectories, removeDirectoryService);
+
+    return results;
   }
 
   private void deleteInvalidFileContent(List<Path> files, ExecutorService removeDirectoryService) {

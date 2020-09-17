@@ -383,7 +383,7 @@ public class Worker extends LoggingMain {
   public void start() throws InterruptedException {
     try {
       Files.createDirectories(root);
-      fileCache.start();
+      fileCache.start(false);
     } catch (IOException e) {
       logger.log(SEVERE, "error starting file cache", e);
       return;
