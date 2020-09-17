@@ -329,7 +329,7 @@ class CASFileCacheTest {
     assertThat(fileCache.put(blobDigest, false).equals(path)).isTrue();
     assertThat(fileCache.put(blobDigest, true).equals(execPath)).isTrue();
   }
-  
+
   @Test
   public void startSkipsLoadingExistingBlob() throws IOException, InterruptedException {
     ByteString blob = ByteString.copyFromUtf8("blob");
