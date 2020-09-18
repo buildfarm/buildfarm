@@ -28,22 +28,33 @@ public class Time {
 
   ///
   /// @brief   Convert a protobuf duration to a grpc deadline.
-  /// @details Deadline will be represented in seconds.
+  /// @details Deadline will have nanosecond precision.
   /// @param   duration A protobuf duration.
   /// @return  A converted grpc deadline.
   /// @note    Suggested return identifier: deadline.
   ///
   public static Deadline toDeadline(Duration duration) {
-    return Deadline.after(duration.getSeconds(), TimeUnit.SECONDS);
+    return Deadline.after(
+        secondsToNanoseconds(duration.getSeconds()) + duration.getNanos(), TimeUnit.NANOSECONDS);
   }
   ///
   /// @brief   Convert a grpc deadline to a protobuf duration.
-  /// @details Duration will be represented in seconds.
+  /// @details Duration will have nanosecond precision.
   /// @param   deadline A converted grpc deadline.
   /// @return  A protobuf duration.
   /// @note    Suggested return identifier: duration.
   ///
   public static Duration toDuration(Deadline deadline) {
-    return Durations.fromSeconds(deadline.timeRemaining(TimeUnit.SECONDS));
+    return Durations.fromNanos(deadline.timeRemaining(TimeUnit.NANOSECONDS));
+  }
+  ///
+  /// @brief   Seconds to nanoseconds.
+  /// @details Seconds to nanoseconds.
+  /// @param   seconds Seconds to convert.
+  /// @return  Nanoseconds converted from seconds.
+  /// @note    Suggested return identifier: nanoseconds.
+  ///
+  public static long secondsToNanoseconds(long seconds) {
+    return seconds * 1000000000;
   }
 }
