@@ -95,7 +95,7 @@ public final class ContentAddressableStorages {
           }
         };
     try {
-      cas.start();
+      cas.start(false);
     } catch (IOException | InterruptedException e) {
       throw new RuntimeException("error starting filesystem cas", e);
     }

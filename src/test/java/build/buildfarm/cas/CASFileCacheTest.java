@@ -273,13 +273,14 @@ class CASFileCacheTest {
 
     // start the file cache with no files.
     // the cache should start without any initial files in the cache.
-    StartupCacheResults results = fileCache.start();
+    StartupCacheResults results = fileCache.start(false);
 
     // check the startuo results to ensure no files were processed
-    assertThat(results.scan.computeDirs.size()).isEqualTo(0);
-    assertThat(results.scan.deleteFiles.size()).isEqualTo(0);
-    assertThat(results.scan.fileKeys.size()).isEqualTo(0);
-    assertThat(results.invalidDirectories.size()).isEqualTo(0);
+    assertThat(results.load.loadSkipped).isFalse();
+    assertThat(results.load.scan.computeDirs.size()).isEqualTo(0);
+    assertThat(results.load.scan.deleteFiles.size()).isEqualTo(0);
+    assertThat(results.load.scan.fileKeys.size()).isEqualTo(0);
+    assertThat(results.load.invalidDirectories.size()).isEqualTo(0);
   }
 
   @Test
@@ -292,13 +293,14 @@ class CASFileCacheTest {
 
     // start the CAS with a file whose name indicates its a directory
     // the cache should start and consider it a compute directory
-    StartupCacheResults results = fileCache.start();
+    StartupCacheResults results = fileCache.start(false);
 
     // check the startup results to ensure no files were processed
-    assertThat(results.scan.computeDirs.size()).isEqualTo(0);
-    assertThat(results.scan.deleteFiles.size()).isEqualTo(1);
-    assertThat(results.scan.fileKeys.size()).isEqualTo(0);
-    assertThat(results.invalidDirectories.size()).isEqualTo(0);
+    assertThat(results.load.loadSkipped).isFalse();
+    assertThat(results.load.scan.computeDirs.size()).isEqualTo(0);
+    assertThat(results.load.scan.deleteFiles.size()).isEqualTo(1);
+    assertThat(results.load.scan.fileKeys.size()).isEqualTo(0);
+    assertThat(results.load.invalidDirectories.size()).isEqualTo(0);
   }
 
   @Test
@@ -312,19 +314,41 @@ class CASFileCacheTest {
     Files.write(execPath, blob.toByteArray());
     EvenMoreFiles.setReadOnlyPerms(execPath, true);
 
-    StartupCacheResults results = fileCache.start();
+    StartupCacheResults results = fileCache.start(false);
 
     // check the startup results to ensure our two files were processed
-    assertThat(results.scan.computeDirs.size()).isEqualTo(0);
-    assertThat(results.scan.deleteFiles.size()).isEqualTo(0);
-    assertThat(results.scan.fileKeys.size()).isEqualTo(2);
-    assertThat(results.invalidDirectories.size()).isEqualTo(0);
+    assertThat(results.load.loadSkipped).isFalse();
+    assertThat(results.load.scan.computeDirs.size()).isEqualTo(0);
+    assertThat(results.load.scan.deleteFiles.size()).isEqualTo(0);
+    assertThat(results.load.scan.fileKeys.size()).isEqualTo(2);
+    assertThat(results.load.invalidDirectories.size()).isEqualTo(0);
 
     // explicitly not providing blob via blobs, this would throw if fetched from factory
     //
     // FIXME https://github.com/google/truth/issues/285 assertThat(Path) is ambiguous
     assertThat(fileCache.put(blobDigest, false).equals(path)).isTrue();
     assertThat(fileCache.put(blobDigest, true).equals(execPath)).isTrue();
+  }
+
+  @Test
+  public void startSkipsLoadingExistingBlob() throws IOException, InterruptedException {
+    ByteString blob = ByteString.copyFromUtf8("blob");
+    Digest blobDigest = DIGEST_UTIL.compute(blob);
+    Path path = root.resolve(fileCache.getKey(blobDigest, false));
+    Path execPath = root.resolve(fileCache.getKey(blobDigest, true));
+    Files.write(path, blob.toByteArray());
+    EvenMoreFiles.setReadOnlyPerms(path, false);
+    Files.write(execPath, blob.toByteArray());
+    EvenMoreFiles.setReadOnlyPerms(execPath, true);
+
+    StartupCacheResults results = fileCache.start(true);
+
+    // check the startup results to ensure our two files were processed
+    assertThat(results.load.loadSkipped).isTrue();
+    assertThat(results.load.scan.computeDirs.size()).isEqualTo(0);
+    assertThat(results.load.scan.deleteFiles.size()).isEqualTo(0);
+    assertThat(results.load.scan.fileKeys.size()).isEqualTo(0);
+    assertThat(results.load.invalidDirectories.size()).isEqualTo(0);
   }
 
   @Test
@@ -350,7 +374,7 @@ class CASFileCacheTest {
     Files.write(
         invalidExec, validBlob.toByteArray()); // content would match but for invalid exec field
 
-    fileCache.start();
+    fileCache.start(false);
 
     assertThat(!Files.exists(tooFewComponents)).isTrue();
     assertThat(!Files.exists(tooManyComponents)).isTrue();
