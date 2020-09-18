@@ -758,7 +758,7 @@ class Cat {
       throws Exception {
     ManagedChannel channel = createChannel(host);
     Instance instance =
-        new StubInstance(instanceName, "bf-cat", digestUtil, channel, 10, TimeUnit.SECONDS);
+        new StubInstance(instanceName, "bf-cat", digestUtil, channel, Durations.fromSeconds(10));
     try {
       instanceMain(instance, type, args);
     } finally {
