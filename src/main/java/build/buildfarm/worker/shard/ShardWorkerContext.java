@@ -40,6 +40,7 @@ import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.Poller;
 import build.buildfarm.common.ShardBackplane;
+import build.buildfarm.common.Size;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.Retrier.Backoff;
@@ -798,13 +799,13 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
-  public int getStandardOutputLimit() {
-    return 100 * 1024 * 1024; // 100 MiB
+  public long getStandardOutputLimit() {
+    return Size.mbToBytes(100);
   }
 
   @Override
-  public int getStandardErrorLimit() {
-    return 100 * 1024 * 1024; // 100 MiB
+  public long getStandardErrorLimit() {
+    return Size.mbToBytes(100);
   }
 
   @Override

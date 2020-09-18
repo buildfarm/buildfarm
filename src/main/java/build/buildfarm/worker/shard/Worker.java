@@ -37,6 +37,7 @@ import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.LoggingMain;
 import build.buildfarm.common.ShardBackplane;
+import build.buildfarm.common.Size;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.Instance;
@@ -384,10 +385,6 @@ public class Worker extends LoggingMain {
     logger.log(INFO, String.format("%s initialized", identifier));
   }
 
-  public static int KBtoBytes(int sizeKb) {
-    return sizeKb * 1024;
-  }
-
   private static Duration GetGrpcTimeout(ShardWorkerConfig config) {
 
     // return the configured
@@ -411,7 +408,7 @@ public class Worker extends LoggingMain {
       throws IOException {
 
     SettableFuture<Long> writtenFuture = SettableFuture.create();
-    int chunkSizeBytes = KBtoBytes(128);
+    int chunkSizeBytes = (int) Size.kbToBytes(128);
 
     // The following callback is performed each time the write stream is ready.
     // For each callback we only transfer a small part of the input stream in order to avoid

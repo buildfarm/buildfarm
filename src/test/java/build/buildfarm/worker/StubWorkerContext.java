@@ -181,12 +181,12 @@ class StubWorkerContext implements WorkerContext {
   }
 
   @Override
-  public int getStandardOutputLimit() {
+  public long getStandardOutputLimit() {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public int getStandardErrorLimit() {
+  public long getStandardErrorLimit() {
     throw new UnsupportedOperationException();
   }
 
