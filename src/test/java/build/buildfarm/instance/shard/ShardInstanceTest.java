@@ -330,7 +330,7 @@ public class ShardInstanceTest {
             .setSkipCacheLookup(true)
             .build();
 
-    when(mockBackplane.validQueueProperties(Matchers.anyList())).thenReturn(false);
+    when(mockBackplane.propertiesEligibleForQueue(Matchers.anyList())).thenReturn(false);
 
     when(mockBackplane.canQueue()).thenReturn(true);
 
@@ -458,7 +458,7 @@ public class ShardInstanceTest {
             .setSkipCacheLookup(true)
             .build();
 
-    when(mockBackplane.validQueueProperties(Matchers.anyList())).thenReturn(true);
+    when(mockBackplane.propertiesEligibleForQueue(Matchers.anyList())).thenReturn(true);
 
     when(mockBackplane.canQueue()).thenReturn(true);
 
@@ -525,7 +525,7 @@ public class ShardInstanceTest {
             .setSkipCacheLookup(true)
             .build();
 
-    when(mockBackplane.validQueueProperties(Matchers.anyList())).thenReturn(true);
+    when(mockBackplane.propertiesEligibleForQueue(Matchers.anyList())).thenReturn(true);
 
     when(mockBackplane.canQueue()).thenReturn(true);
 
@@ -589,7 +589,7 @@ public class ShardInstanceTest {
             .setActionDigest(actionKey.getDigest())
             .build();
 
-    when(mockBackplane.validQueueProperties(Matchers.anyList())).thenReturn(true);
+    when(mockBackplane.propertiesEligibleForQueue(Matchers.anyList())).thenReturn(true);
 
     when(mockBackplane.canQueue()).thenReturn(true);
 
@@ -706,7 +706,7 @@ public class ShardInstanceTest {
     Digest missingDirectoryDigest =
         Digest.newBuilder().setHash("missing-directory").setSizeBytes(1).build();
 
-    when(mockBackplane.validQueueProperties(Matchers.anyList())).thenReturn(true);
+    when(mockBackplane.propertiesEligibleForQueue(Matchers.anyList())).thenReturn(true);
 
     when(mockBackplane.getOperation(eq(operationName)))
         .thenReturn(

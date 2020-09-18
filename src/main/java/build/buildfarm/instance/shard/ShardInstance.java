@@ -1432,7 +1432,7 @@ public class ShardInstance extends AbstractServerInstance {
 
     // check that the platform properties correspond to valid provisions for the OperationQeueue.
     // if the operation is eligible to be put anywhere in the OperationQueue, it passes validation.
-    boolean validForOperationQueue = backplane.validQueueProperties(platform.getPropertiesList());
+    boolean validForOperationQueue = backplane.propertiesEligibleForQueue(platform.getPropertiesList());
     if (!validForOperationQueue) {
       preconditionFailure
           .addViolationsBuilder()
