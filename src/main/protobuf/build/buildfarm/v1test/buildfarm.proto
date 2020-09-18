@@ -375,6 +375,9 @@ message ShardInstanceConfig {
   // a maximum threshold for an action's specified timeout,
   // beyond which an action will be rejected for execution
   google.protobuf.Duration maximum_action_timeout = 7;
+  
+  // default timeouts on grpc requests made by instances
+  google.protobuf.Duration grpc_timeout = 8;
 }
 
 message ShardWorkerInstanceConfig {
@@ -395,6 +398,9 @@ message ShardWorkerInstanceConfig {
 
   // page size for getTree request
   uint32 tree_page_size = 12;
+  
+  // default timeouts on grpc requests made by instances
+  google.protobuf.Duration grpc_timeout = 13;
 }
 
 message ShardWorkerConfig {

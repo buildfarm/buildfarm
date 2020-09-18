@@ -40,6 +40,7 @@ import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static java.util.logging.Level.INFO;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
@@ -204,7 +205,26 @@ public class ShardInstance extends AbstractServerInstance {
         config.getMaxBlobSize(),
         config.getMaximumActionTimeout(),
         onStop,
-        WorkerStubs.create(digestUtil));
+        WorkerStubs.create(digestUtil, config.getGrpcTimeout()));
+  }
+
+  private static Duration GetGrpcTimeout(ShardInstanceConfig config) {
+
+    // return the configured
+    if (config.hasGrpcTimeout()) {
+      Duration configured = config.getGrpcTimeout();
+      if (configured.getSeconds() > 0 || configured.getNanos() > 0) {
+        return configured;
+      }
+    }
+
+    // return a default
+    Duration defaultDuration = Durations.fromSeconds(120);
+    logger.log(
+        INFO,
+        String.format(
+            "grpc timeout not configured.  Setting to: " + defaultDuration.getSeconds() + "s"));
+    return defaultDuration;
   }
 
   private static ShardBackplane createBackplane(ShardInstanceConfig config, String identifier)

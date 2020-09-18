@@ -71,7 +71,9 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.devtools.common.options.OptionsParser;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
+import com.google.protobuf.Duration;
 import com.google.protobuf.TextFormat;
+import com.google.protobuf.util.Durations;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.Status;
@@ -286,7 +288,7 @@ public class Worker extends LoggingMain {
         break;
     }
 
-    workerStubs = WorkerStubs.create(digestUtil);
+    workerStubs = WorkerStubs.create(digestUtil, GetGrpcTimeout(config));
 
     ExecutorService removeDirectoryService =
         newFixedThreadPool(
@@ -384,6 +386,25 @@ public class Worker extends LoggingMain {
 
   public static int KBtoBytes(int sizeKb) {
     return sizeKb * 1024;
+  }
+
+  private static Duration GetGrpcTimeout(ShardWorkerConfig config) {
+
+    // return the configured
+    if (config.getShardWorkerInstanceConfig().hasGrpcTimeout()) {
+      Duration configured = config.getShardWorkerInstanceConfig().getGrpcTimeout();
+      if (configured.getSeconds() > 0 || configured.getNanos() > 0) {
+        return configured;
+      }
+    }
+
+    // return a default
+    Duration defaultDuration = Durations.fromSeconds(120);
+    logger.log(
+        INFO,
+        String.format(
+            "grpc timeout not configured.  Setting to: " + defaultDuration.getSeconds() + "s"));
+    return defaultDuration;
   }
 
   private ListenableFuture<Long> streamIntoWriteFuture(InputStream in, Write write, Digest digest)
