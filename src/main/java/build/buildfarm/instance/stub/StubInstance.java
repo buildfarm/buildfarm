@@ -58,6 +58,7 @@ import build.bazel.remote.execution.v2.WaitExecutionRequest;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
+import build.buildfarm.common.Time;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.ByteStreamHelper;
@@ -101,6 +102,8 @@ import com.google.longrunning.Operation;
 import com.google.longrunning.OperationsGrpc;
 import com.google.longrunning.OperationsGrpc.OperationsBlockingStub;
 import com.google.protobuf.ByteString;
+import com.google.protobuf.Duration;
+import com.google.protobuf.util.Durations;
 import com.google.rpc.Code;
 import io.grpc.Channel;
 import io.grpc.ManagedChannel;
@@ -134,20 +137,19 @@ public class StubInstance implements Instance {
   private final String identifier;
   private final DigestUtil digestUtil;
   private final ManagedChannel channel;
-  private final long deadlineAfter;
-  private final TimeUnit deadlineAfterUnits;
+  private final Duration grpcTimeout;
   private final Retrier retrier;
   private final @Nullable ListeningScheduledExecutorService retryService;
   private boolean isStopped = false;
   private final int maxBatchUpdateBlobsSize = 3 * 1024 * 1024;
 
   public StubInstance(String name, DigestUtil digestUtil, ManagedChannel channel) {
-    this(name, "no-identifier", digestUtil, channel, DEFAULT_DEADLINE_DAYS, TimeUnit.DAYS);
+    this(name, "no-identifier", digestUtil, channel, Durations.fromDays(DEFAULT_DEADLINE_DAYS));
   }
 
   public StubInstance(
       String name, String identifier, DigestUtil digestUtil, ManagedChannel channel) {
-    this(name, identifier, digestUtil, channel, DEFAULT_DEADLINE_DAYS, TimeUnit.DAYS);
+    this(name, identifier, digestUtil, channel, Durations.fromDays(DEFAULT_DEADLINE_DAYS));
   }
 
   public StubInstance(
@@ -155,17 +157,8 @@ public class StubInstance implements Instance {
       String identifier,
       DigestUtil digestUtil,
       ManagedChannel channel,
-      long deadlineAfter,
-      TimeUnit deadlineAfterUnits) {
-    this(
-        name,
-        identifier,
-        digestUtil,
-        channel,
-        deadlineAfter,
-        deadlineAfterUnits,
-        NO_RETRIES,
-        /* retryService=*/ null);
+      Duration grpcTimeout) {
+    this(name, identifier, digestUtil, channel, grpcTimeout, NO_RETRIES, /* retryService=*/ null);
   }
 
   public StubInstance(
@@ -173,16 +166,14 @@ public class StubInstance implements Instance {
       String identifier,
       DigestUtil digestUtil,
       ManagedChannel channel,
-      long deadlineAfter,
-      TimeUnit deadlineAfterUnits,
+      Duration grpcTimeout,
       Retrier retrier,
       @Nullable ListeningScheduledExecutorService retryService) {
     this.name = name;
     this.identifier = identifier;
     this.digestUtil = digestUtil;
     this.channel = channel;
-    this.deadlineAfter = deadlineAfter;
-    this.deadlineAfterUnits = deadlineAfterUnits;
+    this.grpcTimeout = grpcTimeout;
     this.retrier = retrier;
     this.retryService = retryService;
   }
@@ -288,8 +279,8 @@ public class StubInstance implements Instance {
 
   private <T extends AbstractStub<T>> T deadlined(Supplier<T> getter) {
     T stub = getter.get();
-    if (deadlineAfter > 0) {
-      stub = stub.withDeadlineAfter(deadlineAfter, deadlineAfterUnits);
+    if (grpcTimeout.getSeconds() > 0) {
+      stub = stub.withDeadline(Time.toDeadline(grpcTimeout));
     }
     return stub;
   }

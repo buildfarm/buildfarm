@@ -29,7 +29,6 @@ import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
 import com.google.protobuf.Duration;
-import com.google.protobuf.util.Durations;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
@@ -63,8 +62,7 @@ public class WorkerStubs {
         worker,
         digestUtil,
         createChannel(worker),
-        Durations.toSeconds(timeout),
-        TimeUnit.SECONDS,
+        timeout,
         newStubRetrier(),
         newStubRetryService());
   }

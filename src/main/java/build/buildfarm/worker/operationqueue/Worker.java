@@ -85,6 +85,7 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.TextFormat;
+import com.google.protobuf.util.Durations;
 import io.grpc.Channel;
 import io.grpc.Deadline;
 import io.grpc.ManagedChannel;
@@ -192,8 +193,7 @@ public class Worker extends LoggingMain {
         /* identifier=*/ "",
         digestUtil,
         channel,
-        deadlineAfterSeconds,
-        SECONDS,
+        Durations.fromSeconds(deadlineAfterSeconds),
         retrier,
         retryScheduler);
   }
