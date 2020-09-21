@@ -113,7 +113,7 @@ public class ResourceDecider {
     // not supported
     limits.network.restrict = false;
 
-    // supported
+    // supported elsewhere
     limits.time.timeout_s = 10 * 60;
 
     return limits;
