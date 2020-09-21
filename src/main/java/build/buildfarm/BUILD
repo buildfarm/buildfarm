@@ -480,6 +480,7 @@ java_library(
         ":stub-instance",
         ":worker",
         ":worker-cgroup",
+        ":worker-resources",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
         "//src/main/java/build/buildfarm:common-cache",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
@@ -530,6 +531,15 @@ java_library(
     deps = [
         ":worker",
         "@maven//:com_google_code_findbugs_jsr305",
+    ],
+)
+
+java_library(
+    name = "worker-resources",
+    srcs = glob(["worker/resources/*.java"]),
+    deps = [
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "@maven//:com_google_guava_guava",
     ],
 )
 

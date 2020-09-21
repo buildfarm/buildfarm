@@ -37,32 +37,4 @@ public class Utils {
       throw new IllegalStateException(e);
     }
   }
-
-  static int commandCoreValue(boolean onlyMulticoreTests, String name, Command command) {
-    int cores = -1;
-    for (Property property : command.getPlatform().getPropertiesList()) {
-      if (property.getName().equals(name)) {
-        cores = Integer.parseInt(property.getValue());
-        if (cores > 1 && onlyMulticoreTests && !commandIsTest(command)) {
-          cores = 1;
-        }
-      }
-    }
-    return cores;
-  }
-
-  public static int commandMaxCores(boolean onlyMulticoreTests, Command command) {
-    return commandCoreValue(onlyMulticoreTests, "max-cores", command);
-  }
-
-  public static int commandMinCores(boolean onlyMulticoreTests, Command command) {
-    return commandCoreValue(onlyMulticoreTests, "min-cores", command);
-  }
-
-  static boolean commandIsTest(Command command) {
-    // only tests are setting this currently - other mechanisms are unreliable
-    return Iterables.any(
-        command.getEnvironmentVariablesList(),
-        (envVar) -> envVar.getName().equals("XML_OUTPUT_FILE"));
-  }
 }
