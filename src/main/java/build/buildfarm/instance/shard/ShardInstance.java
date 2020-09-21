@@ -205,10 +205,10 @@ public class ShardInstance extends AbstractServerInstance {
         config.getMaxBlobSize(),
         config.getMaximumActionTimeout(),
         onStop,
-        WorkerStubs.create(digestUtil, config.getGrpcTimeout()));
+        WorkerStubs.create(digestUtil, getGrpcTimeout(config)));
   }
 
-  private static Duration GetGrpcTimeout(ShardInstanceConfig config) {
+  private static Duration getGrpcTimeout(ShardInstanceConfig config) {
 
     // return the configured
     if (config.hasGrpcTimeout()) {
@@ -219,7 +219,7 @@ public class ShardInstance extends AbstractServerInstance {
     }
 
     // return a default
-    Duration defaultDuration = Durations.fromSeconds(120);
+    Duration defaultDuration = Durations.fromSeconds(60);
     logger.log(
         INFO,
         String.format(
