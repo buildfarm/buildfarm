@@ -14,7 +14,6 @@
 
 package build.buildfarm.worker;
 
-
 ///
 /// @class   GpuLimits
 /// @brief   GPU resource limitations imposed on specific actions.

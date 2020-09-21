@@ -14,7 +14,6 @@
 
 package build.buildfarm.worker;
 
-
 ///
 /// @class   DiskLimits
 /// @brief   Disk resource limitations imposed on specific actions.

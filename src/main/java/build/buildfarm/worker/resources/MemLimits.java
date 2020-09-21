@@ -14,7 +14,6 @@
 
 package build.buildfarm.worker;
 
-
 ///
 /// @class   MemLimits
 /// @brief   Memory resource limitations imposed on specific actions.

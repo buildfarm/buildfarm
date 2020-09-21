@@ -14,7 +14,6 @@
 
 package build.buildfarm.worker;
 
-
 ///
 /// @class   ResourceLimits
 /// @brief   Resource limitations imposed on specific actions.

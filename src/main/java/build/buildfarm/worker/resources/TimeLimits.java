@@ -14,7 +14,6 @@
 
 package build.buildfarm.worker;
 
-
 ///
 /// @class   TimeLimits
 /// @brief   Time limitations imposed on specific actions.

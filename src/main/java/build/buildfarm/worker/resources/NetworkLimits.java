@@ -14,7 +14,6 @@
 
 package build.buildfarm.worker;
 
-
 ///
 /// @class   NetworkLimits
 /// @brief   Network limitations imposed on specific actions.

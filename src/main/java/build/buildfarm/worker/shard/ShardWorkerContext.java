@@ -51,13 +51,12 @@ import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.worker.ExecutionPolicies;
+import build.buildfarm.worker.ResourceDecider;
+import build.buildfarm.worker.ResourceLimits;
 import build.buildfarm.worker.RetryingMatchListener;
-import build.buildfarm.worker.Utils;
 import build.buildfarm.worker.WorkerContext;
 import build.buildfarm.worker.cgroup.Cpu;
 import build.buildfarm.worker.cgroup.Group;
-import build.buildfarm.worker.ResourceDecider;
-import build.buildfarm.worker.ResourceLimits;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
@@ -860,7 +859,7 @@ class ShardWorkerContext implements WorkerContext {
 
   @Override
   public int commandExecutionClaims(Command command) {
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command,onlyMulticoreTests);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, onlyMulticoreTests);
     return Math.min(limits.cpu.min, getExecuteStageWidth());
   }
 
@@ -868,7 +867,8 @@ class ShardWorkerContext implements WorkerContext {
   public IOResource limitExecution(
       String operationName, ImmutableList.Builder<String> arguments, Command command) {
     if (limitExecution) {
-      ResourceLimits limits = ResourceDecider.decideResourceLimitations(command,onlyMulticoreTests);
+      ResourceLimits limits =
+          ResourceDecider.decideResourceLimitations(command, onlyMulticoreTests);
 
       return limitSpecifiedExecution(limits, operationName, arguments);
     }

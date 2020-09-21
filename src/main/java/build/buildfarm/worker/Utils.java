@@ -14,11 +14,8 @@
 
 package build.buildfarm.worker;
 
-import build.bazel.remote.execution.v2.Command;
-import build.bazel.remote.execution.v2.Platform.Property;
 import build.buildfarm.common.FileStatus;
 import build.buildfarm.common.IOUtils;
-import com.google.common.collect.Iterables;
 import java.io.IOException;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
