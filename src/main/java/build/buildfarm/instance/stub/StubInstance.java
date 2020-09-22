@@ -359,7 +359,10 @@ public class StubInstance implements Instance {
             .addAllBlobDigests(digests)
             .build();
     if (request.getSerializedSize() > 4 * 1024 * 1024) {
-      throw new IllegalStateException("FINDMISSINGBLOBS IS TOO LARGE");
+      throw new IllegalStateException(
+          String.format(
+              "FINDMISSINGBLOBS IS TOO LARGE: %d digests are required in one request!",
+              request.getBlobDigestsCount()));
     }
     return transform(
         deadlined(casFutureStub)
