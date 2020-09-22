@@ -181,7 +181,7 @@ public class IOUtils {
 
   private static NamedFileKey pathToNamedFileKey(Path path) throws IOException {
     return new NamedFileKey(
-        path.getFileName().toString(), getFileKey(path, statNullable(path, false)));
+        path.getFileName().toString(), getFileKey(path, statNullable(path, true)));
   }
 
   private static List<NamedFileKey> listNIOdirentSorted(Path path) throws IOException {
