@@ -59,7 +59,8 @@ public class IOUtilsTest {
     Object secondKey = files.get(1).fileKey();
     
     System.out.println(firstKey);
-    System.out.println(secondKey);  
+    System.out.println(secondKey);
+    Directories.remove(root);
     assertThat(firstKey).isEqualTo(secondKey);
   }
 
@@ -78,7 +79,8 @@ public class IOUtilsTest {
     Object firstKey = files.get(0).fileKey();
     Object secondKey = files.get(1).fileKey();
     System.out.println(firstKey);
-    System.out.println(secondKey);  
+    System.out.println(secondKey);
+    Directories.remove(root); 
     assertThat(firstKey).isNotEqualTo(secondKey);
   }
 }
