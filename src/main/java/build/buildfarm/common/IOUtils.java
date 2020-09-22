@@ -174,7 +174,7 @@ public class IOUtils {
   public static Object getFileKey(Path path, @Nullable FileStatus stat) throws IOException {
     Object fileKey = stat == null ? null : stat.fileKey();
     if (fileKey == null) {
-      fileKey = Files.readAttributes(path, BasicFileAttributes.class);
+      fileKey = Files.readAttributes(path, BasicFileAttributes.class).fileKey();
     }
     return fileKey;
   }
@@ -269,7 +269,7 @@ public class IOUtils {
               String inode = keyStr.substring(keyStr.indexOf("ino=") + 4, keyStr.indexOf(")"));
               return Long.parseLong(inode);
             } catch (Exception e) {
-              return attributes.fileKey();
+              return attributes.fileKey().toString();
             }
           }
 

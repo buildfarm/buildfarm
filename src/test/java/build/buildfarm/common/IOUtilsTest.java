@@ -57,10 +57,7 @@ public class IOUtilsTest {
     assertThat(files.size()).isEqualTo(2);
     Object firstKey = files.get(0).fileKey();
     Object secondKey = files.get(1).fileKey();
-
-    System.out.println(firstKey);
-    System.out.println(secondKey);
-    // assertThat(firstKey).isEqualTo(secondKey);
+    assertThat(firstKey).isEqualTo(secondKey);
   }
 
   @Test
@@ -77,8 +74,6 @@ public class IOUtilsTest {
     assertThat(files.size()).isEqualTo(2);
     Object firstKey = files.get(0).fileKey();
     Object secondKey = files.get(1).fileKey();
-    System.out.println(firstKey);
-    System.out.println(secondKey);
     assertThat(firstKey).isNotEqualTo(secondKey);
   }
 }
