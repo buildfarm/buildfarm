@@ -18,6 +18,9 @@ import static com.google.common.truth.Truth.assertThat;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static org.junit.Assert.fail;
 
+import com.google.longrunning.Operation;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.logging.Logger;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -28,8 +31,8 @@ public class SuperscalarPipelineStageTest {
   private static final Logger logger = Logger.getLogger(PipelineStageTest.class.getName());
 
   static class AbstractSuperscalarPipelineStage extends SuperscalarPipelineStage {
-    public AbstractSuperscalarPipelineStage(String name, int width) {
-      this(name, null, null, null, width);
+    public AbstractSuperscalarPipelineStage(String name, PipelineStage output, int width) {
+      this(name, null, output, null, width);
     }
 
     public AbstractSuperscalarPipelineStage(
@@ -52,12 +55,17 @@ public class SuperscalarPipelineStageTest {
     }
 
     @Override
-    OperationContext take() {
+    OperationContext take() throws InterruptedException {
       throw new UnsupportedOperationException();
     }
 
     @Override
     protected void interruptAll() {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    protected int claimsRequired(OperationContext operationContext) {
       throw new UnsupportedOperationException();
     }
 
@@ -69,10 +77,10 @@ public class SuperscalarPipelineStageTest {
   @Test
   public void interruptedClaimReleasesPartial() throws InterruptedException {
     AbstractSuperscalarPipelineStage stage =
-        new AbstractSuperscalarPipelineStage("too-narrow", /* width=*/ 3) {
+        new AbstractSuperscalarPipelineStage("too-narrow", /* output=*/ null, /* width=*/ 3) {
           @Override
-          public boolean claim(OperationContext operationContext) throws InterruptedException {
-            return claim(5);
+          protected int claimsRequired(OperationContext operationContext) {
+            return 5;
           }
         };
 
@@ -101,6 +109,38 @@ public class SuperscalarPipelineStageTest {
     } finally {
       interruptor.join();
       assertThat(stage.isClaimed()).isFalse();
+    }
+  }
+
+  @Test
+  public void takeReleasesQueueClaims() throws InterruptedException {
+    OperationContext context =
+        OperationContext.newBuilder()
+            .setOperation(Operation.newBuilder().setName("operation-in-queue").build())
+            .build();
+    BlockingQueue<OperationContext> queue = new ArrayBlockingQueue<>(1);
+    PipelineStage output = new PipelineStageTest.StubPipelineStage("unclosed-sink");
+    PipelineStage stage =
+        new AbstractSuperscalarPipelineStage("queue-claimed", output, /* width=*/ 3) {
+          @Override
+          protected int claimsRequired(OperationContext operationContext) {
+            return 2;
+          }
+
+          @Override
+          public OperationContext take() throws InterruptedException {
+            return takeOrDrain(queue);
+          }
+        };
+    stage.claim(context);
+    queue.put(context);
+
+    stage.close();
+    try {
+      stage.take();
+      fail("should not get here");
+    } catch (InterruptedException e) {
+      // ignore
     }
   }
 }

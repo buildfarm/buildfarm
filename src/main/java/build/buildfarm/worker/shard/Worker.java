@@ -39,7 +39,6 @@ import build.buildfarm.common.LoggingMain;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.io.FeedbackOutputStream;
-import build.buildfarm.instance.ExcessiveWriteSizeException;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.RedisShardBackplane;
 import build.buildfarm.instance.shard.RemoteInputStreamFactory;
@@ -61,6 +60,7 @@ import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.ReportResultStage;
 import com.google.common.base.Strings;
 import com.google.common.base.Suppliers;
+import com.google.common.base.Throwables;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
@@ -71,7 +71,9 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.devtools.common.options.OptionsParser;
 import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
+import com.google.protobuf.Duration;
 import com.google.protobuf.TextFormat;
+import com.google.protobuf.util.Durations;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.Status;
@@ -182,7 +184,7 @@ public class Worker extends LoggingMain {
       Instance casMember = workerStub(workerName);
       Write write = getCasMemberWrite(digest, workerName);
 
-      streamIntoWriteFuture(in, write, digest.getSizeBytes()).get();
+      streamIntoWriteFuture(in, write, digest).get();
     }
 
     private Write getCasMemberWrite(Digest digest, String workerName)
@@ -190,13 +192,8 @@ public class Worker extends LoggingMain {
 
       Instance casMember = workerStub(workerName);
 
-      try {
-        Write write =
-            casMember.getBlobWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
-        return write;
-      } catch (ExcessiveWriteSizeException e) {
-        throw new IOException("unable to obtain writer to cas member");
-      }
+      return casMember.getBlobWrite(
+          digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
     }
 
     public void insertBlob(Digest digest, ByteString content)
@@ -210,7 +207,11 @@ public class Worker extends LoggingMain {
       try (InputStream in = content.newInput()) {
         writeToCasMember(digest, in);
       } catch (ExecutionException e) {
-        throw new IOException(Status.RESOURCE_EXHAUSTED.withCause(e).asRuntimeException());
+        Throwable cause = e.getCause();
+        Throwables.throwIfUnchecked(cause);
+        Throwables.throwIfInstanceOf(cause, IOException.class);
+        Status status = Status.fromThrowable(cause);
+        throw new IOException(status.asException());
       }
     }
   }
@@ -287,7 +288,7 @@ public class Worker extends LoggingMain {
         break;
     }
 
-    workerStubs = WorkerStubs.create(digestUtil);
+    workerStubs = WorkerStubs.create(digestUtil, getGrpcTimeout(config));
 
     ExecutorService removeDirectoryService =
         newFixedThreadPool(
@@ -387,7 +388,26 @@ public class Worker extends LoggingMain {
     return sizeKb * 1024;
   }
 
-  private ListenableFuture<Long> streamIntoWriteFuture(InputStream in, Write write, long size)
+  private static Duration getGrpcTimeout(ShardWorkerConfig config) {
+
+    // return the configured
+    if (config.getShardWorkerInstanceConfig().hasGrpcTimeout()) {
+      Duration configured = config.getShardWorkerInstanceConfig().getGrpcTimeout();
+      if (configured.getSeconds() > 0 || configured.getNanos() > 0) {
+        return configured;
+      }
+    }
+
+    // return a default
+    Duration defaultDuration = Durations.fromSeconds(60);
+    logger.log(
+        INFO,
+        String.format(
+            "grpc timeout not configured.  Setting to: " + defaultDuration.getSeconds() + "s"));
+    return defaultDuration;
+  }
+
+  private ListenableFuture<Long> streamIntoWriteFuture(InputStream in, Write write, Digest digest)
       throws IOException {
 
     SettableFuture<Long> writtenFuture = SettableFuture.create();
@@ -412,31 +432,36 @@ public class Worker extends LoggingMain {
                 }
 
               } catch (IOException e) {
-                logger.log(Level.SEVERE, "unexpected error transferring file: ", e);
+                if (!write.isComplete()) {
+                  write.reset();
+                  logger.log(Level.SEVERE, "unexpected error transferring file for " + digest, e);
+                }
               }
             });
 
-    write.addListener(
-        () -> {
-          try {
-
-            try {
-              out.close();
-            } catch (IOException e) {
-              // ignore
-            }
-            long committedSize = write.getCommittedSize();
-            if (committedSize != size) {
-              logger.warning(
-                  format(
-                      "committed size %d did not match expectation for digestUtil", committedSize));
-            }
-            writtenFuture.set(size);
-          } catch (RuntimeException e) {
-            writtenFuture.setException(e);
-          }
-        },
-        directExecutor());
+    write
+        .getFuture()
+        .addListener(
+            () -> {
+              try {
+                try {
+                  out.close();
+                } catch (IOException e) {
+                  // ignore
+                }
+                long committedSize = write.getCommittedSize();
+                if (committedSize != digest.getSizeBytes()) {
+                  logger.warning(
+                      format(
+                          "committed size %d did not match expectation for digestUtil",
+                          committedSize));
+                }
+                writtenFuture.set(digest.getSizeBytes());
+              } catch (RuntimeException e) {
+                writtenFuture.setException(e);
+              }
+            },
+            directExecutor());
 
     return writtenFuture;
   }
@@ -782,7 +807,7 @@ public class Worker extends LoggingMain {
 
   public void start() throws InterruptedException {
     try {
-      backplane.start();
+      backplane.start(config.getPublicName());
 
       removeWorker(config.getPublicName());
 
@@ -798,7 +823,6 @@ public class Worker extends LoggingMain {
       } else {
         logger.log(INFO, "Skipping worker registration");
       }
-
     } catch (Exception e) {
       stop();
       logger.log(SEVERE, "error starting worker", e);

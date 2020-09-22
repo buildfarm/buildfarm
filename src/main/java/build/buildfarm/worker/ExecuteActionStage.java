@@ -60,11 +60,6 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
   }
 
   @Override
-  public boolean claim(OperationContext operationContext) throws InterruptedException {
-    return claim(workerContext.commandExecutionClaims(operationContext.command));
-  }
-
-  @Override
   protected Logger getLogger() {
     return logger;
   }
@@ -115,9 +110,14 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
   }
 
   @Override
+  protected int claimsRequired(OperationContext operationContext) {
+    return workerContext.commandExecutionClaims(operationContext.command);
+  }
+
+  @Override
   protected void iterate() throws InterruptedException {
     OperationContext operationContext = take();
-    int claims = workerContext.commandExecutionClaims(operationContext.command);
+    int claims = claimsRequired(operationContext);
     Executor executor = new Executor(workerContext, operationContext, this);
     Thread executorThread = new Thread(() -> executor.run(claims));
 

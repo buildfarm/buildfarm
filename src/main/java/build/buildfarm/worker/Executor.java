@@ -60,12 +60,21 @@ class Executor {
   private final OperationContext operationContext;
   private final ExecuteActionStage owner;
   private int exitCode = INCOMPLETE_EXIT_CODE;
+  private boolean wasErrored = false;
 
   Executor(
       WorkerContext workerContext, OperationContext operationContext, ExecuteActionStage owner) {
     this.workerContext = workerContext;
     this.operationContext = operationContext;
     this.owner = owner;
+  }
+
+  // ensure that only one error put attempt occurs
+  private void putError() throws InterruptedException {
+    if (!wasErrored) {
+      wasErrored = true;
+      owner.error().put(operationContext);
+    }
   }
 
   private long runInterruptible(Stopwatch stopwatch) throws InterruptedException {
@@ -113,7 +122,7 @@ class Executor {
           Level.WARNING,
           String.format(
               "Executor::run(%s): could not transition to EXECUTING", operation.getName()));
-      owner.error().put(operationContext);
+      putError();
       return 0;
     }
 
@@ -204,7 +213,7 @@ class Executor {
     } catch (IOException e) {
       logger.log(Level.SEVERE, format("error executing operation %s", operationName), e);
       operationContext.poller.pause();
-      owner.error().put(operationContext);
+      putError();
       return 0;
     }
 
@@ -242,11 +251,10 @@ class Executor {
         throw e;
       }
     } else {
-      // FIXME we need to release the action root
       workerContext.logInfo("Executor: Operation " + operationName + " Failed to claim output");
       boolean wasInterrupted = Thread.interrupted();
       try {
-        owner.error().put(operationContext);
+        putError();
       } finally {
         if (wasInterrupted) {
           Thread.currentThread().interrupt();
@@ -265,7 +273,7 @@ class Executor {
     } catch (InterruptedException e) {
       /* we can be interrupted when the poller fails */
       try {
-        owner.error().put(operationContext);
+        putError();
       } catch (InterruptedException errorEx) {
         logger.log(Level.SEVERE, format("interrupted while erroring %s", operationName), errorEx);
       } finally {
@@ -276,7 +284,7 @@ class Executor {
       boolean wasInterrupted = Thread.interrupted();
       logger.log(Level.SEVERE, format("errored during execution of %s", operationName), e);
       try {
-        owner.error().put(operationContext);
+        putError();
       } catch (InterruptedException errorEx) {
         logger.log(
             Level.SEVERE,

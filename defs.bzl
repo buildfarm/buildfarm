@@ -52,8 +52,13 @@ def buildfarm_init(name="buildfarm"):
     """
     maven_install(
         artifacts = [
+            "com.amazonaws:aws-java-sdk-autoscaling:1.11.729",
             "com.amazonaws:aws-java-sdk-core:1.11.729",
+            "com.amazonaws:aws-java-sdk-ec2:1.11.729",
+            "com.amazonaws:aws-java-sdk-secretsmanager:1.11.729",
             "com.amazonaws:aws-java-sdk-sns:1.11.729",
+            "com.amazonaws:aws-java-sdk-ssm:1.11.729",
+            "com.fasterxml.jackson.core:jackson-databind:2.9.8",
             "com.github.jnr:jnr-constants:0.9.9",
             "com.github.jnr:jnr-ffi:2.1.7",
             "com.github.jnr:jffi:1.2.16",

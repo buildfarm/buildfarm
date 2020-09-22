@@ -28,16 +28,16 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
 import com.google.common.util.concurrent.ListeningScheduledExecutorService;
+import com.google.protobuf.Duration;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
-import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
 public class WorkerStubs {
   private WorkerStubs() {}
 
-  public static LoadingCache create(DigestUtil digestUtil) {
+  public static LoadingCache create(DigestUtil digestUtil, Duration timeout) {
     return CacheBuilder.newBuilder()
         .expireAfterAccess(10, TimeUnit.MINUTES)
         .removalListener(
@@ -51,19 +51,18 @@ public class WorkerStubs {
             new CacheLoader<String, Instance>() {
               @Override
               public Instance load(String worker) {
-                return newStubInstance(worker, digestUtil);
+                return newStubInstance(worker, digestUtil, timeout);
               }
             });
   }
 
-  private static Instance newStubInstance(String worker, DigestUtil digestUtil) {
+  private static Instance newStubInstance(String worker, DigestUtil digestUtil, Duration timeout) {
     return new StubInstance(
         "",
         worker,
         digestUtil,
         createChannel(worker),
-        60 /* FIXME CONFIG */,
-        TimeUnit.SECONDS,
+        timeout,
         newStubRetrier(),
         newStubRetryService());
   }
@@ -77,8 +76,8 @@ public class WorkerStubs {
   private static Retrier newStubRetrier() {
     return new Retrier(
         Backoff.exponential(
-            Duration.ofMillis(/*options.experimentalRemoteRetryStartDelayMillis=*/ 100),
-            Duration.ofMillis(/*options.experimentalRemoteRetryMaxDelayMillis=*/ 5000),
+            java.time.Duration.ofMillis(/*options.experimentalRemoteRetryStartDelayMillis=*/ 100),
+            java.time.Duration.ofMillis(/*options.experimentalRemoteRetryMaxDelayMillis=*/ 5000),
             /*options.experimentalRemoteRetryMultiplier=*/ 2,
             /*options.experimentalRemoteRetryJitter=*/ 0.1,
             /*options.experimentalRemoteRetryMaxAttempts=*/ 5),

@@ -84,6 +84,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -546,5 +547,26 @@ public class MemoryInstanceTest {
     instance.putOperation(queuedOperation); // requeue
     assertThat(requeuers).isEmpty();
     assertThat(outstandingOperations.get(operationName)).isEqualTo(queuedOperation);
+  }
+
+  @Test
+  public void executeRespectsSkipCacheLookup() throws InterruptedException {
+    Digest actionDigest = createAction(Action.newBuilder());
+    // populate actionDigest in AC
+    instance.putActionResult(
+        DigestUtil.asActionKey(actionDigest), ActionResult.getDefaultInstance());
+    AtomicReference<Operation> operation = new AtomicReference<>(null);
+    instance.execute(
+        actionDigest,
+        /* skipCacheLookup=*/ true,
+        ExecutionPolicy.getDefaultInstance(),
+        ResultsCachePolicy.getDefaultInstance(),
+        RequestMetadata.getDefaultInstance(),
+        o -> operation.compareAndSet(null, o));
+
+    String operationName = operation.get().getName();
+    assertThat(outstandingOperations.contains(operationName)).isTrue();
+    Operation queuedOperation = outstandingOperations.get(operationName);
+    assertThat(instance.isQueued(queuedOperation)).isTrue();
   }
 }

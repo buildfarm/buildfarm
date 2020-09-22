@@ -53,6 +53,8 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
 import com.google.common.jimfs.Configuration;
 import com.google.common.jimfs.Jimfs;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.ByteString;
 import io.grpc.Deadline;
@@ -70,7 +72,6 @@ import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
@@ -272,13 +273,14 @@ class CASFileCacheTest {
 
     // start the file cache with no files.
     // the cache should start without any initial files in the cache.
-    StartupCacheResults results = fileCache.start();
+    StartupCacheResults results = fileCache.start(false);
 
     // check the startuo results to ensure no files were processed
-    assertThat(results.scan.computeDirs.size()).isEqualTo(0);
-    assertThat(results.scan.deleteFiles.size()).isEqualTo(0);
-    assertThat(results.scan.fileKeys.size()).isEqualTo(0);
-    assertThat(results.invalidDirectories.size()).isEqualTo(0);
+    assertThat(results.load.loadSkipped).isFalse();
+    assertThat(results.load.scan.computeDirs.size()).isEqualTo(0);
+    assertThat(results.load.scan.deleteFiles.size()).isEqualTo(0);
+    assertThat(results.load.scan.fileKeys.size()).isEqualTo(0);
+    assertThat(results.load.invalidDirectories.size()).isEqualTo(0);
   }
 
   @Test
@@ -291,13 +293,14 @@ class CASFileCacheTest {
 
     // start the CAS with a file whose name indicates its a directory
     // the cache should start and consider it a compute directory
-    StartupCacheResults results = fileCache.start();
+    StartupCacheResults results = fileCache.start(false);
 
     // check the startup results to ensure no files were processed
-    assertThat(results.scan.computeDirs.size()).isEqualTo(0);
-    assertThat(results.scan.deleteFiles.size()).isEqualTo(1);
-    assertThat(results.scan.fileKeys.size()).isEqualTo(0);
-    assertThat(results.invalidDirectories.size()).isEqualTo(0);
+    assertThat(results.load.loadSkipped).isFalse();
+    assertThat(results.load.scan.computeDirs.size()).isEqualTo(0);
+    assertThat(results.load.scan.deleteFiles.size()).isEqualTo(1);
+    assertThat(results.load.scan.fileKeys.size()).isEqualTo(0);
+    assertThat(results.load.invalidDirectories.size()).isEqualTo(0);
   }
 
   @Test
@@ -311,19 +314,41 @@ class CASFileCacheTest {
     Files.write(execPath, blob.toByteArray());
     EvenMoreFiles.setReadOnlyPerms(execPath, true);
 
-    StartupCacheResults results = fileCache.start();
+    StartupCacheResults results = fileCache.start(false);
 
     // check the startup results to ensure our two files were processed
-    assertThat(results.scan.computeDirs.size()).isEqualTo(0);
-    assertThat(results.scan.deleteFiles.size()).isEqualTo(0);
-    assertThat(results.scan.fileKeys.size()).isEqualTo(2);
-    assertThat(results.invalidDirectories.size()).isEqualTo(0);
+    assertThat(results.load.loadSkipped).isFalse();
+    assertThat(results.load.scan.computeDirs.size()).isEqualTo(0);
+    assertThat(results.load.scan.deleteFiles.size()).isEqualTo(0);
+    assertThat(results.load.scan.fileKeys.size()).isEqualTo(2);
+    assertThat(results.load.invalidDirectories.size()).isEqualTo(0);
 
     // explicitly not providing blob via blobs, this would throw if fetched from factory
     //
     // FIXME https://github.com/google/truth/issues/285 assertThat(Path) is ambiguous
     assertThat(fileCache.put(blobDigest, false).equals(path)).isTrue();
     assertThat(fileCache.put(blobDigest, true).equals(execPath)).isTrue();
+  }
+
+  @Test
+  public void startSkipsLoadingExistingBlob() throws IOException, InterruptedException {
+    ByteString blob = ByteString.copyFromUtf8("blob");
+    Digest blobDigest = DIGEST_UTIL.compute(blob);
+    Path path = root.resolve(fileCache.getKey(blobDigest, false));
+    Path execPath = root.resolve(fileCache.getKey(blobDigest, true));
+    Files.write(path, blob.toByteArray());
+    EvenMoreFiles.setReadOnlyPerms(path, false);
+    Files.write(execPath, blob.toByteArray());
+    EvenMoreFiles.setReadOnlyPerms(execPath, true);
+
+    StartupCacheResults results = fileCache.start(true);
+
+    // check the startup results to ensure our two files were processed
+    assertThat(results.load.loadSkipped).isTrue();
+    assertThat(results.load.scan.computeDirs.size()).isEqualTo(0);
+    assertThat(results.load.scan.deleteFiles.size()).isEqualTo(0);
+    assertThat(results.load.scan.fileKeys.size()).isEqualTo(0);
+    assertThat(results.load.invalidDirectories.size()).isEqualTo(0);
   }
 
   @Test
@@ -349,7 +374,7 @@ class CASFileCacheTest {
     Files.write(
         invalidExec, validBlob.toByteArray()); // content would match but for invalid exec field
 
-    fileCache.start();
+    fileCache.start(false);
 
     assertThat(!Files.exists(tooFewComponents)).isTrue();
     assertThat(!Files.exists(tooManyComponents)).isTrue();
@@ -447,7 +472,7 @@ class CASFileCacheTest {
     assertThat(storage.get(pathThree).after).isEqualTo(storage.get(pathOne));
   }
 
-  Write getWrite(Digest digest) {
+  Write getWrite(Digest digest) throws IOException {
     return fileCache.getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
   }
 
@@ -458,7 +483,7 @@ class CASFileCacheTest {
 
     AtomicBoolean notified = new AtomicBoolean(false);
     Write write = getWrite(digest);
-    write.addListener(() -> notified.set(true), directExecutor());
+    write.getFuture().addListener(() -> notified.set(true), directExecutor());
     try (OutputStream out = write.getOutput(1, SECONDS, () -> {})) {
       content.writeTo(out);
     }
@@ -479,7 +504,7 @@ class CASFileCacheTest {
     Write incompleteWrite = getWrite(digest);
     AtomicBoolean notified = new AtomicBoolean(false);
     // both should be size committed
-    incompleteWrite.addListener(() -> notified.set(true), directExecutor());
+    incompleteWrite.getFuture().addListener(() -> notified.set(true), directExecutor());
     OutputStream incompleteOut = incompleteWrite.getOutput(1, SECONDS, () -> {});
     try (OutputStream out = completingWrite.getOutput(1, SECONDS, () -> {})) {
       assertThat(fileCache.size()).isEqualTo(digest.getSizeBytes() * 2);
@@ -505,7 +530,7 @@ class CASFileCacheTest {
     }
     Write write = fileCache.getWrite(digest, writeId, RequestMetadata.getDefaultInstance());
     AtomicBoolean notified = new AtomicBoolean(false);
-    write.addListener(() -> notified.set(true), directExecutor());
+    write.getFuture().addListener(() -> notified.set(true), directExecutor());
     assertThat(write.getCommittedSize()).isEqualTo(6);
     try (OutputStream out = write.getOutput(1, SECONDS, () -> {})) {
       content.substring(6).writeTo(out);
@@ -547,7 +572,7 @@ class CASFileCacheTest {
   }
 
   @Test
-  public void emptyWriteIsComplete() {
+  public void emptyWriteIsComplete() throws IOException {
     Write write =
         fileCache.getWrite(
             DIGEST_UTIL.compute(ByteString.EMPTY),
@@ -599,7 +624,7 @@ class CASFileCacheTest {
           }
 
           @Override
-          public void addListener(Runnable onCompleted, Executor executor) {
+          public ListenableFuture<Long> getFuture() {
             throw new UnsupportedOperationException();
           }
         };
@@ -620,7 +645,7 @@ class CASFileCacheTest {
         .getWrite(eq(expiringDigest), any(UUID.class), any(RequestMetadata.class));
   }
 
-  void decrementReference(Path path) {
+  void decrementReference(Path path) throws IOException, InterruptedException {
     fileCache.decrementReferences(
         ImmutableList.of(path.getFileName().toString()), ImmutableList.of());
   }
@@ -778,8 +803,9 @@ class CASFileCacheTest {
     Write write =
         new NullWrite() {
           @Override
-          public void addListener(Runnable onCompleted, Executor executor) {
-            writeComplete.addListener(onCompleted, executor);
+          public ListenableFuture<Long> getFuture() {
+            return Futures.transform(
+                writeComplete, result -> blob.getDigest().getSizeBytes(), directExecutor());
           }
 
           @Override

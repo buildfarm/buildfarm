@@ -75,10 +75,10 @@ java_library(
 )
 
 java_library(
-    name = "common-metrics",
+    name = "metrics",
     srcs = glob([
-        "common/metrics/AbstractMetricsPublisher.java",
-        "common/metrics/MetricsPublisher.java",
+        "metrics/AbstractMetricsPublisher.java",
+        "metrics/MetricsPublisher.java",
     ]),
     deps = [
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
@@ -95,16 +95,18 @@ java_library(
 java_library(
     name = "aws-metrics",
     srcs = glob([
-        "common/metrics/aws/*.java",
+        "metrics/aws/*.java",
     ]),
     deps = [
-        ":common-metrics",
+        ":metrics",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
         "@googleapis//:google_rpc_error_details_java_proto",
         "@googleapis//:google_rpc_status_java_proto",
         "@maven//:com_amazonaws_aws_java_sdk_core",
         "@maven//:com_amazonaws_aws_java_sdk_sns",
+        "@maven//:com_amazonaws_aws_java_sdk_secretsmanager",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java_util",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
@@ -114,10 +116,10 @@ java_library(
 java_library(
     name = "log-metrics",
     srcs = glob([
-        "common/metrics/log/*.java",
+        "metrics/log/*.java",
     ]),
     deps = [
-        ":common-metrics",
+        ":metrics",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
         "@googleapis//:google_rpc_error_details_java_proto",
@@ -131,10 +133,66 @@ java_library(
 java_library(
     name = "gcp-metrics",
     srcs = glob([
-        "common/metrics/gcp/*.java",
+        "metrics/gcp/*.java",
     ]),
     deps = [
-        ":common-metrics",
+        ":metrics",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "@googleapis//:google_rpc_code_java_proto",
+        "@googleapis//:google_rpc_error_details_java_proto",
+        "@googleapis//:google_rpc_status_java_proto",
+        "@maven//:com_google_guava_guava",
+        "@maven//:com_google_protobuf_protobuf_java_util",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+    ],
+)
+
+java_library(
+    name = "admin",
+    srcs = glob([
+        "admin/Admin.java",
+    ]),
+    deps = [
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "@googleapis//:google_rpc_code_java_proto",
+        "@googleapis//:google_rpc_error_details_java_proto",
+        "@googleapis//:google_rpc_status_java_proto",
+        "@maven//:com_google_guava_guava",
+        "@maven//:com_google_protobuf_protobuf_java",
+        "@maven//:com_google_protobuf_protobuf_java_util",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+    ],
+)
+
+java_library(
+    name = "aws-admin",
+    srcs = glob([
+        "admin/aws/*.java",
+    ]),
+    deps = [
+        ":admin",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "@googleapis//:google_rpc_code_java_proto",
+        "@googleapis//:google_rpc_error_details_java_proto",
+        "@googleapis//:google_rpc_status_java_proto",
+        "@maven//:com_amazonaws_aws_java_sdk_autoscaling",
+        "@maven//:com_amazonaws_aws_java_sdk_core",
+        "@maven//:com_amazonaws_aws_java_sdk_ec2",
+        "@maven//:com_amazonaws_aws_java_sdk_secretsmanager",
+        "@maven//:com_amazonaws_aws_java_sdk_ssm",
+        "@maven//:com_google_guava_guava",
+        "@maven//:com_google_protobuf_protobuf_java_util",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+    ],
+)
+
+java_library(
+    name = "gcp-admin",
+    srcs = glob([
+        "admin/gcp/*.java",
+    ]),
+    deps = [
+        ":admin",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
         "@googleapis//:google_rpc_error_details_java_proto",
@@ -162,7 +220,6 @@ java_library(
 java_library(
     name = "instance",
     srcs = [
-        "instance/ExcessiveWriteSizeException.java",
         "instance/Instance.java",
         "instance/Utils.java",
     ],
@@ -179,6 +236,7 @@ java_library(
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+        "@maven//:com_google_protobuf_protobuf_java_util",
     ],
 )
 
@@ -308,11 +366,14 @@ java_library(
     srcs = glob(["server/**/*.java"]),
     visibility = ["//visibility:public"],
     deps = [
+        ":aws-admin",
         ":aws-metrics",
         ":cas",
         ":common",
         ":common-grpc",
-        ":common-metrics",
+        ":admin",
+        ":metrics",
+        ":gcp-admin",
         ":gcp-metrics",
         ":instance",
         ":log-metrics",
@@ -356,7 +417,7 @@ java_binary(
 
 container_image(
     name = "server.container",
-    base = "@java_base//image",
+    base = "@java_image_base//image",
     cmd = [
         "buildfarm-server_deploy.jar",
         "/config/server.config",
@@ -399,6 +460,7 @@ java_library(
         "@maven//:io_grpc_grpc_stub",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+        "@maven//:com_google_protobuf_protobuf_java_util",
     ],
 )
 
@@ -450,7 +512,7 @@ java_binary(
 
 container_image(
     name = "buildfarm-shard-worker.container",
-    base = "@java_base//image",
+    base = "@java_image_base//image",
     # leverage the implicit target of the buildfarm-shard-worker to get a fat jar.
     # this is simply a workaround for the fact that we have so many dependencies,
     # so we'd want some wrappy script. This seemed more straightforward.
@@ -522,6 +584,7 @@ java_library(
         "@maven//:io_grpc_grpc_netty",
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
+        "@maven//:com_google_protobuf_protobuf_java_util",
     ],
 )
 
@@ -579,7 +642,7 @@ java_binary(
 
 container_image(
     name = "buildfarm-operationqueue-worker.container",
-    base = "@java_base//image",
+    base = "@java_image_base//image",
     cmd = [
         "buildfarm-operationqueue-worker_deploy.jar",
         "/config/worker.config",

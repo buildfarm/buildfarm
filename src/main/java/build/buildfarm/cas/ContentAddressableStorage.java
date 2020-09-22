@@ -18,6 +18,7 @@ import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.ThreadSafety.ThreadSafe;
 import build.buildfarm.common.Write;
@@ -66,19 +67,6 @@ public interface ContentAddressableStorage extends InputStreamFactory {
     }
   }
 
-  class EntryLimitException extends IOException {
-    private final Digest digest;
-
-    public EntryLimitException(Digest digest) {
-      super(DigestUtil.toString(digest));
-      this.digest = digest;
-    }
-
-    public Digest getDigest() {
-      return digest;
-    }
-  }
-
   /** Indicates presence in the CAS for a single digest. */
   @ThreadSafe
   boolean contains(Digest digest);
@@ -107,11 +95,12 @@ public interface ContentAddressableStorage extends InputStreamFactory {
       RequestMetadata requestMetadata);
 
   @ThreadSafe
-  Write getWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata);
+  Write getWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata)
+      throws EntryLimitException;
 
   /** Insert a blob into the CAS. */
   @ThreadSafe
-  void put(Blob blob) throws InterruptedException;
+  void put(Blob blob) throws EntryLimitException, InterruptedException;
 
   /**
    * Insert a value into the CAS with expiration callback.

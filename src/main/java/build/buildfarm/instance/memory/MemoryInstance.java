@@ -53,7 +53,6 @@ import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.AbstractServerInstance;
-import build.buildfarm.instance.ExcessiveWriteSizeException;
 import build.buildfarm.instance.OperationsMap;
 import build.buildfarm.instance.WatchFuture;
 import build.buildfarm.instance.WorkerQueue;
@@ -62,6 +61,7 @@ import build.buildfarm.instance.WorkerQueues;
 import build.buildfarm.v1test.ActionCacheConfig;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.FilesystemACConfig;
+import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.GrpcACConfig;
 import build.buildfarm.v1test.MemoryInstanceConfig;
 import build.buildfarm.v1test.OperationIteratorToken;
@@ -85,6 +85,7 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.MultimapBuilder;
 import com.google.common.collect.SetMultimap;
 import com.google.common.io.BaseEncoding;
+import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.longrunning.Operation;
@@ -118,6 +119,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
+import javax.naming.ConfigurationException;
 
 public class MemoryInstance extends AbstractServerInstance {
   private static final Logger logger = Logger.getLogger(MemoryInstance.class.getName());
@@ -197,7 +199,8 @@ public class MemoryInstance extends AbstractServerInstance {
     }
   }
 
-  public MemoryInstance(String name, DigestUtil digestUtil, MemoryInstanceConfig config) {
+  public MemoryInstance(String name, DigestUtil digestUtil, MemoryInstanceConfig config)
+      throws ConfigurationException {
     this(
         name,
         digestUtil,
@@ -365,8 +368,10 @@ public class MemoryInstance extends AbstractServerInstance {
       }
 
       @Override
-      public void addListener(Runnable onCompleted, Executor executor) {
-        getStreamSource(name).getClosedFuture().addListener(onCompleted, executor);
+      public ListenableFuture<Long> getFuture() {
+        ByteStringStreamSource source = getStreamSource(name);
+        return Futures.transform(
+            source.getClosedFuture(), result -> source.getCommittedSize(), directExecutor());
       }
     };
   }
@@ -696,7 +701,7 @@ public class MemoryInstance extends AbstractServerInstance {
           60,
           SECONDS,
           RequestMetadata.getDefaultInstance());
-    } catch (StatusException | IOException | ExcessiveWriteSizeException e) {
+    } catch (StatusException | IOException e) {
       logger.log(Level.SEVERE, format("could not emplace queued operation: %s", operationName), e);
       return false;
     }
@@ -833,7 +838,7 @@ public class MemoryInstance extends AbstractServerInstance {
           } else {
             enqueueOperation(operation);
           }
-        } catch (StatusException | IOException | ExcessiveWriteSizeException e) {
+        } catch (StatusException | IOException e) {
           logger.log(
               Level.SEVERE, format("could not emplace queued operation: %s", operationName), e);
         }
@@ -994,5 +999,10 @@ public class MemoryInstance extends AbstractServerInstance {
   @Override
   protected Logger getLogger() {
     return logger;
+  }
+
+  @Override
+  public GetClientStartTimeResult getClientStartTime(String clientKey) {
+    throw new UnsupportedOperationException();
   }
 }

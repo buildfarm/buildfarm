@@ -45,6 +45,7 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Paths;
 import java.util.Map;
 import java.util.UUID;
+import javax.naming.ConfigurationException;
 
 public final class ContentAddressableStorages {
   private static Channel createChannel(String target) {
@@ -63,12 +64,28 @@ public final class ContentAddressableStorages {
     return new GrpcCAS(config.getInstanceName(), channel, byteStreamUploader, onExpirations);
   }
 
-  public static ContentAddressableStorage createFilesystemCAS(FilesystemCASConfig config) {
+  public static ContentAddressableStorage createFilesystemCAS(FilesystemCASConfig config)
+      throws ConfigurationException {
+    String path = config.getPath();
+    if (path.isEmpty()) {
+      throw new ConfigurationException("filesystem cas path is empty");
+    }
+    long maxSizeBytes = config.getMaxSizeBytes();
+    long maxEntrySizeBytes = config.getMaxEntrySizeBytes();
+    if (maxSizeBytes <= 0) {
+      throw new ConfigurationException("filesystem cas max_size_bytes <= 0");
+    }
+    if (maxEntrySizeBytes <= 0) {
+      throw new ConfigurationException("filesystem cas max_entry_size_bytes <= 0");
+    }
+    if (maxEntrySizeBytes > maxSizeBytes) {
+      throw new ConfigurationException("filesystem cas max_entry_size_bytes > maxSizeBytes");
+    }
     CASFileCache cas =
         new CASFileCache(
-            Paths.get(config.getPath()),
-            config.getMaxSizeBytes(),
-            config.getMaxEntrySizeBytes(),
+            Paths.get(path),
+            maxSizeBytes,
+            maxEntrySizeBytes,
             DigestUtil.forHash("SHA256"),
             /* expireService=*/ newDirectExecutorService(),
             /* accessRecorder=*/ directExecutor()) {
@@ -78,14 +95,15 @@ public final class ContentAddressableStorages {
           }
         };
     try {
-      cas.start();
+      cas.start(false);
     } catch (IOException | InterruptedException e) {
       throw new RuntimeException("error starting filesystem cas", e);
     }
     return cas;
   }
 
-  public static ContentAddressableStorage create(ContentAddressableStorageConfig config) {
+  public static ContentAddressableStorage create(ContentAddressableStorageConfig config)
+      throws ConfigurationException {
     switch (config.getTypeCase()) {
       default:
       case FILESYSTEM:

@@ -14,6 +14,100 @@ option java_package = "build.buildfarm.v1test";
 option java_multiple_files = true;
 option java_outer_classname = "OperationQueueProto";
 
+// The Admin API is used to perform administrative functions on Buildfarm infrastructure
+service Admin {
+  rpc TerminateHost(TerminateHostRequest) returns (google.rpc.Status) {
+    option (google.api.http) = { get: "/v1test/admin:terminateHost" };
+  }
+
+  rpc StopContainer(StopContainerRequest) returns (google.rpc.Status) {
+    option (google.api.http) = { get: "/v1test/admin:stopContainer" };
+  }
+
+  rpc GetHosts(GetHostsRequest) returns (GetHostsResult) {
+    option (google.api.http) = { get: "/v1test/admin:getHosts" };
+  }
+
+  rpc GetClientStartTime(GetClientStartTimeRequest) returns (GetClientStartTimeResult) {
+    option (google.api.http) = { get: "/v1test/admin:getClientStartTime" };
+  }
+
+  rpc ScaleCluster(ScaleClusterRequest) returns (google.rpc.Status) {
+    option (google.api.http) = { get: "/v1test/admin:scaleCluster" };
+  }
+}
+
+message TerminateHostRequest {
+  string instance_name = 1;
+
+  string host_id = 2;
+}
+
+message StopContainerRequest {
+  string instance_name = 1;
+
+  string host_id = 2;
+
+  string container_name = 3;
+}
+
+message GetHostsRequest {
+  string filter = 1;
+
+  int32 age_in_minutes = 2;
+
+  string status = 3;
+}
+
+message GetHostsResult {
+  int64 num_hosts = 1;
+
+  repeated Host hosts = 2;
+}
+
+message Host {
+  int64 host_num = 1;
+
+  string host_id = 2;
+
+  string ip_address = 3;
+
+  google.protobuf.Timestamp launch_time = 4;
+
+  string state = 5;
+
+  string dns_name = 6;
+
+  int64 uptime_minutes = 7;
+
+  int64 num_cores = 8;
+
+  string type = 9;
+
+  string lifecycle = 10;
+}
+
+message GetClientStartTimeRequest {
+  string instance_name = 1;
+  string client_key = 2;
+}
+
+message GetClientStartTimeResult {
+  google.protobuf.Timestamp client_start_time = 1;
+}
+
+message ScaleClusterRequest {
+  string scale_group_name = 1;
+
+  int32 min_hosts = 2;
+
+  int32 max_hosts = 3;
+
+  int32 target_hosts = 4;
+
+  int32 target_reserved_hosts_percent = 5;
+}
+
 // The OperationQueue API is used internally to communicate with Workers
 service OperationQueue {
   rpc Take(TakeOperationRequest) returns (QueueEntry) {
@@ -70,6 +164,8 @@ message BuildFarmServerConfig {
   int32 execute_keepalive_after_seconds = 4;
 
   MetricsConfig metrics_config = 5;
+
+  AdminConfig admin_config = 6;
 }
 
 message MetricsConfig {
@@ -89,11 +185,9 @@ message AwsMetricsConfig {
 
   int32 sns_client_max_connections = 2;
 
-  string aws_access_key_id = 3;
+  string secret_name = 3;
 
-  string aws_secret_key = 4;
-
-  string region = 5;
+  string region = 4;
 }
 
 message GcpMetricsConfig {
@@ -102,6 +196,22 @@ message GcpMetricsConfig {
 
 message LogMetricsConfig {
   string log_level = 1;
+}
+
+message AdminConfig {
+  string deployment_environment = 1;
+
+  oneof type {
+    AwsAdminConfig aws_admin_config = 2;
+    GcpAdminConfig gcp_admin_config = 3;
+  }
+}
+
+message AwsAdminConfig {
+  string region = 1;
+}
+
+message GcpAdminConfig {
 }
 
 message MemoryCASConfig {
@@ -244,6 +354,8 @@ message RedisShardBackplaneConfig {
   int32 max_queue_depth = 16;
   int32 max_pre_queue_depth = 17;
   ProvisionedQueuesConfig provisioned_queues = 31;
+  int32 timeout = 32;
+  int32 max_attempts = 33;
 }
 
 message ShardInstanceConfig {
@@ -263,6 +375,9 @@ message ShardInstanceConfig {
   // a maximum threshold for an action's specified timeout,
   // beyond which an action will be rejected for execution
   google.protobuf.Duration maximum_action_timeout = 7;
+  
+  // default timeouts on grpc requests made by instances
+  google.protobuf.Duration grpc_timeout = 8;
 }
 
 message ShardWorkerInstanceConfig {
@@ -283,6 +398,9 @@ message ShardWorkerInstanceConfig {
 
   // page size for getTree request
   uint32 tree_page_size = 12;
+  
+  // default timeouts on grpc requests made by instances
+  google.protobuf.Duration grpc_timeout = 13;
 }
 
 message ShardWorkerConfig {
@@ -719,6 +837,9 @@ message StageInformation {
 message WorkerProfileMessage {
   // number of Entry in CAS
   int64 cas_entry_count = 1;
+
+  // number of unreferenced Entry in CAS
+  int64 cas_unreferenced_entry_count = 11;
 
   // number of DirectoryEntry in CAS
   int64 cas_directory_entry_count = 2;

@@ -144,9 +144,9 @@ public class BuildFarmInstances implements Instances {
   }
 
   @Override
-  public void start() {
+  public void start(String publicName) {
     for (Instance instance : instances.values()) {
-      instance.start();
+      instance.start(publicName);
     }
   }
 

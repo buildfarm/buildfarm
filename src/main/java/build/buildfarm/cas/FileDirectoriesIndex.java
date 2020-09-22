@@ -148,30 +148,24 @@ class FileDirectoriesIndex implements DirectoriesIndex {
   }
 
   @Override
-  public synchronized Set<Digest> removeEntry(String entry) {
+  public synchronized Set<Digest> removeEntry(String entry) throws IOException {
     Set<Digest> directories = removeEntryDirectories(entry);
-    try {
-      for (Digest directory : directories) {
-        try {
-          Files.delete(path(directory));
-        } catch (NoSuchFileException e) {
-          // ignore
-        }
+    for (Digest directory : directories) {
+      try {
+        Files.delete(path(directory));
+      } catch (NoSuchFileException e) {
+        // ignore
       }
-    } catch (IOException e) {
-      throw new RuntimeException(e);
     }
     return directories;
   }
 
   @Override
-  public Iterable<String> directoryEntries(Digest directory) {
+  public Iterable<String> directoryEntries(Digest directory) throws IOException {
     try {
       return asCharSource(path(directory), UTF_8).readLines();
     } catch (NoSuchFileException e) {
       return ImmutableList.of();
-    } catch (IOException e) {
-      throw new RuntimeException(e);
     }
   }
 
@@ -195,12 +189,8 @@ class FileDirectoriesIndex implements DirectoriesIndex {
   }
 
   @Override
-  public void put(Digest directory, Iterable<String> entries) {
-    try {
-      asCharSink(path(directory), UTF_8).writeLines(entries);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
+  public void put(Digest directory, Iterable<String> entries) throws IOException {
+    asCharSink(path(directory), UTF_8).writeLines(entries);
     addEntriesDirectory(ImmutableSet.copyOf(entries), directory);
   }
 
@@ -219,13 +209,11 @@ class FileDirectoriesIndex implements DirectoriesIndex {
   }
 
   @Override
-  public synchronized void remove(Digest directory) {
+  public synchronized void remove(Digest directory) throws IOException {
     try {
       Files.delete(path(directory));
     } catch (NoSuchFileException e) {
       // ignore
-    } catch (IOException e) {
-      throw new RuntimeException(e);
     }
     removeEntriesDirectory(directory);
   }

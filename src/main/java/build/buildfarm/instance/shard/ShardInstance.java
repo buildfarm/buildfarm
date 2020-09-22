@@ -40,6 +40,7 @@ import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static java.util.logging.Level.INFO;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
@@ -57,6 +58,7 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.Poller;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.TokenizableIterator;
@@ -71,9 +73,9 @@ import build.buildfarm.common.cache.CacheLoader.InvalidCacheLoadException;
 import build.buildfarm.common.cache.LoadingCache;
 import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
 import build.buildfarm.instance.AbstractServerInstance;
-import build.buildfarm.instance.ExcessiveWriteSizeException;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.ExecuteEntry;
+import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationIteratorToken;
 import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.ProfiledQueuedOperationMetadata;
@@ -203,7 +205,26 @@ public class ShardInstance extends AbstractServerInstance {
         config.getMaxBlobSize(),
         config.getMaximumActionTimeout(),
         onStop,
-        WorkerStubs.create(digestUtil));
+        WorkerStubs.create(digestUtil, getGrpcTimeout(config)));
+  }
+
+  private static Duration getGrpcTimeout(ShardInstanceConfig config) {
+
+    // return the configured
+    if (config.hasGrpcTimeout()) {
+      Duration configured = config.getGrpcTimeout();
+      if (configured.getSeconds() > 0 || configured.getNanos() > 0) {
+        return configured;
+      }
+    }
+
+    // return a default
+    Duration defaultDuration = Durations.fromSeconds(60);
+    logger.log(
+        INFO,
+        String.format(
+            "grpc timeout not configured.  Setting to: " + defaultDuration.getSeconds() + "s"));
+    return defaultDuration;
   }
 
   private static ShardBackplane createBackplane(ShardInstanceConfig config, String identifier)
@@ -405,10 +426,10 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @Override
-  public void start() {
+  public void start(String publicName) {
     stopped = false;
     try {
-      backplane.start();
+      backplane.start(publicName);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
@@ -993,7 +1014,7 @@ public class ShardInstance extends AbstractServerInstance {
 
   @Override
   public Write getBlobWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata)
-      throws ExcessiveWriteSizeException {
+      throws EntryLimitException {
     try {
       if (backplane.isBlacklisted(requestMetadata)) {
         throw Status.UNAVAILABLE
@@ -1004,7 +1025,7 @@ public class ShardInstance extends AbstractServerInstance {
       throw Status.fromThrowable(e).asRuntimeException();
     }
     if (maxBlobSize > 0 && digest.getSizeBytes() > maxBlobSize) {
-      throw new ExcessiveWriteSizeException(requestMetadata, digest, maxBlobSize);
+      throw new EntryLimitException(digest.getSizeBytes(), maxBlobSize);
     }
     // FIXME small blob write to proto cache
     return writes.get(digest, uuid, requestMetadata);
@@ -1332,7 +1353,7 @@ public class ShardInstance extends AbstractServerInstance {
 
   private ListenableFuture<QueuedOperationResult> uploadQueuedOperation(
       QueuedOperation queuedOperation, ExecuteEntry executeEntry, ExecutorService service)
-      throws ExcessiveWriteSizeException {
+      throws EntryLimitException {
     ByteString queuedOperationBlob = queuedOperation.toByteString();
     Digest queuedOperationDigest = getDigestUtil().compute(queuedOperationBlob);
     QueuedOperationMetadata metadata =
@@ -1360,33 +1381,29 @@ public class ShardInstance extends AbstractServerInstance {
 
   private ListenableFuture<Long> writeBlobFuture(
       Digest digest, ByteString content, RequestMetadata requestMetadata)
-      throws ExcessiveWriteSizeException {
+      throws EntryLimitException {
     checkState(digest.getSizeBytes() == content.size());
     SettableFuture<Long> writtenFuture = SettableFuture.create();
     Write write = getBlobWrite(digest, UUID.randomUUID(), requestMetadata);
-    write.addListener(
-        () -> {
-          try {
-            long committedSize = write.getCommittedSize();
-            if (committedSize != digest.getSizeBytes()) {
-              logger.warning(
-                  format(
-                      "committed size %d did not match expectation for %s, ignoring it",
-                      committedSize, DigestUtil.toString(digest)));
-            }
-            writtenFuture.set(digest.getSizeBytes());
-          } catch (RuntimeException e) {
-            // should we wrap with an additional exception?
-            writtenFuture.setException(e);
+    addCallback(
+        write.getFuture(),
+        new FutureCallback<Long>() {
+          @Override
+          public void onSuccess(Long committedSize) {
+            writtenFuture.set(committedSize);
+          }
+
+          @Override
+          public void onFailure(Throwable t) {
+            writtenFuture.setException(t);
           }
         },
         directExecutor());
     try (OutputStream out = write.getOutput(60, SECONDS, () -> {})) {
       content.writeTo(out);
     } catch (IOException e) {
-      if (!writtenFuture.isDone()) {
-        writtenFuture.setException(e);
-      }
+      // if the stream is complete already, we will have already set the future value
+      writtenFuture.setException(e);
     }
     return writtenFuture;
   }
@@ -1707,6 +1724,11 @@ public class ShardInstance extends AbstractServerInstance {
       RequestMetadata requestMetadata,
       Watcher watcher) {
     try {
+      if (!backplane.canPrequeue()) {
+        return immediateFailedFuture(
+            Status.RESOURCE_EXHAUSTED.withDescription("Too many jobs pending").asException());
+      }
+
       String operationName = createOperationName(UUID.randomUUID().toString());
 
       logger.log(
@@ -2334,5 +2356,14 @@ public class ShardInstance extends AbstractServerInstance {
   @Override
   protected Logger getLogger() {
     return logger;
+  }
+
+  @Override
+  public GetClientStartTimeResult getClientStartTime(String clientKey) {
+    try {
+      return backplane.getClientStartTime(clientKey);
+    } catch (IOException e) {
+      throw Status.fromThrowable(e).asRuntimeException();
+    }
   }
 }
