@@ -266,10 +266,15 @@ public class IOUtils {
             // Windows will leave the fileKey verbatim via NIO for comparison and hashing
             try {
               String keyStr = attributes.fileKey().toString();
-              String inode = keyStr.substring(keyStr.indexOf("ino=") + 4, keyStr.indexOf(")"));
-              return Long.parseLong(inode);
+              
+              final String OS = System.getProperty("os.name");
+              if (OS.contains("Linux")) {
+                String inode = keyStr.substring(keyStr.indexOf("ino=") + 4, keyStr.indexOf(")"));
+                return Long.parseLong(inode);
+              }
+              return keyStr;
             } catch (Exception e) {
-              return "test";
+              return attributes.fileKey().toString();
             }
           }
 
