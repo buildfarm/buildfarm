@@ -289,7 +289,7 @@ public class Worker extends LoggingMain {
         break;
     }
 
-    workerStubs = WorkerStubs.create(digestUtil, GetGrpcTimeout(config));
+    workerStubs = WorkerStubs.create(digestUtil, getGrpcTimeout(config));
 
     ExecutorService removeDirectoryService =
         newFixedThreadPool(
@@ -385,7 +385,7 @@ public class Worker extends LoggingMain {
     logger.log(INFO, String.format("%s initialized", identifier));
   }
 
-  private static Duration GetGrpcTimeout(ShardWorkerConfig config) {
+  private static Duration getGrpcTimeout(ShardWorkerConfig config) {
 
     // return the configured
     if (config.getShardWorkerInstanceConfig().hasGrpcTimeout()) {
@@ -396,7 +396,7 @@ public class Worker extends LoggingMain {
     }
 
     // return a default
-    Duration defaultDuration = Durations.fromSeconds(120);
+    Duration defaultDuration = Durations.fromSeconds(60);
     logger.log(
         INFO,
         String.format(
