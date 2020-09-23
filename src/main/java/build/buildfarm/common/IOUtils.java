@@ -265,6 +265,8 @@ public class IOUtils {
             // fast directory reads.
             // Windows will leave the fileKey verbatim via NIO for comparison and hashing
             try {
+              Path link = Files.readSymbolicLink(path);
+              return Files.readAttributes(link, BasicFileAttributes.class).fileKey();
               String keyStr = attributes.fileKey().toString();
               
               final String OS = System.getProperty("os.name");
