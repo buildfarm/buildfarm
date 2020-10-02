@@ -62,6 +62,9 @@ cas: {
     # from CAS in the cache
     max_entry_size_bytes: 2147483648 # 2 * 1024 * 1024 * 1024
   }
+  # whether the transient data on the worker should be loaded into the CAS on worker startup.
+  # It can be faster for worker startup to skip loading.
+  skip_load: false
 }
 
 # another cas entry specification here will provide a fallback
