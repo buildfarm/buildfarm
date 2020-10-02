@@ -39,7 +39,7 @@ class FuseExecFileSystem implements ExecFileSystem {
   }
 
   @Override
-  public void start(Consumer<List<Digest>> onDigests) {
+  public void start(Consumer<List<Digest>> onDigests, boolean skipLoad) {
     // onDigests.accept(storage.getAllDigests());
   }
 

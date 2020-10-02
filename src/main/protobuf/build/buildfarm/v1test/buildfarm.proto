@@ -258,6 +258,9 @@ message ContentAddressableStorageConfig {
     FilesystemCASConfig filesystem = 3;
     FuseCASConfig fuse = 4;
   }
+  
+  // whether the transient data on the worker should be loaded into the CAS on worker startup
+  bool skip_load = 5;
 }
 
 message DelegateCASConfig {

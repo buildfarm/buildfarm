@@ -811,10 +811,11 @@ public class Worker extends LoggingMain {
 
       removeWorker(config.getPublicName());
 
-      execFileSystem.start((digests) -> addBlobsLocation(digests, config.getPublicName()));
+      boolean skipLoad = config.getCasList().get(0).getSkipLoad();
+      execFileSystem.start(
+          (digests) -> addBlobsLocation(digests, config.getPublicName()), skipLoad);
 
       server.start();
-
       // Not all workers need to be registered and visible in the backplane.
       // For example, a GPU worker may wish to perform work that we do not want to cache locally for
       // other workers.

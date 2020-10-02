@@ -27,7 +27,8 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 interface ExecFileSystem extends InputStreamFactory {
-  void start(Consumer<List<Digest>> onDigests) throws IOException, InterruptedException;
+  void start(Consumer<List<Digest>> onDigests, boolean skipLoad)
+      throws IOException, InterruptedException;
 
   void stop();
 
