@@ -1334,8 +1334,8 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   @Override
-  public Boolean validQueueProperties(List<Platform.Property> provisions) {
-    return operationQueue.validProperties(provisions);
+  public Boolean propertiesEligibleForQueue(List<Platform.Property> provisions) {
+    return operationQueue.isEligible(provisions);
   }
 
   @Override

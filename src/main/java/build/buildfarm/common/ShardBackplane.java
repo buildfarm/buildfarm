@@ -295,7 +295,7 @@ public interface ShardBackplane {
   OperationsStatus operationsStatus() throws IOException;
 
   @ThreadSafe
-  Boolean validQueueProperties(List<Platform.Property> provisions);
+  Boolean propertiesEligibleForQueue(List<Platform.Property> provisions);
 
   @ThreadSafe
   GetClientStartTimeResult getClientStartTime(String clientKey) throws IOException;
