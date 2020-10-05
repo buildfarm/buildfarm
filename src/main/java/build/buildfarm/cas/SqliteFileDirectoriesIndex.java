@@ -41,7 +41,7 @@ import javax.annotation.concurrent.GuardedBy;
  *
  * <p>Sqlite db should be removed prior to using this index
  */
-class FileDirectoriesIndex implements DirectoriesIndex {
+class SqliteFileDirectoriesIndex implements DirectoriesIndex {
   private static final Charset UTF_8 = Charset.forName("UTF-8");
 
   private final String dbUrl;
@@ -50,7 +50,7 @@ class FileDirectoriesIndex implements DirectoriesIndex {
   private boolean opened = false;
   private Connection conn;
 
-  FileDirectoriesIndex(String dbUrl, Path root) {
+  SqliteFileDirectoriesIndex(String dbUrl, Path root) {
     this.dbUrl = dbUrl;
     this.root = root;
   }
