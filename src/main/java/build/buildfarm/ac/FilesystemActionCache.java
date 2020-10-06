@@ -1,7 +1,10 @@
 package build.buildfarm.ac;
 
+import static com.google.common.util.concurrent.Futures.immediateFuture;
+
 import build.bazel.remote.execution.v2.ActionResult;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.io.InputStream;
@@ -17,13 +20,13 @@ public class FilesystemActionCache implements ActionCache {
   }
 
   @Override
-  public ActionResult get(ActionKey actionKey) {
+  public ListenableFuture<ActionResult> get(ActionKey actionKey) {
     String hash = actionKey.getDigest().getHash();
     Path resultPath = path.resolve(hash);
     try (InputStream in = Files.newInputStream(resultPath)) {
-      return ActionResult.parseFrom(ByteString.readFrom(in));
+      return immediateFuture(ActionResult.parseFrom(ByteString.readFrom(in)));
     } catch (IOException e) {
-      return null;
+      return immediateFuture(null);
     }
   }
 

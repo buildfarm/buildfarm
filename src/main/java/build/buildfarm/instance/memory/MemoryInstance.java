@@ -280,8 +280,8 @@ public class MemoryInstance extends AbstractServerInstance {
           new DelegateCASMap<>(cas, ActionResult.parser(), digestUtil);
 
       @Override
-      public ActionResult get(ActionKey actionKey) {
-        return map.get(actionKey);
+      public ListenableFuture<ActionResult> get(ActionKey actionKey) {
+        return immediateFuture(map.get(actionKey));
       }
 
       @Override

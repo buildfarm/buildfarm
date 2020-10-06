@@ -97,9 +97,7 @@ public class ContentAddressableStorageService
     ListenableFuture<FindMissingBlobsResponse.Builder> responseFuture =
         transform(
             instance.findMissingBlobs(
-                request.getBlobDigestsList(),
-                directExecutor(),
-                TracingMetadataUtils.fromCurrentContext()),
+                request.getBlobDigestsList(), TracingMetadataUtils.fromCurrentContext()),
             builder::addAllMissingBlobDigests,
             directExecutor());
     addCallback(

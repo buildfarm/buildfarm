@@ -45,7 +45,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 
@@ -64,7 +63,7 @@ public interface Instance {
   void putActionResult(ActionKey actionKey, ActionResult actionResult) throws InterruptedException;
 
   ListenableFuture<Iterable<Digest>> findMissingBlobs(
-      Iterable<Digest> digests, Executor executor, RequestMetadata requestMetadata);
+      Iterable<Digest> digests, RequestMetadata requestMetadata);
 
   boolean containsBlob(Digest digest, RequestMetadata requestMetadata);
 

@@ -119,7 +119,6 @@ import java.io.InputStream;
 import java.util.Iterator;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
@@ -351,7 +350,7 @@ public class StubInstance implements Instance {
 
   @Override
   public ListenableFuture<Iterable<Digest>> findMissingBlobs(
-      Iterable<Digest> digests, Executor executor, RequestMetadata requestMetadata) {
+      Iterable<Digest> digests, RequestMetadata requestMetadata) {
     throwIfStopped();
     FindMissingBlobsRequest request =
         FindMissingBlobsRequest.newBuilder()
@@ -369,7 +368,7 @@ public class StubInstance implements Instance {
             .withInterceptors(attachMetadataInterceptor(requestMetadata))
             .findMissingBlobs(request),
         (response) -> response.getMissingBlobDigestsList(),
-        executor);
+        directExecutor());
   }
 
   @Override
@@ -570,8 +569,7 @@ public class StubInstance implements Instance {
   @Override
   public boolean containsBlob(Digest digest, RequestMetadata requestMetadata) {
     try {
-      return Iterables.isEmpty(
-          findMissingBlobs(ImmutableList.of(digest), directExecutor(), requestMetadata).get());
+      return Iterables.isEmpty(findMissingBlobs(ImmutableList.of(digest), requestMetadata).get());
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
       if (cause instanceof RuntimeException) {
