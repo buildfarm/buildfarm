@@ -19,9 +19,11 @@ import static build.buildfarm.common.Actions.checkPreconditionFailure;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static build.buildfarm.instance.Utils.putBlob;
+import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.Futures.transform;
+import static com.google.common.util.concurrent.Futures.transformAsync;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
@@ -88,8 +90,11 @@ import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.ServerCallStreamObserver;
+import io.netty.handler.codec.http.QueryStringDecoder;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -209,10 +214,60 @@ public abstract class AbstractServerInstance implements Instance {
     return digestUtil;
   }
 
+  protected ListenableFuture<Iterable<Digest>> findMissingActionResultOutputs(
+      @Nullable ActionResult result, RequestMetadata requestMetadata) {
+    if (result == null) {
+      return immediateFuture(ImmutableList.of());
+    }
+    // TODO Directories
+    return findMissingBlobs(
+        Iterables.concat(
+            Iterables.transform(result.getOutputFilesList(), outputFile -> outputFile.getDigest()),
+            // findMissingBlobs will weed out empties
+            ImmutableList.of(result.getStdoutDigest(), result.getStderrDigest())),
+        requestMetadata);
+  }
+
+  protected ListenableFuture<ActionResult> ensureOutputsPresent(
+      ListenableFuture<ActionResult> resultFuture, RequestMetadata requestMetadata) {
+    ListenableFuture<Iterable<Digest>> missingOutputsFuture =
+        transformAsync(
+            resultFuture,
+            result -> findMissingActionResultOutputs(result, requestMetadata),
+            directExecutor());
+    return transformAsync(
+        missingOutputsFuture,
+        missingOutputs -> {
+          if (Iterables.isEmpty(missingOutputs)) {
+            return resultFuture;
+          }
+          return immediateFuture(null);
+        },
+        directExecutor());
+  }
+
+  private static boolean shouldEnsureOutputsPresent(RequestMetadata requestMetadata) {
+    try {
+      URI uri = new URI(requestMetadata.getCorrelatedInvocationsId());
+      QueryStringDecoder decoder = new QueryStringDecoder(uri);
+      return decoder
+          .parameters()
+          .getOrDefault("ENSURE_OUTPUTS_PRESENT", ImmutableList.of("false"))
+          .get(0)
+          .equals("true");
+    } catch (URISyntaxException e) {
+      return false;
+    }
+  }
+
   @Override
   public ListenableFuture<ActionResult> getActionResult(
       ActionKey actionKey, RequestMetadata requestMetadata) {
-    return immediateFuture(actionCache.get(actionKey));
+    ListenableFuture<ActionResult> result = checkNotNull(actionCache.get(actionKey));
+    if (shouldEnsureOutputsPresent(requestMetadata)) {
+      result = checkNotNull(ensureOutputsPresent(result, requestMetadata));
+    }
+    return result;
   }
 
   @Override
@@ -398,7 +453,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public ListenableFuture<Iterable<Digest>> findMissingBlobs(
-      Iterable<Digest> digests, Executor executor, RequestMetadata requestMetadata) {
+      Iterable<Digest> digests, RequestMetadata requestMetadata) {
     Thread findingThread = Thread.currentThread();
     Context.CancellationListener cancellationListener =
         (context) -> {
@@ -688,12 +743,11 @@ public abstract class AbstractServerInstance implements Instance {
   private void validateInputs(
       Iterable<Digest> inputDigests,
       PreconditionFailure.Builder preconditionFailure,
-      Executor executor,
       RequestMetadata requestMetadata)
       throws StatusException, InterruptedException {
     ListenableFuture<Void> result =
         transform(
-            findMissingBlobs(inputDigests, executor, requestMetadata),
+            findMissingBlobs(inputDigests, requestMetadata),
             (missingBlobDigests) -> {
               preconditionFailure.addAllViolations(
                   Iterables.transform(
@@ -706,7 +760,7 @@ public abstract class AbstractServerInstance implements Instance {
                               .build()));
               return null;
             },
-            executor);
+            directExecutor());
     try {
       result.get();
     } catch (ExecutionException e) {
@@ -740,7 +794,6 @@ public abstract class AbstractServerInstance implements Instance {
       Digest actionDigest,
       QueuedOperation queuedOperation,
       PreconditionFailure.Builder preconditionFailure,
-      Executor executor,
       RequestMetadata requestMetadata)
       throws StatusException, InterruptedException {
     final ListenableFuture<Void> validatedFuture;
@@ -759,7 +812,7 @@ public abstract class AbstractServerInstance implements Instance {
           DigestUtil.proxyDirectoriesIndex(queuedOperation.getTree().getDirectories()),
           inputDigestsBuilder::add,
           preconditionFailure);
-      validateInputs(inputDigestsBuilder.build(), preconditionFailure, executor, requestMetadata);
+      validateInputs(inputDigestsBuilder.build(), preconditionFailure, requestMetadata);
     }
     checkPreconditionFailure(actionDigest, preconditionFailure.build());
     return queuedOperation;
@@ -815,7 +868,7 @@ public abstract class AbstractServerInstance implements Instance {
         DigestUtil.proxyDirectoriesIndex(tree.getDirectories()),
         inputDigestsBuilder::add,
         preconditionFailure);
-    validateInputs(inputDigestsBuilder.build(), preconditionFailure, service, requestMetadata);
+    validateInputs(inputDigestsBuilder.build(), preconditionFailure, requestMetadata);
   }
 
   protected void validateQueuedOperation(Digest actionDigest, QueuedOperation queuedOperation)

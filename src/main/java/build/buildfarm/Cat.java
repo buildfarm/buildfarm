@@ -15,7 +15,6 @@
 package build.buildfarm;
 
 import static build.buildfarm.instance.Utils.getBlob;
-import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
 import static java.lang.String.format;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
@@ -234,9 +233,7 @@ class Cat {
       throws ExecutionException, InterruptedException {
     Stopwatch stopwatch = Stopwatch.createStarted();
     Iterable<Digest> missingDigests =
-        instance
-            .findMissingBlobs(digests, directExecutor(), RequestMetadata.getDefaultInstance())
-            .get();
+        instance.findMissingBlobs(digests, RequestMetadata.getDefaultInstance()).get();
     long elapsedMicros = stopwatch.elapsed(TimeUnit.MICROSECONDS);
 
     boolean missing = false;

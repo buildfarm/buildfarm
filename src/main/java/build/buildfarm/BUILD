@@ -267,6 +267,7 @@ java_library(
         "@maven//:io_grpc_grpc_netty",
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
+        "@maven//:io_netty_netty_codec_http",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )
@@ -304,6 +305,7 @@ java_library(
     name = "shard-instance",
     srcs = glob(["instance/shard/*.java"]),
     deps = [
+        ":ac",
         ":common",
         ":common-cache",
         ":common-grpc",
@@ -326,7 +328,6 @@ java_library(
         "@maven//:io_grpc_grpc_netty",
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
-        "@maven//:io_netty_netty_codec_http",
         "@maven//:org_apache_commons_commons_pool2",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
