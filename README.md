@@ -123,6 +123,14 @@ buildfarm_dependencies()
 load("@build_buildfarm//:defs.bzl", "buildfarm_init")
 
 buildfarm_init()
+
+load("@build_buildfarm//:docker.bzl", "buildfarm_docker")
+
+buildfarm_docker()
+
+load("@build_buildfarm//:pip.bzl", "buildfarm_pip")
+
+buildfarm_pip()
 ```
 
 Optionally, if you want to use the buildfarm docker container image targets, you can add this:
