@@ -104,8 +104,8 @@ java_library(
         "@googleapis//:google_rpc_error_details_java_proto",
         "@googleapis//:google_rpc_status_java_proto",
         "@maven//:com_amazonaws_aws_java_sdk_core",
-        "@maven//:com_amazonaws_aws_java_sdk_sns",
         "@maven//:com_amazonaws_aws_java_sdk_secretsmanager",
+        "@maven//:com_amazonaws_aws_java_sdk_sns",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java_util",
@@ -231,12 +231,12 @@ java_library(
         "@maven//:com_google_guava_failureaccess",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java",
+        "@maven//:com_google_protobuf_protobuf_java_util",
         "@maven//:io_grpc_grpc_api",
         "@maven//:io_grpc_grpc_core",
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
-        "@maven//:com_google_protobuf_protobuf_java_util",
     ],
 )
 
@@ -367,18 +367,18 @@ java_library(
     srcs = glob(["server/**/*.java"]),
     visibility = ["//visibility:public"],
     deps = [
+        ":admin",
         ":aws-admin",
         ":aws-metrics",
         ":cas",
         ":common",
         ":common-grpc",
-        ":admin",
-        ":metrics",
         ":gcp-admin",
         ":gcp-metrics",
         ":instance",
         ":log-metrics",
         ":memory-instance",
+        ":metrics",
         ":shard-instance",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
@@ -432,7 +432,7 @@ container_image(
     files = [
         ":buildfarm-server_deploy.jar",
     ],
-    tags = ["manual"],
+    tags = ["no_windows"],
     visibility = ["//visibility:public"],
 )
 
@@ -453,6 +453,7 @@ java_library(
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java",
+        "@maven//:com_google_protobuf_protobuf_java_util",
         "@maven//:io_grpc_grpc_api",
         "@maven//:io_grpc_grpc_context",
         "@maven//:io_grpc_grpc_core",
@@ -461,7 +462,6 @@ java_library(
         "@maven//:io_grpc_grpc_stub",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
-        "@maven//:com_google_protobuf_protobuf_java_util",
     ],
 )
 
@@ -481,8 +481,8 @@ java_library(
         ":stub-instance",
         ":worker",
         ":worker-cgroup",
-        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
         "//src/main/java/build/buildfarm:common-cache",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_rpc_error_details_java_proto",
         "@maven//:com_github_pcj_google_options",
@@ -521,7 +521,7 @@ container_image(
     files = [
         ":buildfarm-shard-worker_deploy.jar",
     ],
-    tags = ["manual"],
+    tags = ["no_windows"],
     visibility = ["//visibility:public"],
 )
 
@@ -579,13 +579,13 @@ java_library(
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java",
+        "@maven//:com_google_protobuf_protobuf_java_util",
         "@maven//:io_grpc_grpc_api",
         "@maven//:io_grpc_grpc_context",
         "@maven//:io_grpc_grpc_core",
         "@maven//:io_grpc_grpc_netty",
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
-        "@maven//:com_google_protobuf_protobuf_java_util",
     ],
 )
 
@@ -655,7 +655,7 @@ container_image(
     files = [
         ":buildfarm-operationqueue-worker_deploy.jar",
     ],
-    tags = ["manual"],
+    tags = ["no_windows"],
     visibility = ["//visibility:public"],
 )
 
