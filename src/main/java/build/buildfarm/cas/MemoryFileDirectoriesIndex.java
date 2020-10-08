@@ -34,20 +34,18 @@ import java.util.stream.Collectors;
 import javax.annotation.concurrent.GuardedBy;
 
 /**
- * Ephemeral file manifestations of the entry/directory mappings Directory entries are stored in
- * files (and expected to be immutable) Entry directories are maintained in sqlite.
- *
- * <p>Sqlite db should be removed prior to using this index
+ * Use ConcurrentHashMap in memory to store bidirectional entry directory mapping.
+ * Comparing to using sqlite, this should reduce worker startup time a lot, but
+ * will also cause high memory usage.
  */
-class MemoryFileDirectoriesIndex implements DirectoriesIndex {
+class MemoryFileDirectoriesIndex extends DirectoriesIndex {
   private static final Charset UTF_8 = Charset.forName("UTF-8");
 
-  private final Path root;
 
   private final ConcurrentHashMap<String, Set<String>> data;
 
   public MemoryFileDirectoriesIndex(Path root) {
-    this.root = root;
+    super(root);
     data = new ConcurrentHashMap<>();
   }
 
@@ -81,19 +79,6 @@ class MemoryFileDirectoriesIndex implements DirectoriesIndex {
       }
     }
     return directories;
-  }
-
-  @Override
-  public Iterable<String> directoryEntries(Digest directory) throws IOException {
-    try {
-      return asCharSource(path(directory), UTF_8).readLines();
-    } catch (NoSuchFileException e) {
-      return ImmutableList.of();
-    }
-  }
-
-  Path path(Digest digest) {
-    return root.resolve(digest.getHash() + "_" + digest.getSizeBytes() + "_dir_inputs");
   }
 
   @Override

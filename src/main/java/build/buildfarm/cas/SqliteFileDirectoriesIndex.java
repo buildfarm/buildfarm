@@ -41,18 +41,17 @@ import javax.annotation.concurrent.GuardedBy;
  *
  * <p>Sqlite db should be removed prior to using this index
  */
-class SqliteFileDirectoriesIndex implements DirectoriesIndex {
+class SqliteFileDirectoriesIndex extends DirectoriesIndex {
   private static final Charset UTF_8 = Charset.forName("UTF-8");
 
   private final String dbUrl;
-  private final Path root;
 
   private boolean opened = false;
   private Connection conn;
 
   SqliteFileDirectoriesIndex(String dbUrl, Path root) {
+    super(root);
     this.dbUrl = dbUrl;
-    this.root = root;
   }
 
   @GuardedBy("this")
@@ -158,15 +157,6 @@ class SqliteFileDirectoriesIndex implements DirectoriesIndex {
       }
     }
     return directories;
-  }
-
-  @Override
-  public Iterable<String> directoryEntries(Digest directory) throws IOException {
-    try {
-      return asCharSource(path(directory), UTF_8).readLines();
-    } catch (NoSuchFileException e) {
-      return ImmutableList.of();
-    }
   }
 
   private synchronized void addEntriesDirectory(Set<String> entries, Digest directory) {
