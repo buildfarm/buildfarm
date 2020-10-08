@@ -20,7 +20,6 @@ import static com.google.common.io.MoreFiles.asCharSource;
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 
 import java.io.IOException;
@@ -28,12 +27,6 @@ import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -63,6 +56,7 @@ class MemoryFileDirectoriesIndex implements DirectoriesIndex {
     throw new UnsupportedOperationException("MemoryFileDirectoriesIndex doesn't support close() operation.");
   }
 
+  @GuardedBy("this")
   private Set<Digest> removeEntryDirectories(String entry) {
     Set<String> directories = data.remove(entry);
     directories = directories == null ? new HashSet<>() : directories;
