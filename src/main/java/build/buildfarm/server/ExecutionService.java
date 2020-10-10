@@ -40,6 +40,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
+import com.google.protobuf.Duration;
+import com.google.protobuf.util.Durations;
+import build.buildfarm.common.Time;
 
 public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
   private static final Logger logger = Logger.getLogger(ExecutionService.class.getName());
@@ -63,15 +66,15 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
     this.metricsPublisher = metricsPublisher;
   }
   
-  private void enforceGrpcTimeout(ServerCallStreamObserver<Operation> streamObserver, ListenableFuture<Void> future) {
+  private <T> void enforceGrpcTimeout(ServerCallStreamObserver<T> streamObserver, ListenableFuture<Void> future, String endpoint, Duration duration) {
     
-    Context.CancellableContext c = Context.current().withDeadlineAfter(10, TimeUnit.SECONDS, keepaliveScheduler);
+    Context.CancellableContext c = Context.current().withDeadline(Time.toDeadline(duration), keepaliveScheduler);
     Context.CancellationListener listener = new Context.CancellationListener() {
         @Override
         public void cancelled(Context ctx) {
           future.cancel(true);
-          //TODO: say amount
-          streamObserver.onError(Status.DEADLINE_EXCEEDED.withDescription("SDFSDF").asException());
+          String error = "The grpc endpoint '" + endpoint + "' has timed out because buildfarm enforces a deadline of " + duration.toString();
+          streamObserver.onError(Status.DEADLINE_EXCEEDED.withDescription(error).asException());
         }
       };
   
@@ -82,7 +85,7 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
       ServerCallStreamObserver<Operation> serverCallStreamObserver, ListenableFuture<Void> future) {
     
     
-    enforceGrpcTimeout(serverCallStreamObserver,future);
+    enforceGrpcTimeout(serverCallStreamObserver,future,"execute",Durations.fromSeconds(10));
     
     addCallback(
         future,

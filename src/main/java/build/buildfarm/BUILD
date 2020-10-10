@@ -401,6 +401,7 @@ java_library(
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
         "@remote_apis//:build_bazel_semver_java_proto",
+        "@maven//:com_google_protobuf_protobuf_java_util",
     ],
 )
 
