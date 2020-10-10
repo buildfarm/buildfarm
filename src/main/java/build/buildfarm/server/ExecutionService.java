@@ -66,14 +66,24 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
     this.metricsPublisher = metricsPublisher;
   }
   
+public static String humanReadableFormat(Duration duration) {
+    return duration.toString()
+            .substring(2)
+            .replaceAll("(\\d[HMS])(?!$)", "$1 ")
+            .toLowerCase();
+}
+  
   private <T> void enforceGrpcTimeout(ServerCallStreamObserver<T> streamObserver, ListenableFuture<Void> future, String endpoint, Duration duration) {
     
+    // enforce a grpc timeout on the endpoint via a deadline.
+    // if canceled, also cancel the future, and return an error to the client.
+    // we cancel the future, so ongoing work does not continue after the grpc timeout is reached.
     Context.CancellableContext c = Context.current().withDeadline(Time.toDeadline(duration), keepaliveScheduler);
     Context.CancellationListener listener = new Context.CancellationListener() {
         @Override
         public void cancelled(Context ctx) {
           future.cancel(true);
-          String error = "The grpc endpoint '" + endpoint + "' has timed out because buildfarm enforces a deadline of " + duration.toString();
+          String error = "The grpc endpoint '" + endpoint + "' has timed out because buildfarm enforces a deadline of " + humanReadableFormat(duration);
           streamObserver.onError(Status.DEADLINE_EXCEEDED.withDescription(error).asException());
         }
       };
