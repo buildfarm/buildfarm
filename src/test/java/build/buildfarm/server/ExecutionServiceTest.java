@@ -25,6 +25,7 @@ import static org.mockito.Mockito.verify;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.metrics.log.LogMetricsPublisher;
 import build.buildfarm.server.ExecutionService.KeepaliveWatcher;
+import build.buildfarm.v1test.GrpcTimeout;
 import build.buildfarm.v1test.MetricsConfig;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
@@ -53,6 +54,8 @@ public class ExecutionServiceTest {
     ExecutionService service =
         new ExecutionService(
             instances,
+            GrpcTimeout.newBuilder().build(),
+            GrpcTimeout.newBuilder().build(),
             /* keepaliveAfter=*/ 1,
             /* keepaliveUnit=*/ SECONDS, // far enough in the future that we'll get scheduled and
             keepaliveScheduler,
