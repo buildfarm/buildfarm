@@ -38,28 +38,31 @@ public class GrpcEndpointHandler {
   ///
   public static <T> void handleTimeout(
       GrpcEndpoint<T> endpoint, Context context, ScheduledExecutorService executor) {
-    // enforce a grpc timeout using a deadline.
-    // when the timeout occurs, it will cause a context cancellation.
-    // we also cancel the operation, and return an error to the client.
-    // the operation is canceled so that ongoing work does not continue after the grpc timeout.
-    Context.CancellableContext c =
-        context.withDeadline(Time.toDeadline(endpoint.duration), executor);
-    Context.CancellationListener listener =
-        new Context.CancellationListener() {
-          @Override
-          public void cancelled(Context ctx) {
-            endpoint.operation.cancel(true);
-            String error =
-                "The grpc endpoint '"
-                    + endpoint.name
-                    + "' has timed out because buildfarm enforces a deadline of "
-                    + endpoint.duration.getSeconds()
-                    + "s";
-            endpoint.streamObserver.onError(
-                Status.DEADLINE_EXCEEDED.withDescription(error).asException());
-          }
-        };
+    if (endpoint.enforceDeadline) {
 
-    c.addListener(listener, directExecutor());
+      // enforce a grpc timeout using a deadline.
+      // when the timeout occurs, it will cause a context cancellation.
+      // we also cancel the operation, and return an error to the client.
+      // the operation is canceled so that ongoing work does not continue after the grpc timeout.
+      Context.CancellableContext c =
+          context.withDeadline(Time.toDeadline(endpoint.duration), executor);
+      Context.CancellationListener listener =
+          new Context.CancellationListener() {
+            @Override
+            public void cancelled(Context ctx) {
+              endpoint.operation.cancel(true);
+              String error =
+                  "The grpc endpoint '"
+                      + endpoint.name
+                      + "' has timed out because buildfarm enforces a deadline of "
+                      + endpoint.duration.getSeconds()
+                      + "s";
+              endpoint.streamObserver.onError(
+                  Status.DEADLINE_EXCEEDED.withDescription(error).asException());
+            }
+          };
+
+      c.addListener(listener, directExecutor());
+    }
   }
 }

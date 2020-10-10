@@ -101,6 +101,8 @@ public class BuildFarmServer extends LoggingMain {
             .addService(
                 new ExecutionService(
                     instances,
+                    config.getExecuteTimeout(),
+                    config.getWaitExecuteTimeout(),
                     config.getExecuteKeepaliveAfterSeconds(),
                     TimeUnit.SECONDS,
                     keepaliveScheduler,

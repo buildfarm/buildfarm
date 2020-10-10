@@ -23,6 +23,7 @@ import build.bazel.remote.execution.v2.ExecuteRequest;
 import build.bazel.remote.execution.v2.ExecutionGrpc;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.WaitExecutionRequest;
+import build.buildfarm.v1test.GrpcTimeout;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.grpc.GrpcEndpoint;
 import build.buildfarm.common.grpc.GrpcEndpointHandler;
@@ -52,14 +53,20 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
   private final TimeUnit keepaliveUnit;
   private final ScheduledExecutorService keepaliveScheduler;
   private final MetricsPublisher metricsPublisher;
+  private final GrpcTimeout executeTimeout;
+  private final GrpcTimeout waitExecuteTimeout;
 
   public ExecutionService(
       Instances instances,
+      GrpcTimeout executeTimeout,
+      GrpcTimeout waitExecuteTimeout,
       long keepaliveAfter,
       TimeUnit keepaliveUnit,
       ScheduledExecutorService keepaliveScheduler,
       MetricsPublisher metricsPublisher) {
     this.instances = instances;
+    this.executeTimeout = executeTimeout;
+    this.waitExecuteTimeout = waitExecuteTimeout;
     this.keepaliveAfter = keepaliveAfter;
     this.keepaliveUnit = keepaliveUnit;
     this.keepaliveScheduler = keepaliveScheduler;
@@ -68,7 +75,7 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
 
   private <T> void withCancellation(GrpcEndpoint<T> endpoint) {
 
-    GrpcEndpointHandler.handleTimeout(endpoint,Context.current(),keepaliveScheduler);
+    GrpcEndpointHandler.handleTimeout(endpoint, Context.current(), keepaliveScheduler);
 
     addCallback(
         endpoint.operation,
@@ -199,8 +206,8 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
     endpoint.streamObserver = serverCallStreamObserver;
     endpoint.operation = operation;
     endpoint.name = "wait execution";
-    endpoint.enforceDeadline = false;
-    endpoint.duration = Durations.fromSeconds(10);
+    endpoint.enforceDeadline = waitExecuteTimeout.getEnforce();
+    endpoint.duration = waitExecuteTimeout.getTimeout();
 
     withCancellation(endpoint);
   }
@@ -233,8 +240,8 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
       endpoint.streamObserver = serverCallStreamObserver;
       endpoint.operation = operation;
       endpoint.name = "execute";
-      endpoint.enforceDeadline = true;
-      endpoint.duration = Durations.fromSeconds(10);
+      endpoint.enforceDeadline = executeTimeout.getEnforce();
+      endpoint.duration = executeTimeout.getTimeout();
 
       withCancellation(endpoint);
     } catch (InterruptedException e) {

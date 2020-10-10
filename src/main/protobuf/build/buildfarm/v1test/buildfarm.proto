@@ -166,6 +166,15 @@ message BuildFarmServerConfig {
   MetricsConfig metrics_config = 5;
 
   AdminConfig admin_config = 6;
+  
+  GrpcTimeout execute_timeout = 7;
+  GrpcTimeout wait_execute_timeout = 8;
+}
+
+message GrpcTimeout {
+  bool enforce = 1;
+  
+  google.protobuf.Duration timeout = 2;
 }
 
 message MetricsConfig {
