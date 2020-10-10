@@ -62,9 +62,28 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
     this.keepaliveScheduler = keepaliveScheduler;
     this.metricsPublisher = metricsPublisher;
   }
+  
+  private void enforceGrpcTimeout(ServerCallStreamObserver<Operation> streamObserver, ListenableFuture<Void> future) {
+    
+    Context.CancellableContext c = Context.current().withDeadlineAfter(10, TimeUnit.SECONDS, keepaliveScheduler);
+    Context.CancellationListener listener = new Context.CancellationListener() {
+        @Override
+        public void cancelled(Context ctx) {
+          future.cancel(true);
+          //TODO: say amount
+          streamObserver.onError(Status.DEADLINE_EXCEEDED.withDescription("SDFSDF").asException());
+        }
+      };
+  
+    c.addListener(listener,directExecutor());
+  }
 
   private void withCancellation(
       ServerCallStreamObserver<Operation> serverCallStreamObserver, ListenableFuture<Void> future) {
+    
+    
+    enforceGrpcTimeout(serverCallStreamObserver,future);
+    
     addCallback(
         future,
         new FutureCallback<Void>() {
