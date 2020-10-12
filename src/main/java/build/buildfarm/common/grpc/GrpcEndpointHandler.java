@@ -39,30 +39,47 @@ public class GrpcEndpointHandler {
   public static <T> void handleTimeout(
       GrpcEndpoint<T> endpoint, Context context, ScheduledExecutorService executor) {
     if (endpoint.enforceDeadline) {
-
-      // enforce a grpc timeout using a deadline.
-      // when the timeout occurs, it will cause a context cancellation.
-      // we also cancel the operation, and return an error to the client.
-      // the operation is canceled so that ongoing work does not continue after the grpc timeout.
-      Context.CancellableContext c =
-          context.withDeadline(Time.toDeadline(endpoint.duration), executor);
-      Context.CancellationListener listener =
-          new Context.CancellationListener() {
-            @Override
-            public void cancelled(Context ctx) {
-              endpoint.operation.cancel(true);
-              String error =
-                  "The grpc endpoint '"
-                      + endpoint.name
-                      + "' has timed out because buildfarm enforces a deadline of "
-                      + endpoint.duration.getSeconds()
-                      + "s";
-              endpoint.streamObserver.onError(
-                  Status.DEADLINE_EXCEEDED.withDescription(error).asException());
-            }
-          };
-
-      c.addListener(listener, directExecutor());
+      enforceDeadline(endpoint, context, executor);
     }
+  }
+  ///
+  /// @brief   Enforce a deadline on the endpoint.
+  /// @details Cancel the context and operation after a certain amount of time.
+  /// @param   endpoint Information about the endpoint including how to handle timeouts.
+  /// @param   context  The grpc context from hitting the endpoint.
+  /// @param   executor The executor to use with the context.
+  ///
+  private static <T> void enforceDeadline(
+      GrpcEndpoint<T> endpoint, Context context, ScheduledExecutorService executor) {
+    // enforce a grpc timeout using a deadline.
+    // when the timeout occurs, it will cause a context cancellation.
+    // we also cancel the operation, and return an error to the client.
+    // the operation is canceled so that ongoing work does not continue after the grpc timeout.
+    Context.CancellableContext c =
+        context.withDeadline(Time.toDeadline(endpoint.duration), executor);
+    Context.CancellationListener listener =
+        new Context.CancellationListener() {
+          @Override
+          public void cancelled(Context ctx) {
+            endpoint.operation.cancel(true);
+            String error = deadlineExceededError(endpoint);
+            endpoint.streamObserver.onError(
+                Status.DEADLINE_EXCEEDED.withDescription(error).asException());
+          }
+        };
+
+    c.addListener(listener, directExecutor());
+  }
+  ///
+  /// @brief   Get error message for deadline exceeded.
+  /// @details This message will be sent back to the client.
+  /// @param   endpoint Information about the endpoint including how to handle timeouts.
+  /// @return  The error message.
+  /// @note    Suggested return identifier: error.
+  ///
+  private static <T> String deadlineExceededError(GrpcEndpoint<T> endpoint) {
+    return String.format(
+        "The grpc endpoint '%s' has timed out because buildfarm enforces a deadline of %ds",
+        endpoint.name, endpoint.duration.getSeconds());
   }
 }
