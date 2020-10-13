@@ -440,6 +440,13 @@ public class ShardInstance extends AbstractServerInstance {
       backplane.start(publicName);
     } catch (IOException e) {
       throw new RuntimeException(e);
+    } catch (RuntimeException e) {
+      try {
+        stop();
+      } catch (InterruptedException intEx) {
+        e.addSuppressed(intEx);
+      }
+      throw e;
     }
     if (dispatchedMonitor != null) {
       dispatchedMonitor.start();
