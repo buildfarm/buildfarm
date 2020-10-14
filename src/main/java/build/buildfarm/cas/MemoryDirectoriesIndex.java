@@ -18,6 +18,8 @@ import build.bazel.remote.execution.v2.Digest;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.MultimapBuilder;
 import com.google.common.collect.SetMultimap;
+
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -28,10 +30,14 @@ import java.util.Set;
  * <p>Memory usage for this implementation is combinatorial and is only provided as a reference for
  * requirements.
  */
-class MemoryDirectoriesIndex implements DirectoriesIndex {
+class MemoryDirectoriesIndex extends DirectoriesIndex {
   private final SetMultimap<String, Digest> entryDirectories =
       MultimapBuilder.treeKeys().hashSetValues().build();
   private final Map<Digest, ImmutableList<String>> directories = new HashMap<>();
+
+  MemoryDirectoriesIndex(Path root) {
+    super(root);
+  }
 
   @Override
   public void close() {}
