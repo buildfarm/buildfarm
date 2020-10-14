@@ -65,6 +65,7 @@ class MemoryDirectoriesIndex extends DirectoriesIndex {
   @Override
   public synchronized void remove(Digest directory) {
     Iterable<String> entries = directories.remove(directory);
+    if (entries == null) return;
     for (String entry : entries) {
       // safe for multiple removal
       entryDirectories.remove(entry, directory);

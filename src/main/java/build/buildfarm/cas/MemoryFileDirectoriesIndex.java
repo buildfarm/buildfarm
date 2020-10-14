@@ -97,6 +97,7 @@ class MemoryFileDirectoriesIndex extends DirectoriesIndex {
 
     String digest = DigestUtil.toString(directory);
     Set<String> entries = data.remove(digest);
+    if (entries == null) return;
     for (String entry : entries) {
       data.get(entry).remove(digest);
     }
