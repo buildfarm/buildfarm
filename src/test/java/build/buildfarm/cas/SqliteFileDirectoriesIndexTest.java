@@ -33,20 +33,20 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-public class FileDirectoriesIndexTest {
+public class SqliteFileDirectoriesIndexTest {
   private final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
 
   private final String jdbcIndexUrl = "jdbc:sqlite::memory:";
   private Path root;
-  private FileDirectoriesIndex directoriesIndex;
+  private SqliteFileDirectoriesIndex directoriesIndex;
 
-  protected FileDirectoriesIndexTest(Path root) {
+  protected SqliteFileDirectoriesIndexTest(Path root) {
     this.root = root.resolve("cache");
   }
 
   @Before
   public void setUp() throws IOException {
-    directoriesIndex = new FileDirectoriesIndex(jdbcIndexUrl, root);
+    directoriesIndex = new SqliteFileDirectoriesIndex(jdbcIndexUrl, root);
     Files.createDirectories(root);
   }
 
@@ -89,8 +89,8 @@ public class FileDirectoriesIndexTest {
   }
 
   @RunWith(JUnit4.class)
-  public static class WindowsFileDirectoriesIndexTest extends FileDirectoriesIndexTest {
-    public WindowsFileDirectoriesIndexTest() {
+  public static class WindowsSqliteFileDirectoriesIndexTest extends SqliteFileDirectoriesIndexTest {
+    public WindowsSqliteFileDirectoriesIndexTest() {
       super(
           Iterables.getFirst(
               Jimfs.newFileSystem(
@@ -104,8 +104,8 @@ public class FileDirectoriesIndexTest {
   }
 
   @RunWith(JUnit4.class)
-  public static class UnixFileDirectoriesIndexTest extends FileDirectoriesIndexTest {
-    public UnixFileDirectoriesIndexTest() {
+  public static class UnixSqliteFileDirectoriesIndexTest extends SqliteFileDirectoriesIndexTest {
+    public UnixSqliteFileDirectoriesIndexTest() {
       super(
           Iterables.getFirst(
               Jimfs.newFileSystem(
@@ -119,8 +119,8 @@ public class FileDirectoriesIndexTest {
   }
 
   @RunWith(JUnit4.class)
-  public static class OsFileDirectoriesIndexTest extends FileDirectoriesIndexTest {
-    public OsFileDirectoriesIndexTest() {
+  public static class OsSqliteFileDirectoriesIndexTest extends SqliteFileDirectoriesIndexTest {
+    public OsSqliteFileDirectoriesIndexTest() {
       super(
           Iterables.getFirst(
               Jimfs.newFileSystem(

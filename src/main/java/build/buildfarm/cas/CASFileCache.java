@@ -309,7 +309,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       }
       directoriesIndexUrl += path.toString();
     }
-    this.directoriesIndex = new FileDirectoriesIndex(directoriesIndexUrl, root);
+    this.directoriesIndex = new MemoryDirectoriesIndex(root);
 
     header.before = header.after = header;
   }

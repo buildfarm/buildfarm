@@ -15,11 +15,9 @@
 package build.buildfarm.cas;
 
 import static com.google.common.io.MoreFiles.asCharSink;
-import static com.google.common.io.MoreFiles.asCharSource;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.nio.charset.Charset;
@@ -41,18 +39,17 @@ import javax.annotation.concurrent.GuardedBy;
  *
  * <p>Sqlite db should be removed prior to using this index
  */
-class FileDirectoriesIndex implements DirectoriesIndex {
+class SqliteFileDirectoriesIndex extends DirectoriesIndex {
   private static final Charset UTF_8 = Charset.forName("UTF-8");
 
   private final String dbUrl;
-  private final Path root;
 
   private boolean opened = false;
   private Connection conn;
 
-  FileDirectoriesIndex(String dbUrl, Path root) {
+  SqliteFileDirectoriesIndex(String dbUrl, Path root) {
+    super(root);
     this.dbUrl = dbUrl;
-    this.root = root;
   }
 
   @GuardedBy("this")
@@ -158,15 +155,6 @@ class FileDirectoriesIndex implements DirectoriesIndex {
       }
     }
     return directories;
-  }
-
-  @Override
-  public Iterable<String> directoryEntries(Digest directory) throws IOException {
-    try {
-      return asCharSource(path(directory), UTF_8).readLines();
-    } catch (NoSuchFileException e) {
-      return ImmutableList.of();
-    }
   }
 
   private synchronized void addEntriesDirectory(Set<String> entries, Digest directory) {
