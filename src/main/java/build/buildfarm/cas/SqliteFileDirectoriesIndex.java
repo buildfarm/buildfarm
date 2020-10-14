@@ -15,11 +15,9 @@
 package build.buildfarm.cas;
 
 import static com.google.common.io.MoreFiles.asCharSink;
-import static com.google.common.io.MoreFiles.asCharSource;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.nio.charset.Charset;

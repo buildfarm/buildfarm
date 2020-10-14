@@ -14,16 +14,15 @@
 
 package build.buildfarm.cas;
 
+import static com.google.common.io.MoreFiles.asCharSource;
+
 import build.bazel.remote.execution.v2.Digest;
 import com.google.common.collect.ImmutableList;
-
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.Set;
-
-import static com.google.common.io.MoreFiles.asCharSource;
 
 /**
  * Abstract class for entry/directory mappings.

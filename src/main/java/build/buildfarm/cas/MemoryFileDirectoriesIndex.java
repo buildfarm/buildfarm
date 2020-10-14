@@ -15,13 +15,10 @@
 package build.buildfarm.cas;
 
 import static com.google.common.io.MoreFiles.asCharSink;
-import static com.google.common.io.MoreFiles.asCharSource;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Sets;
-
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
@@ -34,13 +31,12 @@ import java.util.stream.Collectors;
 import javax.annotation.concurrent.GuardedBy;
 
 /**
- * Use ConcurrentHashMap in memory to store bidirectional entry directory mapping.
- * Comparing to using sqlite, this should reduce worker startup time a lot, but
- * will also cause high memory usage.
+ * Use ConcurrentHashMap in memory to store bidirectional entry directory mapping. Comparing to
+ * using sqlite, this should reduce worker startup time a lot, but will also cause high memory
+ * usage.
  */
 class MemoryFileDirectoriesIndex extends DirectoriesIndex {
   private static final Charset UTF_8 = Charset.forName("UTF-8");
-
 
   private final ConcurrentHashMap<String, Set<String>> data;
 
@@ -51,7 +47,8 @@ class MemoryFileDirectoriesIndex extends DirectoriesIndex {
 
   @Override
   public void close() {
-    throw new UnsupportedOperationException("MemoryFileDirectoriesIndex doesn't support close() operation.");
+    throw new UnsupportedOperationException(
+        "MemoryFileDirectoriesIndex doesn't support close() operation.");
   }
 
   @GuardedBy("this")
@@ -62,9 +59,7 @@ class MemoryFileDirectoriesIndex extends DirectoriesIndex {
       data.remove(directory);
     }
 
-    return directories.stream()
-        .map(DigestUtil::parseDigest)
-        .collect(Collectors.toSet());
+    return directories.stream().map(DigestUtil::parseDigest).collect(Collectors.toSet());
   }
 
   @Override
@@ -108,6 +103,5 @@ class MemoryFileDirectoriesIndex extends DirectoriesIndex {
   }
 
   @Override
-  public void start() {
-  }
+  public void start() {}
 }
