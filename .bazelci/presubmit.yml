@@ -20,7 +20,7 @@ platforms:
     - "..."
   windows:
     build_flags:
-    - "--test_tag_filters=-container"
+    - "--build_tag_filters=-container"
     build_targets:
     - "..."
     test_targets:
