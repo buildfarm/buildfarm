@@ -19,6 +19,8 @@ platforms:
     test_targets:
     - "..."
   windows:
+    build_flags:
+    - "--build_tag_filters=-container"
     build_targets:
     - "..."
     test_targets:
