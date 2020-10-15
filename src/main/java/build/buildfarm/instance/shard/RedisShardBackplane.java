@@ -508,9 +508,10 @@ public class RedisShardBackplane implements ShardBackplane {
     client = new RedisClient(jedisClusterFactory.get());
 
     // Construct the prequeue so that elements are balanced across all redis nodes.
-    List<String> clusterHashes =
-        client.call(jedis -> RedisNodeHashes.getEvenlyDistributedHashes(jedis));
-    this.prequeue = new BalancedRedisQueue(config.getPreQueuedOperationsListName(), clusterHashes);
+    this.prequeue =
+        new BalancedRedisQueue(
+            config.getPreQueuedOperationsListName(),
+            getQueueHashes(config.getPreQueuedOperationsListName()));
 
     // Construct an operation queue based on configuration.
     // An operation queue consists of multiple provisioned queues in which the order dictates the
@@ -522,7 +523,7 @@ public class RedisShardBackplane implements ShardBackplane {
       ProvisionedRedisQueue provisionedQueue =
           new ProvisionedRedisQueue(
               queueConfig.getName(),
-              clusterHashes,
+              getQueueHashes(queueConfig.getName()),
               toMultimap(queueConfig.getPlatform().getPropertiesList()));
       provisionedQueues.add(provisionedQueue);
     }
@@ -540,7 +541,9 @@ public class RedisShardBackplane implements ShardBackplane {
           ProvisionedRedisQueue.WILDCARD_VALUE, ProvisionedRedisQueue.WILDCARD_VALUE);
       ProvisionedRedisQueue defaultQueue =
           new ProvisionedRedisQueue(
-              config.getQueuedOperationsListName(), clusterHashes, defaultProvisions);
+              config.getQueuedOperationsListName(),
+              getQueueHashes(config.getQueuedOperationsListName()),
+              defaultProvisions);
       provisionedQueues.add(defaultQueue);
     }
 
@@ -556,6 +559,13 @@ public class RedisShardBackplane implements ShardBackplane {
     // Record client start time
     client.call(
         jedis -> jedis.set("startTime/" + clientPublicName, Long.toString(new Date().getTime())));
+  }
+
+  List<String> getQueueHashes(String queueName) throws IOException {
+    List<String> clusterHashes =
+        client.call(
+            jedis -> RedisNodeHashes.getEvenlyDistributedHashesWithPrefix(jedis, queueName));
+    return clusterHashes;
   }
 
   @Override

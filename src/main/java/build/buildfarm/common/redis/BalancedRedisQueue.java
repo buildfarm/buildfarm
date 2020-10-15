@@ -19,8 +19,6 @@ import build.buildfarm.v1test.QueueStatus;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import redis.clients.jedis.JedisCluster;
 
 ///
@@ -95,8 +93,8 @@ public class BalancedRedisQueue {
   /// @note    Overloaded.
   ///
   public BalancedRedisQueue(String name, List<String> hashtags) {
-    this.originalHashtag = existingHash(name);
-    this.name = unhashedName(name);
+    this.originalHashtag = RedisHashtags.existingHash(name);
+    this.name = RedisHashtags.unhashedName(name);
     createHashedQueues(this.name, hashtags);
   }
 
@@ -326,7 +324,7 @@ public class BalancedRedisQueue {
   private void createHashedQueues(String name, List<String> hashtags) {
     // create an internal queue for each of the provided hashtags
     for (String hashtag : hashtags) {
-      queues.add(new RedisQueue(hashedName(name, hashtag)));
+      queues.add(new RedisQueue(RedisHashtags.hashedName(name, hashtag)));
     }
 
     // if there were no hashtags, we'll create a single internal queue
@@ -339,63 +337,11 @@ public class BalancedRedisQueue {
     if (hashtags.isEmpty()) {
 
       if (!originalHashtag.isEmpty()) {
-        queues.add(new RedisQueue(hashedName(name, originalHashtag)));
+        queues.add(new RedisQueue(RedisHashtags.hashedName(name, originalHashtag)));
       } else {
-        queues.add(new RedisQueue(hashedName(name, "06S")));
+        queues.add(new RedisQueue(RedisHashtags.hashedName(name, "06S")));
       }
     }
-  }
-
-  ///
-  /// @brief   Append the hashtag value to the base queue name.
-  /// @details Creates a valid queue name for one of the entire queues.
-  /// @param   name    The global name of the queue.
-  /// @param   hashtag A hashtag for an individual internal queue.
-  /// @return  A valid queue name for one of the internal queues.
-  /// @note    Suggested return identifier: queueName.
-  ///
-  private String hashedName(String name, String hashtag) {
-    return "{" + hashtag + "}" + name;
-  }
-
-  ///
-  /// @brief   Remove any existing redis hashtag from the key name.
-  /// @details Creates a valid key name with any existing hashtags removed.
-  /// @param   name The global name of the queue.
-  /// @return  A valid keyname without hashtags.
-  /// @note    Suggested return identifier: queueName.
-  ///
-  private String unhashedName(String name) {
-    return name.replaceAll("\\{.*?\\}", "");
-  }
-
-  ///
-  /// @brief   Get the existing hashtag of the name.
-  /// @details Parses out the first redis hashtag found. If no hashtags are
-  ///          found, an empty string is returned.
-  /// @param   name The global name of the queue.
-  /// @return  The existing hashtag name found in the string (brackets are removed).
-  /// @note    Suggested return identifier: hashtag.
-  ///
-  private String existingHash(String name) {
-    String regex = "\\{.*?\\}";
-    Pattern pattern = Pattern.compile(regex);
-    Matcher matcher = pattern.matcher(name);
-
-    // hashtag found
-    if (matcher.find()) {
-
-      // extract from matcher
-      String hashtag = matcher.group(0);
-
-      // remove brackets
-      hashtag = hashtag.substring(1, hashtag.length() - 1);
-
-      return hashtag;
-    }
-
-    // hashtag not found
-    return "";
   }
 
   ///
