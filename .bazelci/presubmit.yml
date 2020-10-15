@@ -20,6 +20,6 @@ platforms:
     - "..."
   windows:
     build_targets:
-    - "..."
+    - "... --test_tag_filters=-container"
     test_targets:
     - "..."
