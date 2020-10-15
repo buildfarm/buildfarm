@@ -32,6 +32,7 @@ import build.buildfarm.common.function.InterruptingRunnable;
 import build.buildfarm.common.redis.BalancedRedisQueue;
 import build.buildfarm.common.redis.ProvisionedRedisQueue;
 import build.buildfarm.common.redis.RedisClient;
+import build.buildfarm.common.redis.RedisHashtags;
 import build.buildfarm.common.redis.RedisNodeHashes;
 import build.buildfarm.instance.shard.RedisShardSubscriber.TimedWatchFuture;
 import build.buildfarm.v1test.CompletedOperationMetadata;
@@ -564,7 +565,9 @@ public class RedisShardBackplane implements ShardBackplane {
   List<String> getQueueHashes(String queueName) throws IOException {
     List<String> clusterHashes =
         client.call(
-            jedis -> RedisNodeHashes.getEvenlyDistributedHashesWithPrefix(jedis, queueName));
+            jedis ->
+                RedisNodeHashes.getEvenlyDistributedHashesWithPrefix(
+                    jedis, RedisHashtags.existingHash(queueName)));
     return clusterHashes;
   }
 
