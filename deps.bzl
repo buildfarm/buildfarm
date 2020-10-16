@@ -60,9 +60,9 @@ def archive_dependencies(third_party):
             "patches": [
                 "%s/rules_docker:rules_docker.patch" % third_party,
             ],
-            "sha256": "dc97fccceacd4c6be14e800b2a00693d5e8d07f69ee187babfd04a80a9f8e250",
-            "strip_prefix": "rules_docker-0.14.1",
-            "urls": ["https://github.com/bazelbuild/rules_docker/archive/v0.14.1.tar.gz"],
+            "sha256": "4521794f0fba2e20f3bf15846ab5e01d5332e587e9ce81629c7f96c793bb7036",
+            "strip_prefix": "rules_docker-0.14.4",
+            "urls": ["https://github.com/bazelbuild/rules_docker/archive/v0.14.4.tar.gz"],
         },
     ]
 
