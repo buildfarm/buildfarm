@@ -53,16 +53,17 @@ def archive_dependencies(third_party):
             "url": "https://github.com/bazelbuild/remote-apis/archive/b5123b1bb2853393c7b9aa43236db924d7e32d61.zip",
         },
 
-        # Download the rules_docker repository at release v0.14.1
+        # Ideally we would use the 0.14.4 release of rules_docker,
+        # but that version introduced new pypi and pkg dependncies on tar-related targets making the upgrade difficult.
+        # Those dependencies were then removed afterward.  We pick a stable commit after 0.14.4 instead of cherry-picking in the different changes.
+        # https://github.com/bazelbuild/rules_docker/issues/1622
+        # When a new version after 0.14.4 is released, we can go back to a pinned version.
         {
             "name": "io_bazel_rules_docker",
             "patch_args": ["-p1"],
-            "patches": [
-                "%s/rules_docker:rules_docker.patch" % third_party,
-            ],
-            "sha256": "dc97fccceacd4c6be14e800b2a00693d5e8d07f69ee187babfd04a80a9f8e250",
-            "strip_prefix": "rules_docker-0.14.1",
-            "urls": ["https://github.com/bazelbuild/rules_docker/archive/v0.14.1.tar.gz"],
+            "sha256": "d5609b7858246fa11e76237aa9b3e681615bdc8acf2ed29058426cf7c4cea099",
+            "strip_prefix": "rules_docker-f4822f3921f0c343dd9e5ae65c760d0fb70be1b3",
+            "urls": ["https://github.com/bazelbuild/rules_docker/archive/f4822f3921f0c343dd9e5ae65c760d0fb70be1b3.tar.gz"],
         },
     ]
 
