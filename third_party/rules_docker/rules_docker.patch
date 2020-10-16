@@ -1,11 +1,11 @@
 diff --git a/container/BUILD b/container/BUILD
-index 9a554de..e966464 100644
+index 8254214..8f2a626 100644
 --- a/container/BUILD
 +++ b/container/BUILD
-@@ -13,6 +13,11 @@
- # limitations under the License.
+@@ -14,6 +14,11 @@
  
  load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+ load("@pip_deps//:requirements.bzl", "requirement")
 +load(
 +    "@rules_python//python:defs.bzl",
 +    "py_binary",
