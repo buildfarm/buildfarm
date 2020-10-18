@@ -107,13 +107,23 @@ public final class ByteStreamHelper {
                       try {
                         schedulingResult.get();
                       } catch (ExecutionException e) {
+                        // If an exception is raised from within the retry, we don't know that
+                        // a new retry was properly triggered. send a failure out to prevent
+                        // potential live lock.
+                        streamReadyFuture.setException(e.getCause());
                         inputStream.setException(e.getCause());
                       } catch (InterruptedException e) {
+                        // If an exception is raised from within the retry, we don't know that
+                        // a new retry was properly triggered. send a failure out to prevent
+                        // potential live lock.
+                        streamReadyFuture.setException(e);
                         inputStream.setException(e);
                       }
                     },
                     MoreExecutors.directExecutor());
               } catch (RejectedExecutionException e) {
+                // Our retry was rejected - no way to complete this.
+                streamReadyFuture.setException(e);
                 inputStream.setException(e);
               }
             }
