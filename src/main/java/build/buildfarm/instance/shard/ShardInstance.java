@@ -1686,7 +1686,7 @@ public class ShardInstance extends AbstractServerInstance {
             .append(operationName)
             .append(": ")
             .append(DigestUtil.toString(actionDigest))
-            .toString();
+            .toString());
 
       readThroughActionCache.invalidate(DigestUtil.asActionKey(actionDigest));
       if (!skipCacheLookup) {
