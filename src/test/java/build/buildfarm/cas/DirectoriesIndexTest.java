@@ -33,20 +33,28 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-public class SqliteFileDirectoriesIndexTest {
+public class DirectoriesIndexTest {
   private final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
 
   private final String jdbcIndexUrl = "jdbc:sqlite::memory:";
   private Path root;
-  private SqliteFileDirectoriesIndex directoriesIndex;
+  private DirectoriesIndex directoriesIndex;
 
-  protected SqliteFileDirectoriesIndexTest(Path root) {
+  protected DirectoriesIndexTest(Path root, DirectoriesIndexType type) {
+    if (type == DirectoriesIndexType.Sqlite) {
+      directoriesIndex = new SqliteFileDirectoriesIndex(jdbcIndexUrl, root);
+    } else if (type == DirectoriesIndexType.HashMap) {
+      directoriesIndex = new MemoryFileDirectoriesIndex(root);
+    } else if (type == DirectoriesIndexType.SetMultimap) {
+      directoriesIndex = new MemoryDirectoriesIndex(root);
+    } else {
+      throw new IllegalArgumentException("DirectoriesIndex type is not supported.");
+    }
     this.root = root.resolve("cache");
   }
 
   @Before
   public void setUp() throws IOException {
-    directoriesIndex = new SqliteFileDirectoriesIndex(jdbcIndexUrl, root);
     Files.createDirectories(root);
   }
 
@@ -88,9 +96,16 @@ public class SqliteFileDirectoriesIndexTest {
     }
   }
 
+  protected enum DirectoriesIndexType {
+    Sqlite,
+    HashMap,
+    SetMultimap
+  }
+
+  // Testing SqliteFileDirectoriesIndex implementation
   @RunWith(JUnit4.class)
-  public static class WindowsSqliteFileDirectoriesIndexTest extends SqliteFileDirectoriesIndexTest {
-    public WindowsSqliteFileDirectoriesIndexTest() {
+  public static class WindowsSqliteDirectoriesIndexTest extends DirectoriesIndexTest {
+    public WindowsSqliteDirectoriesIndexTest() {
       super(
           Iterables.getFirst(
               Jimfs.newFileSystem(
@@ -99,13 +114,14 @@ public class SqliteFileDirectoriesIndexTest {
                           .setAttributeViews("basic", "owner", "dos", "acl", "posix", "user")
                           .build())
                   .getRootDirectories(),
-              null));
+              null),
+          DirectoriesIndexType.Sqlite);
     }
   }
 
   @RunWith(JUnit4.class)
-  public static class UnixSqliteFileDirectoriesIndexTest extends SqliteFileDirectoriesIndexTest {
-    public UnixSqliteFileDirectoriesIndexTest() {
+  public static class UnixSqliteDirectoriesIndexTest extends DirectoriesIndexTest {
+    public UnixSqliteDirectoriesIndexTest() {
       super(
           Iterables.getFirst(
               Jimfs.newFileSystem(
@@ -114,13 +130,14 @@ public class SqliteFileDirectoriesIndexTest {
                           .setAttributeViews("basic", "owner", "posix", "unix")
                           .build())
                   .getRootDirectories(),
-              null));
+              null),
+          DirectoriesIndexType.Sqlite);
     }
   }
 
   @RunWith(JUnit4.class)
-  public static class OsSqliteFileDirectoriesIndexTest extends SqliteFileDirectoriesIndexTest {
-    public OsSqliteFileDirectoriesIndexTest() {
+  public static class OsSqliteDirectoriesIndexTest extends DirectoriesIndexTest {
+    public OsSqliteDirectoriesIndexTest() {
       super(
           Iterables.getFirst(
               Jimfs.newFileSystem(
@@ -129,7 +146,57 @@ public class SqliteFileDirectoriesIndexTest {
                           .setAttributeViews("basic", "owner", "posix", "unix")
                           .build())
                   .getRootDirectories(),
-              null));
+              null),
+          DirectoriesIndexType.Sqlite);
+    }
+  }
+
+  // Testing MemoryFileDirectoriesIndex (using ConcurrentHashMap) implementation
+  @RunWith(JUnit4.class)
+  public static class WindowsMemoryFileDirectoriesIndexTest extends DirectoriesIndexTest {
+    public WindowsMemoryFileDirectoriesIndexTest() {
+      super(
+          Iterables.getFirst(
+              Jimfs.newFileSystem(
+                      Configuration.windows()
+                          .toBuilder()
+                          .setAttributeViews("basic", "owner", "dos", "acl", "posix", "user")
+                          .build())
+                  .getRootDirectories(),
+              null),
+          DirectoriesIndexType.HashMap);
+    }
+  }
+
+  @RunWith(JUnit4.class)
+  public static class UnixMemoryFileDirectoriesIndexTest extends DirectoriesIndexTest {
+    public UnixMemoryFileDirectoriesIndexTest() {
+      super(
+          Iterables.getFirst(
+              Jimfs.newFileSystem(
+                      Configuration.unix()
+                          .toBuilder()
+                          .setAttributeViews("basic", "owner", "posix", "unix")
+                          .build())
+                  .getRootDirectories(),
+              null),
+          DirectoriesIndexType.HashMap);
+    }
+  }
+
+  @RunWith(JUnit4.class)
+  public static class OsMemoryFileDirectoriesIndexTest extends DirectoriesIndexTest {
+    public OsMemoryFileDirectoriesIndexTest() {
+      super(
+          Iterables.getFirst(
+              Jimfs.newFileSystem(
+                      Configuration.osX()
+                          .toBuilder()
+                          .setAttributeViews("basic", "owner", "posix", "unix")
+                          .build())
+                  .getRootDirectories(),
+              null),
+          DirectoriesIndexType.HashMap);
     }
   }
 }

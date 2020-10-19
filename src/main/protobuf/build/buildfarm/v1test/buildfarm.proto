@@ -239,6 +239,10 @@ message FilesystemCASConfig {
   // limit for contents of a single file retained
   // from CAS in the cache
   int64 max_entry_size_bytes = 3;
+
+  // whether the file directories bidirectional mapping should be stored in sqlite or
+  // hashmap in memory
+  bool file_directories_index_in_memory = 4;
 }
 
 message FilesystemACConfig {
