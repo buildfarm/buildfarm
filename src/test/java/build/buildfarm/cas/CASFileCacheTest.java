@@ -127,6 +127,7 @@ class CASFileCacheTest {
             root,
             /* maxSizeInBytes=*/ 1024,
             /* maxEntrySizeInBytes=*/ 1024,
+            /* storeFileDirsIndexInMemory=*/ true,
             DIGEST_UTIL,
             expireService,
             /* accessRecorder=*/ directExecutor(),

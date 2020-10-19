@@ -37,7 +37,14 @@ class CASTest {
         DigestUtil digestUtil,
         ExecutorService expireService,
         Executor accessRecorder) {
-      super(root, maxSizeInBytes, maxSizeInBytes, digestUtil, expireService, accessRecorder);
+      super(
+          root,
+          maxSizeInBytes,
+          maxSizeInBytes,
+          /* storeFileDirsIndexInMemory= */ true,
+          digestUtil,
+          expireService,
+          accessRecorder);
     }
 
     @Override
