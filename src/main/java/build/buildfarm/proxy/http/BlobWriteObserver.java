@@ -71,8 +71,7 @@ class BlobWriteObserver implements WriteObserver {
     checkError();
     String requestResourceName = request.getResourceName();
     if (!requestResourceName.isEmpty() && !resourceName.equals(requestResourceName)) {
-      logger.log(
-          Level.WARNING,
+      logger.log(Level.WARNING,
           String.format(
               "ByteStreamServer:write:%s: resource name %s does not match first request",
               resourceName, requestResourceName));
@@ -82,8 +81,7 @@ class BlobWriteObserver implements WriteObserver {
               resourceName, requestResourceName));
     }
     if (complete) {
-      logger.log(
-          Level.WARNING,
+      logger.log(Level.WARNING,
           String.format(
               "ByteStreamServer:write:%s: write received after finish_write specified",
               resourceName));

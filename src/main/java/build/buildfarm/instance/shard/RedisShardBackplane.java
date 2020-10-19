@@ -313,8 +313,7 @@ public class RedisShardBackplane implements ShardBackplane {
         };
 
     if (!expiringChannels.isEmpty()) {
-      logger.log(
-          Level.INFO,
+      logger.log(Level.INFO,
           format("Scan %d watches, %s, expiresAt: %s", expiringChannels.size(), now, expiresAt));
 
       logger.log(Level.INFO, "Scan prequeue");
@@ -431,8 +430,7 @@ public class RedisShardBackplane implements ShardBackplane {
           operation = onPublish.apply(operation);
         }
         subscriber.onOperation(operationChannel(operationName), operation, nextExpiresAt(now));
-        logger.log(
-            Level.INFO,
+        logger.log(Level.INFO,
             format(
                 "operation %s done due to %s",
                 operationName, operation == null ? "null" : "completed"));
@@ -1049,8 +1047,7 @@ public class RedisShardBackplane implements ShardBackplane {
         JsonFormat.parser().merge(entry.getValue(), dispatchedOperationBuilder);
         builder.add(dispatchedOperationBuilder.build());
       } catch (InvalidProtocolBufferException e) {
-        logger.log(
-            Level.SEVERE,
+        logger.log(Level.SEVERE,
             "RedisShardBackplane::getDispatchedOperations: removing invalid operation "
                 + entry.getKey(),
             e);
@@ -1092,8 +1089,7 @@ public class RedisShardBackplane implements ShardBackplane {
 
       // destroy the processing entry and ttl
       if (!prequeue.removeFromDequeue(jedis, executeEntryJson)) {
-        logger.log(
-            Level.SEVERE,
+        logger.log(Level.SEVERE,
             format("could not remove %s from %s", operationName, prequeue.getDequeueName()));
         return null;
       }
@@ -1150,8 +1146,7 @@ public class RedisShardBackplane implements ShardBackplane {
 
     if (success) {
       if (!operationQueue.removeFromDequeue(jedis, queueEntryJson)) {
-        logger.log(
-            Level.WARNING,
+        logger.log(Level.WARNING,
             format(
                 "operation %s was missing in %s, may be orphaned",
                 operationName, operationQueue.getDequeueName()));

@@ -225,12 +225,10 @@ class ShardWorkerContext implements WorkerContext {
             success =
                 operationPoller.poll(queueEntry, stage, System.currentTimeMillis() + 30 * 1000);
           } catch (IOException e) {
-            logger.log(
-                Level.SEVERE, format("%s: poller: error while polling %s", name, operationName), e);
+            logger.log(Level.SEVERE, format("%s: poller: error while polling %s", name, operationName), e);
           }
 
-          logger.log(
-              Level.INFO,
+          logger.log(Level.INFO,
               format(
                   "%s: poller: Completed Poll for %s: %s",
                   name, operationName, success ? "OK" : "Failed"));
@@ -240,8 +238,7 @@ class ShardWorkerContext implements WorkerContext {
           return success;
         },
         () -> {
-          logger.log(
-              Level.INFO, format("%s: poller: Deadline expired for %s", name, operationName));
+          logger.log(Level.INFO, format("%s: poller: Deadline expired for %s", name, operationName));
           onFailure.run();
         },
         deadline);
@@ -271,8 +268,7 @@ class ShardWorkerContext implements WorkerContext {
     try {
       return QueuedOperation.parseFrom(queuedOperationBlob);
     } catch (InvalidProtocolBufferException e) {
-      logger.log(
-          Level.WARNING,
+      logger.log(Level.WARNING,
           format(
               "invalid queued operation: %s(%s)",
               queueEntry.getExecuteEntry().getOperationName(),
@@ -420,11 +416,6 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
-  public void logInfo(String msg) {
-    logger.log(Level.INFO, msg);
-  }
-
-  @Override
   public CASInsertionPolicy getFileCasPolicy() {
     return CASInsertionPolicy.ALWAYS_INSERT;
   }
@@ -520,12 +511,12 @@ class ShardWorkerContext implements WorkerContext {
       throws IOException, InterruptedException {
     Path outputPath = actionRoot.resolve(outputFile);
     if (!Files.exists(outputPath)) {
-      logInfo("ReportResultStage: " + outputFile + " does not exist...");
+      logger.log(Level.INFO, "ReportResultStage: " + outputFile + " does not exist...");
       return;
     }
 
     if (Files.isDirectory(outputPath)) {
-      logInfo("ReportResultStage: " + outputFile + " is a directory");
+      logger.log(Level.INFO, "ReportResultStage: " + outputFile + " is a directory");
       preconditionFailure
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
@@ -603,12 +594,12 @@ class ShardWorkerContext implements WorkerContext {
       throws IOException, InterruptedException {
     Path outputDirPath = actionRoot.resolve(outputDir);
     if (!Files.exists(outputDirPath)) {
-      logInfo("ReportResultStage: " + outputDir + " does not exist...");
+      logger.log(Level.INFO, "ReportResultStage: " + outputDir + " does not exist...");
       return;
     }
 
     if (!Files.isDirectory(outputDirPath)) {
-      logInfo("ReportResultStage: " + outputDir + " is not a directory...");
+      logger.log(Level.INFO, "ReportResultStage: " + outputDir + " is not a directory...");
       preconditionFailure
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
@@ -632,8 +623,7 @@ class ShardWorkerContext implements WorkerContext {
             try {
               digest = getDigestUtil().compute(file);
             } catch (NoSuchFileException e) {
-              logger.log(
-                  Level.SEVERE,
+              logger.log(Level.SEVERE,
                   format(
                       "error visiting file %s under output dir %s",
                       outputDirPath.relativize(file), outputDirPath.toAbsolutePath()),
@@ -723,10 +713,6 @@ class ShardWorkerContext implements WorkerContext {
     updateActionResultStdOutputs(resultBuilder);
   }
 
-  private void logComplete(String operationName) {
-    logger.log(Level.INFO, "CompletedOperation: " + operationName);
-  }
-
   @Override
   public Iterable<ExecutionPolicy> getExecutionPolicies(String name) {
     return policies.get(name);
@@ -737,7 +723,7 @@ class ShardWorkerContext implements WorkerContext {
       throws IOException, InterruptedException {
     boolean success = createBackplaneRetrier().execute(() -> instance.putOperation(operation));
     if (success && operation.getDone()) {
-      logComplete(operation.getName());
+      logger.log(Level.INFO, "CompletedOperation: " + operation.getName());
     }
     return success;
   }

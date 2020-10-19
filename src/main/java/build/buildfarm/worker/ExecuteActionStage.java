@@ -50,8 +50,7 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
         try {
           workerContext.destroyExecDir(operationContext.execDir);
         } catch (IOException e) {
-          logger.log(
-              Level.SEVERE, "error while destroying action root " + operationContext.execDir, e);
+          logger.log(Level.SEVERE, "error while destroying action root " + operationContext.execDir, e);
         } finally {
           output.put(operationContext);
         }
