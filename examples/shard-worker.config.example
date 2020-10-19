@@ -62,8 +62,8 @@ cas: {
     # from CAS in the cache
     max_entry_size_bytes: 2147483648 # 2 * 1024 * 1024 * 1024
 
-    # whether the file directories bidirectional mapping should be stored in sqlite or
-    # hashmap in memory
+    # whether the file directories bidirectional mapping should be stored in memory (HashMap) or
+    # in sqlite
     file_directories_index_in_memory = false
   }
 
