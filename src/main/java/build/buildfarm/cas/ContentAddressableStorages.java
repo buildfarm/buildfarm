@@ -72,6 +72,7 @@ public final class ContentAddressableStorages {
     }
     long maxSizeBytes = config.getMaxSizeBytes();
     long maxEntrySizeBytes = config.getMaxEntrySizeBytes();
+    boolean storeFileDirsIndexInMemory = config.getFileDirectoriesIndexInMemory();
     if (maxSizeBytes <= 0) {
       throw new ConfigurationException("filesystem cas max_size_bytes <= 0");
     }
@@ -86,6 +87,7 @@ public final class ContentAddressableStorages {
             Paths.get(path),
             maxSizeBytes,
             maxEntrySizeBytes,
+            storeFileDirsIndexInMemory,
             DigestUtil.forHash("SHA256"),
             /* expireService=*/ newDirectExecutorService(),
             /* accessRecorder=*/ directExecutor()) {

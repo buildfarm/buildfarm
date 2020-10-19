@@ -238,6 +238,7 @@ public class Worker extends LoggingMain {
             root.resolve(casCacheDirectory),
             config.getCasCacheMaxSizeBytes(),
             config.getCasCacheMaxEntrySizeBytes(),
+            /* storeFileDirsIndexInMemory= */ true,
             casInstance.getDigestUtil(),
             newDirectExecutorService(),
             directExecutor());
@@ -383,7 +384,7 @@ public class Worker extends LoggingMain {
   public void start() throws InterruptedException {
     try {
       Files.createDirectories(root);
-      fileCache.start(false);
+      fileCache.start(/* skipLoad= */ false);
     } catch (IOException e) {
       logger.log(SEVERE, "error starting file cache", e);
       return;
