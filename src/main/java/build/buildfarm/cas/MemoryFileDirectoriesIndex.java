@@ -77,12 +77,10 @@ class MemoryFileDirectoriesIndex extends DirectoriesIndex {
   public void put(Digest directory, Iterable<String> entries) throws IOException {
     asCharSink(path(directory), UTF_8).writeLines(entries);
     String digest = DigestUtil.toString(directory);
-    data.put(digest, Sets.newHashSet(entries));
+    data.put(digest, Sets.newConcurrentHashSet(entries));
     for (String entry : entries) {
-      data.putIfAbsent(entry, new HashSet<>());
-      synchronized (this) {
-        data.get(entry).add(digest);
-      }
+      data.putIfAbsent(entry, Sets.newConcurrentHashSet());
+      data.get(entry).add(digest);
     }
   }
 
