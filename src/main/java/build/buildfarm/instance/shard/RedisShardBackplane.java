@@ -691,7 +691,7 @@ public class RedisShardBackplane implements ShardBackplane {
     for (String casKey : casKeys) {
       results.totalKeys++;
       Long wasRemoved = cluster.srem(casKey, workerName);
-      if (wasRemoved == 1){
+      if (wasRemoved == 1) {
         results.removedInstances++;
       }
       if (cluster.scard(casKey) == 0) {

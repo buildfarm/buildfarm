@@ -659,7 +659,11 @@ public class Worker extends LoggingMain {
           String.format("Worker references removed: %d ", results.removedInstances));
       IndexMessage.append(String.format("CAS keys deleted: %d ", results.removedKeys));
       IndexMessage.append(
-          String.format("CAS lost: %f%%", results.totalKeys == 0 ? 0 : (results.removedKeys / (float)results.totalKeys) * 100));
+          String.format(
+              "CAS lost: %f%%",
+              results.totalKeys == 0
+                  ? 0
+                  : (results.removedKeys / (float) results.totalKeys) * 100));
       logger.log(INFO, IndexMessage.toString());
     } catch (IOException e) {
       logger.log(SEVERE, "Unable to remove worker indexes", e);
