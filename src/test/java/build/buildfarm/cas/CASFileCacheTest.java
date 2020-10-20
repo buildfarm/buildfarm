@@ -92,6 +92,7 @@ class CASFileCacheTest {
 
   private CASFileCache fileCache;
   private Path root;
+  private boolean storeFileDirsIndexInMemory;
   private Map<Digest, ByteString> blobs;
   private ExecutorService putService;
 
@@ -105,8 +106,9 @@ class CASFileCacheTest {
 
   private ConcurrentMap<String, Entry> storage;
 
-  protected CASFileCacheTest(Path fileSystemRoot) {
+  protected CASFileCacheTest(Path fileSystemRoot, boolean storeFileDirsIndexInMemory) {
     this.root = fileSystemRoot.resolve("cache");
+    this.storeFileDirsIndexInMemory = storeFileDirsIndexInMemory;
   }
 
   @Before
@@ -127,6 +129,7 @@ class CASFileCacheTest {
             root,
             /* maxSizeInBytes=*/ 1024,
             /* maxEntrySizeInBytes=*/ 1024,
+            storeFileDirsIndexInMemory,
             DIGEST_UTIL,
             expireService,
             /* accessRecorder=*/ directExecutor(),
@@ -859,9 +862,9 @@ class CASFileCacheTest {
   }
 
   @RunWith(JUnit4.class)
-  public static class NativeCASFileCacheTest extends CASFileCacheTest {
-    public NativeCASFileCacheTest() throws IOException {
-      super(createTempDirectory());
+  public static class NativeFileDirsIndexInMemoryCASFileCacheTest extends CASFileCacheTest {
+    public NativeFileDirsIndexInMemoryCASFileCacheTest() throws IOException {
+      super(createTempDirectory(), /* storeFileDirsIndexInMemory= */ true);
     }
 
     private static Path createTempDirectory() throws IOException {
@@ -874,8 +877,23 @@ class CASFileCacheTest {
   }
 
   @RunWith(JUnit4.class)
-  public static class OsXCASFileCacheTest extends CASFileCacheTest {
-    public OsXCASFileCacheTest() {
+  public static class NativeFileDirsIndexInSqliteCASFileCacheTest extends CASFileCacheTest {
+    public NativeFileDirsIndexInSqliteCASFileCacheTest() throws IOException {
+      super(createTempDirectory(), /* storeFileDirsIndexInMemory= */ false);
+    }
+
+    private static Path createTempDirectory() throws IOException {
+      if (Thread.interrupted()) {
+        throw new RuntimeException(new InterruptedException());
+      }
+      Path path = Files.createTempDirectory("native-cas-test");
+      return path;
+    }
+  }
+
+  @RunWith(JUnit4.class)
+  public static class OsXFileDirsIndexInMemoryCASFileCacheTest extends CASFileCacheTest {
+    public OsXFileDirsIndexInMemoryCASFileCacheTest() {
       super(
           Iterables.getFirst(
               Jimfs.newFileSystem(
@@ -884,13 +902,30 @@ class CASFileCacheTest {
                           .setAttributeViews("basic", "owner", "posix", "unix")
                           .build())
                   .getRootDirectories(),
-              null));
+              null),
+          /* storeFileDirsIndexInMemory= */ true);
     }
   }
 
   @RunWith(JUnit4.class)
-  public static class UnixCASFileCacheTest extends CASFileCacheTest {
-    public UnixCASFileCacheTest() {
+  public static class OsXFileDirsIndexInSqliteCASFileCacheTest extends CASFileCacheTest {
+    public OsXFileDirsIndexInSqliteCASFileCacheTest() {
+      super(
+          Iterables.getFirst(
+              Jimfs.newFileSystem(
+                      Configuration.osX()
+                          .toBuilder()
+                          .setAttributeViews("basic", "owner", "posix", "unix")
+                          .build())
+                  .getRootDirectories(),
+              null),
+          /* storeFileDirsIndexInMemory= */ false);
+    }
+  }
+
+  @RunWith(JUnit4.class)
+  public static class UnixFileDirsIndexInMemoryCASFileCacheTest extends CASFileCacheTest {
+    public UnixFileDirsIndexInMemoryCASFileCacheTest() {
       super(
           Iterables.getFirst(
               Jimfs.newFileSystem(
@@ -899,13 +934,30 @@ class CASFileCacheTest {
                           .setAttributeViews("basic", "owner", "posix", "unix")
                           .build())
                   .getRootDirectories(),
-              null));
+              null),
+          /* storeFileDirsIndexInMemory= */ true);
     }
   }
 
   @RunWith(JUnit4.class)
-  public static class WindowsCASFileCacheTest extends CASFileCacheTest {
-    public WindowsCASFileCacheTest() {
+  public static class UnixFileDirsIndexInSqliteCASFileCacheTest extends CASFileCacheTest {
+    public UnixFileDirsIndexInSqliteCASFileCacheTest() {
+      super(
+          Iterables.getFirst(
+              Jimfs.newFileSystem(
+                      Configuration.unix()
+                          .toBuilder()
+                          .setAttributeViews("basic", "owner", "posix", "unix")
+                          .build())
+                  .getRootDirectories(),
+              null),
+          /* storeFileDirsIndexInMemory= */ false);
+    }
+  }
+
+  @RunWith(JUnit4.class)
+  public static class WindowsFileDirsIndexInMemoryCASFileCacheTest extends CASFileCacheTest {
+    public WindowsFileDirsIndexInMemoryCASFileCacheTest() {
       super(
           Iterables.getFirst(
               Jimfs.newFileSystem(
@@ -914,7 +966,24 @@ class CASFileCacheTest {
                           .setAttributeViews("basic", "owner", "dos", "acl", "posix", "user")
                           .build())
                   .getRootDirectories(),
-              null));
+              null),
+          /* storeFileDirsIndexInMemory= */ true);
+    }
+  }
+
+  @RunWith(JUnit4.class)
+  public static class WindowsFileDirsIndexInSqliteCASFileCacheTest extends CASFileCacheTest {
+    public WindowsFileDirsIndexInSqliteCASFileCacheTest() {
+      super(
+          Iterables.getFirst(
+              Jimfs.newFileSystem(
+                      Configuration.windows()
+                          .toBuilder()
+                          .setAttributeViews("basic", "owner", "dos", "acl", "posix", "user")
+                          .build())
+                  .getRootDirectories(),
+              null),
+          /* storeFileDirsIndexInMemory= */ false);
     }
   }
 }

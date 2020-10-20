@@ -252,6 +252,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Path root,
       long maxSizeInBytes,
       long maxEntrySizeInBytes,
+      boolean storeFileDirsIndexInMemory,
       DigestUtil digestUtil,
       ExecutorService expireService,
       Executor accessRecorder) {
@@ -259,6 +260,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         root,
         maxSizeInBytes,
         maxEntrySizeInBytes,
+        storeFileDirsIndexInMemory,
         digestUtil,
         expireService,
         accessRecorder,
@@ -273,6 +275,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Path root,
       long maxSizeInBytes,
       long maxEntrySizeInBytes,
+      boolean storeFileDirsIndexInMemory,
       DigestUtil digestUtil,
       ExecutorService expireService,
       Executor accessRecorder,
@@ -309,8 +312,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       }
       directoriesIndexUrl += path.toString();
     }
-    this.directoriesIndex = new FileDirectoriesIndex(directoriesIndexUrl, root);
-
+    this.directoriesIndex =
+        storeFileDirsIndexInMemory
+            ? new MemoryFileDirectoriesIndex(root)
+            : new SqliteFileDirectoriesIndex(directoriesIndexUrl, root);
     header.before = header.after = header;
   }
 

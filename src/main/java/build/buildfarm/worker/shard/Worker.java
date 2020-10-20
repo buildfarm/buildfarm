@@ -594,6 +594,7 @@ public class Worker extends LoggingMain {
             root.resolve(getValidFilesystemCASPath(fsCASConfig, root)),
             fsCASConfig.getMaxSizeBytes(),
             fsCASConfig.getMaxEntrySizeBytes(),
+            fsCASConfig.getFileDirectoriesIndexInMemory(),
             digestUtil,
             removeDirectoryService,
             accessRecorder,
