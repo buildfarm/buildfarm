@@ -113,13 +113,13 @@ public class ContentAddressableStorageService
               logger.log(
                   requestLogLevel,
                   new StringBuilder()
-                    .append("FindMissingBlobs(")
-                    .append(instance.getName())
-                    .append(") for ")
-                    .append(request.getBlobDigestsList().size())
-                    .append(" blobs in ")
-                    .append(elapsedMicros / 1000.0)
-                    .toString());
+                      .append("FindMissingBlobs(")
+                      .append(instance.getName())
+                      .append(") for ")
+                      .append(request.getBlobDigestsList().size())
+                      .append(" blobs in ")
+                      .append(elapsedMicros / 1000.0)
+                      .toString());
             } catch (Throwable t) {
               onFailure(t);
             }

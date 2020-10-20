@@ -140,7 +140,8 @@ public class MemoryInstance extends AbstractServerInstance {
                   try {
                     notification.getValue().getOutput().close();
                   } catch (IOException e) {
-                    logger.log(Level.SEVERE,
+                    logger.log(
+                        Level.SEVERE,
                         format("error closing stream source %s", notification.getKey()),
                         e);
                   }
@@ -485,7 +486,8 @@ public class MemoryInstance extends AbstractServerInstance {
       Operation operation, com.google.rpc.Status.Builder status) throws InterruptedException {
     Digest actionDigest = expectActionDigest(operation);
     if (actionDigest == null) {
-      logger.log(Level.WARNING,
+      logger.log(
+          Level.WARNING,
           format("Could not determine Action Digest for operation %s", operation.getName()));
       String message =
           String.format("Could not determine Action Digest from Operation %s", operation.getName());
@@ -494,7 +496,8 @@ public class MemoryInstance extends AbstractServerInstance {
     }
     ByteString actionBlob = getBlob(actionDigest);
     if (actionBlob == null) {
-      logger.log(Level.WARNING,
+      logger.log(
+          Level.WARNING,
           format(
               "Action %s for operation %s went missing, cannot initiate execution monitoring",
               DigestUtil.toString(actionDigest), operation.getName()));
@@ -515,7 +518,8 @@ public class MemoryInstance extends AbstractServerInstance {
     try {
       return Action.parseFrom(actionBlob);
     } catch (InvalidProtocolBufferException e) {
-      logger.log(Level.WARNING,
+      logger.log(
+          Level.WARNING,
           format(
               "Could not parse Action %s for Operation %s",
               DigestUtil.toString(actionDigest), operation.getName()),
@@ -835,7 +839,8 @@ public class MemoryInstance extends AbstractServerInstance {
             enqueueOperation(operation);
           }
         } catch (StatusException | IOException e) {
-          logger.log(Level.SEVERE, format("could not emplace queued operation: %s", operationName), e);
+          logger.log(
+              Level.SEVERE, format("could not emplace queued operation: %s", operationName), e);
         }
       } else {
         rejectedOperations.add(operation);

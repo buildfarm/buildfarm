@@ -400,7 +400,8 @@ public class Worker extends LoggingMain {
 
     // return a default
     Duration defaultDuration = Durations.fromSeconds(60);
-    logger.log(INFO,
+    logger.log(
+        INFO,
         String.format(
             "grpc timeout not configured.  Setting to: " + defaultDuration.getSeconds() + "s"));
     return defaultDuration;
@@ -450,8 +451,9 @@ public class Worker extends LoggingMain {
                 }
                 long committedSize = write.getCommittedSize();
                 if (committedSize != digest.getSizeBytes()) {
-                  logger.log(Level.WARNING,
-                    format(
+                  logger.log(
+                      Level.WARNING,
+                      format(
                           "committed size %d did not match expectation for digestUtil",
                           committedSize));
                 }
@@ -853,7 +855,8 @@ public class Worker extends LoggingMain {
 
   private static void printUsage(OptionsParser parser) {
     logger.log(INFO, "Usage: CONFIG_PATH");
-    logger.log(INFO, parser.describeOptions(Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
+    logger.log(
+        INFO, parser.describeOptions(Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
   }
 
   public static void main(String[] args) {

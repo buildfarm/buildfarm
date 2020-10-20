@@ -74,7 +74,8 @@ public class AwsAdmin implements Admin {
             .withDocumentName("AWS-RunShellScript")
             .withInstanceIds(hostId)
             .withParameters(parameters));
-    logger.log(Level.INFO, String.format("Stopped container: %s on host: %s", containerName, hostId));
+    logger.log(
+        Level.INFO, String.format("Stopped container: %s on host: %s", containerName, hostId));
   }
 
   @Override

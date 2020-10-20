@@ -225,10 +225,12 @@ class ShardWorkerContext implements WorkerContext {
             success =
                 operationPoller.poll(queueEntry, stage, System.currentTimeMillis() + 30 * 1000);
           } catch (IOException e) {
-            logger.log(Level.SEVERE, format("%s: poller: error while polling %s", name, operationName), e);
+            logger.log(
+                Level.SEVERE, format("%s: poller: error while polling %s", name, operationName), e);
           }
 
-          logger.log(Level.INFO,
+          logger.log(
+              Level.INFO,
               format(
                   "%s: poller: Completed Poll for %s: %s",
                   name, operationName, success ? "OK" : "Failed"));
@@ -238,7 +240,8 @@ class ShardWorkerContext implements WorkerContext {
           return success;
         },
         () -> {
-          logger.log(Level.INFO, format("%s: poller: Deadline expired for %s", name, operationName));
+          logger.log(
+              Level.INFO, format("%s: poller: Deadline expired for %s", name, operationName));
           onFailure.run();
         },
         deadline);
@@ -268,7 +271,8 @@ class ShardWorkerContext implements WorkerContext {
     try {
       return QueuedOperation.parseFrom(queuedOperationBlob);
     } catch (InvalidProtocolBufferException e) {
-      logger.log(Level.WARNING,
+      logger.log(
+          Level.WARNING,
           format(
               "invalid queued operation: %s(%s)",
               queueEntry.getExecuteEntry().getOperationName(),
@@ -623,7 +627,8 @@ class ShardWorkerContext implements WorkerContext {
             try {
               digest = getDigestUtil().compute(file);
             } catch (NoSuchFileException e) {
-              logger.log(Level.SEVERE,
+              logger.log(
+                  Level.SEVERE,
                   format(
                       "error visiting file %s under output dir %s",
                       outputDirPath.relativize(file), outputDirPath.toAbsolutePath()),

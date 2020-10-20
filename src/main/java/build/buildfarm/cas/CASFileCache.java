@@ -1610,17 +1610,17 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   private static String digestFilename(Digest digest) {
     return new StringBuilder()
-      .append(digest.getHash())
-      .append("_")
-      .append(digest.getSizeBytes())
-      .toString();
+        .append(digest.getHash())
+        .append("_")
+        .append(digest.getSizeBytes())
+        .toString();
   }
 
   public static String getFileName(Digest digest, boolean isExecutable) {
     return new StringBuilder()
-      .append(digestFilename(digest))
-      .append((isExecutable ? "_exec" : ""))
-      .toString();
+        .append(digestFilename(digest))
+        .append((isExecutable ? "_exec" : ""))
+        .toString();
   }
 
   public String getKey(Digest digest, boolean isExecutable) {

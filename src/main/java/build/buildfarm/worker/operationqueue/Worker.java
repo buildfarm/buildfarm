@@ -427,7 +427,8 @@ public class Worker extends LoggingMain {
             poller.resume(
                 () -> {
                   boolean success = oq.poll(operationName, stage);
-                  logger.log(Level.INFO,
+                  logger.log(
+                      Level.INFO,
                       format(
                           "%s: poller: Completed Poll for %s: %s",
                           name, operationName, success ? "OK" : "Failed"));
@@ -437,7 +438,9 @@ public class Worker extends LoggingMain {
                   return success;
                 },
                 () -> {
-                  logger.log(Level.INFO, format("%s: poller: Deadline expired for %s", name, operationName));
+                  logger.log(
+                      Level.INFO,
+                      format("%s: poller: Deadline expired for %s", name, operationName));
                   onFailure.run();
                 },
                 deadline);
@@ -544,7 +547,8 @@ public class Worker extends LoggingMain {
             try {
               return QueuedOperation.parseFrom(queuedOperationBlob);
             } catch (InvalidProtocolBufferException e) {
-              logger.log(Level.WARNING,
+              logger.log(
+                  Level.WARNING,
                   format(
                       "invalid queued operation: %s(%s)",
                       queueEntry.getExecuteEntry().getOperationName(),
@@ -754,7 +758,9 @@ public class Worker extends LoggingMain {
 
   private static void printUsage(OptionsParser parser) {
     logger.log(Level.INFO, "Usage: CONFIG_PATH");
-    logger.log(Level.INFO, parser.describeOptions(Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
+    logger.log(
+        Level.INFO,
+        parser.describeOptions(Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
   }
 
   /** returns success or failure */

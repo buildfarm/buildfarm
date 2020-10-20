@@ -215,7 +215,8 @@ public class InputFetcher implements Runnable {
         try {
           workerContext.destroyExecDir(execDir);
         } catch (IOException e) {
-          logger.log(Level.SEVERE,
+          logger.log(
+              Level.SEVERE,
               format("error deleting exec dir for %s after interrupt", operationName));
         }
       }
@@ -252,7 +253,8 @@ public class InputFetcher implements Runnable {
       }
     } else {
       String operationName = operationContext.queueEntry.getExecuteEntry().getOperationName();
-      logger.log(Level.INFO, "InputFetcher: Operation " + operationName + " Failed to claim output");
+      logger.log(
+          Level.INFO, "InputFetcher: Operation " + operationName + " Failed to claim output");
 
       owner.error().put(operationContext);
     }

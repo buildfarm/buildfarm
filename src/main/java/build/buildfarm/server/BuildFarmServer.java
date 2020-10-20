@@ -187,7 +187,8 @@ public class BuildFarmServer extends LoggingMain {
 
   private static void printUsage(OptionsParser parser) {
     logger.log(Level.INFO, "Usage: CONFIG_PATH");
-    logger.log(Level.INFO,
+    logger.log(
+        Level.INFO,
         parser.describeOptions(Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
   }
 

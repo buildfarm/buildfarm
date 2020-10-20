@@ -1680,13 +1680,13 @@ public class ShardInstance extends AbstractServerInstance {
       logger.log(
           Level.INFO,
           new StringBuilder()
-            .append("ExecutionSuccess: ")
-            .append(requestMetadata.getToolInvocationId())
-            .append(" -> ")
-            .append(operationName)
-            .append(": ")
-            .append(DigestUtil.toString(actionDigest))
-            .toString());
+              .append("ExecutionSuccess: ")
+              .append(requestMetadata.getToolInvocationId())
+              .append(" -> ")
+              .append(operationName)
+              .append(": ")
+              .append(DigestUtil.toString(actionDigest))
+              .toString());
 
       readThroughActionCache.invalidate(DigestUtil.asActionKey(actionDigest));
       if (!skipCacheLookup) {
