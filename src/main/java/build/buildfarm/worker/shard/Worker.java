@@ -32,6 +32,7 @@ import build.buildfarm.cas.CASFileCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.cas.MemoryCAS;
+import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
@@ -649,6 +650,21 @@ public class Worker extends LoggingMain {
         interrupted = true;
       }
     }
+    try {
+      CasIndexResults results = backplane.removeWorkerIndexes(config.getPublicName());
+
+      StringBuilder IndexMessage = new StringBuilder();
+      IndexMessage.append(String.format("Total keys re-indexed: %d ", results.totalKeys));
+      IndexMessage.append(
+          String.format("Worker references removed: %d ", results.removedInstances));
+      IndexMessage.append(String.format("CAS keys deleted: %d ", results.removedKeys));
+      IndexMessage.append(
+          String.format("CAS lost: %d%%", (results.removedKeys / results.totalKeys) * 100));
+      logger.log(INFO, IndexMessage.toString());
+    } catch (IOException e) {
+      logger.log(SEVERE, "Unable to remove worker indexes", e);
+    }
+
     if (execFileSystem != null) {
       logger.log(INFO, "Stopping exec filesystem");
       execFileSystem.stop();
@@ -713,7 +729,6 @@ public class Worker extends LoggingMain {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
-    stop();
   }
 
   private void removeWorker(String name) {

@@ -23,6 +23,7 @@ import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.ShardBackplane;
@@ -87,6 +88,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
+import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisClusterPipeline;
 import redis.clients.jedis.Response;
@@ -643,6 +645,58 @@ public class RedisShardBackplane implements ShardBackplane {
     String workerChangeJson = JsonFormat.printer().print(workerChange);
     return subscriber.removeWorker(name)
         && client.call(jedis -> removeWorkerAndPublish(jedis, name, workerChangeJson));
+  }
+
+  @Override
+  public CasIndexResults removeWorkerIndexes(String workerName) throws IOException {
+    return client.call(jedis -> removeWorkerIndexes(jedis, workerName));
+  }
+
+  private CasIndexResults removeWorkerIndexes(JedisCluster cluster, String workerName) {
+
+    CasIndexResults results = new CasIndexResults();
+
+    cluster.getClusterNodes().values().stream()
+        .forEach(
+            pool -> {
+              try (Jedis jedisNode = pool.getResource()) {
+
+                // construct CAS query
+                int defaultScanCount = 10000;
+                String cursorSentinal = "0";
+                String casQuery = config.getCasPrefix() + ":*";
+                ScanParams params = new ScanParams();
+                params.match(casQuery);
+                params.count(defaultScanCount);
+
+                // iterate over all CAS entries via scanning
+                // and remove worker from the CAS keys.
+                String nextCursor = cursorSentinal;
+                do {
+
+                  ScanResult scanResult = jedisNode.scan(nextCursor, params);
+                  if (scanResult != null) {
+                    RemoveWorkerFromCasKeys(cluster, results, scanResult.getResult(), workerName);
+                    nextCursor = scanResult.getCursor();
+                  }
+                } while (!nextCursor.equals(cursorSentinal));
+              }
+            });
+
+    return results;
+  }
+
+  private void RemoveWorkerFromCasKeys(
+      JedisCluster cluster, CasIndexResults results, List<String> casKeys, String workerName) {
+    for (String casKey : casKeys) {
+      results.totalKeys++;
+      Long wasRemoved = cluster.srem(casKey, workerName);
+      results.removedInstances++;
+      if (cluster.scard(casKey) == 0) {
+        results.removedKeys++;
+        cluster.del(casKey);
+      }
+    }
   }
 
   @Override
