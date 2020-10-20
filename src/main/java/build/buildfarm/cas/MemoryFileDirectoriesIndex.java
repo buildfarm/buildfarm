@@ -46,10 +46,7 @@ class MemoryFileDirectoriesIndex extends DirectoriesIndex {
   }
 
   @Override
-  public void close() {
-    throw new UnsupportedOperationException(
-        "MemoryFileDirectoriesIndex doesn't support close() operation.");
-  }
+  public void close() {}
 
   @GuardedBy("this")
   private Set<Digest> removeEntryDirectories(String entry) {
@@ -83,7 +80,9 @@ class MemoryFileDirectoriesIndex extends DirectoriesIndex {
     data.put(digest, Sets.newHashSet(entries));
     for (String entry : entries) {
       data.putIfAbsent(entry, new HashSet<>());
-      data.get(entry).add(digest);
+      synchronized (this) {
+        data.get(entry).add(digest);
+      }
     }
   }
 
