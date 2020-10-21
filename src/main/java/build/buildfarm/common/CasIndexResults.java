@@ -14,6 +14,7 @@
 
 package build.buildfarm.common;
 
+
 ///
 /// @class   CasIndexResults
 /// @brief   The result of a worker de-registering itself from CAS entries.
@@ -23,11 +24,11 @@ package build.buildfarm.common;
 public class CasIndexResults {
 
   ///
-  /// @field   removedInstances
+  /// @field   removedHosts
   /// @brief   The number of CAS entries the worker was removed from.
   /// @details This indicates how much CAS data the shard new the worker had.
   ///
-  public int removedInstances = 0;
+  public int removedHosts = 0;
 
   ///
   /// @field   removedKeys
@@ -40,8 +41,8 @@ public class CasIndexResults {
   ///
   /// @field   totalKeys
   /// @brief   The total number of keys processed.
-  /// @details A raito can be made with removed keys to see the percentage of
-  ///          CAS lost.
+  /// @details A fraction can be made with removed keys to see the total
+  ///          percentage of CAS lost.
   ///
   public int totalKeys = 0;
 }

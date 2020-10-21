@@ -676,7 +676,7 @@ public class RedisShardBackplane implements ShardBackplane {
 
                   ScanResult scanResult = jedisNode.scan(nextCursor, params);
                   if (scanResult != null) {
-                    RemoveWorkerFromCasKeys(cluster, results, scanResult.getResult(), workerName);
+                    removeWorkerFromCasKeys(cluster, results, scanResult.getResult(), workerName);
                     nextCursor = scanResult.getCursor();
                   }
                 } while (!nextCursor.equals(cursorSentinal));
@@ -686,13 +686,12 @@ public class RedisShardBackplane implements ShardBackplane {
     return results;
   }
 
-  private void RemoveWorkerFromCasKeys(
+  private void removeWorkerFromCasKeys(
       JedisCluster cluster, CasIndexResults results, List<String> casKeys, String workerName) {
     for (String casKey : casKeys) {
       results.totalKeys++;
-      Long wasRemoved = cluster.srem(casKey, workerName);
-      if (wasRemoved == 1) {
-        results.removedInstances++;
+      if (cluster.srem(casKey, workerName) == 1) {
+        results.removedHosts++;
       }
       if (cluster.scard(casKey) == 0) {
         results.removedKeys++;
