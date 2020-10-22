@@ -55,6 +55,7 @@ import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.bazel.remote.execution.v2.UpdateActionResultRequest;
 import build.bazel.remote.execution.v2.WaitExecutionRequest;
+import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
@@ -803,6 +804,11 @@ public class StubInstance implements Instance {
 
   @Override
   public GetClientStartTimeResult getClientStartTime(String clientKey) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public CasIndexResults reindexCas(String hostName) {
     throw new UnsupportedOperationException();
   }
 }

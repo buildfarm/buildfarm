@@ -87,7 +87,7 @@ public interface ShardBackplane {
   boolean removeWorker(String workerName, String reason) throws IOException;
 
   @ThreadSafe
-  public CasIndexResults removeWorkerIndexes(String workerName) throws IOException;
+  public CasIndexResults reindexCas(String hostName) throws IOException;
 
   /** Returns a set of the names of all active workers. */
   @ThreadSafe

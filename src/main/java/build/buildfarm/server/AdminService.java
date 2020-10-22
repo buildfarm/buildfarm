@@ -14,9 +14,13 @@
 
 package build.buildfarm.server;
 
+import static java.util.logging.Level.INFO;
+
 import build.buildfarm.admin.Admin;
 import build.buildfarm.admin.aws.AwsAdmin;
 import build.buildfarm.admin.gcp.GcpAdmin;
+import build.buildfarm.common.CasIndexResults;
+import build.buildfarm.common.WorkerIndexer;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.AdminConfig;
 import build.buildfarm.v1test.AdminGrpc;
@@ -24,6 +28,7 @@ import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.GetHostsRequest;
 import build.buildfarm.v1test.GetHostsResult;
+import build.buildfarm.v1test.ReindexCasRequest;
 import build.buildfarm.v1test.ScaleClusterRequest;
 import build.buildfarm.v1test.StopContainerRequest;
 import build.buildfarm.v1test.TerminateHostRequest;
@@ -129,6 +134,21 @@ public class AdminService extends AdminGrpc.AdminImplBase {
       responseObserver.onCompleted();
     } catch (Exception e) {
       logger.log(Level.SEVERE, "Could not scale cluster.", e);
+      responseObserver.onError(io.grpc.Status.fromThrowable(e).asException());
+    }
+  }
+
+  @Override
+  public void reindexCas(ReindexCasRequest request, StreamObserver<Status> responseObserver) {
+    Instance instance;
+    try {
+      instance = instances.get(request.getInstanceName());
+      CasIndexResults results = instance.reindexCas(request.getHostId());
+      logger.log(INFO, WorkerIndexer.indexResultsMessage(results));
+      responseObserver.onNext(Status.newBuilder().setCode(Code.OK_VALUE).build());
+      responseObserver.onCompleted();
+    } catch (Exception e) {
+      logger.log(Level.SEVERE, "Could not reindex CAS.", e);
       responseObserver.onError(io.grpc.Status.fromThrowable(e).asException());
     }
   }

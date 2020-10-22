@@ -24,6 +24,7 @@ import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ServerCapabilities;
+import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
@@ -140,6 +141,8 @@ public interface Instance {
   WorkerProfileMessage getWorkerProfile();
 
   GetClientStartTimeResult getClientStartTime(String clientKey);
+
+  CasIndexResults reindexCas(String hostName);
 
   interface MatchListener {
     // start/end pair called for each wait period

@@ -35,6 +35,16 @@ service Admin {
   rpc ScaleCluster(ScaleClusterRequest) returns (google.rpc.Status) {
     option (google.api.http) = { get: "/v1test/admin:scaleCluster" };
   }
+  
+  rpc ReindexCas(ReindexCasRequest) returns (google.rpc.Status) {
+    option (google.api.http) = { get: "/v1test/admin:reindexCas" };
+  }
+}
+
+message ReindexCasRequest {
+  string instance_name = 1;
+  
+  string host_id = 2;
 }
 
 message TerminateHostRequest {

@@ -32,13 +32,11 @@ import build.buildfarm.cas.CASFileCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.cas.MemoryCAS;
-import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.LoggingMain;
 import build.buildfarm.common.ShardBackplane;
-import build.buildfarm.common.WorkerIndexer;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.Instance;
@@ -650,12 +648,6 @@ public class Worker extends LoggingMain {
         Thread.interrupted();
         interrupted = true;
       }
-    }
-    try {
-      CasIndexResults results = backplane.removeWorkerIndexes(config.getPublicName());
-      logger.log(INFO, WorkerIndexer.indexResultsMessage(results));
-    } catch (IOException e) {
-      logger.log(SEVERE, "Unable to remove worker indexes", e);
     }
 
     if (execFileSystem != null) {

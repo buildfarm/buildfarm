@@ -649,7 +649,7 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   @Override
-  public CasIndexResults removeWorkerIndexes(String hostName) throws IOException {
+  public CasIndexResults reindexCas(String hostName) throws IOException {
     CasIndexSettings settings = new CasIndexSettings();
     settings.hostName = hostName;
     settings.casQuery = config.getCasPrefix() + ":*";

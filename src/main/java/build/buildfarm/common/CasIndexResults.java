@@ -14,7 +14,6 @@
 
 package build.buildfarm.common;
 
-
 ///
 /// @class   CasIndexResults
 /// @brief   The result of a worker de-registering itself from CAS entries.
