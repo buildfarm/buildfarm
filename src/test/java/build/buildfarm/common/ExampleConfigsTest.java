@@ -14,29 +14,20 @@
 
 package build.buildfarm.common;
 
-import static com.google.common.truth.Truth.assertThat;
 
-import build.bazel.remote.execution.v2.Digest;
-import build.bazel.remote.execution.v2.DigestFunction;
-import build.buildfarm.common.DigestUtil.HashFunction;
-import com.google.protobuf.ByteString;
+import build.buildfarm.v1test.BuildFarmServerConfig;
+import build.buildfarm.v1test.ShardWorkerConfig;
+import build.buildfarm.v1test.WorkerConfig;
+import com.google.protobuf.TextFormat;
 import java.io.IOException;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.nio.file.FileSystem;
-import java.nio.file.FileSystems;
 import java.nio.file.Files;
-import com.google.protobuf.TextFormat;
-import build.buildfarm.v1test.WorkerConfig;
-import build.buildfarm.v1test.ShardWorkerConfig;
-import build.buildfarm.v1test.BuildFarmServerConfig;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.JUnit4;
 
 // Test that example config files can load properly
 @RunWith(JUnit4.class)
@@ -44,39 +35,49 @@ public class ExampleConfigsTest {
 
   @Test
   public void workerConfig() throws IOException {
-    
+
     // parse text into protobuf
     Path configPath = Paths.get("examples/worker.config.example");
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
-        WorkerConfig.Builder builder = WorkerConfig.newBuilder();
-        TextFormat.merge(new InputStreamReader(configInputStream), builder);
-        builder.build();
+      WorkerConfig.Builder builder = WorkerConfig.newBuilder();
+      TextFormat.merge(new InputStreamReader(configInputStream), builder);
+      builder.build();
     }
   }
-  
+
   @Test
   public void serverConfig() throws IOException {
-    
+
     // parse text into protobuf
     Path configPath = Paths.get("examples/server.config.example");
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
-        BuildFarmServerConfig.Builder builder = BuildFarmServerConfig.newBuilder();
-        TextFormat.merge(new InputStreamReader(configInputStream), builder);
-        builder.build();
+      BuildFarmServerConfig.Builder builder = BuildFarmServerConfig.newBuilder();
+      TextFormat.merge(new InputStreamReader(configInputStream), builder);
+      builder.build();
     }
   }
-  
+
   @Test
   public void shardWorkerConfig() throws IOException {
-    
+
     // parse text into protobuf
     Path configPath = Paths.get("examples/shard-worker.config.example");
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
-        ShardWorkerConfig.Builder builder = ShardWorkerConfig.newBuilder();
-        TextFormat.merge(new InputStreamReader(configInputStream), builder);
-        builder.build();
+      ShardWorkerConfig.Builder builder = ShardWorkerConfig.newBuilder();
+      TextFormat.merge(new InputStreamReader(configInputStream), builder);
+      builder.build();
     }
   }
-  
-  
+
+  @Test
+  public void shardWorkerConfig() throws IOException {
+
+    // parse text into protobuf
+    Path configPath = Paths.get("examples/shard-server.config.example");
+    try (InputStream configInputStream = Files.newInputStream(configPath)) {
+      BuildFarmServerConfig.Builder builder = BuildFarmServerConfig.newBuilder();
+      TextFormat.merge(new InputStreamReader(configInputStream), builder);
+      builder.build();
+    }
+  }
 }
