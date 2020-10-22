@@ -30,7 +30,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 
 // This tool is helpful for testing the startup of the CasFileCache.
-// Give an existing file cache, and the tool will load and print startup information about it.
+// Give an existing file path, and the tool will load and print startup information about it.
 class CacheLoad {
   private static class LocalCASFileCache extends CASFileCache {
     LocalCASFileCache(
