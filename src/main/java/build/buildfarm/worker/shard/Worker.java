@@ -714,6 +714,7 @@ public class Worker extends LoggingMain {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
+    stop();
   }
 
   private void removeWorker(String name) {
