@@ -656,7 +656,7 @@ public class Worker extends LoggingMain {
       StringBuilder IndexMessage = new StringBuilder();
       IndexMessage.append(String.format("Total keys re-indexed: %d ", results.totalKeys));
       IndexMessage.append(
-          String.format("Worker references removed: %d ", results.removedInstances));
+          String.format("Worker references removed: %d ", results.removedHosts));
       IndexMessage.append(String.format("CAS keys deleted: %d ", results.removedKeys));
       IndexMessage.append(
           String.format(
