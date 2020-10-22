@@ -70,7 +70,7 @@ public class ExampleConfigsTest {
   }
 
   @Test
-  public void shardWorkerConfig() throws IOException {
+  public void shardServerConfig() throws IOException {
 
     // parse text into protobuf
     Path configPath = Paths.get("examples/shard-server.config.example");
