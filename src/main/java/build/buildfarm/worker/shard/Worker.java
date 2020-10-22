@@ -78,6 +78,8 @@ import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.Status;
 import io.grpc.Status.Code;
+import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
+import io.grpc.services.HealthStatusManager;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -111,6 +113,7 @@ public class Worker extends LoggingMain {
 
   private final ShardWorkerConfig config;
   private final ShardWorkerInstance instance;
+  private final HealthStatusManager healthStatusManager;
   private final Server server;
   private final Path root;
   private final DigestUtil digestUtil;
@@ -370,8 +373,10 @@ public class Worker extends LoggingMain {
     pipeline.add(executeActionStage, 2);
     pipeline.add(reportResultStage, 1);
 
+    healthStatusManager = new HealthStatusManager();
     server =
         serverBuilder
+            .addService(healthStatusManager.getHealthService())
             .addService(
                 new ContentAddressableStorageService(
                     instances, /* deadlineAfter=*/ 1, DAYS, /* requestLogLevel=*/ FINER))
@@ -650,6 +655,8 @@ public class Worker extends LoggingMain {
         interrupted = true;
       }
     }
+    healthStatusManager.setStatus(
+        HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.NOT_SERVING);
     if (execFileSystem != null) {
       logger.log(INFO, "Stopping exec filesystem");
       execFileSystem.stop();
@@ -817,6 +824,8 @@ public class Worker extends LoggingMain {
           (digests) -> addBlobsLocation(digests, config.getPublicName()), skipLoad);
 
       server.start();
+      healthStatusManager.setStatus(
+          HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
       // Not all workers need to be registered and visible in the backplane.
       // For example, a GPU worker may wish to perform work that we do not want to cache locally for
       // other workers.
