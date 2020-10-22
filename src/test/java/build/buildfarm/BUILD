@@ -43,6 +43,7 @@ java_test(
         ],
     ) + ["common/redis/RedisClientTest.java"],
     test_class = "build.buildfarm.AllTests",
+    data = ["//examples:example_configs"],
     deps = [
         ":test_runner",
         "//src/main/java/build/buildfarm:common",
