@@ -24,6 +24,7 @@ import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -31,6 +32,11 @@ import org.junit.runners.JUnit4;
 // Test that example config files can load properly
 @RunWith(JUnit4.class)
 public class ExampleConfigsTest {
+
+  @Before
+  public void skipWindows() {
+    org.junit.Assume.assumeFalse(System.getProperty("os.name").contains("Win"));
+  }
 
   @Test
   public void workerConfig() throws IOException {
