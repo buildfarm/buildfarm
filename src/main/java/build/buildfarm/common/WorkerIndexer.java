@@ -93,7 +93,6 @@ public class WorkerIndexer {
     // and remove worker from the CAS keys.
     String cursor = "0";
     do {
-
       List<String> casKeys = scanCas(node, cursor, settings);
       removeWorkerFromCasKeys(cluster, casKeys, settings.hostName, results);
 

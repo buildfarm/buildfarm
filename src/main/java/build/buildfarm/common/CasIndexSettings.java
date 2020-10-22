@@ -14,6 +14,7 @@
 
 package build.buildfarm.common;
 
+
 ///
 /// @class   CasIndexSettings
 /// @brief   Settings used to determine how to index CAS entries and remove
