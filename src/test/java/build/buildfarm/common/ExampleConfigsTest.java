@@ -14,7 +14,6 @@
 
 package build.buildfarm.common;
 
-
 import build.buildfarm.v1test.BuildFarmServerConfig;
 import build.buildfarm.v1test.ShardWorkerConfig;
 import build.buildfarm.v1test.WorkerConfig;
