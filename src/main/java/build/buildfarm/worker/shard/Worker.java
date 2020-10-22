@@ -38,6 +38,7 @@ import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.LoggingMain;
 import build.buildfarm.common.ShardBackplane;
+import build.buildfarm.common.WorkerIndexer;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.Instance;
@@ -652,19 +653,7 @@ public class Worker extends LoggingMain {
     }
     try {
       CasIndexResults results = backplane.removeWorkerIndexes(config.getPublicName());
-
-      StringBuilder IndexMessage = new StringBuilder();
-      IndexMessage.append(String.format("Total keys re-indexed: %d ", results.totalKeys));
-      IndexMessage.append(
-          String.format("Worker references removed: %d ", results.removedHosts));
-      IndexMessage.append(String.format("CAS keys deleted: %d ", results.removedKeys));
-      IndexMessage.append(
-          String.format(
-              "CAS lost: %f%%",
-              results.totalKeys == 0
-                  ? 0
-                  : (results.removedKeys / (float) results.totalKeys) * 100));
-      logger.log(INFO, IndexMessage.toString());
+      logger.log(INFO, WorkerIndexer.indexResultsMessage(results));
     } catch (IOException e) {
       logger.log(SEVERE, "Unable to remove worker indexes", e);
     }
