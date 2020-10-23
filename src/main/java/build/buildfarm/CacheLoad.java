@@ -29,7 +29,9 @@ import java.nio.file.Paths;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 
-class CASTest {
+// This tool is helpful for testing the startup of the CasFileCache.
+// Give an existing file path, and the tool will load and print startup information about it.
+class CacheLoad {
   private static class LocalCASFileCache extends CASFileCache {
     LocalCASFileCache(
         Path root,
