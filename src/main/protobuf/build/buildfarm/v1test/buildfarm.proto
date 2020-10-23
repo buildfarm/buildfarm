@@ -48,11 +48,11 @@ message ReindexCasRequest {
 }
 
 message ReindexCasRequestResults {
-  int64 removedHosts = 1;
+  int32 removedHosts = 1;
 
-  int64 removedKeys = 2;
+  int32 removedKeys = 2;
 
-  int64 totalKeys = 3;
+  int32 totalKeys = 3;
 }
 
 message TerminateHostRequest {
