@@ -649,7 +649,6 @@ public class Worker extends LoggingMain {
         interrupted = true;
       }
     }
-
     if (execFileSystem != null) {
       logger.log(INFO, "Stopping exec filesystem");
       execFileSystem.stop();
