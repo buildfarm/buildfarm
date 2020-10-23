@@ -683,12 +683,12 @@ java_binary(
 )
 
 java_binary(
-    name = "bf-cas",
-    srcs = ["CASTest.java"],
+    name = "bf-cache-load",
+    srcs = ["CacheLoad.java"],
     classpath_resources = [
         ":configs",
     ],
-    main_class = "build.buildfarm.CASTest",
+    main_class = "build.buildfarm.CacheLoad",
     visibility = ["//visibility:public"],
     deps = [
         ":cas",
