@@ -24,7 +24,8 @@ import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 
 // This tool can be used to remove worker entries from the CAS.
-// This is usually done by an admin when a worker is departing from the cluster.
+// This is usually done via the admin service when a worker is departing from the cluster.
+// ./tool <URL> shard SHA256 <worker instance name>
 class IndexWorker {
 
   private static ManagedChannel createChannel(String target) {
