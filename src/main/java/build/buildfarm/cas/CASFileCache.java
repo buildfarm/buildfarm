@@ -94,6 +94,7 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentMap;
@@ -420,11 +421,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   private boolean contains(Digest digest, boolean isExecutable, Consumer<String> onContains) {
     String key = getKey(digest, isExecutable);
-    if (!storage.containsKey(key)) {
-      return false;
+    if (Optional.ofNullable(storage.get(key)).isPresent()) {
+      onContains.accept(key);
+      return true;
     }
-    onContains.accept(key);
-    return true;
+    return false;
   }
 
   private void accessed(Iterable<String> keys) {
@@ -1613,11 +1614,18 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   private static String digestFilename(Digest digest) {
-    return format("%s_%d", digest.getHash(), digest.getSizeBytes());
+    return new StringBuilder()
+        .append(digest.getHash())
+        .append("_")
+        .append(digest.getSizeBytes())
+        .toString();
   }
 
   public static String getFileName(Digest digest, boolean isExecutable) {
-    return format("%s%s", digestFilename(digest), (isExecutable ? "_exec" : ""));
+    return new StringBuilder()
+        .append(digestFilename(digest))
+        .append((isExecutable ? "_exec" : ""))
+        .toString();
   }
 
   public String getKey(Digest digest, boolean isExecutable) {

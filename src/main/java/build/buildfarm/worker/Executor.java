@@ -173,7 +173,7 @@ class Executor {
       Stopwatch stopwatch)
       throws InterruptedException {
     /* execute command */
-    workerContext.logInfo("Executor: Operation " + operation.getName() + " Executing command");
+    logger.log(Level.INFO, "Executor: Operation " + operation.getName() + " Executing command");
 
     ActionResult.Builder resultBuilder = operationContext.executeResponse.getResultBuilder();
     resultBuilder
@@ -251,7 +251,7 @@ class Executor {
         throw e;
       }
     } else {
-      workerContext.logInfo("Executor: Operation " + operationName + " Failed to claim output");
+      logger.log(Level.INFO, "Executor: Operation " + operationName + " Failed to claim output");
       boolean wasInterrupted = Thread.interrupted();
       try {
         putError();

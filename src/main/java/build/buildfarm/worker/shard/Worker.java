@@ -451,7 +451,8 @@ public class Worker extends LoggingMain {
                 }
                 long committedSize = write.getCommittedSize();
                 if (committedSize != digest.getSizeBytes()) {
-                  logger.warning(
+                  logger.log(
+                      Level.WARNING,
                       format(
                           "committed size %d did not match expectation for digestUtil",
                           committedSize));
