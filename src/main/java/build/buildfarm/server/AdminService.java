@@ -29,6 +29,7 @@ import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.GetHostsRequest;
 import build.buildfarm.v1test.GetHostsResult;
 import build.buildfarm.v1test.ReindexCasRequest;
+import build.buildfarm.v1test.ReindexCasRequestResults;
 import build.buildfarm.v1test.ScaleClusterRequest;
 import build.buildfarm.v1test.StopContainerRequest;
 import build.buildfarm.v1test.TerminateHostRequest;
@@ -139,13 +140,19 @@ public class AdminService extends AdminGrpc.AdminImplBase {
   }
 
   @Override
-  public void reindexCas(ReindexCasRequest request, StreamObserver<Status> responseObserver) {
+  public void reindexCas(
+      ReindexCasRequest request, StreamObserver<ReindexCasRequestResults> responseObserver) {
     Instance instance;
     try {
       instance = instances.get(request.getInstanceName());
       CasIndexResults results = instance.reindexCas(request.getHostId());
       logger.log(INFO, WorkerIndexer.indexResultsMessage(results));
-      responseObserver.onNext(Status.newBuilder().setCode(Code.OK_VALUE).build());
+      responseObserver.onNext(
+          ReindexCasRequestResults.newBuilder()
+              .setRemovedHosts(results.removedHosts)
+              .setRemovedKeys(results.removedKeys)
+              .setTotalKeys(results.totalKeys)
+              .build());
       responseObserver.onCompleted();
     } catch (Exception e) {
       logger.log(Level.SEVERE, "Could not reindex CAS.", e);
