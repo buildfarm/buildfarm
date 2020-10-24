@@ -20,7 +20,6 @@ import build.buildfarm.admin.Admin;
 import build.buildfarm.admin.aws.AwsAdmin;
 import build.buildfarm.admin.gcp.GcpAdmin;
 import build.buildfarm.common.CasIndexResults;
-import build.buildfarm.common.WorkerIndexer;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.AdminConfig;
 import build.buildfarm.v1test.AdminGrpc;
@@ -146,7 +145,7 @@ public class AdminService extends AdminGrpc.AdminImplBase {
     try {
       instance = instances.get(request.getInstanceName());
       CasIndexResults results = instance.reindexCas(request.getHostId());
-      logger.log(INFO, WorkerIndexer.indexResultsMessage(results));
+      logger.log(INFO, results.toMessage());
       responseObserver.onNext(
           ReindexCasRequestResults.newBuilder()
               .setRemovedHosts(results.removedHosts)

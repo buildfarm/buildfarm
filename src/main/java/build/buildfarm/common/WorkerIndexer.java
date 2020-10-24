@@ -59,26 +59,6 @@ public class WorkerIndexer {
     return results;
   }
   ///
-  /// @brief   Get a string message from performing worker indexing on the CAS.
-  /// @details This message is useful for logging.
-  /// @param   indexResults Results from re-indexing the worker in the CAS.
-  /// @return  A message representation of the CasIndexResults.
-  /// @note    Suggested return identifier: message.
-  ///
-  public static String indexResultsMessage(CasIndexResults indexResults) {
-    StringBuilder message = new StringBuilder();
-    message.append(String.format("Total keys re-indexed: %d ", indexResults.totalKeys));
-    message.append(String.format("Worker references removed: %d ", indexResults.removedHosts));
-    message.append(String.format("CAS keys deleted: %d ", indexResults.removedKeys));
-    message.append(
-        String.format(
-            "CAS lost: %f%%",
-            indexResults.totalKeys == 0
-                ? 0
-                : (indexResults.removedKeys / (float) indexResults.totalKeys) * 100));
-    return message.toString();
-  }
-  ///
   /// @brief   Scan all CAS entires on existing Jedis node and remove
   ///          particular worker indices.
   /// @details Results are accumulated onto.
@@ -109,7 +89,6 @@ public class WorkerIndexer {
   ///
   private static List<String> scanCas(Jedis node, String cursor, CasIndexSettings settings) {
     // construct CAS query
-    // String casQuery = config.getCasPrefix() + ":*";
     ScanParams params = new ScanParams();
     params.match(settings.casQuery);
     params.count(settings.scanAmount);

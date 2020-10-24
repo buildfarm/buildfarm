@@ -44,4 +44,21 @@ public class CasIndexResults {
   ///          percentage of CAS lost.
   ///
   public int totalKeys = 0;
+
+  ///
+  /// @brief   Get a string message from performing worker indexing on the CAS.
+  /// @details This message is useful for logging.
+  /// @return  A message representation of the CasIndexResults.
+  /// @note    Suggested return identifier: message.
+  ///
+  public String toMessage() {
+    StringBuilder message = new StringBuilder();
+    message.append(String.format("Total keys re-indexed: %d. ", totalKeys));
+    message.append(String.format("Worker references removed: %d. ", removedHosts));
+    message.append(String.format("CAS keys deleted: %d. ", removedKeys));
+    message.append(
+        String.format(
+            "CAS lost: %.2f%%.", totalKeys == 0 ? 0 : (removedKeys / (float) totalKeys) * 100));
+    return message.toString();
+  }
 }
