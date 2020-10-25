@@ -239,6 +239,10 @@ message FilesystemCASConfig {
   // limit for contents of a single file retained
   // from CAS in the cache
   int64 max_entry_size_bytes = 3;
+
+  // whether the file directories bidirectional mapping should be stored in memory (HashMap) or
+  // in sqlite
+  bool file_directories_index_in_memory = 4;
 }
 
 message FilesystemACConfig {
@@ -329,35 +333,119 @@ message ProvisionedQueuesConfig {
 }
 
 message RedisShardBackplaneConfig {
+  // the uri endpoint of the redis target. This must be a single host entry
+  // with cluster discoverability enabled if the redis service is configured
+  // for cluster operation. If the endpoint is a singleton redis node, cluster
+  // adaptive behaviors, specifically queue balancing, will be emulated.
   string redis_uri = 1;
+
+  // the password used to authenticate to redis via `auth`
+  string redis_password = 34;
+
+  // the size of the pool of jedis connections per-cluster-member
   int32 jedis_pool_max_total = 15;
+
+  // the hash of active cas shards. Shards must update a self-reported expiry
+  // regularly or face deactivation and excommunication. Advertisements for
+  // contents on deactivated workers may be pruned.
   string workers_hash_name = 2;
+
+  // the channel used to communicate cas shard structural changes
   string worker_channel = 25;
+
+  // the prefix of keys which map action keys to action results
   string action_cache_prefix = 3;
+
+  // the expiration time in seconds for action cache entries
   int32 action_cache_expire = 4;
+
+  // the prefix of keys which identify actions that are to be rejected
+  // from any request endpoint
   string action_blacklist_prefix = 28;
+
+  // the expiration time in seconds for banned actions
   int32 action_blacklist_expire = 29;
+
+  // the prefix of keys which identify invocations that are to be rejected
+  // from any request endpoint
   string invocation_blacklist_prefix = 30;
+
+  // the prefix of keys used to retain current Operation state
   string operation_prefix = 5;
+
+  // the expiration time in seconds for operation keys
   int32 operation_expire = 6;
+
+  // the arrival queue. Contains ExecuteEntry messages
   string pre_queued_operations_list_name = 18;
+
+  // the atomic target list for reliable arrival queue removal
   string processing_list_name = 19;
+
+  // the prefix of the processing list timeout monitor key
   string processing_prefix = 20;
+
+  // the minimum timeout for an operation to be removed from the processing list
+  // upon leaving the arrival queue
   int32 processing_timeout_millis = 21;
+
+  // the ready-to-run operation queue. Contains QueueEntry messages
   string queued_operations_list_name = 7;
+
+  // the atomic target list for reliable ready-to-run queue removal
   string dispatching_list_name = 22;
+
+  // the prefix of the dispatching list timeout monitor key
   string dispatching_prefix = 23;
+
+  // the minimum timeout for an operation to be observable in the dispatched
+  // hash upon leaving the ready-to-run queue.
   int32 dispatching_timeout_millis = 24;
+
+  // the hash key of dispatched operations. all operations which have been
+  // removed from the ready-to-run queue should make their way here in a timely
+  // (per dispatching) fashion.
   string dispatched_operations_hash_name = 8;
+
+  // the prefix of operation update topics
   string operation_channel_prefix = 9;
+
+  // the prefix of cas set keys. A cas set for a key suffixed with a digest
+  // address, contain the shards which have advertised storage of the
+  // addressed content. This set of valid shards for a digest must intersect
+  // with the active shard list (workers)
   string cas_prefix = 10;
+
+  // the expiration time in seconds for cas sets
   int32 cas_expire = 11;
+
+  // whether to listen to the backplane communication streams for shard lifecycle
+  // events and watched operations. This is required for failsafe operation below
+  // and realtime notification for watched operations.
+  // This is nearly required for schedulers, and may be useful elsewhere
   bool subscribe_to_backplane = 26;
+
+  // whether to run the failsafe operation monitor, which establishes watchdogs
+  // on watched operations, to ensure they are in a known or recently refreshed
+  // state, and guaranteeing a watch's termination on expiry
+  // This monitor also effects processing/dispatching expirations globally, required
+  // to ensure queue reliability.
+  // This is recommended for schedulers, meaningless for others
   bool run_failsafe_operation = 27;
+
+  // the maximum size allowed for the ready-to-run queue before rejection
   int32 max_queue_depth = 16;
+
+  // the maximum size allowed for the arrival queue before rejection
   int32 max_pre_queue_depth = 17;
+
+  // the provisioned queue definitions for platform partitioning
   ProvisionedQueuesConfig provisioned_queues = 31;
+
+  // connection and socket read timeout for jedis
   int32 timeout = 32;
+
+  // maximum number of retries in a cluster
   int32 max_attempts = 33;
 }
 

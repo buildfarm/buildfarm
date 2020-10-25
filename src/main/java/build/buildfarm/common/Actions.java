@@ -116,7 +116,8 @@ public final class Actions {
     if (requirement.equals("max-cores")) {
       return true;
     }
-    return provisions.containsEntry(requirement, value);
+    return provisions.containsEntry(requirement, value)
+        || provisions.containsEntry(requirement, "*");
   }
 
   public static boolean satisfiesRequirements(

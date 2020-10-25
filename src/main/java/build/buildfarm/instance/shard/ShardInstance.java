@@ -440,6 +440,13 @@ public class ShardInstance extends AbstractServerInstance {
       backplane.start(publicName);
     } catch (IOException e) {
       throw new RuntimeException(e);
+    } catch (RuntimeException e) {
+      try {
+        stop();
+      } catch (InterruptedException intEx) {
+        e.addSuppressed(intEx);
+      }
+      throw e;
     }
     if (dispatchedMonitor != null) {
       dispatchedMonitor.start();
@@ -1672,11 +1679,14 @@ public class ShardInstance extends AbstractServerInstance {
 
       logger.log(
           Level.INFO,
-          format(
-              "ExecutionSuccess: %s -> %s: %s",
-              requestMetadata.getToolInvocationId(),
-              operationName,
-              DigestUtil.toString(actionDigest)));
+          new StringBuilder()
+              .append("ExecutionSuccess: ")
+              .append(requestMetadata.getToolInvocationId())
+              .append(" -> ")
+              .append(operationName)
+              .append(": ")
+              .append(DigestUtil.toString(actionDigest))
+              .toString());
 
       readThroughActionCache.invalidate(DigestUtil.asActionKey(actionDigest));
       if (!skipCacheLookup) {

@@ -124,7 +124,7 @@ public class AwsMetricsPublisher extends AbstractMetricsPublisher {
     try {
       getSecretValueResult = client.getSecretValue(getSecretValueRequest);
     } catch (Exception e) {
-      logger.severe(String.format("Could not get secret %s from AWS.", secretName));
+      logger.log(Level.SEVERE, String.format("Could not get secret %s from AWS.", secretName));
       return;
     }
     String secret = null;
@@ -142,7 +142,7 @@ public class AwsMetricsPublisher extends AbstractMetricsPublisher {
         accessKeyId = secretMap.get("access_key");
         secretKey = secretMap.get("secret_key");
       } catch (IOException e) {
-        logger.severe(String.format("Could not parse secret %s from AWS", secretName));
+        logger.log(Level.SEVERE, String.format("Could not parse secret %s from AWS", secretName));
       }
     }
   }

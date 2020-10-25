@@ -139,7 +139,8 @@ public class ByteStreamUploader {
    */
   public void uploadBlobs(Map<HashCode, Chunker> chunkers)
       throws IOException, InterruptedException {
-    List<ListenableFuture<Void>> uploads = Lists.newArrayList();
+    List<ListenableFuture<Void>> uploads =
+        Lists.newArrayListWithCapacity(chunkers.entrySet().size());
 
     for (Map.Entry<HashCode, Chunker> chunkerEntry : chunkers.entrySet()) {
       uploads.add(uploadBlobAsync(chunkerEntry.getKey(), chunkerEntry.getValue()));

@@ -432,7 +432,7 @@ container_image(
     files = [
         ":buildfarm-server_deploy.jar",
     ],
-    tags = ["manual"],
+    tags = ["container"],
     visibility = ["//visibility:public"],
 )
 
@@ -495,6 +495,7 @@ java_library(
         "@maven//:io_grpc_grpc_core",
         "@maven//:io_grpc_grpc_netty",
         "@maven//:io_grpc_grpc_protobuf",
+        "@maven//:io_grpc_grpc_services",
         "@maven//:io_grpc_grpc_stub",
     ],
 )
@@ -521,7 +522,7 @@ container_image(
     files = [
         ":buildfarm-shard-worker_deploy.jar",
     ],
-    tags = ["manual"],
+    tags = ["container"],
     visibility = ["//visibility:public"],
 )
 
@@ -655,7 +656,7 @@ container_image(
     files = [
         ":buildfarm-operationqueue-worker_deploy.jar",
     ],
-    tags = ["manual"],
+    tags = ["container"],
     visibility = ["//visibility:public"],
 )
 
@@ -683,12 +684,12 @@ java_binary(
 )
 
 java_binary(
-    name = "bf-cas",
-    srcs = ["CASTest.java"],
+    name = "bf-cache-load",
+    srcs = ["CacheLoad.java"],
     classpath_resources = [
         ":configs",
     ],
-    main_class = "build.buildfarm.CASTest",
+    main_class = "build.buildfarm.CacheLoad",
     visibility = ["//visibility:public"],
     deps = [
         ":cas",

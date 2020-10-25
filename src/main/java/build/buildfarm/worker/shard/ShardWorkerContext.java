@@ -420,11 +420,6 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
-  public void logInfo(String msg) {
-    logger.log(Level.INFO, msg);
-  }
-
-  @Override
   public CASInsertionPolicy getFileCasPolicy() {
     return CASInsertionPolicy.ALWAYS_INSERT;
   }
@@ -520,12 +515,12 @@ class ShardWorkerContext implements WorkerContext {
       throws IOException, InterruptedException {
     Path outputPath = actionRoot.resolve(outputFile);
     if (!Files.exists(outputPath)) {
-      logInfo("ReportResultStage: " + outputFile + " does not exist...");
+      logger.log(Level.INFO, "ReportResultStage: " + outputFile + " does not exist...");
       return;
     }
 
     if (Files.isDirectory(outputPath)) {
-      logInfo("ReportResultStage: " + outputFile + " is a directory");
+      logger.log(Level.INFO, "ReportResultStage: " + outputFile + " is a directory");
       preconditionFailure
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
@@ -603,12 +598,12 @@ class ShardWorkerContext implements WorkerContext {
       throws IOException, InterruptedException {
     Path outputDirPath = actionRoot.resolve(outputDir);
     if (!Files.exists(outputDirPath)) {
-      logInfo("ReportResultStage: " + outputDir + " does not exist...");
+      logger.log(Level.INFO, "ReportResultStage: " + outputDir + " does not exist...");
       return;
     }
 
     if (!Files.isDirectory(outputDirPath)) {
-      logInfo("ReportResultStage: " + outputDir + " is not a directory...");
+      logger.log(Level.INFO, "ReportResultStage: " + outputDir + " is not a directory...");
       preconditionFailure
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
@@ -723,10 +718,6 @@ class ShardWorkerContext implements WorkerContext {
     updateActionResultStdOutputs(resultBuilder);
   }
 
-  private void logComplete(String operationName) {
-    logger.log(Level.INFO, "CompletedOperation: " + operationName);
-  }
-
   @Override
   public Iterable<ExecutionPolicy> getExecutionPolicies(String name) {
     return policies.get(name);
@@ -737,7 +728,7 @@ class ShardWorkerContext implements WorkerContext {
       throws IOException, InterruptedException {
     boolean success = createBackplaneRetrier().execute(() -> instance.putOperation(operation));
     if (success && operation.getDone()) {
-      logComplete(operation.getName());
+      logger.log(Level.INFO, "CompletedOperation: " + operation.getName());
     }
     return success;
   }

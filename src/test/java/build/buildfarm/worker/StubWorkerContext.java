@@ -64,9 +64,6 @@ class StubWorkerContext implements WorkerContext {
   }
 
   @Override
-  public void logInfo(String msg) {}
-
-  @Override
   public CASInsertionPolicy getFileCasPolicy() {
     throw new UnsupportedOperationException();
   }

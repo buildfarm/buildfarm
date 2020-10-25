@@ -151,7 +151,7 @@ public abstract class PipelineStage implements Runnable {
   protected void logComplete(String operationName, long usecs, long stallUSecs, String status) {
     getLogger()
         .log(
-            Level.INFO,
+            Level.FINE,
             String.format(
                 "%s: %g ms (%g ms stalled) %s",
                 logIterateId(operationName), usecs / 1000.0f, stallUSecs / 1000.0f, status));

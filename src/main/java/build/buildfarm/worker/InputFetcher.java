@@ -253,7 +253,8 @@ public class InputFetcher implements Runnable {
       }
     } else {
       String operationName = operationContext.queueEntry.getExecuteEntry().getOperationName();
-      workerContext.logInfo("InputFetcher: Operation " + operationName + " Failed to claim output");
+      logger.log(
+          Level.INFO, "InputFetcher: Operation " + operationName + " Failed to claim output");
 
       owner.error().put(operationContext);
     }
