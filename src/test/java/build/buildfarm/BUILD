@@ -71,8 +71,8 @@ java_test(
     name = "example-configs-tests",
     size = "small",
     srcs = ["common/ExampleConfigsTest.java"],
-    test_class = "build.buildfarm.AllTests",
     data = ["//examples:example_configs"],
+    test_class = "build.buildfarm.AllTests",
     deps = [
         ":test_runner",
         "//src/main/java/build/buildfarm:common",
