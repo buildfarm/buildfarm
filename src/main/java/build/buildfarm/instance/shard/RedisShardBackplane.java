@@ -23,11 +23,14 @@ import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.common.CasIndexResults;
+import build.buildfarm.common.CasIndexSettings;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.StringVisitor;
 import build.buildfarm.common.Watcher;
+import build.buildfarm.common.WorkerIndexer;
 import build.buildfarm.common.function.InterruptingRunnable;
 import build.buildfarm.common.redis.BalancedRedisQueue;
 import build.buildfarm.common.redis.ProvisionedRedisQueue;
@@ -643,6 +646,15 @@ public class RedisShardBackplane implements ShardBackplane {
     String workerChangeJson = JsonFormat.printer().print(workerChange);
     return subscriber.removeWorker(name)
         && client.call(jedis -> removeWorkerAndPublish(jedis, name, workerChangeJson));
+  }
+
+  @Override
+  public CasIndexResults reindexCas(String hostName) throws IOException {
+    CasIndexSettings settings = new CasIndexSettings();
+    settings.hostName = hostName;
+    settings.casQuery = config.getCasPrefix() + ":*";
+    settings.scanAmount = 10000;
+    return client.call(jedis -> WorkerIndexer.removeWorkerIndexesFromCas(jedis, settings));
   }
 
   @Override

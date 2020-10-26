@@ -54,6 +54,7 @@ import build.bazel.remote.execution.v2.SymlinkAbsolutePathStrategy;
 import build.buildfarm.ac.ActionCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
+import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
@@ -1693,6 +1694,9 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public abstract GetClientStartTimeResult getClientStartTime(String clientKey);
+
+  @Override
+  public abstract CasIndexResults reindexCas(String hostName);
 
   protected abstract Logger getLogger();
 }

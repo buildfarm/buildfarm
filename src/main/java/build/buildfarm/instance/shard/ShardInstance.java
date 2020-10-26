@@ -56,6 +56,7 @@ import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.Platform.Property;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
+import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
@@ -2324,6 +2325,15 @@ public class ShardInstance extends AbstractServerInstance {
   public GetClientStartTimeResult getClientStartTime(String clientKey) {
     try {
       return backplane.getClientStartTime(clientKey);
+    } catch (IOException e) {
+      throw Status.fromThrowable(e).asRuntimeException();
+    }
+  }
+
+  @Override
+  public CasIndexResults reindexCas(String hostName) {
+    try {
+      return backplane.reindexCas(hostName);
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }
