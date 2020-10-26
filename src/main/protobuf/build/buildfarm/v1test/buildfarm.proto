@@ -44,6 +44,7 @@ service Admin {
 message ReindexCasRequest {
   string instance_name = 1;
   
+  // format: ip:port
   string host_id = 2;
 }
 
