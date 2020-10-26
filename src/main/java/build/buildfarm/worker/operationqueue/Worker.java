@@ -238,6 +238,7 @@ public class Worker extends LoggingMain {
             root.resolve(casCacheDirectory),
             config.getCasCacheMaxSizeBytes(),
             config.getCasCacheMaxEntrySizeBytes(),
+            /* storeFileDirsIndexInMemory= */ true,
             casInstance.getDigestUtil(),
             newDirectExecutorService(),
             directExecutor());
@@ -383,7 +384,7 @@ public class Worker extends LoggingMain {
   public void start() throws InterruptedException {
     try {
       Files.createDirectories(root);
-      fileCache.start(false);
+      fileCache.start(/* skipLoad= */ false);
     } catch (IOException e) {
       logger.log(SEVERE, "error starting file cache", e);
       return;
@@ -427,7 +428,8 @@ public class Worker extends LoggingMain {
             poller.resume(
                 () -> {
                   boolean success = oq.poll(operationName, stage);
-                  logger.info(
+                  logger.log(
+                      Level.INFO,
                       format(
                           "%s: poller: Completed Poll for %s: %s",
                           name, operationName, success ? "OK" : "Failed"));
@@ -437,7 +439,9 @@ public class Worker extends LoggingMain {
                   return success;
                 },
                 () -> {
-                  logger.info(format("%s: poller: Deadline expired for %s", name, operationName));
+                  logger.log(
+                      Level.INFO,
+                      format("%s: poller: Deadline expired for %s", name, operationName));
                   onFailure.run();
                 },
                 deadline);
@@ -451,11 +455,6 @@ public class Worker extends LoggingMain {
           @Override
           public void match(MatchListener listener) throws InterruptedException {
             oq.match(listener);
-          }
-
-          @Override
-          public void logInfo(String msg) {
-            logger.info(msg);
           }
 
           @Override
@@ -549,7 +548,8 @@ public class Worker extends LoggingMain {
             try {
               return QueuedOperation.parseFrom(queuedOperationBlob);
             } catch (InvalidProtocolBufferException e) {
-              logger.warning(
+              logger.log(
+                  Level.WARNING,
                   format(
                       "invalid queued operation: %s(%s)",
                       queueEntry.getExecuteEntry().getOperationName(),
@@ -735,7 +735,7 @@ public class Worker extends LoggingMain {
       pipeline = null;
     }
     if (!shutdownAndAwaitTermination(retryScheduler, 1, MINUTES)) {
-      logger.severe("unable to terminate retry scheduler");
+      logger.log(SEVERE, "unable to terminate retry scheduler");
     }
     if (interrupted) {
       Thread.currentThread().interrupt();
@@ -758,8 +758,10 @@ public class Worker extends LoggingMain {
   }
 
   private static void printUsage(OptionsParser parser) {
-    logger.info("Usage: CONFIG_PATH");
-    logger.info(parser.describeOptions(Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
+    logger.log(Level.INFO, "Usage: CONFIG_PATH");
+    logger.log(
+        Level.INFO,
+        parser.describeOptions(Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
   }
 
   /** returns success or failure */

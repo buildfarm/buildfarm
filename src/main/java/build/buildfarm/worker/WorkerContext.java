@@ -57,8 +57,6 @@ public interface WorkerContext {
 
   void match(MatchListener listener) throws InterruptedException;
 
-  void logInfo(String msg);
-
   CASInsertionPolicy getFileCasPolicy();
 
   CASInsertionPolicy getStdoutCasPolicy();
