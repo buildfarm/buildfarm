@@ -95,8 +95,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
@@ -127,9 +129,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private final DigestUtil digestUtil;
   private final ConcurrentMap<String, Entry> storage;
   private final Consumer<Digest> onPut;
+  private final Consumer<Iterable<Digest>> onPutAll;
   private final Consumer<Iterable<Digest>> onExpire;
   private final Executor accessRecorder;
   private final ExecutorService expireService;
+  private Queue<Digest> digestList = new ConcurrentLinkedQueue<>();
 
   private final Map<Digest, DirectoryEntry> directoryStorage = Maps.newConcurrentMap();
   private final DirectoriesIndex directoriesIndex;
@@ -268,6 +272,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         /* storage=*/ Maps.newConcurrentMap(),
         /* directoriesIndexDbName=*/ DEFAULT_DIRECTORIES_INDEX_NAME,
         /* onPut=*/ (digest) -> {},
+        /* onPutAll=*/ (digest) -> {},
         /* onExpire=*/ (digests) -> {},
         /* delegate=*/ null);
   }
@@ -283,6 +288,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       ConcurrentMap<String, Entry> storage,
       String directoriesIndexDbName,
       Consumer<Digest> onPut,
+      Consumer<Iterable<Digest>> onPutAll,
       Consumer<Iterable<Digest>> onExpire,
       @Nullable ContentAddressableStorage delegate) {
     this.root = root;
@@ -293,6 +299,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     this.accessRecorder = accessRecorder;
     this.storage = storage;
     this.onPut = onPut;
+    this.onPutAll = onPutAll;
     this.onExpire = onExpire;
     this.delegate = delegate;
     this.directoriesIndexDbName = directoriesIndexDbName;
@@ -1425,7 +1432,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     cacheScanResults.computeDirs = computeDirsBuilder.build();
     cacheScanResults.deleteFiles = deleteFilesBuilder.build();
     cacheScanResults.fileKeys = fileKeysBuilder.build();
-
+    onPutAll.accept(digestList);
+    digestList.clear();
     return cacheScanResults;
   }
 
@@ -1483,7 +1491,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               fileKeys.put(getFileKey(root.resolve(key), stat), e);
             }
             storage.put(e.key, e);
-            onPut.accept(fileEntryKey.getDigest());
+            digestList.add(fileEntryKey.getDigest());
             synchronized (CASFileCache.this) {
               if (e.decrementReference(header)) {
                 unreferencedEntryCount++;
