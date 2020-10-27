@@ -1479,8 +1479,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             // populate key it is not currently stored.
             String key = fileEntryKey.getKey();
             Entry e = new Entry(key, size, Deadline.after(10, SECONDS));
+            Object fileKey = getFileKey(root.resolve(key), stat);
             synchronized (fileKeys) {
-              fileKeys.put(getFileKey(root.resolve(key), stat), e);
+              fileKeys.put(fileKey, e);
             }
             storage.put(e.key, e);
             onPut.accept(fileEntryKey.getDigest());
