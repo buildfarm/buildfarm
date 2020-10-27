@@ -42,7 +42,9 @@ public class ExampleConfigsTest {
   public void workerConfig() throws IOException {
 
     // parse text into protobuf
-    Path configPath = Paths.get("examples", "worker.config.example");
+    Path configPath =
+        Paths.get(
+            System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "worker.config.example");
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
       WorkerConfig.Builder builder = WorkerConfig.newBuilder();
       TextFormat.merge(new InputStreamReader(configInputStream), builder);
@@ -54,7 +56,9 @@ public class ExampleConfigsTest {
   public void serverConfig() throws IOException {
 
     // parse text into protobuf
-    Path configPath = Paths.get("examples", "server.config.example");
+    Path configPath =
+        Paths.get(
+            System.getenv("TEST_SRCDIR"), "build_buildfarm", "examples", "server.config.example");
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
       BuildFarmServerConfig.Builder builder = BuildFarmServerConfig.newBuilder();
       TextFormat.merge(new InputStreamReader(configInputStream), builder);
@@ -66,7 +70,12 @@ public class ExampleConfigsTest {
   public void shardWorkerConfig() throws IOException {
 
     // parse text into protobuf
-    Path configPath = Paths.get("examples", "shard-worker.config.example");
+    Path configPath =
+        Paths.get(
+            System.getenv("TEST_SRCDIR"),
+            "build_buildfarm",
+            "examples",
+            "shard-worker.config.example");
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
       ShardWorkerConfig.Builder builder = ShardWorkerConfig.newBuilder();
       TextFormat.merge(new InputStreamReader(configInputStream), builder);
@@ -78,7 +87,12 @@ public class ExampleConfigsTest {
   public void shardServerConfig() throws IOException {
 
     // parse text into protobuf
-    Path configPath = Paths.get("examples", "shard-server.config.example");
+    Path configPath =
+        Paths.get(
+            System.getenv("TEST_SRCDIR"),
+            "build_buildfarm",
+            "examples",
+            "shard-server.config.example");
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
       BuildFarmServerConfig.Builder builder = BuildFarmServerConfig.newBuilder();
       TextFormat.merge(new InputStreamReader(configInputStream), builder);
