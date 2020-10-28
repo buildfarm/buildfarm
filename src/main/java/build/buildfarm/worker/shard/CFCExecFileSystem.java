@@ -116,7 +116,14 @@ class CFCExecFileSystem implements ExecFileSystem {
     }
 
     ImmutableList.Builder<Digest> blobDigests = ImmutableList.builder();
-    fileCache.start(blobDigests::add, removeDirectoryService, skipLoad);
+    fileCache.start(
+        digest -> {
+          synchronized (blobDigests) {
+            blobDigests.add(digest);
+          }
+        },
+        removeDirectoryService,
+        skipLoad);
     onDigests.accept(blobDigests.build());
 
     getInterruptiblyOrIOException(allAsList(removeDirectoryFutures.build()));
