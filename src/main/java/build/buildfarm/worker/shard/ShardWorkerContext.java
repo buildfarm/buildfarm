@@ -873,6 +873,11 @@ class ShardWorkerContext implements WorkerContext {
     return new IOResource() {
       @Override
       public void close() {}
+
+      @Override
+      public boolean isReferenced() {
+        return false;
+      }
     };
   }
 
@@ -914,6 +919,12 @@ class ShardWorkerContext implements WorkerContext {
           new IOResource() {
             @Override
             public void close() {}
+
+            @Override
+            public boolean isReferenced() {
+              // no way to isolate references to this shared group
+              return false;
+            }
           };
     }
     if (limitGlobalExecution || group != operationsGroup) {
