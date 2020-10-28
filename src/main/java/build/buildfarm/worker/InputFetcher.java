@@ -213,6 +213,8 @@ public class InputFetcher implements Runnable {
     } finally {
       if (!completed) {
         try {
+          logger.log(
+              Level.SEVERE, format("error claiming %s input. Must remove execDir", operationName));
           workerContext.destroyExecDir(execDir);
         } catch (IOException e) {
           logger.log(
