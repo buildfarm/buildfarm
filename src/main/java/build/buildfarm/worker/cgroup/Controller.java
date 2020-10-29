@@ -14,7 +14,6 @@
 
 package build.buildfarm.worker.cgroup;
 
-import static com.google.common.base.Preconditions.checkState;
 
 import build.buildfarm.worker.WorkerContext.IOResource;
 import java.io.IOException;
@@ -56,7 +55,6 @@ abstract class Controller implements IOResource {
    */
   @Override
   public void close() throws IOException {
-    checkState(opened, "controller was not opened");
     Path path = getPath();
     boolean exists = true;
     while (exists) {
