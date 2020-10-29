@@ -22,12 +22,9 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisPool;
@@ -44,13 +41,6 @@ import redis.clients.jedis.JedisPool;
 @RunWith(JUnit4.class)
 public class RedisNodeHashesMockTest {
 
-  @Mock private JedisCluster redis;
-
-  @Before
-  public void setUp() {
-    MockitoAnnotations.initMocks(this);
-  }
-
   // Function under test: getEvenlyDistributedHashes
   // Reason for testing: an established redis cluster can be used to obtain distributed hashes
   // Failure explanation: there is an error in the cluster's ability to report slot ranges or
@@ -65,6 +55,7 @@ public class RedisNodeHashesMockTest {
     JedisPool pool = mock(JedisPool.class);
     when(pool.getResource()).thenReturn(node);
 
+    JedisCluster redis = mock(JedisCluster.class);
     Map<String, JedisPool> poolMap =
         new HashMap<String, JedisPool>() {
           {
@@ -86,6 +77,9 @@ public class RedisNodeHashesMockTest {
   @Test
   public void getEvenlyDistributedHashesCannotRetrieveDistributedHashes() throws Exception {
 
+    // ARRANGE
+    JedisCluster redis = mock(JedisCluster.class);
+
     // ACT
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
 
@@ -100,5 +94,40 @@ public class RedisNodeHashesMockTest {
   public void getEvenlyDistributedHashesCanConstruct() throws Exception {
 
     RedisNodeHashes converter = new RedisNodeHashes();
+  }
+
+  // Function under test: getEvenlyDistributedHashesWithPrefix
+  // Reason for testing: an established redis cluster can be used to obtain distributed hashes with
+  // prefixes
+  // Failure explanation: there is an error in the cluster's ability to report slot ranges or
+  // convert ranges to hashtags
+  @Test
+  public void getEvenlyDistributedHashesWithPrefixExpectedPrefixHashes() throws Exception {
+
+    // ARRANGE
+    Jedis node = mock(Jedis.class);
+    when(node.clusterSlots())
+        .thenReturn(Arrays.asList(Arrays.asList(0L, 100L), Arrays.asList(101L, 200L)));
+
+    JedisPool pool = mock(JedisPool.class);
+    when(pool.getResource()).thenReturn(node);
+
+    JedisCluster redis = mock(JedisCluster.class);
+    Map<String, JedisPool> poolMap =
+        new HashMap<String, JedisPool>() {
+          {
+            put("key1", pool);
+          }
+        };
+    when(redis.getClusterNodes()).thenReturn(poolMap);
+
+    // ACT
+    List<String> hashtags =
+        RedisNodeHashes.getEvenlyDistributedHashesWithPrefix(redis, "Execution");
+
+    // ASSERT
+    assertThat(hashtags.size()).isEqualTo(2);
+    assertThat(hashtags.get(0)).isEqualTo("Execution:97");
+    assertThat(hashtags.get(1)).isEqualTo("Execution:66");
   }
 }

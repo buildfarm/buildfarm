@@ -24,6 +24,7 @@ import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform.Property;
 import build.buildfarm.common.Write;
@@ -192,7 +193,7 @@ class Executor {
     String operationName = operation.getName();
 
     ImmutableList.Builder<String> arguments = ImmutableList.builder();
-    final Code statusCode;
+    Code statusCode;
     try (IOResource resource =
         workerContext.limitExecution(operationName, arguments, operationContext.command)) {
       for (ExecutionPolicy policy : policies) {
@@ -213,6 +214,21 @@ class Executor {
               "", // executingMetadata.getStdoutStreamName(),
               "", // executingMetadata.getStderrStreamName(),
               resultBuilder);
+
+      if (resource.isReferenced()) {
+        // there should no longer be any references to the resource. Any references will be
+        // killed upon close, but we must error the operation due to improper execution
+        ExecuteResponse executeResponse = operationContext.executeResponse.build();
+        if (statusCode == Code.OK) {
+          // per the gRPC spec: 'The operation was attempted past the valid range.' Seems
+          // appropriate
+          statusCode = Code.OUT_OF_RANGE;
+          operationContext
+              .executeResponse
+              .getStatusBuilder()
+              .setMessage("command resources were referenced after execution completed");
+        }
+      }
     } catch (IOException e) {
       logger.log(Level.SEVERE, format("error executing operation %s", operationName), e);
       operationContext.poller.pause();

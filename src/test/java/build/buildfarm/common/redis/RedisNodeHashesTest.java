@@ -51,4 +51,21 @@ public class RedisNodeHashesTest {
     // ASSERT
     assertThat(hashtags.isEmpty()).isFalse();
   }
+
+  // Function under test: getEvenlyDistributedHashesWithPrefix
+  // Reason for testing: an established redis cluster can be used to obtain distributed hashes
+  // Failure explanation: there is an error in the cluster's ability to report slot ranges or
+  // convert ranges to hashtags
+  @Test
+  public void getEvenlyDistributedHashesWithPrefixCanRetrieveDistributedHashes() throws Exception {
+
+    // ARRANGE
+    JedisCluster redis = JedisClusterFactory.createTest();
+
+    // ACT
+    List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis, "Execution");
+
+    // ASSERT
+    assertThat(hashtags.isEmpty()).isFalse();
+  }
 }
