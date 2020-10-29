@@ -191,7 +191,6 @@ public class ReportResultStage extends PipelineStage {
     operationContext.poller.pause();
 
     try {
-      PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
       if (!workerContext.putOperation(completedOperation, settings, operationContext.action)) {
         return null;
       }
