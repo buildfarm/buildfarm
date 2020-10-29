@@ -132,7 +132,7 @@ public class Group {
     pids.forEach(
         pid -> {
           try {
-            Process process = Runtime.getRuntime().exec("ps -o cmd fp " + Integer.toString(pid));
+            Process process = Runtime.getRuntime().exec("ps -o cmd -h " + Integer.toString(pid));
             BufferedReader lineReader =
                 new BufferedReader(new InputStreamReader(process.getInputStream()));
             String command = lineReader.lines().collect(Collectors.joining());
