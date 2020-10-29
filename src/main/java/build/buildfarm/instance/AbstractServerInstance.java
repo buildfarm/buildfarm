@@ -51,6 +51,7 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.bazel.remote.execution.v2.SymlinkAbsolutePathStrategy;
+import build.buildfarm.v1test.PlatformValidationSettings;
 import build.buildfarm.ac.ActionCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
@@ -885,7 +886,7 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   protected void validatePlatform(
-      Platform platform, PreconditionFailure.Builder preconditionFailure) {
+      Platform platform, PlatformValidationSettings settings, PreconditionFailure.Builder preconditionFailure) {
     /* no default platform validation */
   }
 
@@ -897,7 +898,8 @@ public abstract class AbstractServerInstance implements Instance {
       Set<String> inputDirectories,
       Map<Digest, Directory> directoriesIndex,
       PreconditionFailure.Builder preconditionFailure) {
-    validatePlatform(command.getPlatform(), preconditionFailure);
+    PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
+    validatePlatform(command.getPlatform(), settings, preconditionFailure);
 
     // FIXME should input/output collisions (through directories) be another
     // invalid action?

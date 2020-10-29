@@ -82,6 +82,7 @@ import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ShardInstanceConfig;
+import build.buildfarm.v1test.PlatformValidationSettings;
 import build.buildfarm.v1test.Tree;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Stopwatch;
@@ -1376,7 +1377,7 @@ public class ShardInstance extends AbstractServerInstance {
 
   @Override
   protected void validatePlatform(
-      Platform platform, PreconditionFailure.Builder preconditionFailure) {
+      Platform platform, PlatformValidationSettings settings, PreconditionFailure.Builder preconditionFailure) {
     int minCores = 0;
     int maxCores = -1;
 
@@ -1400,7 +1401,7 @@ public class ShardInstance extends AbstractServerInstance {
       if (property.getName().equals("min-cores") || property.getName().equals("max-cores")) {
         try {
           int intValue = Integer.parseInt(property.getValue());
-          if (intValue <= 0 || intValue > 80) {
+          if (intValue <= 0 || intValue > settings.getMaxCpu()) {
             preconditionFailure
                 .addViolationsBuilder()
                 .setType(VIOLATION_TYPE_INVALID)

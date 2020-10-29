@@ -588,6 +588,10 @@ message ShardWorkerConfig {
   bool omit_from_cas = 33;
 }
 
+message PlatformValidationSettings {
+  int32 max_cpu = 1;
+}
+
 message ShardWorker {
   string endpoint = 1;
 
