@@ -31,6 +31,7 @@ import build.buildfarm.common.Write.NullWrite;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.ExecutionWrapper;
+import build.buildfarm.v1test.PlatformValidationSettings;
 import build.buildfarm.worker.WorkerContext.IOResource;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
@@ -111,7 +112,9 @@ class Executor {
 
     boolean operationUpdateSuccess = false;
     try {
-      operationUpdateSuccess = workerContext.putOperation(operation, operationContext.action);
+      PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
+      operationUpdateSuccess =
+          workerContext.putOperation(operation, settings, operationContext.action);
     } catch (IOException e) {
       logger.log(
           Level.SEVERE, format("error putting operation %s as EXECUTING", operation.getName()), e);

@@ -26,6 +26,7 @@ import build.bazel.remote.execution.v2.Platform.Property;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.v1test.ExecutionPolicy;
+import build.buildfarm.v1test.PlatformValidationSettings;
 import build.buildfarm.v1test.QueueEntry;
 import com.google.common.collect.ImmutableList;
 import javax.annotation.Nullable;
@@ -34,7 +35,6 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
-import build.buildfarm.v1test.PlatformValidationSettings;
 
 @RunWith(JUnit4.class)
 public class OperationQueueClientTest {
@@ -52,7 +52,8 @@ public class OperationQueueClientTest {
               }
             })
         .when(instance)
-        .match(any(Platform.class), any(PlatformValidationSettings.class),any(MatchListener.class));
+        .match(
+            any(Platform.class), any(PlatformValidationSettings.class), any(MatchListener.class));
     OperationQueueClient client =
         new OperationQueueClient(
             instance,
@@ -85,6 +86,6 @@ public class OperationQueueClientTest {
             .addProperties(
                 Property.newBuilder().setName("execution-policy").setValue("foo").build())
             .build();
-    verify(instance, times(1)).match(eq(matchPlatform), eq(settings),any(MatchListener.class));
+    verify(instance, times(1)).match(eq(matchPlatform), eq(settings), any(MatchListener.class));
   }
 }

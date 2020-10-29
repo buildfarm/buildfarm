@@ -26,6 +26,7 @@ import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
+import build.buildfarm.v1test.PlatformValidationSettings;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -184,7 +185,8 @@ public class ReportResultStage extends PipelineStage {
     operationContext.poller.pause();
 
     try {
-      if (!workerContext.putOperation(completedOperation, operationContext.action)) {
+      PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
+      if (!workerContext.putOperation(completedOperation, settings, operationContext.action)) {
         return null;
       }
     } catch (IOException e) {

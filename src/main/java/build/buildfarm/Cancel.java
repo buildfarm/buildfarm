@@ -17,10 +17,10 @@ package build.buildfarm;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
+import build.buildfarm.v1test.PlatformValidationSettings;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
-import build.buildfarm.v1test.PlatformValidationSettings;
 
 class Cancel {
   private static ManagedChannel createChannel(String target) {
@@ -37,7 +37,7 @@ class Cancel {
     Instance instance = new StubInstance(instanceName, digestUtil, channel);
     PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
     for (int i = 3; i < args.length; i++) {
-      instance.cancelOperation(args[i],settings);
+      instance.cancelOperation(args[i], settings);
     }
     instance.stop();
   }

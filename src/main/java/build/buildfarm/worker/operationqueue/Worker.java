@@ -56,6 +56,7 @@ import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.InstanceEndpoint;
+import build.buildfarm.v1test.PlatformValidationSettings;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.WorkerConfig;
@@ -108,7 +109,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
-import build.buildfarm.v1test.PlatformValidationSettings;
 
 public class Worker extends LoggingMain {
   private static final Logger logger = Logger.getLogger(Worker.class.getName());
@@ -628,10 +628,10 @@ public class Worker extends LoggingMain {
           }
 
           @Override
-          public boolean putOperation(Operation operation, Action action)
+          public boolean putOperation(
+              Operation operation, PlatformValidationSettings settings, Action action)
               throws InterruptedException {
-            PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
-            return oq.put(operation,settings);
+            return oq.put(operation, settings);
           }
 
           // doesn't belong in CAS or AC, must be in OQ

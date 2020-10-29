@@ -30,6 +30,7 @@ import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.v1test.ExecuteEntry;
+import build.buildfarm.v1test.PlatformValidationSettings;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.ShardWorkerInstanceConfig;
 import build.buildfarm.v1test.Tree;
@@ -47,7 +48,6 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
-import build.buildfarm.v1test.PlatformValidationSettings;
 
 @RunWith(JUnit4.class)
 public class ShardWorkerInstanceTest {
@@ -167,13 +167,13 @@ public class ShardWorkerInstanceTest {
   @Test(expected = UnsupportedOperationException.class)
   public void matchIsUnsupported() throws InterruptedException {
     PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
-    instance.match(/* platform=*/ null, settings,/* listener=*/ null);
+    instance.match(/* platform=*/ null, settings, /* listener=*/ null);
   }
 
   @Test(expected = UnsupportedOperationException.class)
   public void cancelOperationIsUnsupported() throws InterruptedException {
     PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
-    instance.cancelOperation(/* name=*/ null,settings);
+    instance.cancelOperation(/* name=*/ null, settings);
   }
 
   @Test(expected = UnsupportedOperationException.class)

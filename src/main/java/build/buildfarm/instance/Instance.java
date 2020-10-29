@@ -24,7 +24,6 @@ import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ServerCapabilities;
-import build.buildfarm.v1test.PlatformValidationSettings;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
@@ -33,6 +32,7 @@ import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationsStatus;
+import build.buildfarm.v1test.PlatformValidationSettings;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.Tree;
 import build.buildfarm.v1test.WorkerProfileMessage;
@@ -117,13 +117,16 @@ public interface Instance {
       Watcher operationObserver)
       throws InterruptedException;
 
-  void match(Platform platform, PlatformValidationSettings settings, MatchListener listener) throws InterruptedException;
+  void match(Platform platform, PlatformValidationSettings settings, MatchListener listener)
+      throws InterruptedException;
 
   OperationsStatus operationsStatus();
 
-  boolean putOperation(Operation operation, PlatformValidationSettings settings) throws InterruptedException;
+  boolean putOperation(Operation operation, PlatformValidationSettings settings)
+      throws InterruptedException;
 
-  boolean putAndValidateOperation(Operation operation, PlatformValidationSettings settings) throws InterruptedException;
+  boolean putAndValidateOperation(Operation operation, PlatformValidationSettings settings)
+      throws InterruptedException;
 
   boolean pollOperation(String operationName, ExecutionStage.Value stage);
   // returns nextPageToken suitable for list restart
@@ -132,7 +135,8 @@ public interface Instance {
 
   Operation getOperation(String name);
 
-  void cancelOperation(String name, PlatformValidationSettings settings) throws InterruptedException;
+  void cancelOperation(String name, PlatformValidationSettings settings)
+      throws InterruptedException;
 
   void deleteOperation(String name);
 

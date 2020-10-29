@@ -15,6 +15,7 @@
 package build.buildfarm.server;
 
 import build.buildfarm.instance.Instance;
+import build.buildfarm.v1test.PlatformValidationSettings;
 import com.google.common.collect.ImmutableList;
 import com.google.longrunning.CancelOperationRequest;
 import com.google.longrunning.DeleteOperationRequest;
@@ -26,7 +27,6 @@ import com.google.longrunning.OperationsGrpc;
 import com.google.protobuf.Empty;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
-import build.buildfarm.v1test.PlatformValidationSettings;
 
 public class OperationsService extends OperationsGrpc.OperationsImplBase {
   private final Instances instances;
@@ -113,7 +113,7 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
 
     try {
       PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
-      instance.cancelOperation(request.getName(),settings);
+      instance.cancelOperation(request.getName(), settings);
       responseObserver.onNext(Empty.getDefaultInstance());
       responseObserver.onCompleted();
     } catch (InterruptedException e) {

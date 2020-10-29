@@ -27,7 +27,6 @@ import static java.lang.String.format;
 import build.bazel.remote.execution.v2.ActionCacheGrpc;
 import build.bazel.remote.execution.v2.ActionCacheGrpc.ActionCacheBlockingStub;
 import build.bazel.remote.execution.v2.ActionCacheGrpc.ActionCacheFutureStub;
-import build.buildfarm.v1test.PlatformValidationSettings;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.BatchReadBlobsRequest;
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
@@ -74,6 +73,7 @@ import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.OperationQueueGrpc.OperationQueueBlockingStub;
 import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.OperationsStatusRequest;
+import build.buildfarm.v1test.PlatformValidationSettings;
 import build.buildfarm.v1test.PollOperationRequest;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.ReindexCasRequest;
@@ -677,7 +677,8 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public void match(Platform platform, PlatformValidationSettings settings, MatchListener listener) throws InterruptedException {
+  public void match(Platform platform, PlatformValidationSettings settings, MatchListener listener)
+      throws InterruptedException {
     throwIfStopped();
     TakeOperationRequest request =
         TakeOperationRequest.newBuilder().setInstanceName(getName()).setPlatform(platform).build();

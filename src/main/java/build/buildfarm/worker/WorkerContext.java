@@ -27,6 +27,7 @@ import build.buildfarm.common.Write;
 import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.v1test.ExecutionPolicy;
+import build.buildfarm.v1test.PlatformValidationSettings;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import com.google.common.collect.ImmutableList;
@@ -100,7 +101,8 @@ public interface WorkerContext {
       Iterable<String> outputDirs)
       throws IOException, InterruptedException, StatusException;
 
-  boolean putOperation(Operation operation, Action Action) throws IOException, InterruptedException;
+  boolean putOperation(Operation operation, PlatformValidationSettings settings, Action Action)
+      throws IOException, InterruptedException;
 
   void blacklistAction(String actionId) throws IOException, InterruptedException;
 

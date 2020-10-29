@@ -20,6 +20,7 @@ import static java.lang.String.format;
 
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.v1test.DispatchedOperation;
+import build.buildfarm.v1test.PlatformValidationSettings;
 import build.buildfarm.v1test.QueueEntry;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -27,11 +28,9 @@ import com.google.common.util.concurrent.UncheckedExecutionException;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
 import java.util.function.BiFunction;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import build.buildfarm.v1test.PlatformValidationSettings;
 
 class DispatchedMonitor implements Runnable {
   private static final Logger logger = Logger.getLogger(DispatchedMonitor.class.getName());
@@ -60,7 +59,7 @@ class DispatchedMonitor implements Runnable {
         format(
             "DispatchedMonitor: Testing %s because %d >= %d",
             operationName, now, o.getRequeueAt()));
-    ListenableFuture<Void> requeuedFuture = requeuer.apply(queueEntry,settings);
+    ListenableFuture<Void> requeuedFuture = requeuer.apply(queueEntry, settings);
     long startTime = System.nanoTime();
     requeuedFuture.addListener(
         () -> {

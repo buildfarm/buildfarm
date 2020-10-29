@@ -24,6 +24,7 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.ExecutionPolicy;
+import build.buildfarm.v1test.PlatformValidationSettings;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.worker.ExecutionPolicies;
@@ -35,7 +36,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
-import build.buildfarm.v1test.PlatformValidationSettings;
 
 class OperationQueueClient {
   private static final Logger logger = Logger.getLogger(Worker.class.getName());
@@ -132,7 +132,7 @@ class OperationQueueClient {
 
       operation = operation.toBuilder().setMetadata(Any.pack(executingMetadata)).build();
       PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
-      instance.putOperation(operation,settings);
+      instance.putOperation(operation, settings);
     } catch (InvalidProtocolBufferException e) {
       logger.log(
           SEVERE, "error unpacking execute operation metadata for " + operation.getName(), e);
@@ -143,8 +143,9 @@ class OperationQueueClient {
     activeOperations.remove(name);
   }
 
-  boolean put(Operation operation, PlatformValidationSettings settings) throws InterruptedException {
-    return instance.putOperation(operation,settings);
+  boolean put(Operation operation, PlatformValidationSettings settings)
+      throws InterruptedException {
+    return instance.putOperation(operation, settings);
   }
 
   public Write getStreamWrite(String name) {

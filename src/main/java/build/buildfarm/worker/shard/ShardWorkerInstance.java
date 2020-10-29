@@ -32,7 +32,6 @@ import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watcher;
-import build.buildfarm.v1test.PlatformValidationSettings;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
 import build.buildfarm.instance.AbstractServerInstance;
@@ -40,6 +39,7 @@ import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationsStatus;
+import build.buildfarm.v1test.PlatformValidationSettings;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ShardWorkerInstanceConfig;
@@ -218,7 +218,8 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  public void match(Platform platform, PlatformValidationSettings settings, MatchListener listener) throws InterruptedException {
+  public void match(Platform platform, PlatformValidationSettings settings, MatchListener listener)
+      throws InterruptedException {
     throw new UnsupportedOperationException();
   }
 

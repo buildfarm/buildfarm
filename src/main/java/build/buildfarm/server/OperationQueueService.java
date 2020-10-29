@@ -20,6 +20,7 @@ import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.OperationsStatusRequest;
+import build.buildfarm.v1test.PlatformValidationSettings;
 import build.buildfarm.v1test.PollOperationRequest;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.TakeOperationRequest;
@@ -33,7 +34,6 @@ import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Consumer;
-import build.buildfarm.v1test.PlatformValidationSettings;
 
 public class OperationQueueService extends OperationQueueGrpc.OperationQueueImplBase {
   private final Instances instances;
@@ -100,7 +100,8 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
         }
       }
       PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
-      instance.putOperation(instance.getOperation(queueEntry.getExecuteEntry().getOperationName()),settings);
+      instance.putOperation(
+          instance.getOperation(queueEntry.getExecuteEntry().getOperationName()), settings);
       return false;
     };
   }
@@ -163,7 +164,7 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
 
     try {
       PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
-      boolean ok = instance.putAndValidateOperation(operation,settings);
+      boolean ok = instance.putAndValidateOperation(operation, settings);
       Code code = ok ? Code.OK : Code.UNAVAILABLE;
       responseObserver.onNext(com.google.rpc.Status.newBuilder().setCode(code.getNumber()).build());
       responseObserver.onCompleted();

@@ -51,7 +51,6 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.bazel.remote.execution.v2.SymlinkAbsolutePathStrategy;
-import build.buildfarm.v1test.PlatformValidationSettings;
 import build.buildfarm.ac.ActionCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
@@ -66,6 +65,7 @@ import build.buildfarm.common.Write;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.GetClientStartTimeResult;
+import build.buildfarm.v1test.PlatformValidationSettings;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.Tree;
@@ -823,7 +823,10 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   private Action validateActionDigest(
-      String operationName, Digest actionDigest, RequestMetadata requestMetadata, PlatformValidationSettings settings)
+      String operationName,
+      Digest actionDigest,
+      RequestMetadata requestMetadata,
+      PlatformValidationSettings settings)
       throws StatusException, InterruptedException {
     Action action = null;
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
@@ -859,7 +862,7 @@ public abstract class AbstractServerInstance implements Instance {
       String operationName,
       Action action,
       PreconditionFailure.Builder preconditionFailure,
-      PlatformValidationSettings settings, 
+      PlatformValidationSettings settings,
       RequestMetadata requestMetadata)
       throws InterruptedException, StatusException {
     ExecutorService service = newDirectExecutorService();
@@ -877,7 +880,8 @@ public abstract class AbstractServerInstance implements Instance {
     validateInputs(inputDigestsBuilder.build(), preconditionFailure, requestMetadata);
   }
 
-  protected void validateQueuedOperation(Digest actionDigest, QueuedOperation queuedOperation, PlatformValidationSettings settings)
+  protected void validateQueuedOperation(
+      Digest actionDigest, QueuedOperation queuedOperation, PlatformValidationSettings settings)
       throws StatusException {
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
     validateAction(
@@ -891,7 +895,9 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   protected void validatePlatform(
-      Platform platform, PlatformValidationSettings settings, PreconditionFailure.Builder preconditionFailure) {
+      Platform platform,
+      PlatformValidationSettings settings,
+      PreconditionFailure.Builder preconditionFailure) {
     /* no default platform validation */
   }
 
@@ -990,7 +996,7 @@ public abstract class AbstractServerInstance implements Instance {
           .setSubject("blobs/" + DigestUtil.toString(action.getCommandDigest()))
           .setDescription(MISSING_COMMAND);
     } else {
-      
+
       validateCommand(
           command,
           action.getInputRootDigest(),
@@ -1125,7 +1131,7 @@ public abstract class AbstractServerInstance implements Instance {
       throws InterruptedException {
     Action action;
     try {
-      action = validateActionDigest("execute", actionDigest, requestMetadata,settings);
+      action = validateActionDigest("execute", actionDigest, requestMetadata, settings);
     } catch (StatusException e) {
       com.google.rpc.Status status = StatusProto.fromThrowable(e);
       if (status == null) {
@@ -1165,7 +1171,7 @@ public abstract class AbstractServerInstance implements Instance {
                 "%s::execute(%s): %s",
                 getName(), DigestUtil.toString(actionDigest), operation.getName()));
 
-    putOperation(operation,settings);
+    putOperation(operation, settings);
 
     ListenableFuture<Void> watchFuture = watchOperation(operation.getName(), watcher);
 
@@ -1179,7 +1185,7 @@ public abstract class AbstractServerInstance implements Instance {
       cacheCheckMetadata = metadata;
     } else {
       cacheCheckMetadata = metadata.toBuilder().setStage(ExecutionStage.Value.CACHE_CHECK).build();
-      putOperation(operationBuilder.setMetadata(Any.pack(metadata)).build(),settings);
+      putOperation(operationBuilder.setMetadata(Any.pack(metadata)).build(), settings);
       actionResultFuture = getActionResult(actionKey, requestMetadata);
     }
 
@@ -1216,7 +1222,7 @@ public abstract class AbstractServerInstance implements Instance {
                 updateOperationWatchers(
                     nextOperation); // updates watchers initially for queued stage
               }
-              putOperation(nextOperation,settings);
+              putOperation(nextOperation, settings);
             } catch (InterruptedException e) {
               // ignore
             }
@@ -1421,12 +1427,14 @@ public abstract class AbstractServerInstance implements Instance {
     return null;
   }
 
-  protected abstract boolean matchOperation(Operation operation, PlatformValidationSettings settings) throws InterruptedException;
+  protected abstract boolean matchOperation(
+      Operation operation, PlatformValidationSettings settings) throws InterruptedException;
 
   protected abstract void enqueueOperation(Operation operation);
 
   @Override
-  public boolean putOperation(Operation operation, PlatformValidationSettings settings) throws InterruptedException {
+  public boolean putOperation(Operation operation, PlatformValidationSettings settings)
+      throws InterruptedException {
     String name = operation.getName();
     if (isCancelled(operation)) {
       if (outstandingOperations.remove(name) == null) {
@@ -1440,7 +1448,7 @@ public abstract class AbstractServerInstance implements Instance {
       return false;
     }
     if (isQueued(operation)) {
-      if (!matchOperation(operation,settings)) {
+      if (!matchOperation(operation, settings)) {
         enqueueOperation(operation);
       }
     } else {
@@ -1518,7 +1526,8 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public void cancelOperation(String name, PlatformValidationSettings settings) throws InterruptedException {
+  public void cancelOperation(String name, PlatformValidationSettings settings)
+      throws InterruptedException {
     Operation operation = getOperation(name);
     if (operation == null) {
       operation =
@@ -1536,15 +1545,17 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public boolean putAndValidateOperation(Operation operation, PlatformValidationSettings settings) throws InterruptedException {
+  public boolean putAndValidateOperation(Operation operation, PlatformValidationSettings settings)
+      throws InterruptedException {
     if (isQueued(operation)) {
-      return requeueOperation(operation,settings);
+      return requeueOperation(operation, settings);
     }
-    return putOperation(operation,settings);
+    return putOperation(operation, settings);
   }
 
   @VisibleForTesting
-  public boolean requeueOperation(Operation operation, PlatformValidationSettings settings) throws InterruptedException {
+  public boolean requeueOperation(Operation operation, PlatformValidationSettings settings)
+      throws InterruptedException {
     String name = operation.getName();
     ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
     RequestMetadata requestMetadata = expectRequestMetadata(operation);
@@ -1577,7 +1588,7 @@ public abstract class AbstractServerInstance implements Instance {
     }
     Digest actionDigest = metadata.getActionDigest();
     try {
-      validateActionDigest(name, actionDigest, requestMetadata,settings);
+      validateActionDigest(name, actionDigest, requestMetadata, settings);
     } catch (StatusException e) {
       com.google.rpc.Status status = StatusProto.fromThrowable(e);
       if (status == null) {
@@ -1588,7 +1599,7 @@ public abstract class AbstractServerInstance implements Instance {
                 .build();
       }
       logFailedStatus(actionDigest, status);
-      errorOperation(operation, settings,requestMetadata, status);
+      errorOperation(operation, settings, requestMetadata, status);
       return false;
     }
 
@@ -1598,11 +1609,14 @@ public abstract class AbstractServerInstance implements Instance {
                 "%s::requeueOperation(%s): %s",
                 getName(), DigestUtil.toString(actionDigest), name));
 
-    return putOperation(operation,settings);
+    return putOperation(operation, settings);
   }
 
   protected void errorOperation(
-      Operation operation, PlatformValidationSettings settings, RequestMetadata requestMetadata, com.google.rpc.Status status)
+      Operation operation,
+      PlatformValidationSettings settings,
+      RequestMetadata requestMetadata,
+      com.google.rpc.Status status)
       throws InterruptedException {
     if (operation.getDone()) {
       throw new IllegalStateException("Trying to error already completed operation [" + name + "]");
@@ -1623,11 +1637,12 @@ public abstract class AbstractServerInstance implements Instance {
             .setDone(true)
             .setMetadata(Any.pack(completedMetadata))
             .setResponse(Any.pack(ExecuteResponse.newBuilder().setStatus(status).build()))
-            .build()
-            ,settings);
+            .build(),
+        settings);
   }
 
-  protected void expireOperation(Operation operation, PlatformValidationSettings settings) throws InterruptedException {
+  protected void expireOperation(Operation operation, PlatformValidationSettings settings)
+      throws InterruptedException {
     ActionResult actionResult =
         ActionResult.newBuilder()
             .setExitCode(-1)
@@ -1653,7 +1668,8 @@ public abstract class AbstractServerInstance implements Instance {
             .setDone(true)
             .setMetadata(Any.pack(metadata))
             .setResponse(Any.pack(executeResponse))
-            .build(),settings);
+            .build(),
+        settings);
   }
 
   @Override

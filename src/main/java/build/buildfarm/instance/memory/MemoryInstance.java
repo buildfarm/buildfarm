@@ -67,10 +67,10 @@ import build.buildfarm.v1test.GrpcACConfig;
 import build.buildfarm.v1test.MemoryInstanceConfig;
 import build.buildfarm.v1test.OperationIteratorToken;
 import build.buildfarm.v1test.OperationsStatus;
+import build.buildfarm.v1test.PlatformValidationSettings;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.Tree;
-import build.buildfarm.v1test.PlatformValidationSettings;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
@@ -449,7 +449,7 @@ public class MemoryInstance extends AbstractServerInstance {
       }
     }
 
-    super.validateAction(operationName, action, preconditionFailure, settings,requestMetadata);
+    super.validateAction(operationName, action, preconditionFailure, settings, requestMetadata);
   }
 
   @Override
@@ -552,7 +552,8 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  public boolean putOperation(Operation operation, PlatformValidationSettings settings) throws InterruptedException {
+  public boolean putOperation(Operation operation, PlatformValidationSettings settings)
+      throws InterruptedException {
     String operationName = operation.getName();
     if (isQueued(operation)) {
       // destroy any monitors for this queued operation
@@ -566,7 +567,7 @@ public class MemoryInstance extends AbstractServerInstance {
         operationTimeoutDelay.stop();
       }
     }
-    if (!super.putOperation(operation,settings)) {
+    if (!super.putOperation(operation, settings)) {
       return false;
     }
     if (operation.getDone()) {
@@ -592,7 +593,7 @@ public class MemoryInstance extends AbstractServerInstance {
       Watchdog requeuer = requeuers.get(operationName);
       if (requeuer == null) {
         // restore a requeuer if a worker indicates they are executing
-        onDispatched(operation,settings);
+        onDispatched(operation, settings);
       } else {
         requeuer.pet();
       }
@@ -630,7 +631,7 @@ public class MemoryInstance extends AbstractServerInstance {
                 () -> {
                   operationTimeoutDelays.remove(operationName);
                   try {
-                    expireOperation(operation,settings);
+                    expireOperation(operation, settings);
                   } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                   }
@@ -651,7 +652,7 @@ public class MemoryInstance extends AbstractServerInstance {
             () -> {
               logger.log(Level.INFO, format("REQUEUEING %s", operation.getName()));
               requeuers.remove(operationName);
-              requeueOperation(operation,settings);
+              requeueOperation(operation, settings);
             });
     requeuers.put(operation.getName(), requeuer);
     new Thread(requeuer).start();
@@ -667,7 +668,8 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  protected boolean matchOperation(Operation operation, PlatformValidationSettings settings) throws InterruptedException {
+  protected boolean matchOperation(Operation operation, PlatformValidationSettings settings)
+      throws InterruptedException {
     ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
     Preconditions.checkState(metadata != null, "metadata not found");
 
@@ -734,7 +736,7 @@ public class MemoryInstance extends AbstractServerInstance {
                   .build();
           dispatched = worker.getListener().onEntry(queueEntry);
           if (dispatched) {
-            onDispatched(operation,settings);
+            onDispatched(operation, settings);
           }
         }
       }
@@ -770,7 +772,8 @@ public class MemoryInstance extends AbstractServerInstance {
     return createProvisions(command.getPlatform());
   }
 
-  private void matchSynchronized(Platform platform, PlatformValidationSettings settings, MatchListener listener)
+  private void matchSynchronized(
+      Platform platform, PlatformValidationSettings settings, MatchListener listener)
       throws InterruptedException {
     ImmutableList.Builder<Operation> rejectedOperations = ImmutableList.builder();
     boolean matched = false;
@@ -801,7 +804,7 @@ public class MemoryInstance extends AbstractServerInstance {
 
       String operationName = operation.getName();
       if (command == null) {
-        cancelOperation(operationName,settings);
+        cancelOperation(operationName, settings);
       } else if (satisfiesRequirements(provisions, command.getPlatform())) {
         QueuedOperation queuedOperation =
             QueuedOperation.newBuilder()
@@ -850,7 +853,7 @@ public class MemoryInstance extends AbstractServerInstance {
       }
     }
     for (Operation operation : rejectedOperations.build()) {
-      requeueOperation(operation,settings);
+      requeueOperation(operation, settings);
     }
     if (!matched) {
       synchronized (queue.workers) {
@@ -862,7 +865,8 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  public void match(Platform platform, PlatformValidationSettings settings, MatchListener listener) throws InterruptedException {
+  public void match(Platform platform, PlatformValidationSettings settings, MatchListener listener)
+      throws InterruptedException {
     WorkerQueue queue = queuedOperations.MatchEligibleQueue(createProvisions(platform));
     synchronized (queue.operations) {
       matchSynchronized(platform, settings, listener);

@@ -77,12 +77,12 @@ import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationIteratorToken;
 import build.buildfarm.v1test.OperationsStatus;
+import build.buildfarm.v1test.PlatformValidationSettings;
 import build.buildfarm.v1test.ProfiledQueuedOperationMetadata;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ShardInstanceConfig;
-import build.buildfarm.v1test.PlatformValidationSettings;
 import build.buildfarm.v1test.Tree;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Stopwatch;
@@ -1379,7 +1379,9 @@ public class ShardInstance extends AbstractServerInstance {
 
   @Override
   protected void validatePlatform(
-      Platform platform, PlatformValidationSettings settings, PreconditionFailure.Builder preconditionFailure) {
+      Platform platform,
+      PlatformValidationSettings settings,
+      PreconditionFailure.Builder preconditionFailure) {
     int minCores = 0;
     int maxCores = -1;
 
@@ -1463,7 +1465,8 @@ public class ShardInstance extends AbstractServerInstance {
       }
     }
 
-    super.validateAction(action, command, directoriesIndex, onInputDigest, settings, preconditionFailure);
+    super.validateAction(
+        action, command, directoriesIndex, onInputDigest, settings, preconditionFailure);
   }
 
   private ListenableFuture<Void> validateAndRequeueOperation(
@@ -1578,7 +1581,8 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @VisibleForTesting
-  public ListenableFuture<Void> requeueOperation(QueueEntry queueEntry, PlatformValidationSettings settings) {
+  public ListenableFuture<Void> requeueOperation(
+      QueueEntry queueEntry, PlatformValidationSettings settings) {
     ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
     String operationName = executeEntry.getOperationName();
     try {
@@ -1588,7 +1592,8 @@ public class ShardInstance extends AbstractServerInstance {
                 .setName(operationName)
                 .setDone(true)
                 .setResponse(Any.pack(blacklistResponse(executeEntry.getActionDigest())))
-                .build(),settings);
+                .build(),
+            settings);
         return IMMEDIATE_VOID_FUTURE;
       }
     } catch (IOException e) {
@@ -1629,7 +1634,7 @@ public class ShardInstance extends AbstractServerInstance {
           if (cachedResult) {
             return IMMEDIATE_VOID_FUTURE;
           }
-          return validateAndRequeueOperation(operation, queueEntry,settings);
+          return validateAndRequeueOperation(operation, queueEntry, settings);
         },
         operationTransformService);
   }
@@ -1896,7 +1901,8 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @VisibleForTesting
-  public ListenableFuture<Void> queue(ExecuteEntry executeEntry, PlatformValidationSettings settings, Poller poller)
+  public ListenableFuture<Void> queue(
+      ExecuteEntry executeEntry, PlatformValidationSettings settings, Poller poller)
       throws InterruptedException {
     ExecuteOperationMetadata metadata =
         ExecuteOperationMetadata.newBuilder()
@@ -1939,7 +1945,11 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   private ListenableFuture<Void> transformAndQueue(
-      ExecuteEntry executeEntry, Poller poller, Operation operation, PlatformValidationSettings settings, Stopwatch stopwatch) {
+      ExecuteEntry executeEntry,
+      Poller poller,
+      Operation operation,
+      PlatformValidationSettings settings,
+      Stopwatch stopwatch) {
     long checkCacheUSecs = stopwatch.elapsed(MICROSECONDS);
     ExecuteOperationMetadata metadata;
     try {
@@ -2035,7 +2045,8 @@ public class ShardInstance extends AbstractServerInstance {
                               .getQueuedOperationDigest())));
               long startValidateUSecs = stopwatch.elapsed(MICROSECONDS);
               /* sync, throws StatusException */
-              validateQueuedOperation(actionDigest, profiledQueuedMetadata.getQueuedOperation(),settings);
+              validateQueuedOperation(
+                  actionDigest, profiledQueuedMetadata.getQueuedOperation(), settings);
               return immediateFuture(
                   profiledQueuedMetadata.setValidatedIn(
                       Durations.fromMicros(stopwatch.elapsed(MICROSECONDS) - startValidateUSecs)));
@@ -2147,7 +2158,8 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @Override
-  public void match(Platform platform, PlatformValidationSettings settings, MatchListener listener) {
+  public void match(
+      Platform platform, PlatformValidationSettings settings, MatchListener listener) {
     throw new UnsupportedOperationException();
   }
 

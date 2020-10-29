@@ -27,6 +27,7 @@ import build.buildfarm.common.Write;
 import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.v1test.ExecutionPolicy;
+import build.buildfarm.v1test.PlatformValidationSettings;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import com.google.common.collect.ImmutableList;
@@ -158,7 +159,8 @@ class StubWorkerContext implements WorkerContext {
   }
 
   @Override
-  public boolean putOperation(Operation operation, Action action) {
+  public boolean putOperation(
+      Operation operation, PlatformValidationSettings settings, Action action) {
     throw new UnsupportedOperationException();
   }
 

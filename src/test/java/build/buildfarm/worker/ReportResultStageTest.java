@@ -36,6 +36,7 @@ import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.Poller;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
+import build.buildfarm.v1test.PlatformValidationSettings;
 import build.buildfarm.v1test.QueueEntry;
 import com.google.common.collect.ImmutableList;
 import com.google.longrunning.Operation;
@@ -109,14 +110,20 @@ public class ReportResultStageTest {
             .setExecDir(Paths.get("reported-operation-path"))
             .setPoller(mock(Poller.class))
             .build();
-    when(context.putOperation(any(Operation.class), eq(reportedContext.action))).thenReturn(true);
+    when(context.putOperation(
+            any(Operation.class),
+            any(PlatformValidationSettings.class),
+            eq(reportedContext.action)))
+        .thenReturn(true);
 
     PipelineStage reportResultStage = new ReportResultStage(context, output, /* error=*/ null);
+    PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
     reportResultStage.put(reportedContext);
     reportResultStage.run();
     verify(context, times(1)).destroyExecDir(reportedContext.execDir);
     ArgumentCaptor<Operation> operationCaptor = ArgumentCaptor.forClass(Operation.class);
-    verify(context, times(1)).putOperation(operationCaptor.capture(), eq(reportedContext.action));
+    verify(context, times(1))
+        .putOperation(operationCaptor.capture(), eq(settings), eq(reportedContext.action));
     Operation completeOperation = operationCaptor.getValue();
     assertThat(output.get().operation).isEqualTo(completeOperation);
   }
@@ -149,7 +156,11 @@ public class ReportResultStageTest {
             .setExecDir(Paths.get("erroring-operation-path"))
             .setPoller(mock(Poller.class))
             .build();
-    when(context.putOperation(any(Operation.class), eq(erroringContext.action))).thenReturn(true);
+    when(context.putOperation(
+            any(Operation.class),
+            any(PlatformValidationSettings.class),
+            eq(erroringContext.action)))
+        .thenReturn(true);
     Status erroredStatus =
         Status.newBuilder().setCode(Code.FAILED_PRECONDITION.getNumber()).build();
     doThrow(StatusProto.toStatusException(erroredStatus))
@@ -166,7 +177,9 @@ public class ReportResultStageTest {
     reportResultStage.run();
     verify(context, times(1)).destroyExecDir(erroringContext.execDir);
     ArgumentCaptor<Operation> operationCaptor = ArgumentCaptor.forClass(Operation.class);
-    verify(context, times(1)).putOperation(operationCaptor.capture(), eq(erroringContext.action));
+    PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
+    verify(context, times(1))
+        .putOperation(operationCaptor.capture(), eq(settings), eq(erroringContext.action));
     Operation erroredOperation = operationCaptor.getValue();
     assertThat(output.get().operation).isEqualTo(erroredOperation);
     verify(context, times(1))

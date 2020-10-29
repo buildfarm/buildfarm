@@ -749,6 +749,7 @@ java_binary(
         "@maven//:io_grpc_grpc_stub",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
     ],
 )
 

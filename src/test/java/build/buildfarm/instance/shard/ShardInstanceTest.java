@@ -55,7 +55,6 @@ import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ToolDetails;
-import build.buildfarm.v1test.PlatformValidationSettings;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
@@ -66,6 +65,7 @@ import build.buildfarm.common.Write.NullWrite;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecuteEntry;
+import build.buildfarm.v1test.PlatformValidationSettings;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import com.google.common.cache.CacheBuilder;
@@ -104,7 +104,6 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
-import build.buildfarm.v1test.PlatformValidationSettings;
 
 @RunWith(JUnit4.class)
 public class ShardInstanceTest {
@@ -286,7 +285,7 @@ public class ShardInstanceTest {
     boolean failedPreconditionExceptionCaught = false;
     try {
       PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
-      instance.queue(executeEntry, settings,poller).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
+      instance.queue(executeEntry, settings, poller).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
     } catch (ExecutionException e) {
       com.google.rpc.Status status = StatusProto.fromThrowable(e);
       if (status.getCode() == Code.FAILED_PRECONDITION.getNumber()) {
@@ -400,7 +399,7 @@ public class ShardInstanceTest {
     boolean failedPreconditionExceptionCaught = false;
     try {
       PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
-      instance.queue(executeEntry, settings,poller).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
+      instance.queue(executeEntry, settings, poller).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
     } catch (ExecutionException e) {
       com.google.rpc.Status status = StatusProto.fromThrowable(e);
       if (status.getCode() == Code.FAILED_PRECONDITION.getNumber()) {
@@ -548,7 +547,7 @@ public class ShardInstanceTest {
     try {
       // anything more would be unreasonable
       PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
-      instance.queue(executeEntry, settings,poller).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
+      instance.queue(executeEntry, settings, poller).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
     } catch (ExecutionException e) {
       com.google.rpc.Status status = StatusProto.fromThrowable(e);
       if (status.getCode() == Code.UNAVAILABLE.getNumber()) {
@@ -584,7 +583,7 @@ public class ShardInstanceTest {
     when(mockBackplane.getActionResult(eq(actionKey))).thenReturn(actionResult);
 
     Poller poller = mock(Poller.class);
-    
+
     PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
     instance.queue(executeEntry, settings, poller).get();
 
@@ -629,7 +628,7 @@ public class ShardInstanceTest {
     Poller poller = mock(Poller.class);
 
     PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
-    instance.queue(executeEntry, settings,poller).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
+    instance.queue(executeEntry, settings, poller).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
 
     verify(mockBackplane, times(1)).queue(any(QueueEntry.class), any(Operation.class));
     verify(mockBackplane, times(1)).putOperation(any(Operation.class), eq(CACHE_CHECK));
@@ -681,7 +680,9 @@ public class ShardInstanceTest {
             .build();
     Poller poller = mock(Poller.class);
     PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
-    instance.queue(cacheServedExecuteEntry, settings,poller).get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
+    instance
+        .queue(cacheServedExecuteEntry, settings, poller)
+        .get(QUEUE_TEST_TIMEOUT_SECONDS, SECONDS);
 
     verify(poller, times(1)).pause();
     verify(mockBackplane, never()).queue(any(QueueEntry.class), any(Operation.class));
@@ -745,7 +746,7 @@ public class ShardInstanceTest {
                     .setActionDigest(actionDigest))
             .build();
     PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
-    instance.requeueOperation(queueEntry,settings).get();
+    instance.requeueOperation(queueEntry, settings).get();
     ArgumentCaptor<Operation> operationCaptor = ArgumentCaptor.forClass(Operation.class);
     verify(mockBackplane, times(1)).putOperation(operationCaptor.capture(), eq(COMPLETED));
     Operation operation = operationCaptor.getValue();
@@ -817,7 +818,7 @@ public class ShardInstanceTest {
             .setQueuedOperationDigest(queuedOperationDigest)
             .build();
     PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
-    instance.requeueOperation(queueEntry,settings).get();
+    instance.requeueOperation(queueEntry, settings).get();
   }
 
   @Test
