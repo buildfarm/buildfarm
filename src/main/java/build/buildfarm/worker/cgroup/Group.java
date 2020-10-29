@@ -17,13 +17,15 @@ package build.buildfarm.worker.cgroup;
 import static java.util.stream.Collectors.joining;
 
 import com.google.common.collect.ImmutableList;
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
 public class Group {
@@ -125,20 +127,19 @@ public class Group {
     // get all pids
     List<Integer> pids = getPids(controllerName);
 
-    // convert them to handles
-    List<Optional<ProcessHandle>> handles = new ArrayList();
-    pids.forEach(pid -> handles.add(ProcessHandle.of(pid)));
-
     // convert them to commands
     List<String> commands = new ArrayList();
-    handles.stream()
-        .filter(Optional::isPresent)
-        .map(Optional::get)
-        .forEach(
-            handle -> {
-              ProcessHandle.Info processInfo = handle.info();
-              commands.add(processInfo.commandLine().orElse("command missing"));
-            });
+    pids.forEach(
+        pid -> {
+          try {
+            Process process = Runtime.getRuntime().exec("ps -o cmd fp " + Integer.toString(pid));
+            BufferedReader lineReader =
+                new BufferedReader(new InputStreamReader(process.getInputStream()));
+            String command = lineReader.lines().collect(Collectors.joining());
+            commands.add(command);
+          } catch (IOException e) {
+          }
+        });
 
     return commands;
   }
