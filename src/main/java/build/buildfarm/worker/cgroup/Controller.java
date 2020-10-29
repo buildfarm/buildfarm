@@ -14,7 +14,6 @@
 
 package build.buildfarm.worker.cgroup;
 
-
 import build.buildfarm.worker.WorkerContext.IOResource;
 import java.io.IOException;
 import java.io.InputStreamReader;
