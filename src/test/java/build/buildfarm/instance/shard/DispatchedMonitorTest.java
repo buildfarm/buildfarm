@@ -36,27 +36,30 @@ import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
+import java.util.function.BiFunction;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import build.buildfarm.v1test.PlatformValidationSettings;
 
 @RunWith(JUnit4.class)
 public class DispatchedMonitorTest {
   @Mock private ShardBackplane backplane;
 
-  @Mock private Function<QueueEntry, ListenableFuture<Void>> requeuer;
+  @Mock private BiFunction<QueueEntry, PlatformValidationSettings, ListenableFuture<Void>> requeuer;
 
   private DispatchedMonitor dispatchedMonitor;
 
   @Before
   public void setUp() throws InterruptedException {
     MockitoAnnotations.initMocks(this);
-    when(requeuer.apply(any(QueueEntry.class)))
+    PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
+    when(requeuer.apply(any(QueueEntry.class),any(PlatformValidationSettings.class)))
         .thenReturn(immediateFailedFuture(new RuntimeException("unexpected requeue")));
-    dispatchedMonitor = new DispatchedMonitor(backplane, requeuer, /* intervalSeconds=*/ 0);
+    dispatchedMonitor = new DispatchedMonitor(backplane, requeuer, settings,/* intervalSeconds=*/ 0);
   }
 
   @Test
@@ -96,9 +99,10 @@ public class DispatchedMonitorTest {
                     .setRequeueAt(0)
                     .setQueueEntry(queueEntry)
                     .build()));
-    when(requeuer.apply(eq(queueEntry))).thenReturn(immediateFuture(null));
+    PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
+    when(requeuer.apply(eq(queueEntry),eq(settings))).thenReturn(immediateFuture(null));
     dispatchedMonitor.iterate();
-    verify(requeuer, times(1)).apply(queueEntry);
+    verify(requeuer, times(1)).apply(queueEntry,settings);
   }
 
   @Test
@@ -119,7 +123,8 @@ public class DispatchedMonitorTest {
                     .setRequeueAt(0)
                     .setQueueEntry(queueEntry)
                     .build()));
-    when(requeuer.apply(eq(queueEntry))).thenReturn(immediateFuture(null));
+    PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
+    when(requeuer.apply(eq(queueEntry),eq(settings))).thenReturn(immediateFuture(null));
     dispatchedMonitor.iterate();
     verifyZeroInteractions(requeuer);
   }
@@ -150,10 +155,11 @@ public class DispatchedMonitorTest {
                     .setRequeueAt(0)
                     .setQueueEntry(queueEntry)
                     .build()));
-    when(requeuer.apply(eq(queueEntry)))
+    PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
+    when(requeuer.apply(eq(queueEntry),eq(settings)))
         .thenReturn(immediateFailedFuture(new Exception("error during requeue")));
     dispatchedMonitor.iterate();
-    verify(requeuer, times(1)).apply(queueEntry);
+    verify(requeuer, times(1)).apply(queueEntry,settings);
   }
 
   @Test

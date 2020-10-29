@@ -488,6 +488,8 @@ message ShardInstanceConfig {
   
   // default timeouts on grpc requests made by instances
   google.protobuf.Duration grpc_timeout = 8;
+  
+  PlatformValidationSettings platform_validation_settings = 14;
 }
 
 message ShardWorkerInstanceConfig {

@@ -258,6 +258,7 @@ public class ShardInstance extends AbstractServerInstance {
         config.getRunOperationQueuer(),
         config.getMaxBlobSize(),
         config.getMaximumActionTimeout(),
+        config.getPlatformValidationSettings(),
         onStop,
         WorkerStubs.create(digestUtil, getGrpcTimeout(config)),
         actionCacheFetchService);
@@ -273,6 +274,7 @@ public class ShardInstance extends AbstractServerInstance {
       boolean runOperationQueuer,
       long maxBlobSize,
       Duration maxActionTimeout,
+      PlatformValidationSettings settings,
       Runnable onStop,
       com.google.common.cache.LoadingCache<String, Instance> workerStubs,
       ListeningExecutorService actionCacheFetchService)
@@ -302,7 +304,7 @@ public class ShardInstance extends AbstractServerInstance {
       dispatchedMonitor =
           new Thread(
               new DispatchedMonitor(
-                  backplane, this::requeueOperation, dispatchedMonitorIntervalSeconds));
+                  backplane, this::requeueOperation, settings, dispatchedMonitorIntervalSeconds));
     } else {
       dispatchedMonitor = null;
     }
@@ -345,7 +347,7 @@ public class ShardInstance extends AbstractServerInstance {
                       Deadline.after(5, MINUTES));
                   try {
                     logger.log(Level.INFO, "queueing " + operationName);
-                    ListenableFuture<Void> queueFuture = queue(executeEntry, poller);
+                    ListenableFuture<Void> queueFuture = queue(executeEntry, settings, poller);
                     addCallback(
                         queueFuture,
                         new FutureCallback<Void>() {
@@ -1465,7 +1467,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   private ListenableFuture<Void> validateAndRequeueOperation(
-      Operation operation, QueueEntry queueEntry) {
+      Operation operation, QueueEntry queueEntry, PlatformValidationSettings settings) {
     ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
     String operationName = executeEntry.getOperationName();
     checkState(operationName.equals(operation.getName()));
@@ -1492,7 +1494,7 @@ public class ShardInstance extends AbstractServerInstance {
             (queuedOperation) -> {
               /* sync, throws StatusException - must be serviced via non-OTS */
               validateQueuedOperationAndInputs(
-                  actionDigest, queuedOperation, preconditionFailure, requestMetadata);
+                  actionDigest, queuedOperation, preconditionFailure, settings, requestMetadata);
               return immediateFuture(queuedOperation);
             },
             operationTransformService);
@@ -1576,7 +1578,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @VisibleForTesting
-  public ListenableFuture<Void> requeueOperation(QueueEntry queueEntry) {
+  public ListenableFuture<Void> requeueOperation(QueueEntry queueEntry, PlatformValidationSettings settings) {
     ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
     String operationName = executeEntry.getOperationName();
     try {
@@ -1627,7 +1629,7 @@ public class ShardInstance extends AbstractServerInstance {
           if (cachedResult) {
             return IMMEDIATE_VOID_FUTURE;
           }
-          return validateAndRequeueOperation(operation, queueEntry);
+          return validateAndRequeueOperation(operation, queueEntry,settings);
         },
         operationTransformService);
   }
@@ -1893,7 +1895,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @VisibleForTesting
-  public ListenableFuture<Void> queue(ExecuteEntry executeEntry, Poller poller)
+  public ListenableFuture<Void> queue(ExecuteEntry executeEntry, PlatformValidationSettings settings, Poller poller)
       throws InterruptedException {
     ExecuteOperationMetadata metadata =
         ExecuteOperationMetadata.newBuilder()
@@ -1930,13 +1932,13 @@ public class ShardInstance extends AbstractServerInstance {
                     getName(), operation.getName(), checkCacheUSecs));
             return IMMEDIATE_VOID_FUTURE;
           }
-          return transformAndQueue(executeEntry, poller, operation, stopwatch);
+          return transformAndQueue(executeEntry, poller, operation, settings, stopwatch);
         },
         operationTransformService);
   }
 
   private ListenableFuture<Void> transformAndQueue(
-      ExecuteEntry executeEntry, Poller poller, Operation operation, Stopwatch stopwatch) {
+      ExecuteEntry executeEntry, Poller poller, Operation operation, PlatformValidationSettings settings, Stopwatch stopwatch) {
     long checkCacheUSecs = stopwatch.elapsed(MICROSECONDS);
     ExecuteOperationMetadata metadata;
     try {
@@ -2032,7 +2034,7 @@ public class ShardInstance extends AbstractServerInstance {
                               .getQueuedOperationDigest())));
               long startValidateUSecs = stopwatch.elapsed(MICROSECONDS);
               /* sync, throws StatusException */
-              validateQueuedOperation(actionDigest, profiledQueuedMetadata.getQueuedOperation());
+              validateQueuedOperation(actionDigest, profiledQueuedMetadata.getQueuedOperation(),settings);
               return immediateFuture(
                   profiledQueuedMetadata.setValidatedIn(
                       Durations.fromMicros(stopwatch.elapsed(MICROSECONDS) - startValidateUSecs)));

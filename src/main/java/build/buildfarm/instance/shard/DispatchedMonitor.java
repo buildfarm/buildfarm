@@ -28,22 +28,27 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.function.BiFunction;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import build.buildfarm.v1test.PlatformValidationSettings;
 
 class DispatchedMonitor implements Runnable {
   private static final Logger logger = Logger.getLogger(DispatchedMonitor.class.getName());
 
   private final ShardBackplane backplane;
-  private final Function<QueueEntry, ListenableFuture<Void>> requeuer;
+  private final BiFunction<QueueEntry, PlatformValidationSettings, ListenableFuture<Void>> requeuer;
+  private final PlatformValidationSettings settings;
   private final int intervalSeconds;
 
   DispatchedMonitor(
       ShardBackplane backplane,
-      Function<QueueEntry, ListenableFuture<Void>> requeuer,
+      BiFunction<QueueEntry, PlatformValidationSettings, ListenableFuture<Void>> requeuer,
+      PlatformValidationSettings settings,
       int intervalSeconds) {
     this.backplane = backplane;
     this.requeuer = requeuer;
+    this.settings = settings;
     this.intervalSeconds = intervalSeconds;
   }
 
@@ -55,7 +60,7 @@ class DispatchedMonitor implements Runnable {
         format(
             "DispatchedMonitor: Testing %s because %d >= %d",
             operationName, now, o.getRequeueAt()));
-    ListenableFuture<Void> requeuedFuture = requeuer.apply(queueEntry);
+    ListenableFuture<Void> requeuedFuture = requeuer.apply(queueEntry,settings);
     long startTime = System.nanoTime();
     requeuedFuture.addListener(
         () -> {

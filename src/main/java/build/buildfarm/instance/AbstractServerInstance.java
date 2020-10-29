@@ -796,6 +796,7 @@ public abstract class AbstractServerInstance implements Instance {
       Digest actionDigest,
       QueuedOperation queuedOperation,
       PreconditionFailure.Builder preconditionFailure,
+      PlatformValidationSettings settings,
       RequestMetadata requestMetadata)
       throws StatusException, InterruptedException {
     final ListenableFuture<Void> validatedFuture;
@@ -808,7 +809,6 @@ public abstract class AbstractServerInstance implements Instance {
       validatedFuture = Futures.immediateFuture(null);
     } else {
       ImmutableSet.Builder<Digest> inputDigestsBuilder = ImmutableSet.builder();
-      PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
       validateAction(
           queuedOperation.getAction(),
           queuedOperation.hasCommand() ? queuedOperation.getCommand() : null,
@@ -877,10 +877,9 @@ public abstract class AbstractServerInstance implements Instance {
     validateInputs(inputDigestsBuilder.build(), preconditionFailure, requestMetadata);
   }
 
-  protected void validateQueuedOperation(Digest actionDigest, QueuedOperation queuedOperation)
+  protected void validateQueuedOperation(Digest actionDigest, QueuedOperation queuedOperation, PlatformValidationSettings settings)
       throws StatusException {
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
-    PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
     validateAction(
         queuedOperation.getAction(),
         queuedOperation.hasCommand() ? queuedOperation.getCommand() : null,
