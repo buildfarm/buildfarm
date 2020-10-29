@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker;
 
+import build.buildfarm.v1test.PlatformValidationSettings;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.Set;
@@ -31,15 +32,20 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
   private final AtomicInteger executorClaims = new AtomicInteger(0);
   private BlockingQueue<OperationContext> queue = new ArrayBlockingQueue<>(1);
   private volatile int size = 0;
+  private final PlatformValidationSettings settings;
 
   public ExecuteActionStage(
-      WorkerContext workerContext, PipelineStage output, PipelineStage error) {
+      WorkerContext workerContext,
+      PlatformValidationSettings settings,
+      PipelineStage output,
+      PipelineStage error) {
     super(
         "ExecuteActionStage",
         workerContext,
         output,
         createDestroyExecDirStage(workerContext, error),
         workerContext.getExecuteStageWidth());
+    this.settings = settings;
   }
 
   static PipelineStage createDestroyExecDirStage(
@@ -119,7 +125,7 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
     OperationContext operationContext = take();
     int claims = claimsRequired(operationContext);
     Executor executor = new Executor(workerContext, operationContext, this);
-    Thread executorThread = new Thread(() -> executor.run(claims));
+    Thread executorThread = new Thread(() -> executor.run(settings, claims));
 
     synchronized (this) {
       executors.add(executorThread);

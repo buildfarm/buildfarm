@@ -43,9 +43,15 @@ class OperationQueueClient {
   private final Instance instance;
   private final Platform matchPlatform;
   private final Set<String> activeOperations = new ConcurrentSkipListSet<>();
+  private final PlatformValidationSettings settings;
 
-  OperationQueueClient(Instance instance, Platform platform, Iterable<ExecutionPolicy> policies) {
+  OperationQueueClient(
+      Instance instance,
+      Platform platform,
+      PlatformValidationSettings settings,
+      Iterable<ExecutionPolicy> policies) {
     this.instance = instance;
+    this.settings = settings;
     matchPlatform = ExecutionPolicies.getMatchPlatform(platform, policies);
   }
 
@@ -116,7 +122,6 @@ class OperationQueueClient {
           }
         };
     while (!dedupMatchListener.getMatched()) {
-      PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
       instance.match(matchPlatform, settings, dedupMatchListener);
     }
   }
@@ -131,7 +136,6 @@ class OperationQueueClient {
           metadata.toBuilder().setStage(ExecutionStage.Value.QUEUED).build();
 
       operation = operation.toBuilder().setMetadata(Any.pack(executingMetadata)).build();
-      PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
       instance.putOperation(operation, settings);
     } catch (InvalidProtocolBufferException e) {
       logger.log(

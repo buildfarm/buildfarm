@@ -79,7 +79,8 @@ class Executor {
     }
   }
 
-  private long runInterruptible(Stopwatch stopwatch) throws InterruptedException {
+  private long runInterruptible(PlatformValidationSettings settings, Stopwatch stopwatch)
+      throws InterruptedException {
     long startedAt = System.currentTimeMillis();
 
     ExecuteOperationMetadata metadata;
@@ -113,7 +114,6 @@ class Executor {
 
     boolean operationUpdateSuccess = false;
     try {
-      PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
       operationUpdateSuccess =
           workerContext.putOperation(operation, settings, operationContext.action);
     } catch (IOException e) {
@@ -283,12 +283,12 @@ class Executor {
     return stopwatch.elapsed(MICROSECONDS) - executeUSecs;
   }
 
-  public void run(int claims) {
+  public void run(PlatformValidationSettings settings, int claims) {
     long stallUSecs = 0;
     Stopwatch stopwatch = Stopwatch.createStarted();
     String operationName = operationContext.operation.getName();
     try {
-      stallUSecs = runInterruptible(stopwatch);
+      stallUSecs = runInterruptible(settings, stopwatch);
     } catch (InterruptedException e) {
       /* we can be interrupted when the poller fails */
       try {

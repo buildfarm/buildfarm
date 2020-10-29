@@ -58,6 +58,7 @@ public class OperationQueueClientTest {
         new OperationQueueClient(
             instance,
             Platform.getDefaultInstance(),
+            PlatformValidationSettings.newBuilder().build(),
             ImmutableList.of(ExecutionPolicy.newBuilder().setName("foo").build()));
     MatchListener listener =
         new MatchListener() {

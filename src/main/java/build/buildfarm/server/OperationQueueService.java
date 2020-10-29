@@ -37,9 +37,11 @@ import java.util.function.Consumer;
 
 public class OperationQueueService extends OperationQueueGrpc.OperationQueueImplBase {
   private final Instances instances;
+  private final PlatformValidationSettings settings;
 
-  public OperationQueueService(Instances instances) {
+  public OperationQueueService(Instances instances, PlatformValidationSettings settings) {
     this.instances = instances;
+    this.settings = settings;
   }
 
   private static <V> V getUnchecked(ListenableFuture<V> future) throws InterruptedException {
@@ -99,7 +101,7 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
           responseObserver.onError(e);
         }
       }
-      PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
+
       instance.putOperation(
           instance.getOperation(queueEntry.getExecuteEntry().getOperationName()), settings);
       return false;
@@ -120,7 +122,7 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
         (ServerCallStreamObserver<QueueEntry>) responseObserver;
 
     try {
-      PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
+
       instance.match(
           request.getPlatform(),
           settings,
@@ -163,7 +165,7 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
     }
 
     try {
-      PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
+
       boolean ok = instance.putAndValidateOperation(operation, settings);
       Code code = ok ? Code.OK : Code.UNAVAILABLE;
       responseObserver.onNext(com.google.rpc.Status.newBuilder().setCode(code.getNumber()).build());

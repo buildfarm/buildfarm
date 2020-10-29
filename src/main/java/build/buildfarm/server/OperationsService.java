@@ -30,9 +30,11 @@ import io.grpc.stub.StreamObserver;
 
 public class OperationsService extends OperationsGrpc.OperationsImplBase {
   private final Instances instances;
+  private final PlatformValidationSettings settings;
 
-  public OperationsService(Instances instances) {
+  public OperationsService(Instances instances, PlatformValidationSettings settings) {
     this.instances = instances;
+    this.settings = settings;
   }
 
   @Override
@@ -112,7 +114,6 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
     }
 
     try {
-      PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
       instance.cancelOperation(request.getName(), settings);
       responseObserver.onNext(Empty.getDefaultInstance());
       responseObserver.onCompleted();

@@ -101,12 +101,14 @@ public class BuildFarmServer extends LoggingMain {
             .addService(
                 new ExecutionService(
                     instances,
+                    config.getPlatformValidationSettings(),
                     config.getExecuteKeepaliveAfterSeconds(),
                     TimeUnit.SECONDS,
                     keepaliveScheduler,
                     getMetricsPublisher(config.getMetricsConfig())))
-            .addService(new OperationQueueService(instances))
-            .addService(new OperationsService(instances))
+            .addService(
+                new OperationQueueService(instances, config.getPlatformValidationSettings()))
+            .addService(new OperationsService(instances, config.getPlatformValidationSettings()))
             .addService(new AdminService(config.getAdminConfig(), instances))
             .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
             .intercept(headersInterceptor)

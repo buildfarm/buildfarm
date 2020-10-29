@@ -50,14 +50,17 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
   private final TimeUnit keepaliveUnit;
   private final ScheduledExecutorService keepaliveScheduler;
   private final MetricsPublisher metricsPublisher;
+  private final PlatformValidationSettings settings;
 
   public ExecutionService(
       Instances instances,
+      PlatformValidationSettings settings,
       long keepaliveAfter,
       TimeUnit keepaliveUnit,
       ScheduledExecutorService keepaliveScheduler,
       MetricsPublisher metricsPublisher) {
     this.instances = instances;
+    this.settings = settings;
     this.keepaliveAfter = keepaliveAfter;
     this.keepaliveUnit = keepaliveUnit;
     this.keepaliveScheduler = keepaliveScheduler;
@@ -206,7 +209,6 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
         (ServerCallStreamObserver<Operation>) responseObserver;
     try {
       RequestMetadata requestMetadata = TracingMetadataUtils.fromCurrentContext();
-      PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
       withCancellation(
           serverCallStreamObserver,
           instance.execute(

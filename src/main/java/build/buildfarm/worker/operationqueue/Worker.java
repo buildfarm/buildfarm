@@ -393,7 +393,10 @@ public class Worker extends LoggingMain {
 
     OperationQueueClient oq =
         new OperationQueueClient(
-            operationQueueInstance, config.getPlatform(), config.getExecutionPoliciesList());
+            operationQueueInstance,
+            config.getPlatform(),
+            config.getPlatformValidationSettings(),
+            config.getExecutionPoliciesList());
 
     WorkerContext context =
         new WorkerContext() {
@@ -703,9 +706,12 @@ public class Worker extends LoggingMain {
     PipelineStage completeStage =
         new PutOperationStage((operation) -> oq.deactivate(operation.getName()));
     PipelineStage errorStage = completeStage; /* new ErrorStage(); */
-    PipelineStage reportResultStage = new ReportResultStage(context, completeStage, errorStage);
+    PipelineStage reportResultStage =
+        new ReportResultStage(
+            context, config.getPlatformValidationSettings(), completeStage, errorStage);
     PipelineStage executeActionStage =
-        new ExecuteActionStage(context, reportResultStage, errorStage);
+        new ExecuteActionStage(
+            context, config.getPlatformValidationSettings(), reportResultStage, errorStage);
     PipelineStage inputFetchStage =
         new InputFetchStage(context, executeActionStage, new PutOperationStage(oq::requeue));
     PipelineStage matchStage = new MatchStage(context, inputFetchStage, errorStage);

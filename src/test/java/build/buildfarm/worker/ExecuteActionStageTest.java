@@ -20,6 +20,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import build.buildfarm.v1test.ExecuteEntry;
+import build.buildfarm.v1test.PlatformValidationSettings;
 import build.buildfarm.v1test.QueueEntry;
 import java.nio.file.Paths;
 import org.junit.Test;
@@ -43,8 +44,9 @@ public class ExecuteActionStageTest {
             .setQueueEntry(errorEntry)
             .setExecDir(Paths.get("error-operation-path"))
             .build();
-
-    PipelineStage executeActionStage = new ExecuteActionStage(context, /* output=*/ null, error);
+    PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
+    PipelineStage executeActionStage =
+        new ExecuteActionStage(context, settings, /* output=*/ null, error);
     executeActionStage.error().put(errorContext);
     verify(context, times(1)).destroyExecDir(errorContext.execDir);
     verify(error, times(1)).put(errorContext);

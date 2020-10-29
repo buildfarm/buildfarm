@@ -26,6 +26,7 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.metrics.log.LogMetricsPublisher;
 import build.buildfarm.server.ExecutionService.KeepaliveWatcher;
 import build.buildfarm.v1test.MetricsConfig;
+import build.buildfarm.v1test.PlatformValidationSettings;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
 import io.grpc.stub.ServerCallStreamObserver;
@@ -53,6 +54,7 @@ public class ExecutionServiceTest {
     ExecutionService service =
         new ExecutionService(
             instances,
+            PlatformValidationSettings.newBuilder().build(),
             /* keepaliveAfter=*/ 1,
             /* keepaliveUnit=*/ SECONDS, // far enough in the future that we'll get scheduled and
             keepaliveScheduler,

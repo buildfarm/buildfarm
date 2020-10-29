@@ -116,8 +116,9 @@ public class ReportResultStageTest {
             eq(reportedContext.action)))
         .thenReturn(true);
 
-    PipelineStage reportResultStage = new ReportResultStage(context, output, /* error=*/ null);
     PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
+    PipelineStage reportResultStage =
+        new ReportResultStage(context, settings, output, /* error=*/ null);
     reportResultStage.put(reportedContext);
     reportResultStage.run();
     verify(context, times(1)).destroyExecDir(reportedContext.execDir);
@@ -171,13 +172,13 @@ public class ReportResultStageTest {
             eq(erroringContext.execDir),
             eq(ImmutableList.of()),
             eq(ImmutableList.of()));
-
-    PipelineStage reportResultStage = new ReportResultStage(context, output, /* error=*/ null);
+    PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
+    PipelineStage reportResultStage =
+        new ReportResultStage(context, settings, output, /* error=*/ null);
     reportResultStage.put(erroringContext);
     reportResultStage.run();
     verify(context, times(1)).destroyExecDir(erroringContext.execDir);
     ArgumentCaptor<Operation> operationCaptor = ArgumentCaptor.forClass(Operation.class);
-    PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
     verify(context, times(1))
         .putOperation(operationCaptor.capture(), eq(settings), eq(erroringContext.action));
     Operation erroredOperation = operationCaptor.getValue();

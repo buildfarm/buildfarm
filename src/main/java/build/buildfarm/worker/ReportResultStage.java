@@ -46,11 +46,17 @@ import java.util.logging.Logger;
 
 public class ReportResultStage extends PipelineStage {
   private static final Logger logger = Logger.getLogger(ReportResultStage.class.getName());
+  private final PlatformValidationSettings settings;
 
   private final BlockingQueue<OperationContext> queue = new ArrayBlockingQueue<>(1);
 
-  public ReportResultStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
+  public ReportResultStage(
+      WorkerContext workerContext,
+      PlatformValidationSettings settings,
+      PipelineStage output,
+      PipelineStage error) {
     super("ReportResultStage", workerContext, output, error);
+    this.settings = settings;
   }
 
   @Override
