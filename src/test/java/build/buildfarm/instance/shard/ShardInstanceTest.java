@@ -55,6 +55,7 @@ import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ToolDetails;
+import build.buildfarm.v1test.PlatformValidationSettings;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
@@ -248,12 +249,14 @@ public class ShardInstanceTest {
     when(mockBackplane.canPrequeue()).thenReturn(true);
     Digest actionDigest = Digest.newBuilder().setHash("action").setSizeBytes(10).build();
     Watcher mockWatcher = mock(Watcher.class);
+    PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
     instance.execute(
         actionDigest,
         /* skipCacheLookup=*/ false,
         ExecutionPolicy.getDefaultInstance(),
         ResultsCachePolicy.getDefaultInstance(),
         RequestMetadata.getDefaultInstance(),
+        settings,
         /* watcher=*/ mockWatcher);
     verify(mockWatcher, times(1)).observe(any(Operation.class));
     ArgumentCaptor<ExecuteEntry> executeEntryCaptor = ArgumentCaptor.forClass(ExecuteEntry.class);
@@ -689,12 +692,14 @@ public class ShardInstanceTest {
     assertThat(executeResponse.getCachedResult()).isTrue();
 
     Watcher mockWatcher = mock(Watcher.class);
+    PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
     instance.execute(
         actionDigest,
         /* skipCacheLookup=*/ false,
         ExecutionPolicy.getDefaultInstance(),
         ResultsCachePolicy.getDefaultInstance(),
         requestMetadata,
+        settings,
         /* watcher=*/ mockWatcher);
     verify(mockWatcher, times(1)).observe(any(Operation.class));
     ArgumentCaptor<ExecuteEntry> executeEntryCaptor = ArgumentCaptor.forClass(ExecuteEntry.class);

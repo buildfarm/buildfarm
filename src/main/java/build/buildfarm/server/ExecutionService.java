@@ -40,6 +40,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
+import build.buildfarm.v1test.PlatformValidationSettings;
 
 public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
   private static final Logger logger = Logger.getLogger(ExecutionService.class.getName());
@@ -205,6 +206,7 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
         (ServerCallStreamObserver<Operation>) responseObserver;
     try {
       RequestMetadata requestMetadata = TracingMetadataUtils.fromCurrentContext();
+      PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
       withCancellation(
           serverCallStreamObserver,
           instance.execute(
@@ -213,6 +215,7 @@ public class ExecutionService extends ExecutionGrpc.ExecutionImplBase {
               request.getExecutionPolicy(),
               request.getResultsCachePolicy(),
               requestMetadata,
+              settings,
               createWatcher(serverCallStreamObserver, requestMetadata)));
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();

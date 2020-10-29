@@ -70,6 +70,7 @@ import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.Tree;
+import build.buildfarm.v1test.PlatformValidationSettings;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
@@ -431,6 +432,7 @@ public class MemoryInstance extends AbstractServerInstance {
       String operationName,
       Action action,
       PreconditionFailure.Builder preconditionFailure,
+      PlatformValidationSettings settings,
       RequestMetadata requestMetadata)
       throws InterruptedException, StatusException {
     if (action.hasTimeout() && config.hasMaximumActionTimeout()) {
@@ -447,7 +449,7 @@ public class MemoryInstance extends AbstractServerInstance {
       }
     }
 
-    super.validateAction(operationName, action, preconditionFailure, requestMetadata);
+    super.validateAction(operationName, action, preconditionFailure, settings,requestMetadata);
   }
 
   @Override
@@ -649,7 +651,8 @@ public class MemoryInstance extends AbstractServerInstance {
             () -> {
               logger.log(Level.INFO, format("REQUEUEING %s", operation.getName()));
               requeuers.remove(operationName);
-              requeueOperation(operation);
+              PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
+              requeueOperation(operation,settings);
             });
     requeuers.put(operation.getName(), requeuer);
     new Thread(requeuer).start();
@@ -848,7 +851,8 @@ public class MemoryInstance extends AbstractServerInstance {
       }
     }
     for (Operation operation : rejectedOperations.build()) {
-      requeueOperation(operation);
+      PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
+      requeueOperation(operation,settings);
     }
     if (!matched) {
       synchronized (queue.workers) {

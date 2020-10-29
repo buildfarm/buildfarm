@@ -27,6 +27,7 @@ import static java.lang.String.format;
 import build.bazel.remote.execution.v2.ActionCacheGrpc;
 import build.bazel.remote.execution.v2.ActionCacheGrpc.ActionCacheBlockingStub;
 import build.bazel.remote.execution.v2.ActionCacheGrpc.ActionCacheFutureStub;
+import build.buildfarm.v1test.PlatformValidationSettings;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.BatchReadBlobsRequest;
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
@@ -670,6 +671,7 @@ public class StubInstance implements Instance {
       ExecutionPolicy executionPolicy,
       ResultsCachePolicy resultsCachePolicy,
       RequestMetadata metadata,
+      PlatformValidationSettings settings,
       Watcher watcher) {
     throw new UnsupportedOperationException();
   }
@@ -721,7 +723,7 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public boolean putAndValidateOperation(Operation operation) {
+  public boolean putAndValidateOperation(Operation operation, PlatformValidationSettings settings) {
     throw new UnsupportedOperationException();
   }
 

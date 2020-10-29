@@ -93,6 +93,7 @@ import org.junit.runners.JUnit4;
 import org.mockito.ArgumentCaptor;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
+import build.buildfarm.v1test.PlatformValidationSettings;
 
 @RunWith(JUnit4.class)
 public class MemoryInstanceTest {
@@ -320,7 +321,8 @@ public class MemoryInstanceTest {
     Watcher watcher = mock(Watcher.class);
     watchers.put(queuedOperation.getName(), new UnwatchFuture(queuedOperation.getName(), watcher));
 
-    assertThat(instance.requeueOperation(queuedOperation)).isFalse();
+    PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
+    assertThat(instance.requeueOperation(queuedOperation,settings)).isFalse();
 
     ArgumentCaptor<Operation> operationCaptor = ArgumentCaptor.forClass(Operation.class);
     verify(watcher, times(1)).observe(operationCaptor.capture());
@@ -339,7 +341,8 @@ public class MemoryInstanceTest {
     Watcher watcher = mock(Watcher.class);
     watchers.put(queuedOperation.getName(), new UnwatchFuture(queuedOperation.getName(), watcher));
 
-    assertThat(instance.requeueOperation(queuedOperation)).isTrue();
+    PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
+    assertThat(instance.requeueOperation(queuedOperation,settings)).isTrue();
     verifyZeroInteractions(watcher);
   }
 
@@ -355,7 +358,8 @@ public class MemoryInstanceTest {
     Watcher watcher = mock(Watcher.class);
     ListenableFuture<Void> watchFuture =
         instance.watchOperation(queuedOperation.getName(), watcher);
-    assertThat(instance.requeueOperation(queuedOperation)).isFalse();
+    PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
+    assertThat(instance.requeueOperation(queuedOperation,settings)).isFalse();
     watchFuture.get();
     ArgumentCaptor<Operation> operationCaptor = ArgumentCaptor.forClass(Operation.class);
     verify(watcher, atLeastOnce()).observe(operationCaptor.capture());
@@ -454,12 +458,14 @@ public class MemoryInstanceTest {
 
     Watcher watcher = mock(Watcher.class);
     IllegalStateException timeoutInvalid = null;
+    PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
     instance.execute(
         actionDigestWithExcessiveTimeout,
         /* skipCacheLookup=*/ true,
         ExecutionPolicy.getDefaultInstance(),
         ResultsCachePolicy.getDefaultInstance(),
         RequestMetadata.getDefaultInstance(),
+        settings,
         watcher);
     ArgumentCaptor<Operation> watchCaptor = ArgumentCaptor.forClass(Operation.class);
     verify(watcher, times(1)).observe(watchCaptor.capture());
@@ -489,12 +495,14 @@ public class MemoryInstanceTest {
         createAction(Action.newBuilder().setTimeout(MAXIMUM_ACTION_TIMEOUT));
 
     Watcher watcher = mock(Watcher.class);
+    PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
     instance.execute(
         actionDigestWithExcessiveTimeout,
         /* skipCacheLookup=*/ true,
         ExecutionPolicy.getDefaultInstance(),
         ResultsCachePolicy.getDefaultInstance(),
         RequestMetadata.getDefaultInstance(),
+        settings,
         watcher);
     verify(watcher, atLeastOnce()).observe(any(Operation.class));
   }
@@ -526,12 +534,14 @@ public class MemoryInstanceTest {
   @Test
   public void requeueRemovesRequeuers() throws InterruptedException {
     Digest actionDigest = createAction(Action.newBuilder());
+    PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
     instance.execute(
         actionDigest,
         /* skipCacheLookup=*/ true,
         ExecutionPolicy.getDefaultInstance(),
         ResultsCachePolicy.getDefaultInstance(),
         RequestMetadata.getDefaultInstance(),
+        settings,
         (operation) -> {});
     MatchListener listener = mock(MatchListener.class);
     when(listener.onEntry(any(QueueEntry.class))).thenReturn(true);
@@ -556,12 +566,14 @@ public class MemoryInstanceTest {
     instance.putActionResult(
         DigestUtil.asActionKey(actionDigest), ActionResult.getDefaultInstance());
     AtomicReference<Operation> operation = new AtomicReference<>(null);
+    PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
     instance.execute(
         actionDigest,
         /* skipCacheLookup=*/ true,
         ExecutionPolicy.getDefaultInstance(),
         ResultsCachePolicy.getDefaultInstance(),
         RequestMetadata.getDefaultInstance(),
+        settings,
         o -> operation.compareAndSet(null, o));
 
     String operationName = operation.get().getName();

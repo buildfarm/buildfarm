@@ -32,6 +32,7 @@ import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watcher;
+import build.buildfarm.v1test.PlatformValidationSettings;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
 import build.buildfarm.instance.AbstractServerInstance;
@@ -188,6 +189,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
       ExecutionPolicy executionPolicy,
       ResultsCachePolicy resultsCachePolicy,
       RequestMetadata requestMetadata,
+      PlatformValidationSettings settings,
       Watcher watcher) {
     throw new UnsupportedOperationException();
   }

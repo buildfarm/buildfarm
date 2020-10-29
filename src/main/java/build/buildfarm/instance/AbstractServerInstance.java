@@ -808,11 +808,13 @@ public abstract class AbstractServerInstance implements Instance {
       validatedFuture = Futures.immediateFuture(null);
     } else {
       ImmutableSet.Builder<Digest> inputDigestsBuilder = ImmutableSet.builder();
+      PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
       validateAction(
           queuedOperation.getAction(),
           queuedOperation.hasCommand() ? queuedOperation.getCommand() : null,
           DigestUtil.proxyDirectoriesIndex(queuedOperation.getTree().getDirectories()),
           inputDigestsBuilder::add,
+          settings,
           preconditionFailure);
       validateInputs(inputDigestsBuilder.build(), preconditionFailure, requestMetadata);
     }
@@ -821,7 +823,7 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   private Action validateActionDigest(
-      String operationName, Digest actionDigest, RequestMetadata requestMetadata)
+      String operationName, Digest actionDigest, RequestMetadata requestMetadata, PlatformValidationSettings settings)
       throws StatusException, InterruptedException {
     Action action = null;
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
@@ -846,7 +848,7 @@ public abstract class AbstractServerInstance implements Instance {
             .setDescription("Action " + DigestUtil.toString(actionDigest));
       }
       if (action != null) {
-        validateAction(operationName, action, preconditionFailure, requestMetadata);
+        validateAction(operationName, action, preconditionFailure, settings, requestMetadata);
       }
     }
     checkPreconditionFailure(actionDigest, preconditionFailure.build());
@@ -857,6 +859,7 @@ public abstract class AbstractServerInstance implements Instance {
       String operationName,
       Action action,
       PreconditionFailure.Builder preconditionFailure,
+      PlatformValidationSettings settings, 
       RequestMetadata requestMetadata)
       throws InterruptedException, StatusException {
     ExecutorService service = newDirectExecutorService();
@@ -869,6 +872,7 @@ public abstract class AbstractServerInstance implements Instance {
         getUnchecked(expect(action.getCommandDigest(), Command.parser(), service, requestMetadata)),
         DigestUtil.proxyDirectoriesIndex(tree.getDirectories()),
         inputDigestsBuilder::add,
+        settings,
         preconditionFailure);
     validateInputs(inputDigestsBuilder.build(), preconditionFailure, requestMetadata);
   }
@@ -876,11 +880,13 @@ public abstract class AbstractServerInstance implements Instance {
   protected void validateQueuedOperation(Digest actionDigest, QueuedOperation queuedOperation)
       throws StatusException {
     PreconditionFailure.Builder preconditionFailure = PreconditionFailure.newBuilder();
+    PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
     validateAction(
         queuedOperation.getAction(),
         queuedOperation.hasCommand() ? queuedOperation.getCommand() : null,
         DigestUtil.proxyDirectoriesIndex(queuedOperation.getTree().getDirectories()),
         digest -> {},
+        settings,
         preconditionFailure);
     checkPreconditionFailure(actionDigest, preconditionFailure.build());
   }
@@ -897,8 +903,8 @@ public abstract class AbstractServerInstance implements Instance {
       Set<String> inputFiles,
       Set<String> inputDirectories,
       Map<Digest, Directory> directoriesIndex,
+      PlatformValidationSettings settings,
       PreconditionFailure.Builder preconditionFailure) {
-    PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
     validatePlatform(command.getPlatform(), settings, preconditionFailure);
 
     // FIXME should input/output collisions (through directories) be another
@@ -961,6 +967,7 @@ public abstract class AbstractServerInstance implements Instance {
       @Nullable Command command,
       Map<Digest, Directory> directoriesIndex,
       Consumer<Digest> onInputDigest,
+      PlatformValidationSettings settings,
       PreconditionFailure.Builder preconditionFailure) {
     ImmutableSet.Builder<String> inputDirectoriesBuilder = ImmutableSet.builder();
     ImmutableSet.Builder<String> inputFilesBuilder = ImmutableSet.builder();
@@ -984,12 +991,14 @@ public abstract class AbstractServerInstance implements Instance {
           .setSubject("blobs/" + DigestUtil.toString(action.getCommandDigest()))
           .setDescription(MISSING_COMMAND);
     } else {
+      
       validateCommand(
           command,
           action.getInputRootDigest(),
           inputFilesBuilder.build(),
           inputDirectoriesBuilder.build(),
           directoriesIndex,
+          settings,
           preconditionFailure);
     }
   }
@@ -1112,11 +1121,12 @@ public abstract class AbstractServerInstance implements Instance {
       ExecutionPolicy executionPolicy,
       ResultsCachePolicy resultsCachePolicy,
       RequestMetadata requestMetadata,
+      PlatformValidationSettings settings,
       Watcher watcher)
       throws InterruptedException {
     Action action;
     try {
-      action = validateActionDigest("execute", actionDigest, requestMetadata);
+      action = validateActionDigest("execute", actionDigest, requestMetadata,settings);
     } catch (StatusException e) {
       com.google.rpc.Status status = StatusProto.fromThrowable(e);
       if (status == null) {
@@ -1526,15 +1536,15 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public boolean putAndValidateOperation(Operation operation) throws InterruptedException {
+  public boolean putAndValidateOperation(Operation operation, PlatformValidationSettings settings) throws InterruptedException {
     if (isQueued(operation)) {
-      return requeueOperation(operation);
+      return requeueOperation(operation,settings);
     }
     return putOperation(operation);
   }
 
   @VisibleForTesting
-  public boolean requeueOperation(Operation operation) throws InterruptedException {
+  public boolean requeueOperation(Operation operation, PlatformValidationSettings settings) throws InterruptedException {
     String name = operation.getName();
     ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
     RequestMetadata requestMetadata = expectRequestMetadata(operation);
@@ -1565,7 +1575,7 @@ public abstract class AbstractServerInstance implements Instance {
     }
     Digest actionDigest = metadata.getActionDigest();
     try {
-      validateActionDigest(name, actionDigest, requestMetadata);
+      validateActionDigest(name, actionDigest, requestMetadata,settings);
     } catch (StatusException e) {
       com.google.rpc.Status status = StatusProto.fromThrowable(e);
       if (status == null) {

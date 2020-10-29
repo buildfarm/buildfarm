@@ -40,6 +40,7 @@ import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationsStatus;
+import build.buildfarm.v1test.PlatformValidationSettings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -363,6 +364,7 @@ public class AbstractServerInstanceTest {
         ImmutableSet.of(),
         ImmutableSet.of(),
         ImmutableMap.of(),
+        PlatformValidationSettings.newBuilder().build(),
         preconditionFailureBuilder);
     PreconditionFailure preconditionFailure = preconditionFailureBuilder.build();
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
@@ -383,6 +385,7 @@ public class AbstractServerInstanceTest {
         ImmutableSet.of(),
         ImmutableSet.of(),
         ImmutableMap.of(),
+        PlatformValidationSettings.newBuilder().build(),
         preconditionFailureBuilder);
     PreconditionFailure preconditionFailure = preconditionFailureBuilder.build();
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);
@@ -404,6 +407,7 @@ public class AbstractServerInstanceTest {
         ImmutableSet.of(),
         ImmutableSet.of(),
         ImmutableMap.of(inputRootDigest, Directory.getDefaultInstance()),
+        PlatformValidationSettings.newBuilder().build(),
         preconditionFailureBuilder);
     PreconditionFailure preconditionFailure = preconditionFailureBuilder.build();
     assertThat(preconditionFailure.getViolationsCount()).isEqualTo(1);

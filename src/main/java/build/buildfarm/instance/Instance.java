@@ -24,6 +24,7 @@ import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ServerCapabilities;
+import build.buildfarm.v1test.PlatformValidationSettings;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
@@ -112,6 +113,7 @@ public interface Instance {
       ExecutionPolicy executionPolicy,
       ResultsCachePolicy resultsCachePolicy,
       RequestMetadata requestMetadata,
+      PlatformValidationSettings settings,
       Watcher operationObserver)
       throws InterruptedException;
 
@@ -121,7 +123,7 @@ public interface Instance {
 
   boolean putOperation(Operation operation) throws InterruptedException;
 
-  boolean putAndValidateOperation(Operation operation) throws InterruptedException;
+  boolean putAndValidateOperation(Operation operation, PlatformValidationSettings settings) throws InterruptedException;
 
   boolean pollOperation(String operationName, ExecutionStage.Value stage);
   // returns nextPageToken suitable for list restart

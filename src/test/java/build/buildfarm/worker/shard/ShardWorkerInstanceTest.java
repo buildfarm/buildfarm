@@ -47,6 +47,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import build.buildfarm.v1test.PlatformValidationSettings;
 
 @RunWith(JUnit4.class)
 public class ShardWorkerInstanceTest {
@@ -152,12 +153,14 @@ public class ShardWorkerInstanceTest {
 
   @Test(expected = UnsupportedOperationException.class)
   public void executeIsUnsupported() {
+    PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
     instance.execute(
         /* actionDigest=*/ null,
         /* skipCacheLookup=*/ false,
         /* executionPolicy=*/ null,
         /* resultsCachePolicy=*/ null,
         /* requestMetadata=*/ null,
+        settings,
         /* watcher=*/ null);
   }
 

@@ -1446,6 +1446,7 @@ public class ShardInstance extends AbstractServerInstance {
       @Nullable Command command,
       Map<Digest, Directory> directoriesIndex,
       Consumer<Digest> onInputDigest,
+      PlatformValidationSettings settings,
       PreconditionFailure.Builder preconditionFailure) {
     if (action.hasTimeout() && hasMaxActionTimeout()) {
       Duration timeout = action.getTimeout();
@@ -1460,7 +1461,7 @@ public class ShardInstance extends AbstractServerInstance {
       }
     }
 
-    super.validateAction(action, command, directoriesIndex, onInputDigest, preconditionFailure);
+    super.validateAction(action, command, directoriesIndex, onInputDigest, settings, preconditionFailure);
   }
 
   private ListenableFuture<Void> validateAndRequeueOperation(
@@ -1670,6 +1671,7 @@ public class ShardInstance extends AbstractServerInstance {
       ExecutionPolicy executionPolicy,
       ResultsCachePolicy resultsCachePolicy,
       RequestMetadata requestMetadata,
+      PlatformValidationSettings settings,
       Watcher watcher) {
     try {
       if (!backplane.canPrequeue()) {
