@@ -124,10 +124,8 @@ public class Group {
 
   public List<String> getCommands(String controllerName) throws IOException {
 
-    // get all pids
+    // get all pids and convert them to commands
     List<Integer> pids = getPids(controllerName);
-
-    // convert them to commands
     List<String> commands = new ArrayList();
     pids.forEach(
         pid -> {
