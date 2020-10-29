@@ -166,12 +166,14 @@ public class ShardWorkerInstanceTest {
 
   @Test(expected = UnsupportedOperationException.class)
   public void matchIsUnsupported() throws InterruptedException {
-    instance.match(/* platform=*/ null, /* listener=*/ null);
+    PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
+    instance.match(/* platform=*/ null, settings,/* listener=*/ null);
   }
 
   @Test(expected = UnsupportedOperationException.class)
   public void cancelOperationIsUnsupported() throws InterruptedException {
-    instance.cancelOperation(/* name=*/ null);
+    PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
+    instance.cancelOperation(/* name=*/ null,settings);
   }
 
   @Test(expected = UnsupportedOperationException.class)

@@ -406,7 +406,8 @@ public class MemoryInstanceTest {
   private boolean putNovelOperation(ExecutionStage.Value stage) throws InterruptedException {
     storage.put(simpleActionDigest, simpleAction.toByteString());
     storage.put(simpleCommandDigest, simpleCommand.toByteString());
-    return instance.putOperation(createOperation("does-not-exist", stage));
+    PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
+    return instance.putOperation(createOperation("does-not-exist", stage),settings);
   }
 
   @Test
@@ -524,7 +525,8 @@ public class MemoryInstanceTest {
   @Test
   public void matchCancelRemovesFromWorkers() throws InterruptedException {
     MatchListener listener = mock(MatchListener.class);
-    instance.match(Platform.getDefaultInstance(), listener);
+    PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
+    instance.match(Platform.getDefaultInstance(), settings,listener);
     ArgumentCaptor<Runnable> onCancelHandlerCaptor = ArgumentCaptor.forClass(Runnable.class);
     verify(listener, times(1)).setOnCancelHandler(onCancelHandlerCaptor.capture());
     onCancelHandlerCaptor.getValue().run();
@@ -545,7 +547,7 @@ public class MemoryInstanceTest {
         (operation) -> {});
     MatchListener listener = mock(MatchListener.class);
     when(listener.onEntry(any(QueueEntry.class))).thenReturn(true);
-    instance.match(Platform.getDefaultInstance(), listener);
+    instance.match(Platform.getDefaultInstance(), settings,listener);
     ArgumentCaptor<QueueEntry> queueEntryCaptor = ArgumentCaptor.forClass(QueueEntry.class);
     verify(listener, times(1)).onEntry(queueEntryCaptor.capture());
     QueueEntry queueEntry = queueEntryCaptor.getValue();
@@ -554,7 +556,7 @@ public class MemoryInstanceTest {
     assertThat(requeuers).isNotEmpty();
     Operation queuedOperation = outstandingOperations.get(operationName);
     assertThat(instance.isQueued(queuedOperation)).isTrue();
-    instance.putOperation(queuedOperation); // requeue
+    instance.putOperation(queuedOperation,settings); // requeue
     assertThat(requeuers).isEmpty();
     assertThat(outstandingOperations.get(operationName)).isEqualTo(queuedOperation);
   }

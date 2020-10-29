@@ -34,12 +34,14 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
+import build.buildfarm.v1test.PlatformValidationSettings;
 
 @RunWith(JUnit4.class)
 public class OperationQueueClientTest {
   @Test
   public void matchPlatformContainsExecutionPolicies() throws InterruptedException {
     Instance instance = mock(Instance.class);
+    PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
     doAnswer(
             new Answer<Void>() {
               @Override
@@ -50,7 +52,7 @@ public class OperationQueueClientTest {
               }
             })
         .when(instance)
-        .match(any(Platform.class), any(MatchListener.class));
+        .match(any(Platform.class), any(PlatformValidationSettings.class),any(MatchListener.class));
     OperationQueueClient client =
         new OperationQueueClient(
             instance,
@@ -83,6 +85,6 @@ public class OperationQueueClientTest {
             .addProperties(
                 Property.newBuilder().setName("execution-policy").setValue("foo").build())
             .build();
-    verify(instance, times(1)).match(eq(matchPlatform), any(MatchListener.class));
+    verify(instance, times(1)).match(eq(matchPlatform), eq(settings),any(MatchListener.class));
   }
 }

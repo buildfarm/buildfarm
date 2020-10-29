@@ -94,6 +94,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import build.buildfarm.v1test.PlatformValidationSettings;
 
 class ShardWorkerContext implements WorkerContext {
   private static final Logger logger = Logger.getLogger(ShardWorkerContext.class.getName());
@@ -726,7 +727,8 @@ class ShardWorkerContext implements WorkerContext {
   @Override
   public boolean putOperation(Operation operation, Action action)
       throws IOException, InterruptedException {
-    boolean success = createBackplaneRetrier().execute(() -> instance.putOperation(operation));
+    PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
+    boolean success = createBackplaneRetrier().execute(() -> instance.putOperation(operation,settings));
     if (success && operation.getDone()) {
       logger.log(Level.INFO, "CompletedOperation: " + operation.getName());
     }

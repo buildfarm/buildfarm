@@ -57,6 +57,7 @@ import java.util.logging.Logger;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import build.buildfarm.v1test.PlatformValidationSettings;
 
 @RunWith(JUnit4.class)
 public class AbstractServerInstanceTest {
@@ -103,7 +104,7 @@ public class AbstractServerInstanceTest {
     }
 
     @Override
-    protected boolean matchOperation(Operation operation) {
+    protected boolean matchOperation(Operation operation, PlatformValidationSettings settings) {
       throw new UnsupportedOperationException();
     }
 
@@ -143,7 +144,7 @@ public class AbstractServerInstanceTest {
     }
 
     @Override
-    public void match(Platform platform, MatchListener listener) {
+    public void match(Platform platform, PlatformValidationSettings settings, MatchListener listener) {
       throw new UnsupportedOperationException();
     }
 

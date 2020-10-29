@@ -117,11 +117,11 @@ public interface Instance {
       Watcher operationObserver)
       throws InterruptedException;
 
-  void match(Platform platform, MatchListener listener) throws InterruptedException;
+  void match(Platform platform, PlatformValidationSettings settings, MatchListener listener) throws InterruptedException;
 
   OperationsStatus operationsStatus();
 
-  boolean putOperation(Operation operation) throws InterruptedException;
+  boolean putOperation(Operation operation, PlatformValidationSettings settings) throws InterruptedException;
 
   boolean putAndValidateOperation(Operation operation, PlatformValidationSettings settings) throws InterruptedException;
 
@@ -132,7 +132,7 @@ public interface Instance {
 
   Operation getOperation(String name);
 
-  void cancelOperation(String name) throws InterruptedException;
+  void cancelOperation(String name, PlatformValidationSettings settings) throws InterruptedException;
 
   void deleteOperation(String name);
 

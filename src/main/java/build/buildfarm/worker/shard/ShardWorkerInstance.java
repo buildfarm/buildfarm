@@ -218,7 +218,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  public void match(Platform platform, MatchListener listener) throws InterruptedException {
+  public void match(Platform platform, PlatformValidationSettings settings, MatchListener listener) throws InterruptedException {
     throw new UnsupportedOperationException();
   }
 
@@ -228,7 +228,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  public boolean putOperation(Operation operation) {
+  public boolean putOperation(Operation operation, PlatformValidationSettings settings) {
     try {
       return backplane.putOperation(
           operation, expectExecuteOperationMetadata(operation).getStage());
@@ -243,7 +243,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  protected boolean matchOperation(Operation operation) {
+  protected boolean matchOperation(Operation operation, PlatformValidationSettings settings) {
     throw new UnsupportedOperationException();
   }
 
@@ -288,7 +288,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  public void cancelOperation(String name) {
+  public void cancelOperation(String name, PlatformValidationSettings settings) {
     throw new UnsupportedOperationException();
   }
 

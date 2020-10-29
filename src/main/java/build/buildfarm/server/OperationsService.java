@@ -26,6 +26,7 @@ import com.google.longrunning.OperationsGrpc;
 import com.google.protobuf.Empty;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
+import build.buildfarm.v1test.PlatformValidationSettings;
 
 public class OperationsService extends OperationsGrpc.OperationsImplBase {
   private final Instances instances;
@@ -111,7 +112,8 @@ public class OperationsService extends OperationsGrpc.OperationsImplBase {
     }
 
     try {
-      instance.cancelOperation(request.getName());
+      PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
+      instance.cancelOperation(request.getName(),settings);
       responseObserver.onNext(Empty.getDefaultInstance());
       responseObserver.onCompleted();
     } catch (InterruptedException e) {

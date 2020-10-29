@@ -35,6 +35,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
+import build.buildfarm.v1test.PlatformValidationSettings;
 
 class OperationQueueClient {
   private static final Logger logger = Logger.getLogger(Worker.class.getName());
@@ -115,7 +116,8 @@ class OperationQueueClient {
           }
         };
     while (!dedupMatchListener.getMatched()) {
-      instance.match(matchPlatform, dedupMatchListener);
+      PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
+      instance.match(matchPlatform, settings, dedupMatchListener);
     }
   }
 
@@ -129,7 +131,8 @@ class OperationQueueClient {
           metadata.toBuilder().setStage(ExecutionStage.Value.QUEUED).build();
 
       operation = operation.toBuilder().setMetadata(Any.pack(executingMetadata)).build();
-      instance.putOperation(operation);
+      PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
+      instance.putOperation(operation,settings);
     } catch (InvalidProtocolBufferException e) {
       logger.log(
           SEVERE, "error unpacking execute operation metadata for " + operation.getName(), e);
@@ -140,8 +143,8 @@ class OperationQueueClient {
     activeOperations.remove(name);
   }
 
-  boolean put(Operation operation) throws InterruptedException {
-    return instance.putOperation(operation);
+  boolean put(Operation operation, PlatformValidationSettings settings) throws InterruptedException {
+    return instance.putOperation(operation,settings);
   }
 
   public Write getStreamWrite(String name) {

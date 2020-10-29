@@ -99,7 +99,8 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
           responseObserver.onError(e);
         }
       }
-      instance.putOperation(instance.getOperation(queueEntry.getExecuteEntry().getOperationName()));
+      PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
+      instance.putOperation(instance.getOperation(queueEntry.getExecuteEntry().getOperationName()),settings);
       return false;
     };
   }
@@ -118,8 +119,10 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
         (ServerCallStreamObserver<QueueEntry>) responseObserver;
 
     try {
+      PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
       instance.match(
           request.getPlatform(),
+          settings,
           new OperationQueueMatchListener(
               instance,
               createOnMatch(instance, responseObserver),

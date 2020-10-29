@@ -1165,7 +1165,7 @@ public abstract class AbstractServerInstance implements Instance {
                 "%s::execute(%s): %s",
                 getName(), DigestUtil.toString(actionDigest), operation.getName()));
 
-    putOperation(operation);
+    putOperation(operation,settings);
 
     ListenableFuture<Void> watchFuture = watchOperation(operation.getName(), watcher);
 
@@ -1179,7 +1179,7 @@ public abstract class AbstractServerInstance implements Instance {
       cacheCheckMetadata = metadata;
     } else {
       cacheCheckMetadata = metadata.toBuilder().setStage(ExecutionStage.Value.CACHE_CHECK).build();
-      putOperation(operationBuilder.setMetadata(Any.pack(metadata)).build());
+      putOperation(operationBuilder.setMetadata(Any.pack(metadata)).build(),settings);
       actionResultFuture = getActionResult(actionKey, requestMetadata);
     }
 
@@ -1216,7 +1216,7 @@ public abstract class AbstractServerInstance implements Instance {
                 updateOperationWatchers(
                     nextOperation); // updates watchers initially for queued stage
               }
-              putOperation(nextOperation);
+              putOperation(nextOperation,settings);
             } catch (InterruptedException e) {
               // ignore
             }
@@ -1421,12 +1421,12 @@ public abstract class AbstractServerInstance implements Instance {
     return null;
   }
 
-  protected abstract boolean matchOperation(Operation operation) throws InterruptedException;
+  protected abstract boolean matchOperation(Operation operation, PlatformValidationSettings settings) throws InterruptedException;
 
   protected abstract void enqueueOperation(Operation operation);
 
   @Override
-  public boolean putOperation(Operation operation) throws InterruptedException {
+  public boolean putOperation(Operation operation, PlatformValidationSettings settings) throws InterruptedException {
     String name = operation.getName();
     if (isCancelled(operation)) {
       if (outstandingOperations.remove(name) == null) {
@@ -1440,7 +1440,7 @@ public abstract class AbstractServerInstance implements Instance {
       return false;
     }
     if (isQueued(operation)) {
-      if (!matchOperation(operation)) {
+      if (!matchOperation(operation,settings)) {
         enqueueOperation(operation);
       }
     } else {
@@ -1518,7 +1518,7 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public void cancelOperation(String name) throws InterruptedException {
+  public void cancelOperation(String name, PlatformValidationSettings settings) throws InterruptedException {
     Operation operation = getOperation(name);
     if (operation == null) {
       operation =
@@ -1530,6 +1530,7 @@ public abstract class AbstractServerInstance implements Instance {
     RequestMetadata requestMetadata = expectRequestMetadata(operation);
     errorOperation(
         operation,
+        settings,
         requestMetadata,
         com.google.rpc.Status.newBuilder().setCode(Code.CANCELLED.getNumber()).build());
   }
@@ -1539,7 +1540,7 @@ public abstract class AbstractServerInstance implements Instance {
     if (isQueued(operation)) {
       return requeueOperation(operation,settings);
     }
-    return putOperation(operation);
+    return putOperation(operation,settings);
   }
 
   @VisibleForTesting
@@ -1552,6 +1553,7 @@ public abstract class AbstractServerInstance implements Instance {
       String message = format("Operation %s does not contain ExecuteOperationMetadata", name);
       errorOperation(
           operation,
+          settings,
           requestMetadata,
           com.google.rpc.Status.newBuilder()
               .setCode(Code.INTERNAL.getNumber())
@@ -1565,6 +1567,7 @@ public abstract class AbstractServerInstance implements Instance {
       String message = format("Operation %s stage is not QUEUED", name);
       errorOperation(
           operation,
+          settings,
           requestMetadata,
           com.google.rpc.Status.newBuilder()
               .setCode(com.google.rpc.Code.INTERNAL.getNumber())
@@ -1585,7 +1588,7 @@ public abstract class AbstractServerInstance implements Instance {
                 .build();
       }
       logFailedStatus(actionDigest, status);
-      errorOperation(operation, requestMetadata, status);
+      errorOperation(operation, settings,requestMetadata, status);
       return false;
     }
 
@@ -1595,11 +1598,11 @@ public abstract class AbstractServerInstance implements Instance {
                 "%s::requeueOperation(%s): %s",
                 getName(), DigestUtil.toString(actionDigest), name));
 
-    return putOperation(operation);
+    return putOperation(operation,settings);
   }
 
   protected void errorOperation(
-      Operation operation, RequestMetadata requestMetadata, com.google.rpc.Status status)
+      Operation operation, PlatformValidationSettings settings, RequestMetadata requestMetadata, com.google.rpc.Status status)
       throws InterruptedException {
     if (operation.getDone()) {
       throw new IllegalStateException("Trying to error already completed operation [" + name + "]");
@@ -1620,10 +1623,11 @@ public abstract class AbstractServerInstance implements Instance {
             .setDone(true)
             .setMetadata(Any.pack(completedMetadata))
             .setResponse(Any.pack(ExecuteResponse.newBuilder().setStatus(status).build()))
-            .build());
+            .build()
+            ,settings);
   }
 
-  protected void expireOperation(Operation operation) throws InterruptedException {
+  protected void expireOperation(Operation operation, PlatformValidationSettings settings) throws InterruptedException {
     ActionResult actionResult =
         ActionResult.newBuilder()
             .setExitCode(-1)
@@ -1649,7 +1653,7 @@ public abstract class AbstractServerInstance implements Instance {
             .setDone(true)
             .setMetadata(Any.pack(metadata))
             .setResponse(Any.pack(executeResponse))
-            .build());
+            .build(),settings);
   }
 
   @Override

@@ -677,7 +677,7 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public void match(Platform platform, MatchListener listener) throws InterruptedException {
+  public void match(Platform platform, PlatformValidationSettings settings, MatchListener listener) throws InterruptedException {
     throwIfStopped();
     TakeOperationRequest request =
         TakeOperationRequest.newBuilder().setInstanceName(getName()).setPlatform(platform).build();
@@ -717,7 +717,7 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public boolean putOperation(Operation operation) {
+  public boolean putOperation(Operation operation, PlatformValidationSettings settings) {
     throwIfStopped();
     return deadlined(operationQueueBlockingStub).put(operation).getCode() == Code.OK.getNumber();
   }
@@ -798,7 +798,7 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public void cancelOperation(String operationName) {
+  public void cancelOperation(String operationName, PlatformValidationSettings settings) {
     throwIfStopped();
     deadlined(operationsBlockingStub)
         .cancelOperation(CancelOperationRequest.newBuilder().setName(operationName).build());

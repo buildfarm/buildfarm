@@ -552,7 +552,7 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  public boolean putOperation(Operation operation) throws InterruptedException {
+  public boolean putOperation(Operation operation, PlatformValidationSettings settings) throws InterruptedException {
     String operationName = operation.getName();
     if (isQueued(operation)) {
       // destroy any monitors for this queued operation
@@ -566,7 +566,7 @@ public class MemoryInstance extends AbstractServerInstance {
         operationTimeoutDelay.stop();
       }
     }
-    if (!super.putOperation(operation)) {
+    if (!super.putOperation(operation,settings)) {
       return false;
     }
     if (operation.getDone()) {
@@ -592,7 +592,7 @@ public class MemoryInstance extends AbstractServerInstance {
       Watchdog requeuer = requeuers.get(operationName);
       if (requeuer == null) {
         // restore a requeuer if a worker indicates they are executing
-        onDispatched(operation);
+        onDispatched(operation,settings);
       } else {
         requeuer.pet();
       }
@@ -607,7 +607,7 @@ public class MemoryInstance extends AbstractServerInstance {
         // transition to execution without independent provision of action blob
         // or reconfiguration of operation metadata
         // force an immediate error completion of the operation
-        errorOperation(operation, RequestMetadata.getDefaultInstance(), status.build());
+        errorOperation(operation, settings, RequestMetadata.getDefaultInstance(), status.build());
         return false;
       }
       Duration actionTimeout = null;
@@ -630,7 +630,7 @@ public class MemoryInstance extends AbstractServerInstance {
                 () -> {
                   operationTimeoutDelays.remove(operationName);
                   try {
-                    expireOperation(operation);
+                    expireOperation(operation,settings);
                   } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                   }
@@ -642,7 +642,7 @@ public class MemoryInstance extends AbstractServerInstance {
     return true;
   }
 
-  private void onDispatched(Operation operation) {
+  private void onDispatched(Operation operation, PlatformValidationSettings settings) {
     final String operationName = operation.getName();
     Duration timeout = config.getOperationPollTimeout();
     Watchdog requeuer =
@@ -651,7 +651,6 @@ public class MemoryInstance extends AbstractServerInstance {
             () -> {
               logger.log(Level.INFO, format("REQUEUEING %s", operation.getName()));
               requeuers.remove(operationName);
-              PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
               requeueOperation(operation,settings);
             });
     requeuers.put(operation.getName(), requeuer);
@@ -668,7 +667,7 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  protected boolean matchOperation(Operation operation) throws InterruptedException {
+  protected boolean matchOperation(Operation operation, PlatformValidationSettings settings) throws InterruptedException {
     ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
     Preconditions.checkState(metadata != null, "metadata not found");
 
@@ -735,7 +734,7 @@ public class MemoryInstance extends AbstractServerInstance {
                   .build();
           dispatched = worker.getListener().onEntry(queueEntry);
           if (dispatched) {
-            onDispatched(operation);
+            onDispatched(operation,settings);
           }
         }
       }
@@ -771,7 +770,7 @@ public class MemoryInstance extends AbstractServerInstance {
     return createProvisions(command.getPlatform());
   }
 
-  private void matchSynchronized(Platform platform, MatchListener listener)
+  private void matchSynchronized(Platform platform, PlatformValidationSettings settings, MatchListener listener)
       throws InterruptedException {
     ImmutableList.Builder<Operation> rejectedOperations = ImmutableList.builder();
     boolean matched = false;
@@ -802,7 +801,7 @@ public class MemoryInstance extends AbstractServerInstance {
 
       String operationName = operation.getName();
       if (command == null) {
-        cancelOperation(operationName);
+        cancelOperation(operationName,settings);
       } else if (satisfiesRequirements(provisions, command.getPlatform())) {
         QueuedOperation queuedOperation =
             QueuedOperation.newBuilder()
@@ -838,7 +837,7 @@ public class MemoryInstance extends AbstractServerInstance {
 
           matched = true;
           if (listener.onEntry(queueEntry)) {
-            onDispatched(operation);
+            onDispatched(operation, settings);
           } else {
             enqueueOperation(operation);
           }
@@ -851,7 +850,6 @@ public class MemoryInstance extends AbstractServerInstance {
       }
     }
     for (Operation operation : rejectedOperations.build()) {
-      PlatformValidationSettings settings = PlatformValidationSettings.newBuilder().build();
       requeueOperation(operation,settings);
     }
     if (!matched) {
@@ -864,10 +862,10 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  public void match(Platform platform, MatchListener listener) throws InterruptedException {
+  public void match(Platform platform, PlatformValidationSettings settings, MatchListener listener) throws InterruptedException {
     WorkerQueue queue = queuedOperations.MatchEligibleQueue(createProvisions(platform));
     synchronized (queue.operations) {
-      matchSynchronized(platform, listener);
+      matchSynchronized(platform, settings, listener);
     }
   }
 

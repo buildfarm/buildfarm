@@ -1569,7 +1569,7 @@ public class ShardInstance extends AbstractServerInstance {
             }
             logFailedStatus(actionDigest, status);
             SettableFuture<Void> errorFuture = SettableFuture.create();
-            errorOperationFuture(operation, requestMetadata, status, errorFuture);
+            errorOperationFuture(operation, settings, requestMetadata, status, errorFuture);
             errorFuture.addListener(() -> requeuedFuture.set(null), operationTransformService);
           }
         },
@@ -1588,7 +1588,7 @@ public class ShardInstance extends AbstractServerInstance {
                 .setName(operationName)
                 .setDone(true)
                 .setResponse(Any.pack(blacklistResponse(executeEntry.getActionDigest())))
-                .build());
+                .build(),settings);
         return IMMEDIATE_VOID_FUTURE;
       }
     } catch (IOException e) {
@@ -1772,6 +1772,7 @@ public class ShardInstance extends AbstractServerInstance {
 
   private <T> void errorOperationFuture(
       Operation operation,
+      PlatformValidationSettings settings,
       RequestMetadata requestMetadata,
       com.google.rpc.Status status,
       SettableFuture<T> errorFuture) {
@@ -1783,7 +1784,7 @@ public class ShardInstance extends AbstractServerInstance {
           @Override
           public void run() {
             try {
-              errorOperation(operation, requestMetadata, status);
+              errorOperation(operation, settings, requestMetadata, status);
               errorFuture.setException(StatusProto.toStatusException(status));
             } catch (StatusRuntimeException e) {
               if (attempt % 100 == 0) {
@@ -2138,7 +2139,7 @@ public class ShardInstance extends AbstractServerInstance {
                       .build();
             }
             logFailedStatus(actionDigest, status);
-            errorOperationFuture(operation, requestMetadata, status, queueFuture);
+            errorOperationFuture(operation, settings, requestMetadata, status, queueFuture);
           }
         },
         operationTransformService);
@@ -2146,7 +2147,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @Override
-  public void match(Platform platform, MatchListener listener) {
+  public void match(Platform platform, PlatformValidationSettings settings, MatchListener listener) {
     throw new UnsupportedOperationException();
   }
 
@@ -2160,7 +2161,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @Override
-  public boolean putOperation(Operation operation) {
+  public boolean putOperation(Operation operation, PlatformValidationSettings settings) {
     if (isErrored(operation)) {
       try {
         return backplane.putOperation(operation, ExecutionStage.Value.COMPLETED);
@@ -2171,7 +2172,7 @@ public class ShardInstance extends AbstractServerInstance {
     throw new UnsupportedOperationException();
   }
 
-  protected boolean matchOperation(Operation operation) {
+  protected boolean matchOperation(Operation operation, PlatformValidationSettings settings) {
     throw new UnsupportedOperationException();
   }
 
