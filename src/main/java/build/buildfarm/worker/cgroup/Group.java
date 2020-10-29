@@ -21,7 +21,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import javax.annotation.Nullable;
 
 public class Group {
@@ -116,6 +118,29 @@ public class Group {
 
   public void killUntilEmpty(String controllerName) throws IOException {
     while (!killAllProcs(controllerName)) ;
+  }
+
+  public List<String> getCommands(String controllerName) throws IOException {
+
+    // get all pids
+    List<Integer> pids = getPids(controllerName);
+
+    // convert them to handles
+    List<Optional<ProcessHandle>> handles = new ArrayList();
+    pids.forEach(pid -> handles.add(ProcessHandle.of(pid)));
+
+    // convert them to commands
+    List<String> commands = new ArrayList();
+    handles.stream()
+        .filter(Optional::isPresent)
+        .map(Optional::get)
+        .forEach(
+            handle -> {
+              ProcessHandle.Info processInfo = handle.info();
+              commands.add(processInfo.commandLine().orElse("command missing"));
+            });
+
+    return commands;
   }
 
   void create(String controllerName) throws IOException {

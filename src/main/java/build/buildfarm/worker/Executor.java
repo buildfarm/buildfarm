@@ -33,6 +33,7 @@ import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.ExecutionWrapper;
 import build.buildfarm.worker.WorkerContext.IOResource;
+import build.buildfarm.worker.cgroup.Cpu;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
 import com.google.longrunning.Operation;
@@ -220,10 +221,14 @@ class Executor {
           // per the gRPC spec: 'The operation was attempted past the valid range.' Seems
           // appropriate
           statusCode = Code.OUT_OF_RANGE;
+          List<String> commands = ((Cpu) resource).getCommands();
           operationContext
               .executeResponse
               .getStatusBuilder()
-              .setMessage("command resources were referenced after execution completed");
+              .setMessage(
+                  String.format(
+                      "command resources were referenced after execution completed: %s",
+                      String.join("\n", commands)));
         }
       }
     } catch (IOException e) {
