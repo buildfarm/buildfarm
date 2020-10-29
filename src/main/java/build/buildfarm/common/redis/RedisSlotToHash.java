@@ -28,7 +28,7 @@ import redis.clients.jedis.util.JedisClusterCRC16;
 /// @details Sometimes in redis you want to hash a particular key to a
 ///          particular node in the redis cluster. You might decide to do this
 ///          in order to distribute data evenly across nodes and balance cpu
-///          utilization. . Since redis nodes are decided based on the slot
+///          utilization. Since redis nodes are decided based on the slot
 ///          number that a value hashes to, you can force. A key to land on a
 ///          particular node by choosing a redis hashtag which you know
 ///          corresponds to the appropriate slot number. The class is used to
@@ -70,6 +70,39 @@ public class RedisSlotToHash {
       slotNumber = JedisClusterCRC16.getSlot(Long.toString(hashNumber));
     }
     return Long.toString(hashNumber);
+  }
+  ///
+  /// @brief   Dynamically convert a range of slot number into string that
+  ///          hashes to a slot within the range.
+  /// @details Dynamically generates hashtags and tests them for valid slot
+  ///          number. Slower than static lookup, but less code.
+  /// @param   start  The starting slot range number to find a hashable string for.
+  /// @param   end    The ending slot range number to find a hashable string for.
+  /// @param   prefix A string prefix to include as part of the generated hashtag.
+  /// @return  The string value to be used in a key's hashtag.
+  /// @note    Suggested return identifier: hashtag.
+  ///
+  public static String correlateRangeWithPrefix(long start, long end, String prefix) {
+    Preconditions.checkState(start >= 0 && end < HASHSLOTS);
+
+    long hashNumber = 0;
+    int slotNumber = JedisClusterCRC16.getSlot(createHashtag(prefix, hashNumber));
+    while (slotNumber < start || slotNumber > end) {
+      hashNumber++;
+      slotNumber = JedisClusterCRC16.getSlot(createHashtag(prefix, hashNumber));
+    }
+    return createHashtag(prefix, hashNumber);
+  }
+  ///
+  /// @brief   Create hashtag.
+  /// @details Combine prefix with a generated number.
+  /// @param   prefix    A prefix of the hashtag.
+  /// @param   generated A generated number for the balancing the hashtag.
+  /// @return  Created hashtag.
+  /// @note    Suggested return identifier: hashtag.
+  ///
+  private static String createHashtag(String prefix, long generated) {
+    return String.format("%s:%d", prefix, generated);
   }
   ///
   /// @brief   Convert the slot to a hashtag using a static lookup table.
