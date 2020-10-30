@@ -3,7 +3,6 @@ buildfarm images that can be imported into other WORKSPACE files
 """
 
 load("@io_bazel_rules_docker//repositories:deps.bzl", container_deps = "deps")
-
 load("@io_bazel_rules_docker//container:container.bzl", "container_pull")
 
 def buildfarm_images():

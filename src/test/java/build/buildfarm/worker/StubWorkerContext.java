@@ -207,4 +207,9 @@ class StubWorkerContext implements WorkerContext {
   public int commandExecutionClaims(Command command) {
     throw new UnsupportedOperationException();
   }
+
+  @Override
+  public boolean shouldErrorOperationOnRemainingResources() {
+    throw new UnsupportedOperationException();
+  }
 }

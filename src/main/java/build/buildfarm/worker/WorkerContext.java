@@ -47,6 +47,8 @@ public interface WorkerContext {
 
   String getName();
 
+  boolean shouldErrorOperationOnRemainingResources();
+
   Poller createPoller(String name, QueueEntry queueEntry, ExecutionStage.Value stage);
 
   void resumePoller(

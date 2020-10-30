@@ -5,8 +5,8 @@ buildfarm dependencies that can be imported into other WORKSPACE files
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_jar")
 load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
 
-RULES_JVM_EXTERNAL_TAG = "3.0"
-RULES_JVM_EXTERNAL_SHA = "62133c125bf4109dfd9d2af64830208356ce4ef8b165a6ef15bbff7460b35c3a"
+RULES_JVM_EXTERNAL_TAG = "3.3"
+RULES_JVM_EXTERNAL_SHA = "d85951a92c0908c80bd8551002d66cb23c3434409c814179c0ff026b53544dab"
 
 def archive_dependencies(third_party):
     return [
@@ -20,18 +20,24 @@ def archive_dependencies(third_party):
         # Needed for "well-known protos" and @com_google_protobuf//:protoc.
         {
             "name": "com_google_protobuf",
-            "sha256": "b37e96e81842af659605908a421960a5dc809acbc888f6b947bc320f8628e5b1",
-            "strip_prefix": "protobuf-3.12.0",
-            "urls": ["https://github.com/protocolbuffers/protobuf/archive/v3.12.0.zip"],
+            "sha256": "1c744a6a1f2c901e68c5521bc275e22bdc66256eeb605c2781923365b7087e5f",
+            "strip_prefix": "protobuf-3.13.0",
+            "urls": ["https://github.com/protocolbuffers/protobuf/archive/v3.13.0.zip"],
+        },
+        {
+            "name": "com_github_bazelbuild_buildtools",
+            "sha256": "a02ba93b96a8151b5d8d3466580f6c1f7e77212c4eb181cba53eb2cae7752a23",
+            "strip_prefix": "buildtools-3.5.0",
+            "urls": ["https://github.com/bazelbuild/buildtools/archive/3.5.0.tar.gz"],
         },
 
         # Needed for @grpc_java//compiler:grpc_java_plugin.
         {
             "name": "io_grpc_grpc_java",
             "patch_args": ["-p1"],
-            "sha256": "849780c41b7a251807872a00b752cc965da483e0c345b25f78ed163e878b9b2c",
-            "strip_prefix": "grpc-java-1.30.2",
-            "urls": ["https://github.com/grpc/grpc-java/archive/v1.30.2.zip"],
+            "sha256": "2705d274ce79b324f3520414202481a09640b4b14e58d3124841b3318d9b6e19",
+            "strip_prefix": "grpc-java-1.32.1",
+            "urls": ["https://github.com/grpc/grpc-java/archive/v1.32.1.zip"],
         },
 
         # The APIs that we implement.
@@ -42,15 +48,14 @@ def archive_dependencies(third_party):
             "strip_prefix": "googleapis-143084a2624b6591ee1f9d23e7f5241856642f4d",
             "url": "https://github.com/googleapis/googleapis/archive/143084a2624b6591ee1f9d23e7f5241856642f4d.zip",
         },
-
         {
             "name": "remote_apis",
             "build_file": "%s:BUILD.remote_apis" % third_party,
             "patch_args": ["-p1"],
             "patches": ["%s/remote-apis:remote-apis.patch" % third_party],
-            "sha256": "21ad15be502ef529ca07fdda56d25d6678647b954d41f08a040241ea5e43dce1",
-            "strip_prefix": "remote-apis-b5123b1bb2853393c7b9aa43236db924d7e32d61",
-            "url": "https://github.com/bazelbuild/remote-apis/archive/b5123b1bb2853393c7b9aa43236db924d7e32d61.zip",
+            "sha256": "03433a21ed97517f0fbda03c759854850336775a22dc737bab918949ceeddac9",
+            "strip_prefix": "remote-apis-f54876595da9f2c2d66c98c318d00b60fd64900b",
+            "url": "https://github.com/bazelbuild/remote-apis/archive/f54876595da9f2c2d66c98c318d00b60fd64900b.zip",
         },
 
         # Ideally we would use the 0.14.4 release of rules_docker,
@@ -67,10 +72,10 @@ def archive_dependencies(third_party):
         },
     ]
 
-def buildfarm_dependencies(repository_name="build_buildfarm"):
+def buildfarm_dependencies(repository_name = "build_buildfarm"):
     """
     Define all 3rd party archive rules for buildfarm
-    
+
     Args:
       repository_name: the name of the repository
     """
@@ -87,4 +92,5 @@ def buildfarm_dependencies(repository_name="build_buildfarm"):
         sha256 = "294ff5e4e6ae3fda5ff00f0a3c398fa50c1ffa3bc9313800b32e34a75fbb93f3",
         urls = [
             "https://github.com/werkt/jedis/releases/download/3.2.0-e82e68e2f7/jedis-3.2.0-e82e68e2f7.jar",
-        ])
+        ],
+    )
