@@ -31,15 +31,20 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
   private final AtomicInteger executorClaims = new AtomicInteger(0);
   private BlockingQueue<OperationContext> queue = new ArrayBlockingQueue<>(1);
   private volatile int size = 0;
+  private final boolean errorOperationRemainingResources;
 
   public ExecuteActionStage(
-      WorkerContext workerContext, PipelineStage output, PipelineStage error) {
+      WorkerContext workerContext,
+      boolean errorOperationRemainingResources,
+      PipelineStage output,
+      PipelineStage error) {
     super(
         "ExecuteActionStage",
         workerContext,
         output,
         createDestroyExecDirStage(workerContext, error),
         workerContext.getExecuteStageWidth());
+    this.errorOperationRemainingResources = errorOperationRemainingResources;
   }
 
   static PipelineStage createDestroyExecDirStage(
@@ -118,7 +123,8 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
   protected void iterate() throws InterruptedException {
     OperationContext operationContext = take();
     int claims = claimsRequired(operationContext);
-    Executor executor = new Executor(workerContext, operationContext, this);
+    Executor executor =
+        new Executor(workerContext, errorOperationRemainingResources, operationContext, this);
     Thread executorThread = new Thread(() -> executor.run(claims));
 
     synchronized (this) {

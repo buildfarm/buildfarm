@@ -703,7 +703,8 @@ public class Worker extends LoggingMain {
     PipelineStage errorStage = completeStage; /* new ErrorStage(); */
     PipelineStage reportResultStage = new ReportResultStage(context, completeStage, errorStage);
     PipelineStage executeActionStage =
-        new ExecuteActionStage(context, reportResultStage, errorStage);
+        new ExecuteActionStage(
+            context, config.getErrorOperationRemainingResources(), reportResultStage, errorStage);
     PipelineStage inputFetchStage =
         new InputFetchStage(context, executeActionStage, new PutOperationStage(oq::requeue));
     PipelineStage matchStage = new MatchStage(context, inputFetchStage, errorStage);
