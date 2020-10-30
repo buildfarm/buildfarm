@@ -354,6 +354,7 @@ public class Worker extends LoggingMain {
             config.getLimitExecution(),
             config.getLimitGlobalExecution(),
             config.getOnlyMulticoreTests(),
+            config.getErrorOperationRemainingResources(),
             Suppliers.ofInstance(writer));
 
     PipelineStage completeStage =
@@ -361,8 +362,7 @@ public class Worker extends LoggingMain {
     PipelineStage errorStage = completeStage; /* new ErrorStage(); */
     PipelineStage reportResultStage = new ReportResultStage(context, completeStage, errorStage);
     PipelineStage executeActionStage =
-        new ExecuteActionStage(
-            context, config.getErrorOperationRemainingResources(), reportResultStage, errorStage);
+        new ExecuteActionStage(context, reportResultStage, errorStage);
     PipelineStage inputFetchStage =
         new InputFetchStage(context, executeActionStage, new PutOperationStage(context::requeue));
     PipelineStage matchStage = new MatchStage(context, inputFetchStage, errorStage);

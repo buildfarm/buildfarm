@@ -62,15 +62,10 @@ class Executor {
   private final ExecuteActionStage owner;
   private int exitCode = INCOMPLETE_EXIT_CODE;
   private boolean wasErrored = false;
-  private final boolean errorOperationRemainingResources;
 
   Executor(
-      WorkerContext workerContext,
-      boolean errorOperationRemainingResources,
-      OperationContext operationContext,
-      ExecuteActionStage owner) {
+      WorkerContext workerContext, OperationContext operationContext, ExecuteActionStage owner) {
     this.workerContext = workerContext;
-    this.errorOperationRemainingResources = errorOperationRemainingResources;
     this.operationContext = operationContext;
     this.owner = owner;
   }
@@ -217,7 +212,14 @@ class Executor {
               "", // executingMetadata.getStderrStreamName(),
               resultBuilder);
 
-      if (resource.isReferenced() && errorOperationRemainingResources) {
+      // From Bazel Test Encyclopedia:
+      // If the main process of a test exits, but some of its children are still running,
+      // the test runner should consider the run complete and count it as a success or failure
+      // based on the exit code observed from the main process. The test runner may kill any stray
+      // processes.
+      // Tests should not leak processes in this fashion.
+      if (workerContext.shouldErrorOperationOnRemainingResources() && resource.isReferenced()) {
+
         // there should no longer be any references to the resource. Any references will be
         // killed upon close, but we must error the operation due to improper execution
         ExecuteResponse executeResponse = operationContext.executeResponse.build();

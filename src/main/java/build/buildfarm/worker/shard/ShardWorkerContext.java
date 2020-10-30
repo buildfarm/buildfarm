@@ -124,6 +124,7 @@ class ShardWorkerContext implements WorkerContext {
   private final Group executionsGroup = Group.getRoot().getChild("executions");
   private final Group operationsGroup = executionsGroup.getChild("operations");
   private final Supplier<CasWriter> writer;
+  private final boolean errorOperationRemainingResources;
 
   static SetMultimap<String, String> getMatchProvisions(
       Platform platform, Iterable<ExecutionPolicy> policies, int executeStageWidth) {
@@ -156,6 +157,7 @@ class ShardWorkerContext implements WorkerContext {
       boolean limitExecution,
       boolean limitGlobalExecution,
       boolean onlyMulticoreTests,
+      boolean errorOperationRemainingResources,
       Supplier<CasWriter> writer) {
     this.name = name;
     this.platform = platform;
@@ -177,6 +179,7 @@ class ShardWorkerContext implements WorkerContext {
     this.limitExecution = limitExecution;
     this.limitGlobalExecution = limitGlobalExecution;
     this.onlyMulticoreTests = onlyMulticoreTests;
+    this.errorOperationRemainingResources = errorOperationRemainingResources;
     this.writer = writer;
     Preconditions.checkState(
         !limitGlobalExecution || limitExecution,
@@ -200,6 +203,11 @@ class ShardWorkerContext implements WorkerContext {
   @Override
   public String getName() {
     return name;
+  }
+
+  @Override
+  public boolean shouldErrorOperationOnRemainingResources() {
+    return errorOperationRemainingResources;
   }
 
   @Override
