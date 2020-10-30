@@ -63,6 +63,9 @@ class Executor {
   private int exitCode = INCOMPLETE_EXIT_CODE;
   private boolean wasErrored = false;
 
+  // whether to error on a complete operation that keeps resources open
+  private boolean errorOperationResources = false;
+
   Executor(
       WorkerContext workerContext, OperationContext operationContext, ExecuteActionStage owner) {
     this.workerContext = workerContext;
@@ -212,7 +215,7 @@ class Executor {
               "", // executingMetadata.getStderrStreamName(),
               resultBuilder);
 
-      if (resource.isReferenced()) {
+      if (resource.isReferenced() && errorOperationResources) {
         // there should no longer be any references to the resource. Any references will be
         // killed upon close, but we must error the operation due to improper execution
         ExecuteResponse executeResponse = operationContext.executeResponse.build();
