@@ -409,6 +409,11 @@ public class Worker extends LoggingMain {
           }
 
           @Override
+          public boolean shouldErrorOperationOnRemainingResources() {
+            return config.getErrorOperationRemainingResources();
+          }
+
+          @Override
           public Poller createPoller(
               String name, QueueEntry queueEntry, ExecutionStage.Value stage) {
             Poller poller = new Poller(config.getOperationPollPeriod());

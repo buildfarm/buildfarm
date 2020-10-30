@@ -586,6 +586,8 @@ message ShardWorkerConfig {
   // and cache it's operation outputs in its own cache file CAS.
   // When omitted from CAS, the worker will send its output to another worker's CAS.
   bool omit_from_cas = 33;
+  
+  bool error_operation_remaining_resources = 34;
 }
 
 message ShardWorker {
@@ -897,6 +899,8 @@ message WorkerConfig {
   // available execution policies, will be used to match
   // with an action's platform for selection
   repeated ExecutionPolicy execution_policies = 22;
+  
+  bool error_operation_remaining_resources = 26;
 }
 
 message TreeIteratorToken {

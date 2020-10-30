@@ -212,7 +212,13 @@ class Executor {
               "", // executingMetadata.getStderrStreamName(),
               resultBuilder);
 
-      if (resource.isReferenced()) {
+      // From Bazel Test Encyclopedia:
+      // If the main process of a test exits, but some of its children are still running,
+      // the test runner should consider the run complete and count it as a success or failure
+      // based on the exit code observed from the main process. The test runner may kill any stray
+      // processes. Tests should not leak processes in this fashion.
+      // Based on configuration, we will decide whether remaining resources should be an error.
+      if (workerContext.shouldErrorOperationOnRemainingResources() && resource.isReferenced()) {
         // there should no longer be any references to the resource. Any references will be
         // killed upon close, but we must error the operation due to improper execution
         ExecuteResponse executeResponse = operationContext.executeResponse.build();
