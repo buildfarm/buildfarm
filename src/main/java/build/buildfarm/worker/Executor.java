@@ -227,14 +227,10 @@ class Executor {
           // per the gRPC spec: 'The operation was attempted past the valid range.' Seems
           // appropriate
           statusCode = Code.OUT_OF_RANGE;
-          List<String> commands = ((Cpu) resource).getCommands();
           operationContext
               .executeResponse
               .getStatusBuilder()
-              .setMessage(
-                  String.format(
-                      "command resources were referenced after execution completed: %s",
-                      String.join("\n", commands)));
+              .setMessage(commandResourceErrorMsg(operation, resource));
         }
       }
     } catch (IOException e) {
@@ -289,6 +285,23 @@ class Executor {
       }
     }
     return stopwatch.elapsed(MICROSECONDS) - executeUSecs;
+  }
+
+  private String commandResourceErrorMsg(Operation operation, IOResource resource)
+      throws IOException {
+
+    StringBuilder message = new StringBuilder();
+    message.append(
+        String.format(
+            "The following operation completed successfully, but is still considered a failure: %s.\n",
+            operation.getName()));
+    message.append(String.format("This is because it leaked resources after execution.\n"));
+
+    List<String> commands = ((Cpu) resource).getCommands();
+    message.append(
+        String.format(
+            "Here are the commands of the leaked pids:\n%s", String.join("\n", commands)));
+    return message.toString();
   }
 
   public void run(int claims) {
