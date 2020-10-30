@@ -217,6 +217,7 @@ class Executor {
       // the test runner should consider the run complete and count it as a success or failure
       // based on the exit code observed from the main process. The test runner may kill any stray
       // processes. Tests should not leak processes in this fashion.
+      // Based on configuration, we will decide whether remaining resources should be an error.
       if (workerContext.shouldErrorOperationOnRemainingResources() && resource.isReferenced()) {
 
         // there should no longer be any references to the resource. Any references will be
