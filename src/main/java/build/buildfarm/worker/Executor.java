@@ -33,6 +33,7 @@ import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.ExecutionWrapper;
 import build.buildfarm.worker.WorkerContext.IOResource;
+import build.buildfarm.worker.cgroup.Cpu;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
 import com.google.longrunning.Operation;
@@ -229,7 +230,7 @@ class Executor {
           operationContext
               .executeResponse
               .getStatusBuilder()
-              .setMessage("command resources were referenced after execution completed");
+              .setMessage(commandResourceErrorMsg(operation, resource));
         }
       }
     } catch (IOException e) {
@@ -284,6 +285,23 @@ class Executor {
       }
     }
     return stopwatch.elapsed(MICROSECONDS) - executeUSecs;
+  }
+
+  private String commandResourceErrorMsg(Operation operation, IOResource resource)
+      throws IOException {
+
+    StringBuilder message = new StringBuilder();
+    message.append(
+        String.format(
+            "The following operation completed successfully, but is still considered a failure: %s.\n",
+            operation.getName()));
+    message.append(String.format("This is because it leaked resources after execution.\n"));
+
+    List<String> commands = ((Cpu) resource).getCommands();
+    message.append(
+        String.format(
+            "Here are the commands of the leaked pids:\n%s", String.join("\n", commands)));
+    return message.toString();
   }
 
   public void run(int claims) {

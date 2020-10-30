@@ -22,6 +22,7 @@ import java.io.Reader;
 import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 abstract class Controller implements IOResource {
   protected final Group group;
@@ -78,6 +79,10 @@ abstract class Controller implements IOResource {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  public List<String> getCommands() throws IOException {
+    return group.getCommands(getName());
   }
 
   protected void writeInt(String propertyName, int value) throws IOException {

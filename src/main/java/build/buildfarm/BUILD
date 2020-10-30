@@ -480,7 +480,6 @@ java_library(
         ":shard-instance",
         ":stub-instance",
         ":worker",
-        ":worker-cgroup",
         "//src/main/java/build/buildfarm:common-cache",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
@@ -527,18 +526,8 @@ container_image(
 )
 
 java_library(
-    name = "worker-cgroup",
-    srcs = glob(["worker/cgroup/*.java"]),
-    deps = [
-        ":worker",
-        "@maven//:com_google_code_findbugs_jsr305",
-        "@maven//:com_google_guava_guava",
-    ],
-)
-
-java_library(
     name = "worker",
-    srcs = glob(["worker/*.java"]),
+    srcs = glob(["worker/*.java","worker/cgroup/*.java"]),
     deps = [
         ":cas",
         ":common",
