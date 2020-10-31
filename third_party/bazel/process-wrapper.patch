@@ -1,0 +1,12 @@
+diff --git a/src/main/tools/BUILD b/src/main/tools/BUILD
+index d1b45f8353..0245cea627 100644
+--- a/src/main/tools/BUILD
++++ b/src/main/tools/BUILD
+@@ -45,6 +45,7 @@ cc_binary(
+             ":logging",
+         ],
+     }),
++    visibility = ["//visibility:public"],
+ )
+ 
+ cc_binary(

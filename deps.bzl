@@ -70,6 +70,14 @@ def archive_dependencies(third_party):
             "strip_prefix": "rules_docker-f4822f3921f0c343dd9e5ae65c760d0fb70be1b3",
             "urls": ["https://github.com/bazelbuild/rules_docker/archive/f4822f3921f0c343dd9e5ae65c760d0fb70be1b3.tar.gz"],
         },
+        {
+            "name": "io_bazel",
+            "patch_args": ["-p1"],
+            "patches": ["//third_party/bazel:process-wrapper.patch"],
+            "sha256": "d777949137904997ba052da7d34a9005ccfb75b142e0e0b0ea2a34150346ddc1",
+            "strip_prefix": "bazel-3.1.0",
+            "urls": ["https://github.com/bazelbuild/bazel/archive/3.1.0.tar.gz"],
+        }
     ]
 
 def buildfarm_dependencies(repository_name = "build_buildfarm"):
