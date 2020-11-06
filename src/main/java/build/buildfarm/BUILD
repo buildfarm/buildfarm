@@ -509,6 +509,7 @@ java_binary(
     visibility = ["//visibility:public"],
     runtime_deps = [
         ":shard-worker",
+        "//:process-wrapper.binary",
     ],
 )
 

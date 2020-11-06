@@ -77,7 +77,13 @@ def archive_dependencies(third_party):
             "sha256": "d777949137904997ba052da7d34a9005ccfb75b142e0e0b0ea2a34150346ddc1",
             "strip_prefix": "bazel-3.1.0",
             "urls": ["https://github.com/bazelbuild/bazel/archive/3.1.0.tar.gz"],
+        },
+        {
+            "name": "tini",
+            urls = ["https://github.com/krallin/tini/releases/download/v0.18.0/tini"],
         }
+)
+
     ]
 
 def buildfarm_dependencies(repository_name = "build_buildfarm"):

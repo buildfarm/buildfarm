@@ -8,5 +8,6 @@ genrule(
     name = "process-wrapper.binary",
     srcs = ["@io_bazel//src/main/tools:process-wrapper"],
     outs = ["process-wrapper"],
+    visibility = ["//visibility:public"],
     cmd = "cp $< $@",
 )
