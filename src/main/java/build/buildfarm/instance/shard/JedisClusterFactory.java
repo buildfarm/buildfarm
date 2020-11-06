@@ -15,12 +15,16 @@
 package build.buildfarm.instance.shard;
 
 import build.buildfarm.v1test.RedisShardBackplaneConfig;
+import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.UnknownHostException;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import javax.naming.ConfigurationException;
 import redis.clients.jedis.HostAndPort;
 import redis.clients.jedis.Jedis;
@@ -141,14 +145,25 @@ public class JedisClusterFactory {
   ///
   private static Supplier<JedisCluster> createJedisClusterFactory(
       URI redisUri, int timeout, int maxAttempts, String password, JedisPoolConfig poolConfig) {
-    return () ->
-        new JedisCluster(
-            new HostAndPort(redisUri.getHost(), redisUri.getPort()),
-            /* connectionTimeout=*/ Integer.max(2000, timeout),
-            /* soTimeout=*/ Integer.max(2000, timeout),
-            Integer.max(5, maxAttempts),
-            password,
-            poolConfig);
+    return () -> {
+      Set<HostAndPort> hostsAndPorts;
+      try {
+        hostsAndPorts =
+            Arrays.stream(InetAddress.getAllByName(redisUri.getHost()))
+                .map(a -> new HostAndPort(a.getHostAddress(), redisUri.getPort()))
+                .collect(Collectors.toSet());
+      } catch (UnknownHostException e) {
+        hostsAndPorts = new HashSet<>();
+        hostsAndPorts.add(new HostAndPort(redisUri.getHost(), redisUri.getPort()));
+      }
+      return new JedisCluster(
+          hostsAndPorts,
+          /* connectionTimeout=*/ Integer.max(2000, timeout),
+          /* soTimeout=*/ Integer.max(2000, timeout),
+          Integer.max(5, maxAttempts),
+          password,
+          poolConfig);
+    };
   }
   ///
   /// @brief   Create a jedis pool config.
