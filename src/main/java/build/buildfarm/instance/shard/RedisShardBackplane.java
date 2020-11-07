@@ -505,18 +505,34 @@ public class RedisShardBackplane implements ShardBackplane {
 
   @Override
   public void start(String clientPublicName) throws IOException {
-
     // Construct a single redis client to be used throughout the entire backplane.
     // We wish to avoid various synchronous and error handling issues that could occur when using
     // multiple clients.
     client = new RedisClient(jedisClusterFactory.get());
 
-    // Construct the prequeue so that elements are balanced across all redis nodes.
-    this.prequeue =
-        new BalancedRedisQueue(
-            config.getPreQueuedOperationsListName(),
-            getQueueHashes(config.getPreQueuedOperationsListName()));
+    this.prequeue = createPrequeue(config);
+    this.operationQueue = createOperationQueue(config);
 
+    if (config.getSubscribeToBackplane()) {
+      startSubscriptionThread();
+    }
+    if (config.getRunFailsafeOperation()) {
+      startFailsafeOperationThread();
+    }
+
+    // Record client start time
+    client.call(
+        jedis -> jedis.set("startTime/" + clientPublicName, Long.toString(new Date().getTime())));
+  }
+
+  BalancedRedisQueue createPrequeue(RedisShardBackplaneConfig config) throws IOException {
+    // Construct the prequeue so that elements are balanced across all redis nodes.
+    return new BalancedRedisQueue(
+        config.getPreQueuedOperationsListName(),
+        getQueueHashes(config.getPreQueuedOperationsListName()));
+  }
+
+  OperationQueue createOperationQueue(RedisShardBackplaneConfig config) throws IOException {
     // Construct an operation queue based on configuration.
     // An operation queue consists of multiple provisioned queues in which the order dictates the
     // eligibility and placement of operations.
@@ -531,7 +547,6 @@ public class RedisShardBackplane implements ShardBackplane {
               toMultimap(queueConfig.getPlatform().getPropertiesList()));
       provisionedQueues.add(provisionedQueue);
     }
-
     // If there is no configuration for provisioned queues, we might consider that an error.
     // After all, the operation queue is made up of n provisioned queues, and if there were no
     // provisioned queues provided, we can not properly construct the operation queue.
@@ -551,18 +566,7 @@ public class RedisShardBackplane implements ShardBackplane {
       provisionedQueues.add(defaultQueue);
     }
 
-    this.operationQueue = new OperationQueue(provisionedQueues.build());
-
-    if (config.getSubscribeToBackplane()) {
-      startSubscriptionThread();
-    }
-    if (config.getRunFailsafeOperation()) {
-      startFailsafeOperationThread();
-    }
-
-    // Record client start time
-    client.call(
-        jedis -> jedis.set("startTime/" + clientPublicName, Long.toString(new Date().getTime())));
+    return new OperationQueue(provisionedQueues.build());
   }
 
   List<String> getQueueHashes(String queueName) throws IOException {
