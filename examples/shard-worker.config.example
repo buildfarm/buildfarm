@@ -61,7 +61,15 @@ cas: {
     # limit for content size of files retained
     # from CAS in the cache
     max_entry_size_bytes: 2147483648 # 2 * 1024 * 1024 * 1024
+
+    # whether the file directories bidirectional mapping should be stored in memory (HashMap) or
+    # in sqlite
+    file_directories_index_in_memory: false
   }
+
+  # whether the transient data on the worker should be loaded into the CAS on worker startup.
+  # It can be faster for worker startup to skip loading.
+  skip_load: false
 }
 
 # another cas entry specification here will provide a fallback
@@ -117,6 +125,9 @@ redis_shard_backplane_config: {
   # The URI of the redis cluster endpoint. This must
   # be a single URI, regardless of the layout of the cluster
   redis_uri: "redis://localhost:6379"
+
+  # The password used to authenticate redis clients, if required
+  # redis_password: "mypass"
 
   # The size of the redis connection pool
   jedis_pool_max_total: 4000

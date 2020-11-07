@@ -24,6 +24,7 @@ import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ServerCapabilities;
+import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
@@ -45,7 +46,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 
@@ -64,7 +64,7 @@ public interface Instance {
   void putActionResult(ActionKey actionKey, ActionResult actionResult) throws InterruptedException;
 
   ListenableFuture<Iterable<Digest>> findMissingBlobs(
-      Iterable<Digest> digests, Executor executor, RequestMetadata requestMetadata);
+      Iterable<Digest> digests, RequestMetadata requestMetadata);
 
   boolean containsBlob(Digest digest, RequestMetadata requestMetadata);
 
@@ -141,6 +141,8 @@ public interface Instance {
   WorkerProfileMessage getWorkerProfile();
 
   GetClientStartTimeResult getClientStartTime(String clientKey);
+
+  CasIndexResults reindexCas(String hostName);
 
   interface MatchListener {
     // start/end pair called for each wait period

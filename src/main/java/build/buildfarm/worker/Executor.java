@@ -24,6 +24,7 @@ import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.bazel.remote.execution.v2.ExecuteResponse;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform.Property;
 import build.buildfarm.common.Write;
@@ -173,7 +174,7 @@ class Executor {
       Stopwatch stopwatch)
       throws InterruptedException {
     /* execute command */
-    workerContext.logInfo("Executor: Operation " + operation.getName() + " Executing command");
+    logger.log(Level.INFO, "Executor: Operation " + operation.getName() + " Executing command");
 
     ActionResult.Builder resultBuilder = operationContext.executeResponse.getResultBuilder();
     resultBuilder
@@ -189,7 +190,7 @@ class Executor {
     String operationName = operation.getName();
 
     ImmutableList.Builder<String> arguments = ImmutableList.builder();
-    final Code statusCode;
+    Code statusCode;
     try (IOResource resource =
         workerContext.limitExecution(operationName, arguments, operationContext.command)) {
       for (ExecutionPolicy policy : policies) {
@@ -210,6 +211,27 @@ class Executor {
               "", // executingMetadata.getStdoutStreamName(),
               "", // executingMetadata.getStderrStreamName(),
               resultBuilder);
+
+      // From Bazel Test Encyclopedia:
+      // If the main process of a test exits, but some of its children are still running,
+      // the test runner should consider the run complete and count it as a success or failure
+      // based on the exit code observed from the main process. The test runner may kill any stray
+      // processes. Tests should not leak processes in this fashion.
+      // Based on configuration, we will decide whether remaining resources should be an error.
+      if (workerContext.shouldErrorOperationOnRemainingResources() && resource.isReferenced()) {
+        // there should no longer be any references to the resource. Any references will be
+        // killed upon close, but we must error the operation due to improper execution
+        ExecuteResponse executeResponse = operationContext.executeResponse.build();
+        if (statusCode == Code.OK) {
+          // per the gRPC spec: 'The operation was attempted past the valid range.' Seems
+          // appropriate
+          statusCode = Code.OUT_OF_RANGE;
+          operationContext
+              .executeResponse
+              .getStatusBuilder()
+              .setMessage("command resources were referenced after execution completed");
+        }
+      }
     } catch (IOException e) {
       logger.log(Level.SEVERE, format("error executing operation %s", operationName), e);
       operationContext.poller.pause();
@@ -251,7 +273,7 @@ class Executor {
         throw e;
       }
     } else {
-      workerContext.logInfo("Executor: Operation " + operationName + " Failed to claim output");
+      logger.log(Level.INFO, "Executor: Operation " + operationName + " Failed to claim output");
       boolean wasInterrupted = Thread.interrupted();
       try {
         putError();

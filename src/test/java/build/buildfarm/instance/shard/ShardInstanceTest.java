@@ -25,7 +25,9 @@ import static build.buildfarm.instance.AbstractServerInstance.MISSING_ACTION;
 import static build.buildfarm.instance.AbstractServerInstance.MISSING_COMMAND;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
+import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
+import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.AdditionalAnswers.answer;
 import static org.mockito.ArgumentMatchers.argThat;
@@ -89,7 +91,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executor;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -125,18 +126,22 @@ public class ShardInstanceTest {
   public void setUp() throws InterruptedException {
     MockitoAnnotations.initMocks(this);
     blobDigests = Sets.newHashSet();
+    ReadThroughActionCache actionCache =
+        new ShardActionCache(10, mockBackplane, newDirectExecutorService());
     instance =
         new ShardInstance(
             "shard",
             DIGEST_UTIL,
             mockBackplane,
+            actionCache,
             /* runDispatchedMonitor=*/ false,
             /* dispatchedMonitorIntervalSeconds=*/ 0,
             /* runOperationQueuer=*/ false,
             /* maxBlobSize=*/ 0,
             /* maxActionTimeout=*/ Duration.getDefaultInstance(),
             mockOnStop,
-            CacheBuilder.newBuilder().build(mockInstanceLoader));
+            CacheBuilder.newBuilder().build(mockInstanceLoader),
+            /* actionCacheFetchService=*/ listeningDecorator(newSingleThreadExecutor()));
     instance.start("startTime/test:0000");
   }
 
@@ -193,7 +198,7 @@ public class ShardInstanceTest {
               }
             })
         .when(mockWorkerInstance)
-        .findMissingBlobs(any(Iterable.class), any(Executor.class), any(RequestMetadata.class));
+        .findMissingBlobs(any(Iterable.class), any(RequestMetadata.class));
 
     Action action =
         Action.newBuilder()
@@ -232,7 +237,7 @@ public class ShardInstanceTest {
     when(mockBackplane.getBlobLocationSet(eq(actionDigest)))
         .thenReturn(provideAction ? workers : ImmutableSet.of());
     when(mockWorkerInstance.findMissingBlobs(
-            eq(ImmutableList.of(actionDigest)), any(Executor.class), any(RequestMetadata.class)))
+            eq(ImmutableList.of(actionDigest)), any(RequestMetadata.class)))
         .thenReturn(immediateFuture(ImmutableList.of()));
 
     return action;
@@ -330,7 +335,7 @@ public class ShardInstanceTest {
             .setSkipCacheLookup(true)
             .build();
 
-    when(mockBackplane.validQueueProperties(Matchers.anyList())).thenReturn(false);
+    when(mockBackplane.propertiesEligibleForQueue(Matchers.anyList())).thenReturn(false);
 
     when(mockBackplane.canQueue()).thenReturn(true);
 
@@ -458,7 +463,7 @@ public class ShardInstanceTest {
             .setSkipCacheLookup(true)
             .build();
 
-    when(mockBackplane.validQueueProperties(Matchers.anyList())).thenReturn(true);
+    when(mockBackplane.propertiesEligibleForQueue(Matchers.anyList())).thenReturn(true);
 
     when(mockBackplane.canQueue()).thenReturn(true);
 
@@ -502,8 +507,7 @@ public class ShardInstanceTest {
     Action action = createAction();
     Digest actionDigest = DIGEST_UTIL.compute(action);
 
-    when(mockWorkerInstance.findMissingBlobs(
-            any(Iterable.class), any(Executor.class), any(RequestMetadata.class)))
+    when(mockWorkerInstance.findMissingBlobs(any(Iterable.class), any(RequestMetadata.class)))
         .thenReturn(immediateFuture(ImmutableList.of()));
 
     doAnswer(answer((digest, uuid) -> new NullWrite()))
@@ -525,7 +529,7 @@ public class ShardInstanceTest {
             .setSkipCacheLookup(true)
             .build();
 
-    when(mockBackplane.validQueueProperties(Matchers.anyList())).thenReturn(true);
+    when(mockBackplane.propertiesEligibleForQueue(Matchers.anyList())).thenReturn(true);
 
     when(mockBackplane.canQueue()).thenReturn(true);
 
@@ -589,7 +593,7 @@ public class ShardInstanceTest {
             .setActionDigest(actionKey.getDigest())
             .build();
 
-    when(mockBackplane.validQueueProperties(Matchers.anyList())).thenReturn(true);
+    when(mockBackplane.propertiesEligibleForQueue(Matchers.anyList())).thenReturn(true);
 
     when(mockBackplane.canQueue()).thenReturn(true);
 
@@ -706,7 +710,7 @@ public class ShardInstanceTest {
     Digest missingDirectoryDigest =
         Digest.newBuilder().setHash("missing-directory").setSizeBytes(1).build();
 
-    when(mockBackplane.validQueueProperties(Matchers.anyList())).thenReturn(true);
+    when(mockBackplane.propertiesEligibleForQueue(Matchers.anyList())).thenReturn(true);
 
     when(mockBackplane.getOperation(eq(operationName)))
         .thenReturn(
@@ -806,10 +810,7 @@ public class ShardInstanceTest {
     Digest digest = Digest.newBuilder().setHash("hash").setSizeBytes(1).build();
     Iterable<Digest> missingDigests =
         instance
-            .findMissingBlobs(
-                ImmutableList.of(digest),
-                newDirectExecutorService(),
-                RequestMetadata.getDefaultInstance())
+            .findMissingBlobs(ImmutableList.of(digest), RequestMetadata.getDefaultInstance())
             .get();
     assertThat(missingDigests).containsExactly(digest);
   }
@@ -826,16 +827,12 @@ public class ShardInstanceTest {
     List<Digest> queryDigests = ImmutableList.of(digest);
     ArgumentMatcher<Iterable<Digest>> queryMatcher =
         (digests) -> Iterables.elementsEqual(digests, queryDigests);
-    when(mockWorkerInstance.findMissingBlobs(
-            argThat(queryMatcher), any(Executor.class), any(RequestMetadata.class)))
+    when(mockWorkerInstance.findMissingBlobs(argThat(queryMatcher), any(RequestMetadata.class)))
         .thenReturn(immediateFuture(queryDigests));
     Iterable<Digest> missingDigests =
-        instance
-            .findMissingBlobs(
-                queryDigests, newDirectExecutorService(), RequestMetadata.getDefaultInstance())
-            .get();
+        instance.findMissingBlobs(queryDigests, RequestMetadata.getDefaultInstance()).get();
     verify(mockWorkerInstance, times(1))
-        .findMissingBlobs(argThat(queryMatcher), any(Executor.class), any(RequestMetadata.class));
+        .findMissingBlobs(argThat(queryMatcher), any(RequestMetadata.class));
     assertThat(missingDigests).containsExactly(digest);
   }
 
@@ -931,8 +928,10 @@ public class ShardInstanceTest {
     actionResultWatcher.observe(completedOperation);
 
     verify(mockWatcher, never()).observe(operation);
-    assertThat(instance.getActionResult(actionKey, RequestMetadata.getDefaultInstance()).get())
-        .isNull();
+    ListenableFuture<ActionResult> resultFuture =
+        instance.getActionResult(actionKey, RequestMetadata.getDefaultInstance());
+    ActionResult result = resultFuture.get();
+    assertThat(result).isNull();
     verify(mockWatcher, times(1)).observe(completedOperation);
   }
 

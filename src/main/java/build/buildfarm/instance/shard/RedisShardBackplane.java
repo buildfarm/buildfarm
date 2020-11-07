@@ -23,15 +23,19 @@ import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.common.CasIndexResults;
+import build.buildfarm.common.CasIndexSettings;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.StringVisitor;
 import build.buildfarm.common.Watcher;
+import build.buildfarm.common.WorkerIndexer;
 import build.buildfarm.common.function.InterruptingRunnable;
 import build.buildfarm.common.redis.BalancedRedisQueue;
 import build.buildfarm.common.redis.ProvisionedRedisQueue;
 import build.buildfarm.common.redis.RedisClient;
+import build.buildfarm.common.redis.RedisHashtags;
 import build.buildfarm.common.redis.RedisNodeHashes;
 import build.buildfarm.instance.shard.RedisShardSubscriber.TimedWatchFuture;
 import build.buildfarm.v1test.CompletedOperationMetadata;
@@ -508,9 +512,10 @@ public class RedisShardBackplane implements ShardBackplane {
     client = new RedisClient(jedisClusterFactory.get());
 
     // Construct the prequeue so that elements are balanced across all redis nodes.
-    List<String> clusterHashes =
-        client.call(jedis -> RedisNodeHashes.getEvenlyDistributedHashes(jedis));
-    this.prequeue = new BalancedRedisQueue(config.getPreQueuedOperationsListName(), clusterHashes);
+    this.prequeue =
+        new BalancedRedisQueue(
+            config.getPreQueuedOperationsListName(),
+            getQueueHashes(config.getPreQueuedOperationsListName()));
 
     // Construct an operation queue based on configuration.
     // An operation queue consists of multiple provisioned queues in which the order dictates the
@@ -522,7 +527,7 @@ public class RedisShardBackplane implements ShardBackplane {
       ProvisionedRedisQueue provisionedQueue =
           new ProvisionedRedisQueue(
               queueConfig.getName(),
-              clusterHashes,
+              getQueueHashes(queueConfig.getName()),
               toMultimap(queueConfig.getPlatform().getPropertiesList()));
       provisionedQueues.add(provisionedQueue);
     }
@@ -540,7 +545,9 @@ public class RedisShardBackplane implements ShardBackplane {
           ProvisionedRedisQueue.WILDCARD_VALUE, ProvisionedRedisQueue.WILDCARD_VALUE);
       ProvisionedRedisQueue defaultQueue =
           new ProvisionedRedisQueue(
-              config.getQueuedOperationsListName(), clusterHashes, defaultProvisions);
+              config.getQueuedOperationsListName(),
+              getQueueHashes(config.getQueuedOperationsListName()),
+              defaultProvisions);
       provisionedQueues.add(defaultQueue);
     }
 
@@ -556,6 +563,15 @@ public class RedisShardBackplane implements ShardBackplane {
     // Record client start time
     client.call(
         jedis -> jedis.set("startTime/" + clientPublicName, Long.toString(new Date().getTime())));
+  }
+
+  List<String> getQueueHashes(String queueName) throws IOException {
+    List<String> clusterHashes =
+        client.call(
+            jedis ->
+                RedisNodeHashes.getEvenlyDistributedHashesWithPrefix(
+                    jedis, RedisHashtags.existingHash(queueName)));
+    return clusterHashes;
   }
 
   @Override
@@ -643,6 +659,15 @@ public class RedisShardBackplane implements ShardBackplane {
     String workerChangeJson = JsonFormat.printer().print(workerChange);
     return subscriber.removeWorker(name)
         && client.call(jedis -> removeWorkerAndPublish(jedis, name, workerChangeJson));
+  }
+
+  @Override
+  public CasIndexResults reindexCas(String hostName) throws IOException {
+    CasIndexSettings settings = new CasIndexSettings();
+    settings.hostName = hostName;
+    settings.casQuery = config.getCasPrefix() + ":*";
+    settings.scanAmount = 10000;
+    return client.call(jedis -> WorkerIndexer.removeWorkerIndexesFromCas(jedis, settings));
   }
 
   @Override
@@ -1334,8 +1359,8 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   @Override
-  public Boolean validQueueProperties(List<Platform.Property> provisions) {
-    return operationQueue.validProperties(provisions);
+  public Boolean propertiesEligibleForQueue(List<Platform.Property> provisions) {
+    return operationQueue.isEligible(provisions);
   }
 
   @Override

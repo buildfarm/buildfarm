@@ -16,9 +16,10 @@ package build.buildfarm.ac;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import com.google.common.util.concurrent.ListenableFuture;
 
 public interface ActionCache {
-  ActionResult get(ActionKey actionKey);
+  ListenableFuture<ActionResult> get(ActionKey actionKey);
 
   void put(ActionKey actionKey, ActionResult actionResult) throws InterruptedException;
 }

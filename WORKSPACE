@@ -11,3 +11,7 @@ buildfarm_init()
 load(":images.bzl", "buildfarm_images")
 
 buildfarm_images()
+
+load(":pip.bzl", "buildfarm_pip")
+
+buildfarm_pip()

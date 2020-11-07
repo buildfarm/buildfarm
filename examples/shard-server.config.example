@@ -56,6 +56,9 @@ instances {
       # be a single URI, regardless of the layout of the cluster
       redis_uri: "redis://localhost:6379"
 
+      # The password used to authenticate redis clients, if required
+      # redis_password: "mypass"
+
       # The size of the redis connection pool
       jedis_pool_max_total: 4000
 

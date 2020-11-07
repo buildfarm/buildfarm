@@ -125,6 +125,7 @@ class ShardWorkerContext implements WorkerContext {
   private final Group executionsGroup = Group.getRoot().getChild("executions");
   private final Group operationsGroup = executionsGroup.getChild("operations");
   private final Supplier<CasWriter> writer;
+  private final boolean errorOperationRemainingResources;
 
   static SetMultimap<String, String> getMatchProvisions(
       Platform platform, Iterable<ExecutionPolicy> policies, int executeStageWidth) {
@@ -157,6 +158,7 @@ class ShardWorkerContext implements WorkerContext {
       boolean limitExecution,
       boolean limitGlobalExecution,
       boolean onlyMulticoreTests,
+      boolean errorOperationRemainingResources,
       Supplier<CasWriter> writer) {
     this.name = name;
     this.platform = platform;
@@ -178,6 +180,7 @@ class ShardWorkerContext implements WorkerContext {
     this.limitExecution = limitExecution;
     this.limitGlobalExecution = limitGlobalExecution;
     this.onlyMulticoreTests = onlyMulticoreTests;
+    this.errorOperationRemainingResources = errorOperationRemainingResources;
     this.writer = writer;
     Preconditions.checkState(
         !limitGlobalExecution || limitExecution,
@@ -201,6 +204,11 @@ class ShardWorkerContext implements WorkerContext {
   @Override
   public String getName() {
     return name;
+  }
+
+  @Override
+  public boolean shouldErrorOperationOnRemainingResources() {
+    return errorOperationRemainingResources;
   }
 
   @Override
@@ -421,11 +429,6 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
-  public void logInfo(String msg) {
-    logger.log(Level.INFO, msg);
-  }
-
-  @Override
   public CASInsertionPolicy getFileCasPolicy() {
     return CASInsertionPolicy.ALWAYS_INSERT;
   }
@@ -521,12 +524,12 @@ class ShardWorkerContext implements WorkerContext {
       throws IOException, InterruptedException {
     Path outputPath = actionRoot.resolve(outputFile);
     if (!Files.exists(outputPath)) {
-      logInfo("ReportResultStage: " + outputFile + " does not exist...");
+      logger.log(Level.INFO, "ReportResultStage: " + outputFile + " does not exist...");
       return;
     }
 
     if (Files.isDirectory(outputPath)) {
-      logInfo("ReportResultStage: " + outputFile + " is a directory");
+      logger.log(Level.INFO, "ReportResultStage: " + outputFile + " is a directory");
       preconditionFailure
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
@@ -604,12 +607,12 @@ class ShardWorkerContext implements WorkerContext {
       throws IOException, InterruptedException {
     Path outputDirPath = actionRoot.resolve(outputDir);
     if (!Files.exists(outputDirPath)) {
-      logInfo("ReportResultStage: " + outputDir + " does not exist...");
+      logger.log(Level.INFO, "ReportResultStage: " + outputDir + " does not exist...");
       return;
     }
 
     if (!Files.isDirectory(outputDirPath)) {
-      logInfo("ReportResultStage: " + outputDir + " is not a directory...");
+      logger.log(Level.INFO, "ReportResultStage: " + outputDir + " is not a directory...");
       preconditionFailure
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
@@ -724,10 +727,6 @@ class ShardWorkerContext implements WorkerContext {
     updateActionResultStdOutputs(resultBuilder);
   }
 
-  private void logComplete(String operationName) {
-    logger.log(Level.INFO, "CompletedOperation: " + operationName);
-  }
-
   @Override
   public Iterable<ExecutionPolicy> getExecutionPolicies(String name) {
     return policies.get(name);
@@ -738,7 +737,7 @@ class ShardWorkerContext implements WorkerContext {
       throws IOException, InterruptedException {
     boolean success = createBackplaneRetrier().execute(() -> instance.putOperation(operation));
     if (success && operation.getDone()) {
-      logComplete(operation.getName());
+      logger.log(Level.INFO, "CompletedOperation: " + operation.getName());
     }
     return success;
   }
@@ -883,6 +882,11 @@ class ShardWorkerContext implements WorkerContext {
     return new IOResource() {
       @Override
       public void close() {}
+
+      @Override
+      public boolean isReferenced() {
+        return false;
+      }
     };
   }
 
@@ -924,6 +928,12 @@ class ShardWorkerContext implements WorkerContext {
           new IOResource() {
             @Override
             public void close() {}
+
+            @Override
+            public boolean isReferenced() {
+              // no way to isolate references to this shared group
+              return false;
+            }
           };
     }
     if (limitGlobalExecution || group != operationsGroup) {

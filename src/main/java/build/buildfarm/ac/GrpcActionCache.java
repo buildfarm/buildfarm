@@ -14,18 +14,20 @@
 
 package build.buildfarm.ac;
 
+import static com.google.common.util.concurrent.Futures.catchingAsync;
+import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
+import static com.google.common.util.concurrent.Futures.immediateFuture;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+
 import build.bazel.remote.execution.v2.ActionCacheGrpc;
-import build.bazel.remote.execution.v2.ActionCacheGrpc.ActionCacheBlockingStub;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.GetActionResultRequest;
 import build.bazel.remote.execution.v2.UpdateActionResultRequest;
 import build.buildfarm.common.DigestUtil.ActionKey;
-import com.google.common.base.Supplier;
-import com.google.common.base.Suppliers;
+import com.google.common.util.concurrent.ListenableFuture;
 import io.grpc.Channel;
 import io.grpc.Status;
 import io.grpc.Status.Code;
-import io.grpc.StatusRuntimeException;
 
 public class GrpcActionCache implements ActionCache {
   private final String instanceName;
@@ -36,38 +38,29 @@ public class GrpcActionCache implements ActionCache {
     this.channel = channel;
   }
 
-  private final Supplier<ActionCacheBlockingStub> actionCacheBlockingStub =
-      Suppliers.memoize(
-          new Supplier<ActionCacheBlockingStub>() {
-            @Override
-            public ActionCacheBlockingStub get() {
-              return ActionCacheGrpc.newBlockingStub(channel);
-            }
-          });
-
   @Override
-  public ActionResult get(ActionKey actionKey) {
-    try {
-      return actionCacheBlockingStub
-          .get()
-          .getActionResult(
-              GetActionResultRequest.newBuilder()
-                  .setInstanceName(instanceName)
-                  .setActionDigest(actionKey.getDigest())
-                  .build());
-    } catch (StatusRuntimeException e) {
-      Status status = Status.fromThrowable(e);
-      if (status.getCode() == Code.NOT_FOUND) {
-        return null;
-      }
-      throw e;
-    }
+  public ListenableFuture<ActionResult> get(ActionKey actionKey) {
+    return catchingAsync(
+        ActionCacheGrpc.newFutureStub(channel)
+            .getActionResult(
+                GetActionResultRequest.newBuilder()
+                    .setInstanceName(instanceName)
+                    .setActionDigest(actionKey.getDigest())
+                    .build()),
+        Exception.class,
+        e -> {
+          Status status = Status.fromThrowable(e);
+          if (status.getCode() == Code.NOT_FOUND) {
+            return immediateFuture(null);
+          }
+          return immediateFailedFuture(e);
+        },
+        directExecutor());
   }
 
   @Override
   public void put(ActionKey actionKey, ActionResult actionResult) {
-    actionCacheBlockingStub
-        .get()
+    ActionCacheGrpc.newBlockingStub(channel)
         .updateActionResult(
             UpdateActionResultRequest.newBuilder()
                 .setInstanceName(instanceName)

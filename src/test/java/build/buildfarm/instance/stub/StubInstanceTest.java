@@ -16,7 +16,6 @@ package build.buildfarm.instance.stub;
 
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.truth.Truth.assertThat;
-import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -192,11 +191,7 @@ public class StubInstanceTest {
     Instance instance = newStubInstance("findMissingBlobs-test");
     Iterable<Digest> digests =
         ImmutableList.of(Digest.newBuilder().setHash("present").setSizeBytes(1).build());
-    assertThat(
-            instance
-                .findMissingBlobs(
-                    digests, newDirectExecutorService(), RequestMetadata.getDefaultInstance())
-                .get())
+    assertThat(instance.findMissingBlobs(digests, RequestMetadata.getDefaultInstance()).get())
         .isEmpty();
     instance.stop();
   }

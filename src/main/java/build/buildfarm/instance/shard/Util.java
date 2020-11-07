@@ -16,6 +16,7 @@ package build.buildfarm.instance.shard;
 
 import static com.google.common.util.concurrent.Futures.addCallback;
 import static com.google.common.util.concurrent.Futures.transform;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.lang.String.format;
 
 import build.bazel.remote.execution.v2.Digest;
@@ -87,7 +88,6 @@ public class Util {
               originalLocationSet,
               workerInstanceFactory,
               digest,
-              executor,
               foundWorkers,
               requestMetadata);
     }
@@ -119,7 +119,6 @@ public class Util {
       Set<String> originalLocationSet,
       Function<String, Instance> workerInstanceFactory,
       Digest digest,
-      Executor executor,
       Set<String> foundWorkers,
       RequestMetadata requestMetadata) {
     SettableFuture<Void> foundFuture = SettableFuture.create();
@@ -170,7 +169,6 @@ public class Util {
               foundCallback.onFailure(t);
             }
           },
-          executor,
           requestMetadata);
     }
     foundCallback.complete();
@@ -182,10 +180,9 @@ public class Util {
       String worker,
       Instance instance,
       FutureCallback<Boolean> foundCallback,
-      Executor executor,
       RequestMetadata requestMetadata) {
     ListenableFuture<Iterable<Digest>> missingBlobsFuture =
-        instance.findMissingBlobs(ImmutableList.of(digest), executor, requestMetadata);
+        instance.findMissingBlobs(ImmutableList.of(digest), requestMetadata);
     addCallback(
         missingBlobsFuture,
         new FutureCallback<Iterable<Digest>>() {
@@ -220,11 +217,10 @@ public class Util {
                   t);
               foundCallback.onFailure(t);
             } else {
-              checkMissingBlobOnInstance(
-                  digest, worker, instance, foundCallback, executor, requestMetadata);
+              checkMissingBlobOnInstance(digest, worker, instance, foundCallback, requestMetadata);
             }
           }
         },
-        executor);
+        directExecutor());
   }
 }

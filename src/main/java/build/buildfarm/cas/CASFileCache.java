@@ -94,6 +94,7 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentMap;
@@ -252,6 +253,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Path root,
       long maxSizeInBytes,
       long maxEntrySizeInBytes,
+      boolean storeFileDirsIndexInMemory,
       DigestUtil digestUtil,
       ExecutorService expireService,
       Executor accessRecorder) {
@@ -259,6 +261,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         root,
         maxSizeInBytes,
         maxEntrySizeInBytes,
+        storeFileDirsIndexInMemory,
         digestUtil,
         expireService,
         accessRecorder,
@@ -273,6 +276,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Path root,
       long maxSizeInBytes,
       long maxEntrySizeInBytes,
+      boolean storeFileDirsIndexInMemory,
       DigestUtil digestUtil,
       ExecutorService expireService,
       Executor accessRecorder,
@@ -309,8 +313,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       }
       directoriesIndexUrl += path.toString();
     }
-    this.directoriesIndex = new FileDirectoriesIndex(directoriesIndexUrl, root);
-
+    this.directoriesIndex =
+        storeFileDirsIndexInMemory
+            ? new MemoryFileDirectoriesIndex(root)
+            : new SqliteFileDirectoriesIndex(directoriesIndexUrl, root);
     header.before = header.after = header;
   }
 
@@ -415,11 +421,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   private boolean contains(Digest digest, boolean isExecutable, Consumer<String> onContains) {
     String key = getKey(digest, isExecutable);
-    if (!storage.containsKey(key)) {
-      return false;
+    if (Optional.ofNullable(storage.get(key)).isPresent()) {
+      onContains.accept(key);
+      return true;
     }
-    onContains.accept(key);
-    return true;
+    return false;
   }
 
   private void accessed(Iterable<String> keys) {
@@ -651,6 +657,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   boolean completeWrite(Digest digest) {
+    // this should be traded for an event emission
     try {
       onPut.accept(digest);
     } catch (RuntimeException e) {
@@ -1291,13 +1298,13 @@ public abstract class CASFileCache implements ContentAddressableStorage {
    * and will scale in cost with the number of files already present.
    */
   public StartupCacheResults start(
-      Consumer<Digest> onPut, ExecutorService removeDirectoryService, boolean skipLoad)
+      Consumer<Digest> onStartPut, ExecutorService removeDirectoryService, boolean skipLoad)
       throws IOException, InterruptedException {
 
     // start delegate if it exists
     if (delegate != null && delegate instanceof CASFileCache) {
       CASFileCache fileCacheDelegate = (CASFileCache) delegate;
-      fileCacheDelegate.start(onPut, removeDirectoryService, skipLoad);
+      fileCacheDelegate.start(onStartPut, removeDirectoryService, skipLoad);
     }
 
     logger.log(Level.INFO, "Initializing cache at: " + root);
@@ -1310,7 +1317,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     if (!skipLoad) {
       Files.createDirectories(root);
       FileStore fileStore = Files.getFileStore(root);
-      loadResults = loadCache(fileStore, removeDirectoryService);
+      loadResults = loadCache(onStartPut, fileStore, removeDirectoryService);
     }
 
     // Skip loading the cache and ensure its empty
@@ -1337,14 +1344,15 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return startupResults;
   }
 
-  private CacheLoadResults loadCache(FileStore fileStore, ExecutorService removeDirectoryService)
+  private CacheLoadResults loadCache(
+      Consumer<Digest> onStartPut, FileStore fileStore, ExecutorService removeDirectoryService)
       throws IOException, InterruptedException {
 
     CacheLoadResults results = new CacheLoadResults();
 
     // Phase 1: Scan
     // build scan cache results by analyzing each file on the root.
-    results.scan = scanRoot();
+    results.scan = scanRoot(onStartPut);
     LogCacheScanResults(results.scan);
     deleteInvalidFileContent(results.scan.deleteFiles, removeDirectoryService);
 
@@ -1387,7 +1395,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     logger.log(Level.INFO, "{\"invalid dirs\": " + invalidDirectories.size() + "}");
   }
 
-  private CacheScanResults scanRoot() throws IOException, InterruptedException {
+  private CacheScanResults scanRoot(Consumer<Digest> onStartPut)
+      throws IOException, InterruptedException {
     // create thread pool
     int nThreads = Runtime.getRuntime().availableProcessors();
     String threadNameFormat = "scan-cache-pool-%d";
@@ -1405,7 +1414,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       pool.execute(
           () -> {
             try {
-              processRootFile(file, computeDirsBuilder, deleteFilesBuilder, fileKeysBuilder);
+              processRootFile(
+                  onStartPut, file, computeDirsBuilder, deleteFilesBuilder, fileKeysBuilder);
             } catch (Exception e) {
               logger.log(Level.SEVERE, "error reading file " + file.toString(), e);
             }
@@ -1424,6 +1434,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   private void processRootFile(
+      Consumer<Digest> onStartPut,
       Path file,
       ImmutableList.Builder<Path> computeDirs,
       ImmutableList.Builder<Path> deleteFiles,
@@ -1473,11 +1484,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             // populate key it is not currently stored.
             String key = fileEntryKey.getKey();
             Entry e = new Entry(key, size, Deadline.after(10, SECONDS));
+            Object fileKey = getFileKey(root.resolve(key), stat);
             synchronized (fileKeys) {
-              fileKeys.put(getFileKey(root.resolve(key), stat), e);
+              fileKeys.put(fileKey, e);
             }
             storage.put(e.key, e);
-            onPut.accept(fileEntryKey.getDigest());
+            onStartPut.accept(fileEntryKey.getDigest());
             synchronized (CASFileCache.this) {
               if (e.decrementReference(header)) {
                 unreferencedEntryCount++;
@@ -1608,11 +1620,18 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   private static String digestFilename(Digest digest) {
-    return format("%s_%d", digest.getHash(), digest.getSizeBytes());
+    return new StringBuilder()
+        .append(digest.getHash())
+        .append("_")
+        .append(digest.getSizeBytes())
+        .toString();
   }
 
   public static String getFileName(Digest digest, boolean isExecutable) {
-    return format("%s%s", digestFilename(digest), (isExecutable ? "_exec" : ""));
+    return new StringBuilder()
+        .append(digestFilename(digest))
+        .append((isExecutable ? "_exec" : ""))
+        .toString();
   }
 
   public String getKey(Digest digest, boolean isExecutable) {

@@ -28,7 +28,7 @@ import redis.clients.jedis.util.JedisClusterCRC16;
 /// @details Sometimes in redis you want to hash a particular key to a
 ///          particular node in the redis cluster. You might decide to do this
 ///          in order to distribute data evenly across nodes and balance cpu
-///          utilization. . Since redis nodes are decided based on the slot
+///          utilization. Since redis nodes are decided based on the slot
 ///          number that a value hashes to, you can force. A key to land on a
 ///          particular node by choosing a redis hashtag which you know
 ///          corresponds to the appropriate slot number. The class is used to
@@ -81,5 +81,24 @@ public class RedisSlotToHashTest {
 
     // check correct correlation
     assertThat(slotNumber >= 100 && slotNumber <= 200).isTrue();
+  }
+
+  // Function under test: correlateRangeWithPrefix
+  // Reason for testing: given a slot range a correct hashtag is dynamically derived
+  // Failure explanation: the hashtag does not correlate back to the slot number
+  @Test
+  public void correlateRangeWithPrefixCorrectHashtagFoundForSlotRange() throws Exception {
+
+    // convert to hashtag
+    String hashtag = RedisSlotToHash.correlateRangeWithPrefix(100, 200, "Execution");
+
+    // convert hashtag back to slot
+    int slotNumber = JedisClusterCRC16.getSlot(hashtag);
+
+    // check correct correlation
+    assertThat(slotNumber >= 100 && slotNumber <= 200).isTrue();
+
+    // check correct hashtag prefix
+    assertThat(hashtag.startsWith("Execution:")).isTrue();
   }
 }

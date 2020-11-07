@@ -2,13 +2,15 @@
 buildifier: latest
 platforms:
   ubuntu1604:
-    shell_commands:
-    - ./.bazelci/format.sh --check
     build_targets:
     - "..."
     test_targets:
     - "..."
   ubuntu1804:
+    shell_commands:
+    - ./.bazelci/format.sh --check
+    - export BUILDFARM_SKIP_COVERAGE_HOST=true
+    - ./generate_coverage.sh
     build_targets:
     - "..."
     test_targets:
@@ -19,6 +21,8 @@ platforms:
     test_targets:
     - "..."
   windows:
+    build_flags:
+    - "--build_tag_filters=-container"
     build_targets:
     - "..."
     test_targets:
