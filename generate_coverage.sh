@@ -12,7 +12,7 @@ set -e
 
 DEFAULT_TEST_TARGET="//src/test/...:all"
 DEFAULT_TEST_TAG_FILTERS="-redis"
-DEFAULT_BAZEL_WRAPPER=./bazelw
+DEFAULT_BAZEL_WRAPPER=bazelisk
 EXPECTED_TEST_LOGS=bazel-testlogs
 
 # store the targets to get test coverage on.
