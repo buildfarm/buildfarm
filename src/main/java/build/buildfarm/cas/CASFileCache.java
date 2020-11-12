@@ -191,6 +191,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return sizeInBytes;
   }
 
+  public long maxSize() {
+    return maxSizeInBytes;
+  }
+
   public long entryCount() {
     return storage.size();
   }

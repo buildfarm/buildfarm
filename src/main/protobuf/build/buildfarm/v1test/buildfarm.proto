@@ -952,6 +952,15 @@ message WorkerProfileMessage {
   // number of Entry in CAS
   int64 cas_entry_count = 1;
 
+  // current size of the CAS as sum of entries
+  int64 cas_size = 12;
+
+  // configured maximum size of the CAS
+  int64 cas_max_size = 13;
+
+  // configured maximum entry size of the CAS
+  int64 cas_max_entry_size = 14;
+
   // number of unreferenced Entry in CAS
   int64 cas_unreferenced_entry_count = 11;
 
