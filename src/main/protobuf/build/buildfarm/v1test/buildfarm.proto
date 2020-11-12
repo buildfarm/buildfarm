@@ -975,6 +975,15 @@ message WorkerProfileMessage {
 message WorkerProfileRequest {
 }
 
+message WorkerListRequest {
+}
+
+message WorkerListMessage {
+  repeated string workers = 1;
+}
+
 service WorkerProfile {
   rpc GetWorkerProfile(WorkerProfileRequest) returns (WorkerProfileMessage) {}
+
+  rpc GetWorkerList(WorkerListRequest) returns (WorkerListMessage) {}
 }

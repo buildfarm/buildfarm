@@ -34,6 +34,7 @@ import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.Tree;
+import build.buildfarm.v1test.WorkerListMessage;
 import build.buildfarm.v1test.WorkerProfileMessage;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
@@ -139,6 +140,8 @@ public interface Instance {
   ServerCapabilities getCapabilities();
 
   WorkerProfileMessage getWorkerProfile();
+
+  WorkerListMessage getWorkerList();
 
   GetClientStartTimeResult getClientStartTime(String clientKey);
 

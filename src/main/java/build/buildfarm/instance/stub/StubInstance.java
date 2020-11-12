@@ -79,6 +79,8 @@ import build.buildfarm.v1test.ReindexCasRequest;
 import build.buildfarm.v1test.ReindexCasRequestResults;
 import build.buildfarm.v1test.TakeOperationRequest;
 import build.buildfarm.v1test.Tree;
+import build.buildfarm.v1test.WorkerListMessage;
+import build.buildfarm.v1test.WorkerListRequest;
 import build.buildfarm.v1test.WorkerProfileGrpc;
 import build.buildfarm.v1test.WorkerProfileGrpc.WorkerProfileBlockingStub;
 import build.buildfarm.v1test.WorkerProfileMessage;
@@ -813,6 +815,11 @@ public class StubInstance implements Instance {
   public WorkerProfileMessage getWorkerProfile() {
     return WorkerProfileBlockingStub.get()
         .getWorkerProfile(WorkerProfileRequest.newBuilder().build());
+  }
+
+  @Override
+  public WorkerListMessage getWorkerList() {
+    return WorkerProfileBlockingStub.get().getWorkerList(WorkerListRequest.newBuilder().build());
   }
 
   @Override

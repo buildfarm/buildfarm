@@ -44,6 +44,7 @@ import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.StageInformation;
 import build.buildfarm.v1test.Tree;
+import build.buildfarm.v1test.WorkerListMessage;
 import build.buildfarm.v1test.WorkerProfileMessage;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
@@ -608,7 +609,84 @@ class Cat {
     return 10;
   }
 
+  /**
+   * Transform worker string from "ip-10-135-31-210.ec2:8981" to "10-135-31-210".
+   *
+   * @param worker
+   * @return
+   */
+  private static String workerStringTransformation(String worker) {
+    String result = worker.split("\\.")[0].substring("ip-".length()).replaceAll("-", ".") + ":8981";
+    System.out.println("==============result format: " + result);
+    return result;
+  }
+
+  private static void analyzeMessage(WorkerProfileMessage response) {
+    System.out.println("\nWorkerProfile:");
+    String strIntFormat = "%-50s : %d";
+    String strFloatFormat = "%-50s : %2.1f";
+    long entryCount = response.getCasEntryCount();
+    long unreferencedEntryCount = response.getCasUnreferencedEntryCount();
+    System.out.println(String.format(strIntFormat, "Current Total Entry Count", entryCount));
+    System.out.println(
+        String.format(strIntFormat, "Current Unreferenced Entry Count", unreferencedEntryCount));
+    if (entryCount != 0) {
+      System.out.println(
+          String.format(
+              strFloatFormat,
+              "Percentage of Unreferenced Entry",
+              1.0 * response.getCasEntryCount() / response.getCasUnreferencedEntryCount()));
+    }
+    System.out.println(
+        String.format(
+            strIntFormat, "Current DirectoryEntry Count", response.getCasDirectoryEntryCount()));
+    System.out.println(
+        String.format(
+            strIntFormat, "Number of Evicted Entries", response.getCasEvictedEntryCount()));
+    System.out.println(
+        String.format(
+            strIntFormat,
+            "Total Evicted Entries size in Bytes",
+            response.getCasEvictedEntrySize()));
+
+    List<StageInformation> stages = response.getStagesList();
+    for (StageInformation stage : stages) {
+      printStageInformation(stage);
+    }
+
+    List<OperationTimesBetweenStages> times = response.getTimesList();
+    for (OperationTimesBetweenStages time : times) {
+      printOperationTime(time);
+    }
+  }
+
+  private static void profileAllWorkers(Instance instance) {
+    WorkerListMessage workerList = instance.getWorkerList();
+    DigestUtil digestUtil = DigestUtil.forHash("SHA256");
+    ManagedChannel currentChannel;
+    Instance currentInstance = instance;
+    WorkerProfileMessage currentWorkerMessage;
+    while (true) {
+      for (String worker : workerList.getWorkersList()) {
+        currentChannel = createChannel(workerStringTransformation(worker));
+        currentInstance =
+            new StubInstance(
+                "shard", "bf-cat", digestUtil, currentChannel, Durations.fromSeconds(10));
+        currentWorkerMessage = currentInstance.getWorkerProfile();
+        analyzeMessage(currentWorkerMessage);
+      }
+      workerList = currentInstance.getWorkerList();
+
+      try {
+        Thread.sleep(10 * 60 * 1000);
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+      }
+    }
+  }
+
   private static void getWorkerProfile(Instance instance) {
+    // List<String> worker = instance.
     WorkerProfileMessage response = instance.getWorkerProfile();
     System.out.println("\nWorkerProfile:");
     String strIntFormat = "%-50s : %d";
@@ -766,6 +844,10 @@ class Cat {
   static void instanceMain(Instance instance, String type, String[] args) throws Exception {
     if (type.equals("WorkerProfile")) {
       getWorkerProfile(instance);
+    }
+
+    if (type.equals("ProfileAllWorkers")) {
+      profileAllWorkers(instance);
     }
     if (type.equals("Capabilities")) {
       ServerCapabilities capabilities = instance.getCapabilities();

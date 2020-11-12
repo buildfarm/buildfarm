@@ -16,8 +16,11 @@ package build.buildfarm.worker.shard;
 
 import build.buildfarm.cas.CASFileCache;
 import build.buildfarm.cas.ContentAddressableStorage;
+import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.v1test.OperationTimesBetweenStages;
 import build.buildfarm.v1test.StageInformation;
+import build.buildfarm.v1test.WorkerListMessage;
+import build.buildfarm.v1test.WorkerListRequest;
 import build.buildfarm.v1test.WorkerProfileGrpc;
 import build.buildfarm.v1test.WorkerProfileMessage;
 import build.buildfarm.v1test.WorkerProfileRequest;
@@ -28,6 +31,7 @@ import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.PutOperationStage.OperationStageDurations;
 import build.buildfarm.worker.WorkerContext;
 import io.grpc.stub.StreamObserver;
+import java.io.IOException;
 
 public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBase {
   private final CASFileCache storage;
@@ -35,18 +39,21 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
   private final ExecuteActionStage executeActionStage;
   private final WorkerContext context;
   private final PutOperationStage completeStage;
+  private final ShardBackplane backplane;
 
   public WorkerProfileService(
       ContentAddressableStorage storage,
       PipelineStage inputFetchStage,
       PipelineStage executeActionStage,
       WorkerContext context,
-      PipelineStage completeStage) {
+      PipelineStage completeStage,
+      ShardBackplane backplane) {
     this.storage = (CASFileCache) storage;
     this.inputFetchStage = (InputFetchStage) inputFetchStage;
     this.executeActionStage = (ExecuteActionStage) executeActionStage;
     this.context = context;
     this.completeStage = (PutOperationStage) completeStage;
+    this.backplane = backplane;
   }
 
   @Override
@@ -91,6 +98,19 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
           .setOperationCount(duration.operationCount)
           .setPeriod(duration.period);
       replyBuilder.addTimes(timesBuilder.build());
+    }
+    responseObserver.onNext(replyBuilder.build());
+    responseObserver.onCompleted();
+  }
+
+  @Override
+  public void getWorkerList(
+      WorkerListRequest request, StreamObserver<WorkerListMessage> responseObserver) {
+    WorkerListMessage.Builder replyBuilder = WorkerListMessage.newBuilder();
+    try {
+      replyBuilder.addAllWorkers(backplane.getWorkers());
+    } catch (IOException e) {
+      e.printStackTrace();
     }
     responseObserver.onNext(replyBuilder.build());
     responseObserver.onCompleted();
