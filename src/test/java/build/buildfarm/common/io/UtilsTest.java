@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.common;
+package build.buildfarm.common.io;
 
 import static com.google.common.truth.Truth.assertThat;
 
-import build.buildfarm.common.io.Directories;
 import com.google.protobuf.ByteString;
 import java.io.IOException;
 import java.nio.file.FileStore;
@@ -30,7 +29,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
-class IOUtilsTest {
+class UtilsTest {
   private Path root;
 
   private FileStore fileStore;
@@ -53,7 +52,7 @@ class IOUtilsTest {
     Files.write(path, blob.toByteArray());
     Files.createLink(root.resolve("b"), path);
 
-    List<NamedFileKey> files = IOUtils.listDirentSorted(root, fileStore);
+    List<NamedFileKey> files = Utils.listDirentSorted(root, fileStore);
     assertThat(files.size()).isEqualTo(2);
     Object firstKey = files.get(0).fileKey();
     Object secondKey = files.get(1).fileKey();
@@ -70,7 +69,7 @@ class IOUtilsTest {
     ByteString blobB = ByteString.copyFromUtf8("content for b");
     Files.write(pathB, blobB.toByteArray());
 
-    List<NamedFileKey> files = IOUtils.listDirentSorted(root, fileStore);
+    List<NamedFileKey> files = Utils.listDirentSorted(root, fileStore);
     assertThat(files.size()).isEqualTo(2);
     Object firstKey = files.get(0).fileKey();
     Object secondKey = files.get(1).fileKey();

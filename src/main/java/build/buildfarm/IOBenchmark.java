@@ -34,21 +34,23 @@
 
 package build.buildfarm;
 
-import static build.buildfarm.common.IOUtils.getInode;
-import static build.buildfarm.common.IOUtils.isDir;
-import static build.buildfarm.common.IOUtils.jnrGetInode;
-import static build.buildfarm.common.IOUtils.jnrIsDir;
-import static build.buildfarm.common.IOUtils.jnrReaddir;
-import static build.buildfarm.common.IOUtils.jnrStatNullable;
-import static build.buildfarm.common.IOUtils.posixReaddir;
-import static build.buildfarm.common.IOUtils.posixStatNullable;
-import static build.buildfarm.common.IOUtils.readdir;
-import static build.buildfarm.common.IOUtils.statNullable;
+import static build.buildfarm.common.io.Utils.getInode;
+import static build.buildfarm.common.io.Utils.isDir;
+import static build.buildfarm.common.io.Utils.jnrGetInode;
+import static build.buildfarm.common.io.Utils.jnrIsDir;
+import static build.buildfarm.common.io.Utils.jnrReaddir;
+import static build.buildfarm.common.io.Utils.jnrStatNullable;
+import static build.buildfarm.common.io.Utils.posixReaddir;
+import static build.buildfarm.common.io.Utils.posixStatNullable;
+import static build.buildfarm.common.io.Utils.readdir;
+import static build.buildfarm.common.io.Utils.statNullable;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.nio.file.FileStore;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
@@ -92,15 +94,17 @@ public class IOBenchmark {
   */
   @State(Scope.Benchmark)
   public static class IOState {
-    public static Path testDir = null;
-    public static String testDirStr = null;
-    public static POSIX posix = null;
+    public Path testDir = null;
+    public String testDirStr = null;
+    public POSIX posix = null;
+    public FileStore fileStore;
 
     @Setup(Level.Invocation)
     public void setUp() throws Exception {
       testDir = ReadTestDir();
       testDirStr = testDir.toString();
       posix = POSIXFactory.getPOSIX(new DefaultPOSIXHandler(), true);
+      fileStore = Files.getFileStore(testDir);
     }
   }
 
@@ -109,17 +113,17 @@ public class IOBenchmark {
   */
   @Benchmark
   public static Object benchmark_statNullable(IOState state) throws Exception {
-    return statNullable(IOState.testDir, false);
+    return statNullable(state.testDir, false, state.fileStore);
   }
 
   @Benchmark
   public static Object benchmark_posixStatNullable(IOState state) throws Exception {
-    return posixStatNullable(IOState.testDir, false);
+    return posixStatNullable(state.testDir, false);
   }
 
   @Benchmark
   public static Object benchmark_jnrStatNullable(IOState state) throws Exception {
-    return jnrStatNullable(IOState.posix, IOState.testDirStr);
+    return jnrStatNullable(state.posix, state.testDirStr);
   }
 
   /*
@@ -127,12 +131,12 @@ public class IOBenchmark {
   */
   @Benchmark
   public static Object benchmark_getInode(IOState state) throws Exception {
-    return getInode(IOState.testDir);
+    return getInode(state.testDir);
   }
 
   @Benchmark
   public static Object benchmark_jnrGetInode(IOState state) throws Exception {
-    return jnrGetInode(IOState.posix, IOState.testDirStr);
+    return jnrGetInode(state.posix, state.testDirStr);
   }
 
   /*
@@ -140,17 +144,17 @@ public class IOBenchmark {
   */
   @Benchmark
   public static Object benchmark_readdir(IOState state) throws Exception {
-    return readdir(IOState.testDir, false);
+    return readdir(state.testDir, false, state.fileStore);
   }
 
   @Benchmark
   public static Object benchmark_posixReaddir(IOState state) throws Exception {
-    return posixReaddir(IOState.testDir, false);
+    return posixReaddir(state.testDir, false);
   }
 
   @Benchmark
   public static Object benchmark_jnrReaddir(IOState state) throws Exception {
-    return jnrReaddir(IOState.posix, IOState.testDir);
+    return jnrReaddir(state.posix, state.testDir);
   }
 
   /*
@@ -158,11 +162,11 @@ public class IOBenchmark {
   */
   @Benchmark
   public static Object benchmark_isDir(IOState state) throws Exception {
-    return isDir(IOState.testDirStr);
+    return isDir(state.testDirStr);
   }
 
   public static Object benchmark_jnrIsDir(IOState state) throws Exception {
-    return jnrIsDir(IOState.posix, IOState.testDirStr);
+    return jnrIsDir(state.posix, state.testDirStr);
   }
 
   public static void main(String[] args) throws Exception {

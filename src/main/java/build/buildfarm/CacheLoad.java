@@ -18,8 +18,8 @@ import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 
 import build.bazel.remote.execution.v2.Digest;
-import build.buildfarm.cas.CASFileCache;
-import build.buildfarm.cas.CASFileCache.StartupCacheResults;
+import build.buildfarm.cas.cfc.CASFileCache;
+import build.buildfarm.cas.cfc.CASFileCache.StartupCacheResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import java.io.IOException;
@@ -43,7 +43,8 @@ class CacheLoad {
           root,
           maxSizeInBytes,
           maxSizeInBytes,
-          /* storeFileDirsIndexInMemory= */ true,
+          /* hexBucketLevels=*/ 0,
+          /* storeFileDirsIndexInMemory=*/ true,
           digestUtil,
           expireService,
           accessRecorder);

@@ -15,7 +15,7 @@
 package build.buildfarm;
 
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.EXECUTING;
-import static build.buildfarm.common.IOUtils.stat;
+import static build.buildfarm.common.io.Utils.stat;
 import static build.buildfarm.instance.stub.ByteStreamUploader.uploadResourceName;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterables.all;
@@ -38,7 +38,7 @@ import build.bazel.remote.execution.v2.ExecutionGrpc.ExecutionStub;
 import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
 import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
 import build.buildfarm.common.DigestUtil;
-import build.buildfarm.common.FileStatus;
+import build.buildfarm.common.io.FileStatus;
 import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamStub;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
@@ -59,6 +59,7 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.DirectoryStream;
+import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -377,9 +378,10 @@ class Executor {
     System.out.println("Looking for missing blobs");
 
     Stopwatch stopwatch = Stopwatch.createUnstarted();
+    FileStore fileStore = Files.getFileStore(blobsDir);
     try (DirectoryStream<Path> stream = Files.newDirectoryStream(blobsDir)) {
       for (Path file : stream) {
-        FileStatus stat = stat(file, /* followSymlinks=*/ false);
+        FileStatus stat = stat(file, /* followSymlinks=*/ false, fileStore);
 
         Digest digest =
             DigestUtil.buildDigest(file.getFileName().toString().split("_")[0], stat.getSize());

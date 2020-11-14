@@ -1,4 +1,4 @@
-// Copyright 2020 The Bazel Authors. All rights reserved.
+// Copyright 2014 The Bazel Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,23 +12,35 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.common;
+package build.buildfarm.common.io;
 
 import com.google.common.base.Preconditions;
 import java.io.Serializable;
-import java.nio.file.attribute.PosixFileAttributes;
 import java.util.Objects;
 import javax.annotation.Nullable;
 
 /** Directory entry representation returned by {@link Path#readdir}. */
-public final class PosixDirent implements Serializable, Comparable<PosixDirent> {
+public final class Dirent implements Serializable, Comparable<Dirent> {
+  /** Type of the directory entry */
+  public enum Type {
+    // A regular file.
+    FILE,
+    // A directory.
+    DIRECTORY,
+    // A symlink.
+    SYMLINK,
+    // Not one of the above. For example, a special file.
+    UNKNOWN
+  }
 
   private final String name;
-  @Nullable private final PosixFileAttributes stat;
+  private final Type type;
+  @Nullable private final FileStatus stat;
 
-  /** Creates a new posix dirent with the given name */
-  public PosixDirent(String name, PosixFileAttributes stat) {
+  /** Creates a new dirent with the given name and type, both of which must be non-null. */
+  public Dirent(String name, Type type, FileStatus stat) {
     this.name = Preconditions.checkNotNull(name);
+    this.type = Preconditions.checkNotNull(type);
     this.stat = stat;
   }
 
@@ -36,35 +48,39 @@ public final class PosixDirent implements Serializable, Comparable<PosixDirent> 
     return name;
   }
 
+  public Type getType() {
+    return type;
+  }
+
   @Nullable
-  public PosixFileAttributes getStat() {
+  public FileStatus getStat() {
     return stat;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(name);
+    return Objects.hash(name, type);
   }
 
   @Override
   public boolean equals(Object other) {
-    if (!(other instanceof PosixDirent)) {
+    if (!(other instanceof Dirent)) {
       return false;
     }
     if (this == other) {
       return true;
     }
-    PosixDirent otherPosixDirent = (PosixDirent) other;
-    return name.equals(otherPosixDirent.name);
+    Dirent otherDirent = (Dirent) other;
+    return name.equals(otherDirent.name) && type.equals(otherDirent.type);
   }
 
   @Override
   public String toString() {
-    return name;
+    return name + "[" + type.toString().toLowerCase() + "]";
   }
 
   @Override
-  public int compareTo(PosixDirent other) {
+  public int compareTo(Dirent other) {
     return this.getName().compareTo(other.getName());
   }
 }

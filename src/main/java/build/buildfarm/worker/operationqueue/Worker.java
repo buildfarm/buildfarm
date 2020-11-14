@@ -14,8 +14,8 @@
 
 package build.buildfarm.worker.operationqueue;
 
-import static build.buildfarm.cas.CASFileCache.getInterruptiblyOrIOException;
-import static build.buildfarm.common.IOUtils.formatIOError;
+import static build.buildfarm.common.io.Utils.formatIOError;
+import static build.buildfarm.common.io.Utils.getInterruptiblyOrIOException;
 import static build.buildfarm.instance.Utils.getBlob;
 import static com.google.common.util.concurrent.Futures.allAsList;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
@@ -37,7 +37,7 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.RequestMetadata;
-import build.buildfarm.cas.CASFileCache;
+import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;

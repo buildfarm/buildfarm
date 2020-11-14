@@ -14,21 +14,23 @@
 
 package build.buildfarm.worker;
 
+import static build.buildfarm.common.io.Utils.stat;
+
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Platform.Property;
-import build.buildfarm.common.FileStatus;
-import build.buildfarm.common.IOUtils;
+import build.buildfarm.common.io.FileStatus;
 import com.google.common.collect.Iterables;
 import java.io.IOException;
+import java.nio.file.FileStore;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 
 public class Utils {
   private Utils() {}
 
-  public static FileStatus statIfFound(Path path, boolean followSymlinks) {
+  public static FileStatus statIfFound(Path path, boolean followSymlinks, FileStore fileStore) {
     try {
-      return IOUtils.stat(path, followSymlinks);
+      return stat(path, followSymlinks, fileStore);
     } catch (NoSuchFileException e) {
       return null;
     } catch (IOException e) {

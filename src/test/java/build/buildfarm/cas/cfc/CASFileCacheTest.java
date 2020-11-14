@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.cas;
+package build.buildfarm.cas.cfc;
 
-import static build.buildfarm.cas.CASFileCache.getInterruptiblyOrIOException;
+import static build.buildfarm.common.io.Utils.getInterruptiblyOrIOException;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
@@ -35,10 +35,12 @@ import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.RequestMetadata;
-import build.buildfarm.cas.CASFileCache.Entry;
-import build.buildfarm.cas.CASFileCache.PutDirectoryException;
-import build.buildfarm.cas.CASFileCache.StartupCacheResults;
+import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
+import build.buildfarm.cas.DigestMismatchException;
+import build.buildfarm.cas.cfc.CASFileCache.Entry;
+import build.buildfarm.cas.cfc.CASFileCache.PutDirectoryException;
+import build.buildfarm.cas.cfc.CASFileCache.StartupCacheResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
@@ -63,6 +65,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.channels.ClosedChannelException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
@@ -122,13 +125,12 @@ class CASFileCacheTest {
     putService = newSingleThreadExecutor();
     storage = Maps.newConcurrentMap();
     expireService = newSingleThreadExecutor();
-    // do this so that we can remove the cache root dir
-    Files.createDirectories(root);
     fileCache =
         new CASFileCache(
             root,
             /* maxSizeInBytes=*/ 1024,
             /* maxEntrySizeInBytes=*/ 1024,
+            /* hexBucketLevels=*/ 1,
             storeFileDirsIndexInMemory,
             DIGEST_UTIL,
             expireService,
@@ -147,6 +149,8 @@ class CASFileCacheTest {
             return content.substring((int) offset).newInput();
           }
         };
+    // do this so that we can remove the cache root dir
+    fileCache.initializeRootDirectory();
   }
 
   @After
@@ -308,14 +312,15 @@ class CASFileCacheTest {
 
   @Test
   public void startLoadsExistingBlob() throws IOException, InterruptedException {
+    FileStore fileStore = Files.getFileStore(root);
     ByteString blob = ByteString.copyFromUtf8("blob");
     Digest blobDigest = DIGEST_UTIL.compute(blob);
-    Path path = root.resolve(fileCache.getKey(blobDigest, false));
-    Path execPath = root.resolve(fileCache.getKey(blobDigest, true));
+    Path path = fileCache.getPath(fileCache.getKey(blobDigest, false));
+    Path execPath = fileCache.getPath(fileCache.getKey(blobDigest, true));
     Files.write(path, blob.toByteArray());
-    EvenMoreFiles.setReadOnlyPerms(path, false);
+    EvenMoreFiles.setReadOnlyPerms(path, false, fileStore);
     Files.write(execPath, blob.toByteArray());
-    EvenMoreFiles.setReadOnlyPerms(execPath, true);
+    EvenMoreFiles.setReadOnlyPerms(execPath, true, fileStore);
 
     StartupCacheResults results = fileCache.start(false);
 
@@ -335,16 +340,17 @@ class CASFileCacheTest {
 
   @Test
   public void startSkipsLoadingExistingBlob() throws IOException, InterruptedException {
+    FileStore fileStore = Files.getFileStore(root);
     ByteString blob = ByteString.copyFromUtf8("blob");
     Digest blobDigest = DIGEST_UTIL.compute(blob);
-    Path path = root.resolve(fileCache.getKey(blobDigest, false));
-    Path execPath = root.resolve(fileCache.getKey(blobDigest, true));
+    Path path = fileCache.getPath(fileCache.getKey(blobDigest, false));
+    Path execPath = fileCache.getPath(fileCache.getKey(blobDigest, true));
     Files.write(path, blob.toByteArray());
-    EvenMoreFiles.setReadOnlyPerms(path, false);
+    EvenMoreFiles.setReadOnlyPerms(path, false, fileStore);
     Files.write(execPath, blob.toByteArray());
-    EvenMoreFiles.setReadOnlyPerms(execPath, true);
+    EvenMoreFiles.setReadOnlyPerms(execPath, true, fileStore);
 
-    StartupCacheResults results = fileCache.start(true);
+    StartupCacheResults results = fileCache.start(/* skipLoad=*/ true);
 
     // check the startup results to ensure our two files were processed
     assertThat(results.load.loadSkipped).isTrue();
@@ -356,12 +362,13 @@ class CASFileCacheTest {
 
   @Test
   public void startRemovesInvalidEntries() throws IOException, InterruptedException {
-    Path tooFewComponents = root.resolve("toofewcomponents");
-    Path tooManyComponents = root.resolve("too_many_components_here");
-    Path invalidDigest = root.resolve("digest_10");
+    Path tooFewComponents = root.resolve("00").resolve("toofewcomponents");
+    Path tooManyComponents = root.resolve("00").resolve("too_many_components_here");
+    Path invalidDigest = root.resolve("00").resolve("digest_10");
     ByteString validBlob = ByteString.copyFromUtf8("valid");
     Digest validDigest = DIGEST_UTIL.compute(ByteString.copyFromUtf8("valid"));
-    Path invalidSize = root.resolve(validDigest.getHash() + "_ten");
+    String validHash = validDigest.getHash();
+    Path invalidSize = root.resolve(validHash.substring(0, 2)).resolve(validHash + "_ten");
     Path incorrectSize =
         fileCache.getPath(
             fileCache.getKey(
@@ -377,7 +384,7 @@ class CASFileCacheTest {
     Files.write(
         invalidExec, validBlob.toByteArray()); // content would match but for invalid exec field
 
-    fileCache.start(false);
+    fileCache.start(/* skipLoad=*/ false);
 
     assertThat(!Files.exists(tooFewComponents)).isTrue();
     assertThat(!Files.exists(tooManyComponents)).isTrue();
@@ -389,8 +396,7 @@ class CASFileCacheTest {
 
   @Test
   public void newInputRemovesNonExistentEntry() throws IOException, InterruptedException {
-    Digest nonexistentDigest =
-        Digest.newBuilder().setHash("file_does_not_exist").setSizeBytes(1).build();
+    Digest nonexistentDigest = DIGEST_UTIL.compute(ByteString.copyFromUtf8("file does not exist"));
     String nonexistentKey = fileCache.getKey(nonexistentDigest, false);
     Entry entry = new Entry(nonexistentKey, 1, Deadline.after(10, SECONDS));
     entry.before = entry;

@@ -28,10 +28,10 @@ import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
-import build.buildfarm.cas.CASFileCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.cas.MemoryCAS;
+import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
@@ -601,6 +601,7 @@ public class Worker extends LoggingMain {
             root.resolve(getValidFilesystemCASPath(fsCASConfig, root)),
             fsCASConfig.getMaxSizeBytes(),
             fsCASConfig.getMaxEntrySizeBytes(),
+            fsCASConfig.getHexBucketLevels(),
             fsCASConfig.getFileDirectoriesIndexInMemory(),
             digestUtil,
             removeDirectoryService,
