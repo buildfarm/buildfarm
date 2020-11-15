@@ -495,7 +495,7 @@ public class RedisShardBackplane implements ShardBackplane {
     failsafeOperationThread.start();
   }
 
-  private SetMultimap<String, String> toMultimap(List<Platform.Property> provisions) {
+  private static SetMultimap<String, String> toMultimap(List<Platform.Property> provisions) {
     SetMultimap<String, String> set = LinkedHashMultimap.create();
     for (Platform.Property property : provisions) {
       set.put(property.getName(), property.getValue());
@@ -510,8 +510,8 @@ public class RedisShardBackplane implements ShardBackplane {
     // multiple clients.
     client = new RedisClient(jedisClusterFactory.get());
 
-    this.prequeue = createPrequeue(config);
-    this.operationQueue = createOperationQueue(config);
+    prequeue = createPrequeue(client, config);
+    operationQueue = createOperationQueue(client, config);
 
     if (config.getSubscribeToBackplane()) {
       startSubscriptionThread();
@@ -525,14 +525,16 @@ public class RedisShardBackplane implements ShardBackplane {
         jedis -> jedis.set("startTime/" + clientPublicName, Long.toString(new Date().getTime())));
   }
 
-  BalancedRedisQueue createPrequeue(RedisShardBackplaneConfig config) throws IOException {
+  static BalancedRedisQueue createPrequeue(RedisClient client, RedisShardBackplaneConfig config)
+      throws IOException {
     // Construct the prequeue so that elements are balanced across all redis nodes.
     return new BalancedRedisQueue(
         config.getPreQueuedOperationsListName(),
-        getQueueHashes(config.getPreQueuedOperationsListName()));
+        getQueueHashes(client, config.getPreQueuedOperationsListName()));
   }
 
-  OperationQueue createOperationQueue(RedisShardBackplaneConfig config) throws IOException {
+  static OperationQueue createOperationQueue(RedisClient client, RedisShardBackplaneConfig config)
+      throws IOException {
     // Construct an operation queue based on configuration.
     // An operation queue consists of multiple provisioned queues in which the order dictates the
     // eligibility and placement of operations.
@@ -543,7 +545,7 @@ public class RedisShardBackplane implements ShardBackplane {
       ProvisionedRedisQueue provisionedQueue =
           new ProvisionedRedisQueue(
               queueConfig.getName(),
-              getQueueHashes(queueConfig.getName()),
+              getQueueHashes(client, queueConfig.getName()),
               toMultimap(queueConfig.getPlatform().getPropertiesList()));
       provisionedQueues.add(provisionedQueue);
     }
@@ -561,7 +563,7 @@ public class RedisShardBackplane implements ShardBackplane {
       ProvisionedRedisQueue defaultQueue =
           new ProvisionedRedisQueue(
               config.getQueuedOperationsListName(),
-              getQueueHashes(config.getQueuedOperationsListName()),
+              getQueueHashes(client, config.getQueuedOperationsListName()),
               defaultProvisions);
       provisionedQueues.add(defaultQueue);
     }
@@ -569,7 +571,7 @@ public class RedisShardBackplane implements ShardBackplane {
     return new OperationQueue(provisionedQueues.build());
   }
 
-  List<String> getQueueHashes(String queueName) throws IOException {
+  static List<String> getQueueHashes(RedisClient client, String queueName) throws IOException {
     List<String> clusterHashes =
         client.call(
             jedis ->
