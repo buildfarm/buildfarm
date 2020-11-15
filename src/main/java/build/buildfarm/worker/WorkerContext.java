@@ -113,9 +113,9 @@ public interface WorkerContext {
 
   Write getOperationStreamWrite(String name) throws IOException;
 
-  int getStandardOutputLimit();
+  long getStandardOutputLimit();
 
-  int getStandardErrorLimit();
+  long getStandardErrorLimit();
 
   void createExecutionLimits();
 
