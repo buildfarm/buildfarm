@@ -59,6 +59,7 @@ import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
+import build.buildfarm.common.Size;
 import build.buildfarm.common.Time;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
@@ -145,7 +146,7 @@ public class StubInstance implements Instance {
   private final Retrier retrier;
   private final @Nullable ListeningScheduledExecutorService retryService;
   private boolean isStopped = false;
-  private final int maxBatchUpdateBlobsSize = 3 * 1024 * 1024;
+  private final long maxBatchUpdateBlobsSize = Size.mbToBytes(3);
 
   public StubInstance(String name, DigestUtil digestUtil, ManagedChannel channel) {
     this(name, "no-identifier", digestUtil, channel, Durations.fromDays(DEFAULT_DEADLINE_DAYS));
@@ -371,7 +372,7 @@ public class StubInstance implements Instance {
             .setInstanceName(getName())
             .addAllBlobDigests(digests)
             .build();
-    if (request.getSerializedSize() > 4 * 1024 * 1024) {
+    if (request.getSerializedSize() > Size.mbToBytes(4)) {
       throw new IllegalStateException(
           String.format(
               "FINDMISSINGBLOBS IS TOO LARGE: %d digests are required in one request!",

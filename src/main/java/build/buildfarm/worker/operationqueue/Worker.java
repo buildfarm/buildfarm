@@ -44,6 +44,7 @@ import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.LoggingMain;
 import build.buildfarm.common.Poller;
+import build.buildfarm.common.Size;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.Retrier.Backoff;
@@ -668,13 +669,13 @@ public class Worker extends LoggingMain {
           }
 
           @Override
-          public int getStandardOutputLimit() {
-            return 100 * 1024 * 1024; // 100 MiB
+          public long getStandardOutputLimit() {
+            return Size.mbToBytes(100);
           }
 
           @Override
-          public int getStandardErrorLimit() {
-            return 100 * 1024 * 1024; // 100 MiB
+          public long getStandardErrorLimit() {
+            return Size.mbToBytes(100);
           }
 
           @Override

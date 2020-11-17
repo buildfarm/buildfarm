@@ -38,6 +38,7 @@ import build.bazel.remote.execution.v2.ExecutionGrpc.ExecutionStub;
 import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
 import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.Size;
 import build.buildfarm.common.io.FileStatus;
 import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamStub;
@@ -247,7 +248,7 @@ class Executor {
     ByteStreamStub bsStub = ByteStreamGrpc.newStub(channel);
     for (Digest missingDigest : missingDigests) {
       Path path = blobsDir.resolve(missingDigest.getHash() + "_" + missingDigest.getSizeBytes());
-      if (missingDigest.getSizeBytes() < 1024 * 1024) {
+      if (missingDigest.getSizeBytes() < Size.mbToBytes(1)) {
         Request request =
             Request.newBuilder()
                 .setDigest(missingDigest)
@@ -255,13 +256,13 @@ class Executor {
                 .build();
         boolean foundBucket = false;
         int maxBucketSize = 0;
-        int minBucketSize = 2 * 1024 * 1024 + 1;
+        long minBucketSize = Size.mbToBytes(2) + 1;
         int maxBucketIndex = 0;
         int minBucketIndex = -1;
         int size = (int) missingDigest.getSizeBytes() + 48;
         for (int i = 0; i < 128; i++) {
           int newBucketSize = bucketSizes[i] + size;
-          if (newBucketSize < 2 * 1024 * 1024) {
+          if (newBucketSize < Size.mbToBytes(2)) {
             if (bucketSizes[i] < minBucketSize) {
               minBucketSize = bucketSizes[i];
               minBucketIndex = i;

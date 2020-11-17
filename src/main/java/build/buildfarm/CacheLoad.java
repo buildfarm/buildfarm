@@ -22,6 +22,7 @@ import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.cas.cfc.CASFileCache.StartupCacheResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
+import build.buildfarm.common.Size;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
@@ -56,14 +57,6 @@ class CacheLoad {
     }
   }
 
-  public static long GBtoBytes(long sizeGb) {
-    return sizeGb * 1024 * 1024 * 1024;
-  }
-
-  public static long BytestoGB(long sizeBytes) {
-    return sizeBytes / 1024 / 1024 / 1024;
-  }
-
   /*
     When starting the CAS, ensure that the "max size" appropriately reflects the content size of the CAS's root.
     Otherwise, reaching the "max size" will result in files being deleted from the root.
@@ -76,7 +69,7 @@ class CacheLoad {
     CASFileCache fileCache =
         new LocalCASFileCache(
             root,
-            /* maxSizeInBytes=*/ GBtoBytes(500),
+            /* maxSizeInBytes=*/ Size.gbToBytes(500),
             new DigestUtil(HashFunction.SHA1),
             /* expireService=*/ newDirectExecutorService(),
             /* accessRecorder=*/ directExecutor());
@@ -98,6 +91,6 @@ class CacheLoad {
     // File Information
     System.out.println("Cache Root: " + results.cacheDirectory);
     System.out.println("Directory Count: " + fileCache.directoryStorageCount());
-    System.out.println("Current Size: " + BytestoGB(fileCache.size()) + "GB");
+    System.out.println("Current Size: " + Size.bytesToGb(fileCache.size()) + "GB");
   }
 }

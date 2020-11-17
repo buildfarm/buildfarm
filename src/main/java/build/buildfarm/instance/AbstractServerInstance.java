@@ -58,6 +58,7 @@ import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
+import build.buildfarm.common.Size;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watcher;
@@ -1666,7 +1667,7 @@ public abstract class AbstractServerInstance implements Instance {
         .addDigestFunction(digestUtil.getDigestFunction())
         .setActionCacheUpdateCapabilities(
             ActionCacheUpdateCapabilities.newBuilder().setUpdateEnabled(true))
-        .setMaxBatchTotalSizeBytes(4 * 1024 * 1024)
+        .setMaxBatchTotalSizeBytes(Size.mbToBytes(4))
         .setSymlinkAbsolutePathStrategy(SymlinkAbsolutePathStrategy.Value.DISALLOWED)
         .build();
   }
