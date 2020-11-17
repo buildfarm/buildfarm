@@ -431,10 +431,10 @@ class Executor {
     stderrWrite.reset();
     ByteStringWriteReader stdoutReader =
         new ByteStringWriteReader(
-            process.getInputStream(), stdoutWrite, workerContext.getStandardOutputLimit());
+            process.getInputStream(), stdoutWrite, (int) workerContext.getStandardOutputLimit());
     ByteStringWriteReader stderrReader =
         new ByteStringWriteReader(
-            process.getErrorStream(), stderrWrite, workerContext.getStandardErrorLimit());
+            process.getErrorStream(), stderrWrite, (int) workerContext.getStandardErrorLimit());
 
     Thread stdoutReaderThread = new Thread(stdoutReader);
     Thread stderrReaderThread = new Thread(stderrReader);
