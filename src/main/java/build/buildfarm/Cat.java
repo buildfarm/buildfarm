@@ -49,7 +49,6 @@ import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.ShardWorkerConfig;
 import build.buildfarm.v1test.StageInformation;
 import build.buildfarm.v1test.Tree;
-import build.buildfarm.v1test.WorkerListMessage;
 import build.buildfarm.v1test.WorkerProfileMessage;
 import build.buildfarm.worker.shard.WorkerOptions;
 import com.google.common.base.Stopwatch;
@@ -77,9 +76,6 @@ import io.grpc.ManagedChannel;
 import io.grpc.Status;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
-import redis.clients.jedis.JedisCluster;
-
-import javax.naming.ConfigurationException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -87,7 +83,6 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Instant;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -95,6 +90,8 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import javax.naming.ConfigurationException;
+import redis.clients.jedis.JedisCluster;
 
 class Cat {
   private static ManagedChannel createChannel(String target) {
@@ -675,8 +672,8 @@ class Cat {
     }
   }
 
-  private static RedisShardBackplaneConfig toRedisShardBackplaneConfig (Readable input, WorkerOptions options)
-      throws IOException {
+  private static RedisShardBackplaneConfig toRedisShardBackplaneConfig(
+      Readable input, WorkerOptions options) throws IOException {
     ShardWorkerConfig.Builder builder = ShardWorkerConfig.newBuilder();
     TextFormat.merge(input, builder);
     if (!Strings.isNullOrEmpty(options.root)) {
@@ -688,7 +685,6 @@ class Cat {
     return builder.build().getRedisShardBackplaneConfig();
   }
 
-
   private static Set<String> getWorkers(String[] args) throws ConfigurationException, IOException {
     OptionsParser parser = OptionsParser.newOptionsParser(WorkerOptions.class);
     parser.parseAndExitUponError(args);
@@ -696,12 +692,12 @@ class Cat {
     if (residue.isEmpty()) {
       throw new IllegalArgumentException("Missing Config_PATH");
     }
-    Path configPath = Paths.get(residue.get(4)); //?
+    Path configPath = Paths.get(residue.get(4)); // ?
     RedisShardBackplaneConfig config = null;
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
-      config = toRedisShardBackplaneConfig(
-          new InputStreamReader(configInputStream),
-          parser.getOptions(WorkerOptions.class));
+      config =
+          toRedisShardBackplaneConfig(
+              new InputStreamReader(configInputStream), parser.getOptions(WorkerOptions.class));
     } catch (Exception e) {
       e.printStackTrace();
     }
@@ -711,7 +707,8 @@ class Cat {
     return client.call(jedis -> fetchWorkers(jedis, finalConfig, System.currentTimeMillis()));
   }
 
-  private static Set<String> fetchWorkers(JedisCluster jedis, RedisShardBackplaneConfig config, long now) {
+  private static Set<String> fetchWorkers(
+      JedisCluster jedis, RedisShardBackplaneConfig config, long now) {
     Set<String> workers = Sets.newConcurrentHashSet();
     for (Map.Entry<String, String> entry : jedis.hgetAll(config.getWorkersHashName()).entrySet()) {
       String json = entry.getValue();
@@ -765,6 +762,7 @@ class Cat {
       }
     }
   }
+
   private static void getWorkerProfile(Instance instance) {
     // List<String> worker = instance.
     WorkerProfileMessage response = instance.getWorkerProfile();
