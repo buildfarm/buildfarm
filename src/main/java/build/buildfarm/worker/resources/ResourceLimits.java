@@ -36,44 +36,4 @@ public class ResourceLimits {
   ///          given action.
   ///
   public CpuLimits cpu;
-
-  ///
-  /// @field   gpu
-  /// @brief   Resource limitations on GPUs.
-  /// @details Decides specific GPU limitations and whether to apply them for a
-  ///          given action.
-  ///
-  public GpuLimits gpu;
-
-  ///
-  /// @field   mem
-  /// @brief   Resource limitations on RAM.
-  /// @details Decides specific memory limitations and whether to apply them
-  ///          for a given action.
-  ///
-  public MemLimits mem;
-
-  ///
-  /// @field   disk
-  /// @brief   Resource limitations on disk.
-  /// @details Decides specific disk limitations and whether to apply them for
-  ///          a given action.
-  ///
-  public DiskLimits disk;
-
-  ///
-  /// @field   network
-  /// @brief   Resource limitations on network.
-  /// @details Decides specific network limitations and whether to apply them
-  ///          for a given action.
-  ///
-  public NetworkLimits network;
-
-  ///
-  /// @field   time
-  /// @brief   Time limitations for the action.
-  /// @details Decides specific time limitations and whether to apply them for
-  ///          a given action.
-  ///
-  public TimeLimits time;
 }
