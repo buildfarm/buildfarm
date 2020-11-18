@@ -52,8 +52,9 @@ import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.worker.ExecutionPolicies;
+import build.buildfarm.worker.ResourceDecider;
+import build.buildfarm.worker.ResourceLimits;
 import build.buildfarm.worker.RetryingMatchListener;
-import build.buildfarm.worker.Utils;
 import build.buildfarm.worker.WorkerContext;
 import build.buildfarm.worker.cgroup.Cpu;
 import build.buildfarm.worker.cgroup.Group;
@@ -856,28 +857,20 @@ class ShardWorkerContext implements WorkerContext {
     return components[components.length - 1];
   }
 
-  int commandMaxCores(Command command) {
-    return Utils.commandMaxCores(onlyMulticoreTests, command);
-  }
-
-  int commandMinCores(Command command) {
-    return Utils.commandMinCores(onlyMulticoreTests, command);
-  }
-
   @Override
   public int commandExecutionClaims(Command command) {
-    int minCores = commandMinCores(command);
-    return Math.min(minCores <= 0 ? 1 : minCores, getExecuteStageWidth());
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, onlyMulticoreTests);
+    return Math.min(limits.cpu.min, getExecuteStageWidth());
   }
 
   @Override
   public IOResource limitExecution(
       String operationName, ImmutableList.Builder<String> arguments, Command command) {
     if (limitExecution) {
-      int mincores = commandMinCores(command);
-      int maxcores = commandMaxCores(command);
+      ResourceLimits limits =
+          ResourceDecider.decideResourceLimitations(command, onlyMulticoreTests);
 
-      return limitSpecifiedExecution(mincores, maxcores, operationName, arguments);
+      return limitSpecifiedExecution(limits, operationName, arguments);
     }
     return new IOResource() {
       @Override
@@ -891,22 +884,22 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   IOResource limitSpecifiedExecution(
-      int mincores, int maxcores, String operationName, ImmutableList.Builder<String> arguments) {
+      ResourceLimits limits, String operationName, ImmutableList.Builder<String> arguments) {
     final IOResource resource;
     final Group group;
-    if (mincores > 0 || maxcores > 0) {
+    if (limits.cpu.min > 0 || limits.cpu.max > 0) {
       String operationId = getOperationId(operationName);
       group = operationsGroup.getChild(operationId);
       Cpu cpu = group.getCpu();
       try {
         cpu.close();
-        if (maxcores > 0) {
+        if (limits.cpu.max > 0) {
           /* period of 100ms */
           cpu.setCFSPeriod(100000);
-          cpu.setCFSQuota(maxcores * 100000);
+          cpu.setCFSQuota(limits.cpu.max * 100000);
         }
-        if (mincores > 0) {
-          cpu.setShares(mincores * 1024);
+        if (limits.cpu.min > 0) {
+          cpu.setShares(limits.cpu.min * 1024);
         }
       } catch (IOException e) {
         // clear interrupt flag if set due to ClosedByInterruptException
