@@ -41,9 +41,13 @@ import java.util.Map;
 public interface WorkerContext {
   interface IOResource extends AutoCloseable {
     void close() throws IOException;
+
+    boolean isReferenced();
   }
 
   String getName();
+
+  boolean shouldErrorOperationOnRemainingResources();
 
   Poller createPoller(String name, QueueEntry queueEntry, ExecutionStage.Value stage);
 
@@ -56,8 +60,6 @@ public interface WorkerContext {
       Deadline deadline);
 
   void match(MatchListener listener) throws InterruptedException;
-
-  void logInfo(String msg);
 
   CASInsertionPolicy getFileCasPolicy();
 
@@ -111,9 +113,9 @@ public interface WorkerContext {
 
   Write getOperationStreamWrite(String name) throws IOException;
 
-  int getStandardOutputLimit();
+  long getStandardOutputLimit();
 
-  int getStandardErrorLimit();
+  long getStandardErrorLimit();
 
   void createExecutionLimits();
 

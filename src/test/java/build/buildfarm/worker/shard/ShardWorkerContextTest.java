@@ -101,6 +101,7 @@ public class ShardWorkerContextTest {
         /* limitExecution=*/ false,
         /* limitGlobalExecution=*/ false,
         /* onlyMulticoreTests=*/ false,
+        /* errorOperationRemainingResources=*/ false,
         writer);
   }
 

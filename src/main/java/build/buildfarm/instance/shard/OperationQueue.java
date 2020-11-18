@@ -188,12 +188,14 @@ public class OperationQueue {
     return queue.status(jedis);
   }
   ///
-  /// @brief   Decide if the properties are valid based on having eligibility into a queue
-  /// @param   properties Properties to check validity of.
-  /// @return  Whether the properties are valid for a queue.
-  /// @note    Suggested return identifier: validProperties.
+  /// @brief   Checks required properties for eligibility.
+  /// @details Checks whether the properties given fulfill all of the required
+  ///          provisions for the operation queue to accept it.
+  /// @param   properties Properties to check that requirements are met.
+  /// @return  Whether the operation queue will accept an operation containing the given properties.
+  /// @note    Suggested return identifier: isEligible.
   ///
-  public Boolean validProperties(List<Platform.Property> properties) {
+  public boolean isEligible(List<Platform.Property> properties) {
     for (ProvisionedRedisQueue provisionedQueue : queues) {
       if (provisionedQueue.isEligible(toMultimap(properties))) {
         return true;
@@ -217,7 +219,9 @@ public class OperationQueue {
       }
     }
     throw new RuntimeException(
-        "there are no eligible queues for the provided execution requirements.  One solution to is to configure a provision queue with no requirements which would be eligible to all operations.");
+        "there are no eligible queues for the provided execution requirements."
+            + " One solution to is to configure a provision queue with no requirements which would be eligible to all operations."
+            + " See https://github.com/bazelbuild/bazel-buildfarm/wiki/Shard-Platform-Operation-Queue for details");
   }
   ///
   /// @brief   Convert proto provisions into java multimap.

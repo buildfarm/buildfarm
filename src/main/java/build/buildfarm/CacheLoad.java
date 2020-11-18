@@ -22,6 +22,7 @@ import build.buildfarm.cas.CASFileCache;
 import build.buildfarm.cas.CASFileCache.StartupCacheResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
+import build.buildfarm.common.Size;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
@@ -29,7 +30,9 @@ import java.nio.file.Paths;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 
-class CASTest {
+// This tool is helpful for testing the startup of the CasFileCache.
+// Give an existing file path, and the tool will load and print startup information about it.
+class CacheLoad {
   private static class LocalCASFileCache extends CASFileCache {
     LocalCASFileCache(
         Path root,
@@ -37,21 +40,20 @@ class CASTest {
         DigestUtil digestUtil,
         ExecutorService expireService,
         Executor accessRecorder) {
-      super(root, maxSizeInBytes, maxSizeInBytes, digestUtil, expireService, accessRecorder);
+      super(
+          root,
+          maxSizeInBytes,
+          maxSizeInBytes,
+          /* storeFileDirsIndexInMemory= */ true,
+          digestUtil,
+          expireService,
+          accessRecorder);
     }
 
     @Override
     protected InputStream newExternalInput(Digest digest, long offset) throws IOException {
       throw new IOException();
     }
-  }
-
-  public static long GBtoBytes(long sizeGb) {
-    return sizeGb * 1024 * 1024 * 1024;
-  }
-
-  public static long BytestoGB(long sizeBytes) {
-    return sizeBytes / 1024 / 1024 / 1024;
   }
 
   /*
@@ -66,7 +68,7 @@ class CASTest {
     CASFileCache fileCache =
         new LocalCASFileCache(
             root,
-            /* maxSizeInBytes=*/ GBtoBytes(500),
+            /* maxSizeInBytes=*/ Size.gbToBytes(500),
             new DigestUtil(HashFunction.SHA1),
             /* expireService=*/ newDirectExecutorService(),
             /* accessRecorder=*/ directExecutor());
@@ -88,6 +90,6 @@ class CASTest {
     // File Information
     System.out.println("Cache Root: " + results.cacheDirectory);
     System.out.println("Directory Count: " + fileCache.directoryStorageCount());
-    System.out.println("Current Size: " + BytestoGB(fileCache.size()) + "GB");
+    System.out.println("Current Size: " + Size.bytesToGb(fileCache.size()) + "GB");
   }
 }

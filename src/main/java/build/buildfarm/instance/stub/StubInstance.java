@@ -55,9 +55,11 @@ import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.bazel.remote.execution.v2.UpdateActionResultRequest;
 import build.bazel.remote.execution.v2.WaitExecutionRequest;
+import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
+import build.buildfarm.common.Size;
 import build.buildfarm.common.Time;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
@@ -65,6 +67,8 @@ import build.buildfarm.common.grpc.ByteStreamHelper;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.StubWriteOutputStream;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.v1test.AdminGrpc;
+import build.buildfarm.v1test.AdminGrpc.AdminBlockingStub;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.OperationQueueGrpc.OperationQueueBlockingStub;
@@ -72,6 +76,8 @@ import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.OperationsStatusRequest;
 import build.buildfarm.v1test.PollOperationRequest;
 import build.buildfarm.v1test.QueueEntry;
+import build.buildfarm.v1test.ReindexCasRequest;
+import build.buildfarm.v1test.ReindexCasRequestResults;
 import build.buildfarm.v1test.TakeOperationRequest;
 import build.buildfarm.v1test.Tree;
 import build.buildfarm.v1test.WorkerProfileGrpc;
@@ -119,7 +125,6 @@ import java.io.InputStream;
 import java.util.Iterator;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
@@ -141,7 +146,7 @@ public class StubInstance implements Instance {
   private final Retrier retrier;
   private final @Nullable ListeningScheduledExecutorService retryService;
   private boolean isStopped = false;
-  private final int maxBatchUpdateBlobsSize = 3 * 1024 * 1024;
+  private final long maxBatchUpdateBlobsSize = Size.mbToBytes(3);
 
   public StubInstance(String name, DigestUtil digestUtil, ManagedChannel channel) {
     this(name, "no-identifier", digestUtil, channel, Durations.fromDays(DEFAULT_DEADLINE_DAYS));
@@ -211,6 +216,15 @@ public class StubInstance implements Instance {
             @Override
             public CapabilitiesBlockingStub get() {
               return CapabilitiesGrpc.newBlockingStub(channel);
+            }
+          });
+
+  private final Supplier<AdminBlockingStub> adminBlockingStub =
+      Suppliers.memoize(
+          new Supplier<AdminBlockingStub>() {
+            @Override
+            public AdminBlockingStub get() {
+              return AdminGrpc.newBlockingStub(channel);
             }
           });
 
@@ -351,22 +365,25 @@ public class StubInstance implements Instance {
 
   @Override
   public ListenableFuture<Iterable<Digest>> findMissingBlobs(
-      Iterable<Digest> digests, Executor executor, RequestMetadata requestMetadata) {
+      Iterable<Digest> digests, RequestMetadata requestMetadata) {
     throwIfStopped();
     FindMissingBlobsRequest request =
         FindMissingBlobsRequest.newBuilder()
             .setInstanceName(getName())
             .addAllBlobDigests(digests)
             .build();
-    if (request.getSerializedSize() > 4 * 1024 * 1024) {
-      throw new IllegalStateException("FINDMISSINGBLOBS IS TOO LARGE");
+    if (request.getSerializedSize() > Size.mbToBytes(4)) {
+      throw new IllegalStateException(
+          String.format(
+              "FINDMISSINGBLOBS IS TOO LARGE: %d digests are required in one request!",
+              request.getBlobDigestsCount()));
     }
     return transform(
         deadlined(casFutureStub)
             .withInterceptors(attachMetadataInterceptor(requestMetadata))
             .findMissingBlobs(request),
         (response) -> response.getMissingBlobDigestsList(),
-        executor);
+        directExecutor());
   }
 
   @Override
@@ -567,8 +584,7 @@ public class StubInstance implements Instance {
   @Override
   public boolean containsBlob(Digest digest, RequestMetadata requestMetadata) {
     try {
-      return Iterables.isEmpty(
-          findMissingBlobs(ImmutableList.of(digest), directExecutor(), requestMetadata).get());
+      return Iterables.isEmpty(findMissingBlobs(ImmutableList.of(digest), requestMetadata).get());
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
       if (cause instanceof RuntimeException) {
@@ -803,5 +819,19 @@ public class StubInstance implements Instance {
   @Override
   public GetClientStartTimeResult getClientStartTime(String clientKey) {
     throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public CasIndexResults reindexCas(String hostName) {
+    throwIfStopped();
+    ReindexCasRequestResults proto =
+        adminBlockingStub
+            .get()
+            .reindexCas(ReindexCasRequest.newBuilder().setHostId(hostName).build());
+    CasIndexResults results = new CasIndexResults();
+    results.removedHosts = proto.getRemovedHosts();
+    results.removedKeys = proto.getRemovedKeys();
+    results.totalKeys = proto.getTotalKeys();
+    return results;
   }
 }

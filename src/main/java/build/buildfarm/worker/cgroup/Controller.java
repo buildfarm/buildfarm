@@ -1,3 +1,17 @@
+// Copyright 2020 The Bazel Authors. All rights reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//    http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package build.buildfarm.worker.cgroup;
 
 import build.buildfarm.worker.WorkerContext.IOResource;
@@ -31,17 +45,19 @@ abstract class Controller implements IOResource {
     }
   }
 
+  /**
+   * This method requires that all processes under the cgroup are no longer desirable and should be
+   * killed as a result
+   *
+   * <p>This requires a posix environment, as with cgroups, and will take reasonable action to
+   * attempt to end the process.
+   */
   @Override
   public void close() throws IOException {
     Path path = getPath();
     boolean exists = true;
     while (exists) {
-      try {
-        group.waitUntilEmpty(getName());
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw new IOException(e);
-      }
+      group.killUntilEmpty(getName());
       try {
         Files.delete(path);
         exists = false;
@@ -53,6 +69,15 @@ abstract class Controller implements IOResource {
       }
     }
     opened = false;
+  }
+
+  @Override
+  public boolean isReferenced() {
+    try {
+      return !group.isEmpty(getName());
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   protected void writeInt(String propertyName, int value) throws IOException {

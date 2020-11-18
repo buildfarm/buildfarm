@@ -97,9 +97,7 @@ public class ContentAddressableStorageService
     ListenableFuture<FindMissingBlobsResponse.Builder> responseFuture =
         transform(
             instance.findMissingBlobs(
-                request.getBlobDigestsList(),
-                directExecutor(),
-                TracingMetadataUtils.fromCurrentContext()),
+                request.getBlobDigestsList(), TracingMetadataUtils.fromCurrentContext()),
             builder::addAllMissingBlobDigests,
             directExecutor());
     addCallback(
@@ -114,11 +112,14 @@ public class ContentAddressableStorageService
               long elapsedMicros = stopwatch.elapsed(MICROSECONDS);
               logger.log(
                   requestLogLevel,
-                  format(
-                      "FindMissingBlobs(%s) for %d blobs in %gms",
-                      instance.getName(),
-                      request.getBlobDigestsList().size(),
-                      elapsedMicros / 1000.0));
+                  new StringBuilder()
+                      .append("FindMissingBlobs(")
+                      .append(instance.getName())
+                      .append(") for ")
+                      .append(request.getBlobDigestsList().size())
+                      .append(" blobs in ")
+                      .append(elapsedMicros / 1000.0)
+                      .toString());
             } catch (Throwable t) {
               onFailure(t);
             }

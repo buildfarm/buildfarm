@@ -70,7 +70,7 @@ public class GrpcActionCacheTest {
   }
 
   @Test
-  public void getSuppliesResponse() {
+  public void getSuppliesResponse() throws Exception {
     ActionResult result =
         ActionResult.newBuilder().setStdoutRaw(ByteString.copyFromUtf8("out")).build();
     Digest actionDigest = DIGEST_UTIL.compute(ByteString.copyFromUtf8("in"));
@@ -88,11 +88,11 @@ public class GrpcActionCacheTest {
             }
           }
         });
-    assertThat(ac.get(DigestUtil.asActionKey(actionDigest))).isEqualTo(result);
+    assertThat(ac.get(DigestUtil.asActionKey(actionDigest)).get()).isEqualTo(result);
   }
 
   @Test
-  public void getNotFoundIsNull() {
+  public void getNotFoundIsNull() throws Exception {
     Digest actionDigest = DIGEST_UTIL.compute(ByteString.copyFromUtf8("not-found"));
     serviceRegistry.addService(
         new ActionCacheImplBase() {
@@ -102,7 +102,7 @@ public class GrpcActionCacheTest {
             responseObserver.onError(Status.NOT_FOUND.asException());
           }
         });
-    assertThat(ac.get(DigestUtil.asActionKey(actionDigest))).isNull();
+    assertThat(ac.get(DigestUtil.asActionKey(actionDigest)).get()).isNull();
   }
 
   @Test

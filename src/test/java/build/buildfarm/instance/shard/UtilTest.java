@@ -40,7 +40,6 @@ import io.grpc.Status.Code;
 import java.io.IOException;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executor;
 import java.util.function.Function;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -59,12 +58,10 @@ public class UtilTest {
     ImmutableList<Digest> digests = ImmutableList.of(digest);
 
     Instance foundInstance = mock(Instance.class);
-    when(foundInstance.findMissingBlobs(
-            eq(digests), any(Executor.class), any(RequestMetadata.class)))
+    when(foundInstance.findMissingBlobs(eq(digests), any(RequestMetadata.class)))
         .thenReturn(immediateFuture(ImmutableList.of()));
     Instance missingInstance = mock(Instance.class);
-    when(missingInstance.findMissingBlobs(
-            eq(digests), any(Executor.class), any(RequestMetadata.class)))
+    when(missingInstance.findMissingBlobs(eq(digests), any(RequestMetadata.class)))
         .thenReturn(immediateFuture(ImmutableList.of(digest)));
 
     ShardBackplane backplane = mock(ShardBackplane.class);
@@ -92,10 +89,8 @@ public class UtilTest {
             directExecutor(),
             RequestMetadata.getDefaultInstance());
     assertThat(correctFuture.get()).isEqualTo(ImmutableSet.of(worker2Name, worker3Name));
-    verify(foundInstance, times(2))
-        .findMissingBlobs(eq(digests), any(Executor.class), any(RequestMetadata.class));
-    verify(missingInstance, times(1))
-        .findMissingBlobs(eq(digests), any(Executor.class), any(RequestMetadata.class));
+    verify(foundInstance, times(2)).findMissingBlobs(eq(digests), any(RequestMetadata.class));
+    verify(missingInstance, times(1)).findMissingBlobs(eq(digests), any(RequestMetadata.class));
     verify(backplane, times(1))
         .adjustBlobLocations(
             eq(digest), eq(ImmutableSet.of(worker2Name, worker3Name)), eq(ImmutableSet.of()));
@@ -114,7 +109,7 @@ public class UtilTest {
     ImmutableList<Digest> digests = ImmutableList.of(digest);
 
     Instance instance = mock(Instance.class);
-    when(instance.findMissingBlobs(eq(digests), any(Executor.class), any(RequestMetadata.class)))
+    when(instance.findMissingBlobs(eq(digests), any(RequestMetadata.class)))
         .thenReturn(immediateFailedFuture(Status.INVALID_ARGUMENT.asRuntimeException()));
 
     Function<String, Instance> workerInstanceFactory =
@@ -144,8 +139,7 @@ public class UtilTest {
       Status status = Status.fromThrowable(e.getCause());
       assertThat(status.getCode()).isEqualTo(Code.INVALID_ARGUMENT);
     }
-    verify(instance, times(1))
-        .findMissingBlobs(eq(digests), any(Executor.class), any(RequestMetadata.class));
+    verify(instance, times(1)).findMissingBlobs(eq(digests), any(RequestMetadata.class));
     assertThat(caughtException).isTrue();
     verifyZeroInteractions(backplane);
   }
@@ -161,12 +155,11 @@ public class UtilTest {
     ImmutableList<Digest> digests = ImmutableList.of(digest);
 
     Instance instance = mock(Instance.class);
-    when(instance.findMissingBlobs(eq(digests), any(Executor.class), any(RequestMetadata.class)))
+    when(instance.findMissingBlobs(eq(digests), any(RequestMetadata.class)))
         .thenReturn(immediateFuture(ImmutableList.of()));
 
     Instance unavailableInstance = mock(Instance.class);
-    when(unavailableInstance.findMissingBlobs(
-            eq(digests), any(Executor.class), any(RequestMetadata.class)))
+    when(unavailableInstance.findMissingBlobs(eq(digests), any(RequestMetadata.class)))
         .thenReturn(immediateFailedFuture(Status.UNAVAILABLE.asRuntimeException()));
 
     Function<String, Instance> workerInstanceFactory =
@@ -192,10 +185,8 @@ public class UtilTest {
             directExecutor(),
             RequestMetadata.getDefaultInstance());
     assertThat(correctFuture.get()).isEqualTo(ImmutableSet.of(workerName));
-    verify(instance, times(1))
-        .findMissingBlobs(eq(digests), any(Executor.class), any(RequestMetadata.class));
-    verify(unavailableInstance, times(1))
-        .findMissingBlobs(eq(digests), any(Executor.class), any(RequestMetadata.class));
+    verify(instance, times(1)).findMissingBlobs(eq(digests), any(RequestMetadata.class));
+    verify(unavailableInstance, times(1)).findMissingBlobs(eq(digests), any(RequestMetadata.class));
     verify(backplane, times(1))
         .adjustBlobLocations(eq(digest), eq(ImmutableSet.of(workerName)), eq(ImmutableSet.of()));
   }
@@ -210,7 +201,7 @@ public class UtilTest {
     ImmutableList<Digest> digests = ImmutableList.of(digest);
 
     Instance instance = mock(Instance.class);
-    when(instance.findMissingBlobs(eq(digests), any(Executor.class), any(RequestMetadata.class)))
+    when(instance.findMissingBlobs(eq(digests), any(RequestMetadata.class)))
         .thenReturn(immediateFailedFuture(Status.UNKNOWN.asRuntimeException()))
         .thenReturn(immediateFuture(ImmutableList.of()));
 
@@ -234,8 +225,7 @@ public class UtilTest {
             directExecutor(),
             RequestMetadata.getDefaultInstance());
     assertThat(correctFuture.get()).isEqualTo(ImmutableSet.of(workerName));
-    verify(instance, times(2))
-        .findMissingBlobs(eq(digests), any(Executor.class), any(RequestMetadata.class));
+    verify(instance, times(2)).findMissingBlobs(eq(digests), any(RequestMetadata.class));
     verify(backplane, times(1))
         .adjustBlobLocations(eq(digest), eq(ImmutableSet.of(workerName)), eq(ImmutableSet.of()));
   }
@@ -249,7 +239,7 @@ public class UtilTest {
     ImmutableList<Digest> digests = ImmutableList.of(digest);
 
     Instance instance = mock(Instance.class);
-    when(instance.findMissingBlobs(eq(digests), any(Executor.class), any(RequestMetadata.class)))
+    when(instance.findMissingBlobs(eq(digests), any(RequestMetadata.class)))
         .thenReturn(immediateFailedFuture(Status.UNKNOWN.asRuntimeException()))
         .thenReturn(immediateFuture(ImmutableList.of()));
 
@@ -278,8 +268,7 @@ public class UtilTest {
             directExecutor(),
             RequestMetadata.getDefaultInstance());
     assertThat(correctFuture.get()).isEqualTo(ImmutableSet.of(workerName));
-    verify(instance, times(2))
-        .findMissingBlobs(eq(digests), any(Executor.class), any(RequestMetadata.class));
+    verify(instance, times(2)).findMissingBlobs(eq(digests), any(RequestMetadata.class));
     verify(backplane, times(1))
         .adjustBlobLocations(eq(digest), eq(ImmutableSet.of(workerName)), eq(ImmutableSet.of()));
   }

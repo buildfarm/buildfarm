@@ -42,6 +42,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class AwsAdmin implements Admin {
@@ -59,7 +60,7 @@ public class AwsAdmin implements Admin {
   @Override
   public void terminateHost(String hostId) {
     ec2.terminateInstances(new TerminateInstancesRequest().withInstanceIds(hostId));
-    logger.info(String.format("Terminated host: %s", hostId));
+    logger.log(Level.INFO, String.format("Terminated host: %s", hostId));
   }
 
   @Override
@@ -73,7 +74,8 @@ public class AwsAdmin implements Admin {
             .withDocumentName("AWS-RunShellScript")
             .withInstanceIds(hostId)
             .withParameters(parameters));
-    logger.info(String.format("Stopped container: %s on host: %s", containerName, hostId));
+    logger.log(
+        Level.INFO, String.format("Stopped container: %s on host: %s", containerName, hostId));
   }
 
   @Override
@@ -109,7 +111,7 @@ public class AwsAdmin implements Admin {
     }
     resultBuilder.addAllHosts(hosts);
     resultBuilder.setNumHosts(hosts.size());
-    logger.fine(String.format("Got %d hosts for filter: %s", hosts.size(), filter));
+    logger.log(Level.FINE, String.format("Got %d hosts for filter: %s", hosts.size(), filter));
     return resultBuilder.build();
   }
 
@@ -139,7 +141,7 @@ public class AwsAdmin implements Admin {
                       .withOnDemandPercentageAboveBaseCapacity(targetReservedHostsPercent)));
     }
     scale.updateAutoScalingGroup(request);
-    logger.info(String.format("Scaled: %s", scaleGroupName));
+    logger.log(Level.INFO, String.format("Scaled: %s", scaleGroupName));
   }
 
   private long getHostUptimeInMinutes(Date launchTime) {
