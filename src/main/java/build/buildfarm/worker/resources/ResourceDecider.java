@@ -95,27 +95,6 @@ public class ResourceDecider {
     limits.cpu.min = 1;
     limits.cpu.max = 1;
 
-    // not supported
-    limits.gpu.limit = false;
-    limits.gpu.min = 0;
-    limits.gpu.max = 0;
-
-    // not supported
-    limits.mem.limit = false;
-    limits.mem.min_gb = 4;
-    limits.mem.max_gb = 32;
-
-    // not supported
-    limits.disk.limit = false;
-    limits.disk.min_mb = 2 * 1024;
-    limits.disk.max_mb = 2 * 1024;
-
-    // not supported
-    limits.network.restrict = false;
-
-    // supported elsewhere
-    limits.time.timeout_s = 10 * 60;
-
     return limits;
   }
   ///
