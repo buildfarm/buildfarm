@@ -115,22 +115,7 @@ public class ResourceDecider {
     }
     return defaultVal;
   }
-  ///
-  /// @brief   Whether the command has the platform property.
-  /// @details Checks whether the command has the given platform property name.
-  /// @param   command The command to extract the platform value from.
-  /// @param   name    The platform property name.
-  /// @return  Whether the platform name exists.
-  /// @note    Suggested return identifier: exists.
-  ///
-  private static boolean hasPlatformProperty(Command command, String name) {
-    for (Property property : command.getPlatform().getPropertiesList()) {
-      if (property.getName().equals(name)) {
-        return true;
-      }
-    }
-    return false;
-  }
+
   ///
   /// @brief   Derive if command is a test run.
   /// @details Find a reliable way to identify whether a command is a test or
