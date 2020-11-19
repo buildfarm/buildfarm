@@ -64,6 +64,15 @@ public class ProvisionedRedisQueue {
   private final boolean isFullyWildcard;
 
   ///
+  /// @field   allowUserUnmatched
+  /// @brief   Can the user provide extra platform properties that are not a
+  ///          part of the queue and still be matched with it?
+  /// @details If true, the user can provide a superset of platform properties
+  ///          and still be matched with the queue.
+  ///
+  private final boolean allowUserUnmatched;
+
+  ///
   /// @field   provisions
   /// @brief   Provisions enforced by the queue.
   /// @details The provisions are filtered by wildcard.
@@ -84,12 +93,34 @@ public class ProvisionedRedisQueue {
   /// @param   name             The global name of the queue.
   /// @param   hashtags         Hashtags to distribute queue data.
   /// @param   filterProvisions The filtered provisions of the queue.
+  /// @note    Overloaded.
   ///
   public ProvisionedRedisQueue(
       String name, List<String> hashtags, SetMultimap<String, String> filterProvisions) {
     this.queue = new BalancedRedisQueue(name, hashtags);
     isFullyWildcard = filterProvisions.containsKey(WILDCARD_VALUE);
     provisions = filterProvisionsByWildcard(filterProvisions, isFullyWildcard, WILDCARD_VALUE);
+    allowUserUnmatched = false;
+  }
+  ///
+  /// @brief   Constructor.
+  /// @details Construct the provision queue.
+  /// @param   name               The global name of the queue.
+  /// @param   hashtags           Hashtags to distribute queue data.
+  /// @param   filterProvisions   The filtered provisions of the queue.
+  /// @param   allowUserUnmatched Whether the user can provide extra platform properties and still
+  // match the queue.
+  /// @note    Overloaded.
+  ///
+  public ProvisionedRedisQueue(
+      String name,
+      List<String> hashtags,
+      SetMultimap<String, String> filterProvisions,
+      boolean allowUserUnmatched) {
+    this.queue = new BalancedRedisQueue(name, hashtags);
+    isFullyWildcard = filterProvisions.containsKey(WILDCARD_VALUE);
+    provisions = filterProvisionsByWildcard(filterProvisions, isFullyWildcard, WILDCARD_VALUE);
+    this.allowUserUnmatched = allowUserUnmatched;
   }
   ///
   /// @brief   Checks required properties.
@@ -109,7 +140,9 @@ public class ProvisionedRedisQueue {
     for (Map.Entry<String, String> property : properties.entries()) {
       // for each of the properties specified, we must match requirements
       if (!provisions.wildcard.contains(property.getKey()) && !requirements.remove(property)) {
-        return false;
+        if (!allowUserUnmatched) {
+          return false;
+        }
       }
     }
     return requirements.isEmpty();

@@ -59,6 +59,16 @@ public class ProvisionedRedisQueueTest {
         new ProvisionedRedisQueue("name", ImmutableList.of(), HashMultimap.create());
   }
 
+  // Function under test: ProvisionedRedisQueue
+  // Reason for testing: the object can be constructed
+  // Failure explanation: the object cannot be constructed
+  @Test
+  public void provisionedRedisQueueCanConstructOverload() throws Exception {
+
+    ProvisionedRedisQueue queue =
+        new ProvisionedRedisQueue("name", ImmutableList.of(), HashMultimap.create(), true);
+  }
+
   // Function under test: explainEligibility
   // Reason for testing: the queue will accept the properties if no provisions are involved
   // Failure explanation: the queue is unable to accept the properties with no provisions or the
@@ -69,6 +79,30 @@ public class ProvisionedRedisQueueTest {
     // ARRANGE
     ProvisionedRedisQueue queue =
         new ProvisionedRedisQueue("foo", ImmutableList.of(), HashMultimap.create());
+
+    // ACT
+    String explanation = queue.explainEligibility(HashMultimap.create());
+    boolean isEligible = queue.isEligible(HashMultimap.create());
+
+    // ASSERT
+    String expected_explanation = "The properties are eligible for the foo queue.\n";
+    expected_explanation += "matched: {}\n";
+    expected_explanation += "unmatched: {}\n";
+    expected_explanation += "still required: {}\n";
+    assertThat(explanation).isEqualTo(expected_explanation);
+    assertThat(isEligible).isTrue();
+  }
+
+  // Function under test: explainEligibility
+  // Reason for testing: the queue will accept the properties if no provisions are involved
+  // Failure explanation: the queue is unable to accept the properties with no provisions or the
+  // explanation is wrong
+  @Test
+  public void explainEligibilityNoProvisionsAcceptedAllowUserUnmatched() throws Exception {
+
+    // ARRANGE
+    ProvisionedRedisQueue queue =
+        new ProvisionedRedisQueue("foo", ImmutableList.of(), HashMultimap.create(), true);
 
     // ACT
     String explanation = queue.explainEligibility(HashMultimap.create());
@@ -109,6 +143,31 @@ public class ProvisionedRedisQueueTest {
   }
 
   // Function under test: explainEligibility
+  // Reason for testing: the queue will accept the properties and show the provision was matched
+  // Failure explanation: the queue is unable to accept the properties or the explanation is wrong
+  @Test
+  public void explainEligibilitySingleProvisionMatchedAllowUserUnmatched() throws Exception {
+
+    // ARRANGE
+    SetMultimap<String, String> queueProperties = HashMultimap.create();
+    queueProperties.put("key", "value");
+    ProvisionedRedisQueue queue =
+        new ProvisionedRedisQueue("foo", ImmutableList.of(), queueProperties, true);
+
+    // ACT
+    String explanation = queue.explainEligibility(queueProperties);
+    boolean isEligible = queue.isEligible(queueProperties);
+
+    // ASSERT
+    String expected_explanation = "The properties are eligible for the foo queue.\n";
+    expected_explanation += "matched: {key=[value]}\n";
+    expected_explanation += "unmatched: {}\n";
+    expected_explanation += "still required: {}\n";
+    assertThat(explanation).isEqualTo(expected_explanation);
+    assertThat(isEligible).isTrue();
+  }
+
+  // Function under test: explainEligibility
   // Reason for testing: the queue will not accept properties and show the provision was not matched
   // Failure explanation: the queue is still accepting properties or the explanation is wrong
   @Test
@@ -131,6 +190,31 @@ public class ProvisionedRedisQueueTest {
     expected_explanation += "still required: {}\n";
     assertThat(explanation).isEqualTo(expected_explanation);
     assertThat(isEligible).isFalse();
+  }
+
+  // Function under test: explainEligibility
+  // Reason for testing: the queue will accept properties even though some were unmatched
+  // Failure explanation: the queue is not accepting properties or the explanation is wrong
+  @Test
+  public void explainEligibilitySingleProvisionAllowedToNotMatch() throws Exception {
+
+    // ARRANGE
+    SetMultimap<String, String> queueProperties = HashMultimap.create();
+    queueProperties.put("key", "value");
+    ProvisionedRedisQueue queue =
+        new ProvisionedRedisQueue("foo", ImmutableList.of(), HashMultimap.create(), true);
+
+    // ACT
+    String explanation = queue.explainEligibility(queueProperties);
+    boolean isEligible = queue.isEligible(queueProperties);
+
+    // ASSERT
+    String expected_explanation = "The properties are eligible for the foo queue.\n";
+    expected_explanation += "matched: {}\n";
+    expected_explanation += "unmatched: {key=[value]}\n";
+    expected_explanation += "still required: {}\n";
+    assertThat(explanation).isEqualTo(expected_explanation);
+    assertThat(isEligible).isTrue();
   }
 
   // Function under test: explainEligibility
@@ -160,6 +244,32 @@ public class ProvisionedRedisQueueTest {
   }
 
   // Function under test: explainEligibility
+  // Reason for testing: the queue will not accept properties and show the provision is still
+  // required
+  // Failure explanation: the queue is still accepting properties or the explanation is wrong
+  @Test
+  public void explainEligibilitySingleProvisionStillRequiredAllowUserUnmatched() throws Exception {
+
+    // ARRANGE
+    SetMultimap<String, String> queueProperties = HashMultimap.create();
+    queueProperties.put("key", "value");
+    ProvisionedRedisQueue queue =
+        new ProvisionedRedisQueue("foo", ImmutableList.of(), queueProperties, true);
+
+    // ACT
+    String explanation = queue.explainEligibility(HashMultimap.create());
+    boolean isEligible = queue.isEligible(HashMultimap.create());
+
+    // ASSERT
+    String expected_explanation = "The properties are not eligible for the foo queue.\n";
+    expected_explanation += "matched: {}\n";
+    expected_explanation += "unmatched: {}\n";
+    expected_explanation += "still required: {key=[value]}\n";
+    assertThat(explanation).isEqualTo(expected_explanation);
+    assertThat(isEligible).isFalse();
+  }
+
+  // Function under test: explainEligibility
   // Reason for testing: the queue will accept the properties because of wildcard
   // Failure explanation: the queue is unable to accept the properties or the explanation is wrong
   @Test
@@ -170,6 +280,29 @@ public class ProvisionedRedisQueueTest {
     queueProperties.put("*", "value");
     ProvisionedRedisQueue queue =
         new ProvisionedRedisQueue("foo", ImmutableList.of(), queueProperties);
+
+    // ACT
+    String explanation = queue.explainEligibility(HashMultimap.create());
+    boolean isEligible = queue.isEligible(HashMultimap.create());
+
+    // ASSERT
+    String expected_explanation = "The properties are eligible for the foo queue.\n";
+    expected_explanation += "The queue is fully wildcard.\n";
+    assertThat(explanation).isEqualTo(expected_explanation);
+    assertThat(isEligible).isTrue();
+  }
+
+  // Function under test: explainEligibility
+  // Reason for testing: the queue will accept the properties because of wildcard
+  // Failure explanation: the queue is unable to accept the properties or the explanation is wrong
+  @Test
+  public void explainEligibilityAcceptedDueToWildcardAllowUserUnmatched() throws Exception {
+
+    // ARRANGE
+    SetMultimap<String, String> queueProperties = HashMultimap.create();
+    queueProperties.put("*", "value");
+    ProvisionedRedisQueue queue =
+        new ProvisionedRedisQueue("foo", ImmutableList.of(), queueProperties, true);
 
     // ACT
     String explanation = queue.explainEligibility(HashMultimap.create());
