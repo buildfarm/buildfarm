@@ -66,7 +66,7 @@ public class ProvisionedRedisQueue {
   ///          solutions that use exec_properties to choose which "pool" they
   ///          want to run in.
   ///
-  public static final String CHOOSE_QUEUE_KEY = "choose_queue";
+  public static final String CHOOSE_QUEUE_KEY = "choose-queue";
 
   ///
   /// @field   isFullyWildcard
@@ -144,11 +144,11 @@ public class ProvisionedRedisQueue {
   /// @note    Suggested return identifier: isEligible.
   ///
   public boolean isEligible(SetMultimap<String, String> properties) {
-    // check if a property is specifically requesting the queue
-    for (Map.Entry<String, String> property : provisions.required) {
-      if (property.getKey() == CHOOSE_QUEUE_KEY) {
-        return property.getValue() == queue.getName();
-      }
+    // check if a property is specifically requesting to match with the queue
+    // any attempt to specifically match will not evaluate other properties
+    Set<String> selected = properties.get(CHOOSE_QUEUE_KEY);
+    if (!selected.isEmpty()) {
+      return selected.contains(queue.getName());
     }
 
     // fully wildcarded queues are always eligible
@@ -232,11 +232,11 @@ public class ProvisionedRedisQueue {
     result.isSpecificallyChosen = false;
     result.allowsUnmatched = allowUserUnmatched;
 
-    // check if a property is specifically requesting the queue
-    for (Map.Entry<String, String> property : provisions.required) {
-      if (property.getKey() == CHOOSE_QUEUE_KEY) {
-        result.isSpecificallyChosen = property.getValue() == queue.getName();
-      }
+    // check if a property is specifically requesting to match with the queue
+    // any attempt to specifically match will not evaluate other properties
+    Set<String> selected = properties.get(CHOOSE_QUEUE_KEY);
+    if (!selected.isEmpty()) {
+      result.isSpecificallyChosen = selected.contains(queue.getName());
     }
 
     // gather matched, unmatched, and still required properties
@@ -288,6 +288,11 @@ public class ProvisionedRedisQueue {
       explanation += "The properties are eligible for the " + result.queueName + " queue.\n";
     } else {
       explanation += "The properties are not eligible for the " + result.queueName + " queue.\n";
+    }
+
+    if (result.isSpecificallyChosen) {
+      explanation += "The queue was specifically chosen.\n";
+      return explanation;
     }
 
     if (result.isFullyWildcard) {

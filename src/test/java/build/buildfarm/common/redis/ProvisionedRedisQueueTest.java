@@ -375,4 +375,52 @@ public class ProvisionedRedisQueueTest {
     assertThat(explanation).isEqualTo(expected_explanation);
     assertThat(isEligible).isTrue();
   }
+
+  // Function under test: explainEligibility
+  // Reason for testing: show that a queue can be specifically selected
+  // Failure explanation: the selection key is not properly being recognized
+  @Test
+  public void explainEligibilitySpecificallySelectQueue() throws Exception {
+
+    // ARRANGE
+    ProvisionedRedisQueue queue =
+        new ProvisionedRedisQueue("foo", ImmutableList.of(), HashMultimap.create());
+    SetMultimap<String, String> userGivenProperties = HashMultimap.create();
+    userGivenProperties.put("choose-queue", "foo");
+
+    // ACT
+    String explanation = queue.explainEligibility(userGivenProperties);
+    boolean isEligible = queue.isEligible(userGivenProperties);
+
+    // ASSERT
+    String expected_explanation = "The properties are eligible for the foo queue.\n";
+    expected_explanation += "The queue was specifically chosen.\n";
+    assertThat(explanation).isEqualTo(expected_explanation);
+    assertThat(isEligible).isTrue();
+  }
+
+  // Function under test: explainEligibility
+  // Reason for testing: show that trying to select the queue by the wrong name fails eligibility
+  // Failure explanation: the queue is incorrectly still being selected or the explanation is wrong
+  @Test
+  public void explainEligibilityFailToSpecificallySelectQueue() throws Exception {
+
+    // ARRANGE
+    ProvisionedRedisQueue queue =
+        new ProvisionedRedisQueue("foo", ImmutableList.of(), HashMultimap.create());
+    SetMultimap<String, String> userGivenProperties = HashMultimap.create();
+    userGivenProperties.put("choose-queue", "wrong");
+
+    // ACT
+    String explanation = queue.explainEligibility(userGivenProperties);
+    boolean isEligible = queue.isEligible(userGivenProperties);
+
+    // ASSERT
+    String expected_explanation = "The properties are not eligible for the foo queue.\n";
+    expected_explanation += "matched: {}\n";
+    expected_explanation += "unmatched: {choose-queue=[wrong]}\n";
+    expected_explanation += "still required: {}\n";
+    assertThat(explanation).isEqualTo(expected_explanation);
+    assertThat(isEligible).isFalse();
+  }
 }
