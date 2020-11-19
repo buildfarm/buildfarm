@@ -56,6 +56,19 @@ public class ProvisionedRedisQueue {
   public static final String WILDCARD_VALUE = "*";
 
   ///
+  /// @field   CHOOSE_QUEUE_KEY
+  /// @brief   Special key to allow directly matching with a queue.
+  /// @details This is to support another paradigm where actions want to
+  ///          specifically request the queue to be placed in. Its less generic
+  ///          than having buildfarm choose the queue for you, and it leaks
+  ///          implementation details about how buildfarm is queuing your work.
+  ///          However, its desirable to match similar remote execution
+  ///          solutions that use exec_properties to choose which "pool" they
+  ///          want to run in.
+  ///
+  public static final String CHOOSE_QUEUE_KEY = "choose_queue";
+
+  ///
   /// @field   isFullyWildcard
   /// @brief   If the queue will deem any set of properties eligible.
   /// @details If any of the provision keys has a wildcard, we consider
@@ -131,7 +144,14 @@ public class ProvisionedRedisQueue {
   /// @note    Suggested return identifier: isEligible.
   ///
   public boolean isEligible(SetMultimap<String, String> properties) {
-    // set intersection of requirements and properties with wildcarding
+    // check if a property is specifically requesting the queue
+    for (Map.Entry<String, String> property : provisions.required) {
+      if (property.getKey() == CHOOSE_QUEUE_KEY) {
+        return property.getValue() == queue.getName();
+      }
+    }
+
+    // fully wildcarded queues are always eligible
     if (isFullyWildcard) {
       return true;
     }
@@ -209,6 +229,15 @@ public class ProvisionedRedisQueue {
     result.queueName = queue.getName();
     result.isEligible = isEligible(properties);
     result.isFullyWildcard = isFullyWildcard;
+    result.isSpecificallyChosen = false;
+    result.allowsUnmatched = allowUserUnmatched;
+
+    // check if a property is specifically requesting the queue
+    for (Map.Entry<String, String> property : provisions.required) {
+      if (property.getKey() == CHOOSE_QUEUE_KEY) {
+        result.isSpecificallyChosen = property.getValue() == queue.getName();
+      }
+    }
 
     // gather matched, unmatched, and still required properties
     ImmutableSetMultimap.Builder<String, String> matched = ImmutableSetMultimap.builder();

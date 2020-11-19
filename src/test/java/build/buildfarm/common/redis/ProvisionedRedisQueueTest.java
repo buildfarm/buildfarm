@@ -314,4 +314,65 @@ public class ProvisionedRedisQueueTest {
     assertThat(explanation).isEqualTo(expected_explanation);
     assertThat(isEligible).isTrue();
   }
+
+  // Function under test: explainEligibility
+  // Reason for testing: this shows a non-desired result which acts as a motivating example for the
+  // "allow unmatched feature
+  // Failure explanation: the queue is accepting properties or the explanation is wrong
+  @Test
+  public void explainEligibilityAllowUnmatchedBadUseCaseExample() throws Exception {
+
+    // ARRANGE
+    SetMultimap<String, String> queueProperties = HashMultimap.create();
+    queueProperties.put("min-cores", "*");
+    queueProperties.put("max-cores", "*");
+    ProvisionedRedisQueue queue =
+        new ProvisionedRedisQueue("cpu", ImmutableList.of(), queueProperties);
+
+    // ACT
+    SetMultimap<String, String> userGivenProperties = HashMultimap.create();
+    userGivenProperties.put("min-cores", "1");
+    userGivenProperties.put("max-cores", "1");
+    userGivenProperties.put("env-vars", "{'OMP_NUM_THREAD': '1'}");
+    String explanation = queue.explainEligibility(userGivenProperties);
+    boolean isEligible = queue.isEligible(userGivenProperties);
+
+    // ASSERT
+    String expected_explanation = "The properties are not eligible for the cpu queue.\n";
+    expected_explanation += "matched: {min-cores=[1], max-cores=[1]}\n";
+    expected_explanation += "unmatched: {env-vars=[{'OMP_NUM_THREAD': '1'}]}\n";
+    expected_explanation += "still required: {}\n";
+    assertThat(explanation).isEqualTo(expected_explanation);
+    assertThat(isEligible).isFalse();
+  }
+
+  // Function under test: explainEligibility
+  // Reason for testing: this is an example use case we have where you would want to allow unmatched
+  // Failure explanation: the queue is not accepting properties or the explanation is wrong
+  @Test
+  public void explainEligibilityAllowUnmatchedUseCaseExample() throws Exception {
+
+    // ARRANGE
+    SetMultimap<String, String> queueProperties = HashMultimap.create();
+    queueProperties.put("min-cores", "*");
+    queueProperties.put("max-cores", "*");
+    ProvisionedRedisQueue queue =
+        new ProvisionedRedisQueue("cpu", ImmutableList.of(), queueProperties, true);
+
+    // ACT
+    SetMultimap<String, String> userGivenProperties = HashMultimap.create();
+    userGivenProperties.put("min-cores", "1");
+    userGivenProperties.put("max-cores", "1");
+    userGivenProperties.put("env-vars", "{'OMP_NUM_THREAD': '1'}");
+    String explanation = queue.explainEligibility(userGivenProperties);
+    boolean isEligible = queue.isEligible(userGivenProperties);
+
+    // ASSERT
+    String expected_explanation = "The properties are eligible for the cpu queue.\n";
+    expected_explanation += "matched: {min-cores=[1], max-cores=[1]}\n";
+    expected_explanation += "unmatched: {env-vars=[{'OMP_NUM_THREAD': '1'}]}\n";
+    expected_explanation += "still required: {}\n";
+    assertThat(explanation).isEqualTo(expected_explanation);
+    assertThat(isEligible).isTrue();
+  }
 }
