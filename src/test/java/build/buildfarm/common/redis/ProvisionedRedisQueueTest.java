@@ -72,6 +72,7 @@ public class ProvisionedRedisQueueTest {
 
     // ACT
     String explanation = queue.explainEligibility(HashMultimap.create());
+    boolean isEligible = queue.isEligible(HashMultimap.create());
 
     // ASSERT
     String expected_explanation = "The properties are eligible for the foo queue.\n";
@@ -79,6 +80,7 @@ public class ProvisionedRedisQueueTest {
     expected_explanation += "unmatched: {}\n";
     expected_explanation += "still required: {}\n";
     assertThat(explanation).isEqualTo(expected_explanation);
+    assertThat(isEligible).isTrue();
   }
 
   // Function under test: explainEligibility
@@ -95,6 +97,7 @@ public class ProvisionedRedisQueueTest {
 
     // ACT
     String explanation = queue.explainEligibility(queueProperties);
+    boolean isEligible = queue.isEligible(queueProperties);
 
     // ASSERT
     String expected_explanation = "The properties are eligible for the foo queue.\n";
@@ -102,6 +105,7 @@ public class ProvisionedRedisQueueTest {
     expected_explanation += "unmatched: {}\n";
     expected_explanation += "still required: {}\n";
     assertThat(explanation).isEqualTo(expected_explanation);
+    assertThat(isEligible).isTrue();
   }
 
   // Function under test: explainEligibility
@@ -118,6 +122,7 @@ public class ProvisionedRedisQueueTest {
 
     // ACT
     String explanation = queue.explainEligibility(queueProperties);
+    boolean isEligible = queue.isEligible(queueProperties);
 
     // ASSERT
     String expected_explanation = "The properties are not eligible for the foo queue.\n";
@@ -125,6 +130,7 @@ public class ProvisionedRedisQueueTest {
     expected_explanation += "unmatched: {key=[value]}\n";
     expected_explanation += "still required: {}\n";
     assertThat(explanation).isEqualTo(expected_explanation);
+    assertThat(isEligible).isFalse();
   }
 
   // Function under test: explainEligibility
@@ -142,6 +148,7 @@ public class ProvisionedRedisQueueTest {
 
     // ACT
     String explanation = queue.explainEligibility(HashMultimap.create());
+    boolean isEligible = queue.isEligible(HashMultimap.create());
 
     // ASSERT
     String expected_explanation = "The properties are not eligible for the foo queue.\n";
@@ -149,6 +156,7 @@ public class ProvisionedRedisQueueTest {
     expected_explanation += "unmatched: {}\n";
     expected_explanation += "still required: {key=[value]}\n";
     assertThat(explanation).isEqualTo(expected_explanation);
+    assertThat(isEligible).isFalse();
   }
 
   // Function under test: explainEligibility
@@ -165,10 +173,12 @@ public class ProvisionedRedisQueueTest {
 
     // ACT
     String explanation = queue.explainEligibility(HashMultimap.create());
+    boolean isEligible = queue.isEligible(HashMultimap.create());
 
     // ASSERT
     String expected_explanation = "The properties are eligible for the foo queue.\n";
     expected_explanation += "The queue is fully wildcard.\n";
     assertThat(explanation).isEqualTo(expected_explanation);
+    assertThat(isEligible).isTrue();
   }
 }
