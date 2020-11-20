@@ -150,4 +150,37 @@ public class ResourceDeciderTest {
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(0);
   }
+
+  // Function under test: decideResourceLimitations
+  // Reason for testing: test that environment variables can have their values resolved
+  // Failure explanation: values were not resolved as expected
+  @Test
+  public void decideResourceLimitationsTestEnvironmentMustacheResolution() throws Exception {
+
+    // ARRANGE
+    Command command =
+        Command.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("min-cores").setValue("7"))
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("max-cores").setValue("14"))
+                    .addProperties(
+                        Platform.Property.newBuilder()
+                            .setName("env-vars")
+                            .setValue(
+                                "{\"foo\": \"{{limits.cpu.min}}\", \"bar\": \"{{limits.cpu.max}}\"}")))
+            .build();
+
+    // ACT
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false);
+
+    // ASSERT
+    assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(2);
+    assertThat(limits.extraEnvironmentVariables.containsKey("foo")).isTrue();
+    assertThat(limits.extraEnvironmentVariables.get("foo")).isEqualTo("7");
+    assertThat(limits.extraEnvironmentVariables.containsKey("bar")).isTrue();
+    assertThat(limits.extraEnvironmentVariables.get("bar")).isEqualTo("14");
+  }
 }

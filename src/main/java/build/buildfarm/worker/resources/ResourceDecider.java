@@ -68,18 +68,7 @@ public class ResourceDecider {
     ResourceLimits limits = getDefaultLimitations();
 
     setCpuLimits(limits, command, onlyMulticoreTests);
-
-    try {
-      JSONParser parser = new JSONParser();
-      limits.extraEnvironmentVariables =
-          (Map<String, String>)
-              parser.parse(getStringPlatformValue(command, EXEC_PROPERTY_ENV_VARS, "{}"));
-    } catch (ParseException pe) {
-      System.out.println(pe);
-    }
-
-    // Map<String, String> myMap = myJsonObject.toMap();
-    // setExtraEnvironmentVariables(limits
+    setEnvironmentVariables(limits, command, onlyMulticoreTests);
 
     return limits;
   }
@@ -102,6 +91,34 @@ public class ResourceDecider {
       limits.cpu.min = 1;
       limits.cpu.max = 1;
     }
+  }
+  ///
+  /// @brief   Decide extra environment variables.
+  /// @details Given a default set of limitations, use the command and global
+  ///          configuration to adjust the extra environment variables.
+  /// @param   limits             Current limits to apply changes to.
+  /// @param   command            The command to decide resource limitations.
+  /// @param   onlyMulticoreTests Only allow ttests to be multicore.
+  ///
+  private static void setEnvironmentVariables(
+      ResourceLimits limits, Command command, boolean onlyMulticoreTests) {
+    // parse any user given environment variables into a map
+    // if the json is malformed assume no environment variables were given
+    try {
+      JSONParser parser = new JSONParser();
+      limits.extraEnvironmentVariables =
+          (Map<String, String>)
+              parser.parse(getStringPlatformValue(command, EXEC_PROPERTY_ENV_VARS, "{}"));
+    } catch (ParseException pe) {
+    }
+
+    // resolve any template values
+    limits.extraEnvironmentVariables.replaceAll(
+        (key, val) -> {
+          val = val.replace("{{limits.cpu.min}}", String.valueOf(limits.cpu.min));
+          val = val.replace("{{limits.cpu.max}}", String.valueOf(limits.cpu.max));
+          return val;
+        });
   }
   ///
   /// @brief   Get default resource limits.
