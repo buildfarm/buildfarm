@@ -286,7 +286,7 @@ class Executor {
     return stopwatch.elapsed(MICROSECONDS) - executeUSecs;
   }
 
-  public void run(int claims) {
+  public void run(ResourceLimits limits) {
     long stallUSecs = 0;
     Stopwatch stopwatch = Stopwatch.createStarted();
     String operationName = operationContext.operation.getName();
@@ -324,7 +324,7 @@ class Executor {
       boolean wasInterrupted = Thread.interrupted();
       try {
         owner.releaseExecutor(
-            operationName, claims, stopwatch.elapsed(MICROSECONDS), stallUSecs, exitCode);
+            operationName, limits.cpu.claimed, stopwatch.elapsed(MICROSECONDS), stallUSecs, exitCode);
       } finally {
         if (wasInterrupted) {
           Thread.currentThread().interrupt();
