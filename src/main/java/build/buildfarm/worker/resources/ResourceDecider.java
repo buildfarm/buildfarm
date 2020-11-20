@@ -153,8 +153,8 @@ public class ResourceDecider {
     // for example, a client may want certain rules to set environment variables
     // based on what buildfarm decides to limit the core count to.
     // that could look like this:
-    // "OMP_NUM_THREADS": "{limits.cpu.max}"
-    // "MKL_NUM_THREADS": "{limits.cpu.max}"
+    // "OMP_NUM_THREADS": "{{limits.cpu.claimed}}"
+    // "MKL_NUM_THREADS": "{{limits.cpu.claimed}}"
     limits.extraEnvironmentVariables = Collections.emptyMap();
 
     return limits;
