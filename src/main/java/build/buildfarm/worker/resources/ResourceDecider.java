@@ -17,6 +17,10 @@ package build.buildfarm.worker;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Platform.Property;
 import com.google.common.collect.Iterables;
+import java.util.Collections;
+import java.util.Map;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
 
 ///
 /// @class   ResourceDecider
@@ -43,6 +47,14 @@ public class ResourceDecider {
   private static final String EXEC_PROPERTY_MAX_CORES = "max-cores";
 
   ///
+  /// @field   EXEC_PROPERTY_ENV_VARS
+  /// @brief   The exec_property and platform property name for providing
+  ///          additional environment variables.
+  /// @details This is decided between client and server.
+  ///
+  private static final String EXEC_PROPERTY_ENV_VARS = "env-vars";
+
+  ///
   /// @brief   Decide resource limitations for the given command.
   /// @details Platform properties from specified exec_properties are taken
   ///          into account as well as global buildfarm configuration.
@@ -56,6 +68,18 @@ public class ResourceDecider {
     ResourceLimits limits = getDefaultLimitations();
 
     setCpuLimits(limits, command, onlyMulticoreTests);
+
+    try {
+      JSONParser parser = new JSONParser();
+      limits.extraEnvironmentVariables =
+          (Map<String, String>)
+              parser.parse(getStringPlatformValue(command, EXEC_PROPERTY_ENV_VARS, "{}"));
+    } catch (ParseException pe) {
+      System.out.println(pe);
+    }
+
+    // Map<String, String> myMap = myJsonObject.toMap();
+    // setExtraEnvironmentVariables(limits
 
     return limits;
   }
@@ -90,10 +114,24 @@ public class ResourceDecider {
     // These can be moved to configuration in the future
     ResourceLimits limits = new ResourceLimits();
 
-    // supported
+    // we usually prefer to isolate operations through some kind of visualization (cgroups)
+    // and then limit their execution to a single core.  When necessary, user's request more cores.
+    limits.cpu = new CpuLimits();
     limits.cpu.limit = true;
     limits.cpu.min = 1;
     limits.cpu.max = 1;
+
+    // Sometimes a client needs to add extra environment variables to their execution.
+    // If they are unable to set these in their code, and --action_env is not sufficient,
+    // they may choose to annotate extra environment variables this way.
+    // these environment variables can be templated, which allows them to reference
+    // other values related to their execution.
+    // for example, a client may want certain rules to set environment variables
+    // based on what buildfarm decides to limit the core count to.
+    // that could look like this:
+    // "OMP_NUM_THREADS": "{limits.cpu.max}"
+    // "MKL_NUM_THREADS": "{limits.cpu.max}"
+    limits.extraEnvironmentVariables = Collections.emptyMap();
 
     return limits;
   }
@@ -115,7 +153,24 @@ public class ResourceDecider {
     }
     return defaultVal;
   }
-
+  ///
+  /// @brief   Get a string value from a platform property.
+  /// @details Get the first value of the property name given. If the property
+  ///          name does not exist the default provided is returned.
+  /// @param   command    The command to extract the platform value from.
+  /// @param   name       The platform property name.
+  /// @param   defaultVal The default value if the property name does not exist.
+  /// @return  The decided platform value.
+  /// @note    Suggested return identifier: platformValue.
+  ///
+  private static String getStringPlatformValue(Command command, String name, String defaultVal) {
+    for (Property property : command.getPlatform().getPropertiesList()) {
+      if (property.getName().equals(name)) {
+        return property.getValue();
+      }
+    }
+    return defaultVal;
+  }
   ///
   /// @brief   Derive if command is a test run.
   /// @details Find a reliable way to identify whether a command is a test or

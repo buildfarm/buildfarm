@@ -74,6 +74,7 @@ def buildfarm_init(name = "buildfarm"):
                         "com.google.protobuf:protobuf-java:3.10.0",
                         "com.google.protobuf:protobuf-java-util:3.10.0",
                         "com.google.truth:truth:0.44",
+                        "com.googlecode.json-simple:json-simple:1.1.1",
                     ] + ["io.netty:netty-%s:4.1.38.Final" % module for module in IO_NETTY_MODULES] +
                     ["io.grpc:grpc-%s:1.26.0" % module for module in IO_GRPC_MODULES] +
                     [

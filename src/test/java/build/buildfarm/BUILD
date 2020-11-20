@@ -276,6 +276,33 @@ java_test(
 )
 
 java_test(
+    name = "worker-resource-limits-tests",
+    size = "small",
+    srcs = glob(["worker/resources/*.java"]),
+    classpath_resources = [
+        ":configs",
+    ],
+    test_class = "build.buildfarm.AllTests",
+    deps = [
+        ":test_runner",
+        "//src/main/java/build/buildfarm:common",
+        "//src/main/java/build/buildfarm:instance",
+        "//src/main/java/build/buildfarm:operationqueue-worker",
+        "//src/main/java/build/buildfarm:stub-instance",
+        "//src/main/java/build/buildfarm:worker",
+        "//src/main/java/build/buildfarm:worker-resources",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "@maven//:com_google_guava_guava",
+        "@maven//:com_google_jimfs_jimfs",
+        "@maven//:com_google_protobuf_protobuf_java",
+        "@maven//:com_google_truth_truth",
+        "@maven//:io_grpc_grpc_api",
+        "@maven//:io_grpc_grpc_core",
+        "@maven//:org_mockito_mockito_core",
+    ],
+)
+
+java_test(
     name = "shard-worker-tests",
     size = "small",
     srcs = glob(["worker/shard/*.java"]),

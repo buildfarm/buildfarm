@@ -14,6 +14,8 @@
 
 package build.buildfarm.worker;
 
+import java.util.Map;
+
 ///
 /// @class   ResourceLimits
 /// @brief   Resource limitations imposed on specific actions.
@@ -36,4 +38,13 @@ public class ResourceLimits {
   ///          given action.
   ///
   public CpuLimits cpu;
+
+  ///
+  /// @field   extraEnvironmentVariables
+  /// @brief   Decides whether we should add extra environment variables when
+  ///          executing an operation.
+  /// @details These variables are added to the end of the existing environment
+  ///          variables in the Command.
+  ///
+  public Map<String, String> extraEnvironmentVariables;
 }
