@@ -14,7 +14,6 @@
 
 package build.buildfarm.worker;
 
-
 ///
 /// @class   CpuLimits
 /// @brief   CPU resource limitations imposed on specific actions.
