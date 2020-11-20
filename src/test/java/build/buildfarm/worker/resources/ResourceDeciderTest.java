@@ -32,6 +32,56 @@ import org.junit.runners.JUnit4;
 public class ResourceDeciderTest {
 
   // Function under test: decideResourceLimitations
+  // Reason for testing: test that cores can be set
+  // Failure explanation: cores were not decided as expected
+  @Test
+  public void decideResourceLimitationsTestCoreSetting() throws Exception {
+
+    // ARRANGE
+    Command command =
+        Command.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("min-cores").setValue("7"))
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("max-cores").setValue("14")))
+            .build();
+
+    // ACT
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false);
+
+    // ASSERT
+    assertThat(limits.cpu.min).isEqualTo(7);
+    assertThat(limits.cpu.min).isEqualTo(14);
+  }
+
+  // Function under test: decideResourceLimitations
+  // Reason for testing: test that cores are skipped
+  // Failure explanation: cores were not decided as expected
+  @Test
+  public void decideResourceLimitationsTestCoreSettingSkippedOnNontest() throws Exception {
+
+    // ARRANGE
+    Command command =
+        Command.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("min-cores").setValue("7"))
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("max-cores").setValue("14")))
+            .build();
+
+    // ACT
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true);
+
+    // ASSERT
+    assertThat(limits.cpu.min).isEqualTo(1);
+    assertThat(limits.cpu.min).isEqualTo(1);
+  }
+
+  // Function under test: decideResourceLimitations
   // Reason for testing: if the user does not pass extra environment variables via platform
   // properties they appear empty
   // Failure explanation: the parsing crashed or did not provide an empty map
