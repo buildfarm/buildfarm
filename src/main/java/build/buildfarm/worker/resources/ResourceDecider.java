@@ -122,6 +122,7 @@ public class ResourceDecider {
         (key, val) -> {
           val = val.replace("{{limits.cpu.min}}", String.valueOf(limits.cpu.min));
           val = val.replace("{{limits.cpu.max}}", String.valueOf(limits.cpu.max));
+          val = val.replace("{{limits.cpu.claimed}}", String.valueOf(limits.cpu.claimed));
           return val;
         });
   }

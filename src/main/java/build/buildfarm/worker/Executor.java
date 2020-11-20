@@ -78,7 +78,8 @@ class Executor {
     }
   }
 
-  private long runInterruptible(Stopwatch stopwatch) throws InterruptedException {
+  private long runInterruptible(Stopwatch stopwatch, ResourceLimits limits)
+      throws InterruptedException {
     long startedAt = System.currentTimeMillis();
 
     ExecuteOperationMetadata metadata;
@@ -160,7 +161,7 @@ class Executor {
         pollDeadline);
 
     try {
-      return executePolled(operation, policies, timeout, isDefaultTimeout, stopwatch);
+      return executePolled(operation, limits, policies, timeout, isDefaultTimeout, stopwatch);
     } finally {
       operationContext.poller.pause();
     }
@@ -168,6 +169,7 @@ class Executor {
 
   private long executePolled(
       Operation operation,
+      ResourceLimits limits,
       Iterable<ExecutionPolicy> policies,
       Duration timeout,
       boolean isDefaultTimeout,
@@ -206,6 +208,7 @@ class Executor {
               workingDirectory,
               arguments.build(),
               command.getEnvironmentVariablesList(),
+              limits,
               timeout,
               isDefaultTimeout,
               "", // executingMetadata.getStdoutStreamName(),
@@ -291,7 +294,7 @@ class Executor {
     Stopwatch stopwatch = Stopwatch.createStarted();
     String operationName = operationContext.operation.getName();
     try {
-      stallUSecs = runInterruptible(stopwatch);
+      stallUSecs = runInterruptible(stopwatch, limits);
     } catch (InterruptedException e) {
       /* we can be interrupted when the poller fails */
       try {
@@ -324,7 +327,11 @@ class Executor {
       boolean wasInterrupted = Thread.interrupted();
       try {
         owner.releaseExecutor(
-            operationName, limits.cpu.claimed, stopwatch.elapsed(MICROSECONDS), stallUSecs, exitCode);
+            operationName,
+            limits.cpu.claimed,
+            stopwatch.elapsed(MICROSECONDS),
+            stallUSecs,
+            exitCode);
       } finally {
         if (wasInterrupted) {
           Thread.currentThread().interrupt();
@@ -369,6 +376,7 @@ class Executor {
       Path execDir,
       List<String> arguments,
       List<EnvironmentVariable> environmentVariables,
+      ResourceLimits limits,
       Duration timeout,
       boolean isDefaultTimeout,
       String stdoutStreamName,
@@ -382,6 +390,10 @@ class Executor {
     environment.clear();
     for (EnvironmentVariable environmentVariable : environmentVariables) {
       environment.put(environmentVariable.getName(), environmentVariable.getValue());
+    }
+    for (Map.Entry<String, String> environmentVariable :
+        limits.extraEnvironmentVariables.entrySet()) {
+      environment.put(environmentVariable.getKey(), environmentVariable.getValue());
     }
 
     final Write stdoutWrite, stderrWrite;

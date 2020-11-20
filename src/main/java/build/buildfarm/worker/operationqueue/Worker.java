@@ -52,7 +52,6 @@ import build.buildfarm.common.io.Directories;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.instance.stub.ByteStreamUploader;
-import build.buildfarm.worker.ResourceLimits;
 import build.buildfarm.instance.stub.Chunker;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.CASInsertionPolicy;
@@ -70,6 +69,7 @@ import build.buildfarm.worker.Pipeline;
 import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.ReportResultStage;
+import build.buildfarm.worker.ResourceLimits;
 import build.buildfarm.worker.UploadManifest;
 import build.buildfarm.worker.WorkerContext;
 import com.google.common.annotations.VisibleForTesting;
@@ -703,12 +703,11 @@ public class Worker extends LoggingMain {
           public int commandExecutionClaims(Command command) {
             return 1;
           }
-          
+
           @Override
           public ResourceLimits commandExecutionSettings(Command command) {
             return null;
           }
-          
         };
 
     PipelineStage completeStage =

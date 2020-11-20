@@ -30,7 +30,6 @@ import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import com.google.common.collect.ImmutableList;
-import build.buildfarm.worker.ResourceLimits;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Duration;
 import io.grpc.Deadline;
@@ -208,7 +207,7 @@ class StubWorkerContext implements WorkerContext {
   public int commandExecutionClaims(Command command) {
     throw new UnsupportedOperationException();
   }
-  
+
   @Override
   public ResourceLimits commandExecutionSettings(Command command) {
     throw new UnsupportedOperationException();
