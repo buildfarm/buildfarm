@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.instance;
+package build.buildfarm.instance.memory.queues;
 
 import build.buildfarm.instance.Instance.MatchListener;
-import build.buildfarm.instance.memory.Worker;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Iterables;
@@ -29,7 +28,7 @@ import java.util.List;
     This holds all of the operation queues for a particular instance.
     Each queue is tagged with the required provisions which affects the operations and workers involved with the queue.
 */
-public class WorkerQueues {
+public class WorkerQueues implements Iterable<WorkerQueue> {
 
   /*
     The specific queues whose provision requirements are considered when queuing an operation.
@@ -40,6 +39,11 @@ public class WorkerQueues {
     before choosing the fallback queue last.
   */
   public List<WorkerQueue> specificQueues = Lists.newArrayList();
+
+  @Override
+  public Iterator<WorkerQueue> iterator() {
+    return specificQueues.iterator();
+  }
 
   public int queueSize(String queueName) {
     for (WorkerQueue queue : specificQueues) {
