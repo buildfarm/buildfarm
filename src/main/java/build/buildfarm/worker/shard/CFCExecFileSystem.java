@@ -14,8 +14,8 @@
 
 package build.buildfarm.worker.shard;
 
-import static build.buildfarm.cas.CASFileCache.getInterruptiblyOrIOException;
-import static build.buildfarm.common.IOUtils.readdir;
+import static build.buildfarm.common.io.Utils.getInterruptiblyOrIOException;
+import static build.buildfarm.common.io.Utils.readdir;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Iterables.concat;
 import static com.google.common.util.concurrent.Futures.allAsList;
@@ -34,11 +34,11 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.FileNode;
-import build.buildfarm.cas.CASFileCache;
 import build.buildfarm.cas.ContentAddressableStorage;
+import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.common.DigestUtil;
-import build.buildfarm.common.Dirent;
 import build.buildfarm.common.io.Directories;
+import build.buildfarm.common.io.Dirent;
 import build.buildfarm.worker.OutputDirectory;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -99,7 +99,7 @@ class CFCExecFileSystem implements ExecFileSystem {
       throws IOException, InterruptedException {
     List<Dirent> dirents = null;
     try {
-      dirents = readdir(root, /* followSymlinks= */ false);
+      dirents = readdir(root, /* followSymlinks= */ false, Files.getFileStore(root));
     } catch (IOException e) {
       logger.log(Level.SEVERE, "error reading directory " + root.toString(), e);
     }

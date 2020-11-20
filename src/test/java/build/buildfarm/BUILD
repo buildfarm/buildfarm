@@ -118,7 +118,7 @@ java_test(
 java_test(
     name = "cas-tests",
     size = "small",
-    srcs = glob(["cas/*.java"]),
+    srcs = glob(["cas/**/*.java"]),
     test_class = "build.buildfarm.AllTests",
     deps = [
         ":test-common-grpc",
