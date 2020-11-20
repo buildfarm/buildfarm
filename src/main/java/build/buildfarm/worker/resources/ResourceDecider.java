@@ -60,14 +60,15 @@ public class ResourceDecider {
   ///          into account as well as global buildfarm configuration.
   /// @param   command            The command to decide resource limitations for.
   /// @param   onlyMulticoreTests Only allow ttests to be multicore.
+  /// @param   executeStageWidth  The maximum amount of cores available for the operation.
   /// @return  Default resource limits.
   /// @note    Suggested return identifier: resourceLimits.
   ///
   public static ResourceLimits decideResourceLimitations(
-      Command command, boolean onlyMulticoreTests) {
+      Command command, boolean onlyMulticoreTests, int executeStageWidth) {
     ResourceLimits limits = getDefaultLimitations();
 
-    setCpuLimits(limits, command, onlyMulticoreTests);
+    setCpuLimits(limits, command, onlyMulticoreTests, executeStageWidth);
     setEnvironmentVariables(limits, command, onlyMulticoreTests);
 
     return limits;
@@ -79,9 +80,10 @@ public class ResourceDecider {
   /// @param   limits             Current limits to apply changes to.
   /// @param   command            The command to decide resource limitations.
   /// @param   onlyMulticoreTests Only allow ttests to be multicore.
+  /// @param   executeStageWidth  The maximum amount of cores available for the operation.
   ///
   private static void setCpuLimits(
-      ResourceLimits limits, Command command, boolean onlyMulticoreTests) {
+      ResourceLimits limits, Command command, boolean onlyMulticoreTests, int executeStageWidth) {
     // apply cpu limits specified on command
     limits.cpu.min = getIntegerPlatformValue(command, EXEC_PROPERTY_MIN_CORES, limits.cpu.min);
     limits.cpu.max = getIntegerPlatformValue(command, EXEC_PROPERTY_MAX_CORES, limits.cpu.max);
@@ -91,6 +93,9 @@ public class ResourceDecider {
       limits.cpu.min = 1;
       limits.cpu.max = 1;
     }
+
+    // claim core amount according to execute stage width
+    limits.cpu.claimed = Math.min(limits.cpu.min, executeStageWidth);
   }
   ///
   /// @brief   Decide extra environment variables.
@@ -137,6 +142,7 @@ public class ResourceDecider {
     limits.cpu.limit = true;
     limits.cpu.min = 1;
     limits.cpu.max = 1;
+    limits.cpu.claimed = 1;
 
     // Sometimes a client needs to add extra environment variables to their execution.
     // If they are unable to set these in their code, and --action_env is not sufficient,

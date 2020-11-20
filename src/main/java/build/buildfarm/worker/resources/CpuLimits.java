@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker;
 
+
 ///
 /// @class   CpuLimits
 /// @brief   CPU resource limitations imposed on specific actions.
@@ -54,4 +55,11 @@ public class CpuLimits {
   /// @details Client can suggest this though exec_properties.
   ///
   public int max;
+
+  ///
+  /// @field   claimed
+  /// @brief   The amount of cores actually claimed for the action.
+  /// @details This will be in the range of (min,max) when limited.
+  ///
+  public int claimed;
 }
