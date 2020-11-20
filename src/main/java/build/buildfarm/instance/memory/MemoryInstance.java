@@ -56,9 +56,10 @@ import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.instance.OperationsMap;
 import build.buildfarm.instance.WatchFuture;
-import build.buildfarm.instance.WorkerQueue;
-import build.buildfarm.instance.WorkerQueueConfigurations;
-import build.buildfarm.instance.WorkerQueues;
+import build.buildfarm.instance.memory.queues.Worker;
+import build.buildfarm.instance.memory.queues.WorkerQueue;
+import build.buildfarm.instance.memory.queues.WorkerQueueConfigurations;
+import build.buildfarm.instance.memory.queues.WorkerQueues;
 import build.buildfarm.v1test.ActionCacheConfig;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.FilesystemACConfig;
@@ -66,6 +67,7 @@ import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.GrpcACConfig;
 import build.buildfarm.v1test.MemoryInstanceConfig;
 import build.buildfarm.v1test.OperationIteratorToken;
+import build.buildfarm.v1test.OperationQueueStatus;
 import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
@@ -869,7 +871,18 @@ public class MemoryInstance extends AbstractServerInstance {
 
   @Override
   public OperationsStatus operationsStatus() {
-    throw new UnsupportedOperationException();
+    OperationsStatus.Builder status = OperationsStatus.newBuilder();
+    OperationQueueStatus.Builder queueStatus = status.getOperationQueueBuilder();
+    long totalSize = 0;
+    for (WorkerQueue queue : queuedOperations) {
+      long size = queue.operations.size();
+      queueStatus.addProvisionsBuilder().setName(queue.name).setSize(size);
+      totalSize += size;
+    }
+    queueStatus.setSize(totalSize);
+    // TODO dispatched - difficult to track
+    // TODO active workers - available, but not with any discerning identifier, should rectify this
+    return status.build();
   }
 
   @Override

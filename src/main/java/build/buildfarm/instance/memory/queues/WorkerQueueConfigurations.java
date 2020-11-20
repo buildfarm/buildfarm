@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.instance;
+package build.buildfarm.instance.memory.queues;
 
 import java.util.ArrayList;
 import java.util.List;

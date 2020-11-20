@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.instance.memory;
+package build.buildfarm.instance.memory.queues;
 
 import build.buildfarm.instance.Instance.MatchListener;
 import com.google.common.collect.SetMultimap;
