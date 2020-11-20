@@ -53,7 +53,7 @@ public class ResourceDeciderTest {
 
     // ASSERT
     assertThat(limits.cpu.min).isEqualTo(7);
-    assertThat(limits.cpu.min).isEqualTo(14);
+    assertThat(limits.cpu.max).isEqualTo(14);
   }
 
   // Function under test: decideResourceLimitations
@@ -78,7 +78,7 @@ public class ResourceDeciderTest {
 
     // ASSERT
     assertThat(limits.cpu.min).isEqualTo(1);
-    assertThat(limits.cpu.min).isEqualTo(1);
+    assertThat(limits.cpu.max).isEqualTo(1);
   }
 
   // Function under test: decideResourceLimitations
