@@ -91,6 +91,7 @@ public class ResourceDecider {
     ResourceLimits limits = new ResourceLimits();
 
     // supported
+    limits.cpu = new CpuLimits();
     limits.cpu.limit = true;
     limits.cpu.min = 1;
     limits.cpu.max = 1;
