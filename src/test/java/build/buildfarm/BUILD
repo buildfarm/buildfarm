@@ -169,6 +169,7 @@ java_test(
         "//src/main/java/build/buildfarm:stub-instance",
         "//src/main/java/build/buildfarm:worker",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "//src/main/java/build/buildfarm:worker-resources",
         "@googleapis//:google_rpc_code_java_proto",
         "@maven//:com_github_jnr_jnr_constants",
         "@maven//:com_github_jnr_jnr_ffi",

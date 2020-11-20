@@ -862,7 +862,14 @@ class ShardWorkerContext implements WorkerContext {
     ResourceLimits limits =
         ResourceDecider.decideResourceLimitations(
             command, onlyMulticoreTests, getExecuteStageWidth());
-    return limits.claimed;
+    return limits.cpu.claimed;
+  }
+  
+  public ResourceLimits commandExecutionSettings(Command command) {
+    ResourceLimits limits =
+        ResourceDecider.decideResourceLimitations(
+            command, onlyMulticoreTests, getExecuteStageWidth());
+    return limits;
   }
 
   @Override
@@ -870,7 +877,7 @@ class ShardWorkerContext implements WorkerContext {
       String operationName, ImmutableList.Builder<String> arguments, Command command) {
     if (limitExecution) {
       ResourceLimits limits =
-          ResourceDecider.decideResourceLimitations(command, onlyMulticoreTests);
+          ResourceDecider.decideResourceLimitations(command, onlyMulticoreTests, getExecuteStageWidth());
 
       return limitSpecifiedExecution(limits, operationName, arguments);
     }

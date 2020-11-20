@@ -20,6 +20,7 @@ import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.ExecutionStage;
+import build.buildfarm.worker.ResourceLimits;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.Poller;
@@ -125,4 +126,6 @@ public interface WorkerContext {
       String operationName, ImmutableList.Builder<String> arguments, Command command);
 
   int commandExecutionClaims(Command command);
+  
+  ResourceLimits commandExecutionSettings(Command command);
 }
