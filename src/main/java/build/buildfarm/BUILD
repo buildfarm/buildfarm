@@ -603,7 +603,7 @@ java_library(
 
 java_library(
     name = "cas",
-    srcs = glob(["cas/*.java"]),
+    srcs = glob(["cas/**/*.java"]),
     runtime_deps = [
         "@maven//:org_xerial_sqlite_jdbc",
     ],
@@ -616,6 +616,7 @@ java_library(
         "@googleapis//:google_bytestream_bytestream_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
         "@maven//:com_github_jnr_jnr_ffi",
+        "@maven//:com_googlecode_json_simple_json_simple",
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java",

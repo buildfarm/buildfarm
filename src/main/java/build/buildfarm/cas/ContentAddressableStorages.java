@@ -23,6 +23,7 @@ import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorS
 import build.bazel.remote.execution.v2.BatchReadBlobsResponse.Response;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.Write;
 import build.buildfarm.instance.stub.ByteStreamUploader;
@@ -72,6 +73,7 @@ public final class ContentAddressableStorages {
     }
     long maxSizeBytes = config.getMaxSizeBytes();
     long maxEntrySizeBytes = config.getMaxEntrySizeBytes();
+    int hexBucketLevels = config.getHexBucketLevels();
     boolean storeFileDirsIndexInMemory = config.getFileDirectoriesIndexInMemory();
     if (maxSizeBytes <= 0) {
       throw new ConfigurationException("filesystem cas max_size_bytes <= 0");
@@ -82,11 +84,15 @@ public final class ContentAddressableStorages {
     if (maxEntrySizeBytes > maxSizeBytes) {
       throw new ConfigurationException("filesystem cas max_entry_size_bytes > maxSizeBytes");
     }
+    if (hexBucketLevels < 0) {
+      throw new ConfigurationException("filesystem cas hex_bucket_levels <= 0");
+    }
     CASFileCache cas =
         new CASFileCache(
             Paths.get(path),
             maxSizeBytes,
             maxEntrySizeBytes,
+            hexBucketLevels,
             storeFileDirsIndexInMemory,
             DigestUtil.forHash("SHA256"),
             /* expireService=*/ newDirectExecutorService(),

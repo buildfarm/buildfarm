@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.cas;
+package build.buildfarm.cas.cfc;
 
 import static com.google.common.io.MoreFiles.asCharSource;
 

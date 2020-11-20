@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.common;
+package build.buildfarm.common.io;
 
-import build.buildfarm.common.io.EvenMoreFiles;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
@@ -30,6 +31,7 @@ import java.nio.file.attribute.PosixFileAttributes;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
@@ -39,8 +41,8 @@ import jnr.ffi.Pointer;
 import jnr.posix.FileStat;
 import jnr.posix.POSIX;
 
-public class IOUtils {
-  private static final Logger logger = Logger.getLogger(IOUtils.class.getName());
+public class Utils {
+  private static final Logger logger = Logger.getLogger(Utils.class.getName());
 
   private static final Supplier<LibC> libc =
       Suppliers.memoize(() -> LibraryLoader.create(LibC.class).load("c"));
@@ -49,7 +51,7 @@ public class IOUtils {
     return jnr.ffi.Runtime.getRuntime(libc.get());
   }
 
-  private IOUtils() {}
+  private Utils() {}
 
   enum IOErrorFormatter {
     AccessDeniedException("access denied"),
@@ -93,11 +95,12 @@ public class IOUtils {
   }
 
   /* listing paths / dirents */
-  public static List<Dirent> readdir(Path path, boolean followSymlinks) throws IOException {
+  public static List<Dirent> readdir(Path path, boolean followSymlinks, FileStore fileStore)
+      throws IOException {
     List<Dirent> dirents = new ArrayList<>();
     try (DirectoryStream<Path> stream = Files.newDirectoryStream(path)) {
       for (Path file : stream) {
-        FileStatus stat = statNullable(file, followSymlinks);
+        FileStatus stat = statNullable(file, followSymlinks, fileStore);
         Dirent.Type type = direntTypeFromStat(stat);
         dirents.add(new Dirent(file.getFileName().toString(), type, stat));
       }
@@ -179,15 +182,17 @@ public class IOUtils {
     return fileKey;
   }
 
-  private static NamedFileKey pathToNamedFileKey(Path path) throws IOException {
+  private static NamedFileKey pathToNamedFileKey(Path path, FileStore fileStore)
+      throws IOException {
     return new NamedFileKey(
-        path.getFileName().toString(), getFileKey(path, statNullable(path, false)));
+        path.getFileName().toString(), getFileKey(path, statNullable(path, false, fileStore)));
   }
 
-  private static List<NamedFileKey> listNIOdirentSorted(Path path) throws IOException {
+  private static List<NamedFileKey> listNIOdirentSorted(Path path, FileStore fileStore)
+      throws IOException {
     List<NamedFileKey> dirents = new ArrayList();
     for (Path entry : listDir(path)) {
-      dirents.add(pathToNamedFileKey(path));
+      dirents.add(pathToNamedFileKey(path, fileStore));
     }
     return dirents;
   }
@@ -198,7 +203,7 @@ public class IOUtils {
     if (fileStore.supportsFileAttributeView("posix")) {
       dirents = ffiReaddir(libc.get(), runtime(), path);
     } else {
-      dirents = listNIOdirentSorted(path);
+      dirents = listNIOdirentSorted(path, fileStore);
     }
     dirents.sort(Comparator.comparing(NamedFileKey::getName));
     return dirents;
@@ -208,12 +213,13 @@ public class IOUtils {
    * calling java stat
    * Like stat(), but returns null on failures instead of throwing.
    */
-  public static FileStatus stat(final Path path, final boolean followSymlinks) throws IOException {
+  public static FileStatus stat(final Path path, final boolean followSymlinks, FileStore fileStore)
+      throws IOException {
     final BasicFileAttributes attributes;
     boolean isReadOnlyExecutable;
     try {
       attributes = Files.readAttributes(path, BasicFileAttributes.class, linkOpts(followSymlinks));
-      isReadOnlyExecutable = EvenMoreFiles.isReadOnlyExecutable(path);
+      isReadOnlyExecutable = EvenMoreFiles.isReadOnlyExecutable(path, fileStore);
     } catch (java.nio.file.FileSystemException e) {
       throw new NoSuchFileException(path + ERR_NO_SUCH_FILE_OR_DIR);
     }
@@ -317,9 +323,9 @@ public class IOUtils {
     }
   }
 
-  public static FileStatus statNullable(Path path, boolean followSymlinks) {
+  public static FileStatus statNullable(Path path, boolean followSymlinks, FileStore fileStore) {
     try {
-      return stat(path, followSymlinks);
+      return stat(path, followSymlinks, fileStore);
     } catch (IOException e) {
       return null;
     }
@@ -348,5 +354,45 @@ public class IOUtils {
   public static Boolean jnrIsDir(POSIX posix, String path) {
     int fd = posix.open(path, OpenFlags.O_DIRECTORY.intValue(), 0444);
     return fd > 0;
+  }
+
+  public static <T> T getInterruptiblyOrIOException(ListenableFuture<T> future)
+      throws IOException, InterruptedException {
+    try {
+      return future.get();
+    } catch (ExecutionException e) {
+      if (e.getCause() instanceof IOException) {
+        throw (IOException) e.getCause();
+      }
+      if (e.getCause() instanceof InterruptedException) {
+        throw (InterruptedException) e.getCause();
+      }
+      throw new UncheckedExecutionException(e.getCause());
+    }
+  }
+
+  public static <T> T getOrIOException(ListenableFuture<T> future) throws IOException {
+    boolean interrupted = false;
+    for (; ; ) {
+      try {
+        T t = future.get();
+        if (interrupted) {
+          Thread.currentThread().interrupt();
+        }
+        return t;
+      } catch (ExecutionException e) {
+        if (e.getCause() instanceof IOException) {
+          throw (IOException) e.getCause();
+        }
+        if (e.getCause() instanceof InterruptedException) {
+          Thread.interrupted();
+          interrupted = true;
+        }
+        throw new UncheckedExecutionException(e.getCause());
+      } catch (InterruptedException e) {
+        Thread.interrupted();
+        interrupted = true;
+      }
+    }
   }
 }

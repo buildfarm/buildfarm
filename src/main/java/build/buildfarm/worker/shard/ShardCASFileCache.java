@@ -15,8 +15,8 @@
 package build.buildfarm.worker.shard;
 
 import build.bazel.remote.execution.v2.Digest;
-import build.buildfarm.cas.CASFileCache;
 import build.buildfarm.cas.ContentAddressableStorage;
+import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.InputStreamFactory;
 import com.google.common.collect.Maps;
@@ -35,6 +35,7 @@ class ShardCASFileCache extends CASFileCache {
       Path root,
       long maxSizeInBytes,
       long maxEntrySizeInBytes,
+      int maxBucketLevels,
       boolean storeFileDirsIndexInMemory,
       DigestUtil digestUtil,
       ExecutorService expireService,
@@ -46,6 +47,7 @@ class ShardCASFileCache extends CASFileCache {
         root,
         maxSizeInBytes,
         maxEntrySizeInBytes,
+        maxBucketLevels,
         storeFileDirsIndexInMemory,
         digestUtil,
         expireService,
