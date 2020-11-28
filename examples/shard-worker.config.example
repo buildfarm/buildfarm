@@ -257,6 +257,11 @@ redis_shard_backplane_config: {
       }
     }
   }
+
+  # Redis connection and read timeout values in milliseconds (defaults: 2000, minimum value: 2000)
+  #timeout: 20000
+  # Redis maximum attempts (default: 5, minimum value: 5)
+  #max_attempts: 10
 }
 
 # Create exec trees containing directories that are owned by
