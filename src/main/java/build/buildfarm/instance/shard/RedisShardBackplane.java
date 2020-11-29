@@ -674,7 +674,7 @@ public class RedisShardBackplane implements ShardBackplane {
   public CasIndexResults reindexCas(String hostName) throws IOException {
     CasIndexSettings settings = new CasIndexSettings();
     settings.hostName = hostName;
-    settings.casQuery = config.getOperationPrefix() + ":*";
+    settings.casQuery = config.getCasPrefix() + ":*";
     settings.scanAmount = 10000;
     return client.call(jedis -> WorkerIndexer.removeWorkerIndexesFromCas(jedis, settings));
   }
@@ -683,7 +683,7 @@ public class RedisShardBackplane implements ShardBackplane {
   public FindOperationsResults findOperations(String user) throws IOException {
     FindOperationsSettings settings = new FindOperationsSettings();
     settings.user = user;
-    settings.operationQuery = config.getCasPrefix() + ":*";
+    settings.operationQuery = config.getOperationPrefix() + ":*";
     settings.scanAmount = 10000;
     return client.call(jedis -> OperationsFinder.findOperations(jedis, settings));
   }

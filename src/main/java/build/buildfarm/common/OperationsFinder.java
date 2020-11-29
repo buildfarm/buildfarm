@@ -14,10 +14,20 @@
 
 package build.buildfarm.common;
 
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.buildfarm.v1test.CompletedOperationMetadata;
+import build.buildfarm.v1test.ExecutingOperationMetadata;
+import build.buildfarm.v1test.QueuedOperationMetadata;
+import com.google.longrunning.Operation;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.util.JsonFormat;
+import com.google.rpc.PreconditionFailure;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
+import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.ScanParams;
 import redis.clients.jedis.ScanResult;
 
@@ -43,16 +53,13 @@ public class OperationsFinder {
     FindOperationsResults results = new FindOperationsResults();
     results.operations = new ArrayList<>();
 
-    // JedisCluster only supports SCAN commands with MATCH patterns containing hash-tags.
-    // This prevents us from using the cluster's SCAN to traverse all of the CAS.
-    // That's why we choose to scan each of the jedisNode's individually.
-    cluster.getClusterNodes().values().stream()
-        .forEach(
-            pool -> {
-              try (Jedis node = pool.getResource()) {
-                findOperationNode(cluster, node, settings, results);
-              }
-            });
+    // Get a Jedis node and run the query on it
+    Collection<JedisPool> pools = cluster.getClusterNodes().values();
+    if (!pools.isEmpty()) {
+      try (Jedis node = ((JedisPool) pools.toArray()[0]).getResource()) {
+        findOperationNode(cluster, node, settings, results);
+      }
+    }
 
     return results;
   }
@@ -73,8 +80,8 @@ public class OperationsFinder {
     // iterate over all operation entries via scanning
     String cursor = "0";
     do {
-      List<String> casKeys = scanOperations(node, cursor, settings);
-      // removeWorkerFromCasKeys(cluster, casKeys, settings.hostName, results);
+      List<String> operationKeys = scanOperations(node, cursor, settings);
+      collectOperations(cluster, operationKeys, settings.user, results);
 
     } while (!cursor.equals("0"));
   }
@@ -101,5 +108,70 @@ public class OperationsFinder {
       return scanResult.getResult();
     }
     return new ArrayList<>();
+  }
+  ///
+  /// @brief   Collect operations based on settings.
+  /// @details Populates results.
+  /// @param   cluster       An established redis cluster.
+  /// @param   operationKeys Keys to get operations from.
+  /// @param   user          The user operations to search for.
+  /// @param   results       Accumulating results from finding operations.
+  ///
+  private static void collectOperations(
+      JedisCluster cluster,
+      List<String> operationKeys,
+      String user,
+      FindOperationsResults results) {
+    for (String operationKey : operationKeys) {
+      Operation operation = operationKeyToOperation(cluster, operationKey);
+      results.operations.add(operationKey);
+    }
+  }
+  ///
+  /// @brief   Convert an operation key into the actual Operation type.
+  /// @details Extracts json from redis and parses it. Null if json was
+  ///          invalid.
+  /// @param   cluster      An established redis cluster.
+  /// @param   operationKey The key to lookup and get back the operation of.
+  /// @return  The looked up operation.
+  /// @note    Suggested return identifier: operation.
+  ///
+  private static Operation operationKeyToOperation(JedisCluster cluster, String operationKey) {
+    String json = cluster.get(operationKey);
+    Operation operation = jsonToOperation(json);
+    return operation;
+  }
+  ///
+  /// @brief   Convert string json into operation type.
+  /// @details Parses json and returns null if invalid.
+  /// @param   json The json to convert to Operation type.
+  /// @return  The created operation.
+  /// @note    Suggested return identifier: operation.
+  ///
+  private static Operation jsonToOperation(String json) {
+    // create a json parser
+    JsonFormat.Parser operationParser =
+        JsonFormat.parser()
+            .usingTypeRegistry(
+                JsonFormat.TypeRegistry.newBuilder()
+                    .add(CompletedOperationMetadata.getDescriptor())
+                    .add(ExecutingOperationMetadata.getDescriptor())
+                    .add(ExecuteOperationMetadata.getDescriptor())
+                    .add(QueuedOperationMetadata.getDescriptor())
+                    .add(PreconditionFailure.getDescriptor())
+                    .build())
+            .ignoringUnknownFields();
+
+    if (json == null) {
+      return null;
+    }
+    try {
+      Operation.Builder operationBuilder = Operation.newBuilder();
+      operationParser.merge(json, operationBuilder);
+      return operationBuilder.build();
+    } catch (InvalidProtocolBufferException e) {
+      // logger.log(Level.SEVERE, "error parsing operation from " + json, e);
+      return null;
+    }
   }
 }
