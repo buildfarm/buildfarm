@@ -28,6 +28,8 @@ import build.buildfarm.common.CasIndexSettings;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.FindOperationsResults;
+import build.buildfarm.common.FindOperationsSettings;
+import build.buildfarm.common.OperationsFinder;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.StringVisitor;
 import build.buildfarm.common.Watcher;
@@ -672,15 +674,18 @@ public class RedisShardBackplane implements ShardBackplane {
   public CasIndexResults reindexCas(String hostName) throws IOException {
     CasIndexSettings settings = new CasIndexSettings();
     settings.hostName = hostName;
-    settings.casQuery = config.getCasPrefix() + ":*";
+    settings.casQuery = config.getOperationPrefix() + ":*";
     settings.scanAmount = 10000;
     return client.call(jedis -> WorkerIndexer.removeWorkerIndexesFromCas(jedis, settings));
   }
 
   @Override
   public FindOperationsResults findOperations(String user) throws IOException {
-    // todo
-    return null;
+    FindOperationsSettings settings = new FindOperationsSettings();
+    settings.user = user;
+    settings.casQuery = config.getCasPrefix() + ":*";
+    settings.scanAmount = 10000;
+    return client.call(jedis -> OperationsFinder.findOperations(jedis, settings));
   }
 
   @Override

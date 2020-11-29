@@ -26,7 +26,7 @@ import io.grpc.netty.NettyChannelBuilder;
 // For example, it could find all of the operations executed by a particular user.
 // ./tool <URL> shard SHA256 <user>
 // The found operations will be printed.
-class FindOperation {
+class FindOperations {
 
   private static ManagedChannel createChannel(String target) {
     NettyChannelBuilder builder =

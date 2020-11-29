@@ -37,6 +37,9 @@ public class FindOperationsResults {
   /// @note    Suggested return identifier: message.
   ///
   public String toMessage() {
-    return String.join("\n", operations);
+    StringBuilder message = new StringBuilder();
+    message.append(String.format("results: %d\n", operations.size()));
+    message.append(String.join("\n", operations));
+    return message.toString();
   }
 }
