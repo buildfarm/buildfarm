@@ -28,6 +28,7 @@ import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
+import build.buildfarm.common.FindOperationsResults;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
 import build.buildfarm.v1test.GetClientStartTimeResult;
@@ -143,6 +144,8 @@ public interface Instance {
   GetClientStartTimeResult getClientStartTime(String clientKey);
 
   CasIndexResults reindexCas(String hostName);
+
+  FindOperationsResults findOperations(String user);
 
   interface MatchListener {
     // start/end pair called for each wait period

@@ -59,6 +59,7 @@ import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
+import build.buildfarm.common.FindOperationsResults;
 import build.buildfarm.common.Size;
 import build.buildfarm.common.Time;
 import build.buildfarm.common.Watcher;
@@ -832,6 +833,17 @@ public class StubInstance implements Instance {
     results.removedHosts = proto.getRemovedHosts();
     results.removedKeys = proto.getRemovedKeys();
     results.totalKeys = proto.getTotalKeys();
+    return results;
+  }
+
+  @Override
+  public FindOperationsResults findOperations(String user) {
+    throwIfStopped();
+    // ReindexCasRequestResults proto =
+    //     adminBlockingStub
+    //         .get()
+    //         .reindexCas(ReindexCasRequest.newBuilder().setHostId(hostName).build());
+    FindOperationsResults results = new FindOperationsResults();
     return results;
   }
 }

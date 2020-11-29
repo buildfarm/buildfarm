@@ -39,6 +39,10 @@ service Admin {
   rpc ReindexCas(ReindexCasRequest) returns (ReindexCasRequestResults) {
     option (google.api.http) = { get: "/v1test/admin:reindexCas" };
   }
+  
+  rpc FindOperations(FindOperationsRequest) returns (FindOperationsRequestResults) {
+    option (google.api.http) = { get: "/v1test/admin:findOperations" };
+  }
 }
 
 message ReindexCasRequest {
@@ -54,6 +58,14 @@ message ReindexCasRequestResults {
   int32 removedKeys = 2;
 
   int32 totalKeys = 3;
+}
+
+message FindOperationsRequest {
+  string instance_name = 1;
+}
+
+message FindOperationsRequestResults {
+  repeated string operations = 1;
 }
 
 message TerminateHostRequest {
