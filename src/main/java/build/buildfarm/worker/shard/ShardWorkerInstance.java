@@ -390,7 +390,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  public FindOperationsResults reindexCas(String user) {
+  public FindOperationsResults findOperations(String user) {
     try {
       return backplane.findOperations(user);
     } catch (IOException e) {

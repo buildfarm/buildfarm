@@ -20,6 +20,7 @@ import build.buildfarm.admin.Admin;
 import build.buildfarm.admin.aws.AwsAdmin;
 import build.buildfarm.admin.gcp.GcpAdmin;
 import build.buildfarm.common.CasIndexResults;
+import build.buildfarm.common.FindOperationsResults;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.AdminConfig;
 import build.buildfarm.v1test.AdminGrpc;

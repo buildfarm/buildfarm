@@ -683,7 +683,7 @@ public class RedisShardBackplane implements ShardBackplane {
   public FindOperationsResults findOperations(String user) throws IOException {
     FindOperationsSettings settings = new FindOperationsSettings();
     settings.user = user;
-    settings.casQuery = config.getCasPrefix() + ":*";
+    settings.operationQuery = config.getCasPrefix() + ":*";
     settings.scanAmount = 10000;
     return client.call(jedis -> OperationsFinder.findOperations(jedis, settings));
   }

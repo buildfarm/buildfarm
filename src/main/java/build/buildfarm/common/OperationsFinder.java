@@ -14,7 +14,12 @@
 
 package build.buildfarm.common;
 
+import java.util.ArrayList;
+import java.util.List;
+import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
+import redis.clients.jedis.ScanParams;
+import redis.clients.jedis.ScanResult;
 
 ///
 /// @class   OperationsFinder
@@ -36,7 +41,65 @@ public class OperationsFinder {
   public static FindOperationsResults findOperations(
       JedisCluster cluster, FindOperationsSettings settings) {
     FindOperationsResults results = new FindOperationsResults();
+    results.operations = new ArrayList<>();
+
+    // JedisCluster only supports SCAN commands with MATCH patterns containing hash-tags.
+    // This prevents us from using the cluster's SCAN to traverse all of the CAS.
+    // That's why we choose to scan each of the jedisNode's individually.
+    cluster.getClusterNodes().values().stream()
+        .forEach(
+            pool -> {
+              try (Jedis node = pool.getResource()) {
+                findOperationNode(cluster, node, settings, results);
+              }
+            });
 
     return results;
+  }
+  ///
+  /// @brief   Scan all operation entires on existing Jedis node and keep ones
+  ///          that meet query requirements.
+  /// @details Results are accumulated onto.
+  /// @param   cluster  An established redis cluster.
+  /// @param   node     A node of the cluster.
+  /// @param   settings Settings on what operations to find and keep.
+  /// @param   results  Accumulating results from performing a search.
+  ///
+  private static void findOperationNode(
+      JedisCluster cluster,
+      Jedis node,
+      FindOperationsSettings settings,
+      FindOperationsResults results) {
+    // iterate over all operation entries via scanning
+    String cursor = "0";
+    do {
+      List<String> casKeys = scanOperations(node, cursor, settings);
+      // removeWorkerFromCasKeys(cluster, casKeys, settings.hostName, results);
+
+    } while (!cursor.equals("0"));
+  }
+  ///
+  /// @brief   Scan the operations list to obtain operation keys.
+  /// @details Scanning is done incrementally via a cursor.
+  /// @param   node     A node of the cluster.
+  /// @param   cursor   Scan cursor.
+  /// @param   settings Settings on how to traverse the Operations.
+  /// @return  Resulting operation keys from scanning.
+  /// @note    Suggested return identifier: operationKeys.
+  ///
+  private static List<String> scanOperations(
+      Jedis node, String cursor, FindOperationsSettings settings) {
+    // construct query
+    ScanParams params = new ScanParams();
+    params.match(settings.operationQuery);
+    params.count(settings.scanAmount);
+
+    // perform scan iteration
+    ScanResult scanResult = node.scan(cursor, params);
+    if (scanResult != null) {
+      cursor = scanResult.getCursor();
+      return scanResult.getResult();
+    }
+    return new ArrayList<>();
   }
 }
