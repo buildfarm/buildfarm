@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.common;
+package build.buildfarm.instance.shard;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
@@ -22,6 +22,9 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.ThreadSafety.ThreadSafe;
 import build.buildfarm.common.function.InterruptingRunnable;
+import build.buildfarm.common.CasIndexResults;
+import build.buildfarm.common.FindOperationsResults;
+import build.buildfarm.common.Watcher;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.GetClientStartTimeResult;
@@ -35,6 +38,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import build.buildfarm.instance.Instance;
 
 public interface ShardBackplane {
 
@@ -90,7 +94,7 @@ public interface ShardBackplane {
   public CasIndexResults reindexCas(String hostName) throws IOException;
 
   @ThreadSafe
-  public FindOperationsResults findOperations(String user) throws IOException;
+  public FindOperationsResults findOperations(Instance instance, String user) throws IOException;
 
   /** Returns a set of the names of all active workers. */
   @ThreadSafe

@@ -28,7 +28,7 @@ import build.bazel.remote.execution.v2.Platform.Property;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
-import build.buildfarm.common.ShardBackplane;
+import build.buildfarm.instance.shard.ShardBackplane;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.v1test.ExecutionPolicy;

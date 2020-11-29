@@ -36,7 +36,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.LoggingMain;
-import build.buildfarm.common.ShardBackplane;
+import build.buildfarm.instance.shard.ShardBackplane;
 import build.buildfarm.common.Size;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.io.FeedbackOutputStream;

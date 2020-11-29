@@ -62,7 +62,7 @@ import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.FindOperationsResults;
 import build.buildfarm.common.Poller;
-import build.buildfarm.common.ShardBackplane;
+import build.buildfarm.instance.shard.ShardBackplane;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
@@ -2343,7 +2343,7 @@ public class ShardInstance extends AbstractServerInstance {
   @Override
   public FindOperationsResults findOperations(String user) {
     try {
-      return backplane.findOperations(user);
+      return backplane.findOperations(this, user);
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }

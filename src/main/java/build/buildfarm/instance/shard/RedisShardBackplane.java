@@ -30,7 +30,7 @@ import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.FindOperationsResults;
 import build.buildfarm.common.FindOperationsSettings;
 import build.buildfarm.common.OperationsFinder;
-import build.buildfarm.common.ShardBackplane;
+import build.buildfarm.instance.shard.ShardBackplane;
 import build.buildfarm.common.StringVisitor;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.WorkerIndexer;
@@ -40,6 +40,7 @@ import build.buildfarm.common.redis.ProvisionedRedisQueue;
 import build.buildfarm.common.redis.RedisClient;
 import build.buildfarm.common.redis.RedisHashtags;
 import build.buildfarm.common.redis.RedisNodeHashes;
+import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.RedisShardSubscriber.TimedWatchFuture;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.DispatchedOperation;
@@ -680,7 +681,7 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   @Override
-  public FindOperationsResults findOperations(String user) throws IOException {
+  public FindOperationsResults findOperations(Instance instance, String user) throws IOException {
     FindOperationsSettings settings = new FindOperationsSettings();
     settings.user = user;
     settings.operationQuery = config.getOperationPrefix() + ":*";

@@ -287,6 +287,7 @@ java_test(
         "//src/main/java/build/buildfarm:instance",
         "//src/main/java/build/buildfarm:shard-worker",
         "//src/main/java/build/buildfarm:worker",
+        "//src/main/java/build/buildfarm:shard-instance",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_jimfs_jimfs",

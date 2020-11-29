@@ -27,7 +27,7 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
-import build.buildfarm.common.ShardBackplane;
+import build.buildfarm.instance.shard.ShardBackplane;
 import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;

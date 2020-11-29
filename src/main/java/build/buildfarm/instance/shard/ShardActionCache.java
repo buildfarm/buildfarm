@@ -20,7 +20,7 @@ import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.buildfarm.common.DigestUtil.ActionKey;
-import build.buildfarm.common.ShardBackplane;
+import build.buildfarm.instance.shard.ShardBackplane;
 import build.buildfarm.common.cache.CacheBuilder;
 import build.buildfarm.common.cache.CacheLoader;
 import build.buildfarm.common.cache.CacheLoader.InvalidCacheLoadException;

@@ -18,7 +18,7 @@ import static com.google.common.util.concurrent.Futures.successfulAsList;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.lang.String.format;
 
-import build.buildfarm.common.ShardBackplane;
+import build.buildfarm.instance.shard.ShardBackplane;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.QueueEntry;
 import com.google.common.collect.ImmutableList;
