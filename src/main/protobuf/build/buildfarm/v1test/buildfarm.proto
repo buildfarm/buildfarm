@@ -62,6 +62,8 @@ message ReindexCasRequestResults {
 
 message FindOperationsRequest {
   string instance_name = 1;
+  
+  string user = 2;
 }
 
 message FindOperationsRequestResults {

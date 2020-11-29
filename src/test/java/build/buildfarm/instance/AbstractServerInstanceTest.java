@@ -31,6 +31,7 @@ import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.CasIndexResults;
+import build.buildfarm.common.FindOperationsResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
@@ -168,6 +169,11 @@ public class AbstractServerInstanceTest {
 
     @Override
     public CasIndexResults reindexCas(String hostName) {
+      throw new UnsupportedOperationException();
+    }
+    
+    @Override
+    public FindOperationsResults findOperations(String user) {
       throw new UnsupportedOperationException();
     }
   }

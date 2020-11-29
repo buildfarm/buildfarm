@@ -79,6 +79,8 @@ import build.buildfarm.v1test.PollOperationRequest;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.ReindexCasRequest;
 import build.buildfarm.v1test.ReindexCasRequestResults;
+import build.buildfarm.v1test.FindOperationsRequest;
+import build.buildfarm.v1test.FindOperationsRequestResults;
 import build.buildfarm.v1test.TakeOperationRequest;
 import build.buildfarm.v1test.Tree;
 import build.buildfarm.v1test.WorkerProfileGrpc;
@@ -839,11 +841,12 @@ public class StubInstance implements Instance {
   @Override
   public FindOperationsResults findOperations(String user) {
     throwIfStopped();
-    // ReindexCasRequestResults proto =
-    //     adminBlockingStub
-    //         .get()
-    //         .reindexCas(ReindexCasRequest.newBuilder().setHostId(hostName).build());
+    FindOperationsRequestResults proto =
+        adminBlockingStub
+            .get()
+            .findOperations(FindOperationsRequest.newBuilder().setUser(user).build());
     FindOperationsResults results = new FindOperationsResults();
+    results.operations = proto.getOperationsList();
     return results;
   }
 }

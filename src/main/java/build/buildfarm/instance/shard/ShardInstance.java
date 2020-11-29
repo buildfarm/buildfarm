@@ -57,6 +57,7 @@ import build.bazel.remote.execution.v2.Platform.Property;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.buildfarm.common.CasIndexResults;
+import build.buildfarm.common.FindOperationsResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
@@ -2334,6 +2335,15 @@ public class ShardInstance extends AbstractServerInstance {
   public CasIndexResults reindexCas(String hostName) {
     try {
       return backplane.reindexCas(hostName);
+    } catch (IOException e) {
+      throw Status.fromThrowable(e).asRuntimeException();
+    }
+  }
+  
+  @Override
+  public FindOperationsResults findOperations(String user) {
+    try {
+      return backplane.findOperations(user);
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }
