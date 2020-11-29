@@ -88,7 +88,7 @@ public interface ShardBackplane {
 
   @ThreadSafe
   public CasIndexResults reindexCas(String hostName) throws IOException;
-  
+
   @ThreadSafe
   public FindOperationsResults findOperations(String user) throws IOException;
 

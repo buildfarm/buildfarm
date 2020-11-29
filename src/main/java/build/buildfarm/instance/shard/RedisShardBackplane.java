@@ -25,10 +25,9 @@ import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.CasIndexSettings;
-import build.buildfarm.common.FindOperationsResults;
-import build.buildfarm.common.FindOperationsSettings;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.FindOperationsResults;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.StringVisitor;
 import build.buildfarm.common.Watcher;
@@ -677,10 +676,10 @@ public class RedisShardBackplane implements ShardBackplane {
     settings.scanAmount = 10000;
     return client.call(jedis -> WorkerIndexer.removeWorkerIndexesFromCas(jedis, settings));
   }
-  
+
   @Override
   public FindOperationsResults findOperations(String user) throws IOException {
-    //todo
+    // todo
     return null;
   }
 

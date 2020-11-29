@@ -57,10 +57,10 @@ import build.bazel.remote.execution.v2.Platform.Property;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.buildfarm.common.CasIndexResults;
-import build.buildfarm.common.FindOperationsResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
+import build.buildfarm.common.FindOperationsResults;
 import build.buildfarm.common.Poller;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.TokenizableIterator;
@@ -2339,7 +2339,7 @@ public class ShardInstance extends AbstractServerInstance {
       throw Status.fromThrowable(e).asRuntimeException();
     }
   }
-  
+
   @Override
   public FindOperationsResults findOperations(String user) {
     try {

@@ -55,10 +55,10 @@ import build.buildfarm.ac.ActionCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.common.CasIndexResults;
-import build.buildfarm.common.FindOperationsResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
+import build.buildfarm.common.FindOperationsResults;
 import build.buildfarm.common.Size;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
@@ -1699,7 +1699,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public abstract CasIndexResults reindexCas(String hostName);
-  
+
   @Override
   public abstract FindOperationsResults findOperations(String hostName);
 

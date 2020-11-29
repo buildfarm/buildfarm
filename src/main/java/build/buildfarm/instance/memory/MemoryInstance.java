@@ -44,9 +44,9 @@ import build.buildfarm.ac.GrpcActionCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorages;
 import build.buildfarm.common.CasIndexResults;
-import build.buildfarm.common.FindOperationsResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.FindOperationsResults;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
@@ -1025,7 +1025,7 @@ public class MemoryInstance extends AbstractServerInstance {
   public CasIndexResults reindexCas(String hostName) {
     throw new UnsupportedOperationException();
   }
-  
+
   @Override
   public FindOperationsResults findOperations(String user) {
     throw new UnsupportedOperationException();
