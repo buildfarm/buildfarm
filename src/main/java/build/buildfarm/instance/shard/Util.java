@@ -22,7 +22,6 @@ import static java.lang.String.format;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
-import build.buildfarm.instance.shard.ShardBackplane;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.instance.Instance;
 import com.google.common.collect.ImmutableList;

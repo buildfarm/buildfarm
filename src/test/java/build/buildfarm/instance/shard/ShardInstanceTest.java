@@ -59,7 +59,6 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.Poller;
-import build.buildfarm.instance.shard.ShardBackplane;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write.NullWrite;
 import build.buildfarm.instance.Instance;

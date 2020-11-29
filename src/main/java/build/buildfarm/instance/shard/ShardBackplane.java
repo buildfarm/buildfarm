@@ -19,12 +19,13 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
-import build.buildfarm.common.DigestUtil.ActionKey;
-import build.buildfarm.common.ThreadSafety.ThreadSafe;
-import build.buildfarm.common.function.InterruptingRunnable;
 import build.buildfarm.common.CasIndexResults;
+import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.FindOperationsResults;
+import build.buildfarm.common.ThreadSafety.ThreadSafe;
 import build.buildfarm.common.Watcher;
+import build.buildfarm.common.function.InterruptingRunnable;
+import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.GetClientStartTimeResult;
@@ -38,7 +39,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import build.buildfarm.instance.Instance;
 
 public interface ShardBackplane {
 

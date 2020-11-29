@@ -15,6 +15,7 @@
 package build.buildfarm.common;
 
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.QueuedOperationMetadata;
@@ -44,12 +45,13 @@ public class OperationsFinder {
   /// @details Operations can be found based on different search queries
   ///          depending on the context a caller has or wants to filter on.
   /// @param   cluster  An established redis cluster.
+  /// @param   instance An instance is used to get additional information about the operation.
   /// @param   settings Settings on how to find and filter operations.
   /// @return  Results from searching for operations.
   /// @note    Suggested return identifier: results.
   ///
   public static FindOperationsResults findOperations(
-      JedisCluster cluster, FindOperationsSettings settings) {
+      JedisCluster cluster, Instance instance, FindOperationsSettings settings) {
     FindOperationsResults results = new FindOperationsResults();
     results.operations = new ArrayList<>();
 

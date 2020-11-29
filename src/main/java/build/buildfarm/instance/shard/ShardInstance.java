@@ -62,7 +62,6 @@ import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.FindOperationsResults;
 import build.buildfarm.common.Poller;
-import build.buildfarm.instance.shard.ShardBackplane;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;

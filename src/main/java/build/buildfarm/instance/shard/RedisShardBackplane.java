@@ -30,7 +30,6 @@ import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.FindOperationsResults;
 import build.buildfarm.common.FindOperationsSettings;
 import build.buildfarm.common.OperationsFinder;
-import build.buildfarm.instance.shard.ShardBackplane;
 import build.buildfarm.common.StringVisitor;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.WorkerIndexer;
@@ -686,7 +685,7 @@ public class RedisShardBackplane implements ShardBackplane {
     settings.user = user;
     settings.operationQuery = config.getOperationPrefix() + ":*";
     settings.scanAmount = 10000;
-    return client.call(jedis -> OperationsFinder.findOperations(jedis, settings));
+    return client.call(jedis -> OperationsFinder.findOperations(jedis, instance, settings));
   }
 
   @Override
