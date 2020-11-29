@@ -315,6 +315,7 @@ java_test(
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_truth_truth",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+        "//src/main/java/build/buildfarm:operations",
     ],
 )
 
@@ -404,6 +405,7 @@ java_test(
         "@maven//:io_grpc_grpc_core",
         "@maven//:org_mockito_mockito_core",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+        "//src/main/java/build/buildfarm:operations",
     ],
 )
 

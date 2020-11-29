@@ -15,9 +15,9 @@
 package build.buildfarm;
 
 import build.buildfarm.common.DigestUtil;
-import build.buildfarm.common.FindOperationsResults;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
+import build.buildfarm.operations.FindOperationsResults;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
