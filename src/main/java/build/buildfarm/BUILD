@@ -102,6 +102,9 @@ java_library(
         ]),
     deps = [
         ":common",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "@googleapis//:google_rpc_code_java_proto",
+        "@googleapis//:google_rpc_error_details_java_proto",
         "@googleapis//:google_bytestream_bytestream_java_grpc",
         "@googleapis//:google_bytestream_bytestream_java_proto",
         "@maven//:com_googlecode_json_simple_json_simple",
@@ -117,6 +120,7 @@ java_library(
         "@maven//:com_jayway_jsonpath_json_path",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_proto",
+        "@googleapis//:google_rpc_error_details_proto",
     ],
 )
 

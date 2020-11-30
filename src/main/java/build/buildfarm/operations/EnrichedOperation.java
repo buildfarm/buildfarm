@@ -16,10 +16,16 @@ package build.buildfarm.operations;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
+import build.buildfarm.v1test.CompletedOperationMetadata;
+import build.buildfarm.v1test.ExecutingOperationMetadata;
+import build.buildfarm.v1test.QueuedOperationMetadata;
 import com.google.longrunning.Operation;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
+import com.google.rpc.PreconditionFailure;
 import org.json.simple.JSONObject;
+import org.json.simple.JSONValue;
 
 ///
 /// @class   EnrichedOperation
@@ -65,11 +71,23 @@ public class EnrichedOperation {
   public String asJsonString() {
     JSONObject obj = new JSONObject();
     try {
-      obj.put("operation", JsonFormat.printer().print(operation));
-      obj.put("action", JsonFormat.printer().print(action));
-      obj.put("command", JsonFormat.printer().print(command));
+
+      JsonFormat.Printer operationPrinter =
+          JsonFormat.printer()
+              .usingTypeRegistry(
+                  JsonFormat.TypeRegistry.newBuilder()
+                      .add(CompletedOperationMetadata.getDescriptor())
+                      .add(ExecutingOperationMetadata.getDescriptor())
+                      .add(ExecuteOperationMetadata.getDescriptor())
+                      .add(QueuedOperationMetadata.getDescriptor())
+                      .add(PreconditionFailure.getDescriptor())
+                      .build());
+
+      obj.put("operation", JSONValue.parse(operationPrinter.print(operation)));
+      obj.put("action", JSONValue.parse(JsonFormat.printer().print(action)));
+      obj.put("command", JSONValue.parse(JsonFormat.printer().print(command)));
     } catch (InvalidProtocolBufferException e) {
     }
-    return obj.toString();
+    return obj.toJSONString();
   }
 }
