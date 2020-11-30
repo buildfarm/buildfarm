@@ -144,7 +144,7 @@ public class StubInstance implements Instance {
   private final String identifier;
   private final DigestUtil digestUtil;
   private final ManagedChannel channel;
-  private final Duration grpcTimeout;
+  private final @Nullable Duration grpcTimeout;
   private final Retrier retrier;
   private final @Nullable ListeningScheduledExecutorService retryService;
   private boolean isStopped = false;
@@ -814,7 +814,7 @@ public class StubInstance implements Instance {
 
   @Override
   public WorkerProfileMessage getWorkerProfile() {
-    return WorkerProfileBlockingStub.get()
+    return deadlined(WorkerProfileBlockingStub)
         .getWorkerProfile(WorkerProfileRequest.newBuilder().build());
   }
 

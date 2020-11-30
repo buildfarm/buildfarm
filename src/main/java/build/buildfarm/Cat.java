@@ -74,6 +74,7 @@ import com.google.rpc.RetryInfo;
 import io.grpc.Context;
 import io.grpc.ManagedChannel;
 import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import java.io.IOException;
@@ -84,6 +85,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -615,7 +617,7 @@ class Cat {
   }
 
   static int deadlineSecondsForType(String type) {
-    if (type.equals("Watch") || type.equals("Execute")) {
+    if (type.equals("Watch") || type.equals("Execute") || type.equals("WorkerProfile")) {
       return 60 * 60 * 24;
     }
     return 10;
@@ -628,13 +630,12 @@ class Cat {
    * @return
    */
   private static String workerStringTransformation(String worker) {
-    String result = worker.split("\\.")[0].substring("ip-".length()).replaceAll("-", ".") + ":8981";
-    System.out.println("==============result format: " + result);
-    return result;
+    return worker.split("\\.")[0].substring("ip-".length()).replaceAll("-", ".") + ":8981";
   }
 
-  private static void analyzeMessage(WorkerProfileMessage response) {
+  private static void analyzeMessage(String worker, WorkerProfileMessage response) {
     System.out.println("\nWorkerProfile:");
+    System.out.println(worker);
     String strIntFormat = "%-50s : %d";
     String strFloatFormat = "%-50s : %2.1f";
     long entryCount = response.getCasEntryCount();
@@ -731,32 +732,44 @@ class Cat {
   private static void workerProfile(String[] args) throws IOException {
     Set<String> workers = null;
     DigestUtil digestUtil = DigestUtil.forHash("SHA256");
-    ManagedChannel currentChannel;
     Instance currentInstance;
     WorkerProfileMessage currentWorkerMessage;
+    HashMap<String, Instance> workersToChannels = new HashMap<>();
+
     while (true) {
-      // get updated worker list
-      try {
-        workers = getWorkers(args);
-      } catch (ConfigurationException e) {
-        e.printStackTrace();
+      // update worker list
+      if (workers == null) {
+        try {
+          workers = getWorkers(args);
+        } catch (ConfigurationException e) {
+          e.printStackTrace();
+        }
       }
       if (workers == null || workers.size() == 0) {
         continue;
       }
       // profile all workers
       for (String worker : workers) {
-        currentChannel = createChannel(workerStringTransformation(worker));
-        currentInstance =
-            new StubInstance(
-                "shard", "bf-cat", digestUtil, currentChannel, Durations.fromSeconds(10));
-        currentWorkerMessage = currentInstance.getWorkerProfile();
-        analyzeMessage(currentWorkerMessage);
+        if (!workersToChannels.containsKey(worker)) {
+          workersToChannels.put(
+              worker,
+              new StubInstance(
+                  "shard", "bf-cat", digestUtil, createChannel(workerStringTransformation(worker)), Durations.fromMinutes(1)));
+        }
+        try {
+          currentWorkerMessage = workersToChannels.get(worker).getWorkerProfile();
+          System.out.println(worker);
+          //analyzeMessage(worker, currentWorkerMessage);
+        } catch (StatusRuntimeException e) {
+          e.printStackTrace();
+          System.out.println("==============TIMEOUT");
+        }
       }
 
       // sleep
       try {
-        Thread.sleep(60 * 1000); // 10 minutes
+        System.out.println("Wait for 5 seconds:");
+        Thread.sleep(5000);
       } catch (InterruptedException e) {
         e.printStackTrace();
       }
