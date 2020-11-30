@@ -14,11 +14,12 @@
 
 package build.buildfarm.operations;
 
-import build.bazel.remote.execution.v2.Command;
 import build.buildfarm.instance.Instance;
+import com.jayway.jsonpath.JsonPath;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisPool;
@@ -139,17 +140,11 @@ public class OperationsFinder {
   /// @note    Suggested return identifier: shouldKeep.
   ///
   private static boolean keepOperation(EnrichedOperation operation, String filterPredicate) {
-    System.out.println("-------------------");
-    for (Command.EnvironmentVariable environmentVariable :
-        operation.command.getEnvironmentVariablesList()) {
-      System.out.println(environmentVariable.getName());
-      System.out.println(environmentVariable.getValue());
-    }
-    System.out.println("--------ARGS:-----------");
-    for (String environmentVariable : operation.command.getArgumentsList()) {
-      System.out.println(environmentVariable);
-    }
-    System.out.println("-------------------");
-    return false;
+    String json = operation.asJsonString();
+    System.out.println(json);
+
+    // test the predicate
+    List<Map<String, Object>> matches = JsonPath.parse(json).read(filterPredicate);
+    return !matches.isEmpty();
   }
 }
