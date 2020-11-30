@@ -680,9 +680,9 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   @Override
-  public FindOperationsResults findOperations(Instance instance, String user) throws IOException {
+  public FindOperationsResults findOperations(Instance instance, String filterPredicate) throws IOException {
     FindOperationsSettings settings = new FindOperationsSettings();
-    settings.user = user;
+    settings.filterPredicate = filterPredicate;
     settings.operationQuery = config.getOperationPrefix() + ":*";
     settings.scanAmount = 10000;
     return client.call(jedis -> OperationsFinder.findOperations(jedis, instance, settings));

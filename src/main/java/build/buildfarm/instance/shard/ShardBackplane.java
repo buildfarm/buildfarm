@@ -94,7 +94,7 @@ public interface ShardBackplane {
   public CasIndexResults reindexCas(String hostName) throws IOException;
 
   @ThreadSafe
-  public FindOperationsResults findOperations(Instance instance, String user) throws IOException;
+  public FindOperationsResults findOperations(Instance instance, String filterPredicate) throws IOException;
 
   /** Returns a set of the names of all active workers. */
   @ThreadSafe

@@ -78,7 +78,7 @@ public class OperationsFinder {
     String cursor = "0";
     do {
       List<String> operationKeys = scanOperations(node, cursor, settings);
-      collectOperations(cluster, instance, operationKeys, settings.user, results);
+      collectOperations(cluster, instance, operationKeys, settings.filterPredicate, results);
 
     } while (!cursor.equals("0"));
   }
@@ -109,21 +109,22 @@ public class OperationsFinder {
   ///
   /// @brief   Collect operations based on settings.
   /// @details Populates results.
-  /// @param   cluster       An established redis cluster.
-  /// @param   instance      An instance is used to get additional information about the operation.
-  /// @param   operationKeys Keys to get operations from.
-  /// @param   user          The user operations to search for.
-  /// @param   results       Accumulating results from finding operations.
+  /// @param   cluster         An established redis cluster.
+  /// @param   instance        An instance is used to get additional information about the
+  // operation.
+  /// @param   operationKeys   Keys to get operations from.
+  /// @param   filterPredicate The search query used to find particular operations.
+  /// @param   results         Accumulating results from finding operations.
   ///
   private static void collectOperations(
       JedisCluster cluster,
       Instance instance,
       List<String> operationKeys,
-      String user,
+      String filterPredicate,
       FindOperationsResults results) {
     for (String operationKey : operationKeys) {
       EnrichedOperation operation = EnrichedOperationBuilder.build(cluster, instance, operationKey);
-      if (keepOperation(operation)) {
+      if (keepOperation(operation, filterPredicate)) {
         results.operations.add(operationKey);
       }
     }
@@ -132,11 +133,12 @@ public class OperationsFinder {
   /// @brief   Whether or not to keep operation based on filter settings.
   /// @details True if the operation should be returned. false if it should be
   ///          ignored.
-  /// @param   operation The operation to analyze based on filter settings.
+  /// @param   operation       The operation to analyze based on filter settings.
+  /// @param   filterPredicate The search query used to find particular operations.
   /// @return  Whether to keep the operation based on the filter settings.
   /// @note    Suggested return identifier: shouldKeep.
   ///
-  private static boolean keepOperation(EnrichedOperation operation) {
+  private static boolean keepOperation(EnrichedOperation operation, String filterPredicate) {
     System.out.println("-------------------");
     for (Command.EnvironmentVariable environmentVariable :
         operation.command.getEnvironmentVariablesList()) {

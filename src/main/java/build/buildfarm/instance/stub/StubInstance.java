@@ -839,12 +839,12 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public FindOperationsResults findOperations(String user) {
+  public FindOperationsResults findOperations(String filterPredicate) {
     throwIfStopped();
     FindOperationsRequestResults proto =
         adminBlockingStub
             .get()
-            .findOperations(FindOperationsRequest.newBuilder().setUser(user).build());
+            .findOperations(FindOperationsRequest.newBuilder().setFilterPredicate(filterPredicate).build());
     FindOperationsResults results = new FindOperationsResults();
     results.operations = proto.getOperationsList();
     return results;

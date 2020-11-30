@@ -38,10 +38,10 @@ class FindOperations {
     String host = args[0];
     String instanceName = args[1];
     DigestUtil digestUtil = DigestUtil.forHash(args[2]);
-    String user = args[3];
+    String filterPredicate = args[3];
     ManagedChannel channel = createChannel(host);
     Instance instance = new StubInstance(instanceName, digestUtil, channel);
-    FindOperationsResults results = instance.findOperations(user);
+    FindOperationsResults results = instance.findOperations(filterPredicate);
     System.out.println(results.toMessage());
     instance.stop();
   }

@@ -24,11 +24,11 @@ package build.buildfarm.operations;
 public class FindOperationsSettings {
 
   ///
-  /// @field   user
-  /// @brief   The name of the user who spawned the operation.
-  /// @details This correlates to the env variable in the operation.
+  /// @field   filterPredicate
+  /// @brief   The search query used to find particular operations.
+  /// @details https://github.com/json-path/JsonPath#predicates
   ///
-  public String user;
+  public String filterPredicate;
 
   ///
   /// @field   scanAmount

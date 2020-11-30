@@ -145,7 +145,7 @@ public interface Instance {
 
   CasIndexResults reindexCas(String hostName);
 
-  FindOperationsResults findOperations(String user);
+  FindOperationsResults findOperations(String filterPredicate);
 
   interface MatchListener {
     // start/end pair called for each wait period

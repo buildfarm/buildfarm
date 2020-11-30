@@ -173,7 +173,7 @@ public class AbstractServerInstanceTest {
     }
 
     @Override
-    public FindOperationsResults findOperations(String user) {
+    public FindOperationsResults findOperations(String filterPredicate) {
       throw new UnsupportedOperationException();
     }
   }

@@ -2340,9 +2340,9 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @Override
-  public FindOperationsResults findOperations(String user) {
+  public FindOperationsResults findOperations(String filterPredicate) {
     try {
-      return backplane.findOperations(this, user);
+      return backplane.findOperations(this, filterPredicate);
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }

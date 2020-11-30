@@ -169,7 +169,7 @@ public class AdminService extends AdminGrpc.AdminImplBase {
     Instance instance;
     try {
       instance = instances.get(request.getInstanceName());
-      FindOperationsResults results = instance.findOperations(request.getUser());
+      FindOperationsResults results = instance.findOperations(request.getFilterPredicate());
       logger.log(INFO, results.toMessage());
       responseObserver.onNext(
           FindOperationsRequestResults.newBuilder().addAllOperations(results.operations).build());
