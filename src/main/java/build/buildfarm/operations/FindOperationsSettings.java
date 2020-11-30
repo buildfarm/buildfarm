@@ -14,6 +14,7 @@
 
 package build.buildfarm.operations;
 
+
 ///
 /// @class   FindOperationsSettings
 /// @brief   Settings used to find operations.
