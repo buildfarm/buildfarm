@@ -35,38 +35,28 @@ import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.buildfarm.common.DigestUtil;
-import build.buildfarm.common.redis.RedisClient;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.instance.shard.JedisClusterFactory;
 import build.buildfarm.instance.stub.StubInstance;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.OperationTimesBetweenStages;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
-import build.buildfarm.v1test.RedisShardBackplaneConfig;
-import build.buildfarm.v1test.ShardWorker;
-import build.buildfarm.v1test.ShardWorkerConfig;
 import build.buildfarm.v1test.StageInformation;
 import build.buildfarm.v1test.Tree;
 import build.buildfarm.v1test.WorkerProfileMessage;
-import build.buildfarm.worker.shard.WorkerOptions;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 import com.google.common.io.ByteStreams;
-import com.google.devtools.common.options.OptionsParser;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Any;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Message;
-import com.google.protobuf.TextFormat;
 import com.google.protobuf.util.Durations;
-import com.google.protobuf.util.JsonFormat;
 import com.google.protobuf.util.Timestamps;
 import com.google.rpc.Code;
 import com.google.rpc.PreconditionFailure;
@@ -74,26 +64,20 @@ import com.google.rpc.RetryInfo;
 import io.grpc.Context;
 import io.grpc.ManagedChannel;
 import io.grpc.Status;
-import io.grpc.StatusRuntimeException;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import javax.naming.ConfigurationException;
-import redis.clients.jedis.JedisCluster;
 
 class Cat {
   private static ManagedChannel createChannel(String target) {
@@ -617,167 +601,13 @@ class Cat {
   }
 
   static int deadlineSecondsForType(String type) {
-    if (type.equals("Watch") || type.equals("Execute") || type.equals("WorkerProfile")) {
+    if (type.equals("Watch") || type.equals("Execute")) {
       return 60 * 60 * 24;
     }
     return 10;
   }
 
-  /**
-   * Transform worker string from "ip-10-135-31-210.ec2:8981" to "10-135-31-210".
-   *
-   * @param worker
-   * @return
-   */
-  private static String workerStringTransformation(String worker) {
-    return worker.split("\\.")[0].substring("ip-".length()).replaceAll("-", ".") + ":8981";
-  }
-
-  private static void analyzeMessage(String worker, WorkerProfileMessage response) {
-    System.out.println("\nWorkerProfile:");
-    System.out.println(worker);
-    String strIntFormat = "%-50s : %d";
-    String strFloatFormat = "%-50s : %2.1f";
-    long entryCount = response.getCasEntryCount();
-    long unreferencedEntryCount = response.getCasUnreferencedEntryCount();
-    System.out.println(String.format(strIntFormat, "Current Total Entry Count", entryCount));
-    System.out.println(
-        String.format(strIntFormat, "Current Unreferenced Entry Count", unreferencedEntryCount));
-    if (entryCount != 0) {
-      System.out.println(
-          String.format(
-              strFloatFormat,
-              "Percentage of Unreferenced Entry",
-              1.0 * response.getCasEntryCount() / response.getCasUnreferencedEntryCount()));
-    }
-    System.out.println(
-        String.format(
-            strIntFormat, "Current DirectoryEntry Count", response.getCasDirectoryEntryCount()));
-    System.out.println(
-        String.format(
-            strIntFormat, "Number of Evicted Entries", response.getCasEvictedEntryCount()));
-    System.out.println(
-        String.format(
-            strIntFormat,
-            "Total Evicted Entries size in Bytes",
-            response.getCasEvictedEntrySize()));
-
-    List<StageInformation> stages = response.getStagesList();
-    for (StageInformation stage : stages) {
-      printStageInformation(stage);
-    }
-
-    List<OperationTimesBetweenStages> times = response.getTimesList();
-    for (OperationTimesBetweenStages time : times) {
-      printOperationTime(time);
-    }
-  }
-
-  private static RedisShardBackplaneConfig toRedisShardBackplaneConfig(
-      Readable input, WorkerOptions options) throws IOException {
-    ShardWorkerConfig.Builder builder = ShardWorkerConfig.newBuilder();
-    TextFormat.merge(input, builder);
-    if (!Strings.isNullOrEmpty(options.root)) {
-      builder.setRoot(options.root);
-    }
-    if (!Strings.isNullOrEmpty(options.publicName)) {
-      builder.setPublicName(options.publicName);
-    }
-    return builder.build().getRedisShardBackplaneConfig();
-  }
-
-  private static Set<String> getWorkers(String[] args) throws ConfigurationException, IOException {
-    OptionsParser parser = OptionsParser.newOptionsParser(WorkerOptions.class);
-    parser.parseAndExitUponError(args);
-    List<String> residue = parser.getResidue();
-    if (residue.isEmpty()) {
-      throw new IllegalArgumentException("Missing Config_PATH");
-    }
-    Path configPath = Paths.get(residue.get(4)); // ?
-    RedisShardBackplaneConfig config = null;
-    try (InputStream configInputStream = Files.newInputStream(configPath)) {
-      config =
-          toRedisShardBackplaneConfig(
-              new InputStreamReader(configInputStream), parser.getOptions(WorkerOptions.class));
-    } catch (Exception e) {
-      e.printStackTrace();
-    }
-
-    RedisClient client = new RedisClient(JedisClusterFactory.create(config).get());
-    RedisShardBackplaneConfig finalConfig = config;
-    return client.call(jedis -> fetchWorkers(jedis, finalConfig, System.currentTimeMillis()));
-  }
-
-  private static Set<String> fetchWorkers(
-      JedisCluster jedis, RedisShardBackplaneConfig config, long now) {
-    Set<String> workers = Sets.newConcurrentHashSet();
-    for (Map.Entry<String, String> entry : jedis.hgetAll(config.getWorkersHashName()).entrySet()) {
-      String json = entry.getValue();
-      try {
-        if (json != null) {
-          ShardWorker.Builder builder = ShardWorker.newBuilder();
-          JsonFormat.parser().merge(json, builder);
-          ShardWorker worker = builder.build();
-          if (worker.getExpireAt() > now) {
-            workers.add(worker.getEndpoint());
-          }
-        }
-      } catch (InvalidProtocolBufferException e) {
-        e.printStackTrace();
-      }
-    }
-    return workers;
-  }
-
-  private static void workerProfile(String[] args) throws IOException {
-    Set<String> workers = null;
-    DigestUtil digestUtil = DigestUtil.forHash("SHA256");
-    Instance currentInstance;
-    WorkerProfileMessage currentWorkerMessage;
-    HashMap<String, Instance> workersToChannels = new HashMap<>();
-
-    while (true) {
-      // update worker list
-      if (workers == null) {
-        try {
-          workers = getWorkers(args);
-        } catch (ConfigurationException e) {
-          e.printStackTrace();
-        }
-      }
-      if (workers == null || workers.size() == 0) {
-        continue;
-      }
-      // profile all workers
-      for (String worker : workers) {
-        if (!workersToChannels.containsKey(worker)) {
-          workersToChannels.put(
-              worker,
-              new StubInstance(
-                  "shard", "bf-cat", digestUtil, createChannel(workerStringTransformation(worker)), Durations.fromMinutes(1)));
-        }
-        try {
-          currentWorkerMessage = workersToChannels.get(worker).getWorkerProfile();
-          System.out.println(worker);
-          //analyzeMessage(worker, currentWorkerMessage);
-        } catch (StatusRuntimeException e) {
-          e.printStackTrace();
-          System.out.println("==============TIMEOUT");
-        }
-      }
-
-      // sleep
-      try {
-        System.out.println("Wait for 5 seconds:");
-        Thread.sleep(5000);
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-      }
-    }
-  }
-
   private static void getWorkerProfile(Instance instance) {
-    // List<String> worker = instance.
     WorkerProfileMessage response = instance.getWorkerProfile();
     System.out.println("\nWorkerProfile:");
     String strIntFormat = "%-50s : %d";
@@ -935,9 +765,8 @@ class Cat {
 
   static void instanceMain(Instance instance, String type, String[] args) throws Exception {
     if (type.equals("WorkerProfile")) {
-      workerProfile(args);
+      getWorkerProfile(instance);
     }
-
     if (type.equals("Capabilities")) {
       ServerCapabilities capabilities = instance.getCapabilities();
       printCapabilities(capabilities);
