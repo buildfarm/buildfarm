@@ -796,21 +796,6 @@ java_plugin(
 )
 
 java_binary(
-    name = "io-benchmark",
-    srcs = ["IOBenchmark.java"],
-    main_class = "build.buildfarm.IOBenchmark",
-    plugins = [":io-benchmark-plugins"],
-    visibility = ["//visibility:public"],
-    deps = [
-        ":common",
-        "@maven//:com_github_jnr_jnr_constants",
-        "@maven//:com_github_jnr_jnr_ffi",
-        "@maven//:com_github_jnr_jnr_posix",
-        "@maven//:org_openjdk_jmh_jmh_core",
-    ],
-)
-
-java_binary(
     name = "bf-executor",
     srcs = ["Executor.java"],
     main_class = "build.buildfarm.Executor",
