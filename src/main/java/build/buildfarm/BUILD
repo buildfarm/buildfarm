@@ -57,6 +57,7 @@ java_library(
     name = "operations-finder",
     srcs = [
         "operations/OperationsFinder.java",
+        "operations/EnrichedOperationBuilder.java",
     ],
     deps = [
         ":ac",
@@ -92,9 +93,12 @@ java_library(
 java_library(
     name = "operations",
     srcs = glob([
-        "operations/FindOperationsSettings.java",
-        "operations/FindOperationsResults.java",
-    ]),
+        "operations/*.java",
+    ],
+            exclude = [
+            "operations/OperationsFinder.java",
+            "operations/EnrichedOperationBuilder.java",
+        ]),
     deps = [
         ":common",
         "@googleapis//:google_bytestream_bytestream_java_grpc",
