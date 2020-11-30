@@ -14,8 +14,8 @@
 
 package build.buildfarm.operations;
 
+import build.bazel.remote.execution.v2.Command;
 import build.buildfarm.instance.Instance;
-import com.google.longrunning.Operation;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -52,7 +52,7 @@ public class OperationsFinder {
     Collection<JedisPool> pools = cluster.getClusterNodes().values();
     if (!pools.isEmpty()) {
       try (Jedis node = ((JedisPool) pools.toArray()[0]).getResource()) {
-        findOperationNode(cluster, node, settings, results);
+        findOperationNode(cluster, node, instance, settings, results);
       }
     }
 
@@ -64,19 +64,21 @@ public class OperationsFinder {
   /// @details Results are accumulated onto.
   /// @param   cluster  An established redis cluster.
   /// @param   node     A node of the cluster.
+  /// @param   instance An instance is used to get additional information about the operation.
   /// @param   settings Settings on what operations to find and keep.
   /// @param   results  Accumulating results from performing a search.
   ///
   private static void findOperationNode(
       JedisCluster cluster,
       Jedis node,
+      Instance instance,
       FindOperationsSettings settings,
       FindOperationsResults results) {
     // iterate over all operation entries via scanning
     String cursor = "0";
     do {
       List<String> operationKeys = scanOperations(node, cursor, settings);
-      collectOperations(cluster, operationKeys, settings.user, results);
+      collectOperations(cluster, instance, operationKeys, settings.user, results);
 
     } while (!cursor.equals("0"));
   }
@@ -108,18 +110,44 @@ public class OperationsFinder {
   /// @brief   Collect operations based on settings.
   /// @details Populates results.
   /// @param   cluster       An established redis cluster.
+  /// @param   instance      An instance is used to get additional information about the operation.
   /// @param   operationKeys Keys to get operations from.
   /// @param   user          The user operations to search for.
   /// @param   results       Accumulating results from finding operations.
   ///
   private static void collectOperations(
       JedisCluster cluster,
+      Instance instance,
       List<String> operationKeys,
       String user,
       FindOperationsResults results) {
     for (String operationKey : operationKeys) {
-      Operation operation = EnrichedOperationBuilder.build(cluster, operationKey).operation;
-      results.operations.add(operationKey);
+      EnrichedOperation operation = EnrichedOperationBuilder.build(cluster, instance, operationKey);
+      if (keepOperation(operation)) {
+        results.operations.add(operationKey);
+      }
     }
+  }
+  ///
+  /// @brief   Whether or not to keep operation based on filter settings.
+  /// @details True if the operation should be returned. false if it should be
+  ///          ignored.
+  /// @param   operation The operation to analyze based on filter settings.
+  /// @return  Whether to keep the operation based on the filter settings.
+  /// @note    Suggested return identifier: shouldKeep.
+  ///
+  private static boolean keepOperation(EnrichedOperation operation) {
+    System.out.println("-------------------");
+    for (Command.EnvironmentVariable environmentVariable :
+        operation.command.getEnvironmentVariablesList()) {
+      System.out.println(environmentVariable.getName());
+      System.out.println(environmentVariable.getValue());
+    }
+    System.out.println("--------ARGS:-----------");
+    for (String environmentVariable : operation.command.getArgumentsList()) {
+      System.out.println(environmentVariable);
+    }
+    System.out.println("-------------------");
+    return false;
   }
 }

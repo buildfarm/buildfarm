@@ -45,13 +45,19 @@ public class EnrichedOperationBuilder {
   /// @details This will make calls to get blobs, and resolve digests into the
   ///          appropriate data structures.
   /// @param   cluster      An established redis cluster.
+  /// @param   instance     An instance is used to get additional information about the operation.
   /// @param   operationKey Key to get operation from.
   /// @return  Operation with populated metadata.
   /// @note    Suggested return identifier: operation.
   ///
-  public static EnrichedOperation build(JedisCluster cluster, String operationKey) {
+  public static EnrichedOperation build(
+      JedisCluster cluster, Instance instance, String operationKey) {
     EnrichedOperation operationWithMetadata = new EnrichedOperation();
     operationWithMetadata.operation = operationKeyToOperation(cluster, operationKey);
+    operationWithMetadata.action =
+        actionDigestToAction(instance, operationToActionDigest(operationWithMetadata.operation));
+    operationWithMetadata.command =
+        commandDigestToCommand(instance, operationWithMetadata.action.getCommandDigest());
     return operationWithMetadata;
   }
   ///
