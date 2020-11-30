@@ -136,7 +136,7 @@ class WorkerProfile{
     if (residue.isEmpty()) {
       throw new IllegalArgumentException("Missing Config_PATH");
     }
-    Path configPath = Paths.get(residue.get(4)); // ?
+    Path configPath = Paths.get(residue.get(1)); // ?
     RedisShardBackplaneConfig config = null;
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
       config =
@@ -175,7 +175,6 @@ class WorkerProfile{
   private static void workerProfile(String[] args) throws IOException {
     Set<String> workers = null;
     DigestUtil digestUtil = DigestUtil.forHash("SHA256");
-    Instance currentInstance;
     WorkerProfileMessage currentWorkerMessage;
     HashMap<String, Instance> workersToChannels = new HashMap<>();
 
@@ -189,6 +188,7 @@ class WorkerProfile{
         }
       }
       if (workers == null || workers.size() == 0) {
+        System.out.println("cannot find any workers, check the redis url and make sure there are workers in the cluster");
         continue;
       }
       // profile all workers
@@ -197,12 +197,12 @@ class WorkerProfile{
           workersToChannels.put(
               worker,
               new StubInstance(
-                  "shard", "bf-cat", digestUtil, createChannel(workerStringTransformation(worker)), Durations.fromMinutes(1)));
+                  "shard", "bf-workerprofile", digestUtil, createChannel(workerStringTransformation(worker)), Durations.fromMinutes(1)));
         }
         try {
           currentWorkerMessage = workersToChannels.get(worker).getWorkerProfile();
           System.out.println(worker);
-          //analyzeMessage(worker, currentWorkerMessage);
+          analyzeMessage(worker, currentWorkerMessage);
         } catch (StatusRuntimeException e) {
           e.printStackTrace();
           System.out.println("==============TIMEOUT");
@@ -349,7 +349,7 @@ class WorkerProfile{
   }
 
   public static void main(String[] args) throws Exception {
-    String type = args[1];
+    String type = args[0];
 
     ScheduledExecutorService service = newSingleThreadScheduledExecutor();
     Context.CancellableContext ctx =
@@ -357,7 +357,7 @@ class WorkerProfile{
             .withDeadlineAfter(deadlineSecondsForType(type), TimeUnit.SECONDS, service);
     Context prevContext = ctx.attach();
     try {
-      cancellableMain(args);
+      workerProfile(args);
     } finally {
       ctx.cancel(null);
       ctx.detach(prevContext);
@@ -365,17 +365,5 @@ class WorkerProfile{
         throw new RuntimeException("could not shut down service");
       }
     }
-  }
-
-  static void cancellableMain(String[] args)
-      throws Exception {
-    try {
-      instanceMain(args);
-    } finally {
-    }
-  }
-
-  static void instanceMain(String[] args) throws Exception {
-      workerProfile(args);
   }
 }
