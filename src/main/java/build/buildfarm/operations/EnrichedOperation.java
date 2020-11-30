@@ -17,6 +17,9 @@ package build.buildfarm.operations;
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.Command;
 import com.google.longrunning.Operation;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.util.JsonFormat;
+import org.json.simple.JSONObject;
 
 ///
 /// @class   EnrichedOperation
@@ -52,4 +55,21 @@ public class EnrichedOperation {
   /// @details Created from the digest in the action.
   ///
   public Command command;
+
+  ///
+  /// @brief   Convert the structure into a json string.
+  /// @details Uses proto to json serialization where appropriate.
+  /// @return  The structure as a json string.
+  /// @note    Suggested return identifier: json.
+  ///
+  public String asJsonString() {
+    JSONObject obj = new JSONObject();
+    try {
+      obj.put("operation", JsonFormat.printer().print(operation));
+      obj.put("action", JsonFormat.printer().print(action));
+      obj.put("command", JsonFormat.printer().print(command));
+    } catch (InvalidProtocolBufferException e) {
+    }
+    return obj.toString();
+  }
 }

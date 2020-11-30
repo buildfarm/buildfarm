@@ -23,9 +23,10 @@ import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 
 // This tool can be used to find Operations based on their particular properties.
-// For example, it could find all of the operations executed by a particular user.
+// For example, it could find all of the operations executed by a particular user or particular
+// program.
 // ./tool <URL> shard SHA256 <user>
-// The found operations will be printed.
+// The operations that match the query will be printed.
 class FindOperations {
 
   private static ManagedChannel createChannel(String target) {

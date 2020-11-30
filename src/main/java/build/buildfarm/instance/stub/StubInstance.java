@@ -844,7 +844,8 @@ public class StubInstance implements Instance {
     FindOperationsRequestResults proto =
         adminBlockingStub
             .get()
-            .findOperations(FindOperationsRequest.newBuilder().setFilterPredicate(filterPredicate).build());
+            .findOperations(
+                FindOperationsRequest.newBuilder().setFilterPredicate(filterPredicate).build());
     FindOperationsResults results = new FindOperationsResults();
     results.operations = proto.getOperationsList();
     return results;
