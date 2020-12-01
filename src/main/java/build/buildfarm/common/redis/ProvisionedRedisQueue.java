@@ -56,12 +56,34 @@ public class ProvisionedRedisQueue {
   public static final String WILDCARD_VALUE = "*";
 
   ///
+  /// @field   CHOOSE_QUEUE_KEY
+  /// @brief   Special key to allow directly matching with a queue.
+  /// @details This is to support another paradigm where actions want to
+  ///          specifically request the queue to be placed in. Its less generic
+  ///          than having buildfarm choose the queue for you, and it leaks
+  ///          implementation details about how buildfarm is queuing your work.
+  ///          However, its desirable to match similar remote execution
+  ///          solutions that use exec_properties to choose which "pool" they
+  ///          want to run in.
+  ///
+  public static final String CHOOSE_QUEUE_KEY = "choose-queue";
+
+  ///
   /// @field   isFullyWildcard
   /// @brief   If the queue will deem any set of properties eligible.
   /// @details If any of the provision keys has a wildcard, we consider
   ///          anything for the queue to be eligible.
   ///
   private final boolean isFullyWildcard;
+
+  ///
+  /// @field   allowUserUnmatched
+  /// @brief   Can the user provide extra platform properties that are not a
+  ///          part of the queue and still be matched with it?
+  /// @details If true, the user can provide a superset of platform properties
+  ///          and still be matched with the queue.
+  ///
+  private final boolean allowUserUnmatched;
 
   ///
   /// @field   provisions
@@ -84,12 +106,34 @@ public class ProvisionedRedisQueue {
   /// @param   name             The global name of the queue.
   /// @param   hashtags         Hashtags to distribute queue data.
   /// @param   filterProvisions The filtered provisions of the queue.
+  /// @note    Overloaded.
   ///
   public ProvisionedRedisQueue(
       String name, List<String> hashtags, SetMultimap<String, String> filterProvisions) {
     this.queue = new BalancedRedisQueue(name, hashtags);
     isFullyWildcard = filterProvisions.containsKey(WILDCARD_VALUE);
     provisions = filterProvisionsByWildcard(filterProvisions, isFullyWildcard, WILDCARD_VALUE);
+    allowUserUnmatched = false;
+  }
+  ///
+  /// @brief   Constructor.
+  /// @details Construct the provision queue.
+  /// @param   name               The global name of the queue.
+  /// @param   hashtags           Hashtags to distribute queue data.
+  /// @param   filterProvisions   The filtered provisions of the queue.
+  /// @param   allowUserUnmatched Whether the user can provide extra platform properties and still
+  // match the queue.
+  /// @note    Overloaded.
+  ///
+  public ProvisionedRedisQueue(
+      String name,
+      List<String> hashtags,
+      SetMultimap<String, String> filterProvisions,
+      boolean allowUserUnmatched) {
+    this.queue = new BalancedRedisQueue(name, hashtags);
+    isFullyWildcard = filterProvisions.containsKey(WILDCARD_VALUE);
+    provisions = filterProvisionsByWildcard(filterProvisions, isFullyWildcard, WILDCARD_VALUE);
+    this.allowUserUnmatched = allowUserUnmatched;
   }
   ///
   /// @brief   Checks required properties.
@@ -100,7 +144,14 @@ public class ProvisionedRedisQueue {
   /// @note    Suggested return identifier: isEligible.
   ///
   public boolean isEligible(SetMultimap<String, String> properties) {
-    // set intersection of requirements and properties with wildcarding
+    // check if a property is specifically requesting to match with the queue
+    // any attempt to specifically match will not evaluate other properties
+    Set<String> selected = properties.get(CHOOSE_QUEUE_KEY);
+    if (!selected.isEmpty()) {
+      return selected.contains(queue.getName());
+    }
+
+    // fully wildcarded queues are always eligible
     if (isFullyWildcard) {
       return true;
     }
@@ -109,7 +160,9 @@ public class ProvisionedRedisQueue {
     for (Map.Entry<String, String> property : properties.entries()) {
       // for each of the properties specified, we must match requirements
       if (!provisions.wildcard.contains(property.getKey()) && !requirements.remove(property)) {
-        return false;
+        if (!allowUserUnmatched) {
+          return false;
+        }
       }
     }
     return requirements.isEmpty();
@@ -176,6 +229,15 @@ public class ProvisionedRedisQueue {
     result.queueName = queue.getName();
     result.isEligible = isEligible(properties);
     result.isFullyWildcard = isFullyWildcard;
+    result.isSpecificallyChosen = false;
+    result.allowsUnmatched = allowUserUnmatched;
+
+    // check if a property is specifically requesting to match with the queue
+    // any attempt to specifically match will not evaluate other properties
+    Set<String> selected = properties.get(CHOOSE_QUEUE_KEY);
+    if (!selected.isEmpty()) {
+      result.isSpecificallyChosen = selected.contains(queue.getName());
+    }
 
     // gather matched, unmatched, and still required properties
     ImmutableSetMultimap.Builder<String, String> matched = ImmutableSetMultimap.builder();
@@ -226,6 +288,11 @@ public class ProvisionedRedisQueue {
       explanation += "The properties are eligible for the " + result.queueName + " queue.\n";
     } else {
       explanation += "The properties are not eligible for the " + result.queueName + " queue.\n";
+    }
+
+    if (result.isSpecificallyChosen) {
+      explanation += "The queue was specifically chosen.\n";
+      return explanation;
     }
 
     if (result.isFullyWildcard) {
