@@ -46,7 +46,7 @@ class FindOperations {
     // decide filter predicate
     String filterPredicate = "*";
     if (args.length >= 4) {
-      System.out.println("sdfsdf");
+      filterPredicate = args[3];
     }
 
     // create instance
