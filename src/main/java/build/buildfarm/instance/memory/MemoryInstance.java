@@ -936,6 +936,12 @@ public class MemoryInstance extends AbstractServerInstance {
   protected int getTreeMaxPageSize() {
     return config.getTreeMaxPageSize();
   }
+  
+  @Override
+  public String listOperations(
+      int pageSize, String pageToken, String filter, ImmutableList.Builder<Operation> operations) {
+    return "";
+  }
 
   @Override
   protected TokenizableIterator<DirectoryEntry> createTreeIterator(
