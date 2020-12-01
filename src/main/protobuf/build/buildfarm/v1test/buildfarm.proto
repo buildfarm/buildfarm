@@ -349,6 +349,8 @@ message MemoryInstanceConfig {
 message ProvisionedQueue {
   string name = 1;
   
+  bool allow_unmatched = 3;
+  
   build.bazel.remote.execution.v2.Platform platform = 2;
 }
 
