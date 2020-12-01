@@ -48,6 +48,8 @@ public class OperationsFinder {
     FindOperationsResults results = new FindOperationsResults();
     results.operations = new HashMap<String, EnrichedOperation>();
 
+    adjustFilter(settings);
+
     // JedisCluster only supports SCAN commands with MATCH patterns containing hash-tags.
     // This prevents us from using the cluster's SCAN to traverse all of the CAS.
     // That's why we choose to scan each of the jedisNode's individually.
@@ -60,6 +62,19 @@ public class OperationsFinder {
             });
 
     return results;
+  }
+  ///
+  /// @brief   Adjust the user provided filter if needed.
+  /// @details This is used to ensure certain expectations on particular given
+  ///          filters.
+  /// @param   settings Settings on how to find and filter operations.
+  ///
+  private static void adjustFilter(FindOperationsSettings settings) {
+    // be generous. if no filter is provided assume the user wants to select all operations instead
+    // of no operations
+    if (settings.filterPredicate.isEmpty()) {
+      settings.filterPredicate = "*";
+    }
   }
   ///
   /// @brief   Scan all operation entires on existing Jedis node and keep ones

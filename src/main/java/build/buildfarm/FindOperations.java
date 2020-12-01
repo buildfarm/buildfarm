@@ -37,18 +37,29 @@ class FindOperations {
   }
 
   public static void main(String[] args) throws Exception {
+
+    // get arguments for establishing an instance
     String host = args[0];
     String instanceName = args[1];
     DigestUtil digestUtil = DigestUtil.forHash(args[2]);
-    String filterPredicate = args[3];
+
+    // decide filter predicate
+    String filterPredicate = "*";
+    if (args.length >= 4) {
+      System.out.println("sdfsdf");
+    }
+
+    // create instance
     ManagedChannel channel = createChannel(host);
     Instance instance = new StubInstance(instanceName, digestUtil, channel);
 
+    // get operations and print them
     ImmutableList.Builder<Operation> operations = new ImmutableList.Builder<>();
     String token = instance.listOperations(100, "/operations", filterPredicate, operations);
     for (Operation operation : operations.build()) {
       System.out.println(operation.getName());
     }
+
     instance.stop();
   }
 }
