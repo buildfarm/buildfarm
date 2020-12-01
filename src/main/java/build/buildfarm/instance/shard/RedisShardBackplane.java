@@ -546,7 +546,8 @@ public class RedisShardBackplane implements ShardBackplane {
           new ProvisionedRedisQueue(
               queueConfig.getName(),
               getQueueHashes(client, queueConfig.getName()),
-              toMultimap(queueConfig.getPlatform().getPropertiesList()));
+              toMultimap(queueConfig.getPlatform().getPropertiesList()),
+              queueConfig.getAllowUnmatched());
       provisionedQueues.add(provisionedQueue);
     }
     // If there is no configuration for provisioned queues, we might consider that an error.
