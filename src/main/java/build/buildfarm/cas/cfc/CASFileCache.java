@@ -2651,7 +2651,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       throw new InterruptedException();
     }
 
-    Path writePath = getPath(key).resolveSibling(key + "." + writeId);
+    String writeKey = key + "." + writeId;
+    Path writePath = getPath(key).resolveSibling(writeKey);
     final long committedSize;
     final HashingOutputStream hashOut;
     if (!isReset && Files.exists(writePath)) {
@@ -2692,6 +2693,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
       @Override
       public void write(int b) throws IOException {
+        if (written >= blobSizeInBytes) {
+          throw new IOException(
+              format("attempted overwrite at %d by 1 byte for %s", written, writeKey));
+        }
         hashOut.write(b);
         written++;
       }
@@ -2704,6 +2709,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
       @Override
       public void write(byte[] b, int off, int len) throws IOException {
+        if (written + len > blobSizeInBytes) {
+          throw new IOException(
+              format("attempted overwrite at %d by %d bytes for %s", written, len, writeKey));
+        }
         hashOut.write(b, off, len);
         written += len;
       }
