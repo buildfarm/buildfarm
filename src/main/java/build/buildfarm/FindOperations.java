@@ -17,7 +17,8 @@ package build.buildfarm;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
-import build.buildfarm.operations.FindOperationsResults;
+import com.google.common.collect.ImmutableList;
+import com.google.longrunning.Operation;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
@@ -42,8 +43,12 @@ class FindOperations {
     String filterPredicate = args[3];
     ManagedChannel channel = createChannel(host);
     Instance instance = new StubInstance(instanceName, digestUtil, channel);
-    FindOperationsResults results = instance.findOperations(filterPredicate);
-    System.out.println(results.toMessage());
+
+    ImmutableList.Builder<Operation> operations = new ImmutableList.Builder<>();
+    String token = instance.listOperations(100, "/operations", filterPredicate, operations);
+    for (Operation operation : operations.build()) {
+      System.out.println(operation.getName());
+    }
     instance.stop();
   }
 }

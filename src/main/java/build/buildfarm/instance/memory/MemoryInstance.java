@@ -1025,7 +1025,7 @@ public class MemoryInstance extends AbstractServerInstance {
   public CasIndexResults reindexCas(String hostName) {
     throw new UnsupportedOperationException();
   }
-  
+
   @Override
   public FindOperationsResults findOperations(String filterPredicate) {
     throw new UnsupportedOperationException();

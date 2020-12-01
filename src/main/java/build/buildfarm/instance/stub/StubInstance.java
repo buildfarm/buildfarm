@@ -67,12 +67,8 @@ import build.buildfarm.common.grpc.ByteStreamHelper;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.StubWriteOutputStream;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.operations.FindOperationsResults;
-import build.buildfarm.operations.EnrichedOperation;
 import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.AdminGrpc.AdminBlockingStub;
-import build.buildfarm.v1test.FindOperationsRequest;
-import build.buildfarm.v1test.FindOperationsRequestResults;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.OperationQueueGrpc.OperationQueueBlockingStub;
@@ -127,7 +123,6 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Iterator;
-import java.util.HashMap;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -839,21 +834,4 @@ public class StubInstance implements Instance {
     results.totalKeys = proto.getTotalKeys();
     return results;
   }
-  
-  @Override
-  public FindOperationsResults findOperations(String filterPredicate) {
-    throwIfStopped();
-    FindOperationsRequestResults proto =
-        adminBlockingStub
-            .get()
-            .findOperations(
-                FindOperationsRequest.newBuilder().setFilterPredicate(filterPredicate).build());
-    FindOperationsResults results = new FindOperationsResults();
-    results.operations = new HashMap<String, EnrichedOperation>();
-    for (String operation: proto.getOperationsList()){
-      results.operations.put(operation,null);
-    }
-    return results;
-  }
-
 }

@@ -51,7 +51,6 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.bazel.remote.execution.v2.SymlinkAbsolutePathStrategy;
-import build.buildfarm.operations.EnrichedOperation;
 import build.buildfarm.ac.ActionCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
@@ -64,6 +63,7 @@ import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
+import build.buildfarm.operations.EnrichedOperation;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
@@ -1486,12 +1486,12 @@ public abstract class AbstractServerInstance implements Instance {
       pageSize = getListOperationsMaxPageSize();
     }
 
-    //todo(luxe): add proper pagination
+    // todo(luxe): add proper pagination
     FindOperationsResults results = findOperations(filter);
-    for (Map.Entry<String,EnrichedOperation> entry : results.operations.entrySet()){
+    for (Map.Entry<String, EnrichedOperation> entry : results.operations.entrySet()) {
       operations.add(entry.getValue().operation);
     }
-    
+
     return "";
   }
 
@@ -1696,8 +1696,7 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public abstract CasIndexResults reindexCas(String hostName);
-  
-  @Override
+
   public abstract FindOperationsResults findOperations(String filterPredicate);
 
   protected abstract Logger getLogger();
