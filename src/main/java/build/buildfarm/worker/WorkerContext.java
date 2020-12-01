@@ -125,4 +125,6 @@ public interface WorkerContext {
       String operationName, ImmutableList.Builder<String> arguments, Command command);
 
   int commandExecutionClaims(Command command);
+
+  ResourceLimits commandExecutionSettings(Command command);
 }

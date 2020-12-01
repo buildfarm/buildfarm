@@ -623,6 +623,7 @@ java_library(
     deps = [
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@maven//:com_google_guava_guava",
+        "@maven//:com_googlecode_json_simple_json_simple",
     ],
 )
 
@@ -634,6 +635,7 @@ java_library(
         ":common",
         ":instance",
         ":stub-instance",
+        ":worker-resources",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
         "@googleapis//:google_rpc_error_details_java_proto",
@@ -665,6 +667,7 @@ java_library(
         ":common-grpc",
         ":instance",
         ":stub-instance",
+        ":worker-resources",
         ":worker",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@maven//:com_github_pcj_google_options",
