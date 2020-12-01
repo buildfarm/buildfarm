@@ -51,6 +51,7 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.bazel.remote.execution.v2.SymlinkAbsolutePathStrategy;
+import build.buildfarm.operations.EnrichedOperation;
 import build.buildfarm.ac.ActionCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
@@ -1485,17 +1486,13 @@ public abstract class AbstractServerInstance implements Instance {
       pageSize = getListOperationsMaxPageSize();
     }
 
-    // FIXME filter?
-    TokenizableIterator<Operation> iter = createOperationsIterator(pageToken);
-
-    while (iter.hasNext() && pageSize != 0) {
-      Operation operation = iter.next();
-      operations.add(operation);
-      if (pageSize > 0) {
-        pageSize--;
-      }
+    //todo(luxe): add proper pagination
+    FindOperationsResults results = findOperations(filter);
+    for (Map.Entry<String,EnrichedOperation> entry : results.operations.entrySet()){
+      operations.add(entry.getValue().operation);
     }
-    return iter.toNextPageToken();
+    
+    return "";
   }
 
   @Override
@@ -1699,9 +1696,9 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public abstract CasIndexResults reindexCas(String hostName);
-
+  
   @Override
-  public abstract FindOperationsResults findOperations(String hostName);
+  public abstract FindOperationsResults findOperations(String filterPredicate);
 
   protected abstract Logger getLogger();
 }

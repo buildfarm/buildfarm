@@ -388,7 +388,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
       throw Status.fromThrowable(e).asRuntimeException();
     }
   }
-
+  
   @Override
   public FindOperationsResults findOperations(String filterPredicate) {
     try {

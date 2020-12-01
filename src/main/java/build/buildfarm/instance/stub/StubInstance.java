@@ -839,7 +839,7 @@ public class StubInstance implements Instance {
     results.totalKeys = proto.getTotalKeys();
     return results;
   }
-
+  
   @Override
   public FindOperationsResults findOperations(String filterPredicate) {
     throwIfStopped();
@@ -855,4 +855,5 @@ public class StubInstance implements Instance {
     }
     return results;
   }
+
 }

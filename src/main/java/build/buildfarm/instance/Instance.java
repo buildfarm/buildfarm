@@ -144,7 +144,7 @@ public interface Instance {
   GetClientStartTimeResult getClientStartTime(String clientKey);
 
   CasIndexResults reindexCas(String hostName);
-
+  
   FindOperationsResults findOperations(String filterPredicate);
 
   interface MatchListener {

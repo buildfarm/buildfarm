@@ -162,26 +162,6 @@ public class AdminService extends AdminGrpc.AdminImplBase {
     }
   }
 
-  @Override
-  public void findOperations(
-      FindOperationsRequest request,
-      StreamObserver<FindOperationsRequestResults> responseObserver) {
-    Instance instance;
-    try {
-      instance = instances.get(request.getInstanceName());
-      FindOperationsResults results = instance.findOperations(request.getFilterPredicate());
-      logger.log(INFO, results.toMessage());
-      responseObserver.onNext(
-          FindOperationsRequestResults.newBuilder()
-              .addAllOperations(results.operations.keySet())
-              .build());
-      responseObserver.onCompleted();
-    } catch (Exception e) {
-      logger.log(Level.SEVERE, "Could not find operations.", e);
-      responseObserver.onError(io.grpc.Status.fromThrowable(e).asException());
-    }
-  }
-
   private static Admin getAdminController(AdminConfig config) {
     switch (config.getDeploymentEnvironment()) {
       default:
