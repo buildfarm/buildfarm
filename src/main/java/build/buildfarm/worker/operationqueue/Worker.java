@@ -69,6 +69,7 @@ import build.buildfarm.worker.Pipeline;
 import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.ReportResultStage;
+import build.buildfarm.worker.ResourceLimits;
 import build.buildfarm.worker.UploadManifest;
 import build.buildfarm.worker.WorkerContext;
 import com.google.common.annotations.VisibleForTesting;
@@ -701,6 +702,11 @@ public class Worker extends LoggingMain {
           @Override
           public int commandExecutionClaims(Command command) {
             return 1;
+          }
+
+          @Override
+          public ResourceLimits commandExecutionSettings(Command command) {
+            return null;
           }
         };
 
