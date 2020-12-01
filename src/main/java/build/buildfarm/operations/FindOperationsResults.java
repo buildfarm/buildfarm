@@ -14,7 +14,7 @@
 
 package build.buildfarm.operations;
 
-import java.util.List;
+import java.util.Map;
 
 ///
 /// @class   FindOperationsResults
@@ -26,9 +26,10 @@ public class FindOperationsResults {
   ///
   /// @field   operations
   /// @brief   All of the operations found based on the search query.
-  /// @details These operations are not in any particular order.
+  /// @details The key is the operation keu, and the value is all the collected
+  ///          information about the operation.
   ///
-  public List<String> operations;
+  public Map<String, EnrichedOperation> operations;
 
   ///
   /// @brief   Get a string message for the results.
@@ -39,7 +40,7 @@ public class FindOperationsResults {
   public String toMessage() {
     StringBuilder message = new StringBuilder();
     message.append(String.format("results: %d\n", operations.size()));
-    message.append(String.join("\n", operations));
+    message.append(String.join("\n", operations.keySet()));
     return message.toString();
   }
 }

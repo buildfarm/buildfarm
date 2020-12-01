@@ -17,12 +17,11 @@ package build.buildfarm.operations;
 import build.buildfarm.instance.Instance;
 import com.jayway.jsonpath.JsonPath;
 import java.util.ArrayList;
-import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
-import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.ScanParams;
 import redis.clients.jedis.ScanResult;
 
@@ -47,15 +46,18 @@ public class OperationsFinder {
   public static FindOperationsResults findOperations(
       JedisCluster cluster, Instance instance, FindOperationsSettings settings) {
     FindOperationsResults results = new FindOperationsResults();
-    results.operations = new ArrayList<>();
+    results.operations = new HashMap<String, EnrichedOperation>();
 
-    // Get a Jedis node and run the query on it
-    Collection<JedisPool> pools = cluster.getClusterNodes().values();
-    if (!pools.isEmpty()) {
-      try (Jedis node = ((JedisPool) pools.toArray()[0]).getResource()) {
-        findOperationNode(cluster, node, instance, settings, results);
-      }
-    }
+    // JedisCluster only supports SCAN commands with MATCH patterns containing hash-tags.
+    // This prevents us from using the cluster's SCAN to traverse all of the CAS.
+    // That's why we choose to scan each of the jedisNode's individually.
+    cluster.getClusterNodes().values().stream()
+        .forEach(
+            pool -> {
+              try (Jedis node = pool.getResource()) {
+                findOperationNode(cluster, node, instance, settings, results);
+              }
+            });
 
     return results;
   }
@@ -125,8 +127,8 @@ public class OperationsFinder {
       FindOperationsResults results) {
     for (String operationKey : operationKeys) {
       EnrichedOperation operation = EnrichedOperationBuilder.build(cluster, instance, operationKey);
-      if (keepOperation(operation, filterPredicate)) {
-        results.operations.add(operationKey);
+      if (shouldKeepOperation(operation, filterPredicate)) {
+        results.operations.put(operationKey, operation);
       }
     }
   }
@@ -139,12 +141,16 @@ public class OperationsFinder {
   /// @return  Whether to keep the operation based on the filter settings.
   /// @note    Suggested return identifier: shouldKeep.
   ///
-  private static boolean keepOperation(EnrichedOperation operation, String filterPredicate) {
+  private static boolean shouldKeepOperation(EnrichedOperation operation, String filterPredicate) {
     String json = operation.asJsonString();
     System.out.println(json);
 
     // test the predicate
-    List<Map<String, Object>> matches = JsonPath.parse(json).read(filterPredicate);
-    return !matches.isEmpty();
+    try {
+      List<Map<String, Object>> matches = JsonPath.parse(json).read(filterPredicate);
+      return !matches.isEmpty();
+    } catch (Exception e) {
+      return false;
+    }
   }
 }

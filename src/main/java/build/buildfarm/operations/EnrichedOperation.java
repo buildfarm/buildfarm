@@ -21,11 +21,10 @@ import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import com.google.longrunning.Operation;
-import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 import com.google.rpc.PreconditionFailure;
 import org.json.simple.JSONObject;
-import org.json.simple.JSONValue;
+import org.json.simple.parser.JSONParser;
 
 ///
 /// @class   EnrichedOperation
@@ -83,10 +82,11 @@ public class EnrichedOperation {
                       .add(PreconditionFailure.getDescriptor())
                       .build());
 
-      obj.put("operation", JSONValue.parse(operationPrinter.print(operation)));
-      obj.put("action", JSONValue.parse(JsonFormat.printer().print(action)));
-      obj.put("command", JSONValue.parse(JsonFormat.printer().print(command)));
-    } catch (InvalidProtocolBufferException e) {
+      JSONParser j = new JSONParser();
+      obj.put("operation", j.parse(operationPrinter.print(operation)));
+      obj.put("action", j.parse(JsonFormat.printer().print(action)));
+      obj.put("command", j.parse(JsonFormat.printer().print(command)));
+    } catch (Exception e) {
     }
     return obj.toJSONString();
   }

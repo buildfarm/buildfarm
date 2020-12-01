@@ -847,7 +847,9 @@ public class StubInstance implements Instance {
             .findOperations(
                 FindOperationsRequest.newBuilder().setFilterPredicate(filterPredicate).build());
     FindOperationsResults results = new FindOperationsResults();
-    results.operations = proto.getOperationsList();
+    for (String operation: proto.getOperationsList()){
+      results.operations.put(operation,null);
+    }
     return results;
   }
 }

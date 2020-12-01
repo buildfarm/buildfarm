@@ -172,7 +172,9 @@ public class AdminService extends AdminGrpc.AdminImplBase {
       FindOperationsResults results = instance.findOperations(request.getFilterPredicate());
       logger.log(INFO, results.toMessage());
       responseObserver.onNext(
-          FindOperationsRequestResults.newBuilder().addAllOperations(results.operations).build());
+          FindOperationsRequestResults.newBuilder()
+              .addAllOperations(results.operations.keySet())
+              .build());
       responseObserver.onCompleted();
     } catch (Exception e) {
       logger.log(Level.SEVERE, "Could not find operations.", e);
