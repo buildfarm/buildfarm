@@ -68,7 +68,7 @@ public interface Instance {
   ListenableFuture<Iterable<Digest>> findMissingBlobs(
       Iterable<Digest> digests, RequestMetadata requestMetadata);
 
-  boolean containsBlob(Digest digest, RequestMetadata requestMetadata);
+  boolean containsBlob(Digest digest, Digest.Builder result, RequestMetadata requestMetadata);
 
   String getBlobName(Digest blobDigest);
 
@@ -97,6 +97,9 @@ public interface Instance {
 
   Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs, RequestMetadata requestMetadata)
       throws EntryLimitException, IOException, IllegalArgumentException, InterruptedException;
+
+  ListenableFuture<Digest> fetchBlob(
+      Iterable<String> uris, Digest expectedDigest, RequestMetadata requestMetadata);
 
   Write getOperationStreamWrite(String name);
 

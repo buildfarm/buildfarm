@@ -55,7 +55,7 @@ public class MemoryCAS implements ContentAddressableStorage {
   private final Consumer<Digest> onPut;
 
   @GuardedBy("this")
-  private final Map<Digest, Entry> storage;
+  private final Map<String, Entry> storage;
 
   @GuardedBy("this")
   private final Entry header = new SentinelEntry();
@@ -81,8 +81,13 @@ public class MemoryCAS implements ContentAddressableStorage {
   }
 
   @Override
-  public synchronized boolean contains(Digest digest) {
-    return get(digest) != null || (delegate != null && delegate.contains(digest));
+  public synchronized boolean contains(Digest digest, Digest.Builder result) {
+    Entry entry = getEntry(digest);
+    if (entry != null) {
+      result.setHash(entry.key).setSizeBytes(entry.value.size());
+      return true;
+    }
+    return delegate != null && delegate.contains(digest, result);
   }
 
   @Override
@@ -91,7 +96,7 @@ public class MemoryCAS implements ContentAddressableStorage {
     synchronized (this) {
       // incur access use of the digest
       for (Digest digest : digests) {
-        if (digest.getSizeBytes() != 0 && !contains(digest)) {
+        if (digest.getSizeBytes() != 0 && !contains(digest, Digest.newBuilder())) {
           builder.add(digest);
         }
       }
@@ -196,20 +201,28 @@ public class MemoryCAS implements ContentAddressableStorage {
   }
 
   @Override
-  public synchronized Blob get(Digest digest) {
+  public Blob get(Digest digest) {
     if (digest.getSizeBytes() == 0) {
       throw new IllegalArgumentException("Cannot fetch empty blob");
     }
 
-    Entry e = storage.get(digest);
+    Entry e = getEntry(digest);
     if (e == null) {
       if (delegate != null) {
         return delegate.get(digest);
       }
       return null;
     }
-    e.recordAccess(header);
     return e.value;
+  }
+
+  private synchronized Entry getEntry(Digest digest) {
+    Entry e = storage.get(digest.getHash());
+    if (e == null) {
+      return null;
+    }
+    e.recordAccess(header);
+    return e;
   }
 
   @GuardedBy("this")
@@ -245,7 +258,7 @@ public class MemoryCAS implements ContentAddressableStorage {
   }
 
   private synchronized boolean add(Blob blob, Runnable onExpiration) {
-    Entry e = storage.get(blob.getDigest());
+    Entry e = storage.get(blob.getDigest().getHash());
     if (e != null) {
       if (onExpiration != null) {
         e.addOnExpiration(onExpiration);
@@ -270,7 +283,7 @@ public class MemoryCAS implements ContentAddressableStorage {
 
     createEntry(blob, onExpiration);
 
-    storage.put(blob.getDigest(), header.before);
+    storage.put(blob.getDigest().getHash(), header.before);
 
     return true;
   }
@@ -291,27 +304,28 @@ public class MemoryCAS implements ContentAddressableStorage {
 
   @GuardedBy("this")
   private void expireEntry(Entry e) {
-    logger.log(Level.INFO, "MemoryLRUCAS: expiring " + DigestUtil.toString(e.key));
+    Digest digest = DigestUtil.buildDigest(e.key, e.value.size());
+    logger.log(Level.INFO, "MemoryLRUCAS: expiring " + DigestUtil.toString(digest));
     if (delegate != null) {
       try {
         Write write =
-            delegate.getWrite(e.key, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
+            delegate.getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
         try (OutputStream out = write.getOutput(1, MINUTES, () -> {})) {
           e.value.getData().writeTo(out);
         }
       } catch (IOException ioEx) {
         logger.log(
-            Level.SEVERE, String.format("error delegating %s", DigestUtil.toString(e.key)), ioEx);
+            Level.SEVERE, String.format("error delegating %s", DigestUtil.toString(digest)), ioEx);
       }
     }
     storage.remove(e.key);
     e.expire();
-    sizeInBytes -= e.value.size();
+    sizeInBytes -= digest.getSizeBytes();
   }
 
   private static class Entry {
     Entry before, after;
-    final Digest key;
+    final String key;
     final Blob value;
     private List<Runnable> onExpirations;
 
@@ -323,7 +337,7 @@ public class MemoryCAS implements ContentAddressableStorage {
     }
 
     public Entry(Blob blob) {
-      key = blob.getDigest();
+      key = blob.getDigest().getHash();
       value = blob;
       onExpirations = null;
     }

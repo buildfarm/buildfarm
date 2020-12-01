@@ -39,7 +39,7 @@ abstract class DirectoriesIndex {
   }
 
   Path path(Digest digest) {
-    return root.resolve(digest.getHash() + "_" + digest.getSizeBytes() + "_dir_inputs");
+    return root.resolve(digest.getHash() + "_dir_inputs");
   }
 
   public Iterable<String> directoryEntries(Digest directory) throws IOException {

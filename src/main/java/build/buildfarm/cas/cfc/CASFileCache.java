@@ -15,6 +15,7 @@
 package build.buildfarm.cas.cfc;
 
 import static build.buildfarm.common.io.Directories.disableAllWriteAccess;
+import static build.buildfarm.common.io.EvenMoreFiles.isReadOnlyExecutable;
 import static build.buildfarm.common.io.EvenMoreFiles.setReadOnlyPerms;
 import static build.buildfarm.common.io.Utils.getFileKey;
 import static build.buildfarm.common.io.Utils.getOrIOException;
@@ -97,7 +98,6 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentMap;
@@ -175,7 +175,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                 @Override
                 public SettableFuture<Long> load(Digest digest) {
                   SettableFuture<Long> future = SettableFuture.create();
-                  if (containsLocal(digest, (key) -> {})) {
+                  if (containsLocal(digest, /* result=*/ null, (key) -> {})) {
                     future.set(digest.getSizeBytes());
                   }
                   return future;
@@ -335,15 +335,13 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     header.before = header.after = header;
   }
 
-  private static Digest keyToDigest(String key, DigestUtil digestUtil)
+  private static Digest keyToDigest(String key, long size, DigestUtil digestUtil)
       throws NumberFormatException {
     String[] components = key.split("_");
 
     String hashComponent = components[0];
-    String sizeComponent = components[1];
-    long parsedSizeComponent = Long.parseLong(sizeComponent);
 
-    return digestUtil.build(hashComponent, parsedSizeComponent);
+    return digestUtil.build(hashComponent, size);
   }
 
   /**
@@ -354,7 +352,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private FileEntryKey parseFileEntryKey(String fileName, long size, DigestUtil digestUtil) {
 
     String[] components = fileName.split("_");
-    if (components.length < 2 || components.length > 3) {
+    if (components.length < 1 || components.length > 2) {
       return null;
     }
 
@@ -362,17 +360,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     long parsedSizeComponent = 0;
     Digest digest;
     try {
-      String sizeComponent = components[1];
-      parsedSizeComponent = Long.parseLong(sizeComponent);
-
-      if (size > 0 && parsedSizeComponent != size) {
-        return null;
-      }
-
       String hashComponent = components[0];
-      digest = digestUtil.build(hashComponent, parsedSizeComponent);
-      if (components.length == 3) {
-        if (components[2].equals("exec")) {
+      digest = digestUtil.build(hashComponent, size);
+      if (components.length == 2) {
+        if (components[1].equals("exec")) {
           isExecutable = true;
         } else {
           return null;
@@ -386,17 +377,21 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         getKey(digest, isExecutable), parsedSizeComponent, isExecutable, digest);
   }
 
-  private FileEntryKey parseFileEntryKey(String fileName) {
-    return parseFileEntryKey(fileName, /* size=*/ -1);
-  }
-
   private FileEntryKey parseFileEntryKey(String fileName, long size) {
     return parseFileEntryKey(fileName, size, digestUtil);
   }
 
-  private boolean contains(Digest digest, boolean isExecutable, Consumer<String> onContains) {
+  private boolean contains(
+      Digest digest,
+      boolean isExecutable,
+      @Nullable Digest.Builder result,
+      Consumer<String> onContains) {
     String key = getKey(digest, isExecutable);
-    if (Optional.ofNullable(storage.get(key)).isPresent()) {
+    Entry entry = storage.get(key);
+    if (entry != null && (digest.getSizeBytes() < 0 || digest.getSizeBytes() == entry.size)) {
+      if (result != null) {
+        result.mergeFrom(digest).setSizeBytes(entry.size);
+      }
       onContains.accept(key);
       return true;
     }
@@ -434,9 +429,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     return false;
   }
 
-  boolean containsLocal(Digest digest, Consumer<String> onContains) {
+  boolean containsLocal(
+      Digest digest, @Nullable Digest.Builder result, Consumer<String> onContains) {
     /* maybe swap the order here if we're higher in ratio on one side */
-    return contains(digest, false, onContains) || contains(digest, true, onContains);
+    return contains(digest, false, result, onContains)
+        || contains(digest, true, result, onContains);
   }
 
   @Override
@@ -444,7 +441,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     ImmutableList.Builder<Digest> builder = ImmutableList.builder();
     ImmutableList.Builder<String> found = ImmutableList.builder();
     for (Digest digest : digests) {
-      if (digest.getSizeBytes() != 0 && !containsLocal(digest, found::add)) {
+      if (digest.getSizeBytes() != 0 && !containsLocal(digest, null, found::add)) {
         builder.add(digest);
       }
     }
@@ -460,9 +457,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   @Override
-  public boolean contains(Digest digest) {
-    return containsLocal(digest, (key) -> accessed(ImmutableList.of(key)))
-        || (delegate != null && delegate.contains(digest));
+  public boolean contains(Digest digest, Digest.Builder result) {
+    return containsLocal(digest, result, (key) -> accessed(ImmutableList.of(key)))
+        || (delegate != null && delegate.contains(digest, result));
   }
 
   @Override
@@ -538,7 +535,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   ReadThroughInputStream newReadThroughInput(Digest digest, long offset, Write write)
       throws IOException {
-    return new ReadThroughInputStream(delegate.newInput(digest, 0), digest, offset, write);
+    return new ReadThroughInputStream(
+        delegate.newInput(digest, 0),
+        localOffset -> newTransparentInput(digest, localOffset),
+        digest.getSizeBytes(),
+        offset,
+        write);
   }
 
   @Override
@@ -711,262 +713,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
   }
 
-  class ReadThroughInputStream extends InputStream {
-    private InputStream in;
-    private final Write write;
-    private final OutputStream out;
-    private final Digest digest;
-
-    @GuardedBy("this")
-    private boolean local = false;
-
-    @GuardedBy("this")
-    private long localOffset;
-
-    @GuardedBy("this")
-    private long skip;
-
-    @GuardedBy("this")
-    private long remaining;
-
-    @GuardedBy("this")
-    private IOException exception = null;
-
-    ReadThroughInputStream(InputStream in, Digest digest, long offset, Write write)
-        throws IOException {
-      this.in = in;
-      this.localOffset = offset;
-      this.digest = digest;
-      skip = offset;
-      remaining = digest.getSizeBytes();
-      this.write = write;
-      write.getFuture().addListener(this::switchToLocal, directExecutor());
-      out = write.getOutput(1, MINUTES, () -> {});
-    }
-
-    private synchronized void switchToLocal() {
-      if (!local && localOffset < digest.getSizeBytes()) {
-        local = true;
-        try {
-          in.close();
-        } catch (IOException e) {
-          // ignore
-        }
-        try {
-          in = newTransparentInput(digest, localOffset);
-        } catch (IOException e) {
-          in = null;
-          exception = e;
-        }
-        notify(); // wake up a writer
-      }
-    }
-
-    @GuardedBy("this")
-    private void readToSkip() throws IOException {
-      while (!local && skip > 0) {
-        byte[] buf = new byte[8192];
-
-        int len = (int) Math.min(buf.length, skip);
-        int n = in.read(buf, 0, len);
-        if (n > 0) {
-          out.write(buf, 0, n);
-          skip -= n;
-          remaining -= n;
-          localOffset += n;
-        } else if (n < 0) {
-          throw new IOException("premature EOF for delegate");
-        }
-      }
-    }
-
-    @Override
-    public int available() throws IOException {
-      return in.available();
-    }
-
-    @Override
-    public synchronized int read() throws IOException {
-      if (local) {
-        if (exception != null) {
-          throw exception;
-        }
-        return in.read();
-      }
-      int b;
-      try {
-        readToSkip();
-        b = in.read();
-        if (b != -1) {
-          try {
-            out.write(b);
-          } catch (IOException e) {
-            if (!write.isComplete()) {
-              throw e;
-            }
-            // complete writes will switch to local
-          }
-          remaining--;
-          localOffset++;
-        } else if (remaining != 0) {
-          throw new IOException("premature EOF for delegate");
-        }
-      } catch (ClosedChannelException e) {
-        // if either in or out are closed, it should be due to a local switch
-        while (!local) {
-          try {
-            wait();
-          } catch (InterruptedException intEx) {
-            throw new IOException(intEx);
-          }
-        }
-        // we reacquire, meaning we should have completed the local switch
-        return in.read();
-      }
-      if (remaining == 0) {
-        out.close();
-      }
-      return b;
-    }
-
-    @Override
-    public int read(byte[] buf) throws IOException {
-      return read(buf, 0, buf.length);
-    }
-
-    @Override
-    public synchronized int read(byte[] buf, int ofs, int len) throws IOException {
-      if (local) {
-        if (exception != null) {
-          throw exception;
-        }
-        return in.read(buf, ofs, len);
-      }
-      int n;
-      try {
-        readToSkip();
-        n = in.read(buf, ofs, len);
-        if (n > 0) {
-          out.write(buf, ofs, n);
-          remaining -= n;
-          localOffset += n;
-        } else if (remaining != 0) {
-          throw new IOException("premature EOF for delegate");
-        }
-      } catch (ClosedChannelException e) {
-        // if either in or out are closed, it should be due to a local switch
-        while (!local) {
-          try {
-            wait();
-          } catch (InterruptedException intEx) {
-            throw new IOException(intEx);
-          }
-        }
-        // we reacquire, meaning we should have completed the local switch
-        return in.read(buf, ofs, len);
-      }
-      if (remaining == 0) {
-        out.close();
-      }
-      return n;
-    }
-
-    @Override
-    public synchronized long skip(long n) throws IOException {
-      if (local) {
-        if (exception != null) {
-          throw exception;
-        }
-        return in.skip(n);
-      }
-      if (n <= 0) {
-        return 0;
-      }
-      if (skip + n > remaining) {
-        n = remaining - skip;
-      }
-      skip += n;
-      localOffset += n;
-      return n;
-    }
-
-    @Override
-    public synchronized void close() throws IOException {
-      if (exception != null) {
-        throw exception;
-      }
-      if (!local) {
-        if (remaining != 0) {
-          write.reset();
-        } else {
-          try {
-            out.close();
-          } catch (IOException e) {
-            // ignore, may be incomplete
-          }
-        }
-      }
-      in.close();
-    }
-  }
-
-  static class WriteOutputStream extends FeedbackOutputStream {
-    protected final OutputStream out;
-    private final WriteOutputStream writeOut;
-
-    WriteOutputStream(OutputStream out) {
-      this.out = out;
-      this.writeOut = null;
-    }
-
-    WriteOutputStream(WriteOutputStream writeOut) {
-      this.out = writeOut;
-      this.writeOut = writeOut;
-    }
-
-    @Override
-    public void write(int b) throws IOException {
-      out.write(b);
-    }
-
-    @Override
-    public void write(byte[] b) throws IOException {
-      out.write(b);
-    }
-
-    @Override
-    public void write(byte[] b, int off, int len) throws IOException {
-      out.write(b, off, len);
-    }
-
-    @Override
-    public void close() throws IOException {
-      out.close();
-    }
-
-    @Override
-    public boolean isReady() {
-      if (writeOut != null) {
-        return writeOut.isReady();
-      }
-      return true; // fs blocking guarantees readiness
-    }
-
-    public Path getPath() {
-      if (writeOut == null) {
-        throw new UnsupportedOperationException();
-      }
-      return writeOut.getPath();
-    }
-
-    public long getWritten() {
-      if (writeOut == null) {
-        throw new UnsupportedOperationException();
-      }
-      return writeOut.getWritten();
-    }
-  }
-
   SettableFuture<Long> getFuture(Digest digest) {
     try {
       return writesInProgress.get(digest);
@@ -1097,7 +843,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           public synchronized boolean isComplete() {
             return getFuture().isDone()
                 || ((closedFuture == null || closedFuture.isDone())
-                    && containsLocal(key.getDigest(), (key) -> {}));
+                    && containsLocal(key.getDigest(), /* result=*/ null, (key) -> {}));
           }
 
           @Override
@@ -1152,6 +898,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                     public long getWritten() {
                       return key.getDigest().getSizeBytes();
                     }
+
+                    @Override
+                    public void cancel() {}
                   };
             } else {
               path = out.getPath();
@@ -1698,7 +1447,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           b.addDirectoriesBuilder().setName(name).setDigest(digestUtil.compute(dir));
         } else if (isEmptyFile) {
           // empty file
-          boolean isExecutable = dirent.getFileStatus().isReadOnlyExecutable();
+          boolean isExecutable = isReadOnlyExecutable(entryPath, fileStore);
           b.addFilesBuilder()
               .setName(name)
               .setDigest(digestUtil.empty())
@@ -1706,7 +1455,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         } else {
           // non-empty file
           inputsBuilder.add(e.key);
-          Digest digest = CASFileCache.keyToDigest(e.key, digestUtil);
+          Digest digest = CASFileCache.keyToDigest(e.key, e.size, digestUtil);
           boolean isExecutable = e.key.toString().endsWith("_exec");
           b.addFilesBuilder().setName(name).setDigest(digest).setIsExecutable(isExecutable);
         }
@@ -1726,11 +1475,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   private static String digestFilename(Digest digest) {
-    return new StringBuilder()
-        .append(digest.getHash())
-        .append("_")
-        .append(digest.getSizeBytes())
-        .toString();
+    return digest.getHash();
   }
 
   public static String getFileName(Digest digest, boolean isExecutable) {
@@ -1919,7 +1664,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   @GuardedBy("this")
-  private ListenableFuture<String> dischargeEntryFuture(Entry entry, ExecutorService service) {
+  private ListenableFuture<Entry> dischargeEntryFuture(Entry entry, ExecutorService service) {
     List<ListenableFuture<Void>> directoryExpirationFutures =
         unlinkAndExpireDirectories(entry, service);
     discharge(entry.size);
@@ -1950,7 +1695,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               if (expirationException != null) {
                 throw expirationException;
               }
-              return entry.key;
+              return entry;
             },
             service);
   }
@@ -1988,7 +1733,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   }
 
   @GuardedBy("this")
-  private ListenableFuture<String> expireEntry(long blobSizeInBytes, ExecutorService service)
+  private ListenableFuture<Entry> expireEntry(long blobSizeInBytes, ExecutorService service)
       throws IOException, InterruptedException {
     for (Entry e = waitForLastUnreferencedEntry(blobSizeInBytes);
         e != null;
@@ -2003,7 +1748,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       }
       boolean interrupted = false;
       if (delegate != null) {
-        FileEntryKey fileEntryKey = parseFileEntryKey(e.key);
+        FileEntryKey fileEntryKey = parseFileEntryKey(e.key, e.size);
         if (fileEntryKey == null) {
           logger.log(Level.SEVERE, format("error parsing expired key %s", e.key));
         } else {
@@ -2028,11 +1773,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       Entry removedEntry = storage.remove(e.key);
       // reference compare on purpose
       if (removedEntry == e) {
-        ListenableFuture<String> keyFuture = dischargeEntryFuture(e, service);
+        ListenableFuture<Entry> entryFuture = dischargeEntryFuture(e, service);
         if (interrupted) {
           Thread.currentThread().interrupt();
         }
-        return keyFuture;
+        return entryFuture;
       }
       if (removedEntry == null) {
         logger.log(Level.SEVERE, format("entry %s was already removed during expiration", e.key));
@@ -2538,7 +2283,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     void run() throws IOException;
   }
 
-  private static class CancellableOutputStream extends WriteOutputStream {
+  private abstract static class CancellableOutputStream extends WriteOutputStream {
     CancellableOutputStream(OutputStream out) {
       super(out);
     }
@@ -2547,13 +2292,13 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       super(out);
     }
 
-    void cancel() throws IOException {}
+    abstract void cancel() throws IOException;
   }
 
   private static final CancellableOutputStream DUPLICATE_OUTPUT_STREAM =
       new CancellableOutputStream(nullOutputStream()) {
         @Override
-        public void write(int b) {}
+        void cancel() {}
       };
 
   private CancellableOutputStream putImpl(
@@ -2616,11 +2361,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       } else {
         super.write(b);
       }
-    }
-
-    @Override
-    public void write(byte[] b) throws IOException {
-      write(b, 0, b.length);
     }
 
     @Override
@@ -2705,13 +2445,14 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       ImmutableList.Builder<ListenableFuture<Digest>> builder = ImmutableList.builder();
       try {
         while (!interrupted && sizeInBytes > maxSizeInBytes) {
-          ListenableFuture<String> expiredFuture = expireEntry(blobSizeInBytes, expireService);
+          ListenableFuture<Entry> expiredFuture = expireEntry(blobSizeInBytes, expireService);
           interrupted = Thread.interrupted();
           if (expiredFuture != null) {
             builder.add(
                 transformAsync(
                     expiredFuture,
-                    (expiredKey) -> {
+                    (expiredEntry) -> {
+                      String expiredKey = expiredEntry.key;
                       try {
                         Files.delete(getPath(expiredKey));
                       } catch (NoSuchFileException eNoEnt) {
@@ -2719,9 +2460,9 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                             Level.SEVERE,
                             format(
                                 "CASFileCache::putImpl: expired key %s did not exist to delete",
-                                expiredKey.toString()));
+                                expiredKey));
                       }
-                      FileEntryKey fileEntryKey = parseFileEntryKey(expiredKey);
+                      FileEntryKey fileEntryKey = parseFileEntryKey(expiredKey, expiredEntry.size);
                       if (fileEntryKey == null) {
                         logger.log(
                             Level.SEVERE, format("error parsing expired key %s", expiredKey));
@@ -2801,6 +2542,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
     return new CancellableOutputStream(hashOut) {
       long written = committedSize;
+      Digest expectedDigest = keyToDigest(key, blobSizeInBytes, digestUtil);
 
       @Override
       public long getWritten() {
@@ -2861,8 +2603,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             dischargeAndNotify(blobSizeInBytes);
           }
           Digest actual = Digest.newBuilder().setHash(hash).setSizeBytes(size).build();
-          Digest expected = keyToDigest(key, digestUtil);
-          throw new DigestMismatchException(actual, expected);
+          throw new DigestMismatchException(actual, expectedDigest);
         }
 
         if (size != blobSizeInBytes) {
@@ -2878,8 +2619,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         if (!fileName.startsWith(hash)) {
           dischargeAndNotify(blobSizeInBytes);
           Digest actual = Digest.newBuilder().setHash(hash).setSizeBytes(getWritten()).build();
-          Digest expected = keyToDigest(key, digestUtil);
-          throw new DigestMismatchException(actual, expected);
+          throw new DigestMismatchException(actual, expectedDigest);
         }
         try {
           setReadOnlyPerms(writePath, isExecutable, fileStore);

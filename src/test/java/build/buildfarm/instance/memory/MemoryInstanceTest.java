@@ -111,7 +111,7 @@ public class MemoryInstanceTest {
   private SetMultimap<String, WatchFuture> watchers;
   private ExecutorService watcherService;
 
-  private Map<Digest, ByteString> storage;
+  private Map<String, ByteString> storage;
   private List<Worker> workers;
   private Map<String, Watchdog> requeuers;
   private Map<String, Watchdog> operationTimeoutDelays;
@@ -229,7 +229,7 @@ public class MemoryInstanceTest {
   @Test
   public void actionCacheRetrievableByActionKey() throws Exception {
     ActionResult result = ActionResult.getDefaultInstance();
-    storage.put(DIGEST_UTIL.compute(result), result.toByteString());
+    storage.put(DIGEST_UTIL.compute(result).getHash(), result.toByteString());
 
     Action action = Action.getDefaultInstance();
     instance.putActionResult(instance.getDigestUtil().computeActionKey(action), result);
@@ -332,8 +332,8 @@ public class MemoryInstanceTest {
   @Test
   public void requeueSucceedsOnQueued()
       throws InterruptedException, InvalidProtocolBufferException {
-    storage.put(simpleActionDigest, simpleAction.toByteString());
-    storage.put(simpleCommandDigest, simpleCommand.toByteString());
+    storage.put(simpleActionDigest.getHash(), simpleAction.toByteString());
+    storage.put(simpleCommandDigest.getHash(), simpleCommand.toByteString());
 
     Operation queuedOperation = createOperation("my-queued-operation", QUEUED);
     outstandingOperations.put(queuedOperation.getName(), queuedOperation);
@@ -401,8 +401,8 @@ public class MemoryInstanceTest {
   }
 
   private boolean putNovelOperation(ExecutionStage.Value stage) throws InterruptedException {
-    storage.put(simpleActionDigest, simpleAction.toByteString());
-    storage.put(simpleCommandDigest, simpleCommand.toByteString());
+    storage.put(simpleActionDigest.getHash(), simpleAction.toByteString());
+    storage.put(simpleCommandDigest.getHash(), simpleCommand.toByteString());
     return instance.putOperation(createOperation("does-not-exist", stage));
   }
 
@@ -435,7 +435,7 @@ public class MemoryInstanceTest {
     Command command = Command.newBuilder().addArguments("echo").build();
     ByteString commandBlob = command.toByteString();
     Digest commandDigest = DIGEST_UTIL.compute(commandBlob);
-    storage.put(commandDigest, commandBlob);
+    storage.put(commandDigest.getHash(), commandBlob);
 
     Directory root = Directory.getDefaultInstance();
     Digest rootDigest = DIGEST_UTIL.compute(root);
@@ -443,7 +443,7 @@ public class MemoryInstanceTest {
         actionBuilder.setCommandDigest(commandDigest).setInputRootDigest(rootDigest).build();
     ByteString actionBlob = action.toByteString();
     Digest actionDigest = DIGEST_UTIL.compute(actionBlob);
-    storage.put(actionDigest, actionBlob);
+    storage.put(actionDigest.getHash(), actionBlob);
     return actionDigest;
   }
 

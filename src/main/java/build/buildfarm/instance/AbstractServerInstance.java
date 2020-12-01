@@ -29,6 +29,7 @@ import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static java.lang.String.format;
+import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 import build.bazel.remote.execution.v2.Action;
@@ -82,6 +83,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
+import com.google.common.io.ByteStreams;
 import com.google.common.util.concurrent.AsyncFunction;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
@@ -103,8 +105,14 @@ import io.grpc.stub.ServerCallStreamObserver;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.net.http.HttpResponse.BodyHandlers;
+import java.nio.file.NoSuchFileException;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -446,8 +454,9 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public boolean containsBlob(Digest digest, RequestMetadata requestMetadata) {
-    return contentAddressableStorage.contains(digest);
+  public boolean containsBlob(
+      Digest digest, Digest.Builder result, RequestMetadata requestMetadata) {
+    return contentAddressableStorage.contains(digest, result);
   }
 
   @Override
@@ -535,6 +544,46 @@ public abstract class AbstractServerInstance implements Instance {
       }
     }
     return iter.toNextPageToken();
+  }
+
+  @Override
+  public ListenableFuture<Digest> fetchBlob(
+      Iterable<String> uris, Digest expectedDigest, RequestMetadata requestMetadata) {
+    for (String uri : uris) {
+      try {
+        HttpClient client =
+            HttpClient.newBuilder()
+                .version(HttpClient.Version.HTTP_1_1)
+                .followRedirects(HttpClient.Redirect.ALWAYS)
+                // connect timeout?
+                // proxy?
+                // authenticator?
+                .build();
+        HttpRequest request =
+            HttpRequest.newBuilder()
+                .uri(URI.create(uri))
+                // timeout
+                .build();
+        HttpResponse<InputStream> response = client.send(request, BodyHandlers.ofInputStream());
+        if (response.headers().firstValueAsLong("content-length").isEmpty()) {
+          logger.log(Level.INFO, response.headers().toString());
+        }
+        long contentLength = response.headers().firstValueAsLong("content-length").getAsLong();
+        // digest mismatch exception on incorrect size
+        Digest actualDigest = expectedDigest.toBuilder().setSizeBytes(contentLength).build();
+        try (InputStream in = response.body();
+            OutputStream out =
+                getBlobWrite(actualDigest, UUID.randomUUID(), requestMetadata)
+                    .getOutput(1, DAYS, () -> {})) {
+          ByteStreams.copy(in, out);
+        }
+        return immediateFuture(actualDigest);
+      } catch (Exception e) {
+        logger.log(Level.WARNING, "download attempt failed", e);
+        // ignore?
+      }
+    }
+    return immediateFailedFuture(new NoSuchFileException(expectedDigest.getHash()));
   }
 
   protected String createOperationName(String id) {
