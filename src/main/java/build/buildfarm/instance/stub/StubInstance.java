@@ -293,7 +293,7 @@ public class StubInstance implements Instance {
 
   private <T extends AbstractStub<T>> T deadlined(Supplier<T> getter) {
     T stub = getter.get();
-    if (grpcTimeout.getSeconds() > 0) {
+    if (grpcTimeout.getSeconds() > 0 || grpcTimeout.getNanos() > 0) {
       stub = stub.withDeadline(Time.toDeadline(grpcTimeout));
     }
     return stub;
