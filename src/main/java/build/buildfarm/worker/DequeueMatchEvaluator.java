@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker;
 
+import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Platform;
 import build.buildfarm.v1test.QueueEntry;
 import com.google.common.collect.Iterables;
@@ -71,30 +72,66 @@ public class DequeueMatchEvaluator {
   ///
   /// @brief   Decide whether the worker should keep the operation or put it
   ///          back on the queue.
-  /// @details Compares the platform properties of the worker to the platform
-  ///          properties.
+  /// @details Compares the platform properties of the worker to the
+  ///          operation's platform properties.
   /// @param   matchSettings    The provisions of the worker.
   /// @param   workerProvisions The provisions of the worker.
   /// @param   queueEntry       An entry recently removed from the queue.
   /// @return  Whether or not the worker should accept or reject the queue entry.
+  /// @note    Overloaded.
   /// @note    Suggested return identifier: shouldKeepOperation.
   ///
   public static boolean shouldKeepOperation(
       DequeueMatchSettings matchSettings,
       SetMultimap<String, String> workerProvisions,
       QueueEntry queueEntry) {
-    // attempt to execute everything it gets off the queue.
-    if (matchSettings.acceptEverything) {
-      return true;
-    }
-
-    // if the queue entry was not actually dequeued, we should still accept it?
+    // if the queue entry was not actually dequeued, should we still accept it?
     // TODO(luxe): find out why its currently like this, and if that still makes sense.
     if (queueEntry == null) {
       return true;
     }
 
-    return satisfiesProperties(matchSettings, workerProvisions, queueEntry);
+    return shouldKeepViaPlatform(matchSettings, workerProvisions, queueEntry.getPlatform());
+  }
+  ///
+  /// @brief   Decide whether the worker should keep the operation or put it
+  ///          back on the queue.
+  /// @details Compares the platform properties of the worker to the
+  ///          operation's platform properties.
+  /// @param   matchSettings    The provisions of the worker.
+  /// @param   workerProvisions The provisions of the worker.
+  /// @param   command          A command to evaluate.
+  /// @return  Whether or not the worker should accept or reject the queue entry.
+  /// @note    Overloaded.
+  /// @note    Suggested return identifier: shouldKeepOperation.
+  ///
+  public static boolean shouldKeepOperation(
+      DequeueMatchSettings matchSettings,
+      SetMultimap<String, String> workerProvisions,
+      Command command) {
+    return shouldKeepViaPlatform(matchSettings, workerProvisions, command.getPlatform());
+  }
+  ///
+  /// @brief   Decide whether the worker should keep the operation via platform
+  ///          or put it back on the queue.
+  /// @details Compares the platform properties of the worker to the platform
+  ///          properties of the operation.
+  /// @param   matchSettings    The provisions of the worker.
+  /// @param   workerProvisions The provisions of the worker.
+  /// @param   platform         The platforms of operation.
+  /// @return  Whether or not the worker should accept or reject the operation.
+  /// @note    Suggested return identifier: shouldKeepOperation.
+  ///
+  private static boolean shouldKeepViaPlatform(
+      DequeueMatchSettings matchSettings,
+      SetMultimap<String, String> workerProvisions,
+      Platform platform) {
+    // attempt to execute everything it gets off the queue.
+    if (matchSettings.acceptEverything) {
+      return true;
+    }
+
+    return satisfiesProperties(matchSettings, workerProvisions, platform);
   }
   ///
   /// @brief   Decide whether the worker should keep the operation by comparing
@@ -103,15 +140,15 @@ public class DequeueMatchEvaluator {
   ///          properties.
   /// @param   matchSettings    The provisions of the worker.
   /// @param   workerProvisions The provisions of the worker.
-  /// @param   queueEntry       An entry recently removed from the queue.
+  /// @param   platform         The platforms of operation.
   /// @return  Whether or not the worker should accept or reject the queue entry.
   /// @note    Suggested return identifier: shouldKeepOperation.
   ///
   private static boolean satisfiesProperties(
       DequeueMatchSettings matchSettings,
       SetMultimap<String, String> workerProvisions,
-      QueueEntry queueEntry) {
-    for (Platform.Property property : queueEntry.getPlatform().getPropertiesList()) {
+      Platform platform) {
+    for (Platform.Property property : platform.getPropertiesList()) {
       if (!satisfiesProperty(matchSettings, workerProvisions, property)) {
         return false;
       }
