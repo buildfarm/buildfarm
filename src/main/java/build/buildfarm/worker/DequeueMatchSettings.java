@@ -31,7 +31,7 @@ public class DequeueMatchSettings {
   /// @details This will assume the worker can always execute operations from
   ///          the queue it matches with.
   ///
-  public boolean acceptEverything;
+  public boolean acceptEverything = false;
 
   ///
   /// @field   allowUnmatched
@@ -40,5 +40,5 @@ public class DequeueMatchSettings {
   /// @details This is often necessary if the queue is also configured to allow
   ///          unmatched properties.
   ///
-  public boolean allowUnmatched;
+  public boolean allowUnmatched = false;
 }
