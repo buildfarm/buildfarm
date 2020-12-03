@@ -14,7 +14,6 @@
 
 package build.buildfarm.worker;
 
-
 ///
 /// @class   DequeueMatchSettings
 /// @brief   Settings used by a worker to determine whether they should keep
