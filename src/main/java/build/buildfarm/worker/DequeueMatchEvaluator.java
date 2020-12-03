@@ -36,7 +36,7 @@ import com.google.common.collect.SetMultimap;
 ///          scheduler. For example, you might have a variety of workers with
 ///          different amounts of cpu cores all sharing the same queue. The
 ///          queue may accept N-core operations, because N-core workers exist
-///          in the pool,. But there are additionally some lower core workers
+///          in the pool, but there are additionally some lower core workers
 ///          that would need to forfeit running the operation. All the reasons
 ///          a worker may decide it can't take on the operation and should
 ///          give it back are implemented here. The settings provided allow
