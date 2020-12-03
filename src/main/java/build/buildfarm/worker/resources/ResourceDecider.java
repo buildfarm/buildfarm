@@ -17,7 +17,6 @@ package build.buildfarm.worker;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Platform.Property;
 import com.google.common.collect.Iterables;
-import java.util.Collections;
 import java.util.Map;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
@@ -74,27 +73,30 @@ public class ResourceDecider {
   ///
   public static ResourceLimits decideResourceLimitations(
       Command command, boolean onlyMulticoreTests, int executeStageWidth) {
-    ResourceLimits limits = getDefaultLimitations();
+    ResourceLimits limits = new ResourceLimits();
 
-    setCpuLimits(limits, command, onlyMulticoreTests, executeStageWidth);
-    setEnvironmentVariables(limits, command, onlyMulticoreTests);
+    command
+        .getPlatform()
+        .getPropertiesList()
+        .forEach(
+            (property) -> {
 
-    return limits;
-  }
-  ///
-  /// @brief   Decide CPU limitations.
-  /// @details Given a default set of limitations, use the command and global
-  ///          configuration to adjust CPU limitations.
-  /// @param   limits             Current limits to apply changes to.
-  /// @param   command            The command to decide resource limitations.
-  /// @param   onlyMulticoreTests Only allow ttests to be multicore.
-  /// @param   executeStageWidth  The maximum amount of cores available for the operation.
-  ///
-  private static void setCpuLimits(
-      ResourceLimits limits, Command command, boolean onlyMulticoreTests, int executeStageWidth) {
-    // apply cpu limits specified on command
-    limits.cpu.min = getIntegerPlatformValue(command, EXEC_PROPERTY_MIN_CORES, limits.cpu.min);
-    limits.cpu.max = getIntegerPlatformValue(command, EXEC_PROPERTY_MAX_CORES, limits.cpu.max);
+              // handle cpu properties
+              if (property.getName().equals(EXEC_PROPERTY_MIN_CORES)) {
+                storeMinCores(limits, property);
+              } else if (property.getName().equals(EXEC_PROPERTY_MAX_CORES)) {
+                storeMaxCores(limits, property);
+              }
+
+              // handle env properties
+              else if (property.getName().equals(EXEC_PROPERTY_ENV_VARS)) {
+                storeEnvVars(limits, property);
+              } else if (property.getName().startsWith(EXEC_PROPERTY_ENV_VAR)) {
+                storeEnvVar(limits, property);
+              }
+
+              // handle debug properties
+            });
 
     // force limits on non-test actions
     if (onlyMulticoreTests && !commandIsTest(command)) {
@@ -104,29 +106,62 @@ public class ResourceDecider {
 
     // claim core amount according to execute stage width
     limits.cpu.claimed = Math.min(limits.cpu.min, executeStageWidth);
+
+    // we choose to resolve variables after the other variable values have been decided
+    resolveEnvironmentVariables(limits);
+
+    return limits;
   }
   ///
-  /// @brief   Decide extra environment variables.
-  /// @details Given a default set of limitations, use the command and global
-  ///          configuration to adjust the extra environment variables.
-  /// @param   limits             Current limits to apply changes to.
-  /// @param   command            The command to decide resource limitations.
-  /// @param   onlyMulticoreTests Only allow ttests to be multicore.
+  /// @brief   Store the property for min cores.
+  /// @details Parses and stores the property.
+  /// @param   limits   Current limits to apply changes to.
+  /// @param   property The property to store.
   ///
-  private static void setEnvironmentVariables(
-      ResourceLimits limits, Command command, boolean onlyMulticoreTests) {
-    // parse any user given environment variables into a map
-    // if the json is malformed assume no environment variables were given
+  private static void storeMinCores(ResourceLimits limits, Property property) {
+    limits.cpu.min = Integer.parseInt(property.getValue());
+  }
+  ///
+  /// @brief   Store the property for max cores.
+  /// @details Parses and stores the property.
+  /// @param   limits   Current limits to apply changes to.
+  /// @param   property The property to store.
+  ///
+  private static void storeMaxCores(ResourceLimits limits, Property property) {
+    limits.cpu.max = Integer.parseInt(property.getValue());
+  }
+  ///
+  /// @brief   Store the property for env vars.
+  /// @details Parses the property as json.
+  /// @param   limits   Current limits to apply changes to.
+  /// @param   property The property to store.
+  ///
+  private static void storeEnvVars(ResourceLimits limits, Property property) {
     try {
       JSONParser parser = new JSONParser();
-      limits.extraEnvironmentVariables =
-          (Map<String, String>)
-              parser.parse(getStringPlatformValue(command, EXEC_PROPERTY_ENV_VARS, "{}"));
+      limits.extraEnvironmentVariables = (Map<String, String>) parser.parse(property.getValue());
     } catch (ParseException pe) {
     }
-
-    addIndividualEnvVars(limits, command);
-
+  }
+  ///
+  /// @brief   Store the property for an env var.
+  /// @details Parses the property key name for the env var name.
+  /// @param   limits   Current limits to apply changes to.
+  /// @param   property The property to store.
+  ///
+  private static void storeEnvVar(ResourceLimits limits, Property property) {
+    String keyValue[] = property.getName().split(":", 2);
+    String key = keyValue[1];
+    String value = property.getValue();
+    limits.extraEnvironmentVariables.put(key, value);
+  }
+  ///
+  /// @brief   Resolve any templates found in the env variables.
+  /// @details This assumes the other values that will be resolving the
+  ///          templates have already been decided.
+  /// @param   limits Current limits to have resolved.
+  ///
+  private static void resolveEnvironmentVariables(ResourceLimits limits) {
     // resolve any template values
     limits.extraEnvironmentVariables.replaceAll(
         (key, val) -> {
@@ -135,96 +170,6 @@ public class ResourceDecider {
           val = val.replace("{{limits.cpu.claimed}}", String.valueOf(limits.cpu.claimed));
           return val;
         });
-  }
-  ///
-  /// @brief   Extend env variables that were individual passed.
-  /// @details These are discovered by identifying execution property key
-  ///          names.
-  /// @param   limits  Current limits to apply changes to.
-  /// @param   command The command to decide resource limitations.
-  ///
-  private static void addIndividualEnvVars(ResourceLimits limits, Command command) {
-    command
-        .getPlatform()
-        .getPropertiesList()
-        .forEach(
-            (property) -> {
-              if (property.getName().startsWith(EXEC_PROPERTY_ENV_VAR)) {
-                String keyValue[] = property.getName().split(":", 2);
-                String key = keyValue[1];
-                String value = property.getValue();
-                limits.extraEnvironmentVariables.put(key, value);
-              }
-            });
-  }
-  ///
-  /// @brief   Get default resource limits.
-  /// @details Get the default resource limits before adjusting based on
-  ///          action's exec_properties global configuration.
-  /// @return  Default resource limits.
-  /// @note    Suggested return identifier: resourceLimits.
-  ///
-  private static ResourceLimits getDefaultLimitations() {
-    // These can be moved to configuration in the future
-    ResourceLimits limits = new ResourceLimits();
-
-    // we usually prefer to isolate operations through some kind of visualization (cgroups)
-    // and then limit their execution to a single core.  When necessary, user's request more cores.
-    limits.cpu = new CpuLimits();
-    limits.cpu.limit = true;
-    limits.cpu.min = 1;
-    limits.cpu.max = 1;
-    limits.cpu.claimed = 1;
-
-    // Sometimes a client needs to add extra environment variables to their execution.
-    // If they are unable to set these in their code, and --action_env is not sufficient,
-    // they may choose to annotate extra environment variables this way.
-    // these environment variables can be templated, which allows them to reference
-    // other values related to their execution.
-    // for example, a client may want certain rules to set environment variables
-    // based on what buildfarm decides to limit the core count to.
-    // that could look like this:
-    // "OMP_NUM_THREADS": "{{limits.cpu.claimed}}"
-    // "MKL_NUM_THREADS": "{{limits.cpu.claimed}}"
-    limits.extraEnvironmentVariables = Collections.emptyMap();
-
-    return limits;
-  }
-  ///
-  /// @brief   Get an integer value from a platform property.
-  /// @details Get the first value of the property name given. If the property
-  ///          name does not exist the default provided is returned.
-  /// @param   command    The command to extract the platform value from.
-  /// @param   name       The platform property name.
-  /// @param   defaultVal The default value if the property name does not exist.
-  /// @return  The decided platform value.
-  /// @note    Suggested return identifier: platformValue.
-  ///
-  private static int getIntegerPlatformValue(Command command, String name, int defaultVal) {
-    for (Property property : command.getPlatform().getPropertiesList()) {
-      if (property.getName().equals(name)) {
-        return Integer.parseInt(property.getValue());
-      }
-    }
-    return defaultVal;
-  }
-  ///
-  /// @brief   Get a string value from a platform property.
-  /// @details Get the first value of the property name given. If the property
-  ///          name does not exist the default provided is returned.
-  /// @param   command    The command to extract the platform value from.
-  /// @param   name       The platform property name.
-  /// @param   defaultVal The default value if the property name does not exist.
-  /// @return  The decided platform value.
-  /// @note    Suggested return identifier: platformValue.
-  ///
-  private static String getStringPlatformValue(Command command, String name, String defaultVal) {
-    for (Property property : command.getPlatform().getPropertiesList()) {
-      if (property.getName().equals(name)) {
-        return property.getValue();
-      }
-    }
-    return defaultVal;
   }
   ///
   /// @brief   Derive if command is a test run.
