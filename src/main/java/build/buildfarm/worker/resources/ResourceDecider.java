@@ -151,8 +151,8 @@ public class ResourceDecider {
             (property) -> {
               if (property.getName().startsWith(EXEC_PROPERTY_ENV_VAR)) {
                 String keyValue[] = property.getName().split(":", 2);
-                String key = keyValue[0];
-                String value = (keyValue.length > 1) ? keyValue[1] : "";
+                String key = keyValue[1];
+                String value = property.getValue();
                 limits.extraEnvironmentVariables.put(key, value);
               }
             });
