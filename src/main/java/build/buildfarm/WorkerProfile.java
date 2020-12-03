@@ -14,9 +14,7 @@
 
 package build.buildfarm;
 
-import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
 import static java.lang.String.format;
-import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.redis.RedisClient;
@@ -38,7 +36,6 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.TextFormat;
 import com.google.protobuf.util.Durations;
 import com.google.protobuf.util.JsonFormat;
-import io.grpc.Context;
 import io.grpc.ManagedChannel;
 import io.grpc.StatusRuntimeException;
 import io.grpc.netty.NegotiationType;
@@ -53,18 +50,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import javax.naming.ConfigurationException;
 import redis.clients.jedis.JedisCluster;
 
-class WorkerProfile{
+class WorkerProfile {
   private static ManagedChannel createChannel(String target) {
     NettyChannelBuilder builder =
         NettyChannelBuilder.forTarget(target).negotiationType(NegotiationType.PLAINTEXT);
     return builder.build();
   }
-
 
   /**
    * Transform worker string from "ip-10-135-31-210.ec2:8981" to "10-135-31-210".
@@ -188,7 +182,8 @@ class WorkerProfile{
         }
       }
       if (workers == null || workers.size() == 0) {
-        System.out.println("cannot find any workers, check the redis url and make sure there are workers in the cluster");
+        System.out.println(
+            "cannot find any workers, check the redis url and make sure there are workers in the cluster");
         continue;
       }
       // profile all workers
@@ -197,7 +192,11 @@ class WorkerProfile{
           workersToChannels.put(
               worker,
               new StubInstance(
-                  "shard", "bf-workerprofile", digestUtil, createChannel(workerStringTransformation(worker)), Durations.fromMinutes(1)));
+                  "shard",
+                  "bf-workerprofile",
+                  digestUtil,
+                  createChannel(workerStringTransformation(worker)),
+                  Durations.fromMinutes(1)));
         }
         try {
           currentWorkerMessage = workersToChannels.get(worker).getWorkerProfile();
@@ -341,29 +340,8 @@ class WorkerProfile{
     return Durations.toNanos(d) / (1000.0f * 1000.0f);
   }
 
-  static int deadlineSecondsForType(String type) {
-    if (type.equals("Watch") || type.equals("Execute") || type.equals("WorkerProfile")) {
-      return 60 * 60 * 24;
-    }
-    return 10;
-  }
-
+  // how to run the binary: bf-workerprofile WorkerProfile examples/shard-worker.config.example
   public static void main(String[] args) throws Exception {
-    String type = args[0];
-
-    ScheduledExecutorService service = newSingleThreadScheduledExecutor();
-    Context.CancellableContext ctx =
-        Context.current()
-            .withDeadlineAfter(deadlineSecondsForType(type), TimeUnit.SECONDS, service);
-    Context prevContext = ctx.attach();
-    try {
-      workerProfile(args);
-    } finally {
-      ctx.cancel(null);
-      ctx.detach(prevContext);
-      if (!shutdownAndAwaitTermination(service, 1, TimeUnit.SECONDS)) {
-        throw new RuntimeException("could not shut down service");
-      }
-    }
+    workerProfile(args);
   }
 }
