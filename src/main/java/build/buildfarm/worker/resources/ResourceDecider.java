@@ -62,6 +62,26 @@ public class ResourceDecider {
   private static final String EXEC_PROPERTY_ENV_VAR = "env-var:";
 
   ///
+  /// @field   EXEC_PROPERTY_DEBUG_BEFORE_EXECUTION
+  /// @brief   The exec_property and platform property name for indicating
+  ///          whether a user wants to debug the before action state of an
+  ///          execution.
+  /// @details This is intended to be used interactively to debug remote
+  ///          executions.
+  ///
+  private static final String EXEC_PROPERTY_DEBUG_BEFORE_EXECUTION = "debug-before-execution";
+
+  ///
+  /// @field   EXEC_PROPERTY_DEBUG_AFTER_EXECUTION
+  /// @brief   The exec_property and platform property name for indicating
+  ///          whether a user wants to get debug information from after the
+  ///          execution.
+  /// @details This is intended to be used interactively to debug remote
+  ///          executions.
+  ///
+  private static final String EXEC_PROPERTY_DEBUG_AFTER_EXECUTION = "debug-after-execution";
+
+  ///
   /// @brief   Decide resource limitations for the given command.
   /// @details Platform properties from specified exec_properties are taken
   ///          into account as well as global buildfarm configuration.
@@ -80,22 +100,7 @@ public class ResourceDecider {
         .getPropertiesList()
         .forEach(
             (property) -> {
-
-              // handle cpu properties
-              if (property.getName().equals(EXEC_PROPERTY_MIN_CORES)) {
-                storeMinCores(limits, property);
-              } else if (property.getName().equals(EXEC_PROPERTY_MAX_CORES)) {
-                storeMaxCores(limits, property);
-              }
-
-              // handle env properties
-              else if (property.getName().equals(EXEC_PROPERTY_ENV_VARS)) {
-                storeEnvVars(limits, property);
-              } else if (property.getName().startsWith(EXEC_PROPERTY_ENV_VAR)) {
-                storeEnvVar(limits, property);
-              }
-
-              // handle debug properties
+              evaluateProperty(limits, property);
             });
 
     // force limits on non-test actions
@@ -111,6 +116,35 @@ public class ResourceDecider {
     resolveEnvironmentVariables(limits);
 
     return limits;
+  }
+  ///
+  /// @brief   Evaluate a given platform property of a command and use it to
+  ///          adjust execution settings.
+  /// @details Parses the property key/value and stores them appropriately.
+  /// @param   limits   Current limits to apply changes to.
+  /// @param   property The property to store.
+  ///
+  private static void evaluateProperty(ResourceLimits limits, Property property) {
+    // handle cpu properties
+    if (property.getName().equals(EXEC_PROPERTY_MIN_CORES)) {
+      storeMinCores(limits, property);
+    } else if (property.getName().equals(EXEC_PROPERTY_MAX_CORES)) {
+      storeMaxCores(limits, property);
+    }
+
+    // handle env properties
+    else if (property.getName().equals(EXEC_PROPERTY_ENV_VARS)) {
+      storeEnvVars(limits, property);
+    } else if (property.getName().startsWith(EXEC_PROPERTY_ENV_VAR)) {
+      storeEnvVar(limits, property);
+    }
+
+    // handle debug properties
+    else if (property.getName().equals(EXEC_PROPERTY_DEBUG_BEFORE_EXECUTION)) {
+      storeBeforeExecutionDebug(limits, property);
+    } else if (property.getName().equals(EXEC_PROPERTY_DEBUG_AFTER_EXECUTION)) {
+      storeAfterExecutionDebug(limits, property);
+    }
   }
   ///
   /// @brief   Store the property for min cores.
@@ -154,6 +188,24 @@ public class ResourceDecider {
     String key = keyValue[1];
     String value = property.getValue();
     limits.extraEnvironmentVariables.put(key, value);
+  }
+  ///
+  /// @brief   Store the property for debugging before an execution.
+  /// @details Parses and stores a boolean.
+  /// @param   limits   Current limits to apply changes to.
+  /// @param   property The property to store.
+  ///
+  private static void storeBeforeExecutionDebug(ResourceLimits limits, Property property) {
+    limits.debugBeforeExecution = Boolean.parseBoolean(property.getValue());
+  }
+  ///
+  /// @brief   Store the property for debugging after an execution.
+  /// @details Parses and stores a boolean.
+  /// @param   limits   Current limits to apply changes to.
+  /// @param   property The property to store.
+  ///
+  private static void storeAfterExecutionDebug(ResourceLimits limits, Property property) {
+    limits.debugAfterExecution = Boolean.parseBoolean(property.getValue());
   }
   ///
   /// @brief   Resolve any templates found in the env variables.
