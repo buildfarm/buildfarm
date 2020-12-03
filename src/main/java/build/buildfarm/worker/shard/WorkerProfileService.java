@@ -14,8 +14,8 @@
 
 package build.buildfarm.worker.shard;
 
-import build.buildfarm.cas.CASFileCache;
 import build.buildfarm.cas.ContentAddressableStorage;
+import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.v1test.OperationTimesBetweenStages;
 import build.buildfarm.v1test.StageInformation;

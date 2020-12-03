@@ -12,22 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.common;
+package build.buildfarm.common.io;
 
 import com.google.common.base.Preconditions;
 import java.io.Serializable;
+import java.nio.file.attribute.PosixFileAttributes;
 import java.util.Objects;
 import javax.annotation.Nullable;
-import jnr.posix.FileStat;
 
 /** Directory entry representation returned by {@link Path#readdir}. */
-public final class JnrDirent implements Serializable, Comparable<JnrDirent> {
+public final class PosixDirent implements Serializable, Comparable<PosixDirent> {
 
   private final String name;
-  @Nullable private final FileStat stat;
+  @Nullable private final PosixFileAttributes stat;
 
-  /** Creates a new jnr dirent with the given name */
-  public JnrDirent(String name, FileStat stat) {
+  /** Creates a new posix dirent with the given name */
+  public PosixDirent(String name, PosixFileAttributes stat) {
     this.name = Preconditions.checkNotNull(name);
     this.stat = stat;
   }
@@ -37,7 +37,7 @@ public final class JnrDirent implements Serializable, Comparable<JnrDirent> {
   }
 
   @Nullable
-  public FileStat getStat() {
+  public PosixFileAttributes getStat() {
     return stat;
   }
 
@@ -48,14 +48,14 @@ public final class JnrDirent implements Serializable, Comparable<JnrDirent> {
 
   @Override
   public boolean equals(Object other) {
-    if (!(other instanceof JnrDirent)) {
+    if (!(other instanceof PosixDirent)) {
       return false;
     }
     if (this == other) {
       return true;
     }
-    JnrDirent otherJnrDirent = (JnrDirent) other;
-    return name.equals(otherJnrDirent.name);
+    PosixDirent otherPosixDirent = (PosixDirent) other;
+    return name.equals(otherPosixDirent.name);
   }
 
   @Override
@@ -64,7 +64,7 @@ public final class JnrDirent implements Serializable, Comparable<JnrDirent> {
   }
 
   @Override
-  public int compareTo(JnrDirent other) {
+  public int compareTo(PosixDirent other) {
     return this.getName().compareTo(other.getName());
   }
 }

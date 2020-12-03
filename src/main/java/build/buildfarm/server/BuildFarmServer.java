@@ -14,7 +14,7 @@
 
 package build.buildfarm.server;
 
-import static build.buildfarm.common.IOUtils.formatIOError;
+import static build.buildfarm.common.io.Utils.formatIOError;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.logging.Level.SEVERE;

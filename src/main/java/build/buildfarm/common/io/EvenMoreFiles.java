@@ -36,8 +36,8 @@ public class EvenMoreFiles {
   private static final Set<PosixFilePermission> readOnlyExecPerms =
       PosixFilePermissions.fromString("r-xr-xr-x");
 
-  public static void setReadOnlyPerms(Path path, boolean executable) throws IOException {
-    FileStore fileStore = Files.getFileStore(path);
+  public static void setReadOnlyPerms(Path path, boolean executable, FileStore fileStore)
+      throws IOException {
     if (fileStore.supportsFileAttributeView("posix")) {
       if (executable) {
         Files.setPosixFilePermissions(path, readOnlyExecPerms);
@@ -73,14 +73,13 @@ public class EvenMoreFiles {
     }
   }
 
-  public static boolean isReadOnlyExecutable(Path path) throws IOException {
-    FileStore fileStore = Files.getFileStore(path);
+  public static boolean isReadOnlyExecutable(Path path, FileStore fileStore) throws IOException {
     if (fileStore.supportsFileAttributeView("posix")) {
       Set<PosixFilePermission> perms = Files.getPosixFilePermissions(path);
       if (perms.contains(PosixFilePermission.OWNER_EXECUTE)
           && !perms.contains(PosixFilePermission.GROUP_EXECUTE)
           && !perms.contains(PosixFilePermission.OTHERS_EXECUTE)) {
-        setReadOnlyPerms(path, true);
+        setReadOnlyPerms(path, true, fileStore);
       }
       return perms.contains(PosixFilePermission.OWNER_EXECUTE);
     } else {

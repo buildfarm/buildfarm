@@ -481,8 +481,9 @@ java_library(
         ":stub-instance",
         ":worker",
         ":worker-cgroup",
-        "//src/main/java/build/buildfarm:common-cache",
+        ":worker-resources",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
+        "//src/main/java/build/buildfarm:common-cache",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_rpc_error_details_java_proto",
         "@maven//:com_github_pcj_google_options",
@@ -537,6 +538,16 @@ java_library(
 )
 
 java_library(
+    name = "worker-resources",
+    srcs = glob(["worker/resources/*.java"]),
+    deps = [
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "@maven//:com_google_guava_guava",
+        "@maven//:com_googlecode_json_simple_json_simple",
+    ],
+)
+
+java_library(
     name = "worker",
     srcs = glob(["worker/*.java"]),
     deps = [
@@ -544,6 +555,7 @@ java_library(
         ":common",
         ":instance",
         ":stub-instance",
+        ":worker-resources",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
         "@googleapis//:google_rpc_error_details_java_proto",
@@ -575,6 +587,7 @@ java_library(
         ":common-grpc",
         ":instance",
         ":stub-instance",
+        ":worker-resources",
         ":worker",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@maven//:com_github_pcj_google_options",
@@ -593,7 +606,7 @@ java_library(
 
 java_library(
     name = "cas",
-    srcs = glob(["cas/*.java"]),
+    srcs = glob(["cas/**/*.java"]),
     runtime_deps = [
         "@maven//:org_xerial_sqlite_jdbc",
     ],
@@ -606,6 +619,7 @@ java_library(
         "@googleapis//:google_bytestream_bytestream_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
         "@maven//:com_github_jnr_jnr_ffi",
+        "@maven//:com_googlecode_json_simple_json_simple",
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java",
@@ -709,21 +723,6 @@ java_plugin(
     deps = [
         "@maven//:org_openjdk_jmh_jmh_core",
         "@maven//:org_openjdk_jmh_jmh_generator_annprocess",
-    ],
-)
-
-java_binary(
-    name = "io-benchmark",
-    srcs = ["IOBenchmark.java"],
-    main_class = "build.buildfarm.IOBenchmark",
-    plugins = [":io-benchmark-plugins"],
-    visibility = ["//visibility:public"],
-    deps = [
-        ":common",
-        "@maven//:com_github_jnr_jnr_constants",
-        "@maven//:com_github_jnr_jnr_ffi",
-        "@maven//:com_github_jnr_jnr_posix",
-        "@maven//:org_openjdk_jmh_jmh_core",
     ],
 )
 
