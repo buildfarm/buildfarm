@@ -314,4 +314,76 @@ public class ResourceDeciderTest {
     assertThat(limits.extraEnvironmentVariables.containsKey("foo")).isTrue();
     assertThat(limits.extraEnvironmentVariables.get("foo")).isEqualTo("");
   }
+
+  // Function under test: decideResourceLimitations
+  // Reason for testing: we can parse out a positive bool for "before execution debugging"
+  // Failure explanation: the bool was not parsed as true like we would have expected
+  @Test
+  public void decideResourceLimitationsTestDebugBeforeParse() throws Exception {
+
+    // ARRANGE
+    Command command =
+        Command.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(
+                        Platform.Property.newBuilder()
+                            .setName("debug-before-execution")
+                            .setValue("true")))
+            .build();
+
+    // ACT
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+
+    // ASSERT
+    assertThat(limits.debugBeforeExecution).isTrue();
+  }
+
+  // Function under test: decideResourceLimitations
+  // Reason for testing: we can parse out a positive bool for "after execution debugging"
+  // Failure explanation: the bool was not parsed as true like we would have expected
+  @Test
+  public void decideResourceLimitationsTestDebugAfterParse() throws Exception {
+
+    // ARRANGE
+    Command command =
+        Command.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(
+                        Platform.Property.newBuilder()
+                            .setName("debug-after-execution")
+                            .setValue("true")))
+            .build();
+
+    // ACT
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+
+    // ASSERT
+    assertThat(limits.debugAfterExecution).isTrue();
+  }
+
+  // Function under test: decideResourceLimitations
+  // Reason for testing: if we provide an invalid boolean value, it is stored as false
+  // Failure explanation: the value was not parsed gracefully or was somehow interpreted as true
+  @Test
+  public void decideResourceLimitationsTestInvalidDebugParse() throws Exception {
+
+    // ARRANGE
+    Command command =
+        Command.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(
+                        Platform.Property.newBuilder()
+                            .setName("debug-before-execution")
+                            .setValue("BAD_FORMAT")))
+            .build();
+
+    // ACT
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+
+    // ASSERT
+    assertThat(limits.debugBeforeExecution).isFalse();
+  }
 }
