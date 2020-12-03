@@ -184,27 +184,34 @@ class WorkerProfile {
       if (workers == null || workers.size() == 0) {
         System.out.println(
             "cannot find any workers, check the redis url and make sure there are workers in the cluster");
-        continue;
-      }
-      // profile all workers
-      for (String worker : workers) {
-        if (!workersToChannels.containsKey(worker)) {
-          workersToChannels.put(
-              worker,
-              new StubInstance(
-                  "shard",
-                  "bf-workerprofile",
-                  digestUtil,
-                  createChannel(workerStringTransformation(worker)),
-                  Durations.fromMinutes(1)));
+      } else {
+        // remove the unregistered workers
+        for (String existingWorker : workersToChannels.keySet()) {
+          if (!workers.contains(existingWorker)) {
+            workersToChannels.remove(existingWorker);
+          }
         }
-        try {
-          currentWorkerMessage = workersToChannels.get(worker).getWorkerProfile();
-          System.out.println(worker);
-          analyzeMessage(worker, currentWorkerMessage);
-        } catch (StatusRuntimeException e) {
-          e.printStackTrace();
-          System.out.println("==============TIMEOUT");
+
+        // add new registered workers and profile
+        for (String worker : workers) {
+          if (!workersToChannels.containsKey(worker)) {
+            workersToChannels.put(
+                worker,
+                new StubInstance(
+                    "shard",
+                    "bf-workerprofile",
+                    digestUtil,
+                    createChannel(workerStringTransformation(worker)),
+                    Durations.fromMinutes(1)));
+          }
+          try {
+            currentWorkerMessage = workersToChannels.get(worker).getWorkerProfile();
+            System.out.println(worker);
+            analyzeMessage(worker, currentWorkerMessage);
+          } catch (StatusRuntimeException e) {
+            e.printStackTrace();
+            System.out.println("==============TIMEOUT");
+          }
         }
       }
 
