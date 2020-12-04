@@ -120,37 +120,6 @@ public class DequeueMatchEvaluatorTest {
   }
 
   // Function under test: shouldKeepOperation
-  // Reason for testing: the entry should be kept because the min cores are valid for the worker
-  // properties
-  // Failure explanation: either the property names changed or we evaluate these properties
-  // differently
-  @Test
-  public void shouldKeepOperationValidEqualMinCoresQueueEntry() throws Exception {
-
-    // ARRANGE
-    DequeueMatchSettings settings = new DequeueMatchSettings();
-
-    SetMultimap<String, String> workerProvisions = HashMultimap.create();
-    workerProvisions.put("cores", "10");
-
-    QueueEntry entry =
-        QueueEntry.newBuilder()
-            .setPlatform(
-                Platform.newBuilder()
-                    .addProperties(
-                        Platform.Property.newBuilder().setName("min-cores").setValue("10")))
-            .build();
-
-    // ACT
-    boolean shouldKeep =
-        DequeueMatchEvaluator.shouldKeepOperation(settings, workerProvisions, entry);
-
-    // ASSERT
-    // the worker accepts because it has the same cores as the min-cores requested
-    assertThat(shouldKeep).isTrue();
-  }
-
-  // Function under test: shouldKeepOperation
   // Reason for testing: the entry should not be kept because the min cores are invalid for the
   // worker properties
   // Failure explanation: either the property names changed or we evaluate these properties
@@ -217,7 +186,7 @@ public class DequeueMatchEvaluatorTest {
   // platform
   // Failure explanation: ensuring exact property matches is not behaving correctly by default
   @Test
-  public void shouldKeepOperationUnmatchedPropertiesCauseRejection() throws Exception {
+  public void shouldKeepOperationUnmatchedPropertiesRejectionAcceptance() throws Exception {
 
     // ARRANGE
     DequeueMatchSettings settings = new DequeueMatchSettings();
@@ -238,61 +207,21 @@ public class DequeueMatchEvaluatorTest {
 
     // ASSERT
     assertThat(shouldKeep).isFalse();
-  }
-
-  // Function under test: shouldKeepOperation
-  // Reason for testing: the worker usually rejects a property if it is not provided in the worker
-  // platform, but we can choose to accept all entries regardless
-  // Failure explanation: this overwriting decision is not being respected
-  @Test
-  public void shouldKeepOperationUnmatchedPropertiesForceAcceptance() throws Exception {
 
     // ARRANGE
-    DequeueMatchSettings settings = new DequeueMatchSettings();
     settings.acceptEverything = true;
 
-    SetMultimap<String, String> workerProvisions = HashMultimap.create();
-
-    QueueEntry entry =
-        QueueEntry.newBuilder()
-            .setPlatform(
-                Platform.newBuilder()
-                    .addProperties(
-                        Platform.Property.newBuilder().setName("foo-key").setValue("foo-value")))
-            .build();
-
     // ACT
-    boolean shouldKeep =
-        DequeueMatchEvaluator.shouldKeepOperation(settings, workerProvisions, entry);
+    shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(settings, workerProvisions, entry);
 
     // ASSERT
     assertThat(shouldKeep).isTrue();
-  }
-
-  // Function under test: shouldKeepOperation
-  // Reason for testing: the worker usually rejects a property if it is not provided in the worker
-  // platform, but we can choose to allow unmatched properties
-  // Failure explanation: this matching decision is not being respected
-  @Test
-  public void shouldKeepOperationUnmatchedPropertiesAllowUnmatched() throws Exception {
 
     // ARRANGE
-    DequeueMatchSettings settings = new DequeueMatchSettings();
     settings.allowUnmatched = true;
 
-    SetMultimap<String, String> workerProvisions = HashMultimap.create();
-
-    QueueEntry entry =
-        QueueEntry.newBuilder()
-            .setPlatform(
-                Platform.newBuilder()
-                    .addProperties(
-                        Platform.Property.newBuilder().setName("foo-key").setValue("foo-value")))
-            .build();
-
     // ACT
-    boolean shouldKeep =
-        DequeueMatchEvaluator.shouldKeepOperation(settings, workerProvisions, entry);
+    shouldKeep = DequeueMatchEvaluator.shouldKeepOperation(settings, workerProvisions, entry);
 
     // ASSERT
     assertThat(shouldKeep).isTrue();
