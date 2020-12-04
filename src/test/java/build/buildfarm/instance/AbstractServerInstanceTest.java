@@ -170,6 +170,11 @@ public class AbstractServerInstanceTest {
     public CasIndexResults reindexCas(String hostName) {
       throw new UnsupportedOperationException();
     }
+
+    @Override
+    public void deregisterWorker(String workerName) {
+      throw new UnsupportedOperationException();
+    }
   }
 
   @Test

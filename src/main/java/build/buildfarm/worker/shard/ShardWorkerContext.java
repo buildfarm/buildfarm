@@ -16,7 +16,6 @@ package build.buildfarm.worker.shard;
 
 import static build.buildfarm.cas.ContentAddressableStorage.UNLIMITED_ENTRY_SIZE_MAX;
 import static build.buildfarm.common.Actions.checkPreconditionFailure;
-import static build.buildfarm.common.Actions.satisfiesRequirements;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static java.lang.String.format;
@@ -51,6 +50,8 @@ import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
+import build.buildfarm.worker.DequeueMatchEvaluator;
+import build.buildfarm.worker.DequeueMatchSettings;
 import build.buildfarm.worker.ExecutionPolicies;
 import build.buildfarm.worker.ResourceDecider;
 import build.buildfarm.worker.ResourceLimits;
@@ -311,7 +312,10 @@ class ShardWorkerContext implements WorkerContext {
       // transient backplane errors will propagate a null queueEntry
     }
     listener.onWaitEnd();
-    if (queueEntry == null || satisfiesRequirements(matchProvisions, queueEntry.getPlatform())) {
+
+    DequeueMatchSettings settings = new DequeueMatchSettings();
+    settings.allowUnmatched = true;
+    if (DequeueMatchEvaluator.shouldKeepOperation(settings, matchProvisions, queueEntry)) {
       listener.onEntry(queueEntry);
     } else {
       backplane.rejectOperation(queueEntry);

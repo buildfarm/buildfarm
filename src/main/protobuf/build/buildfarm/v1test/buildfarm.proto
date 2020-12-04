@@ -39,6 +39,19 @@ service Admin {
   rpc ReindexCas(ReindexCasRequest) returns (ReindexCasRequestResults) {
     option (google.api.http) = { get: "/v1test/admin:reindexCas" };
   }
+  
+  rpc DeregisterWorker(DeregisterWorkerRequest) returns (DeregisterWorkerRequestResults) {
+    option (google.api.http) = { get: "/v1test/admin:deregisterWorker" };
+  }
+}
+
+message DeregisterWorkerRequest {
+  string instance_name = 1;
+  
+  string worker_name = 2;
+}
+
+message DeregisterWorkerRequestResults {
 }
 
 message ReindexCasRequest {

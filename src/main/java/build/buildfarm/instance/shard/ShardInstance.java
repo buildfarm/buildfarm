@@ -2338,4 +2338,13 @@ public class ShardInstance extends AbstractServerInstance {
       throw Status.fromThrowable(e).asRuntimeException();
     }
   }
+
+  @Override
+  public void deregisterWorker(String workerName) {
+    try {
+      backplane.deregisterWorker(workerName);
+    } catch (IOException e) {
+      throw Status.fromThrowable(e).asRuntimeException();
+    }
+  }
 }
