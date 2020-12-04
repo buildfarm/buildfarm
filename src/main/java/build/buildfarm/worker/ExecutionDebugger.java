@@ -46,7 +46,8 @@ public class ExecutionDebugger {
       ProcessBuilder processBuilder, ResourceLimits limits, ActionResult.Builder resultBuilder) {
     String message = getBeforeExecutionDebugInfo(processBuilder, limits, resultBuilder);
     resultBuilder.setStderrRaw(ByteString.copyFromUtf8(message));
-    return Code.INVALID_ARGUMENT;
+    resultBuilder.setExitCode(-1);
+    return Code.OK;
   }
   ///
   /// @brief   Fail the operation after executing it but provide relevant debug
@@ -63,7 +64,8 @@ public class ExecutionDebugger {
       ProcessBuilder processBuilder, ResourceLimits limits, ActionResult.Builder resultBuilder) {
     String message = getAfterExecutionDebugInfo(processBuilder, limits, resultBuilder);
     resultBuilder.setStderrRaw(ByteString.copyFromUtf8(message));
-    return Code.INVALID_ARGUMENT;
+    resultBuilder.setExitCode(-1);
+    return Code.OK;
   }
   ///
   /// @brief   Build the debug log message that we want users to see.
