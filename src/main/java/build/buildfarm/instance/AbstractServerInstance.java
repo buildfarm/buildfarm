@@ -1700,6 +1700,9 @@ public abstract class AbstractServerInstance implements Instance {
   public abstract CasIndexResults reindexCas(String hostName);
 
   public abstract FindOperationsResults findOperations(String filterPredicate);
+  
+  @Override
+  public abstract void deregisterWorker(String workerName);
 
   protected abstract Logger getLogger();
 }

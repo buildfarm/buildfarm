@@ -549,7 +549,8 @@ public class RedisShardBackplane implements ShardBackplane {
           new ProvisionedRedisQueue(
               queueConfig.getName(),
               getQueueHashes(client, queueConfig.getName()),
-              toMultimap(queueConfig.getPlatform().getPropertiesList()));
+              toMultimap(queueConfig.getPlatform().getPropertiesList()),
+              queueConfig.getAllowUnmatched());
       provisionedQueues.add(provisionedQueue);
     }
     // If there is no configuration for provisioned queues, we might consider that an error.
@@ -687,6 +688,11 @@ public class RedisShardBackplane implements ShardBackplane {
     settings.operationQuery = config.getOperationPrefix() + ":*";
     settings.scanAmount = 10000;
     return client.call(jedis -> OperationsFinder.findOperations(jedis, instance, settings));
+  }
+  
+  @Override
+  public void deregisterWorker(String workerName) throws IOException {
+    removeWorker(workerName, "Requested shutdown");
   }
 
   @Override

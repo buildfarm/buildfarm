@@ -91,7 +91,10 @@ public interface ShardBackplane {
   boolean removeWorker(String workerName, String reason) throws IOException;
 
   @ThreadSafe
-  public CasIndexResults reindexCas(String hostName) throws IOException;
+  CasIndexResults reindexCas(String workerName) throws IOException;
+
+  @ThreadSafe
+  void deregisterWorker(String hostName) throws IOException;
 
   @ThreadSafe
   public FindOperationsResults findOperations(Instance instance, String filterPredicate)

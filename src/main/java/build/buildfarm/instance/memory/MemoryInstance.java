@@ -15,7 +15,6 @@
 package build.buildfarm.instance.memory;
 
 import static build.buildfarm.common.Actions.invalidActionVerboseMessage;
-import static build.buildfarm.common.Actions.satisfiesRequirements;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static build.buildfarm.instance.Utils.putBlob;
@@ -73,6 +72,8 @@ import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.Tree;
+import build.buildfarm.worker.DequeueMatchEvaluator;
+import build.buildfarm.worker.DequeueMatchSettings;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
@@ -714,10 +715,12 @@ public class MemoryInstance extends AbstractServerInstance {
     boolean dispatched = false;
     WorkerQueue queue =
         queuedOperations.MatchEligibleQueue(createProvisions(command.getPlatform()));
+
+    DequeueMatchSettings settings = new DequeueMatchSettings();
     synchronized (queue.workers) {
       while (!dispatched && !queue.workers.isEmpty()) {
         Worker worker = queue.workers.remove(0);
-        if (!satisfiesRequirements(worker.getProvisions(), command.getPlatform())) {
+        if (!DequeueMatchEvaluator.shouldKeepOperation(settings, worker.getProvisions(), command)) {
           rejectedWorkers.add(worker);
         } else {
           QueueEntry queueEntry =
@@ -801,9 +804,11 @@ public class MemoryInstance extends AbstractServerInstance {
       Preconditions.checkState(command != null, "command not found");
 
       String operationName = operation.getName();
+
+      DequeueMatchSettings settings = new DequeueMatchSettings();
       if (command == null) {
         cancelOperation(operationName);
-      } else if (satisfiesRequirements(provisions, command.getPlatform())) {
+      } else if (DequeueMatchEvaluator.shouldKeepOperation(settings, provisions, command)) {
         QueuedOperation queuedOperation =
             QueuedOperation.newBuilder()
                 .setAction(action)
@@ -1043,6 +1048,11 @@ public class MemoryInstance extends AbstractServerInstance {
 
   @Override
   public FindOperationsResults findOperations(String filterPredicate) {
+    throw new UnsupportedOperationException();
+  }
+  
+  @Override
+  public void deregisterWorker(String workerName) {
     throw new UnsupportedOperationException();
   }
 }

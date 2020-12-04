@@ -233,4 +233,85 @@ public class ResourceDeciderTest {
     assertThat(limits.extraEnvironmentVariables.containsKey("bar")).isTrue();
     assertThat(limits.extraEnvironmentVariables.get("bar")).isEqualTo("14");
   }
+
+  // Function under test: decideResourceLimitations
+  // Reason for testing: if the user passes an extra individual environment variable via platform
+  // properties they should be parsed into the map
+  // Failure explanation: the parsing was not done correctly and the variable was somehow ignored
+  @Test
+  public void decideResourceLimitationsTestIndividualEnvironmentVarParse() throws Exception {
+
+    // ARRANGE
+    Command command =
+        Command.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("env-var:foo").setValue("bar")))
+            .build();
+
+    // ACT
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+
+    // ASSERT
+    assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(1);
+    assertThat(limits.extraEnvironmentVariables.containsKey("foo")).isTrue();
+    assertThat(limits.extraEnvironmentVariables.get("foo")).isEqualTo("bar");
+  }
+
+  // Function under test: decideResourceLimitations
+  // Reason for testing: if the user passes two extra individual environment variable via platform
+  // properties they should be parsed into the map
+  // Failure explanation: the parsing was not done correctly and the variables were ignored for some
+  // reason
+  @Test
+  public void decideResourceLimitationsTestTwoIndividualEnvironmentVarParse() throws Exception {
+
+    // ARRANGE
+    Command command =
+        Command.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("env-var:foo").setValue("bar"))
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("env-var:baz").setValue("qux")))
+            .build();
+
+    // ACT
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+
+    // ASSERT
+    assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(2);
+    assertThat(limits.extraEnvironmentVariables.containsKey("foo")).isTrue();
+    assertThat(limits.extraEnvironmentVariables.get("foo")).isEqualTo("bar");
+    assertThat(limits.extraEnvironmentVariables.containsKey("baz")).isTrue();
+    assertThat(limits.extraEnvironmentVariables.get("baz")).isEqualTo("qux");
+  }
+
+  // Function under test: decideResourceLimitations
+  // Reason for testing: if the user passes an extra individual environment var with no value, it
+  // should still be parsed into the map
+  // Failure explanation: the parsing was not done correctly and the variable was ignored or the
+  // value contents are wrong
+  @Test
+  public void decideResourceLimitationsTestEmptyEnvironmentVarParse() throws Exception {
+
+    // ARRANGE
+    Command command =
+        Command.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("env-var:foo").setValue("")))
+            .build();
+
+    // ACT
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+
+    // ASSERT
+    assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(1);
+    assertThat(limits.extraEnvironmentVariables.containsKey("foo")).isTrue();
+    assertThat(limits.extraEnvironmentVariables.get("foo")).isEqualTo("");
+  }
 }
