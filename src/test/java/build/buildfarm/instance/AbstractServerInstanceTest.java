@@ -172,7 +172,7 @@ public class AbstractServerInstanceTest {
     }
 
     @Override
-    public void deregisterWorker(String hostName) {
+    public void deregisterWorker(String workerName) {
       throw new UnsupportedOperationException();
     }
   }

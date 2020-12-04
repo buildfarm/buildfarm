@@ -838,11 +838,12 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public void deregisterWorker(String hostName) {
+  public void deregisterWorker(String workerName) {
     throwIfStopped();
     DeregisterWorkerRequestResults proto =
         adminBlockingStub
             .get()
-            .deregisterWorker(DeregisterWorkerRequest.newBuilder().setHostId(hostName).build());
+            .deregisterWorker(
+                DeregisterWorkerRequest.newBuilder().setWorkerName(workerName).build());
   }
 }

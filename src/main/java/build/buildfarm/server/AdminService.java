@@ -168,12 +168,14 @@ public class AdminService extends AdminGrpc.AdminImplBase {
     Instance instance;
     try {
       instance = instances.get(request.getInstanceName());
-      instance.deregisterWorker(request.getHostId());
+      instance.deregisterWorker(request.getWorkerName());
       responseObserver.onNext(DeregisterWorkerRequestResults.newBuilder().build());
       responseObserver.onCompleted();
     } catch (Exception e) {
       logger.log(
-          Level.SEVERE, String.format("Could not deregister worker: %s", request.getHostId()), e);
+          Level.SEVERE,
+          String.format("Could not deregister worker: %s", request.getWorkerName()),
+          e);
       responseObserver.onError(io.grpc.Status.fromThrowable(e).asException());
     }
   }

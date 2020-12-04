@@ -678,8 +678,8 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   @Override
-  public void deregisterWorker(String hostName) throws IOException {
-    removeWorker(hostName, "Requested shutdown");
+  public void deregisterWorker(String workerName) throws IOException {
+    removeWorker(workerName, "Requested shutdown");
   }
 
   @Override
