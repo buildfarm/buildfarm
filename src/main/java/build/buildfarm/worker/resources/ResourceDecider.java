@@ -55,6 +55,14 @@ public class ResourceDecider {
   private static final String EXEC_PROPERTY_ENV_VARS = "env-vars";
 
   ///
+  /// @field   EXEC_PROPERTY_ENV_VAR
+  /// @brief   The exec_property and platform property prefix name for
+  ///          providing an additional environment variable.
+  /// @details This is decided between client and server.
+  ///
+  private static final String EXEC_PROPERTY_ENV_VAR = "env-var:";
+
+  ///
   /// @brief   Decide resource limitations for the given command.
   /// @details Platform properties from specified exec_properties are taken
   ///          into account as well as global buildfarm configuration.
@@ -117,6 +125,8 @@ public class ResourceDecider {
     } catch (ParseException pe) {
     }
 
+    addIndividualEnvVars(limits, command);
+
     // resolve any template values
     limits.extraEnvironmentVariables.replaceAll(
         (key, val) -> {
@@ -125,6 +135,27 @@ public class ResourceDecider {
           val = val.replace("{{limits.cpu.claimed}}", String.valueOf(limits.cpu.claimed));
           return val;
         });
+  }
+  ///
+  /// @brief   Extend env variables that were individual passed.
+  /// @details These are discovered by identifying execution property key
+  ///          names.
+  /// @param   limits  Current limits to apply changes to.
+  /// @param   command The command to decide resource limitations.
+  ///
+  private static void addIndividualEnvVars(ResourceLimits limits, Command command) {
+    command
+        .getPlatform()
+        .getPropertiesList()
+        .forEach(
+            (property) -> {
+              if (property.getName().startsWith(EXEC_PROPERTY_ENV_VAR)) {
+                String keyValue[] = property.getName().split(":", 2);
+                String key = keyValue[1];
+                String value = property.getValue();
+                limits.extraEnvironmentVariables.put(key, value);
+              }
+            });
   }
   ///
   /// @brief   Get default resource limits.
