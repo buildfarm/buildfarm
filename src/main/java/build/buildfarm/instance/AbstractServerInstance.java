@@ -1699,5 +1699,8 @@ public abstract class AbstractServerInstance implements Instance {
   @Override
   public abstract CasIndexResults reindexCas(String hostName);
 
+  @Override
+  public abstract void deregisterWorker(String workerName);
+
   protected abstract Logger getLogger();
 }

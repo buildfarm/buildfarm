@@ -69,6 +69,8 @@ import build.buildfarm.common.grpc.StubWriteOutputStream;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.AdminGrpc.AdminBlockingStub;
+import build.buildfarm.v1test.DeregisterWorkerRequest;
+import build.buildfarm.v1test.DeregisterWorkerRequestResults;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.OperationQueueGrpc.OperationQueueBlockingStub;
@@ -833,5 +835,15 @@ public class StubInstance implements Instance {
     results.removedKeys = proto.getRemovedKeys();
     results.totalKeys = proto.getTotalKeys();
     return results;
+  }
+
+  @Override
+  public void deregisterWorker(String workerName) {
+    throwIfStopped();
+    DeregisterWorkerRequestResults proto =
+        adminBlockingStub
+            .get()
+            .deregisterWorker(
+                DeregisterWorkerRequest.newBuilder().setWorkerName(workerName).build());
   }
 }
