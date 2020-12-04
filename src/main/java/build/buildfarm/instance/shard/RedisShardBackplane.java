@@ -678,6 +678,11 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   @Override
+  public void deregisterWorker(String hostName) throws IOException {
+    removeWorker(hostName, "Requested shutdown");
+  }
+
+  @Override
   public synchronized Set<String> getWorkers() throws IOException {
     long now = System.currentTimeMillis();
     if (now < workerSetExpiresAt) {

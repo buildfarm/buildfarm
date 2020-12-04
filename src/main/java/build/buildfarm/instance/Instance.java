@@ -144,6 +144,8 @@ public interface Instance {
 
   CasIndexResults reindexCas(String hostName);
 
+  void deregisterWorker(String hostName);
+
   interface MatchListener {
     // start/end pair called for each wait period
     void onWaitStart();

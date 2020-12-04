@@ -1024,4 +1024,9 @@ public class MemoryInstance extends AbstractServerInstance {
   public CasIndexResults reindexCas(String hostName) {
     throw new UnsupportedOperationException();
   }
+
+  @Override
+  public void deregisterWorker(String hostName) {
+    throw new UnsupportedOperationException();
+  }
 }
