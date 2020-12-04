@@ -76,7 +76,7 @@ public class ExecutionDebugger {
   ///
   private static String getBeforeExecutionDebugInfo(
       ProcessBuilder processBuilder, ResourceLimits limits, ActionResult.Builder resultBuilder) {
-    String message = "";
+    String message = "Buildfarm debug information before execution:\n";
     Gson gson = new Gson();
     message += gson.toJson(limits);
     return message;
@@ -92,7 +92,7 @@ public class ExecutionDebugger {
   ///
   private static String getAfterExecutionDebugInfo(
       ProcessBuilder processBuilder, ResourceLimits limits, ActionResult.Builder resultBuilder) {
-    String message = "";
+    String message = "Buildfarm debug information after execution:\n";
     Gson gson = new Gson();
     message += gson.toJson(limits);
     return message;
