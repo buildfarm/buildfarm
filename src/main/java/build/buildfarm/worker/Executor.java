@@ -412,6 +412,12 @@ class Executor {
     } else {
       stderrWrite = new NullWrite();
     }
+    
+    
+    //allow debugging before an execution
+    if (limits.debugBeforeExecution){
+      return ExecutionDebugger.performBeforeExecutionDebug(processBuilder,limits,resultBuilder);
+    }
 
     long startNanoTime = System.nanoTime();
     Process process;
@@ -489,6 +495,12 @@ class Executor {
     }
     stdoutReaderThread.join();
     stderrReaderThread.join();
+
+    //allow debugging after an execution
+    if (limits.debugAfterExecution){
+      return ExecutionDebugger.performAfterExecutionDebug(processBuilder,limits,resultBuilder);
+    }
+    
     try {
       resultBuilder
           .setExitCode(exitCode)
