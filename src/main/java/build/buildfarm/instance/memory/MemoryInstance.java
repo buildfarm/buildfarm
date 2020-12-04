@@ -1050,7 +1050,7 @@ public class MemoryInstance extends AbstractServerInstance {
   public FindOperationsResults findOperations(String filterPredicate) {
     throw new UnsupportedOperationException();
   }
-  
+
   @Override
   public void deregisterWorker(String workerName) {
     throw new UnsupportedOperationException();

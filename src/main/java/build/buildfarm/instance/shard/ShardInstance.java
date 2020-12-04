@@ -2347,7 +2347,7 @@ public class ShardInstance extends AbstractServerInstance {
       throw Status.fromThrowable(e).asRuntimeException();
     }
   }
-  
+
   @Override
   public void deregisterWorker(String workerName) {
     try {

@@ -689,7 +689,7 @@ public class RedisShardBackplane implements ShardBackplane {
     settings.scanAmount = 10000;
     return client.call(jedis -> OperationsFinder.findOperations(jedis, instance, settings));
   }
-  
+
   @Override
   public void deregisterWorker(String workerName) throws IOException {
     removeWorker(workerName, "Requested shutdown");

@@ -174,9 +174,9 @@ public class AbstractServerInstanceTest {
 
     @Override
     public FindOperationsResults findOperations(String filterPredicate) {
-        throw new UnsupportedOperationException();
+      throw new UnsupportedOperationException();
     }
-    
+
     @Override
     public void deregisterWorker(String workerName) {
       throw new UnsupportedOperationException();
