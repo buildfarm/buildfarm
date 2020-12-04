@@ -34,6 +34,8 @@ import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.ShardWorkerInstanceConfig;
 import build.buildfarm.v1test.Tree;
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableList;
+import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import io.grpc.StatusRuntimeException;
 import java.io.IOException;
@@ -115,10 +117,11 @@ public class ShardWorkerInstanceTest {
     verify(backplane, times(1)).putActionResult(key, result);
   }
 
-  @Test(expected = UnsupportedOperationException.class)
+  @Test
   public void listOperationsIsUnsupported() {
+    ImmutableList.Builder<Operation> operations = new ImmutableList.Builder<>();
     instance.listOperations(
-        /* pageSize=*/ 0, /* pageToken=*/ "", /* filter=*/ "", /* operations=*/ null);
+        /* pageSize=*/ 0, /* pageToken=*/ "", /* filter=*/ "", /* operations=*/ operations);
   }
 
   @Test(expected = UnsupportedOperationException.class)

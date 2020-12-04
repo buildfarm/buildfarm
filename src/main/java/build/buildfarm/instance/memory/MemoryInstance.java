@@ -936,11 +936,20 @@ public class MemoryInstance extends AbstractServerInstance {
   protected int getTreeMaxPageSize() {
     return config.getTreeMaxPageSize();
   }
-  
+
   @Override
   public String listOperations(
       int pageSize, String pageToken, String filter, ImmutableList.Builder<Operation> operations) {
-    return "";
+
+    TokenizableIterator<Operation> iter = createOperationsIterator(pageToken);
+    while (iter.hasNext() && pageSize != 0) {
+      Operation operation = iter.next();
+      operations.add(operation);
+      if (pageSize > 0) {
+        pageSize--;
+      }
+    }
+    return iter.toNextPageToken();
   }
 
   @Override

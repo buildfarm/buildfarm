@@ -14,6 +14,7 @@
 
 package build.buildfarm.operations;
 
+import java.util.HashMap;
 import java.util.Map;
 
 ///
@@ -29,7 +30,7 @@ public class FindOperationsResults {
   /// @details The key is the operation keu, and the value is all the collected
   ///          information about the operation.
   ///
-  public Map<String, EnrichedOperation> operations;
+  public Map<String, EnrichedOperation> operations = new HashMap<String, EnrichedOperation>();
 
   ///
   /// @brief   Get a string message for the results.

@@ -1488,8 +1488,10 @@ public abstract class AbstractServerInstance implements Instance {
 
     // todo(luxe): add proper pagination
     FindOperationsResults results = findOperations(filter);
-    for (Map.Entry<String, EnrichedOperation> entry : results.operations.entrySet()) {
-      operations.add(entry.getValue().operation);
+    if (results != null) {
+      for (Map.Entry<String, EnrichedOperation> entry : results.operations.entrySet()) {
+        operations.add(entry.getValue().operation);
+      }
     }
 
     return "";
