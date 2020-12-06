@@ -39,26 +39,26 @@ public class CpuLimits {
   /// @details Depending on the server implementation, we may skip applying any
   ///          restrictions to core usage.
   ///
-  public boolean limit;
+  public boolean limit = true;
 
   ///
   /// @field   min
   /// @brief   The minimum CPU cores required.
   /// @details Client can suggest this though exec_properties.
   ///
-  public int min;
+  public int min = 1;
 
   ///
   /// @field   max
   /// @brief   The maximum CPU cores required.
   /// @details Client can suggest this though exec_properties.
   ///
-  public int max;
+  public int max = 1;
 
   ///
   /// @field   claimed
   /// @brief   The amount of cores actually claimed for the action.
   /// @details This will be in the range of (min,max) when limited.
   ///
-  public int claimed;
+  public int claimed = 1;
 }
