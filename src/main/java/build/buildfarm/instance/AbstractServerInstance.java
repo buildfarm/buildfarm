@@ -71,6 +71,7 @@ import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.Tree;
+import build.buildfarm.v1test.WorkerListMessage;
 import build.buildfarm.v1test.WorkerProfileMessage;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
@@ -1691,6 +1692,12 @@ public abstract class AbstractServerInstance implements Instance {
   public WorkerProfileMessage getWorkerProfile() {
     throw new UnsupportedOperationException(
         "AbstractServerInstance doesn't support getWorkerProfile() method.");
+  }
+
+  @Override
+  public WorkerListMessage getWorkerList() {
+    throw new UnsupportedOperationException(
+        "AbstractServerInstance doesn't support getWorkerList() method.");
   }
 
   @Override

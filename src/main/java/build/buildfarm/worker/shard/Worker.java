@@ -385,7 +385,12 @@ public class Worker extends LoggingMain {
             .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, DAYS))
             .addService(
                 new WorkerProfileService(
-                    storage, inputFetchStage, executeActionStage, context, completeStage))
+                    storage,
+                    inputFetchStage,
+                    executeActionStage,
+                    context,
+                    completeStage,
+                    backplane))
             .build();
 
     logger.log(INFO, String.format("%s initialized", identifier));
