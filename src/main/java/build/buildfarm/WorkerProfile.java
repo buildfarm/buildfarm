@@ -1,4 +1,4 @@
-// Copyright 2019 The Bazel Authors. All rights reserved.
+// Copyright 2020 The Bazel Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -61,13 +61,16 @@ class WorkerProfile {
   }
 
   /**
-   * Transform worker string from "ip-10-135-31-210.ec2:8981" to "10-135-31-210".
+   * Transform worker string from "ip-10-135-31-210.ec2:8981" to "10.135.31.210".
    *
    * @param worker
    * @return
    */
   private static String workerStringTransformation(String worker) {
-    return worker.split("\\.")[0].substring("ip-".length()).replaceAll("-", ".") + ":8981";
+    StringBuilder sb = new StringBuilder();
+    sb.append(worker.split("\\.")[0].substring("ip-".length()).replaceAll("-", "."));
+    sb.append(":").append(worker.split(":")[1]);
+    return sb.toString();
   }
 
   private static void analyzeMessage(String worker, WorkerProfileMessage response) {
@@ -130,7 +133,7 @@ class WorkerProfile {
     if (residue.isEmpty()) {
       throw new IllegalArgumentException("Missing Config_PATH");
     }
-    Path configPath = Paths.get(residue.get(1)); // ?
+    Path configPath = Paths.get(residue.get(3));
     RedisShardBackplaneConfig config = null;
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
       config =
@@ -168,9 +171,10 @@ class WorkerProfile {
 
   private static void workerProfile(String[] args) throws IOException {
     Set<String> workers = null;
-    DigestUtil digestUtil = DigestUtil.forHash("SHA256");
+    DigestUtil digestUtil = DigestUtil.forHash(args[2]);
     WorkerProfileMessage currentWorkerMessage;
     HashMap<String, Instance> workersToChannels = new HashMap<>();
+    String type = args[1];
 
     while (true) {
       // update worker list
@@ -198,7 +202,7 @@ class WorkerProfile {
             workersToChannels.put(
                 worker,
                 new StubInstance(
-                    "shard",
+                    type,
                     "bf-workerprofile",
                     digestUtil,
                     createChannel(workerStringTransformation(worker)),
@@ -217,8 +221,8 @@ class WorkerProfile {
 
       // sleep
       try {
-        System.out.println("Wait for 5 seconds:");
-        Thread.sleep(5000);
+        System.out.println("Waiting for 10 minutes:");
+        Thread.sleep(10 * 60 * 1000);
       } catch (InterruptedException e) {
         e.printStackTrace();
       }
@@ -347,7 +351,8 @@ class WorkerProfile {
     return Durations.toNanos(d) / (1000.0f * 1000.0f);
   }
 
-  // how to run the binary: bf-workerprofile WorkerProfile examples/shard-worker.config.example
+  // how to run the binary: bf-workerprofile WorkerProfile shard SHA256
+  // examples/shard-worker.config.example
   public static void main(String[] args) throws Exception {
     workerProfile(args);
   }

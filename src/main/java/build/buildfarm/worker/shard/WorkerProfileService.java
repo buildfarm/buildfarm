@@ -113,7 +113,7 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
     try {
       replyBuilder.addAllWorkers(backplane.getWorkers());
     } catch (IOException e) {
-      e.printStackTrace();
+      responseObserver.onError(e);
     }
     responseObserver.onNext(replyBuilder.build());
     responseObserver.onCompleted();
