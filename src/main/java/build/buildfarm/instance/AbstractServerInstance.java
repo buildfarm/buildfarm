@@ -63,6 +63,8 @@ import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
+import build.buildfarm.operations.EnrichedOperation;
+import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.GetClientStartTimeResult;
@@ -1484,17 +1486,15 @@ public abstract class AbstractServerInstance implements Instance {
       pageSize = getListOperationsMaxPageSize();
     }
 
-    // FIXME filter?
-    TokenizableIterator<Operation> iter = createOperationsIterator(pageToken);
-
-    while (iter.hasNext() && pageSize != 0) {
-      Operation operation = iter.next();
-      operations.add(operation);
-      if (pageSize > 0) {
-        pageSize--;
+    // todo(luxe): add proper pagination
+    FindOperationsResults results = findOperations(filter);
+    if (results != null) {
+      for (Map.Entry<String, EnrichedOperation> entry : results.operations.entrySet()) {
+        operations.add(entry.getValue().operation);
       }
     }
-    return iter.toNextPageToken();
+
+    return "";
   }
 
   @Override
@@ -1698,6 +1698,8 @@ public abstract class AbstractServerInstance implements Instance {
 
   @Override
   public abstract CasIndexResults reindexCas(String hostName);
+
+  public abstract FindOperationsResults findOperations(String filterPredicate);
 
   @Override
   public abstract void deregisterWorker(String workerName);

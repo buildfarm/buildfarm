@@ -463,11 +463,9 @@ class Cat {
       pageToken = instance.listOperations(1024, pageToken, "", operations);
       System.out.println(pageToken);
       System.out.println("Page size: " + operations.build().size());
-      /*
       for (Operation operation : operations.build()) {
         printOperation(operation);
       }
-      */
       if (++count == limit) {
         System.out.println("page limit reached");
         break;

@@ -59,6 +59,7 @@ import build.buildfarm.instance.memory.queues.Worker;
 import build.buildfarm.instance.memory.queues.WorkerQueue;
 import build.buildfarm.instance.memory.queues.WorkerQueueConfigurations;
 import build.buildfarm.instance.memory.queues.WorkerQueues;
+import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.ActionCacheConfig;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.FilesystemACConfig;
@@ -942,6 +943,21 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
+  public String listOperations(
+      int pageSize, String pageToken, String filter, ImmutableList.Builder<Operation> operations) {
+
+    TokenizableIterator<Operation> iter = createOperationsIterator(pageToken);
+    while (iter.hasNext() && pageSize != 0) {
+      Operation operation = iter.next();
+      operations.add(operation);
+      if (pageSize > 0) {
+        pageSize--;
+      }
+    }
+    return iter.toNextPageToken();
+  }
+
+  @Override
   protected TokenizableIterator<DirectoryEntry> createTreeIterator(
       String reason, Digest rootDigest, String pageToken) {
     ExecutorService service = newDirectExecutorService();
@@ -1027,6 +1043,11 @@ public class MemoryInstance extends AbstractServerInstance {
 
   @Override
   public CasIndexResults reindexCas(String hostName) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public FindOperationsResults findOperations(String filterPredicate) {
     throw new UnsupportedOperationException();
   }
 
