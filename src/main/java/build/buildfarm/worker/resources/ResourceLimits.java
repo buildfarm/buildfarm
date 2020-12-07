@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker;
 
+import java.util.HashMap;
 import java.util.Map;
 
 ///
@@ -37,7 +38,7 @@ public class ResourceLimits {
   /// @details Decides specific CPU limitations and whether to apply them for a
   ///          given action.
   ///
-  public CpuLimits cpu;
+  public CpuLimits cpu = new CpuLimits();
 
   ///
   /// @field   extraEnvironmentVariables
@@ -46,5 +47,5 @@ public class ResourceLimits {
   /// @details These variables are added to the end of the existing environment
   ///          variables in the Command.
   ///
-  public Map<String, String> extraEnvironmentVariables;
+  public Map<String, String> extraEnvironmentVariables = new HashMap<String, String>();
 }

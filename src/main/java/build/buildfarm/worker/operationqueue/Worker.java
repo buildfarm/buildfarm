@@ -706,7 +706,7 @@ public class Worker extends LoggingMain {
 
           @Override
           public ResourceLimits commandExecutionSettings(Command command) {
-            return null;
+            return new ResourceLimits();
           }
         };
 
