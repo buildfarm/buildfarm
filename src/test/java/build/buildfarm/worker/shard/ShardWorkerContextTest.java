@@ -33,6 +33,7 @@ import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.instance.shard.ShardBackplane;
 import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.QueueEntry;
+import build.buildfarm.worker.DequeueMatchSettings;
 import build.buildfarm.worker.WorkerContext;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -79,8 +80,10 @@ public class ShardWorkerContextTest {
   }
 
   WorkerContext createTestContext(Platform platform, Iterable<ExecutionPolicy> policies) {
+    DequeueMatchSettings matchSettings = new DequeueMatchSettings();
     return new ShardWorkerContext(
         "test",
+        matchSettings,
         platform,
         /* operationPollPeriod=*/ Duration.getDefaultInstance(),
         /* operationPoller=*/ (queueEntry, stage, requeueAt) -> {

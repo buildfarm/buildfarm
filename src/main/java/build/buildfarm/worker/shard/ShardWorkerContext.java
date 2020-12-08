@@ -105,6 +105,7 @@ class ShardWorkerContext implements WorkerContext {
 
   private final String name;
   private final Platform platform;
+  private final DequeueMatchSettings matchSettings;
   private final SetMultimap<String, String> matchProvisions;
   private final Duration operationPollPeriod;
   private final OperationPoller operationPoller;
@@ -142,6 +143,7 @@ class ShardWorkerContext implements WorkerContext {
 
   ShardWorkerContext(
       String name,
+      DequeueMatchSettings matchSettings,
       Platform platform,
       Duration operationPollPeriod,
       OperationPoller operationPoller,
@@ -163,6 +165,7 @@ class ShardWorkerContext implements WorkerContext {
       boolean errorOperationRemainingResources,
       Supplier<CasWriter> writer) {
     this.name = name;
+    this.matchSettings = matchSettings;
     this.platform = platform;
     this.matchProvisions = getMatchProvisions(platform, policies, executeStageWidth);
     this.operationPollPeriod = operationPollPeriod;
@@ -313,9 +316,7 @@ class ShardWorkerContext implements WorkerContext {
     }
     listener.onWaitEnd();
 
-    DequeueMatchSettings settings = new DequeueMatchSettings();
-    settings.allowUnmatched = true;
-    if (DequeueMatchEvaluator.shouldKeepOperation(settings, matchProvisions, queueEntry)) {
+    if (DequeueMatchEvaluator.shouldKeepOperation(matchSettings, matchProvisions, queueEntry)) {
       listener.onEntry(queueEntry);
     } else {
       backplane.rejectOperation(queueEntry);
