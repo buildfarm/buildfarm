@@ -2,7 +2,7 @@
 buildfarm dependencies that can be imported into other WORKSPACE files
 """
 
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_jar")
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file", "http_jar")
 load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
 
 RULES_JVM_EXTERNAL_TAG = "3.3"
@@ -93,4 +93,9 @@ def buildfarm_dependencies(repository_name = "build_buildfarm"):
         urls = [
             "https://github.com/werkt/jedis/releases/download/3.2.0-e82e68e2f7/jedis-3.2.0-e82e68e2f7.jar",
         ],
+    )
+
+    http_file(
+        name = "tini",
+        urls = ["https://github.com/krallin/tini/releases/download/v0.18.0/tini"],
     )

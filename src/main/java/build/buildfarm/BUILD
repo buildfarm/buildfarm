@@ -10,6 +10,13 @@ filegroup(
     visibility = ["//visibility:public"],
 )
 
+genrule(
+    name = "tini.binary",
+    srcs = ["@tini//file"],
+    outs = ["tini"],
+    cmd = "cp $< $@ && chmod +x $@",
+)
+
 java_library(
     name = "common",
     srcs = glob([
