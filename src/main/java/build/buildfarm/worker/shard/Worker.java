@@ -112,8 +112,6 @@ public class Worker extends LoggingMain {
   private static final int shutdownWaitTimeInSeconds = 10;
   private final boolean isCasShard;
 
-  private boolean isDeregistered = false;
-
   private final ShardWorkerConfig config;
   private final ShardWorkerInstance instance;
   private final HealthStatusManager healthStatusManager;
@@ -224,22 +222,6 @@ public class Worker extends LoggingMain {
 
   public Worker(String session, ShardWorkerConfig config) throws ConfigurationException {
     this(session, ServerBuilder.forPort(config.getPort()), config);
-  }
-
-  public boolean shutDownWorkerGracefully() {
-    isDeregistered = true;
-    logger.log(Level.INFO, "The current worker is deregistered and should be shutdown gracefully!");
-
-    try {
-      while (!pipeline.isEmpty()) {
-        SECONDS.sleep(10);
-      }
-    } catch (InterruptedException e) {
-      logger.log(Level.SEVERE, "The worker gracefully shutdown is interrupted: " + e.getMessage());
-      return false;
-    }
-    logger.log(Level.INFO, "The worker Pipeline is empty now!");
-    return true;
   }
 
   private static Path getValidRoot(ShardWorkerConfig config) throws ConfigurationException {
@@ -409,7 +391,6 @@ public class Worker extends LoggingMain {
                     context,
                     completeStage,
                     backplane))
-            .addService(new ShutDownWorkerGracefully(this))
             .build();
 
     logger.log(INFO, String.format("%s initialized", identifier));
@@ -809,7 +790,7 @@ public class Worker extends LoggingMain {
 
               void registerIfExpired() {
                 long now = System.currentTimeMillis();
-                if (now >= workerRegistrationExpiresAt && !isDeregistered) {
+                if (now >= workerRegistrationExpiresAt) {
                   // worker must be registered to match
                   addWorker(nextRegistration(now));
                   // update every 10 seconds

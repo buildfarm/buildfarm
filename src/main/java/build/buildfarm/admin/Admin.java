@@ -29,6 +29,4 @@ public interface Admin {
       Integer maxHosts,
       Integer targetHosts,
       Integer targetReservedHostsPercent);
-
-  void disableHostProtection(String scaleGroupName, String hostId);
 }

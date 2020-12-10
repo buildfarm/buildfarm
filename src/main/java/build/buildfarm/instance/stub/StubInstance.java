@@ -71,8 +71,6 @@ import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.AdminGrpc.AdminBlockingStub;
 import build.buildfarm.v1test.DeregisterWorkerRequest;
 import build.buildfarm.v1test.DeregisterWorkerRequestResults;
-import build.buildfarm.v1test.DrainWorkerPipelineRequest;
-import build.buildfarm.v1test.DrainWorkerPipelineResults;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.OperationQueueGrpc.OperationQueueBlockingStub;
@@ -82,8 +80,6 @@ import build.buildfarm.v1test.PollOperationRequest;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.ReindexCasRequest;
 import build.buildfarm.v1test.ReindexCasRequestResults;
-import build.buildfarm.v1test.ShutDownWorkerGracefullyGrpc;
-import build.buildfarm.v1test.ShutDownWorkerGracefullyGrpc.ShutDownWorkerGracefullyBlockingStub;
 import build.buildfarm.v1test.TakeOperationRequest;
 import build.buildfarm.v1test.Tree;
 import build.buildfarm.v1test.WorkerListMessage;
@@ -298,16 +294,6 @@ public class StubInstance implements Instance {
               return WorkerProfileGrpc.newBlockingStub(channel);
             }
           });
-
-  private final Supplier<ShutDownWorkerGracefullyBlockingStub>
-      ShutDownWorkerGracefullyBlockingStub =
-          Suppliers.memoize(
-              new Supplier<ShutDownWorkerGracefullyBlockingStub>() {
-                @Override
-                public ShutDownWorkerGracefullyBlockingStub get() {
-                  return ShutDownWorkerGracefullyGrpc.newBlockingStub(channel);
-                }
-              });
 
   private <T extends AbstractStub<T>> T deadlined(Supplier<T> getter) {
     T stub = getter.get();
@@ -866,12 +852,5 @@ public class StubInstance implements Instance {
             .get()
             .deregisterWorker(
                 DeregisterWorkerRequest.newBuilder().setWorkerName(workerName).build());
-  }
-
-  @Override
-  public DrainWorkerPipelineResults drainWorkerPipeline(String worker) {
-    throwIfStopped();
-    return ShutDownWorkerGracefullyBlockingStub.get()
-        .drainWorkerPipeline(DrainWorkerPipelineRequest.newBuilder().build());
   }
 }
