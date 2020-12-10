@@ -42,4 +42,9 @@ public class GcpAdmin implements Admin {
       Integer targetReservedHostsPercent) {
     throw new UnsupportedOperationException("Not Implemented.");
   }
+
+  @Override
+  public void disableHostProtection(String scaleGroupName, String hostId) {
+    throw new UnsupportedOperationException("Not Implemented.");
+  }
 }
