@@ -1016,3 +1016,18 @@ service WorkerProfile {
 
   rpc GetWorkerList(WorkerListRequest) returns (WorkerListMessage) {}
 }
+
+message DrainWorkerPipelineRequest {
+  string instance_name = 1;
+
+  string worker_name = 2;
+}
+
+message DrainWorkerPipelineResults {
+  bool is_pipeline_empty = 1;
+}
+
+
+service ShutDownWorkerGracefully {
+  rpc DrainWorkerPipeline(DrainWorkerPipelineRequest) returns (DrainWorkerPipelineResults) {}
+}

@@ -66,6 +66,7 @@ import build.buildfarm.common.Write;
 import build.buildfarm.operations.EnrichedOperation;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.CompletedOperationMetadata;
+import build.buildfarm.v1test.DrainWorkerPipelineResults;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.QueuedOperation;
@@ -1698,6 +1699,12 @@ public abstract class AbstractServerInstance implements Instance {
   public WorkerListMessage getWorkerList() {
     throw new UnsupportedOperationException(
         "AbstractServerInstance doesn't support getWorkerList() method.");
+  }
+
+  @Override
+  public DrainWorkerPipelineResults drainWorkerPipeline(String worker) {
+    throw new UnsupportedOperationException(
+        "AbstractServerInstance doesn't support drainWorkerPipeline() method.");
   }
 
   @Override

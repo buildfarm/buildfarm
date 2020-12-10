@@ -21,6 +21,8 @@ import com.amazonaws.services.autoscaling.AmazonAutoScaling;
 import com.amazonaws.services.autoscaling.AmazonAutoScalingClientBuilder;
 import com.amazonaws.services.autoscaling.model.InstancesDistribution;
 import com.amazonaws.services.autoscaling.model.MixedInstancesPolicy;
+import com.amazonaws.services.autoscaling.model.SetInstanceProtectionRequest;
+import com.amazonaws.services.autoscaling.model.SetInstanceProtectionResult;
 import com.amazonaws.services.autoscaling.model.UpdateAutoScalingGroupRequest;
 import com.amazonaws.services.ec2.AmazonEC2;
 import com.amazonaws.services.ec2.AmazonEC2ClientBuilder;
@@ -147,5 +149,20 @@ public class AwsAdmin implements Admin {
   private long getHostUptimeInMinutes(Date launchTime) {
     Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("UTC"));
     return (cal.getTime().getTime() - launchTime.getTime()) / 60000;
+  }
+
+  @Override
+  public void disableHostProtection(String scaleGroupName, String hostId) {
+    SetInstanceProtectionRequest disableRequest =
+        new SetInstanceProtectionRequest()
+            .withInstanceIds(hostId)
+            .withAutoScalingGroupName(scaleGroupName)
+            .withProtectedFromScaleIn(false);
+    SetInstanceProtectionResult response = scale.setInstanceProtection(disableRequest);
+    logger.log(
+        Level.INFO,
+        String.format(
+            "Disable protection of host: %s in AutoScalingGroup: %s and get result: %s",
+            hostId, scaleGroupName, response.toString()));
   }
 }
