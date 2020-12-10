@@ -239,7 +239,6 @@ public class Worker extends LoggingMain {
       return false;
     }
     logger.log(Level.INFO, "The worker Pipeline is empty now!");
-    // turn off auto scaling protection here
     return true;
   }
 
