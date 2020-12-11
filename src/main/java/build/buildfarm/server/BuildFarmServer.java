@@ -136,7 +136,11 @@ public class BuildFarmServer extends LoggingMain {
     }
   }
 
-  public void start(String publicName) throws IOException {
+  public synchronized void start(String publicName) throws IOException {
+    if (stopping) {
+      logger.log(Level.WARNING, "already stopping, skipping start");
+      return;
+    }
     actionCacheRequestCounter.start();
     instances.start(publicName);
     server.start();
