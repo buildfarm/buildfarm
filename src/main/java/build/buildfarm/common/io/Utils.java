@@ -131,9 +131,8 @@ public class Utils {
     return dirents;
   }
 
-  public static List<NamedFileKey> ffiReaddir(LibC libc, jnr.ffi.Runtime runtime, Path path)
-      throws IOException {
-
+  private static List<NamedFileKey> ffiReaddir(
+      LibC libc, jnr.ffi.Runtime runtime, Path path, FileStore fileStore) throws IOException {
     List<NamedFileKey> dirents = new ArrayList<>();
 
     // open the directory and prepare to iterate over dirents
@@ -148,14 +147,15 @@ public class Utils {
     Pointer direntPtr = libc.readdir(DIR);
 
     while (direntPtr != null) {
-
       FFIdirent dirent = new FFIdirent(runtime);
 
       dirent.useMemory(direntPtr);
 
-      if (!dirent.d_name.toString().equals(".") && !dirent.d_name.toString().equals("..")) {
-
-        dirents.add(new NamedFileKey(dirent.d_name.toString(), dirent.d_ino.longValue()));
+      String name = dirent.d_name.toString();
+      if (!name.equals(".") && !name.equals("..")) {
+        dirents.add(
+            new NamedFileKey(
+                name, stat(path.resolve(name), false, fileStore), dirent.d_ino.longValue()));
       }
       direntPtr = libc.readdir(DIR);
     }
@@ -184,8 +184,9 @@ public class Utils {
 
   private static NamedFileKey pathToNamedFileKey(Path path, FileStore fileStore)
       throws IOException {
+    FileStatus fileStatus = stat(path, false, fileStore);
     return new NamedFileKey(
-        path.getFileName().toString(), getFileKey(path, statNullable(path, false, fileStore)));
+        path.getFileName().toString(), fileStatus, getFileKey(path, fileStatus));
   }
 
   private static List<NamedFileKey> listNIOdirentSorted(Path path, FileStore fileStore)
@@ -201,7 +202,7 @@ public class Utils {
       throws IOException {
     final List<NamedFileKey> dirents;
     if (fileStore.supportsFileAttributeView("posix")) {
-      dirents = ffiReaddir(libc.get(), runtime(), path);
+      dirents = ffiReaddir(libc.get(), runtime(), path, fileStore);
     } else {
       dirents = listNIOdirentSorted(path, fileStore);
     }

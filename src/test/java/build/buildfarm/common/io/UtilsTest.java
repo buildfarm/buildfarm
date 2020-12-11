@@ -54,8 +54,8 @@ class UtilsTest {
 
     List<NamedFileKey> files = Utils.listDirentSorted(root, fileStore);
     assertThat(files.size()).isEqualTo(2);
-    Object firstKey = files.get(0).fileKey();
-    Object secondKey = files.get(1).fileKey();
+    Object firstKey = files.get(0).getFileKey();
+    Object secondKey = files.get(1).getFileKey();
     assertThat(firstKey).isEqualTo(secondKey);
   }
 
@@ -71,8 +71,8 @@ class UtilsTest {
 
     List<NamedFileKey> files = Utils.listDirentSorted(root, fileStore);
     assertThat(files.size()).isEqualTo(2);
-    Object firstKey = files.get(0).fileKey();
-    Object secondKey = files.get(1).fileKey();
+    Object firstKey = files.get(0).getFileKey();
+    Object secondKey = files.get(1).getFileKey();
     assertThat(firstKey).isNotEqualTo(secondKey);
   }
 }
