@@ -1,4 +1,4 @@
-load("@io_bazel_rules_docker//container:container.bzl", "container_image")
+load("@io_bazel_rules_docker//container:container.bzl", "container_image", "container_push")
 
 package(
     default_visibility = ["//src:__subpackages__"],
@@ -603,7 +603,13 @@ java_binary(
 
 container_image(
     name = "buildfarm-shard-worker.container",
-    base = "@java_image_base//image",
+    #base = "@java_image_base//image",
+    base = "@rwc_build//image",
+    entrypoint = [
+        "/usr/bin/java",
+        "-jar",
+        "buildfarm-shard-worker_deploy.jar"
+    ],
     # leverage the implicit target of the buildfarm-shard-worker to get a fat jar.
     # this is simply a workaround for the fact that we have so many dependencies,
     # so we'd want some wrappy script. This seemed more straightforward.
@@ -746,11 +752,15 @@ java_binary(
 )
 
 container_image(
-    name = "buildfarm-operationqueue-worker.container",
-    base = "@java_image_base//image",
+    name = "rwc_buildfarm_worker_image",
+    base = "@rwc_build//image",
+    entrypoint = [
+        "/usr/bin/java",
+        "-jar"
+    ],
     cmd = [
         "buildfarm-operationqueue-worker_deploy.jar",
-        "/config/worker.config",
+        "/config/buildfarm_worker.config",
     ],
     # leverage the implicit target of the buildfarm-server to get a fat jar.
     # this is simply a workaround for the fact that we have so many dependencies,
@@ -761,6 +771,16 @@ container_image(
     ],
     tags = ["container"],
     visibility = ["//visibility:public"],
+)
+
+container_push(
+    name = "push_rwc_buildfarm_worker_image",
+    format = "Docker",
+    image = ":rwc_buildfarm_worker_image",
+    registry = "registry.abagy.com",
+    repository = "tools/rwc_buildfarm_worker",
+    tag = "latest",
+    tags = ["container"],
 )
 
 java_binary(

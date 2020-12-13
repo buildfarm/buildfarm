@@ -21,3 +21,10 @@ def buildfarm_images():
         registry = "gcr.io",
         repository = "distroless/java",
     )
+
+    container_pull(
+        name = "rwc_build",
+        registry = "registry.abagy.com",
+        repository = "tools/rwc_build",
+        tag = "latest",
+    )
