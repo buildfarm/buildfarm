@@ -1024,7 +1024,6 @@ message DrainWorkerPipelineRequest {
 }
 
 message DrainWorkerPipelineResults {
-  bool is_pipeline_empty = 1;
 }
 
 

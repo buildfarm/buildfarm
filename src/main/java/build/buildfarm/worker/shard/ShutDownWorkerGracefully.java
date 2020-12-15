@@ -19,6 +19,8 @@ import build.buildfarm.v1test.DrainWorkerPipelineResults;
 import build.buildfarm.v1test.ShutDownWorkerGracefullyGrpc;
 import io.grpc.stub.StreamObserver;
 
+import java.util.concurrent.CompletableFuture;
+
 public class ShutDownWorkerGracefully
     extends ShutDownWorkerGracefullyGrpc.ShutDownWorkerGracefullyImplBase {
   private final Worker worker;
@@ -32,9 +34,9 @@ public class ShutDownWorkerGracefully
       DrainWorkerPipelineRequest request,
       StreamObserver<DrainWorkerPipelineResults> responseObserver) {
     try {
+      CompletableFuture.runAsync(worker::shutDownWorkerGracefully);
       responseObserver.onNext(
           DrainWorkerPipelineResults.newBuilder()
-              .setIsPipelineEmpty(worker.shutDownWorkerGracefully())
               .build());
       responseObserver.onCompleted();
     } catch (Exception e) {
