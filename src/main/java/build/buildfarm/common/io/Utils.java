@@ -47,6 +47,14 @@ public class Utils {
   private static final Supplier<LibC> libc =
       Suppliers.memoize(() -> LibraryLoader.create(LibC.class).load("c"));
 
+  // pretty poor check here, but avoiding apache commons for now
+  private static Supplier<Boolean> isMacOS =
+      Suppliers.memoize(
+          () -> {
+            String osName = System.getProperty("os.name").toLowerCase();
+            return osName.startsWith("mac");
+          });
+
   private static final jnr.ffi.Runtime runtime() {
     return jnr.ffi.Runtime.getRuntime(libc.get());
   }
@@ -201,7 +209,8 @@ public class Utils {
   public static List<NamedFileKey> listDirentSorted(Path path, FileStore fileStore)
       throws IOException {
     final List<NamedFileKey> dirents;
-    if (fileStore.supportsFileAttributeView("posix")) {
+    // OSX presents an incompatible ffi dirent structure that has not been properly enumerated
+    if (fileStore.supportsFileAttributeView("posix") && !isMacOS.get()) {
       dirents = ffiReaddir(libc.get(), runtime(), path, fileStore);
     } else {
       dirents = listNIOdirentSorted(path, fileStore);
