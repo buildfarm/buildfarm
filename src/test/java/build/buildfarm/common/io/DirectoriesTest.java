@@ -30,7 +30,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 class DirectoriesTest {
-  private Path root;
+  protected Path root;
 
   protected DirectoriesTest(Path root) {
     this.root = root;
@@ -102,7 +102,6 @@ class DirectoriesTest {
     public void checkWriteDisabled() throws IOException {
 
       // establish directory tree
-      Path root = Files.createTempDirectory("native-utils-test");
       Path tree = root.resolve("tree3");
       Files.createDirectory(tree);
       Files.write(tree.resolve("file"), ImmutableList.of("Top level file"), StandardCharsets.UTF_8);
