@@ -20,6 +20,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.file.DirectoryStream;
 import java.nio.file.FileStore;
 import java.nio.file.Files;
@@ -27,6 +28,7 @@ import java.nio.file.LinkOption;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.DosFileAttributes;
 import java.nio.file.attribute.PosixFileAttributes;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -219,6 +221,51 @@ public class Utils {
     return dirents;
   }
 
+  // this is obscene. We cannot acquire useful FileKeys on windows without resorting to drastic
+  // measures
+  private static class WindowsFileKey {
+    private final int volumeSerialNumber;
+    private final int fileIndexHigh;
+    private final int fileIndexLow;
+
+    // bypass accessibility checking to get our key components
+    WindowsFileKey(DosFileAttributes attributes) {
+      volumeSerialNumber = getPrivateInt(attributes, "volumeSerialNumber");
+      fileIndexHigh = getPrivateInt(attributes, "fileIndexHigh");
+      fileIndexLow = getPrivateInt(attributes, "fileIndexLow");
+    }
+
+    private static int getPrivateInt(Object obj, String fieldName) {
+      try {
+        Field field = obj.getClass().getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return (int) field.get(obj);
+      } catch (IllegalAccessException e) {
+        throw new RuntimeException(
+            "error accessing " + fieldName + ", object did not respect setAccessible(true)");
+      } catch (NoSuchFieldException e) {
+        throw new RuntimeException(
+            "expected " + fieldName + " in object, invalid " + obj.getClass().getName());
+      }
+    }
+
+    @Override
+    public int hashCode() {
+      return volumeSerialNumber + fileIndexHigh + fileIndexLow;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      return (obj instanceof WindowsFileKey) && isSameFile((WindowsFileKey) obj);
+    }
+
+    private boolean isSameFile(WindowsFileKey o) {
+      return volumeSerialNumber == o.volumeSerialNumber
+          && fileIndexHigh == o.fileIndexHigh
+          && fileIndexLow == o.fileIndexLow;
+    }
+  };
+
   public static FileStatus stat(final Path path, final boolean followSymlinks, FileStore fileStore)
       throws IOException {
     final BasicFileAttributes attributes;
@@ -269,6 +316,9 @@ public class Utils {
 
           @Override
           public Object fileKey() {
+            if (attributes instanceof DosFileAttributes) {
+              return new WindowsFileKey((DosFileAttributes) attributes);
+            }
             // UnixFileKeys will correspond to a supported "posix" FileAttributeView
             // This will mean that NamedFileKeys are populated with inodes
             // We cannot construct UnixFileKeys, so this is our best option to use
