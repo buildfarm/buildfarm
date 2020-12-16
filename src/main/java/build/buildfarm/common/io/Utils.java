@@ -201,7 +201,7 @@ public class Utils {
       throws IOException {
     List<NamedFileKey> dirents = new ArrayList();
     for (Path entry : listDir(path)) {
-      dirents.add(pathToNamedFileKey(path, fileStore));
+      dirents.add(pathToNamedFileKey(entry, fileStore));
     }
     return dirents;
   }
@@ -219,10 +219,6 @@ public class Utils {
     return dirents;
   }
 
-  /*
-   * calling java stat
-   * Like stat(), but returns null on failures instead of throwing.
-   */
   public static FileStatus stat(final Path path, final boolean followSymlinks, FileStore fileStore)
       throws IOException {
     final BasicFileAttributes attributes;
