@@ -431,9 +431,6 @@ message RedisShardBackplaneConfig {
   // the ready-to-run operation queue. Contains QueueEntry messages
   string queued_operations_list_name = 7;
 
-  // the atomic target list for reliable ready-to-run queue removal
-  string dispatching_list_name = 22;
-
   // the prefix of the dispatching list timeout monitor key
   string dispatching_prefix = 23;
 
