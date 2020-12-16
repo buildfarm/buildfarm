@@ -1181,7 +1181,7 @@ public class RedisShardBackplane implements ShardBackplane {
     Operation operation = keepaliveOperation(operationName);
     publishReset(jedis, operation);
 
-    long requeueAt = System.currentTimeMillis() + 30 * 1000;
+    long requeueAt = System.currentTimeMillis() + config.getDispatchingTimeoutMillis();
     DispatchedOperation o =
         DispatchedOperation.newBuilder().setQueueEntry(queueEntry).setRequeueAt(requeueAt).build();
     boolean success = false;
