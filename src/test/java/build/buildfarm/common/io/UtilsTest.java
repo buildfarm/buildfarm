@@ -29,7 +29,7 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
-class UtilsTest {
+public class UtilsTest {
   private Path root;
 
   private FileStore fileStore;
