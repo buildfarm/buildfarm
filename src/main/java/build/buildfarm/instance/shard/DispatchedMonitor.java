@@ -49,11 +49,8 @@ class DispatchedMonitor implements Runnable {
   private ListenableFuture<Void> requeueDispatchedOperation(DispatchedOperation o, long now) {
     QueueEntry queueEntry = o.getQueueEntry();
     String operationName = queueEntry.getExecuteEntry().getOperationName();
-    logger.log(
-        Level.INFO,
-        format(
-            "DispatchedMonitor: Testing %s because %d >= %d",
-            operationName, now, o.getRequeueAt()));
+
+    logOverdueOperation(o, now);
     ListenableFuture<Void> requeuedFuture = requeuer.apply(queueEntry);
     long startTime = System.nanoTime();
     requeuedFuture.addListener(
@@ -67,13 +64,26 @@ class DispatchedMonitor implements Runnable {
     return requeuedFuture;
   }
 
+  private void logOverdueOperation(DispatchedOperation o, long now) {
+
+    // log that the dispatched operation is overdue in order to indicate that it should be requeued.
+    String operationName = o.getQueueEntry().getExecuteEntry().getOperationName();
+    long overdue_amount = now - o.getRequeueAt();
+    StringBuilder message = new StringBuilder();
+    message.append(
+        String.format(
+            "DispatchedMonitor: Testing %s because %dms overdue (%d >= %d)",
+            operationName, overdue_amount, now, o.getRequeueAt()));
+    logger.log(Level.INFO, message.toString());
+  }
+
   private void testDispatchedOperations(
       long now,
       Iterable<DispatchedOperation> dispatchedOperations,
       ImmutableList.Builder<ListenableFuture<Void>> requeuedFutures) {
-    /* iterate over dispatched */
+
+    // requeue all operations that are over their dispatched duration time
     for (DispatchedOperation o : dispatchedOperations) {
-      /* if now > dispatchedOperation.getExpiresAt() */
       if (now >= o.getRequeueAt()) {
         requeuedFutures.add(requeueDispatchedOperation(o, now));
       }
