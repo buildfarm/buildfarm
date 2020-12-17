@@ -256,13 +256,27 @@ public class Utils {
 
     @Override
     public boolean equals(Object obj) {
-      return (obj instanceof WindowsFileKey) && isSameFile((WindowsFileKey) obj);
+      if (obj == this)
+          return true;
+      if (!(obj instanceof WindowsFileKey))
+          return false;
+      WindowsFileKey other = (WindowsFileKey)obj;
+      return (this.volSerialNumber == other.volSerialNumber)
+          && (this.fileIndexHigh == other.fileIndexHigh)
+          && (this.fileIndexLow == other.fileIndexLow);
     }
 
-    private boolean isSameFile(WindowsFileKey o) {
-      return volSerialNumber == o.volSerialNumber
-          && fileIndexHigh == o.fileIndexHigh
-          && fileIndexLow == o.fileIndexLow;
+    @Override
+    public String toString() {
+      StringBuilder sb = new StringBuilder();
+      sb.append("(volSerialNumber=")
+        .append(volSerialNumber)
+        .append(",fileIndexHigh=")
+        .append(fileIndexHigh)
+        .append(",fileIndexLow=")
+        .append(fileIndexLow)
+        .append(')');
+      return sb.toString();
     }
   };
 
