@@ -822,8 +822,8 @@ public class RedisShardBackplane implements ShardBackplane {
   @Override
   public void removeActionResults(Iterable<ActionKey> actionKeys) throws IOException {
 
+    // convert action keys to strings
     List<String> keyNames = new ArrayList<String>();
-
     actionKeys.forEach(
         key -> {
           keyNames.add(asDigestStr(key));
