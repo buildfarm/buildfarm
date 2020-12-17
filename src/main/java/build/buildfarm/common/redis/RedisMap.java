@@ -14,6 +14,8 @@
 
 package build.buildfarm.common.redis;
 
+import redis.clients.jedis.JedisCluster;
+import redis.clients.jedis.JedisClusterPipeline;
 
 ///
 /// @class   RedisMap
@@ -43,5 +45,51 @@ public class RedisMap {
   ///
   public RedisMap(String name) {
     this.name = name;
+  }
+  ///
+  /// @brief   Set key to hold the string value and set key to timeout after a
+  ///          given number of seconds.
+  /// @details If the key already exists, then the value is replaced.
+  /// @param   jedis     Jedis cluster client.
+  /// @param   key       The name of the key.
+  /// @param   value     The value for the key.
+  /// @param   timeout_s Timeout to expire the entry. (units: seconds (s))
+  ///
+  public void insert(JedisCluster jedis, String key, String value, int timeout_s) {
+    jedis.setex(createKeyName(key), timeout_s, value);
+  }
+  ///
+  /// @brief   Remove a key from the map.
+  /// @details Deletes the key/value pair.
+  /// @param   jedis Jedis cluster client.
+  /// @param   key   The name of the key.
+  /// @note    Overloaded.
+  ///
+  public void remove(JedisCluster jedis, String key) {
+    jedis.del(createKeyName(key));
+  }
+  ///
+  /// @brief   Remove multiple keys from the map.
+  /// @details Done via pipeline.
+  /// @param   jedis Jedis cluster client.
+  /// @param   keys  The name of the keys.
+  /// @note    Overloaded.
+  ///
+  public void remove(JedisCluster jedis, Iterable<String> keys) {
+    JedisClusterPipeline p = jedis.pipelined();
+    for (String key : keys) {
+      p.del(createKeyName(key));
+    }
+    p.sync();
+  }
+  ///
+  /// @brief   Create the key name used in redis.
+  /// @details The key name is made more unique by leveraging the map's name.
+  /// @param   keyName The name of the key.
+  /// @return  The key name to use in redis.
+  /// @note    Suggested return identifier: redisKeyName.
+  ///
+  private String createKeyName(String keyName) {
+    return name + ":" + keyName;
   }
 }

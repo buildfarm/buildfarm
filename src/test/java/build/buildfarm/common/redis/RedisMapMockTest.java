@@ -14,9 +14,14 @@
 
 package build.buildfarm.common.redis;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
+import redis.clients.jedis.JedisCluster;
 
 ///
 /// @class   RedisMapMockTest
@@ -39,5 +44,40 @@ public class RedisMapMockTest {
 
     // ARRANGE
     RedisMap map = new RedisMap("test");
+  }
+
+  // Function under test: insert
+  // Reason for testing: test how an element is added to a map
+  // Failure explanation: jedis was not called as expected
+  @Test
+  public void insertInsert() throws Exception {
+
+    // ARRANGE
+    JedisCluster redis = mock(JedisCluster.class);
+    RedisMap map = new RedisMap("test");
+
+    // ACT
+    map.insert(redis, "key", "value", 60);
+
+    // ASSERT
+    verify(redis, times(1)).setex("test:key", 60, "value");
+  }
+
+  // Function under test: remove
+  // Reason for testing: test how an element is removed to a map
+  // Failure explanation: jedis was not called as expected
+  @Test
+  public void removeRemove() throws Exception {
+
+    // ARRANGE
+    JedisCluster redis = mock(JedisCluster.class);
+    RedisMap map = new RedisMap("test");
+
+    // ACT
+    map.insert(redis, "key", "value", 60);
+    map.remove(redis, "key");
+
+    // ASSERT
+    verify(redis, times(1)).del("test:key");
   }
 }

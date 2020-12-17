@@ -33,6 +33,7 @@ import build.buildfarm.common.WorkerIndexer;
 import build.buildfarm.common.function.InterruptingRunnable;
 import build.buildfarm.common.redis.BalancedRedisQueue;
 import build.buildfarm.common.redis.ProvisionedRedisQueue;
+import build.buildfarm.common.redis.RedisMap;
 import build.buildfarm.common.redis.RedisClient;
 import build.buildfarm.common.redis.RedisHashtags;
 import build.buildfarm.common.redis.RedisNodeHashes;
