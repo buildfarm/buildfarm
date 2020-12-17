@@ -44,9 +44,11 @@ import build.buildfarm.instance.shard.RedisShardBackplane;
 import build.buildfarm.instance.shard.RemoteInputStreamFactory;
 import build.buildfarm.instance.shard.ShardBackplane;
 import build.buildfarm.instance.shard.WorkerStubs;
+import build.buildfarm.server.AdminService;
 import build.buildfarm.server.ByteStreamService;
 import build.buildfarm.server.ContentAddressableStorageService;
 import build.buildfarm.server.Instances;
+import build.buildfarm.v1test.AdminConfig;
 import build.buildfarm.v1test.ContentAddressableStorageConfig;
 import build.buildfarm.v1test.FilesystemCASConfig;
 import build.buildfarm.v1test.ShardWorker;
@@ -238,6 +240,17 @@ public class Worker extends LoggingMain {
       logger.log(Level.SEVERE, "The worker gracefully shutdown is interrupted: " + e.getMessage());
     } finally {
       // make a grpc call to disable scale protection
+      AdminConfig adminConfig = config.getAdminConfig();
+      String clusterId = config.getAdminConfig().getClusterId();
+      if (clusterId.equals("")) {
+        logger.log(
+            SEVERE,
+            "cluster_id of AdminConfig in ShardWorkerConfig is not set, "
+                + " the worker cannot disable scale in protection through grpc call to AdminService. "
+                + "The worker won't be shut down");
+        return;
+      }
+      DisableScaleInProtection.disableScaleInProtection(clusterId);
     }
   }
 

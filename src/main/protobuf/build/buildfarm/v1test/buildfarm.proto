@@ -233,10 +233,14 @@ message LogMetricsConfig {
 message AdminConfig {
   string deployment_environment = 1;
 
+  string cluster_id = 4;
+
   oneof type {
     AwsAdminConfig aws_admin_config = 2;
     GcpAdminConfig gcp_admin_config = 3;
   }
+
+  bool enable_graceful_shutdown = 5;
 }
 
 message AwsAdminConfig {
@@ -608,6 +612,8 @@ message ShardWorkerConfig {
   bool omit_from_cas = 33;
   
   bool error_operation_remaining_resources = 34;
+
+  AdminConfig admin_config = 35;
 }
 
 message ShardWorker {
@@ -1026,7 +1032,17 @@ message DrainWorkerPipelineRequest {
 message DrainWorkerPipelineResults {
 }
 
-
 service ShutDownWorkerGracefully {
   rpc DrainWorkerPipeline(DrainWorkerPipelineRequest) returns (DrainWorkerPipelineResults) {}
+}
+
+message DisableScaleInProtectionRequest{
+  string instance_name = 1;
+}
+
+message DisableScaleInProtectionRequestResults{
+}
+
+service DisableScaleInProtection{
+  rpc DisableScaleInProtection(DisableScaleInProtectionRequest) returns (DisableScaleInProtectionRequestResults) {}
 }

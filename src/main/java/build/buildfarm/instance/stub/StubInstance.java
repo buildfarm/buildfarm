@@ -290,7 +290,7 @@ public class StubInstance implements Instance {
             }
           });
 
-  private final Supplier<WorkerProfileBlockingStub> WorkerProfileBlockingStub =
+  private final Supplier<WorkerProfileBlockingStub> workerProfileBlockingStub =
       Suppliers.memoize(
           new Supplier<WorkerProfileBlockingStub>() {
             @Override
@@ -300,7 +300,7 @@ public class StubInstance implements Instance {
           });
 
   private final Supplier<ShutDownWorkerGracefullyBlockingStub>
-      ShutDownWorkerGracefullyBlockingStub =
+      shutDownWorkerGracefullyBlockingStub =
           Suppliers.memoize(
               new Supplier<ShutDownWorkerGracefullyBlockingStub>() {
                 @Override
@@ -830,13 +830,13 @@ public class StubInstance implements Instance {
 
   @Override
   public WorkerProfileMessage getWorkerProfile() {
-    return deadlined(WorkerProfileBlockingStub)
+    return deadlined(workerProfileBlockingStub)
         .getWorkerProfile(WorkerProfileRequest.newBuilder().build());
   }
 
   @Override
   public WorkerListMessage getWorkerList() {
-    return WorkerProfileBlockingStub.get().getWorkerList(WorkerListRequest.newBuilder().build());
+    return workerProfileBlockingStub.get().getWorkerList(WorkerListRequest.newBuilder().build());
   }
 
   @Override
@@ -871,7 +871,8 @@ public class StubInstance implements Instance {
   @Override
   public DrainWorkerPipelineResults drainWorkerPipeline(String worker) {
     throwIfStopped();
-    return ShutDownWorkerGracefullyBlockingStub.get()
+    return shutDownWorkerGracefullyBlockingStub
+        .get()
         .drainWorkerPipeline(DrainWorkerPipelineRequest.newBuilder().build());
   }
 }
