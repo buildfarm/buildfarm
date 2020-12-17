@@ -44,6 +44,7 @@ class AdminServiceClient {
     channel = createChannel(host);
     adminBlockingStub
         .get()
-        .disableScaleInProtection(DisableScaleInProtectionRequest.newBuilder().setInstanceName(instanceIp).build());
+        .disableScaleInProtection(
+            DisableScaleInProtectionRequest.newBuilder().setInstanceName(instanceIp).build());
   }
 }
