@@ -92,6 +92,8 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
 import redis.clients.jedis.JedisCluster;
@@ -711,6 +713,30 @@ public class RedisShardBackplane implements ShardBackplane {
     // fetch every 3 seconds
     workerSetExpiresAt = now + 3000;
     return workerSet;
+  }
+
+  // When performing a graceful scale down of workers, the backplane can provide worker names to the
+  // scale-down service.
+  // The algorithm in which the backplane chooses these workers can be made more sophisticated in
+  // the future.
+  // But for now, we'll give back n random workers.
+  public List<String> SuggestedWorkersForShutdown(int amount) throws IOException {
+
+    // get all workers
+    List<String> allWorkers = new ArrayList<String>();
+    allWorkers.addAll(getWorkers());
+
+    // ensure selection amount is in range [0 - size]
+    amount = Math.max(0, Math.min(amount, allWorkers.size()));
+
+    // select n workers
+    return randomN(allWorkers, amount);
+  }
+
+  public static <T> List<T> randomN(List<T> list, int n) {
+    return Stream.generate(() -> list.remove((int) (list.size() * Math.random())))
+        .limit(Math.min(list.size(), n))
+        .collect(Collectors.toList());
   }
 
   private void removeInvalidWorkers(JedisCluster jedis, long testedAt, List<ShardWorker> workers) {
