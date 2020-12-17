@@ -83,6 +83,17 @@ public class RedisMap {
     p.sync();
   }
   ///
+  /// @brief   Get the value of the key.
+  /// @details If the key does not exist, null is returned.
+  /// @param   jedis Jedis cluster client.
+  /// @param   key   The name of the key.
+  /// @return  The value of the key. null if key does not exist.
+  /// @note    Suggested return identifier: value.
+  ///
+  public String get(JedisCluster jedis, String key) {
+    return jedis.get(createKeyName(key));
+  }
+  ///
   /// @brief   Create the key name used in redis.
   /// @details The key name is made more unique by leveraging the map's name.
   /// @param   keyName The name of the key.

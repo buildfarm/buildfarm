@@ -33,9 +33,9 @@ import build.buildfarm.common.WorkerIndexer;
 import build.buildfarm.common.function.InterruptingRunnable;
 import build.buildfarm.common.redis.BalancedRedisQueue;
 import build.buildfarm.common.redis.ProvisionedRedisQueue;
-import build.buildfarm.common.redis.RedisMap;
 import build.buildfarm.common.redis.RedisClient;
 import build.buildfarm.common.redis.RedisHashtags;
+import build.buildfarm.common.redis.RedisMap;
 import build.buildfarm.common.redis.RedisNodeHashes;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.RedisShardSubscriber.TimedWatchFuture;
@@ -147,6 +147,7 @@ public class RedisShardBackplane implements ShardBackplane {
   private Set<String> workerSet = Collections.synchronizedSet(new HashSet<>());
   private long workerSetExpiresAt = 0;
 
+  private RedisMap actionCache;
   private BalancedRedisQueue prequeue;
   private OperationQueue operationQueue;
 
@@ -514,6 +515,7 @@ public class RedisShardBackplane implements ShardBackplane {
     // multiple clients.
     client = new RedisClient(jedisClusterFactory.get());
 
+    actionCache = createActionCache(client, config);
     prequeue = createPrequeue(client, config);
     operationQueue = createOperationQueue(client, config);
 
@@ -527,6 +529,11 @@ public class RedisShardBackplane implements ShardBackplane {
     // Record client start time
     client.call(
         jedis -> jedis.set("startTime/" + clientPublicName, Long.toString(new Date().getTime())));
+  }
+
+  static RedisMap createActionCache(RedisClient client, RedisShardBackplaneConfig config)
+      throws IOException {
+    return new RedisMap(config.getActionCachePrefix());
   }
 
   static BalancedRedisQueue createPrequeue(RedisClient client, RedisShardBackplaneConfig config)
@@ -776,7 +783,7 @@ public class RedisShardBackplane implements ShardBackplane {
 
   @Override
   public ActionResult getActionResult(ActionKey actionKey) throws IOException {
-    String json = client.call(jedis -> jedis.get(acKey(actionKey)));
+    String json = client.call(jedis -> actionCache.get(jedis, asDigestStr(actionKey)));
     if (json == null) {
       return null;
     }
@@ -798,11 +805,13 @@ public class RedisShardBackplane implements ShardBackplane {
   @Override
   public void putActionResult(ActionKey actionKey, ActionResult actionResult) throws IOException {
     String json = JsonFormat.printer().print(actionResult);
-    client.run(jedis -> jedis.setex(acKey(actionKey), config.getActionCacheExpire(), json));
+    client.run(
+        jedis ->
+            actionCache.insert(jedis, asDigestStr(actionKey), json, config.getActionCacheExpire()));
   }
 
   private void removeActionResult(JedisCluster jedis, ActionKey actionKey) {
-    jedis.del(acKey(actionKey));
+    actionCache.remove(jedis,asDigestStr(actionKey));
   }
 
   @Override
@@ -812,13 +821,17 @@ public class RedisShardBackplane implements ShardBackplane {
 
   @Override
   public void removeActionResults(Iterable<ActionKey> actionKeys) throws IOException {
+
+    List<String> keyNames = new ArrayList<String>();
+
+    actionKeys.forEach(
+        key -> {
+          keyNames.add(asDigestStr(key));
+        });
+
     client.run(
         jedis -> {
-          JedisClusterPipeline p = jedis.pipelined();
-          for (ActionKey actionKey : actionKeys) {
-            p.del(acKey(actionKey));
-          }
-          p.sync();
+          actionCache.remove(jedis, keyNames);
         });
   }
 
@@ -1352,8 +1365,8 @@ public class RedisShardBackplane implements ShardBackplane {
     return config.getCasPrefix() + ":" + DigestUtil.toString(blobDigest);
   }
 
-  private String acKey(ActionKey actionKey) {
-    return config.getActionCachePrefix() + ":" + DigestUtil.toString(actionKey.getDigest());
+  private String asDigestStr(ActionKey actionKey) {
+    return DigestUtil.toString(actionKey.getDigest());
   }
 
   String operationKey(String operationName) {

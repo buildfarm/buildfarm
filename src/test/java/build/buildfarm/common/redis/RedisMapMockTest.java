@@ -14,9 +14,11 @@
 
 package build.buildfarm.common.redis;
 
+import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -79,5 +81,25 @@ public class RedisMapMockTest {
 
     // ASSERT
     verify(redis, times(1)).del("test:key");
+  }
+
+  // Function under test: get
+  // Reason for testing: test how an element is looked up in a map
+  // Failure explanation: jedis was not called as expected
+  @Test
+  public void getGet() throws Exception {
+
+    // ARRANGE
+    JedisCluster redis = mock(JedisCluster.class);
+    when(redis.get("test:key")).thenReturn("value");
+    RedisMap map = new RedisMap("test");
+
+    // ACT
+    map.insert(redis, "key", "value", 60);
+    String value = map.get(redis, "key");
+
+    // ASSERT
+    verify(redis, times(1)).get("test:key");
+    assertThat(value).isEqualTo("value");
   }
 }
