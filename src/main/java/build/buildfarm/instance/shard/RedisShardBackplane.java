@@ -811,7 +811,7 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   private void removeActionResult(JedisCluster jedis, ActionKey actionKey) {
-    actionCache.remove(jedis,asDigestStr(actionKey));
+    actionCache.remove(jedis, asDigestStr(actionKey));
   }
 
   @Override
