@@ -224,13 +224,13 @@ public class Utils {
   // this is obscene. We cannot acquire useful FileKeys on windows without resorting to drastic
   // measures
   private static class WindowsFileKey {
-    private final int volumeSerialNumber;
+    private final int volSerialNumber;
     private final int fileIndexHigh;
     private final int fileIndexLow;
 
     // bypass accessibility checking to get our key components
     WindowsFileKey(DosFileAttributes attributes) {
-      volumeSerialNumber = getPrivateInt(attributes, "volumeSerialNumber");
+      volSerialNumber = getPrivateInt(attributes, "volSerialNumber");
       fileIndexHigh = getPrivateInt(attributes, "fileIndexHigh");
       fileIndexLow = getPrivateInt(attributes, "fileIndexLow");
     }
@@ -251,7 +251,7 @@ public class Utils {
 
     @Override
     public int hashCode() {
-      return volumeSerialNumber + fileIndexHigh + fileIndexLow;
+      return volSerialNumber + fileIndexHigh + fileIndexLow;
     }
 
     @Override
@@ -260,7 +260,7 @@ public class Utils {
     }
 
     private boolean isSameFile(WindowsFileKey o) {
-      return volumeSerialNumber == o.volumeSerialNumber
+      return volSerialNumber == o.volSerialNumber
           && fileIndexHigh == o.fileIndexHigh
           && fileIndexLow == o.fileIndexLow;
     }
