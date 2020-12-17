@@ -43,6 +43,10 @@ service Admin {
   rpc DeregisterWorker(DeregisterWorkerRequest) returns (DeregisterWorkerRequestResults) {
     option (google.api.http) = { get: "/v1test/admin:deregisterWorker" };
   }
+
+  rpc DisableScaleInProtection(DisableScaleInProtectionRequest) returns (DisableScaleInProtectionRequestResults) {
+    option (google.api.http) = { get: "/v1test/admin:disableScaleInProtection" };
+  }
 }
 
 message DeregisterWorkerRequest {
