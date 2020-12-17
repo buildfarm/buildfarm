@@ -249,7 +249,7 @@ public class Worker extends LoggingMain {
                 + "The worker won't be shut down");
         return;
       }
-      AdminServiceClient.disableScaleInProtection(clusterId);
+      AdminServiceClient.disableScaleInProtection(clusterId, config.getPublicName());
     }
   }
 

@@ -40,10 +40,10 @@ class AdminServiceClient {
             }
           });
 
-  public static void disableScaleInProtection(String host) {
+  public static void disableScaleInProtection(String host, String instanceIp) {
     channel = createChannel(host);
     adminBlockingStub
         .get()
-        .disableScaleInProtection(DisableScaleInProtectionRequest.newBuilder().build());
+        .disableScaleInProtection(DisableScaleInProtectionRequest.newBuilder().setInstanceName(instanceIp).build());
   }
 }

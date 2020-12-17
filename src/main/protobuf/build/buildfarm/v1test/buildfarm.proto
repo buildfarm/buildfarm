@@ -58,6 +58,13 @@ message DeregisterWorkerRequest {
 message DeregisterWorkerRequestResults {
 }
 
+message DisableScaleInProtectionRequest{
+  string instance_name = 1;
+}
+
+message DisableScaleInProtectionRequestResults{
+}
+
 message ReindexCasRequest {
   string instance_name = 1;
   
@@ -1040,13 +1047,3 @@ service ShutDownWorkerGracefully {
   rpc DrainWorkerPipeline(DrainWorkerPipelineRequest) returns (DrainWorkerPipelineResults) {}
 }
 
-message DisableScaleInProtectionRequest{
-  string instance_name = 1;
-}
-
-message DisableScaleInProtectionRequestResults{
-}
-
-service DisableScaleInProtection{
-  rpc DisableScaleInProtection(DisableScaleInProtectionRequest) returns (DisableScaleInProtectionRequestResults) {}
-}
