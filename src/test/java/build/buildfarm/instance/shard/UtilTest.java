@@ -30,7 +30,6 @@ import static org.mockito.Mockito.when;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
-import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.instance.Instance;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;

@@ -14,19 +14,21 @@
 
 package build.buildfarm;
 
-import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.stub.StubInstance;
+import com.google.common.collect.ImmutableList;
+import com.google.longrunning.Operation;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
 
-// This tool can be used to remove worker entries from the CAS.
-// This is usually done via the admin service when a worker is departing from the cluster.
-// ./tool <URL> shard SHA256 <worker instance name>
-// The results of the removal are printed after the CAS entries have been removed.
-class IndexWorker {
+// This tool can be used to find Operations based on their particular properties.
+// For example, it could find all of the operations executed by a particular user or particular
+// program.
+// ./tool <URL> shard SHA256 <user>
+// The operations that match the query will be printed.
+class FindOperations {
 
   private static ManagedChannel createChannel(String target) {
     NettyChannelBuilder builder =
@@ -35,14 +37,29 @@ class IndexWorker {
   }
 
   public static void main(String[] args) throws Exception {
+
+    // get arguments for establishing an instance
     String host = args[0];
     String instanceName = args[1];
     DigestUtil digestUtil = DigestUtil.forHash(args[2]);
-    String reindexworker = args[3];
+
+    // decide filter predicate
+    String filterPredicate = "*";
+    if (args.length >= 4) {
+      filterPredicate = args[3];
+    }
+
+    // create instance
     ManagedChannel channel = createChannel(host);
     Instance instance = new StubInstance(instanceName, digestUtil, channel);
-    CasIndexResults results = instance.reindexCas(reindexworker);
-    System.out.println(results.toMessage());
+
+    // get operations and print them
+    ImmutableList.Builder<Operation> operations = new ImmutableList.Builder<>();
+    String token = instance.listOperations(100, "/operations", filterPredicate, operations);
+    for (Operation operation : operations.build()) {
+      System.out.println(operation.getName());
+    }
+
     instance.stop();
   }
 }

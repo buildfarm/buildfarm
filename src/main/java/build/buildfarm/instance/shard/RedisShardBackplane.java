@@ -27,7 +27,6 @@ import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.CasIndexSettings;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
-import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.StringVisitor;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.WorkerIndexer;
@@ -37,7 +36,11 @@ import build.buildfarm.common.redis.ProvisionedRedisQueue;
 import build.buildfarm.common.redis.RedisClient;
 import build.buildfarm.common.redis.RedisHashtags;
 import build.buildfarm.common.redis.RedisNodeHashes;
+import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.RedisShardSubscriber.TimedWatchFuture;
+import build.buildfarm.operations.FindOperationsResults;
+import build.buildfarm.operations.FindOperationsSettings;
+import build.buildfarm.operations.OperationsFinder;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
@@ -678,6 +681,16 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   @Override
+  public FindOperationsResults findOperations(Instance instance, String filterPredicate)
+      throws IOException {
+    FindOperationsSettings settings = new FindOperationsSettings();
+    settings.filterPredicate = filterPredicate;
+    settings.operationQuery = config.getOperationPrefix() + ":*";
+    settings.scanAmount = 10000;
+    return client.call(jedis -> OperationsFinder.findOperations(jedis, instance, settings));
+  }
+
+  @Override
   public void deregisterWorker(String workerName) throws IOException {
     removeWorker(workerName, "Requested shutdown");
   }
@@ -1168,7 +1181,7 @@ public class RedisShardBackplane implements ShardBackplane {
     Operation operation = keepaliveOperation(operationName);
     publishReset(jedis, operation);
 
-    long requeueAt = System.currentTimeMillis() + 30 * 1000;
+    long requeueAt = System.currentTimeMillis() + config.getDispatchingTimeoutMillis();
     DispatchedOperation o =
         DispatchedOperation.newBuilder().setQueueEntry(queueEntry).setRequeueAt(requeueAt).build();
     boolean success = false;

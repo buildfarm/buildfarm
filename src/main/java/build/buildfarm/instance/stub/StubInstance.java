@@ -82,6 +82,8 @@ import build.buildfarm.v1test.ReindexCasRequest;
 import build.buildfarm.v1test.ReindexCasRequestResults;
 import build.buildfarm.v1test.TakeOperationRequest;
 import build.buildfarm.v1test.Tree;
+import build.buildfarm.v1test.WorkerListMessage;
+import build.buildfarm.v1test.WorkerListRequest;
 import build.buildfarm.v1test.WorkerProfileGrpc;
 import build.buildfarm.v1test.WorkerProfileGrpc.WorkerProfileBlockingStub;
 import build.buildfarm.v1test.WorkerProfileMessage;
@@ -144,7 +146,7 @@ public class StubInstance implements Instance {
   private final String identifier;
   private final DigestUtil digestUtil;
   private final ManagedChannel channel;
-  private final Duration grpcTimeout;
+  private final @Nullable Duration grpcTimeout;
   private final Retrier retrier;
   private final @Nullable ListeningScheduledExecutorService retryService;
   private boolean isStopped = false;
@@ -814,8 +816,13 @@ public class StubInstance implements Instance {
 
   @Override
   public WorkerProfileMessage getWorkerProfile() {
-    return WorkerProfileBlockingStub.get()
+    return deadlined(WorkerProfileBlockingStub)
         .getWorkerProfile(WorkerProfileRequest.newBuilder().build());
+  }
+
+  @Override
+  public WorkerListMessage getWorkerList() {
+    return WorkerProfileBlockingStub.get().getWorkerList(WorkerListRequest.newBuilder().build());
   }
 
   @Override

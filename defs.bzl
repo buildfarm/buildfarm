@@ -76,6 +76,7 @@ def buildfarm_init(name = "buildfarm"):
                         "com.google.truth:truth:0.44",
                         "com.googlecode.json-simple:json-simple:1.1.1",
                         "com.google.code.gson:gson:2.8.6",
+                        "com.jayway.jsonpath:json-path:2.4.0",
                     ] + ["io.netty:netty-%s:4.1.38.Final" % module for module in IO_NETTY_MODULES] +
                     ["io.grpc:grpc-%s:1.26.0" % module for module in IO_GRPC_MODULES] +
                     [

@@ -36,13 +36,13 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.LoggingMain;
-import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.Size;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.RedisShardBackplane;
 import build.buildfarm.instance.shard.RemoteInputStreamFactory;
+import build.buildfarm.instance.shard.ShardBackplane;
 import build.buildfarm.instance.shard.WorkerStubs;
 import build.buildfarm.server.ByteStreamService;
 import build.buildfarm.server.ContentAddressableStorageService;
@@ -385,7 +385,12 @@ public class Worker extends LoggingMain {
             .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, DAYS))
             .addService(
                 new WorkerProfileService(
-                    storage, inputFetchStage, executeActionStage, context, completeStage))
+                    storage,
+                    inputFetchStage,
+                    executeActionStage,
+                    context,
+                    completeStage,
+                    backplane))
             .build();
 
     logger.log(INFO, String.format("%s initialized", identifier));
