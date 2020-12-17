@@ -185,7 +185,10 @@ public class AdminService extends AdminGrpc.AdminImplBase {
   @Override
   public void disableScaleInProtection(
       DisableScaleInProtectionRequest request,
-      StreamObserver<DisableScaleInProtectionRequestResults> responseObserver) {}
+      StreamObserver<DisableScaleInProtectionRequestResults> responseObserver) {
+    //adminController.disableHostProtection(instance_id, asg_name);
+
+  }
 
   private static Admin getAdminController(AdminConfig config) {
     switch (config.getDeploymentEnvironment()) {
