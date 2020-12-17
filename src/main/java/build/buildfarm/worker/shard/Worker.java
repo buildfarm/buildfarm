@@ -230,10 +230,14 @@ public class Worker extends LoggingMain {
   public void shutDownWorkerGracefully() {
     inGracefulShutdown = true;
     logger.log(Level.INFO, "The current worker is deregistered and should be shutdown gracefully!");
+    int scanPerSeconds = 30;
+    int timeWaited = 0;
+    int timeOut = 60 * 15; // 15 minutes
 
     try {
-      while (!pipeline.isEmpty()) {
-        SECONDS.sleep(10);
+      while (!pipeline.isEmpty() && timeWaited < timeOut) {
+        SECONDS.sleep(scanPerSeconds);
+        timeWaited += scanPerSeconds;
       }
     } catch (InterruptedException e) {
       logger.log(Level.SEVERE, "The worker gracefully shutdown is interrupted: " + e.getMessage());
@@ -249,6 +253,10 @@ public class Worker extends LoggingMain {
                 + "The worker won't be shut down");
         return;
       }
+      logger.log(INFO, String.format(
+          "It took the worker %d seconds to %s",
+          timeWaited,
+          pipeline.isEmpty()? "finish all actions" : "but still cannot finish all actions"));
       AdminServiceClient.disableScaleInProtection(clusterId, config.getPublicName());
     }
   }
