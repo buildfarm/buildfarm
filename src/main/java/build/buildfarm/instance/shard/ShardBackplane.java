@@ -12,16 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.common;
+package build.buildfarm.instance.shard;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.ThreadSafety.ThreadSafe;
+import build.buildfarm.common.Watcher;
 import build.buildfarm.common.function.InterruptingRunnable;
+import build.buildfarm.instance.Instance;
+import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.GetClientStartTimeResult;
@@ -87,7 +91,14 @@ public interface ShardBackplane {
   boolean removeWorker(String workerName, String reason) throws IOException;
 
   @ThreadSafe
-  public CasIndexResults reindexCas(String hostName) throws IOException;
+  CasIndexResults reindexCas(String workerName) throws IOException;
+
+  @ThreadSafe
+  void deregisterWorker(String hostName) throws IOException;
+
+  @ThreadSafe
+  public FindOperationsResults findOperations(Instance instance, String filterPredicate)
+      throws IOException;
 
   /** Returns a set of the names of all active workers. */
   @ThreadSafe

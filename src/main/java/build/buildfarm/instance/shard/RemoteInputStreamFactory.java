@@ -27,7 +27,6 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.InputStreamFactory;
-import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.ShardInstance.WorkersCallback;
 import com.google.common.base.Throwables;

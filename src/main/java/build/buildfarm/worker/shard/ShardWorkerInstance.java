@@ -28,13 +28,14 @@ import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
-import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
 import build.buildfarm.instance.AbstractServerInstance;
+import build.buildfarm.instance.shard.ShardBackplane;
+import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.GetClientStartTimeResult;
@@ -386,6 +387,24 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   public CasIndexResults reindexCas(String hostName) {
     try {
       return backplane.reindexCas(hostName);
+    } catch (IOException e) {
+      throw Status.fromThrowable(e).asRuntimeException();
+    }
+  }
+
+  @Override
+  public FindOperationsResults findOperations(String filterPredicate) {
+    try {
+      return backplane.findOperations(this, filterPredicate);
+    } catch (IOException e) {
+      throw Status.fromThrowable(e).asRuntimeException();
+    }
+  }
+
+  @Override
+  public void deregisterWorker(String workerName) {
+    try {
+      backplane.deregisterWorker(workerName);
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }

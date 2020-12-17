@@ -123,13 +123,13 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
   @Override
   protected void iterate() throws InterruptedException {
     OperationContext operationContext = take();
-    int claims = claimsRequired(operationContext);
+    ResourceLimits limits = workerContext.commandExecutionSettings(operationContext.command);
     Executor executor = new Executor(workerContext, operationContext, this);
-    Thread executorThread = new Thread(() -> executor.run(settings, claims));
+    Thread executorThread = new Thread(() -> executor.run(limits));
 
     synchronized (this) {
       executors.add(executorThread);
-      size = executorClaims.addAndGet(claims);
+      size = executorClaims.addAndGet(limits.cpu.claimed);
       logStart(operationContext.operation.getName(), getUsage(size));
       executorThread.start();
     }

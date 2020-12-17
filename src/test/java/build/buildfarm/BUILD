@@ -71,8 +71,8 @@ java_test(
     name = "example-configs-tests",
     size = "small",
     srcs = ["common/ExampleConfigsTest.java"],
-    test_class = "build.buildfarm.AllTests",
     data = ["//examples:example_configs"],
+    test_class = "build.buildfarm.AllTests",
     deps = [
         ":test_runner",
         "//src/main/java/build/buildfarm:common",
@@ -118,7 +118,7 @@ java_test(
 java_test(
     name = "cas-tests",
     size = "small",
-    srcs = glob(["cas/*.java"]),
+    srcs = glob(["cas/**/*.java"]),
     test_class = "build.buildfarm.AllTests",
     deps = [
         ":test-common-grpc",
@@ -169,6 +169,7 @@ java_test(
         "//src/main/java/build/buildfarm:stub-instance",
         "//src/main/java/build/buildfarm:worker",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "//src/main/java/build/buildfarm:worker-resources",
         "@googleapis//:google_rpc_code_java_proto",
         "@maven//:com_github_jnr_jnr_constants",
         "@maven//:com_github_jnr_jnr_ffi",
@@ -276,6 +277,33 @@ java_test(
 )
 
 java_test(
+    name = "worker-resource-limits-tests",
+    size = "small",
+    srcs = glob(["worker/resources/*.java"]),
+    classpath_resources = [
+        ":configs",
+    ],
+    test_class = "build.buildfarm.AllTests",
+    deps = [
+        ":test_runner",
+        "//src/main/java/build/buildfarm:common",
+        "//src/main/java/build/buildfarm:instance",
+        "//src/main/java/build/buildfarm:operationqueue-worker",
+        "//src/main/java/build/buildfarm:stub-instance",
+        "//src/main/java/build/buildfarm:worker",
+        "//src/main/java/build/buildfarm:worker-resources",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "@maven//:com_google_guava_guava",
+        "@maven//:com_google_jimfs_jimfs",
+        "@maven//:com_google_protobuf_protobuf_java",
+        "@maven//:com_google_truth_truth",
+        "@maven//:io_grpc_grpc_api",
+        "@maven//:io_grpc_grpc_core",
+        "@maven//:org_mockito_mockito_core",
+    ],
+)
+
+java_test(
     name = "shard-worker-tests",
     size = "small",
     srcs = glob(["worker/shard/*.java"]),
@@ -287,6 +315,7 @@ java_test(
         "//src/main/java/build/buildfarm:instance",
         "//src/main/java/build/buildfarm:shard-worker",
         "//src/main/java/build/buildfarm:worker",
+        "//src/main/java/build/buildfarm:shard-instance",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_jimfs_jimfs",
@@ -314,6 +343,7 @@ java_test(
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_truth_truth",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+        "//src/main/java/build/buildfarm:operations",
     ],
 )
 
@@ -403,6 +433,7 @@ java_test(
         "@maven//:io_grpc_grpc_core",
         "@maven//:org_mockito_mockito_core",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+        "//src/main/java/build/buildfarm:operations",
     ],
 )
 
@@ -439,10 +470,10 @@ java_test(
     size = "small",
     srcs = [
         "common/redis/BalancedRedisQueueMockTest.java",
+        "common/redis/ProvisionedRedisQueueTest.java",
         "common/redis/RedisNodeHashesMockTest.java",
         "common/redis/RedisQueueMockTest.java",
         "common/redis/RedisSlotToHashTest.java",
-        "common/redis/ProvisionedRedisQueueTest.java",
     ],
     test_class = "build.buildfarm.AllTests",
     deps = [
@@ -466,14 +497,17 @@ java_test(
     test_class = "build.buildfarm.AllTests",
     deps = [
         ":test_runner",
+        "//src/main/java/build/buildfarm:aws-metrics",
         "//src/main/java/build/buildfarm:common",
         "//src/main/java/build/buildfarm:common-grpc",
-        "//src/main/java/build/buildfarm:aws-metrics",
-        "//src/main/java/build/buildfarm:metrics",
         "//src/main/java/build/buildfarm:gcp-metrics",
         "//src/main/java/build/buildfarm:log-metrics",
+        "//src/main/java/build/buildfarm:metrics",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_rpc_error_details_java_proto",
+        "@maven//:com_amazonaws_aws_java_sdk_core",
+        "@maven//:com_amazonaws_aws_java_sdk_secretsmanager",
+        "@maven//:com_amazonaws_aws_java_sdk_sns",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_jimfs_jimfs",
         "@maven//:com_google_protobuf_protobuf_java",
@@ -484,8 +518,5 @@ java_test(
         "@maven//:io_grpc_grpc_stub",
         "@maven//:io_grpc_grpc_testing",
         "@maven//:org_mockito_mockito_core",
-        "@maven//:com_amazonaws_aws_java_sdk_core",
-        "@maven//:com_amazonaws_aws_java_sdk_secretsmanager",
-        "@maven//:com_amazonaws_aws_java_sdk_sns",
     ],
 )

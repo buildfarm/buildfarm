@@ -10,6 +10,13 @@ filegroup(
     visibility = ["//visibility:public"],
 )
 
+genrule(
+    name = "tini.binary",
+    srcs = ["@tini//file"],
+    outs = ["tini"],
+    cmd = "cp $< $@ && chmod +x $@",
+)
+
 java_library(
     name = "common",
     srcs = glob([
@@ -50,6 +57,77 @@ java_library(
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_j2objc_j2objc_annotations",
         "@maven//:org_checkerframework_checker_qual",
+    ],
+)
+
+java_library(
+    name = "operations-finder",
+    srcs = [
+        "operations/OperationsFinder.java",
+        "operations/EnrichedOperationBuilder.java",
+    ],
+    deps = [
+        ":ac",
+        ":common",
+        ":common-cache",
+        ":common-grpc",
+        ":common-redis",
+        ":instance",
+        ":server-instance",
+        ":stub-instance",
+        ":worker-queues",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "//third_party/jedis",
+        "@googleapis//:google_rpc_code_java_proto",
+        "@googleapis//:google_rpc_error_details_java_proto",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:com_google_protobuf_protobuf_java",
+        "@maven//:com_google_protobuf_protobuf_java_util",
+        "@maven//:io_grpc_grpc_api",
+        "@maven//:io_grpc_grpc_context",
+        "@maven//:io_grpc_grpc_core",
+        "@maven//:io_grpc_grpc_netty",
+        "@maven//:io_grpc_grpc_protobuf",
+        "@maven//:io_grpc_grpc_stub",
+        "@maven//:org_apache_commons_commons_pool2",
+        "@maven//:com_jayway_jsonpath_json_path",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+        ":operations",
+    ],
+)
+
+java_library(
+    name = "operations",
+    srcs = glob([
+        "operations/*.java",
+    ],
+            exclude = [
+            "operations/OperationsFinder.java",
+            "operations/EnrichedOperationBuilder.java",
+        ]),
+    deps = [
+        ":common",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "@googleapis//:google_rpc_code_java_proto",
+        "@googleapis//:google_rpc_error_details_java_proto",
+        "@googleapis//:google_bytestream_bytestream_java_grpc",
+        "@googleapis//:google_bytestream_bytestream_java_proto",
+        "@maven//:com_googlecode_json_simple_json_simple",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:com_google_protobuf_protobuf_java",
+        "@maven//:com_google_protobuf_protobuf_java_util",
+        "@maven//:io_grpc_grpc_api",
+        "@maven//:io_grpc_grpc_context",
+        "@maven//:io_grpc_grpc_core",
+        "@maven//:io_grpc_grpc_protobuf",
+        "@maven//:io_grpc_grpc_stub",
+        "@maven//:com_jayway_jsonpath_json_path",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_proto",
+        "@googleapis//:google_rpc_error_details_proto",
     ],
 )
 
@@ -225,6 +303,7 @@ java_library(
     ],
     deps = [
         ":common",
+        ":operations",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_longrunning_operations_java_proto",
         "@maven//:com_google_code_findbugs_jsr305",
@@ -269,6 +348,7 @@ java_library(
         "@maven//:io_grpc_grpc_stub",
         "@maven//:io_netty_netty_codec_http",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+        "//src/main/java/build/buildfarm:operations",
     ],
 )
 
@@ -282,6 +362,7 @@ java_library(
         ":instance",
         ":server-instance",
         ":worker-queues",
+        ":worker",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_longrunning_operations_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
@@ -298,6 +379,7 @@ java_library(
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+        "//src/main/java/build/buildfarm:operations",
     ],
 )
 
@@ -331,6 +413,8 @@ java_library(
         "@maven//:org_apache_commons_commons_pool2",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+        "//src/main/java/build/buildfarm:operations",
+         "//src/main/java/build/buildfarm:operations-finder",
     ],
 )
 
@@ -401,6 +485,7 @@ java_library(
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
         "@remote_apis//:build_bazel_semver_java_proto",
+        "//src/main/java/build/buildfarm:operations",
     ],
 )
 
@@ -462,6 +547,7 @@ java_library(
         "@maven//:io_grpc_grpc_stub",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+        "//src/main/java/build/buildfarm:operations",
     ],
 )
 
@@ -481,8 +567,10 @@ java_library(
         ":stub-instance",
         ":worker",
         ":worker-cgroup",
-        "//src/main/java/build/buildfarm:common-cache",
+        ":worker-resources",
+        ":operations-finder",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
+        "//src/main/java/build/buildfarm:common-cache",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_rpc_error_details_java_proto",
         "@maven//:com_github_pcj_google_options",
@@ -497,6 +585,7 @@ java_library(
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_services",
         "@maven//:io_grpc_grpc_stub",
+        "//src/main/java/build/buildfarm:operations",
     ],
 )
 
@@ -537,6 +626,16 @@ java_library(
 )
 
 java_library(
+    name = "worker-resources",
+    srcs = glob(["worker/resources/*.java"]),
+    deps = [
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "@maven//:com_google_guava_guava",
+        "@maven//:com_googlecode_json_simple_json_simple",
+    ],
+)
+
+java_library(
     name = "worker",
     srcs = glob(["worker/*.java"]),
     deps = [
@@ -544,6 +643,7 @@ java_library(
         ":common",
         ":instance",
         ":stub-instance",
+        ":worker-resources",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
         "@googleapis//:google_rpc_error_details_java_proto",
@@ -575,6 +675,7 @@ java_library(
         ":common-grpc",
         ":instance",
         ":stub-instance",
+        ":worker-resources",
         ":worker",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@maven//:com_github_pcj_google_options",
@@ -593,7 +694,7 @@ java_library(
 
 java_library(
     name = "cas",
-    srcs = glob(["cas/*.java"]),
+    srcs = glob(["cas/**/*.java"]),
     runtime_deps = [
         "@maven//:org_xerial_sqlite_jdbc",
     ],
@@ -606,6 +707,7 @@ java_library(
         "@googleapis//:google_bytestream_bytestream_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
         "@maven//:com_github_jnr_jnr_ffi",
+        "@maven//:com_googlecode_json_simple_json_simple",
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java",
@@ -713,21 +815,6 @@ java_plugin(
 )
 
 java_binary(
-    name = "io-benchmark",
-    srcs = ["IOBenchmark.java"],
-    main_class = "build.buildfarm.IOBenchmark",
-    plugins = [":io-benchmark-plugins"],
-    visibility = ["//visibility:public"],
-    deps = [
-        ":common",
-        "@maven//:com_github_jnr_jnr_constants",
-        "@maven//:com_github_jnr_jnr_ffi",
-        "@maven//:com_github_jnr_jnr_posix",
-        "@maven//:org_openjdk_jmh_jmh_core",
-    ],
-)
-
-java_binary(
     name = "bf-executor",
     srcs = ["Executor.java"],
     main_class = "build.buildfarm.Executor",
@@ -804,6 +891,35 @@ java_binary(
 )
 
 java_binary(
+    name = "bf-workerprofile",
+    srcs = ["WorkerProfile.java"],
+    classpath_resources = [
+        ":configs",
+    ],
+    main_class = "build.buildfarm.WorkerProfile",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":common",
+        ":instance",
+        ":stub-instance",
+        ":shard-instance",
+        ":shard-worker",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "//third_party/jedis",
+        "@maven//:com_google_guava_guava",
+        "@maven//:com_github_pcj_google_options",
+        "@maven//:com_google_protobuf_protobuf_java",
+        "@maven//:com_google_protobuf_protobuf_java_util",
+        "@maven//:io_grpc_grpc_api",
+        "@maven//:io_grpc_grpc_context",
+        "@maven//:io_grpc_grpc_core",
+        "@maven//:io_grpc_grpc_netty",
+        "@maven//:io_grpc_grpc_protobuf",
+        "@maven//:io_grpc_grpc_stub",
+    ],
+)
+
+java_binary(
     name = "bf-hist",
     srcs = ["Hist.java"],
     main_class = "build.buildfarm.Hist",
@@ -846,6 +962,30 @@ java_binary(
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+    ],
+)
+
+java_binary(
+    name = "bf-find-operations",
+    srcs = ["FindOperations.java"],
+    main_class = "build.buildfarm.FindOperations",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":common",
+        ":instance",
+        ":stub-instance",
+        "@googleapis//:google_longrunning_operations_java_proto",
+        "@googleapis//:google_rpc_code_java_proto",
+        "@maven//:com_google_guava_guava",
+        "@maven//:com_google_protobuf_protobuf_java",
+        "@maven//:io_grpc_grpc_api",
+        "@maven//:io_grpc_grpc_context",
+        "@maven//:io_grpc_grpc_core",
+        "@maven//:io_grpc_grpc_netty",
+        "@maven//:io_grpc_grpc_protobuf",
+        "@maven//:io_grpc_grpc_stub",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+         "//src/main/java/build/buildfarm:operations",
     ],
 )
 

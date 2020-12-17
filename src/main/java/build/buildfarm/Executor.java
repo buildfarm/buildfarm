@@ -15,7 +15,7 @@
 package build.buildfarm;
 
 import static build.bazel.remote.execution.v2.ExecutionStage.Value.EXECUTING;
-import static build.buildfarm.common.IOUtils.stat;
+import static build.buildfarm.common.io.Utils.stat;
 import static build.buildfarm.instance.stub.ByteStreamUploader.uploadResourceName;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterables.all;
@@ -38,7 +38,8 @@ import build.bazel.remote.execution.v2.ExecutionGrpc.ExecutionStub;
 import build.bazel.remote.execution.v2.FindMissingBlobsRequest;
 import build.bazel.remote.execution.v2.FindMissingBlobsResponse;
 import build.buildfarm.common.DigestUtil;
-import build.buildfarm.common.FileStatus;
+import build.buildfarm.common.Size;
+import build.buildfarm.common.io.FileStatus;
 import com.google.bytestream.ByteStreamGrpc;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamStub;
 import com.google.bytestream.ByteStreamProto.WriteRequest;
@@ -59,6 +60,7 @@ import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.DirectoryStream;
+import java.nio.file.FileStore;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -246,7 +248,7 @@ class Executor {
     ByteStreamStub bsStub = ByteStreamGrpc.newStub(channel);
     for (Digest missingDigest : missingDigests) {
       Path path = blobsDir.resolve(missingDigest.getHash() + "_" + missingDigest.getSizeBytes());
-      if (missingDigest.getSizeBytes() < 1024 * 1024) {
+      if (missingDigest.getSizeBytes() < Size.mbToBytes(1)) {
         Request request =
             Request.newBuilder()
                 .setDigest(missingDigest)
@@ -254,13 +256,13 @@ class Executor {
                 .build();
         boolean foundBucket = false;
         int maxBucketSize = 0;
-        int minBucketSize = 2 * 1024 * 1024 + 1;
+        long minBucketSize = Size.mbToBytes(2) + 1;
         int maxBucketIndex = 0;
         int minBucketIndex = -1;
         int size = (int) missingDigest.getSizeBytes() + 48;
         for (int i = 0; i < 128; i++) {
           int newBucketSize = bucketSizes[i] + size;
-          if (newBucketSize < 2 * 1024 * 1024) {
+          if (newBucketSize < Size.mbToBytes(2)) {
             if (bucketSizes[i] < minBucketSize) {
               minBucketSize = bucketSizes[i];
               minBucketIndex = i;
@@ -377,9 +379,10 @@ class Executor {
     System.out.println("Looking for missing blobs");
 
     Stopwatch stopwatch = Stopwatch.createUnstarted();
+    FileStore fileStore = Files.getFileStore(blobsDir);
     try (DirectoryStream<Path> stream = Files.newDirectoryStream(blobsDir)) {
       for (Path file : stream) {
-        FileStatus stat = stat(file, /* followSymlinks=*/ false);
+        FileStatus stat = stat(file, /* followSymlinks=*/ false, fileStore);
 
         Digest digest =
             DigestUtil.buildDigest(file.getFileName().toString().split("_")[0], stat.getSize());

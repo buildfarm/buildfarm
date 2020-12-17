@@ -12,12 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.instance.memory;
+package build.buildfarm.instance.memory.queues;
 
 import static com.google.common.truth.Truth.assertThat;
 
-import build.buildfarm.instance.WorkerQueueConfigurations;
-import build.buildfarm.instance.WorkerQueues;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.SetMultimap;
 import com.google.longrunning.Operation;

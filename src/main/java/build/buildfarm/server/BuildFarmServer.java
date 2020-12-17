@@ -14,7 +14,8 @@
 
 package build.buildfarm.server;
 
-import static build.buildfarm.common.IOUtils.formatIOError;
+import static build.buildfarm.common.io.Utils.formatIOError;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.logging.Level.SEVERE;
@@ -138,7 +139,8 @@ public class BuildFarmServer extends LoggingMain {
     }
   }
 
-  public void start(String publicName) throws IOException {
+  public synchronized void start(String publicName) throws IOException {
+    checkState(!stopping, "must not call start after stop");
     actionCacheRequestCounter.start();
     instances.start(publicName);
     server.start();

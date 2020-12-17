@@ -28,20 +28,21 @@ import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
-import build.buildfarm.cas.CASFileCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.cas.MemoryCAS;
+import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.LoggingMain;
-import build.buildfarm.common.ShardBackplane;
+import build.buildfarm.common.Size;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.RedisShardBackplane;
 import build.buildfarm.instance.shard.RemoteInputStreamFactory;
+import build.buildfarm.instance.shard.ShardBackplane;
 import build.buildfarm.instance.shard.WorkerStubs;
 import build.buildfarm.server.ByteStreamService;
 import build.buildfarm.server.ContentAddressableStorageService;
@@ -354,6 +355,7 @@ public class Worker extends LoggingMain {
             config.getLimitExecution(),
             config.getLimitGlobalExecution(),
             config.getOnlyMulticoreTests(),
+            config.getErrorOperationRemainingResources(),
             Suppliers.ofInstance(writer));
 
     PipelineStage completeStage =
@@ -386,14 +388,15 @@ public class Worker extends LoggingMain {
             .addService(new ByteStreamService(instances, /* writeDeadlineAfter=*/ 1, DAYS))
             .addService(
                 new WorkerProfileService(
-                    storage, inputFetchStage, executeActionStage, context, completeStage))
+                    storage,
+                    inputFetchStage,
+                    executeActionStage,
+                    context,
+                    completeStage,
+                    backplane))
             .build();
 
     logger.log(INFO, String.format("%s initialized", identifier));
-  }
-
-  public static int KBtoBytes(int sizeKb) {
-    return sizeKb * 1024;
   }
 
   private static Duration getGrpcTimeout(ShardWorkerConfig config) {
@@ -419,7 +422,7 @@ public class Worker extends LoggingMain {
       throws IOException {
 
     SettableFuture<Long> writtenFuture = SettableFuture.create();
-    int chunkSizeBytes = KBtoBytes(128);
+    int chunkSizeBytes = (int) Size.kbToBytes(128);
 
     // The following callback is performed each time the write stream is ready.
     // For each callback we only transfer a small part of the input stream in order to avoid
@@ -603,6 +606,7 @@ public class Worker extends LoggingMain {
             root.resolve(getValidFilesystemCASPath(fsCASConfig, root)),
             fsCASConfig.getMaxSizeBytes(),
             fsCASConfig.getMaxEntrySizeBytes(),
+            fsCASConfig.getHexBucketLevels(),
             fsCASConfig.getFileDirectoriesIndexInMemory(),
             digestUtil,
             removeDirectoryService,

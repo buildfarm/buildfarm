@@ -38,6 +38,7 @@ import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
+import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.PlatformValidationSettings;
@@ -170,6 +171,16 @@ public class AbstractServerInstanceTest {
 
     @Override
     public CasIndexResults reindexCas(String hostName) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public FindOperationsResults findOperations(String filterPredicate) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void deregisterWorker(String workerName) {
       throw new UnsupportedOperationException();
     }
   }

@@ -33,6 +33,13 @@ public class EligibilityResult {
   public String queueName;
 
   ///
+  /// @field   allowsUnmatched
+  /// @brief   Determines how unmatched properties effect eligibility.
+  /// @details If true, properties can remain unmatched yet still eligible.
+  ///
+  public boolean allowsUnmatched;
+
+  ///
   /// @field   isEligible
   /// @brief   Whether the properties were eligible for the queue.
   /// @details Determined the same way queues are selected.
@@ -45,6 +52,14 @@ public class EligibilityResult {
   /// @details Fully wildcard queues accept all properties.
   ///
   public boolean isFullyWildcard;
+
+  ///
+  /// @field   isSpecificallyChosen
+  /// @brief   Whether the queue was specifically chosen.
+  /// @details A special property was used to specifically match to the queue.
+  ///          This automatically makes it eligible.
+  ///
+  public boolean isSpecificallyChosen;
 
   ///
   /// @field   matched

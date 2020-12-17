@@ -27,7 +27,6 @@ import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.CasIndexSettings;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
-import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.StringVisitor;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.WorkerIndexer;
@@ -37,7 +36,11 @@ import build.buildfarm.common.redis.ProvisionedRedisQueue;
 import build.buildfarm.common.redis.RedisClient;
 import build.buildfarm.common.redis.RedisHashtags;
 import build.buildfarm.common.redis.RedisNodeHashes;
+import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.RedisShardSubscriber.TimedWatchFuture;
+import build.buildfarm.operations.FindOperationsResults;
+import build.buildfarm.operations.FindOperationsSettings;
+import build.buildfarm.operations.OperationsFinder;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
@@ -89,6 +92,8 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
 import redis.clients.jedis.JedisCluster;
@@ -495,7 +500,7 @@ public class RedisShardBackplane implements ShardBackplane {
     failsafeOperationThread.start();
   }
 
-  private SetMultimap<String, String> toMultimap(List<Platform.Property> provisions) {
+  private static SetMultimap<String, String> toMultimap(List<Platform.Property> provisions) {
     SetMultimap<String, String> set = LinkedHashMultimap.create();
     for (Platform.Property property : provisions) {
       set.put(property.getName(), property.getValue());
@@ -505,18 +510,36 @@ public class RedisShardBackplane implements ShardBackplane {
 
   @Override
   public void start(String clientPublicName) throws IOException {
-
     // Construct a single redis client to be used throughout the entire backplane.
     // We wish to avoid various synchronous and error handling issues that could occur when using
     // multiple clients.
     client = new RedisClient(jedisClusterFactory.get());
 
-    // Construct the prequeue so that elements are balanced across all redis nodes.
-    this.prequeue =
-        new BalancedRedisQueue(
-            config.getPreQueuedOperationsListName(),
-            getQueueHashes(config.getPreQueuedOperationsListName()));
+    prequeue = createPrequeue(client, config);
+    operationQueue = createOperationQueue(client, config);
 
+    if (config.getSubscribeToBackplane()) {
+      startSubscriptionThread();
+    }
+    if (config.getRunFailsafeOperation()) {
+      startFailsafeOperationThread();
+    }
+
+    // Record client start time
+    client.call(
+        jedis -> jedis.set("startTime/" + clientPublicName, Long.toString(new Date().getTime())));
+  }
+
+  static BalancedRedisQueue createPrequeue(RedisClient client, RedisShardBackplaneConfig config)
+      throws IOException {
+    // Construct the prequeue so that elements are balanced across all redis nodes.
+    return new BalancedRedisQueue(
+        config.getPreQueuedOperationsListName(),
+        getQueueHashes(client, config.getPreQueuedOperationsListName()));
+  }
+
+  static OperationQueue createOperationQueue(RedisClient client, RedisShardBackplaneConfig config)
+      throws IOException {
     // Construct an operation queue based on configuration.
     // An operation queue consists of multiple provisioned queues in which the order dictates the
     // eligibility and placement of operations.
@@ -527,11 +550,11 @@ public class RedisShardBackplane implements ShardBackplane {
       ProvisionedRedisQueue provisionedQueue =
           new ProvisionedRedisQueue(
               queueConfig.getName(),
-              getQueueHashes(queueConfig.getName()),
-              toMultimap(queueConfig.getPlatform().getPropertiesList()));
+              getQueueHashes(client, queueConfig.getName()),
+              toMultimap(queueConfig.getPlatform().getPropertiesList()),
+              queueConfig.getAllowUnmatched());
       provisionedQueues.add(provisionedQueue);
     }
-
     // If there is no configuration for provisioned queues, we might consider that an error.
     // After all, the operation queue is made up of n provisioned queues, and if there were no
     // provisioned queues provided, we can not properly construct the operation queue.
@@ -546,26 +569,15 @@ public class RedisShardBackplane implements ShardBackplane {
       ProvisionedRedisQueue defaultQueue =
           new ProvisionedRedisQueue(
               config.getQueuedOperationsListName(),
-              getQueueHashes(config.getQueuedOperationsListName()),
+              getQueueHashes(client, config.getQueuedOperationsListName()),
               defaultProvisions);
       provisionedQueues.add(defaultQueue);
     }
 
-    this.operationQueue = new OperationQueue(provisionedQueues.build());
-
-    if (config.getSubscribeToBackplane()) {
-      startSubscriptionThread();
-    }
-    if (config.getRunFailsafeOperation()) {
-      startFailsafeOperationThread();
-    }
-
-    // Record client start time
-    client.call(
-        jedis -> jedis.set("startTime/" + clientPublicName, Long.toString(new Date().getTime())));
+    return new OperationQueue(provisionedQueues.build());
   }
 
-  List<String> getQueueHashes(String queueName) throws IOException {
+  static List<String> getQueueHashes(RedisClient client, String queueName) throws IOException {
     List<String> clusterHashes =
         client.call(
             jedis ->
@@ -671,6 +683,21 @@ public class RedisShardBackplane implements ShardBackplane {
   }
 
   @Override
+  public FindOperationsResults findOperations(Instance instance, String filterPredicate)
+      throws IOException {
+    FindOperationsSettings settings = new FindOperationsSettings();
+    settings.filterPredicate = filterPredicate;
+    settings.operationQuery = config.getOperationPrefix() + ":*";
+    settings.scanAmount = 10000;
+    return client.call(jedis -> OperationsFinder.findOperations(jedis, instance, settings));
+  }
+
+  @Override
+  public void deregisterWorker(String workerName) throws IOException {
+    removeWorker(workerName, "Requested shutdown");
+  }
+
+  @Override
   public synchronized Set<String> getWorkers() throws IOException {
     long now = System.currentTimeMillis();
     if (now < workerSetExpiresAt) {
@@ -686,6 +713,28 @@ public class RedisShardBackplane implements ShardBackplane {
     // fetch every 3 seconds
     workerSetExpiresAt = now + 3000;
     return workerSet;
+  }
+
+  // When performing a graceful scale down of workers, the backplane can provide worker names to the
+  // scale-down service. The algorithm in which the backplane chooses these workers can be made more
+  // sophisticated in the future. But for now, we'll give back n random workers.
+  public List<String> suggestedWorkersToScaleDown(int numWorkers) throws IOException {
+
+    // get all workers
+    List<String> allWorkers = new ArrayList<String>();
+    allWorkers.addAll(getWorkers());
+
+    // ensure selection amount is in range [0 - size]
+    numWorkers = Math.max(0, Math.min(numWorkers, allWorkers.size()));
+
+    // select n workers
+    return randomN(allWorkers, numWorkers);
+  }
+
+  public static <T> List<T> randomN(List<T> list, int n) {
+    return Stream.generate(() -> list.remove((int) (list.size() * Math.random())))
+        .limit(Math.min(list.size(), n))
+        .collect(Collectors.toList());
   }
 
   private void removeInvalidWorkers(JedisCluster jedis, long testedAt, List<ShardWorker> workers) {
@@ -1156,7 +1205,7 @@ public class RedisShardBackplane implements ShardBackplane {
     Operation operation = keepaliveOperation(operationName);
     publishReset(jedis, operation);
 
-    long requeueAt = System.currentTimeMillis() + 30 * 1000;
+    long requeueAt = System.currentTimeMillis() + config.getDispatchingTimeoutMillis();
     DispatchedOperation o =
         DispatchedOperation.newBuilder().setQueueEntry(queueEntry).setRequeueAt(requeueAt).build();
     boolean success = false;

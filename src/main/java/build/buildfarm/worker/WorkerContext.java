@@ -48,6 +48,8 @@ public interface WorkerContext {
 
   String getName();
 
+  boolean shouldErrorOperationOnRemainingResources();
+
   Poller createPoller(String name, QueueEntry queueEntry, ExecutionStage.Value stage);
 
   void resumePoller(
@@ -113,9 +115,9 @@ public interface WorkerContext {
 
   Write getOperationStreamWrite(String name) throws IOException;
 
-  int getStandardOutputLimit();
+  long getStandardOutputLimit();
 
-  int getStandardErrorLimit();
+  long getStandardErrorLimit();
 
   void createExecutionLimits();
 
@@ -125,4 +127,6 @@ public interface WorkerContext {
       String operationName, ImmutableList.Builder<String> arguments, Command command);
 
   int commandExecutionClaims(Command command);
+
+  ResourceLimits commandExecutionSettings(Command command);
 }

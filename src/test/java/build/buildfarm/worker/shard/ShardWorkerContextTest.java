@@ -28,9 +28,9 @@ import build.bazel.remote.execution.v2.Platform.Property;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
-import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Instance.MatchListener;
+import build.buildfarm.instance.shard.ShardBackplane;
 import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.worker.WorkerContext;
@@ -101,6 +101,7 @@ public class ShardWorkerContextTest {
         /* limitExecution=*/ false,
         /* limitGlobalExecution=*/ false,
         /* onlyMulticoreTests=*/ false,
+        /* errorOperationRemainingResources=*/ false,
         writer);
   }
 

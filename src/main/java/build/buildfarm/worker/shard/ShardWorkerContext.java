@@ -16,7 +16,6 @@ package build.buildfarm.worker.shard;
 
 import static build.buildfarm.cas.ContentAddressableStorage.UNLIMITED_ENTRY_SIZE_MAX;
 import static build.buildfarm.common.Actions.checkPreconditionFailure;
-import static build.buildfarm.common.Actions.satisfiesRequirements;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static java.lang.String.format;
@@ -39,21 +38,25 @@ import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.Poller;
-import build.buildfarm.common.ShardBackplane;
+import build.buildfarm.common.Size;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.Retrier.Backoff;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Instance.MatchListener;
+import build.buildfarm.instance.shard.ShardBackplane;
 import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.PlatformValidationSettings;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
+import build.buildfarm.worker.DequeueMatchEvaluator;
+import build.buildfarm.worker.DequeueMatchSettings;
 import build.buildfarm.worker.ExecutionPolicies;
+import build.buildfarm.worker.ResourceDecider;
+import build.buildfarm.worker.ResourceLimits;
 import build.buildfarm.worker.RetryingMatchListener;
-import build.buildfarm.worker.Utils;
 import build.buildfarm.worker.WorkerContext;
 import build.buildfarm.worker.cgroup.Cpu;
 import build.buildfarm.worker.cgroup.Group;
@@ -125,6 +128,7 @@ class ShardWorkerContext implements WorkerContext {
   private final Group executionsGroup = Group.getRoot().getChild("executions");
   private final Group operationsGroup = executionsGroup.getChild("operations");
   private final Supplier<CasWriter> writer;
+  private final boolean errorOperationRemainingResources;
 
   static SetMultimap<String, String> getMatchProvisions(
       Platform platform, Iterable<ExecutionPolicy> policies, int executeStageWidth) {
@@ -157,6 +161,7 @@ class ShardWorkerContext implements WorkerContext {
       boolean limitExecution,
       boolean limitGlobalExecution,
       boolean onlyMulticoreTests,
+      boolean errorOperationRemainingResources,
       Supplier<CasWriter> writer) {
     this.name = name;
     this.platform = platform;
@@ -178,6 +183,7 @@ class ShardWorkerContext implements WorkerContext {
     this.limitExecution = limitExecution;
     this.limitGlobalExecution = limitGlobalExecution;
     this.onlyMulticoreTests = onlyMulticoreTests;
+    this.errorOperationRemainingResources = errorOperationRemainingResources;
     this.writer = writer;
     Preconditions.checkState(
         !limitGlobalExecution || limitExecution,
@@ -201,6 +207,11 @@ class ShardWorkerContext implements WorkerContext {
   @Override
   public String getName() {
     return name;
+  }
+
+  @Override
+  public boolean shouldErrorOperationOnRemainingResources() {
+    return errorOperationRemainingResources;
   }
 
   @Override
@@ -302,7 +313,10 @@ class ShardWorkerContext implements WorkerContext {
       // transient backplane errors will propagate a null queueEntry
     }
     listener.onWaitEnd();
-    if (queueEntry == null || satisfiesRequirements(matchProvisions, queueEntry.getPlatform())) {
+
+    DequeueMatchSettings settings = new DequeueMatchSettings();
+    settings.allowUnmatched = true;
+    if (DequeueMatchEvaluator.shouldKeepOperation(settings, matchProvisions, queueEntry)) {
       listener.onEntry(queueEntry);
     } else {
       backplane.rejectOperation(queueEntry);
@@ -792,13 +806,13 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   @Override
-  public int getStandardOutputLimit() {
-    return 100 * 1024 * 1024; // 100 MiB
+  public long getStandardOutputLimit() {
+    return Size.mbToBytes(100);
   }
 
   @Override
-  public int getStandardErrorLimit() {
-    return 100 * 1024 * 1024; // 100 MiB
+  public long getStandardErrorLimit() {
+    return Size.mbToBytes(100);
   }
 
   @Override
@@ -850,28 +864,30 @@ class ShardWorkerContext implements WorkerContext {
     return components[components.length - 1];
   }
 
-  int commandMaxCores(Command command) {
-    return Utils.commandMaxCores(onlyMulticoreTests, command);
-  }
-
-  int commandMinCores(Command command) {
-    return Utils.commandMinCores(onlyMulticoreTests, command);
-  }
-
   @Override
   public int commandExecutionClaims(Command command) {
-    int minCores = commandMinCores(command);
-    return Math.min(minCores <= 0 ? 1 : minCores, getExecuteStageWidth());
+    ResourceLimits limits =
+        ResourceDecider.decideResourceLimitations(
+            command, onlyMulticoreTests, getExecuteStageWidth());
+    return limits.cpu.claimed;
+  }
+
+  public ResourceLimits commandExecutionSettings(Command command) {
+    ResourceLimits limits =
+        ResourceDecider.decideResourceLimitations(
+            command, onlyMulticoreTests, getExecuteStageWidth());
+    return limits;
   }
 
   @Override
   public IOResource limitExecution(
       String operationName, ImmutableList.Builder<String> arguments, Command command) {
     if (limitExecution) {
-      int mincores = commandMinCores(command);
-      int maxcores = commandMaxCores(command);
+      ResourceLimits limits =
+          ResourceDecider.decideResourceLimitations(
+              command, onlyMulticoreTests, getExecuteStageWidth());
 
-      return limitSpecifiedExecution(mincores, maxcores, operationName, arguments);
+      return limitSpecifiedExecution(limits, operationName, arguments);
     }
     return new IOResource() {
       @Override
@@ -885,22 +901,22 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   IOResource limitSpecifiedExecution(
-      int mincores, int maxcores, String operationName, ImmutableList.Builder<String> arguments) {
+      ResourceLimits limits, String operationName, ImmutableList.Builder<String> arguments) {
     final IOResource resource;
     final Group group;
-    if (mincores > 0 || maxcores > 0) {
+    if (limits.cpu.min > 0 || limits.cpu.max > 0) {
       String operationId = getOperationId(operationName);
       group = operationsGroup.getChild(operationId);
       Cpu cpu = group.getCpu();
       try {
         cpu.close();
-        if (maxcores > 0) {
+        if (limits.cpu.max > 0) {
           /* period of 100ms */
           cpu.setCFSPeriod(100000);
-          cpu.setCFSQuota(maxcores * 100000);
+          cpu.setCFSQuota(limits.cpu.max * 100000);
         }
-        if (mincores > 0) {
-          cpu.setShares(mincores * 1024);
+        if (limits.cpu.min > 0) {
+          cpu.setShares(limits.cpu.min * 1024);
         }
       } catch (IOException e) {
         // clear interrupt flag if set due to ClosedByInterruptException

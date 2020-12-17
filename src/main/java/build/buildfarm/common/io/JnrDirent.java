@@ -1,4 +1,4 @@
-// Copyright 2014 The Bazel Authors. All rights reserved.
+// Copyright 2020 The Bazel Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,35 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.common;
+package build.buildfarm.common.io;
 
 import com.google.common.base.Preconditions;
 import java.io.Serializable;
 import java.util.Objects;
 import javax.annotation.Nullable;
+import jnr.posix.FileStat;
 
 /** Directory entry representation returned by {@link Path#readdir}. */
-public final class Dirent implements Serializable, Comparable<Dirent> {
-  /** Type of the directory entry */
-  public enum Type {
-    // A regular file.
-    FILE,
-    // A directory.
-    DIRECTORY,
-    // A symlink.
-    SYMLINK,
-    // Not one of the above. For example, a special file.
-    UNKNOWN
-  }
+public final class JnrDirent implements Serializable, Comparable<JnrDirent> {
 
   private final String name;
-  private final Type type;
-  @Nullable private final FileStatus stat;
+  @Nullable private final FileStat stat;
 
-  /** Creates a new dirent with the given name and type, both of which must be non-null. */
-  public Dirent(String name, Type type, FileStatus stat) {
+  /** Creates a new jnr dirent with the given name */
+  public JnrDirent(String name, FileStat stat) {
     this.name = Preconditions.checkNotNull(name);
-    this.type = Preconditions.checkNotNull(type);
     this.stat = stat;
   }
 
@@ -48,39 +36,35 @@ public final class Dirent implements Serializable, Comparable<Dirent> {
     return name;
   }
 
-  public Type getType() {
-    return type;
-  }
-
   @Nullable
-  public FileStatus getStat() {
+  public FileStat getStat() {
     return stat;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(name, type);
+    return Objects.hash(name);
   }
 
   @Override
   public boolean equals(Object other) {
-    if (!(other instanceof Dirent)) {
+    if (!(other instanceof JnrDirent)) {
       return false;
     }
     if (this == other) {
       return true;
     }
-    Dirent otherDirent = (Dirent) other;
-    return name.equals(otherDirent.name) && type.equals(otherDirent.type);
+    JnrDirent otherJnrDirent = (JnrDirent) other;
+    return name.equals(otherJnrDirent.name);
   }
 
   @Override
   public String toString() {
-    return name + "[" + type.toString().toLowerCase() + "]";
+    return name;
   }
 
   @Override
-  public int compareTo(Dirent other) {
+  public int compareTo(JnrDirent other) {
     return this.getName().compareTo(other.getName());
   }
 }

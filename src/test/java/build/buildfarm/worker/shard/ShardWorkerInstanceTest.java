@@ -27,14 +27,16 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
-import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.instance.Instance.MatchListener;
+import build.buildfarm.instance.shard.ShardBackplane;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.PlatformValidationSettings;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.ShardWorkerInstanceConfig;
 import build.buildfarm.v1test.Tree;
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableList;
+import com.google.longrunning.Operation;
 import com.google.protobuf.ByteString;
 import io.grpc.StatusRuntimeException;
 import java.io.IOException;
@@ -116,10 +118,11 @@ public class ShardWorkerInstanceTest {
     verify(backplane, times(1)).putActionResult(key, result);
   }
 
-  @Test(expected = UnsupportedOperationException.class)
+  @Test
   public void listOperationsIsUnsupported() {
+    ImmutableList.Builder<Operation> operations = new ImmutableList.Builder<>();
     instance.listOperations(
-        /* pageSize=*/ 0, /* pageToken=*/ "", /* filter=*/ "", /* operations=*/ null);
+        /* pageSize=*/ 0, /* pageToken=*/ "", /* filter=*/ "", /* operations=*/ operations);
   }
 
   @Test(expected = UnsupportedOperationException.class)

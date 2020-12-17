@@ -292,8 +292,7 @@ class Cat {
       Directory subDirectory = directoriesIndex.get(dirNode.getDigest());
       long weight = directoryWeights.get(dirNode.getDigest());
       String displayName =
-          String.format(
-              "%s/ %d (%d%%)", dirNode.getName(), weight, (int) (weight * 100.0 / totalWeight));
+          format("%s/ %d (%d%%)", dirNode.getName(), weight, (int) (weight * 100.0 / totalWeight));
       indentOut(indentLevel, displayName);
       if (subDirectory == null) {
         indentOut(indentLevel + 1, "DIRECTORY MISSING FROM CAS");
@@ -304,7 +303,7 @@ class Cat {
     for (FileNode fileNode : directory.getFilesList()) {
       String name = fileNode.getName();
       String displayName =
-          String.format(
+          format(
               "%s%s %s",
               name,
               fileNode.getIsExecutable() ? "*" : "",
@@ -464,11 +463,9 @@ class Cat {
       pageToken = instance.listOperations(1024, pageToken, "", operations);
       System.out.println(pageToken);
       System.out.println("Page size: " + operations.build().size());
-      /*
       for (Operation operation : operations.build()) {
         printOperation(operation);
       }
-      */
       if (++count == limit) {
         System.out.println("page limit reached");
         break;
@@ -615,24 +612,26 @@ class Cat {
     String strFloatFormat = "%-50s : %2.1f";
     long entryCount = response.getCasEntryCount();
     long unreferencedEntryCount = response.getCasUnreferencedEntryCount();
-    System.out.println(String.format(strIntFormat, "Current Total Entry Count", entryCount));
+    System.out.println(format(strIntFormat, "Current Total Entry Count", entryCount));
+    System.out.println(format(strIntFormat, "Current Total Size", response.getCasSize()));
+    System.out.println(format(strIntFormat, "Max Size", response.getCasMaxSize()));
+    System.out.println(format(strIntFormat, "Max Entry Size", response.getCasMaxEntrySize()));
     System.out.println(
-        String.format(strIntFormat, "Current Unreferenced Entry Count", unreferencedEntryCount));
+        format(strIntFormat, "Current Unreferenced Entry Count", unreferencedEntryCount));
     if (entryCount != 0) {
       System.out.println(
-          String.format(
-              strFloatFormat,
-              "Percentage of Unreferenced Entry",
-              1.0 * response.getCasEntryCount() / response.getCasUnreferencedEntryCount()));
+          format(
+                  strFloatFormat,
+                  "Percentage of Unreferenced Entry",
+                  100.0f * response.getCasEntryCount() / response.getCasUnreferencedEntryCount())
+              + "%");
     }
     System.out.println(
-        String.format(
-            strIntFormat, "Current DirectoryEntry Count", response.getCasDirectoryEntryCount()));
+        format(strIntFormat, "Current DirectoryEntry Count", response.getCasDirectoryEntryCount()));
     System.out.println(
-        String.format(
-            strIntFormat, "Number of Evicted Entries", response.getCasEvictedEntryCount()));
+        format(strIntFormat, "Number of Evicted Entries", response.getCasEvictedEntryCount()));
     System.out.println(
-        String.format(
+        format(
             strIntFormat,
             "Total Evicted Entries size in Bytes",
             response.getCasEvictedEntrySize()));
@@ -683,40 +682,39 @@ class Cat {
     System.out.println("Number of operations completed: " + time.getOperationCount());
     String strStrNumFormat = "%-28s -> %-28s : %12.2f ms";
     System.out.println(
-        String.format(
-            strStrNumFormat, "Queued", "MatchStage", durationToMillis(time.getQueuedToMatch())));
+        format(strStrNumFormat, "Queued", "MatchStage", durationToMillis(time.getQueuedToMatch())));
     System.out.println(
-        String.format(
+        format(
             strStrNumFormat,
             "MatchStage",
             "InputFetchStage start",
             durationToMillis(time.getMatchToInputFetchStart())));
     System.out.println(
-        String.format(
+        format(
             strStrNumFormat,
             "InputFetchStage Start",
             "InputFetchStage Complete",
             durationToMillis(time.getInputFetchStartToComplete())));
     System.out.println(
-        String.format(
+        format(
             strStrNumFormat,
             "InputFetchStage Complete",
             "ExecutionStage Start",
             durationToMillis(time.getInputFetchCompleteToExecutionStart())));
     System.out.println(
-        String.format(
+        format(
             strStrNumFormat,
             "ExecutionStage Start",
             "ExecutionStage Complete",
             durationToMillis(time.getExecutionStartToComplete())));
     System.out.println(
-        String.format(
+        format(
             strStrNumFormat,
             "ExecutionStage Complete",
             "ReportResultStage Start",
             durationToMillis(time.getExecutionCompleteToOutputUploadStart())));
     System.out.println(
-        String.format(
+        format(
             strStrNumFormat,
             "OutputUploadStage Start",
             "OutputUploadStage Complete",

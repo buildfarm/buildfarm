@@ -59,6 +59,7 @@ import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
+import build.buildfarm.common.Size;
 import build.buildfarm.common.Time;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
@@ -68,6 +69,8 @@ import build.buildfarm.common.grpc.StubWriteOutputStream;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.AdminGrpc.AdminBlockingStub;
+import build.buildfarm.v1test.DeregisterWorkerRequest;
+import build.buildfarm.v1test.DeregisterWorkerRequestResults;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.OperationQueueGrpc.OperationQueueBlockingStub;
@@ -80,6 +83,8 @@ import build.buildfarm.v1test.ReindexCasRequest;
 import build.buildfarm.v1test.ReindexCasRequestResults;
 import build.buildfarm.v1test.TakeOperationRequest;
 import build.buildfarm.v1test.Tree;
+import build.buildfarm.v1test.WorkerListMessage;
+import build.buildfarm.v1test.WorkerListRequest;
 import build.buildfarm.v1test.WorkerProfileGrpc;
 import build.buildfarm.v1test.WorkerProfileGrpc.WorkerProfileBlockingStub;
 import build.buildfarm.v1test.WorkerProfileMessage;
@@ -142,11 +147,11 @@ public class StubInstance implements Instance {
   private final String identifier;
   private final DigestUtil digestUtil;
   private final ManagedChannel channel;
-  private final Duration grpcTimeout;
+  private final @Nullable Duration grpcTimeout;
   private final Retrier retrier;
   private final @Nullable ListeningScheduledExecutorService retryService;
   private boolean isStopped = false;
-  private final int maxBatchUpdateBlobsSize = 3 * 1024 * 1024;
+  private final long maxBatchUpdateBlobsSize = Size.mbToBytes(3);
 
   public StubInstance(String name, DigestUtil digestUtil, ManagedChannel channel) {
     this(name, "no-identifier", digestUtil, channel, Durations.fromDays(DEFAULT_DEADLINE_DAYS));
@@ -293,7 +298,7 @@ public class StubInstance implements Instance {
 
   private <T extends AbstractStub<T>> T deadlined(Supplier<T> getter) {
     T stub = getter.get();
-    if (grpcTimeout.getSeconds() > 0) {
+    if (grpcTimeout.getSeconds() > 0 || grpcTimeout.getNanos() > 0) {
       stub = stub.withDeadline(Time.toDeadline(grpcTimeout));
     }
     return stub;
@@ -372,7 +377,7 @@ public class StubInstance implements Instance {
             .setInstanceName(getName())
             .addAllBlobDigests(digests)
             .build();
-    if (request.getSerializedSize() > 4 * 1024 * 1024) {
+    if (request.getSerializedSize() > Size.mbToBytes(4)) {
       throw new IllegalStateException(
           String.format(
               "FINDMISSINGBLOBS IS TOO LARGE: %d digests are required in one request!",
@@ -814,8 +819,13 @@ public class StubInstance implements Instance {
 
   @Override
   public WorkerProfileMessage getWorkerProfile() {
-    return WorkerProfileBlockingStub.get()
+    return deadlined(WorkerProfileBlockingStub)
         .getWorkerProfile(WorkerProfileRequest.newBuilder().build());
+  }
+
+  @Override
+  public WorkerListMessage getWorkerList() {
+    return WorkerProfileBlockingStub.get().getWorkerList(WorkerListRequest.newBuilder().build());
   }
 
   @Override
@@ -835,5 +845,15 @@ public class StubInstance implements Instance {
     results.removedKeys = proto.getRemovedKeys();
     results.totalKeys = proto.getTotalKeys();
     return results;
+  }
+
+  @Override
+  public void deregisterWorker(String workerName) {
+    throwIfStopped();
+    DeregisterWorkerRequestResults proto =
+        adminBlockingStub
+            .get()
+            .deregisterWorker(
+                DeregisterWorkerRequest.newBuilder().setWorkerName(workerName).build());
   }
 }

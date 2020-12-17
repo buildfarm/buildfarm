@@ -15,7 +15,6 @@
 package build.buildfarm.instance.memory;
 
 import static build.buildfarm.common.Actions.invalidActionVerboseMessage;
-import static build.buildfarm.common.Actions.satisfiesRequirements;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static build.buildfarm.instance.Utils.putBlob;
@@ -56,9 +55,11 @@ import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.instance.OperationsMap;
 import build.buildfarm.instance.WatchFuture;
-import build.buildfarm.instance.WorkerQueue;
-import build.buildfarm.instance.WorkerQueueConfigurations;
-import build.buildfarm.instance.WorkerQueues;
+import build.buildfarm.instance.memory.queues.Worker;
+import build.buildfarm.instance.memory.queues.WorkerQueue;
+import build.buildfarm.instance.memory.queues.WorkerQueueConfigurations;
+import build.buildfarm.instance.memory.queues.WorkerQueues;
+import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.ActionCacheConfig;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.FilesystemACConfig;
@@ -66,11 +67,14 @@ import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.GrpcACConfig;
 import build.buildfarm.v1test.MemoryInstanceConfig;
 import build.buildfarm.v1test.OperationIteratorToken;
+import build.buildfarm.v1test.OperationQueueStatus;
 import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.PlatformValidationSettings;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.Tree;
+import build.buildfarm.worker.DequeueMatchEvaluator;
+import build.buildfarm.worker.DequeueMatchSettings;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
@@ -715,10 +719,12 @@ public class MemoryInstance extends AbstractServerInstance {
     boolean dispatched = false;
     WorkerQueue queue =
         queuedOperations.MatchEligibleQueue(createProvisions(command.getPlatform()));
+
+    DequeueMatchSettings settings = new DequeueMatchSettings();
     synchronized (queue.workers) {
       while (!dispatched && !queue.workers.isEmpty()) {
         Worker worker = queue.workers.remove(0);
-        if (!satisfiesRequirements(worker.getProvisions(), command.getPlatform())) {
+        if (!DequeueMatchEvaluator.shouldKeepOperation(settings, worker.getProvisions(), command)) {
           rejectedWorkers.add(worker);
         } else {
           QueueEntry queueEntry =
@@ -803,9 +809,11 @@ public class MemoryInstance extends AbstractServerInstance {
       Preconditions.checkState(command != null, "command not found");
 
       String operationName = operation.getName();
+
+      DequeueMatchSettings settings = new DequeueMatchSettings();
       if (command == null) {
-        cancelOperation(operationName, settings);
-      } else if (satisfiesRequirements(provisions, command.getPlatform())) {
+        cancelOperation(operationName);
+      } else if (DequeueMatchEvaluator.shouldKeepOperation(settings, provisions, command)) {
         QueuedOperation queuedOperation =
             QueuedOperation.newBuilder()
                 .setAction(action)
@@ -875,7 +883,18 @@ public class MemoryInstance extends AbstractServerInstance {
 
   @Override
   public OperationsStatus operationsStatus() {
-    throw new UnsupportedOperationException();
+    OperationsStatus.Builder status = OperationsStatus.newBuilder();
+    OperationQueueStatus.Builder queueStatus = status.getOperationQueueBuilder();
+    long totalSize = 0;
+    for (WorkerQueue queue : queuedOperations) {
+      long size = queue.operations.size();
+      queueStatus.addProvisionsBuilder().setName(queue.name).setSize(size);
+      totalSize += size;
+    }
+    queueStatus.setSize(totalSize);
+    // TODO dispatched - difficult to track
+    // TODO active workers - available, but not with any discerning identifier, should rectify this
+    return status.build();
   }
 
   @Override
@@ -927,6 +946,21 @@ public class MemoryInstance extends AbstractServerInstance {
   @Override
   protected int getTreeMaxPageSize() {
     return config.getTreeMaxPageSize();
+  }
+
+  @Override
+  public String listOperations(
+      int pageSize, String pageToken, String filter, ImmutableList.Builder<Operation> operations) {
+
+    TokenizableIterator<Operation> iter = createOperationsIterator(pageToken);
+    while (iter.hasNext() && pageSize != 0) {
+      Operation operation = iter.next();
+      operations.add(operation);
+      if (pageSize > 0) {
+        pageSize--;
+      }
+    }
+    return iter.toNextPageToken();
   }
 
   @Override
@@ -1015,6 +1049,16 @@ public class MemoryInstance extends AbstractServerInstance {
 
   @Override
   public CasIndexResults reindexCas(String hostName) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public FindOperationsResults findOperations(String filterPredicate) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public void deregisterWorker(String workerName) {
     throw new UnsupportedOperationException();
   }
 }

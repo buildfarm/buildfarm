@@ -61,7 +61,6 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.Poller;
-import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
@@ -73,6 +72,7 @@ import build.buildfarm.common.cache.CacheLoader.InvalidCacheLoadException;
 import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
 import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationIteratorToken;
@@ -2352,6 +2352,24 @@ public class ShardInstance extends AbstractServerInstance {
   public CasIndexResults reindexCas(String hostName) {
     try {
       return backplane.reindexCas(hostName);
+    } catch (IOException e) {
+      throw Status.fromThrowable(e).asRuntimeException();
+    }
+  }
+
+  @Override
+  public FindOperationsResults findOperations(String filterPredicate) {
+    try {
+      return backplane.findOperations(this, filterPredicate);
+    } catch (IOException e) {
+      throw Status.fromThrowable(e).asRuntimeException();
+    }
+  }
+
+  @Override
+  public void deregisterWorker(String workerName) {
+    try {
+      backplane.deregisterWorker(workerName);
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }

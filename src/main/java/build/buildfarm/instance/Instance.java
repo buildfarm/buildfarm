@@ -35,6 +35,7 @@ import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.PlatformValidationSettings;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.Tree;
+import build.buildfarm.v1test.WorkerListMessage;
 import build.buildfarm.v1test.WorkerProfileMessage;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
@@ -146,9 +147,13 @@ public interface Instance {
 
   WorkerProfileMessage getWorkerProfile();
 
+  WorkerListMessage getWorkerList();
+
   GetClientStartTimeResult getClientStartTime(String clientKey);
 
   CasIndexResults reindexCas(String hostName);
+
+  void deregisterWorker(String workerName);
 
   interface MatchListener {
     // start/end pair called for each wait period

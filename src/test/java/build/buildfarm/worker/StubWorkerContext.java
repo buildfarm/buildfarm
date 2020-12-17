@@ -180,12 +180,12 @@ class StubWorkerContext implements WorkerContext {
   }
 
   @Override
-  public int getStandardOutputLimit() {
+  public long getStandardOutputLimit() {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public int getStandardErrorLimit() {
+  public long getStandardErrorLimit() {
     throw new UnsupportedOperationException();
   }
 
@@ -207,6 +207,16 @@ class StubWorkerContext implements WorkerContext {
 
   @Override
   public int commandExecutionClaims(Command command) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public ResourceLimits commandExecutionSettings(Command command) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public boolean shouldErrorOperationOnRemainingResources() {
     throw new UnsupportedOperationException();
   }
 }

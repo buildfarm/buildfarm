@@ -15,6 +15,8 @@
 package build.buildfarm.common.grpc;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static java.lang.String.format;
+import static java.util.logging.Level.WARNING;
 
 import build.buildfarm.common.Write;
 import build.buildfarm.common.io.FeedbackOutputStream;
@@ -41,9 +43,12 @@ import java.io.IOException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.logging.Logger;
 import javax.annotation.concurrent.GuardedBy;
 
 public class StubWriteOutputStream extends FeedbackOutputStream implements Write {
+  private static final Logger logger = Logger.getLogger(StubWriteOutputStream.class.getName());
+
   public static final long UNLIMITED_EXPECTED_SIZE = Long.MAX_VALUE;
 
   private static final int CHUNK_SIZE = 16 * 1024;
@@ -203,7 +208,17 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
 
                     @Override
                     public void onNext(WriteResponse response) {
-                      writeFuture.set(response.getCommittedSize());
+                      long committedSize = response.getCommittedSize();
+                      if (expectedSize != UNLIMITED_EXPECTED_SIZE
+                          && committedSize != expectedSize) {
+                        logger.log(
+                            WARNING,
+                            format(
+                                "received WriteResponse with unexpected committedSize: %d != %d",
+                                committedSize, expectedSize));
+                        committedSize = expectedSize;
+                      }
+                      writeFuture.set(committedSize);
                     }
 
                     @Override

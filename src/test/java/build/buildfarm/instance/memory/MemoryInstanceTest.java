@@ -58,6 +58,7 @@ import build.buildfarm.common.Watcher;
 import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.instance.OperationsMap;
 import build.buildfarm.instance.WatchFuture;
+import build.buildfarm.instance.memory.queues.Worker;
 import build.buildfarm.v1test.ActionCacheConfig;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.DelegateCASConfig;

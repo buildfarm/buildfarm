@@ -79,7 +79,7 @@ class Executor {
     }
   }
 
-  private long runInterruptible(PlatformValidationSettings settings, Stopwatch stopwatch)
+  private long runInterruptible(PlatformValidationSettings settings, Stopwatch stopwatch, ResourceLimits limits)
       throws InterruptedException {
     long startedAt = System.currentTimeMillis();
 
@@ -163,7 +163,7 @@ class Executor {
         pollDeadline);
 
     try {
-      return executePolled(operation, policies, timeout, isDefaultTimeout, stopwatch);
+      return executePolled(operation, limits, policies, timeout, isDefaultTimeout, stopwatch);
     } finally {
       operationContext.poller.pause();
     }
@@ -171,6 +171,7 @@ class Executor {
 
   private long executePolled(
       Operation operation,
+      ResourceLimits limits,
       Iterable<ExecutionPolicy> policies,
       Duration timeout,
       boolean isDefaultTimeout,
@@ -209,13 +210,20 @@ class Executor {
               workingDirectory,
               arguments.build(),
               command.getEnvironmentVariablesList(),
+              limits,
               timeout,
               isDefaultTimeout,
               "", // executingMetadata.getStdoutStreamName(),
               "", // executingMetadata.getStderrStreamName(),
               resultBuilder);
 
-      if (resource.isReferenced()) {
+      // From Bazel Test Encyclopedia:
+      // If the main process of a test exits, but some of its children are still running,
+      // the test runner should consider the run complete and count it as a success or failure
+      // based on the exit code observed from the main process. The test runner may kill any stray
+      // processes. Tests should not leak processes in this fashion.
+      // Based on configuration, we will decide whether remaining resources should be an error.
+      if (workerContext.shouldErrorOperationOnRemainingResources() && resource.isReferenced()) {
         // there should no longer be any references to the resource. Any references will be
         // killed upon close, but we must error the operation due to improper execution
         ExecuteResponse executeResponse = operationContext.executeResponse.build();
@@ -283,12 +291,12 @@ class Executor {
     return stopwatch.elapsed(MICROSECONDS) - executeUSecs;
   }
 
-  public void run(PlatformValidationSettings settings, int claims) {
+  public void run(PlatformValidationSettings settings, ResourceLimits limits) {
     long stallUSecs = 0;
     Stopwatch stopwatch = Stopwatch.createStarted();
     String operationName = operationContext.operation.getName();
     try {
-      stallUSecs = runInterruptible(settings, stopwatch);
+      stallUSecs = runInterruptible(settings, stopwatch, limits);
     } catch (InterruptedException e) {
       /* we can be interrupted when the poller fails */
       try {
@@ -321,7 +329,11 @@ class Executor {
       boolean wasInterrupted = Thread.interrupted();
       try {
         owner.releaseExecutor(
-            operationName, claims, stopwatch.elapsed(MICROSECONDS), stallUSecs, exitCode);
+            operationName,
+            limits.cpu.claimed,
+            stopwatch.elapsed(MICROSECONDS),
+            stallUSecs,
+            exitCode);
       } finally {
         if (wasInterrupted) {
           Thread.currentThread().interrupt();
@@ -366,6 +378,7 @@ class Executor {
       Path execDir,
       List<String> arguments,
       List<EnvironmentVariable> environmentVariables,
+      ResourceLimits limits,
       Duration timeout,
       boolean isDefaultTimeout,
       String stdoutStreamName,
@@ -379,6 +392,10 @@ class Executor {
     environment.clear();
     for (EnvironmentVariable environmentVariable : environmentVariables) {
       environment.put(environmentVariable.getName(), environmentVariable.getValue());
+    }
+    for (Map.Entry<String, String> environmentVariable :
+        limits.extraEnvironmentVariables.entrySet()) {
+      environment.put(environmentVariable.getKey(), environmentVariable.getValue());
     }
 
     final Write stdoutWrite, stderrWrite;
@@ -428,10 +445,10 @@ class Executor {
     stderrWrite.reset();
     ByteStringWriteReader stdoutReader =
         new ByteStringWriteReader(
-            process.getInputStream(), stdoutWrite, workerContext.getStandardOutputLimit());
+            process.getInputStream(), stdoutWrite, (int) workerContext.getStandardOutputLimit());
     ByteStringWriteReader stderrReader =
         new ByteStringWriteReader(
-            process.getErrorStream(), stderrWrite, workerContext.getStandardErrorLimit());
+            process.getErrorStream(), stderrWrite, (int) workerContext.getStandardErrorLimit());
 
     Thread stdoutReaderThread = new Thread(stdoutReader);
     Thread stderrReaderThread = new Thread(stderrReader);
