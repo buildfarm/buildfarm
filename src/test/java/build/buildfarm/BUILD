@@ -473,6 +473,7 @@ java_test(
         "common/redis/ProvisionedRedisQueueTest.java",
         "common/redis/RedisNodeHashesMockTest.java",
         "common/redis/RedisQueueMockTest.java",
+        "common/redis/RedisMapMockTest.java",
         "common/redis/RedisSlotToHashTest.java",
     ],
     test_class = "build.buildfarm.AllTests",
