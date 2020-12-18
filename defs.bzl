@@ -109,3 +109,9 @@ def buildfarm_init(name = "buildfarm"):
         name = "jar/redis/clients/jedis",
         actual = "@jedis//jar",
     )
+
+def ensure_accurate_metadata():
+    return select({
+        "//conditions:default": [],
+        "//config:windows": ["-Dsun.nio.fs.ensureAccurateMetadata=true"],
+    })

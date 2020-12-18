@@ -17,18 +17,24 @@ package build.buildfarm.common.io;
 public class NamedFileKey {
 
   private final String name;
+  private final FileStatus fileStatus;
   private final Object fileKey;
 
-  public NamedFileKey(String name, Object fileKey) {
+  public NamedFileKey(String name, FileStatus fileStatus, Object fileKey) {
     this.name = name;
     this.fileKey = fileKey;
+    this.fileStatus = fileStatus;
   }
 
   public String getName() {
     return name;
   }
 
-  public Object fileKey() {
+  public Object getFileKey() {
     return fileKey;
+  }
+
+  public FileStatus getFileStatus() {
+    return fileStatus;
   }
 }

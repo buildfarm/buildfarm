@@ -24,15 +24,24 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import org.junit.After;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
 class DirectoriesTest {
-  private Path root;
+  protected Path root;
 
   protected DirectoriesTest(Path root) {
     this.root = root;
+  }
+
+  @After
+  public void tearDown() throws IOException {
+    // restore write permissions
+    if (Files.exists(root)) {
+      Directories.enableAllWriteAccess(root);
+    }
   }
 
   @Test
@@ -93,7 +102,6 @@ class DirectoriesTest {
     public void checkWriteDisabled() throws IOException {
 
       // establish directory tree
-      Path root = Files.createTempDirectory("native-utils-test");
       Path tree = root.resolve("tree3");
       Files.createDirectory(tree);
       Files.write(tree.resolve("file"), ImmutableList.of("Top level file"), StandardCharsets.UTF_8);

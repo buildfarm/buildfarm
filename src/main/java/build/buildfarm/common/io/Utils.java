@@ -20,6 +20,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.file.DirectoryStream;
 import java.nio.file.FileStore;
 import java.nio.file.Files;
@@ -27,6 +28,7 @@ import java.nio.file.LinkOption;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.DosFileAttributes;
 import java.nio.file.attribute.PosixFileAttributes;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -46,6 +48,14 @@ public class Utils {
 
   private static final Supplier<LibC> libc =
       Suppliers.memoize(() -> LibraryLoader.create(LibC.class).load("c"));
+
+  // pretty poor check here, but avoiding apache commons for now
+  private static Supplier<Boolean> isMacOS =
+      Suppliers.memoize(
+          () -> {
+            String osName = System.getProperty("os.name").toLowerCase();
+            return osName.startsWith("mac");
+          });
 
   private static final jnr.ffi.Runtime runtime() {
     return jnr.ffi.Runtime.getRuntime(libc.get());
@@ -131,9 +141,8 @@ public class Utils {
     return dirents;
   }
 
-  public static List<NamedFileKey> ffiReaddir(LibC libc, jnr.ffi.Runtime runtime, Path path)
-      throws IOException {
-
+  private static List<NamedFileKey> ffiReaddir(
+      LibC libc, jnr.ffi.Runtime runtime, Path path, FileStore fileStore) throws IOException {
     List<NamedFileKey> dirents = new ArrayList<>();
 
     // open the directory and prepare to iterate over dirents
@@ -148,14 +157,15 @@ public class Utils {
     Pointer direntPtr = libc.readdir(DIR);
 
     while (direntPtr != null) {
-
       FFIdirent dirent = new FFIdirent(runtime);
 
       dirent.useMemory(direntPtr);
 
-      if (!dirent.d_name.toString().equals(".") && !dirent.d_name.toString().equals("..")) {
-
-        dirents.add(new NamedFileKey(dirent.d_name.toString(), dirent.d_ino.longValue()));
+      String name = dirent.d_name.toString();
+      if (!name.equals(".") && !name.equals("..")) {
+        dirents.add(
+            new NamedFileKey(
+                name, stat(path.resolve(name), false, fileStore), dirent.d_ino.longValue()));
       }
       direntPtr = libc.readdir(DIR);
     }
@@ -184,15 +194,16 @@ public class Utils {
 
   private static NamedFileKey pathToNamedFileKey(Path path, FileStore fileStore)
       throws IOException {
+    FileStatus fileStatus = stat(path, false, fileStore);
     return new NamedFileKey(
-        path.getFileName().toString(), getFileKey(path, statNullable(path, false, fileStore)));
+        path.getFileName().toString(), fileStatus, getFileKey(path, fileStatus));
   }
 
   private static List<NamedFileKey> listNIOdirentSorted(Path path, FileStore fileStore)
       throws IOException {
     List<NamedFileKey> dirents = new ArrayList();
     for (Path entry : listDir(path)) {
-      dirents.add(pathToNamedFileKey(path, fileStore));
+      dirents.add(pathToNamedFileKey(entry, fileStore));
     }
     return dirents;
   }
@@ -200,8 +211,9 @@ public class Utils {
   public static List<NamedFileKey> listDirentSorted(Path path, FileStore fileStore)
       throws IOException {
     final List<NamedFileKey> dirents;
-    if (fileStore.supportsFileAttributeView("posix")) {
-      dirents = ffiReaddir(libc.get(), runtime(), path);
+    // OSX presents an incompatible ffi dirent structure that has not been properly enumerated
+    if (fileStore.supportsFileAttributeView("posix") && !isMacOS.get()) {
+      dirents = ffiReaddir(libc.get(), runtime(), path, fileStore);
     } else {
       dirents = listNIOdirentSorted(path, fileStore);
     }
@@ -209,10 +221,63 @@ public class Utils {
     return dirents;
   }
 
-  /*
-   * calling java stat
-   * Like stat(), but returns null on failures instead of throwing.
-   */
+  // this is obscene. We cannot acquire useful FileKeys on windows without resorting to drastic
+  // measures
+  private static class WindowsFileKey {
+    private final int volSerialNumber;
+    private final int fileIndexHigh;
+    private final int fileIndexLow;
+
+    // bypass accessibility checking to get our key components
+    WindowsFileKey(DosFileAttributes attributes) {
+      volSerialNumber = getPrivateInt(attributes, "volSerialNumber");
+      fileIndexHigh = getPrivateInt(attributes, "fileIndexHigh");
+      fileIndexLow = getPrivateInt(attributes, "fileIndexLow");
+    }
+
+    private static int getPrivateInt(Object obj, String fieldName) {
+      try {
+        Field field = obj.getClass().getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return (int) field.get(obj);
+      } catch (IllegalAccessException e) {
+        throw new RuntimeException(
+            "error accessing " + fieldName + ", object did not respect setAccessible(true)");
+      } catch (NoSuchFieldException e) {
+        throw new RuntimeException(
+            "expected " + fieldName + " in object, invalid " + obj.getClass().getName());
+      }
+    }
+
+    @Override
+    public int hashCode() {
+      return volSerialNumber + fileIndexHigh + fileIndexLow;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+      if (obj == this) return true;
+      if (!(obj instanceof WindowsFileKey)) return false;
+      WindowsFileKey other = (WindowsFileKey) obj;
+      return (this.volSerialNumber == other.volSerialNumber)
+          && (this.fileIndexHigh == other.fileIndexHigh)
+          && (this.fileIndexLow == other.fileIndexLow);
+    }
+
+    @Override
+    public String toString() {
+      StringBuilder sb = new StringBuilder();
+      sb.append("(volSerialNumber=")
+          .append(volSerialNumber)
+          .append(",fileIndexHigh=")
+          .append(fileIndexHigh)
+          .append(",fileIndexLow=")
+          .append(fileIndexLow)
+          .append(')');
+      return sb.toString();
+    }
+  };
+
   public static FileStatus stat(final Path path, final boolean followSymlinks, FileStore fileStore)
       throws IOException {
     final BasicFileAttributes attributes;
@@ -263,6 +328,9 @@ public class Utils {
 
           @Override
           public Object fileKey() {
+            if (attributes instanceof DosFileAttributes) {
+              return new WindowsFileKey((DosFileAttributes) attributes);
+            }
             // UnixFileKeys will correspond to a supported "posix" FileAttributeView
             // This will mean that NamedFileKeys are populated with inodes
             // We cannot construct UnixFileKeys, so this is our best option to use
