@@ -720,11 +720,11 @@ public class MemoryInstance extends AbstractServerInstance {
     WorkerQueue queue =
         queuedOperations.MatchEligibleQueue(createProvisions(command.getPlatform()));
 
-    DequeueMatchSettings settings = new DequeueMatchSettings();
+    DequeueMatchSettings matchSettings = new DequeueMatchSettings();
     synchronized (queue.workers) {
       while (!dispatched && !queue.workers.isEmpty()) {
         Worker worker = queue.workers.remove(0);
-        if (!DequeueMatchEvaluator.shouldKeepOperation(settings, worker.getProvisions(), command)) {
+        if (!DequeueMatchEvaluator.shouldKeepOperation(matchSettings, worker.getProvisions(), command)) {
           rejectedWorkers.add(worker);
         } else {
           QueueEntry queueEntry =

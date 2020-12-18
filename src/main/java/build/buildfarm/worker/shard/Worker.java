@@ -355,7 +355,7 @@ public class Worker extends LoggingMain {
             config.getLimitExecution(),
             config.getLimitGlobalExecution(),
             config.getOnlyMulticoreTests(),
-            config.getErrorOperationRemainingResources(),
+            config.getPlatformValidationSettings().getErrorOperationRemainingResources(),
             Suppliers.ofInstance(writer));
 
     PipelineStage completeStage =

@@ -416,7 +416,7 @@ public class Worker extends LoggingMain {
 
           @Override
           public boolean shouldErrorOperationOnRemainingResources() {
-            return config.getErrorOperationRemainingResources();
+            return config.getPlatformValidationSettings().getErrorOperationRemainingResources();
           }
 
           @Override
