@@ -1,4 +1,5 @@
 load("@io_bazel_rules_docker//container:container.bzl", "container_image")
+load("//:defs.bzl", "ensure_accurate_metadata")
 
 package(
     default_visibility = ["//src:__subpackages__"],
@@ -499,6 +500,7 @@ java_binary(
     runtime_deps = [
         ":server",
     ],
+    jvm_flags = ensure_accurate_metadata(),
 )
 
 container_image(
@@ -571,6 +573,7 @@ java_library(
         ":operations-finder",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
         "//src/main/java/build/buildfarm:common-cache",
+        "//src/main/java/build/buildfarm:operations",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_rpc_error_details_java_proto",
         "@maven//:com_github_pcj_google_options",
@@ -585,7 +588,6 @@ java_library(
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_services",
         "@maven//:io_grpc_grpc_stub",
-        "//src/main/java/build/buildfarm:operations",
     ],
 )
 
@@ -599,6 +601,7 @@ java_binary(
     runtime_deps = [
         ":shard-worker",
     ],
+    jvm_flags = ensure_accurate_metadata(),
 )
 
 container_image(
@@ -743,6 +746,7 @@ java_binary(
     runtime_deps = [
         ":operationqueue-worker",
     ],
+    jvm_flags = ensure_accurate_metadata(),
 )
 
 container_image(
