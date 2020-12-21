@@ -407,7 +407,6 @@ java_library(
         "@maven//:io_grpc_grpc_api",
         "@maven//:io_grpc_grpc_context",
         "@maven//:io_grpc_grpc_core",
-        "@maven//:io_grpc_grpc_netty",
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
         "@maven//:org_apache_commons_commons_pool2",
@@ -415,6 +414,18 @@ java_library(
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
         "//src/main/java/build/buildfarm:operations",
          "//src/main/java/build/buildfarm:operations-finder",
+         "@maven//:org_redisson_redisson",
+         
+        "@maven//:io_netty_netty_buffer",
+        "@maven//:io_netty_netty_codec",
+        "@maven//:io_netty_netty_codec_http",
+        "@maven//:io_netty_netty_common",
+        "@maven//:io_netty_netty_handler",
+        "@maven//:io_netty_netty_transport",
+        "@maven//:io_netty_netty_transport_native_epoll",
+        "@maven//:io_netty_netty_transport_native_kqueue",
+        "@maven//:io_netty_netty_transport_native_unix_common",
+        "@maven//:io_grpc_grpc_netty",
     ],
 )
 
@@ -586,6 +597,8 @@ java_library(
         "@maven//:io_grpc_grpc_services",
         "@maven//:io_grpc_grpc_stub",
         "//src/main/java/build/buildfarm:operations",
+        "@maven//:org_redisson_redisson",
+        "@maven//:io_netty_netty_transport",
     ],
 )
 
