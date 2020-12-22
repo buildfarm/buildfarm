@@ -554,11 +554,11 @@ public class RedisShardBackplane implements ShardBackplane {
       throws IOException {
         
       Config redissonConfig = new Config();
-      redissonConfig.setNettyThreads(1);
-      NioEventLoopGroup eventLoop = new NioEventLoopGroup(1);
+      //redissonConfig.setNettyThreads(1);
+      //NioEventLoopGroup eventLoop = new NioEventLoopGroup(1);
       //EpollEventLoopGroup eventLoop = new EpollEventLoopGroup(1);
-      eventLoop.setIoRatio(1);
-      redissonConfig.setEventLoopGroup(eventLoop);
+      //eventLoop.setIoRatio(1);
+      //redissonConfig.setEventLoopGroup(eventLoop);
       
       
       ClusterServersConfig finalConfig = redissonConfig.useClusterServers()
@@ -948,6 +948,17 @@ public class RedisShardBackplane implements ShardBackplane {
   @Override
   public void adjustBlobLocations(
       Digest blobDigest, Set<String> addWorkers, Set<String> removeWorkers) throws IOException {
+    // String key = casKey(blobDigest);
+    // client.run(
+    //     jedis -> {
+    //       for (String workerName : addWorkers) {
+    //         jedis.sadd(key, workerName);
+    //       }
+    //       for (String workerName : removeWorkers) {
+    //         jedis.srem(key, workerName);
+    //       }
+    //       jedis.expire(key, config.getCasExpire());
+    //     });
     
     String key = DigestUtil.toString(blobDigest);
     casLookup.putAll(key,addWorkers);
@@ -960,6 +971,12 @@ public class RedisShardBackplane implements ShardBackplane {
 
   @Override
   public void addBlobLocation(Digest blobDigest, String workerName) throws IOException {
+    // String key = casKey(blobDigest);
+    // client.run(
+    //     jedis -> {
+    //       jedis.sadd(key, workerName);
+    //       jedis.expire(key, config.getCasExpire());
+    //     });
     
     
     String key = DigestUtil.toString(blobDigest);
@@ -970,6 +987,16 @@ public class RedisShardBackplane implements ShardBackplane {
 
   @Override
   public void addBlobsLocation(Iterable<Digest> blobDigests, String workerName) throws IOException {
+    // client.run(
+    //     jedis -> {
+    //       JedisClusterPipeline p = jedis.pipelined();
+    //       for (Digest blobDigest : blobDigests) {
+    //         String key = casKey(blobDigest);
+    //         p.sadd(key, workerName);
+    //         p.expire(key, config.getCasExpire());
+    //       }
+    //       p.sync();
+    //     });
     
     for (Digest blobDigest : blobDigests) {
       String key = DigestUtil.toString(blobDigest);
@@ -981,6 +1008,8 @@ public class RedisShardBackplane implements ShardBackplane {
 
   @Override
   public void removeBlobLocation(Digest blobDigest, String workerName) throws IOException {
+    // String key = casKey(blobDigest);
+    // client.run(jedis -> jedis.srem(key, workerName));
     
     String key = DigestUtil.toString(blobDigest);
     casLookup.remove(key,workerName);
@@ -989,6 +1018,14 @@ public class RedisShardBackplane implements ShardBackplane {
   @Override
   public void removeBlobsLocation(Iterable<Digest> blobDigests, String workerName)
       throws IOException {
+    // client.run(
+    //     jedis -> {
+    //       JedisClusterPipeline p = jedis.pipelined();
+    //       for (Digest blobDigest : blobDigests) {
+    //         p.srem(casKey(blobDigest), workerName);
+    //       }
+    //       p.sync();
+    //     });
     
     
     for (Digest blobDigest : blobDigests) {
@@ -999,17 +1036,19 @@ public class RedisShardBackplane implements ShardBackplane {
 
   @Override
   public String getBlobLocation(Digest blobDigest) throws IOException {
+    //return client.call(jedis -> jedis.srandmember(casKey(blobDigest)));
     
     String key = DigestUtil.toString(blobDigest);
-    Set<String> all = casLookup.get(key);
+    Set<String> all = casLookup.get(key).readAll();
     return getRandomSetElement(all);
   }
 
   @Override
   public Set<String> getBlobLocationSet(Digest blobDigest) throws IOException {
+    //return client.call(jedis -> jedis.smembers(casKey(blobDigest)));
     
     String key = DigestUtil.toString(blobDigest);
-    return casLookup.get(key);
+    return casLookup.get(key).readAll();
   }
 
   @Override
@@ -1022,9 +1061,10 @@ public class RedisShardBackplane implements ShardBackplane {
           for (Digest blobDigest : blobDigests) {
             
             
+            //Set<String> workers = jedis.smembers(casKey(blobDigest));
             
             String key = DigestUtil.toString(blobDigest);
-            Set<String> workers = casLookup.get(key);
+            Set<String> workers = casLookup.get(key).readAll();
             
             
             if (workers.isEmpty()) {
