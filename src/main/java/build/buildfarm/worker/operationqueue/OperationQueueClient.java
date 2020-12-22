@@ -33,6 +33,7 @@ import com.google.protobuf.Any;
 import com.google.protobuf.InvalidProtocolBufferException;
 import java.util.Set;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
 
@@ -77,7 +78,7 @@ class OperationQueueClient {
             ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
             String operationName = executeEntry.getOperationName();
             if (activeOperations.contains(operationName)) {
-              logger.severe(
+              logger.log(SEVERE,
                   "WorkerContext::match: WARNING matched duplicate operation " + operationName);
               return false;
             }

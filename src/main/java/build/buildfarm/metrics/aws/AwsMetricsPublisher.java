@@ -82,9 +82,7 @@ public class AwsMetricsPublisher extends AbstractMetricsPublisher {
             });
       }
     } catch (Exception e) {
-      logger.log(
-          Level.WARNING,
-          String.format("Could not publish request metadata to SNS for %s.", operation.getName()),
+      logger.log(Level.WARNING, String.format("Could not publish request metadata to SNS for %s.", operation.getName()),
           e);
     }
   }

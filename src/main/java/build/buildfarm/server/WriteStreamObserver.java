@@ -96,8 +96,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
       } catch (Exception e) {
         Status status = Status.fromThrowable(e);
         if (errorResponse(status.asException())) {
-          logger.log(
-              status.getCode() == Status.Code.CANCELLED ? Level.FINE : Level.SEVERE,
+          logger.log(status.getCode() == Status.Code.CANCELLED ? Level.FINE : Level.SEVERE,
               format("error writing %s", (name == null ? request.getResourceName() : name)),
               e);
         }
@@ -145,13 +144,12 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
     checkNotNull(write);
 
     if (Context.current().isCancelled()) {
-      logger.log(
-          Level.FINER,
+      logger.log(Level.FINER,
           format("skipped delivering committed_size to %s for cancelled context", name));
     } else {
       try {
         if (expectedCommittedSize >= 0 && expectedCommittedSize != committedSize) {
-          logger.warning(
+          logger.log(Level.WARNING,
               format(
                   "committed size %d did not match expectation for %s "
                       + " after %d requests and %d bytes at offset %d, ignoring it",
@@ -163,8 +161,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
         RequestMetadata requestMetadata = TracingMetadataUtils.fromCurrentContext();
         Status status = Status.fromThrowable(e);
         if (errorResponse(status.asException())) {
-          logger.log(
-              status.getCode() == Status.Code.CANCELLED ? Level.FINE : Level.SEVERE,
+          logger.log(status.getCode() == Status.Code.CANCELLED ? Level.FINE : Level.SEVERE,
               format(
                   "%s-%s: %s -> %s -> %s: error committing %s",
                   requestMetadata.getToolDetails().getToolName(),
@@ -184,8 +181,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
 
     if (exception.compareAndSet(null, null)) {
       try {
-        logger.log(
-            Level.FINER, format("delivering committed_size for %s of %d", name, committedSize));
+        logger.log(Level.FINER, format("delivering committed_size for %s of %d", name, committedSize));
         responseObserver.onNext(response);
         responseObserver.onCompleted();
       } catch (Exception e) {
@@ -203,8 +199,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
       name = resourceName;
       try {
         write = getWrite(resourceName);
-        logger.log(
-            Level.FINER,
+        logger.log(Level.FINER,
             format(
                 "registering callback for %s: committed_size = %d, complete = %s",
                 resourceName, write.getCommittedSize(), write.isComplete()));
@@ -241,8 +236,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   }
 
   private void logWriteRequest(Level level, WriteRequest request, Exception e) {
-    logger.log(
-        Level.WARNING,
+    logger.log(Level.WARNING,
         format(
             "write: %s, %d bytes%s",
             request.getResourceName(),
@@ -260,7 +254,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
       responseObserver.onError(t);
       if (isEntryLimitException) {
         RequestMetadata requestMetadata = TracingMetadataUtils.fromCurrentContext();
-        logger.warning(
+        logger.log(Level.WARNING,
             format(
                 "%s-%s: %s -> %s -> %s: exceeded entry limit for %s",
                 requestMetadata.getToolDetails().getToolName(),
@@ -317,8 +311,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
         earliestOffset = offset;
       }
 
-      logger.log(
-          Level.FINER,
+      logger.log(Level.FINER,
           format(
               "writing %d to %s at %d%s",
               data.size(), name, offset, finishWrite ? " with finish_write" : ""));
@@ -399,8 +392,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
       }
     } else {
       if (!withCancellation.isCancelled()) {
-        logger.log(
-            status.getCode() == Status.Code.CANCELLED ? Level.FINE : Level.SEVERE,
+        logger.log(status.getCode() == Status.Code.CANCELLED ? Level.FINE : Level.SEVERE,
             format("cancelling context for %s", name),
             t);
         withCancellation.cancel(t);

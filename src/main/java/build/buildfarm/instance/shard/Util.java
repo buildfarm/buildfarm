@@ -189,7 +189,7 @@ public class Util {
           public void onSuccess(Iterable<Digest> missingDigests) {
             boolean found = Iterables.isEmpty(missingDigests);
             logger.log(
-                Level.INFO,
+                Level.FINE,
                 format(
                     "check missing response for %s to %s was %sfound",
                     DigestUtil.toString(digest), worker, found ? "" : "not "));

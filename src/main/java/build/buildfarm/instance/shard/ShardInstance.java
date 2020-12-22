@@ -198,9 +198,7 @@ public class ShardInstance extends AbstractServerInstance {
 
     // return a default
     Duration defaultDuration = Durations.fromSeconds(60);
-    logger.log(
-        INFO,
-        String.format(
+    logger.log(INFO, String.format(
             "grpc timeout not configured.  Setting to: " + defaultDuration.getSeconds() + "s"));
     return defaultDuration;
   }
@@ -335,10 +333,7 @@ public class ShardInstance extends AbstractServerInstance {
                           backplane.queueing(executeEntry.getOperationName());
                         } catch (IOException e) {
                           if (!stopping && !stopped) {
-                            logger.log(
-                                Level.SEVERE,
-                                format("error polling %s for queuing", operationName),
-                                e);
+                            logger.log(Level.SEVERE, format("error polling %s for queuing", operationName), e);
                           }
                           // mostly ignore, we will be stopped at some point later
                         }
@@ -366,8 +361,7 @@ public class ShardInstance extends AbstractServerInstance {
                         operationTransformService);
                     long operationTransformDispatchUSecs =
                         stopwatch.elapsed(MICROSECONDS) - canQueueUSecs;
-                    logger.log(
-                        Level.INFO,
+                    logger.log(Level.INFO,
                         format(
                             "OperationQueuer: Dispatched To Transform %s: %dus in canQueue, %dus in transform dispatch",
                             operationName, canQueueUSecs, operationTransformDispatchUSecs));
@@ -393,8 +387,7 @@ public class ShardInstance extends AbstractServerInstance {
                                   try {
                                     transformTokensQueue.take();
                                   } catch (InterruptedException e) {
-                                    logger.log(
-                                        Level.SEVERE,
+                                    logger.log(Level.SEVERE,
                                         "interrupted while returning transform token",
                                         e);
                                   }
@@ -412,8 +405,7 @@ public class ShardInstance extends AbstractServerInstance {
                     operationQueuer = null;
                     return;
                   } catch (Exception t) {
-                    logger.log(
-                        Level.SEVERE, "OperationQueuer: fatal exception during iteration", t);
+                    logger.log(Level.SEVERE, "OperationQueuer: fatal exception during iteration", t);
                   } finally {
                     logger.log(Level.INFO, "OperationQueuer: Exiting");
                   }
@@ -481,13 +473,11 @@ public class ShardInstance extends AbstractServerInstance {
     onStop.run();
     backplane.stop();
     if (!contextDeadlineScheduler.awaitTermination(10, SECONDS)) {
-      logger.log(
-          Level.SEVERE,
+      logger.log(Level.SEVERE,
           "Could not shut down operation deletion service, some operations may be zombies");
     }
     if (!operationDeletionService.awaitTermination(10, SECONDS)) {
-      logger.log(
-          Level.SEVERE,
+      logger.log(Level.SEVERE,
           "Could not shut down operation deletion service, some operations may be zombies");
     }
     operationDeletionService.shutdownNow();
@@ -624,8 +614,7 @@ public class ShardInstance extends AbstractServerInstance {
               removeMalfunctioningWorker(worker, t, "findMissingBlobs(" + requestId + ")");
             } else if (status.getCode() == Code.DEADLINE_EXCEEDED) {
               for (FindMissingResponseEntry response : responses.build()) {
-                logger.log(
-                    response.exception == null ? Level.WARNING : Level.SEVERE,
+                logger.log(response.exception == null ? Level.WARNING : Level.SEVERE,
                     format(
                         "DEADLINE_EXCEEDED: findMissingBlobs(%s) %s: %d remaining of %d %dus%s",
                         requestId,
@@ -696,8 +685,7 @@ public class ShardInstance extends AbstractServerInstance {
                   removeMalfunctioningWorker(
                       worker, t, "getBlob(" + DigestUtil.toString(blobDigest) + ")");
                 } else if (status.getCode() == Code.NOT_FOUND) {
-                  logger.log(
-                      Level.INFO, worker + " did not contain " + DigestUtil.toString(blobDigest));
+                  logger.log(Level.INFO, worker + " did not contain " + DigestUtil.toString(blobDigest));
                   // ignore this, the worker will update the backplane eventually
                 } else if (status.getCode() != Code.DEADLINE_EXCEEDED
                     && SHARD_IS_RETRIABLE.test(status)) {
@@ -768,8 +756,7 @@ public class ShardInstance extends AbstractServerInstance {
     boolean emptyWorkerList = workersList.isEmpty();
     final ListenableFuture<List<String>> populatedWorkerListFuture;
     if (emptyWorkerList) {
-      logger.log(
-          Level.INFO,
+      logger.log(Level.INFO,
           format(
               "worker list was initially empty for %s, attempting to correct",
               DigestUtil.toString(blobDigest)));
