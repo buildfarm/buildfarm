@@ -523,9 +523,12 @@ public class RedisShardBackplane implements ShardBackplane {
     // multiple clients.
     client = new RedisClient(jedisClusterFactory.get());
 
-    redissonClient = createRedissonClient(config);
+    if (config.getCacheCas()) {
+      redissonClient = createRedissonClient(config);
+    }
     casWorkerMap =
-        new CasWorkerMap(redissonClient, config.getCasPrefix(), config.getCasExpire(), true);
+        new CasWorkerMap(
+            redissonClient, config.getCasPrefix(), config.getCasExpire(), config.getCacheCas());
 
     actionCache = createActionCache(client, config);
     prequeue = createPrequeue(client, config);
