@@ -1368,10 +1368,6 @@ public class RedisShardBackplane implements ShardBackplane {
         });
   }
 
-  private String casKey(Digest blobDigest) {
-    return config.getCasPrefix() + ":" + DigestUtil.toString(blobDigest);
-  }
-
   private String asDigestStr(ActionKey actionKey) {
     return DigestUtil.toString(actionKey.getDigest());
   }
