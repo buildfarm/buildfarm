@@ -98,13 +98,12 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ForkJoinPool;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ForkJoinPool;
 
 public class Worker extends LoggingMain {
   private static final java.util.logging.Logger nettyLogger =
@@ -376,10 +375,9 @@ public class Worker extends LoggingMain {
     pipeline.add(inputFetchStage, 3);
     pipeline.add(executeActionStage, 2);
     pipeline.add(reportResultStage, 1);
-    
-    
+
     ForkJoinPool executor = new ForkJoinPool(16);
-    //ExecutorService executor = Executors.newFixedThreadPool(16);
+    // ExecutorService executor = Executors.newFixedThreadPool(16);
 
     healthStatusManager = new HealthStatusManager();
     server =

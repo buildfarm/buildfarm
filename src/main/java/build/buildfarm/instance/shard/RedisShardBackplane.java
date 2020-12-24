@@ -97,23 +97,16 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
+import org.redisson.Redisson;
+import org.redisson.api.RSetMultimapCache;
+import org.redisson.api.RedissonClient;
+import org.redisson.config.ClusterServersConfig;
+import org.redisson.config.Config;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisClusterPipeline;
 import redis.clients.jedis.Response;
 import redis.clients.jedis.ScanParams;
 import redis.clients.jedis.ScanResult;
-import java.util.Random;
-
-
-import org.redisson.Redisson;
-import org.redisson.api.RSet;
-import org.redisson.api.RSetMultimapCache;
-import org.redisson.api.RedissonClient;
-import org.redisson.config.Config;
-import org.redisson.config.ClusterServersConfig;
-import org.redisson.config.SingleServerConfig;
-import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.epoll.EpollEventLoopGroup;
 
 public class RedisShardBackplane implements ShardBackplane {
   private static final Logger logger = Logger.getLogger(RedisShardBackplane.class.getName());
@@ -166,6 +159,7 @@ public class RedisShardBackplane implements ShardBackplane {
   private BalancedRedisQueue prequeue;
   private OperationQueue operationQueue;
   private RSetMultimapCache<String, String> casLookup;
+  private CasWorkerMap casWorkerMap;
 
   public RedisShardBackplane(
       RedisShardBackplaneConfig config,
@@ -530,9 +524,11 @@ public class RedisShardBackplane implements ShardBackplane {
     // We wish to avoid various synchronous and error handling issues that could occur when using
     // multiple clients.
     client = new RedisClient(jedisClusterFactory.get());
-    
+
     redissonClient = createRedissonClient(config);
     casLookup = redissonClient.getSetMultimapCache("CasLookup");
+    casWorkerMap =
+        new CasWorkerMap(redissonClient, config.getCasPrefix(), config.getCasExpire(), true);
 
     actionCache = createActionCache(client, config);
     prequeue = createPrequeue(client, config);
@@ -549,29 +545,20 @@ public class RedisShardBackplane implements ShardBackplane {
     client.call(
         jedis -> jedis.set("startTime/" + clientPublicName, Long.toString(new Date().getTime())));
   }
-  
-  static RedissonClient createRedissonClient(RedisShardBackplaneConfig config)
-      throws IOException {
-        
-      Config redissonConfig = new Config();
-      //redissonConfig.setNettyThreads(1);
-      //NioEventLoopGroup eventLoop = new NioEventLoopGroup(1);
-      //EpollEventLoopGroup eventLoop = new EpollEventLoopGroup(1);
-      //eventLoop.setIoRatio(1);
-      //redissonConfig.setEventLoopGroup(eventLoop);
-      
-      
-      ClusterServersConfig finalConfig = redissonConfig.useClusterServers()
-      .addNodeAddress(config.getRedisUri())
-      .setCheckSlotsCoverage(false);
-      
-      // SingleServerConfig finalConfig = redissonConfig.useSingleServer()
-      // .setAddress(config.getRedisUri());
-      
-      
-      RedissonClient client = Redisson.create(redissonConfig);
-      return client;
-    }
+
+  static RedissonClient createRedissonClient(RedisShardBackplaneConfig config) throws IOException {
+
+    Config redissonConfig = new Config();
+
+    ClusterServersConfig finalConfig =
+        redissonConfig
+            .useClusterServers()
+            .addNodeAddress(config.getRedisUri())
+            .setCheckSlotsCoverage(false);
+
+    RedissonClient client = Redisson.create(redissonConfig);
+    return client;
+  }
 
   static RedisMap createActionCache(RedisClient client, RedisShardBackplaneConfig config)
       throws IOException {
@@ -784,9 +771,6 @@ public class RedisShardBackplane implements ShardBackplane {
         .limit(Math.min(list.size(), n))
         .collect(Collectors.toList());
   }
-  public static <E> E getRandomSetElement(Set<E> set) {
-      return set.stream().skip(new Random().nextInt(set.size())).findFirst().orElse(null);
-  }
 
   private void removeInvalidWorkers(JedisCluster jedis, long testedAt, List<ShardWorker> workers) {
     if (!workers.isEmpty()) {
@@ -948,132 +932,44 @@ public class RedisShardBackplane implements ShardBackplane {
   @Override
   public void adjustBlobLocations(
       Digest blobDigest, Set<String> addWorkers, Set<String> removeWorkers) throws IOException {
-    // String key = casKey(blobDigest);
-    // client.run(
-    //     jedis -> {
-    //       for (String workerName : addWorkers) {
-    //         jedis.sadd(key, workerName);
-    //       }
-    //       for (String workerName : removeWorkers) {
-    //         jedis.srem(key, workerName);
-    //       }
-    //       jedis.expire(key, config.getCasExpire());
-    //     });
-    
-    String key = DigestUtil.toString(blobDigest);
-    casLookup.putAll(key,addWorkers);
-    for (String workerName : removeWorkers) {
-      casLookup.remove(key,workerName);
-    }
-    casLookup.expireKey(key,config.getCasExpire(),TimeUnit.SECONDS);
-    
+    casWorkerMap.adjust(client, blobDigest, addWorkers, removeWorkers);
   }
 
   @Override
   public void addBlobLocation(Digest blobDigest, String workerName) throws IOException {
-    // String key = casKey(blobDigest);
-    // client.run(
-    //     jedis -> {
-    //       jedis.sadd(key, workerName);
-    //       jedis.expire(key, config.getCasExpire());
-    //     });
-    
-    
-    String key = DigestUtil.toString(blobDigest);
-    casLookup.put(key,workerName);
-    casLookup.expireKey(key,config.getCasExpire(),TimeUnit.SECONDS);
-    
+    casWorkerMap.add(client, blobDigest, workerName);
   }
 
   @Override
   public void addBlobsLocation(Iterable<Digest> blobDigests, String workerName) throws IOException {
-    // client.run(
-    //     jedis -> {
-    //       JedisClusterPipeline p = jedis.pipelined();
-    //       for (Digest blobDigest : blobDigests) {
-    //         String key = casKey(blobDigest);
-    //         p.sadd(key, workerName);
-    //         p.expire(key, config.getCasExpire());
-    //       }
-    //       p.sync();
-    //     });
-    
-    for (Digest blobDigest : blobDigests) {
-      String key = DigestUtil.toString(blobDigest);
-      casLookup.put(key,workerName);
-      casLookup.expireKey(key,config.getCasExpire(),TimeUnit.SECONDS);
-    }
-    
+    casWorkerMap.addAll(client, blobDigests, workerName);
   }
 
   @Override
   public void removeBlobLocation(Digest blobDigest, String workerName) throws IOException {
-    // String key = casKey(blobDigest);
-    // client.run(jedis -> jedis.srem(key, workerName));
-    
-    String key = DigestUtil.toString(blobDigest);
-    casLookup.remove(key,workerName);
+    casWorkerMap.remove(client, blobDigest, workerName);
   }
 
   @Override
   public void removeBlobsLocation(Iterable<Digest> blobDigests, String workerName)
       throws IOException {
-    // client.run(
-    //     jedis -> {
-    //       JedisClusterPipeline p = jedis.pipelined();
-    //       for (Digest blobDigest : blobDigests) {
-    //         p.srem(casKey(blobDigest), workerName);
-    //       }
-    //       p.sync();
-    //     });
-    
-    
-    for (Digest blobDigest : blobDigests) {
-      String key = DigestUtil.toString(blobDigest);
-      casLookup.remove(key,workerName);
-    }
+    casWorkerMap.removeAll(client, blobDigests, workerName);
   }
 
   @Override
   public String getBlobLocation(Digest blobDigest) throws IOException {
-    //return client.call(jedis -> jedis.srandmember(casKey(blobDigest)));
-    
-    String key = DigestUtil.toString(blobDigest);
-    Set<String> all = casLookup.get(key).readAll();
-    return getRandomSetElement(all);
+    return casWorkerMap.getAny(client, blobDigest);
   }
 
   @Override
   public Set<String> getBlobLocationSet(Digest blobDigest) throws IOException {
-    //return client.call(jedis -> jedis.smembers(casKey(blobDigest)));
-    
-    String key = DigestUtil.toString(blobDigest);
-    return casLookup.get(key).readAll();
+    return casWorkerMap.get(client, blobDigest);
   }
 
   @Override
   public Map<Digest, Set<String>> getBlobDigestsWorkers(Iterable<Digest> blobDigests)
       throws IOException {
-    // FIXME pipeline
-    ImmutableMap.Builder<Digest, Set<String>> blobDigestsWorkers = new ImmutableMap.Builder<>();
-    client.run(
-        jedis -> {
-          for (Digest blobDigest : blobDigests) {
-            
-            
-            //Set<String> workers = jedis.smembers(casKey(blobDigest));
-            
-            String key = DigestUtil.toString(blobDigest);
-            Set<String> workers = casLookup.get(key).readAll();
-            
-            
-            if (workers.isEmpty()) {
-              continue;
-            }
-            blobDigestsWorkers.put(blobDigest, workers);
-          }
-        });
-    return blobDigestsWorkers.build();
+    return casWorkerMap.getMap(client, blobDigests);
   }
 
   public static WorkerChange parseWorkerChange(String workerChangeJson)

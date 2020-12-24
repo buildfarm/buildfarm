@@ -46,13 +46,12 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ForkJoinPool;
 
 public class BuildFarmServer extends LoggingMain {
   // We need to keep references to the root and netty loggers to prevent them from being garbage
@@ -88,9 +87,9 @@ public class BuildFarmServer extends LoggingMain {
         new ActionCacheRequestCounter(ActionCacheService.logger, Duration.ofSeconds(10));
 
     ServerInterceptor headersInterceptor = new ServerHeadersInterceptor();
-    
+
     ForkJoinPool executor = new ForkJoinPool(16);
-    //ExecutorService executor = Executors.newFixedThreadPool(16);
+    // ExecutorService executor = Executors.newFixedThreadPool(16);
 
     server =
         serverBuilder
