@@ -589,7 +589,6 @@ java_library(
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_services",
         "@maven//:io_grpc_grpc_stub",
-        "//src/main/java/build/buildfarm:operations",
         "@maven//:org_redisson_redisson",
     ],
 )
