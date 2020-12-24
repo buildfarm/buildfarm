@@ -526,7 +526,6 @@ public class RedisShardBackplane implements ShardBackplane {
     client = new RedisClient(jedisClusterFactory.get());
 
     redissonClient = createRedissonClient(config);
-    casLookup = redissonClient.getSetMultimapCache("CasLookup");
     casWorkerMap =
         new CasWorkerMap(redissonClient, config.getCasPrefix(), config.getCasExpire(), true);
 
