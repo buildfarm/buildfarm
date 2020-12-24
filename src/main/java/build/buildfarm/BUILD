@@ -588,7 +588,6 @@ java_library(
         "@maven//:io_grpc_grpc_stub",
         "//src/main/java/build/buildfarm:operations",
         "@maven//:org_redisson_redisson",
-        "@maven//:io_netty_netty_transport",
     ],
 )
 
