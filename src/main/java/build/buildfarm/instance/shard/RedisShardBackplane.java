@@ -98,7 +98,6 @@ import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
 import org.redisson.Redisson;
-import org.redisson.api.RSetMultimapCache;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.ClusterServersConfig;
 import org.redisson.config.Config;
@@ -158,7 +157,6 @@ public class RedisShardBackplane implements ShardBackplane {
   private RedisMap actionCache;
   private BalancedRedisQueue prequeue;
   private OperationQueue operationQueue;
-  private RSetMultimapCache<String, String> casLookup;
   private CasWorkerMap casWorkerMap;
 
   public RedisShardBackplane(
