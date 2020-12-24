@@ -98,7 +98,6 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ForkJoinPool;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -376,9 +375,6 @@ public class Worker extends LoggingMain {
     pipeline.add(executeActionStage, 2);
     pipeline.add(reportResultStage, 1);
 
-    ForkJoinPool executor = new ForkJoinPool(16);
-    // ExecutorService executor = Executors.newFixedThreadPool(16);
-
     healthStatusManager = new HealthStatusManager();
     server =
         serverBuilder
@@ -395,7 +391,6 @@ public class Worker extends LoggingMain {
                     context,
                     completeStage,
                     backplane))
-            .executor(executor)
             .build();
 
     logger.log(INFO, String.format("%s initialized", identifier));

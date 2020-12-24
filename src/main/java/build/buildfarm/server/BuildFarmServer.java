@@ -46,7 +46,6 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -88,9 +87,6 @@ public class BuildFarmServer extends LoggingMain {
 
     ServerInterceptor headersInterceptor = new ServerHeadersInterceptor();
 
-    ForkJoinPool executor = new ForkJoinPool(16);
-    // ExecutorService executor = Executors.newFixedThreadPool(16);
-
     server =
         serverBuilder
             .addService(healthStatusManager.getHealthService())
@@ -115,7 +111,6 @@ public class BuildFarmServer extends LoggingMain {
             .addService(new AdminService(config.getAdminConfig(), instances))
             .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
             .intercept(headersInterceptor)
-            .executor(executor)
             .build();
 
     logger.log(Level.INFO, String.format("%s initialized", session));
