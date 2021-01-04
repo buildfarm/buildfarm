@@ -14,7 +14,7 @@
 
 package build.buildfarm.worker.shard;
 
-import static java.util.logging.Level.SEVERE;
+import static java.util.logging.Level.WARNING;
 
 import build.buildfarm.v1test.ShardWorkerConfig;
 import build.buildfarm.v1test.ShutDownWorkerGracefullyRequest;
@@ -55,7 +55,7 @@ public class ShutDownWorkerGracefully extends ShutDownWorkerGrpc.ShutDownWorkerI
               "Current AdminConfig doesn't have cluster_id set or doesn't support shut down worker gracefully, "
                   + "the worker %s won't be shut down.",
               config.getPublicName());
-      logger.log(SEVERE, errorMessage);
+      logger.log(WARNING, errorMessage);
       responseObserver.onError(new RuntimeException(errorMessage));
       return;
     }
