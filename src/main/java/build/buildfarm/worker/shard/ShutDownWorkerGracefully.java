@@ -27,6 +27,12 @@ public class ShutDownWorkerGracefully extends ShutDownWorkerGrpc.ShutDownWorkerI
     this.worker = worker;
   }
 
+  /**
+   * Start point of worker graceful shutdown.
+   *
+   * @param request
+   * @param responseObserver
+   */
   @Override
   public void shutDownWorkerGracefully(
       ShutDownWorkerGracefullyRequest request,

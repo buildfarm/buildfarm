@@ -182,6 +182,12 @@ public class AdminService extends AdminGrpc.AdminImplBase {
     }
   }
 
+  /**
+   * Server-side implementation of disableScaleProtection.
+   *
+   * @param request grpc request
+   * @param responseObserver grpc response observer
+   */
   @Override
   public void disableScaleInProtection(
       DisableScaleInProtectionRequest request,
