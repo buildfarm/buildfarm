@@ -497,6 +497,8 @@ message ShardInstanceConfig {
   }
 
   int64 max_blob_size = 5;
+  
+  int32 max_cpu = 9;
 
   // maximum selectable timeout
   // a maximum threshold for an action's specified timeout,
