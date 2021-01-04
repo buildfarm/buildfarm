@@ -55,7 +55,7 @@ class DispatchedMonitor implements Runnable {
     String operationName = queueEntry.getExecuteEntry().getOperationName();
 
     logOverdueOperation(o, now);
-    ListenableFuture<Void> requeuedFuture = requeuer.apply(queueEntry,settings);
+    ListenableFuture<Void> requeuedFuture = requeuer.apply(queueEntry, settings);
     long startTime = System.nanoTime();
     requeuedFuture.addListener(
         () -> {

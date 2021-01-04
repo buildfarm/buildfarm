@@ -125,7 +125,7 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
     OperationContext operationContext = take();
     ResourceLimits limits = workerContext.commandExecutionSettings(operationContext.command);
     Executor executor = new Executor(workerContext, operationContext, this);
-    Thread executorThread = new Thread(() -> executor.run(settings,limits));
+    Thread executorThread = new Thread(() -> executor.run(settings, limits));
 
     synchronized (this) {
       executors.add(executorThread);

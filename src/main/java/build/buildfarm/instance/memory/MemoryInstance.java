@@ -724,7 +724,8 @@ public class MemoryInstance extends AbstractServerInstance {
     synchronized (queue.workers) {
       while (!dispatched && !queue.workers.isEmpty()) {
         Worker worker = queue.workers.remove(0);
-        if (!DequeueMatchEvaluator.shouldKeepOperation(matchSettings, worker.getProvisions(), command)) {
+        if (!DequeueMatchEvaluator.shouldKeepOperation(
+            matchSettings, worker.getProvisions(), command)) {
           rejectedWorkers.add(worker);
         } else {
           QueueEntry queueEntry =

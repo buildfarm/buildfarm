@@ -79,7 +79,8 @@ class Executor {
     }
   }
 
-  private long runInterruptible(PlatformValidationSettings settings, Stopwatch stopwatch, ResourceLimits limits)
+  private long runInterruptible(
+      PlatformValidationSettings settings, Stopwatch stopwatch, ResourceLimits limits)
       throws InterruptedException {
     long startedAt = System.currentTimeMillis();
 
