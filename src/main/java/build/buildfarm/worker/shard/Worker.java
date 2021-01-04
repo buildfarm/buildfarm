@@ -47,7 +47,6 @@ import build.buildfarm.instance.shard.WorkerStubs;
 import build.buildfarm.server.ByteStreamService;
 import build.buildfarm.server.ContentAddressableStorageService;
 import build.buildfarm.server.Instances;
-import build.buildfarm.v1test.AdminConfig;
 import build.buildfarm.v1test.ContentAddressableStorageConfig;
 import build.buildfarm.v1test.FilesystemCASConfig;
 import build.buildfarm.v1test.ShardWorker;
@@ -90,6 +89,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.UserPrincipal;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -227,6 +227,11 @@ public class Worker extends LoggingMain {
     this(session, ServerBuilder.forPort(config.getPort()), config);
   }
 
+  /**
+   * The method will prepare the worker for graceful shutdown and send out grpc request to disable
+   * scale in protection when the worker is ready. If unexpected errors happened, it will cancel the
+   * graceful shutdown progress make the worker available again.
+   */
   public void shutDownWorkerGracefully() {
     inGracefulShutdown = true;
     logger.log(Level.INFO, "The current worker is deregistered and should be shutdown gracefully!");
@@ -243,14 +248,15 @@ public class Worker extends LoggingMain {
       logger.log(Level.SEVERE, "The worker gracefully shutdown is interrupted: " + e.getMessage());
     } finally {
       // make a grpc call to disable scale protection
-      AdminConfig adminConfig = config.getAdminConfig();
       String clusterId = config.getAdminConfig().getClusterId();
-      if (clusterId.equals("")) {
+      if (clusterId == null || clusterId.equals("")) {
         logger.log(
             SEVERE,
             "cluster_id of AdminConfig in ShardWorkerConfig is not set, "
                 + " the worker cannot disable scale in protection through grpc call to AdminService. "
                 + "The worker won't be shut down and will be added back to worker pool.");
+        // Graceful shutdown has to be cancelled as cluster_id is missing.
+        // Under this scenario, the worker has to be added back to worker pool.
         inGracefulShutdown = false;
       } else {
         logger.log(
@@ -259,7 +265,19 @@ public class Worker extends LoggingMain {
                 "It took the worker %d seconds to %s",
                 timeWaited,
                 pipeline.isEmpty() ? "finish all actions" : "but still cannot finish all actions"));
-        AdminServiceClient.disableScaleInProtection(clusterId, config.getPublicName());
+        try {
+          AdminServiceClient.disableScaleInProtection(clusterId, config.getPublicName());
+        } catch (Exception e) {
+          logger.log(
+              SEVERE,
+              String.format(
+                  "gRPC call to AdminService to disable scale in protection failed with exception: %s and stacktrace %s",
+                  e.getMessage(), Arrays.toString(e.getStackTrace())));
+          // Similarly, gracefully shutdown cannot be performed successfully because of error in
+          // AdminService side.
+          // Under this scenario, the worker has to be added back to worker pool.
+          inGracefulShutdown = false;
+        }
       }
     }
   }
