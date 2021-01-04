@@ -230,14 +230,14 @@ public class Worker extends LoggingMain {
   public void shutDownWorkerGracefully() {
     inGracefulShutdown = true;
     logger.log(Level.INFO, "The current worker is deregistered and should be shutdown gracefully!");
-    int scanPerSeconds = 30;
+    int scanRate = 30; // check every 30 seconds
     int timeWaited = 0;
     int timeOut = 60 * 15; // 15 minutes
 
     try {
       while (!pipeline.isEmpty() && timeWaited < timeOut) {
-        SECONDS.sleep(scanPerSeconds);
-        timeWaited += scanPerSeconds;
+        SECONDS.sleep(scanRate);
+        timeWaited += scanRate;
       }
     } catch (InterruptedException e) {
       logger.log(Level.SEVERE, "The worker gracefully shutdown is interrupted: " + e.getMessage());
@@ -250,16 +250,17 @@ public class Worker extends LoggingMain {
             SEVERE,
             "cluster_id of AdminConfig in ShardWorkerConfig is not set, "
                 + " the worker cannot disable scale in protection through grpc call to AdminService. "
-                + "The worker won't be shut down");
-        return;
+                + "The worker won't be shut down and will be added back to worker pool.");
+        inGracefulShutdown = false;
+      } else {
+        logger.log(
+            INFO,
+            String.format(
+                "It took the worker %d seconds to %s",
+                timeWaited,
+                pipeline.isEmpty() ? "finish all actions" : "but still cannot finish all actions"));
+        AdminServiceClient.disableScaleInProtection(clusterId, config.getPublicName());
       }
-      logger.log(
-          INFO,
-          String.format(
-              "It took the worker %d seconds to %s",
-              timeWaited,
-              pipeline.isEmpty() ? "finish all actions" : "but still cannot finish all actions"));
-      AdminServiceClient.disableScaleInProtection(clusterId, config.getPublicName());
     }
   }
 

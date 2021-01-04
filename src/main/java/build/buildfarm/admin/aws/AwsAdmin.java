@@ -155,6 +155,12 @@ public class AwsAdmin implements Admin {
   @Override
   public void disableHostScaleInProtection(String instanceName) {
 
+    // 1 get instance id from instance private ip
+    AmazonEC2ClientBuilder.standard().
+    // 2 get autoscaling group name from instance id
+    // https://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/services/autoscaling/AmazonAutoScaling.html#putScalingPolicy-com.amazonaws.services.autoscaling.model.PutScalingPolicyRequest-
+    // describeAutoScalingInstances
+
     //logger.log(
     //    Level.INFO,
     //    String.format(
