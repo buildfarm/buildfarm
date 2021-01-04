@@ -19,7 +19,6 @@ import build.buildfarm.v1test.GetHostsResult;
 import build.buildfarm.v1test.Host;
 import com.amazonaws.services.autoscaling.AmazonAutoScaling;
 import com.amazonaws.services.autoscaling.AmazonAutoScalingClientBuilder;
-import com.amazonaws.services.autoscaling.model.AutoScalingGroup;
 import com.amazonaws.services.autoscaling.model.InstancesDistribution;
 import com.amazonaws.services.autoscaling.model.MixedInstancesPolicy;
 import com.amazonaws.services.autoscaling.model.SetInstanceProtectionRequest;
@@ -32,6 +31,7 @@ import com.amazonaws.services.ec2.model.DescribeInstancesResult;
 import com.amazonaws.services.ec2.model.Filter;
 import com.amazonaws.services.ec2.model.Instance;
 import com.amazonaws.services.ec2.model.Reservation;
+import com.amazonaws.services.ec2.model.Tag;
 import com.amazonaws.services.ec2.model.TerminateInstancesRequest;
 import com.amazonaws.services.simplesystemsmanagement.AWSSimpleSystemsManagement;
 import com.amazonaws.services.simplesystemsmanagement.AWSSimpleSystemsManagementClientBuilder;
@@ -153,18 +153,59 @@ public class AwsAdmin implements Admin {
   }
 
   @Override
-  public void disableHostScaleInProtection(String instanceName) {
+  public void disableHostScaleInProtection(String privateDnsName) {
 
-    // 1 get instance id from instance private ip
-    AmazonEC2ClientBuilder.standard().
-    // 2 get autoscaling group name from instance id
-    // https://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/services/autoscaling/AmazonAutoScaling.html#putScalingPolicy-com.amazonaws.services.autoscaling.model.PutScalingPolicyRequest-
-    // describeAutoScalingInstances
+    // 1 get AutoScalingGroup and InstanceId
+    Instance workerInstance = getInstanceId(privateDnsName);
+    if (workerInstance == null) {
+      String errorMessage = "Cannot find instance with private DNS name " + privateDnsName;
+      logger.log(Level.SEVERE, errorMessage);
+      throw new RuntimeException(errorMessage);
+    }
+    String instanceId = workerInstance.getInstanceId();
+    String autoScalingGroup = getTagValue("aws:autoscaling:groupName", workerInstance.getTags());
+    if (autoScalingGroup == null || autoScalingGroup.length() == 0) {
+      String errorMessage =
+          "Cannot find AutoScalingGroup name of worker with private DNS name " + privateDnsName;
+      logger.log(Level.SEVERE, errorMessage);
+      throw new RuntimeException(errorMessage);
+    }
 
-    //logger.log(
-    //    Level.INFO,
-    //    String.format(
-    //        "Disable protection of host: %s in AutoScalingGroup: %s and get result: %s",
-    //        hostId, scaleGroupName, response.toString()));
+    // 2 disable scale in protection of the worker
+    SetInstanceProtectionRequest disableProtectionRequest =
+        new SetInstanceProtectionRequest()
+            .withInstanceIds(instanceId)
+            .withAutoScalingGroupName(autoScalingGroup)
+            .withProtectedFromScaleIn(false);
+    SetInstanceProtectionResult result = scale.setInstanceProtection(disableProtectionRequest);
+    logger.log(
+        Level.INFO,
+        String.format(
+            "Disable protection of host: %s in AutoScalingGroup: %s and get result: %s",
+            instanceId, autoScalingGroup, result.toString()));
+  }
+
+  private String getTagValue(String targetTagName, List<Tag> tags) {
+    for (Tag tag : tags) {
+      if (targetTagName.equalsIgnoreCase(tag.getKey())) {
+        return tag.getValue();
+      }
+    }
+    return null;
+  }
+
+  private Instance getInstanceId(String privateDnsName) {
+    DescribeInstancesRequest describeInstancesRequest =
+        new DescribeInstancesRequest()
+            .withFilters(new Filter().withName("private-dns-name").withValues(privateDnsName));
+    DescribeInstancesResult instancesResult = ec2.describeInstances(describeInstancesRequest);
+    for (Reservation r : instancesResult.getReservations()) {
+      for (Instance e : r.getInstances()) {
+        if (e.getPrivateDnsName() != null && e.getPrivateDnsName().equals(privateDnsName)) {
+          return e;
+        }
+      }
+    }
+    return null;
   }
 }

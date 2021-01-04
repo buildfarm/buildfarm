@@ -44,7 +44,7 @@ public class GcpAdmin implements Admin {
   }
 
   @Override
-   public void disableHostScaleInProtection(String instanceName) {
+  public void disableHostScaleInProtection(String instanceName) {
     throw new UnsupportedOperationException("Not Implemented.");
   }
 }

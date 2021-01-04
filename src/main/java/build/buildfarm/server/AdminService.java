@@ -186,8 +186,12 @@ public class AdminService extends AdminGrpc.AdminImplBase {
   public void disableScaleInProtection(
       DisableScaleInProtectionRequest request,
       StreamObserver<DisableScaleInProtectionRequestResults> responseObserver) {
-    adminController.disableHostScaleInProtection(request.getInstanceName());
-
+    try {
+      adminController.disableHostScaleInProtection(request.getInstanceName());
+    } catch (RuntimeException e) {
+      responseObserver.onError(e);
+    }
+    responseObserver.onCompleted();
   }
 
   private static Admin getAdminController(AdminConfig config) {
