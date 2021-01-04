@@ -46,7 +46,7 @@ public class OperationQueueClientTest {
             new Answer<Void>() {
               @Override
               public Void answer(InvocationOnMock invocation) throws InterruptedException {
-                MatchListener listener = (MatchListener) invocation.getArguments()[1];
+                MatchListener listener = (MatchListener) invocation.getArguments()[2];
                 listener.onEntry(null);
                 return null;
               }
