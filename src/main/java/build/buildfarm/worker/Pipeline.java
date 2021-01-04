@@ -60,6 +60,28 @@ public class Pipeline {
     join(true);
   }
 
+  /**
+   * Checking if there is any ongoing action in any stages of the pipeline.
+   *
+   * @return
+   */
+  public boolean isEmpty() {
+    for (PipelineStage stage : stageClosePriorities.keySet()) {
+      if (stage instanceof SuperscalarPipelineStage) {
+        if (stage.isClaimed()) {
+          logger.log(Level.INFO, "SuperScalarPipelineStage is not empty yet!");
+          return false;
+        }
+      } else { // not SuperScalar
+        if (stage.claimed) {
+          logger.log(Level.INFO, "NonSuperScalarPipelineStage is not empty yet!");
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
   public void join() throws InterruptedException {
     synchronized (this) {
       joiningThread = Thread.currentThread();

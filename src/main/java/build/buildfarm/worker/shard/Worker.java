@@ -89,6 +89,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.UserPrincipal;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -111,6 +112,8 @@ public class Worker extends LoggingMain {
 
   private static final int shutdownWaitTimeInSeconds = 10;
   private final boolean isCasShard;
+
+  private boolean inGracefulShutdown = false;
 
   private final ShardWorkerConfig config;
   private final ShardWorkerInstance instance;
@@ -222,6 +225,49 @@ public class Worker extends LoggingMain {
 
   public Worker(String session, ShardWorkerConfig config) throws ConfigurationException {
     this(session, ServerBuilder.forPort(config.getPort()), config);
+  }
+
+  /**
+   * The method will prepare the worker for graceful shutdown and send out grpc request to disable
+   * scale in protection when the worker is ready. If unexpected errors happened, it will cancel the
+   * graceful shutdown progress make the worker available again.
+   */
+  public void shutDownWorkerGracefully() {
+    inGracefulShutdown = true;
+    logger.log(Level.INFO, "The current worker is deregistered and should be shutdown gracefully!");
+    int scanRate = 30; // check every 30 seconds
+    int timeWaited = 0;
+    int timeOut = 60 * 15; // 15 minutes
+
+    try {
+      while (!pipeline.isEmpty() && timeWaited < timeOut) {
+        SECONDS.sleep(scanRate);
+        timeWaited += scanRate;
+      }
+    } catch (InterruptedException e) {
+      logger.log(Level.SEVERE, "The worker gracefully shutdown is interrupted: " + e.getMessage());
+    } finally {
+      // make a grpc call to disable scale protection
+      String clusterId = config.getAdminConfig().getClusterId();
+      logger.log(
+          INFO,
+          String.format(
+              "It took the worker %d seconds to %s",
+              timeWaited,
+              pipeline.isEmpty() ? "finish all actions" : "but still cannot finish all actions"));
+      try {
+        AdminServiceClient.disableScaleInProtection(clusterId, config.getPublicName());
+      } catch (Exception e) {
+        logger.log(
+            SEVERE,
+            String.format(
+                "gRPC call to AdminService to disable scale in protection failed with exception: %s and stacktrace %s",
+                e.getMessage(), Arrays.toString(e.getStackTrace())));
+        // Gracefully shutdown cannot be performed successfully because of error in
+        // AdminService side. Under this scenario, the worker has to be added back to worker pool.
+        inGracefulShutdown = false;
+      }
+    }
   }
 
   private static Path getValidRoot(ShardWorkerConfig config) throws ConfigurationException {
@@ -391,6 +437,7 @@ public class Worker extends LoggingMain {
                     context,
                     completeStage,
                     backplane))
+            .addService(new ShutDownWorkerGracefully(this, config))
             .build();
 
     logger.log(INFO, String.format("%s initialized", identifier));
@@ -790,7 +837,7 @@ public class Worker extends LoggingMain {
 
               void registerIfExpired() {
                 long now = System.currentTimeMillis();
-                if (now >= workerRegistrationExpiresAt) {
+                if (now >= workerRegistrationExpiresAt && !inGracefulShutdown) {
                   // worker must be registered to match
                   addWorker(nextRegistration(now));
                   // update every 10 seconds

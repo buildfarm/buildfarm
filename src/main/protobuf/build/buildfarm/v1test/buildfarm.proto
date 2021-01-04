@@ -43,6 +43,10 @@ service Admin {
   rpc DeregisterWorker(DeregisterWorkerRequest) returns (DeregisterWorkerRequestResults) {
     option (google.api.http) = { get: "/v1test/admin:deregisterWorker" };
   }
+
+  rpc DisableScaleInProtection(DisableScaleInProtectionRequest) returns (DisableScaleInProtectionRequestResults) {
+    option (google.api.http) = { get: "/v1test/admin:disableScaleInProtection" };
+  }
 }
 
 message DeregisterWorkerRequest {
@@ -52,6 +56,13 @@ message DeregisterWorkerRequest {
 }
 
 message DeregisterWorkerRequestResults {
+}
+
+message DisableScaleInProtectionRequest{
+  string instance_name = 1;
+}
+
+message DisableScaleInProtectionRequestResults{
 }
 
 message ReindexCasRequest {
@@ -233,10 +244,14 @@ message LogMetricsConfig {
 message AdminConfig {
   string deployment_environment = 1;
 
+  string cluster_id = 4;
+
   oneof type {
     AwsAdminConfig aws_admin_config = 2;
     GcpAdminConfig gcp_admin_config = 3;
   }
+
+  bool enable_graceful_shutdown = 5;
 }
 
 message AwsAdminConfig {
@@ -605,6 +620,8 @@ message ShardWorkerConfig {
   bool omit_from_cas = 33;
   
   bool error_operation_remaining_resources = 34;
+
+  AdminConfig admin_config = 35;
 }
 
 message ShardWorker {
@@ -1013,3 +1030,17 @@ service WorkerProfile {
 
   rpc GetWorkerList(WorkerListRequest) returns (WorkerListMessage) {}
 }
+
+message ShutDownWorkerGracefullyRequest {
+  string instance_name = 1;
+
+  string worker_name = 2;
+}
+
+message ShutDownWorkerGracefullyResults {
+}
+
+service ShutDownWorker {
+  rpc ShutDownWorkerGracefully(ShutDownWorkerGracefullyRequest) returns (ShutDownWorkerGracefullyResults) {}
+}
+

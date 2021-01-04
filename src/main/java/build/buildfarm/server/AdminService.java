@@ -25,6 +25,8 @@ import build.buildfarm.v1test.AdminConfig;
 import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.DeregisterWorkerRequest;
 import build.buildfarm.v1test.DeregisterWorkerRequestResults;
+import build.buildfarm.v1test.DisableScaleInProtectionRequest;
+import build.buildfarm.v1test.DisableScaleInProtectionRequestResults;
 import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.GetHostsRequest;
@@ -178,6 +180,24 @@ public class AdminService extends AdminGrpc.AdminImplBase {
           e);
       responseObserver.onError(io.grpc.Status.fromThrowable(e).asException());
     }
+  }
+
+  /**
+   * Server-side implementation of disableScaleProtection.
+   *
+   * @param request grpc request
+   * @param responseObserver grpc response observer
+   */
+  @Override
+  public void disableScaleInProtection(
+      DisableScaleInProtectionRequest request,
+      StreamObserver<DisableScaleInProtectionRequestResults> responseObserver) {
+    try {
+      adminController.disableHostScaleInProtection(request.getInstanceName());
+    } catch (RuntimeException e) {
+      responseObserver.onError(e);
+    }
+    responseObserver.onCompleted();
   }
 
   private static Admin getAdminController(AdminConfig config) {
