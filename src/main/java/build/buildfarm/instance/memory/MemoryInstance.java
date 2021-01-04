@@ -811,10 +811,10 @@ public class MemoryInstance extends AbstractServerInstance {
 
       String operationName = operation.getName();
 
-      DequeueMatchSettings settings = new DequeueMatchSettings();
+      DequeueMatchSettings matchSettings = new DequeueMatchSettings();
       if (command == null) {
-        cancelOperation(operationName);
-      } else if (DequeueMatchEvaluator.shouldKeepOperation(settings, provisions, command)) {
+        cancelOperation(operationName, settings);
+      } else if (DequeueMatchEvaluator.shouldKeepOperation(matchSettings, provisions, command)) {
         QueuedOperation queuedOperation =
             QueuedOperation.newBuilder()
                 .setAction(action)

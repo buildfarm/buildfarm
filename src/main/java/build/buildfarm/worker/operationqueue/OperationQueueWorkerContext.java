@@ -44,6 +44,7 @@ import build.buildfarm.instance.stub.ByteStreamUploader;
 import build.buildfarm.instance.stub.Chunker;
 import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.v1test.ExecutionPolicy;
+import build.buildfarm.v1test.PlatformValidationSettings;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.WorkerConfig;
@@ -121,7 +122,7 @@ class OperationQueueWorkerContext implements WorkerContext {
 
   @Override
   public boolean shouldErrorOperationOnRemainingResources() {
-    return config.getErrorOperationRemainingResources();
+    return config.getPlatformValidationSettings().getErrorOperationRemainingResources();
   }
 
   @Override
@@ -335,8 +336,10 @@ class OperationQueueWorkerContext implements WorkerContext {
   }
 
   @Override
-  public boolean putOperation(Operation operation, Action action) throws InterruptedException {
-    return oq.put(operation);
+  public boolean putOperation(
+      Operation operation, PlatformValidationSettings settings, Action action)
+      throws InterruptedException {
+    return oq.put(operation, settings);
   }
 
   // doesn't belong in CAS or AC, must be in OQ
