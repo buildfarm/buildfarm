@@ -253,10 +253,12 @@ public class Worker extends LoggingMain {
                 + "The worker won't be shut down");
         return;
       }
-      logger.log(INFO, String.format(
-          "It took the worker %d seconds to %s",
-          timeWaited,
-          pipeline.isEmpty()? "finish all actions" : "but still cannot finish all actions"));
+      logger.log(
+          INFO,
+          String.format(
+              "It took the worker %d seconds to %s",
+              timeWaited,
+              pipeline.isEmpty() ? "finish all actions" : "but still cannot finish all actions"));
       AdminServiceClient.disableScaleInProtection(clusterId, config.getPublicName());
     }
   }

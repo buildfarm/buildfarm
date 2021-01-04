@@ -19,6 +19,7 @@ import build.buildfarm.v1test.GetHostsResult;
 import build.buildfarm.v1test.Host;
 import com.amazonaws.services.autoscaling.AmazonAutoScaling;
 import com.amazonaws.services.autoscaling.AmazonAutoScalingClientBuilder;
+import com.amazonaws.services.autoscaling.model.AutoScalingGroup;
 import com.amazonaws.services.autoscaling.model.InstancesDistribution;
 import com.amazonaws.services.autoscaling.model.MixedInstancesPolicy;
 import com.amazonaws.services.autoscaling.model.SetInstanceProtectionRequest;
@@ -152,17 +153,12 @@ public class AwsAdmin implements Admin {
   }
 
   @Override
-  public void disableHostProtection(String scaleGroupName, String hostId) {
-    SetInstanceProtectionRequest disableRequest =
-        new SetInstanceProtectionRequest()
-            .withInstanceIds(hostId)
-            .withAutoScalingGroupName(scaleGroupName)
-            .withProtectedFromScaleIn(false);
-    SetInstanceProtectionResult response = scale.setInstanceProtection(disableRequest);
-    logger.log(
-        Level.INFO,
-        String.format(
-            "Disable protection of host: %s in AutoScalingGroup: %s and get result: %s",
-            hostId, scaleGroupName, response.toString()));
+  public void disableHostScaleInProtection(String instanceName) {
+
+    //logger.log(
+    //    Level.INFO,
+    //    String.format(
+    //        "Disable protection of host: %s in AutoScalingGroup: %s and get result: %s",
+    //        hostId, scaleGroupName, response.toString()));
   }
 }

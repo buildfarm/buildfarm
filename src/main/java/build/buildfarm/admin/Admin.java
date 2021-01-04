@@ -30,5 +30,5 @@ public interface Admin {
       Integer targetHosts,
       Integer targetReservedHostsPercent);
 
-  void disableHostProtection(String scaleGroupName, String hostId);
+  void disableHostScaleInProtection(String instanceName);
 }
