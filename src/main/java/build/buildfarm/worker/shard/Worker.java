@@ -249,35 +249,24 @@ public class Worker extends LoggingMain {
     } finally {
       // make a grpc call to disable scale protection
       String clusterId = config.getAdminConfig().getClusterId();
-      if (clusterId == null || clusterId.equals("")) {
+      logger.log(
+          INFO,
+          String.format(
+              "It took the worker %d seconds to %s",
+              timeWaited,
+              pipeline.isEmpty() ? "finish all actions" : "but still cannot finish all actions"));
+      try {
+        AdminServiceClient.disableScaleInProtection(clusterId, config.getPublicName());
+      } catch (Exception e) {
         logger.log(
             SEVERE,
-            "cluster_id of AdminConfig in ShardWorkerConfig is not set, "
-                + " the worker cannot disable scale in protection through grpc call to AdminService. "
-                + "The worker won't be shut down and will be added back to worker pool.");
-        // Graceful shutdown has to be cancelled as cluster_id is missing.
+            String.format(
+                "gRPC call to AdminService to disable scale in protection failed with exception: %s and stacktrace %s",
+                e.getMessage(), Arrays.toString(e.getStackTrace())));
+        // Similarly, gracefully shutdown cannot be performed successfully because of error in
+        // AdminService side.
         // Under this scenario, the worker has to be added back to worker pool.
         inGracefulShutdown = false;
-      } else {
-        logger.log(
-            INFO,
-            String.format(
-                "It took the worker %d seconds to %s",
-                timeWaited,
-                pipeline.isEmpty() ? "finish all actions" : "but still cannot finish all actions"));
-        try {
-          AdminServiceClient.disableScaleInProtection(clusterId, config.getPublicName());
-        } catch (Exception e) {
-          logger.log(
-              SEVERE,
-              String.format(
-                  "gRPC call to AdminService to disable scale in protection failed with exception: %s and stacktrace %s",
-                  e.getMessage(), Arrays.toString(e.getStackTrace())));
-          // Similarly, gracefully shutdown cannot be performed successfully because of error in
-          // AdminService side.
-          // Under this scenario, the worker has to be added back to worker pool.
-          inGracefulShutdown = false;
-        }
       }
     }
   }
@@ -449,7 +438,7 @@ public class Worker extends LoggingMain {
                     context,
                     completeStage,
                     backplane))
-            .addService(new ShutDownWorkerGracefully(this))
+            .addService(new ShutDownWorkerGracefully(this, config))
             .build();
 
     logger.log(INFO, String.format("%s initialized", identifier));
