@@ -189,7 +189,7 @@ public class UploadOutputsTest {
 
   private void uploadOutputs(Iterable<String> files, Iterable<String> directories)
       throws IOException, InterruptedException {
-    Worker.uploadOutputs(
+    OperationQueueWorkerContext.uploadOutputs(
         resultBuilder,
         DIGEST_UTIL,
         root,

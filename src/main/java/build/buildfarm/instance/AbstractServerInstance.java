@@ -51,6 +51,7 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.bazel.remote.execution.v2.SymlinkAbsolutePathStrategy;
+import build.bazel.remote.execution.v2.SymlinkNode;
 import build.buildfarm.ac.ActionCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
@@ -617,7 +618,7 @@ public abstract class AbstractServerInstance implements Instance {
       }
       /* FIXME serverside validity check? regex?
       Preconditions.checkState(
-          fileName.isValidFilename(),
+          isValidFilename(fileName),
           INVALID_FILE_NAME);
       */
       lastFileName = fileName;
@@ -626,6 +627,34 @@ public abstract class AbstractServerInstance implements Instance {
       onInputDigest.accept(fileNode.getDigest());
       String filePath = directoryPath.isEmpty() ? fileName : (directoryPath + "/" + fileName);
       onInputFile.accept(filePath);
+    }
+    String lastSymlinkName = "";
+    for (SymlinkNode symlinkNode : directory.getSymlinksList()) {
+      String symlinkName = symlinkNode.getName();
+      if (entryNames.contains(symlinkName)) {
+        preconditionFailure
+            .addViolationsBuilder()
+            .setType(VIOLATION_TYPE_INVALID)
+            .setSubject("/" + directoryPath + ": " + symlinkName)
+            .setDescription(DUPLICATE_DIRENT);
+      } else if (lastSymlinkName.compareTo(symlinkName) > 0) {
+        preconditionFailure
+            .addViolationsBuilder()
+            .setType(VIOLATION_TYPE_INVALID)
+            .setSubject("/" + directoryPath + ": " + lastSymlinkName + " > " + symlinkName)
+            .setDescription(DIRECTORY_NOT_SORTED);
+      }
+      /* FIXME serverside validity check? regex?
+      Preconditions.checkState(
+          isValidFilename(symlinkName),
+          INVALID_FILE_NAME);
+      Preconditions.checkState(
+          isValidFilename(symlinkNode.getTarget()),
+          INVALID_FILE_NAME);
+      // FIXME verify that any relative pathing for the target is within the input root
+      */
+      lastSymlinkName = symlinkName;
+      entryNames.add(symlinkName);
     }
     String lastDirectoryName = "";
     for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
@@ -646,7 +675,7 @@ public abstract class AbstractServerInstance implements Instance {
       }
       /* FIXME serverside validity check? regex?
       Preconditions.checkState(
-          directoryName.isValidFilename(),
+          isValidFilename(directoryName),
           INVALID_FILE_NAME);
       */
       lastDirectoryName = directoryName;

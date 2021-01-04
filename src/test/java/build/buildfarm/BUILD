@@ -1,3 +1,5 @@
+load("//:defs.bzl", "ensure_accurate_metadata")
+
 filegroup(
     name = "configs",
     srcs = glob(["logging.properties"]),
@@ -65,6 +67,7 @@ java_test(
         "@maven//:io_grpc_grpc_testing",
         "@maven//:org_mockito_mockito_core",
     ],
+    jvm_flags = ensure_accurate_metadata(),
 )
 
 java_test(
@@ -140,6 +143,7 @@ java_test(
         "@maven//:org_mockito_mockito_core",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
+    jvm_flags = ensure_accurate_metadata(),
 )
 
 config_setting(
@@ -473,6 +477,7 @@ java_test(
         "common/redis/ProvisionedRedisQueueTest.java",
         "common/redis/RedisNodeHashesMockTest.java",
         "common/redis/RedisQueueMockTest.java",
+        "common/redis/RedisMapMockTest.java",
         "common/redis/RedisSlotToHashTest.java",
     ],
     test_class = "build.buildfarm.AllTests",
