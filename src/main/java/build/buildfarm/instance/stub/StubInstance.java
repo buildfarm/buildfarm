@@ -71,8 +71,6 @@ import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.AdminGrpc.AdminBlockingStub;
 import build.buildfarm.v1test.DeregisterWorkerRequest;
 import build.buildfarm.v1test.DeregisterWorkerRequestResults;
-import build.buildfarm.v1test.DrainWorkerPipelineRequest;
-import build.buildfarm.v1test.DrainWorkerPipelineResults;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.OperationQueueGrpc.OperationQueueBlockingStub;
@@ -82,8 +80,10 @@ import build.buildfarm.v1test.PollOperationRequest;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.ReindexCasRequest;
 import build.buildfarm.v1test.ReindexCasRequestResults;
-import build.buildfarm.v1test.ShutDownWorkerGracefullyGrpc;
-import build.buildfarm.v1test.ShutDownWorkerGracefullyGrpc.ShutDownWorkerGracefullyBlockingStub;
+import build.buildfarm.v1test.ShutDownWorkerGracefullyRequest;
+import build.buildfarm.v1test.ShutDownWorkerGracefullyResults;
+import build.buildfarm.v1test.ShutDownWorkerGrpc;
+import build.buildfarm.v1test.ShutDownWorkerGrpc.ShutDownWorkerBlockingStub;
 import build.buildfarm.v1test.TakeOperationRequest;
 import build.buildfarm.v1test.Tree;
 import build.buildfarm.v1test.WorkerListMessage;
@@ -299,15 +299,14 @@ public class StubInstance implements Instance {
             }
           });
 
-  private final Supplier<ShutDownWorkerGracefullyBlockingStub>
-      shutDownWorkerGracefullyBlockingStub =
-          Suppliers.memoize(
-              new Supplier<ShutDownWorkerGracefullyBlockingStub>() {
-                @Override
-                public ShutDownWorkerGracefullyBlockingStub get() {
-                  return ShutDownWorkerGracefullyGrpc.newBlockingStub(channel);
-                }
-              });
+  private final Supplier<ShutDownWorkerBlockingStub> shutDownWorkerBlockingStub =
+      Suppliers.memoize(
+          new Supplier<ShutDownWorkerBlockingStub>() {
+            @Override
+            public ShutDownWorkerBlockingStub get() {
+              return ShutDownWorkerGrpc.newBlockingStub(channel);
+            }
+          });
 
   private <T extends AbstractStub<T>> T deadlined(Supplier<T> getter) {
     T stub = getter.get();
@@ -869,10 +868,10 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public DrainWorkerPipelineResults drainWorkerPipeline(String worker) {
+  public ShutDownWorkerGracefullyResults shutDownWorkerGracefully(String worker) {
     throwIfStopped();
-    return shutDownWorkerGracefullyBlockingStub
+    return shutDownWorkerBlockingStub
         .get()
-        .drainWorkerPipeline(DrainWorkerPipelineRequest.newBuilder().build());
+        .shutDownWorkerGracefully(ShutDownWorkerGracefullyRequest.newBuilder().build());
   }
 }

@@ -1031,16 +1031,16 @@ service WorkerProfile {
   rpc GetWorkerList(WorkerListRequest) returns (WorkerListMessage) {}
 }
 
-message DrainWorkerPipelineRequest {
+message ShutDownWorkerGracefullyRequest {
   string instance_name = 1;
 
   string worker_name = 2;
 }
 
-message DrainWorkerPipelineResults {
+message ShutDownWorkerGracefullyResults {
 }
 
-service ShutDownWorkerGracefully {
-  rpc DrainWorkerPipeline(DrainWorkerPipelineRequest) returns (DrainWorkerPipelineResults) {}
+service ShutDownWorker {
+  rpc ShutDownWorkerGracefully(ShutDownWorkerGracefullyRequest) returns (ShutDownWorkerGracefullyResults) {}
 }
 

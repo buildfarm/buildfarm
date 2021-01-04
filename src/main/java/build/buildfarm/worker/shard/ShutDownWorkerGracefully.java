@@ -14,14 +14,13 @@
 
 package build.buildfarm.worker.shard;
 
-import build.buildfarm.v1test.DrainWorkerPipelineRequest;
-import build.buildfarm.v1test.DrainWorkerPipelineResults;
-import build.buildfarm.v1test.ShutDownWorkerGracefullyGrpc;
+import build.buildfarm.v1test.ShutDownWorkerGracefullyRequest;
+import build.buildfarm.v1test.ShutDownWorkerGracefullyResults;
+import build.buildfarm.v1test.ShutDownWorkerGrpc;
 import io.grpc.stub.StreamObserver;
 import java.util.concurrent.CompletableFuture;
 
-public class ShutDownWorkerGracefully
-    extends ShutDownWorkerGracefullyGrpc.ShutDownWorkerGracefullyImplBase {
+public class ShutDownWorkerGracefully extends ShutDownWorkerGrpc.ShutDownWorkerImplBase {
   private final Worker worker;
 
   public ShutDownWorkerGracefully(Worker worker) {
@@ -29,12 +28,12 @@ public class ShutDownWorkerGracefully
   }
 
   @Override
-  public void drainWorkerPipeline(
-      DrainWorkerPipelineRequest request,
-      StreamObserver<DrainWorkerPipelineResults> responseObserver) {
+  public void shutDownWorkerGracefully(
+      ShutDownWorkerGracefullyRequest request,
+      StreamObserver<ShutDownWorkerGracefullyResults> responseObserver) {
     try {
       CompletableFuture.runAsync(worker::shutDownWorkerGracefully);
-      responseObserver.onNext(DrainWorkerPipelineResults.newBuilder().build());
+      responseObserver.onNext(ShutDownWorkerGracefullyResults.newBuilder().build());
       responseObserver.onCompleted();
     } catch (Exception e) {
       responseObserver.onError(e);

@@ -152,6 +152,11 @@ public class AwsAdmin implements Admin {
     return (cal.getTime().getTime() - launchTime.getTime()) / 60000;
   }
 
+  /**
+   * Disable instance scale in protection so that auto scaler can shutdown the instance.
+   *
+   * @param privateDnsName the private Dns name of instance (i.e. ip-xx-xxx-xx-xx.ec2.internal)
+   */
   @Override
   public void disableHostScaleInProtection(String privateDnsName) {
 

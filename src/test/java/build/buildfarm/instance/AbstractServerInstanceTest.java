@@ -39,9 +39,9 @@ import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
 import build.buildfarm.operations.FindOperationsResults;
-import build.buildfarm.v1test.DrainWorkerPipelineResults;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationsStatus;
+import build.buildfarm.v1test.ShutDownWorkerGracefullyResults;
 import build.buildfarm.v1test.WorkerListMessage;
 import build.buildfarm.v1test.WorkerProfileMessage;
 import com.google.common.collect.ImmutableList;
@@ -196,7 +196,7 @@ public class AbstractServerInstanceTest {
     }
 
     @Override
-    public DrainWorkerPipelineResults drainWorkerPipeline(String worker) {
+    public ShutDownWorkerGracefullyResults shutDownWorkerGracefully(String worker) {
       throw new UnsupportedOperationException();
     }
   }
