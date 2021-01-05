@@ -238,10 +238,11 @@ class ShardWorkerContext implements WorkerContext {
           } catch (IOException e) {
             logger.log(Level.SEVERE, format("%s: poller: error while polling %s", name, operationName), e);
           }
-
-          logger.log(Level.INFO, format("%s: poller: Completed Poll for %s: %s", name, operationName, success ? "OK" : "Failed"));
           if (!success) {
+            logger.log(Level.INFO, format("%s: poller: Completed Poll for %s: Failed", name, operationName));
             onFailure.run();
+          } else {
+            logger.log(Level.INFO, format("%s: poller: Completed Poll for %s: OK", name, operationName));
           }
           return success;
         },
