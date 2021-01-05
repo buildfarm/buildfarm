@@ -137,6 +137,7 @@ public class ShardInstanceTest {
             /* dispatchedMonitorIntervalSeconds=*/ 0,
             /* runOperationQueuer=*/ false,
             /* maxBlobSize=*/ 0,
+            /* maxCpu=*/ 1,
             /* maxActionTimeout=*/ Duration.getDefaultInstance(),
             mockOnStop,
             CacheBuilder.newBuilder().build(mockInstanceLoader),

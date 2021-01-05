@@ -173,6 +173,7 @@ public class ShardInstance extends AbstractServerInstance {
 
   private final Random rand = new Random();
   private final Writes writes = new Writes(this::writeInstanceSupplier);
+  private final int maxCpu;
 
   private final ListeningExecutorService operationTransformService =
       listeningDecorator(newFixedThreadPool(24));
@@ -256,6 +257,7 @@ public class ShardInstance extends AbstractServerInstance {
         config.getDispatchedMonitorIntervalSeconds(),
         config.getRunOperationQueuer(),
         config.getMaxBlobSize(),
+        config.getMaxCpu(),
         config.getMaximumActionTimeout(),
         onStop,
         WorkerStubs.create(digestUtil, getGrpcTimeout(config)),
@@ -271,6 +273,7 @@ public class ShardInstance extends AbstractServerInstance {
       int dispatchedMonitorIntervalSeconds,
       boolean runOperationQueuer,
       long maxBlobSize,
+      int maxCpu,
       Duration maxActionTimeout,
       Runnable onStop,
       com.google.common.cache.LoadingCache<String, Instance> workerStubs,
@@ -289,6 +292,7 @@ public class ShardInstance extends AbstractServerInstance {
     this.workerStubs = workerStubs;
     this.onStop = onStop;
     this.maxBlobSize = maxBlobSize;
+    this.maxCpu = maxCpu;
     this.maxActionTimeout = maxActionTimeout;
     this.actionCacheFetchService = actionCacheFetchService;
     backplane.setOnUnsubscribe(this::stop);
@@ -1400,7 +1404,7 @@ public class ShardInstance extends AbstractServerInstance {
       if (property.getName().equals("min-cores") || property.getName().equals("max-cores")) {
         try {
           int intValue = Integer.parseInt(property.getValue());
-          if (intValue <= 0 || intValue > 80) {
+          if (intValue <= 0 || intValue > maxCpu) {
             preconditionFailure
                 .addViolationsBuilder()
                 .setType(VIOLATION_TYPE_INVALID)
