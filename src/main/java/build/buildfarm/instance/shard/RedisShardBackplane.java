@@ -157,7 +157,7 @@ public class RedisShardBackplane implements ShardBackplane {
   private RedisMap actionCache;
   private BalancedRedisQueue prequeue;
   private OperationQueue operationQueue;
-  private CasWorkerMap casWorkerMap;
+  private AbstractCasWorkerMap casWorkerMap;
 
   public RedisShardBackplane(
       RedisShardBackplaneConfig config,
@@ -525,10 +525,11 @@ public class RedisShardBackplane implements ShardBackplane {
 
     if (config.getCacheCas()) {
       redissonClient = createRedissonClient(config);
+      casWorkerMap =
+          new RedissonCasWorkerMap(redissonClient, config.getCasPrefix(), config.getCasExpire());
+    } else {
+      casWorkerMap = new JedisCasWorkerMap(config.getCasPrefix(), config.getCasExpire());
     }
-    casWorkerMap =
-        new CasWorkerMap(
-            redissonClient, config.getCasPrefix(), config.getCasExpire(), config.getCacheCas());
 
     actionCache = createActionCache(client, config);
     prequeue = createPrequeue(client, config);
