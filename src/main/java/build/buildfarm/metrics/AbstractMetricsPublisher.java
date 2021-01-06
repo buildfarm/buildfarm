@@ -75,7 +75,8 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
       }
       return operationRequestMetadata;
     } catch (Exception e) {
-      logger.log(Level.WARNING,
+      logger.log(
+          Level.WARNING,
           String.format("Could not populate request metadata for %s.", operation.getName()),
           e);
       return null;

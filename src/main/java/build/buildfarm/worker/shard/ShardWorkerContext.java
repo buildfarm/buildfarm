@@ -236,18 +236,23 @@ class ShardWorkerContext implements WorkerContext {
             success =
                 operationPoller.poll(queueEntry, stage, System.currentTimeMillis() + 30 * 1000);
           } catch (IOException e) {
-            logger.log(Level.SEVERE, format("%s: poller: error while polling %s", name, operationName), e);
+            logger.log(
+                Level.SEVERE, format("%s: poller: error while polling %s", name, operationName), e);
           }
           if (!success) {
-            logger.log(Level.INFO, format("%s: poller: Completed Poll for %s: Failed", name, operationName));
+            logger.log(
+                Level.INFO,
+                format("%s: poller: Completed Poll for %s: Failed", name, operationName));
             onFailure.run();
           } else {
-            logger.log(Level.INFO, format("%s: poller: Completed Poll for %s: OK", name, operationName));
+            logger.log(
+                Level.INFO, format("%s: poller: Completed Poll for %s: OK", name, operationName));
           }
           return success;
         },
         () -> {
-          logger.log(Level.INFO, format("%s: poller: Deadline expired for %s", name, operationName));
+          logger.log(
+              Level.INFO, format("%s: poller: Deadline expired for %s", name, operationName));
           onFailure.run();
         },
         deadline);
@@ -277,7 +282,10 @@ class ShardWorkerContext implements WorkerContext {
     try {
       return QueuedOperation.parseFrom(queuedOperationBlob);
     } catch (InvalidProtocolBufferException e) {
-        logger.log(Level.WARNING, format("invalid queued operation: %s(%s)",
+      logger.log(
+          Level.WARNING,
+          format(
+              "invalid queued operation: %s(%s)",
               queueEntry.getExecuteEntry().getOperationName(),
               DigestUtil.toString(queuedOperationDigest)));
       return null;
@@ -633,7 +641,10 @@ class ShardWorkerContext implements WorkerContext {
             try {
               digest = getDigestUtil().compute(file);
             } catch (NoSuchFileException e) {
-              logger.log(Level.SEVERE, format("error visiting file %s under output dir %s",
+              logger.log(
+                  Level.SEVERE,
+                  format(
+                      "error visiting file %s under output dir %s",
                       outputDirPath.relativize(file), outputDirPath.toAbsolutePath()),
                   e);
               return FileVisitResult.CONTINUE;
@@ -731,7 +742,7 @@ class ShardWorkerContext implements WorkerContext {
       throws IOException, InterruptedException {
     boolean success = createBackplaneRetrier().execute(() -> instance.putOperation(operation));
     if (success && operation.getDone()) {
-      //TODO: Convert to metrics
+      // TODO: Convert to metrics
       logger.log(Level.INFO, "CompletedOperation: " + operation.getName());
     }
     return success;

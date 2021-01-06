@@ -42,9 +42,12 @@ public class LogMetricsPublisher extends AbstractMetricsPublisher {
   @Override
   public void publishRequestMetadata(Operation operation, RequestMetadata requestMetadata) {
     try {
-      logger.log(logLevel, formatRequestMetadataToJson(populateRequestMetadata(operation, requestMetadata)));
+      logger.log(
+          logLevel,
+          formatRequestMetadataToJson(populateRequestMetadata(operation, requestMetadata)));
     } catch (Exception e) {
-      logger.log(Level.WARNING,
+      logger.log(
+          Level.WARNING,
           String.format("Could not publish request metadata to LOG for %s.", operation.getName()),
           e);
     }

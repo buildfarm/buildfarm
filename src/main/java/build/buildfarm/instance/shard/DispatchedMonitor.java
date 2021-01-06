@@ -71,7 +71,8 @@ class DispatchedMonitor implements Runnable {
     long overdue_amount = now - o.getRequeueAt();
     StringBuilder message = new StringBuilder();
     message.append(
-        String.format("DispatchedMonitor: Testing %s because %dms overdue (%d >= %d)",
+        String.format(
+            "DispatchedMonitor: Testing %s because %dms overdue (%d >= %d)",
             operationName, overdue_amount, now, o.getRequeueAt()));
     logger.log(Level.INFO, message.toString());
   }
