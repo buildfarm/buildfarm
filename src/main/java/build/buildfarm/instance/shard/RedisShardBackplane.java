@@ -443,7 +443,7 @@ public class RedisShardBackplane implements ShardBackplane {
         }
         subscriber.onOperation(operationChannel(operationName), operation, nextExpiresAt(now));
         logger.log(
-            Level.INFO,
+            Level.FINE,
             format(
                 "operation %s done due to %s",
                 operationName, operation == null ? "null" : "completed"));

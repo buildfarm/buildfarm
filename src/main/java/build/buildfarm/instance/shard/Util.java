@@ -147,7 +147,7 @@ public class Util {
           }
         };
     logger.log(
-        Level.INFO,
+        Level.FINE,
         format(
             "scanning through %d workers to find %s",
             workerSet.size(), DigestUtil.toString(digest)));
@@ -201,7 +201,7 @@ public class Util {
             Status status = Status.fromThrowable(t);
             if (status.getCode() == Code.UNAVAILABLE) {
               logger.log(
-                  Level.INFO,
+                  Level.FINE,
                   format(
                       "check missing response for %s to %s was not found for unavailable",
                       DigestUtil.toString(digest), worker));
