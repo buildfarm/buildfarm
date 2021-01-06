@@ -69,19 +69,19 @@ import build.buildfarm.common.grpc.StubWriteOutputStream;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.AdminGrpc.AdminBlockingStub;
-import build.buildfarm.v1test.DeregisterWorkerRequest;
-import build.buildfarm.v1test.DeregisterWorkerRequestResults;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.OperationQueueGrpc.OperationQueueBlockingStub;
 import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.OperationsStatusRequest;
 import build.buildfarm.v1test.PollOperationRequest;
+import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequest;
+import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.ReindexCasRequest;
 import build.buildfarm.v1test.ReindexCasRequestResults;
 import build.buildfarm.v1test.ShutDownWorkerGracefullyRequest;
-import build.buildfarm.v1test.ShutDownWorkerGracefullyResults;
+import build.buildfarm.v1test.ShutDownWorkerGracefullyRequestResults;
 import build.buildfarm.v1test.ShutDownWorkerGrpc;
 import build.buildfarm.v1test.ShutDownWorkerGrpc.ShutDownWorkerBlockingStub;
 import build.buildfarm.v1test.TakeOperationRequest;
@@ -860,18 +860,19 @@ public class StubInstance implements Instance {
   @Override
   public void deregisterWorker(String workerName) {
     throwIfStopped();
-    DeregisterWorkerRequestResults proto =
+    ShutDownWorkerGracefullyRequestResults proto =
         adminBlockingStub
             .get()
-            .deregisterWorker(
-                DeregisterWorkerRequest.newBuilder().setWorkerName(workerName).build());
+            .shutDownWorkerGracefully(
+                ShutDownWorkerGracefullyRequest.newBuilder().setWorkerName(workerName).build());
   }
 
   @Override
-  public ShutDownWorkerGracefullyResults shutDownWorkerGracefully(String worker) {
+  public PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully(String worker) {
     throwIfStopped();
     return shutDownWorkerBlockingStub
         .get()
-        .shutDownWorkerGracefully(ShutDownWorkerGracefullyRequest.newBuilder().build());
+        .prepareWorkerForGracefulShutdown(
+            PrepareWorkerForGracefulShutDownRequest.newBuilder().build());
   }
 }

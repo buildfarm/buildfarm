@@ -16,17 +16,15 @@ package build.buildfarm.worker.shard;
 
 import static java.util.logging.Level.WARNING;
 
+import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequest;
+import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
 import build.buildfarm.v1test.ShardWorkerConfig;
-import build.buildfarm.v1test.ShutDownWorkerGracefullyRequest;
-import build.buildfarm.v1test.ShutDownWorkerGracefullyResults;
 import build.buildfarm.v1test.ShutDownWorkerGrpc;
 import io.grpc.stub.StreamObserver;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
 
 public class ShutDownWorkerGracefully extends ShutDownWorkerGrpc.ShutDownWorkerImplBase {
-  private static final java.util.logging.Logger nettyLogger =
-      java.util.logging.Logger.getLogger("io.grpc.netty");
   private static final Logger logger = Logger.getLogger(ShutDownWorkerGracefully.class.getName());
   private final Worker worker;
   private final ShardWorkerConfig config;
@@ -43,9 +41,9 @@ public class ShutDownWorkerGracefully extends ShutDownWorkerGrpc.ShutDownWorkerI
    * @param responseObserver
    */
   @Override
-  public void shutDownWorkerGracefully(
-      ShutDownWorkerGracefullyRequest request,
-      StreamObserver<ShutDownWorkerGracefullyResults> responseObserver) {
+  public void prepareWorkerForGracefulShutdown(
+      PrepareWorkerForGracefulShutDownRequest request,
+      StreamObserver<PrepareWorkerForGracefulShutDownRequestResults> responseObserver) {
     String clusterId = config.getAdminConfig().getClusterId();
     if (clusterId == null
         || clusterId.equals("")
@@ -61,8 +59,8 @@ public class ShutDownWorkerGracefully extends ShutDownWorkerGrpc.ShutDownWorkerI
     }
 
     try {
-      CompletableFuture.runAsync(worker::shutDownWorkerGracefully);
-      responseObserver.onNext(ShutDownWorkerGracefullyResults.newBuilder().build());
+      CompletableFuture.runAsync(worker::prepareWorkerForGracefulShutdown);
+      responseObserver.onNext(PrepareWorkerForGracefulShutDownRequestResults.newBuilder().build());
       responseObserver.onCompleted();
     } catch (Exception e) {
       responseObserver.onError(e);
