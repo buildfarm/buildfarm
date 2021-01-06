@@ -163,6 +163,13 @@ public class AdminService extends AdminGrpc.AdminImplBase {
     }
   }
 
+  /**
+   * Server-side implementation of ShutDownWorkerGracefully. This will reroute the request to target
+   * worker.
+   *
+   * @param request ShutDownWorkerGracefullyRequest received through grpc
+   * @param responseObserver grpc response observer
+   */
   @Override
   public void shutDownWorkerGracefully(
       ShutDownWorkerGracefullyRequest request,
@@ -182,7 +189,7 @@ public class AdminService extends AdminGrpc.AdminImplBase {
   }
 
   /**
-   * Server-side implementation of disableScaleProtection.
+   * Server-side implementation of disableScaleInProtection.
    *
    * @param request grpc request
    * @param responseObserver grpc response observer

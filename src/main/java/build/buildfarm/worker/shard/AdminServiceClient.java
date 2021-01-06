@@ -16,8 +16,6 @@ package build.buildfarm.worker.shard;
 
 import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.DisableScaleInProtectionRequest;
-import com.google.common.base.Supplier;
-import com.google.common.base.Suppliers;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
@@ -29,22 +27,10 @@ class AdminServiceClient {
     return builder.build();
   }
 
-  private static ManagedChannel channel;
-
-  private static final Supplier<AdminGrpc.AdminBlockingStub> adminBlockingStub =
-      Suppliers.memoize(
-          new Supplier<AdminGrpc.AdminBlockingStub>() {
-            @Override
-            public AdminGrpc.AdminBlockingStub get() {
-              return AdminGrpc.newBlockingStub(channel);
-            }
-          });
-
   public static void disableScaleInProtection(String host, String instanceIp) {
-    channel = createChannel(host);
-    adminBlockingStub
-        .get()
-        .disableScaleInProtection(
-            DisableScaleInProtectionRequest.newBuilder().setInstanceName(instanceIp).build());
+    ManagedChannel channel = createChannel(host);
+    AdminGrpc.AdminBlockingStub adminBlockingStub = AdminGrpc.newBlockingStub(channel);
+    adminBlockingStub.disableScaleInProtection(
+        DisableScaleInProtectionRequest.newBuilder().setInstanceName(instanceIp).build());
   }
 }
