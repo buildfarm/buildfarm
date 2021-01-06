@@ -576,7 +576,7 @@ message ShardWorkerConfig {
   google.protobuf.Duration operation_poll_period = 13;
 
   //settings used to match with operations
-  DequeueMatchSettings dequeue_match_settings = 35;
+  DequeueMatchSettings dequeue_match_settings = 36;
 
   // total size of the inline content for
   // action results
