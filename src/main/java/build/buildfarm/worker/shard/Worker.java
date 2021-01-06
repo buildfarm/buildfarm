@@ -51,6 +51,7 @@ import build.buildfarm.v1test.ContentAddressableStorageConfig;
 import build.buildfarm.v1test.FilesystemCASConfig;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.ShardWorkerConfig;
+import build.buildfarm.worker.DequeueMatchSettings;
 import build.buildfarm.worker.ExecuteActionStage;
 import build.buildfarm.worker.FuseCAS;
 import build.buildfarm.worker.InputFetchStage;
@@ -378,10 +379,15 @@ public class Worker extends LoggingMain {
       writer = new LocalCasWriter();
     }
 
+    DequeueMatchSettings matchSettings = new DequeueMatchSettings();
+    matchSettings.acceptEverything = config.getDequeueMatchSettings().getAcceptEverything();
+    matchSettings.allowUnmatched = config.getDequeueMatchSettings().getAllowUnmatched();
+
     ShardWorkerContext context =
         new ShardWorkerContext(
             config.getPublicName(),
-            config.getPlatform(),
+            matchSettings,
+            config.getDequeueMatchSettings().getPlatform(),
             config.getOperationPollPeriod(),
             backplane::pollOperation,
             config.getInlineContentLimit(),
