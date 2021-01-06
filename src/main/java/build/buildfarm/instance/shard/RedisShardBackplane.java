@@ -325,10 +325,10 @@ public class RedisShardBackplane implements ShardBackplane {
 
     if (!expiringChannels.isEmpty()) {
       logger.log(
-          Level.INFO,
+          Level.FINE,
           format("Scan %d watches, %s, expiresAt: %s", expiringChannels.size(), now, expiresAt));
 
-      logger.log(Level.INFO, "Scan prequeue");
+      logger.log(Level.FINE, "Scan prequeue");
       // scan prequeue, pet watches
       scanPrequeue(jedis, resetChannel);
     }
@@ -337,7 +337,7 @@ public class RedisShardBackplane implements ShardBackplane {
     scanProcessing(jedis, resetChannel, now);
 
     if (!expiringChannels.isEmpty()) {
-      logger.log(Level.INFO, "Scan queue");
+      logger.log(Level.FINE, "Scan queue");
       // scan queue, pet watches
       scanQueue(jedis, resetChannel);
     }
@@ -346,7 +346,7 @@ public class RedisShardBackplane implements ShardBackplane {
     scanDispatching(jedis, resetChannel, now);
 
     if (!expiringChannels.isEmpty()) {
-      logger.log(Level.INFO, "Scan dispatched");
+      logger.log(Level.FINE, "Scan dispatched");
       // scan dispatched pet watches
       scanDispatched(jedis, resetChannel);
     }
@@ -443,7 +443,7 @@ public class RedisShardBackplane implements ShardBackplane {
         }
         subscriber.onOperation(operationChannel(operationName), operation, nextExpiresAt(now));
         logger.log(
-            Level.INFO,
+            Level.FINE,
             format(
                 "operation %s done due to %s",
                 operationName, operation == null ? "null" : "completed"));

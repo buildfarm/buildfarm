@@ -151,7 +151,8 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
     } else {
       try {
         if (expectedCommittedSize >= 0 && expectedCommittedSize != committedSize) {
-          logger.warning(
+          logger.log(
+              Level.WARNING,
               format(
                   "committed size %d did not match expectation for %s "
                       + " after %d requests and %d bytes at offset %d, ignoring it",
@@ -260,7 +261,8 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
       responseObserver.onError(t);
       if (isEntryLimitException) {
         RequestMetadata requestMetadata = TracingMetadataUtils.fromCurrentContext();
-        logger.warning(
+        logger.log(
+            Level.WARNING,
             format(
                 "%s-%s: %s -> %s -> %s: exceeded entry limit for %s",
                 requestMetadata.getToolDetails().getToolName(),

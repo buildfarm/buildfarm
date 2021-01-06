@@ -54,6 +54,7 @@ class ActionCacheRequestCounter {
   private void logRequests() {
     long requestCount = counter.getAndSet(0l);
     if (requestCount > 0) {
+      // TODO: Convert to metrics
       logger.log(Level.INFO, String.format("GetActionResult %d Requests", requestCount));
     }
     schedule();

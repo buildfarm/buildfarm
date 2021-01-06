@@ -77,7 +77,8 @@ class OperationQueueClient {
             ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
             String operationName = executeEntry.getOperationName();
             if (activeOperations.contains(operationName)) {
-              logger.severe(
+              logger.log(
+                  SEVERE,
                   "WorkerContext::match: WARNING matched duplicate operation " + operationName);
               return false;
             }

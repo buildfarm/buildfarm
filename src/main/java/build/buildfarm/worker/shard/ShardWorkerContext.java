@@ -239,14 +239,14 @@ class ShardWorkerContext implements WorkerContext {
             logger.log(
                 Level.SEVERE, format("%s: poller: error while polling %s", name, operationName), e);
           }
-
-          logger.log(
-              Level.INFO,
-              format(
-                  "%s: poller: Completed Poll for %s: %s",
-                  name, operationName, success ? "OK" : "Failed"));
           if (!success) {
+            logger.log(
+                Level.INFO,
+                format("%s: poller: Completed Poll for %s: Failed", name, operationName));
             onFailure.run();
+          } else {
+            logger.log(
+                Level.INFO, format("%s: poller: Completed Poll for %s: OK", name, operationName));
           }
           return success;
         },
@@ -529,12 +529,12 @@ class ShardWorkerContext implements WorkerContext {
       throws IOException, InterruptedException {
     Path outputPath = actionRoot.resolve(outputFile);
     if (!Files.exists(outputPath)) {
-      logger.log(Level.INFO, "ReportResultStage: " + outputFile + " does not exist...");
+      logger.log(Level.FINE, "ReportResultStage: " + outputFile + " does not exist...");
       return;
     }
 
     if (Files.isDirectory(outputPath)) {
-      logger.log(Level.INFO, "ReportResultStage: " + outputFile + " is a directory");
+      logger.log(Level.FINE, "ReportResultStage: " + outputFile + " is a directory");
       preconditionFailure
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
@@ -612,12 +612,12 @@ class ShardWorkerContext implements WorkerContext {
       throws IOException, InterruptedException {
     Path outputDirPath = actionRoot.resolve(outputDir);
     if (!Files.exists(outputDirPath)) {
-      logger.log(Level.INFO, "ReportResultStage: " + outputDir + " does not exist...");
+      logger.log(Level.FINE, "ReportResultStage: " + outputDir + " does not exist...");
       return;
     }
 
     if (!Files.isDirectory(outputDirPath)) {
-      logger.log(Level.INFO, "ReportResultStage: " + outputDir + " is not a directory...");
+      logger.log(Level.FINE, "ReportResultStage: " + outputDir + " is not a directory...");
       preconditionFailure
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
@@ -742,6 +742,7 @@ class ShardWorkerContext implements WorkerContext {
       throws IOException, InterruptedException {
     boolean success = createBackplaneRetrier().execute(() -> instance.putOperation(operation));
     if (success && operation.getDone()) {
+      // TODO: Convert to metrics
       logger.log(Level.INFO, "CompletedOperation: " + operation.getName());
     }
     return success;
