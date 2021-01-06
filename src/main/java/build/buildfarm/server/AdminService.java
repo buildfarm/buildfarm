@@ -23,8 +23,6 @@ import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.v1test.AdminConfig;
 import build.buildfarm.v1test.AdminGrpc;
-import build.buildfarm.v1test.DeregisterWorkerRequest;
-import build.buildfarm.v1test.DeregisterWorkerRequestResults;
 import build.buildfarm.v1test.DisableScaleInProtectionRequest;
 import build.buildfarm.v1test.DisableScaleInProtectionRequestResults;
 import build.buildfarm.v1test.GetClientStartTimeRequest;
@@ -34,6 +32,8 @@ import build.buildfarm.v1test.GetHostsResult;
 import build.buildfarm.v1test.ReindexCasRequest;
 import build.buildfarm.v1test.ReindexCasRequestResults;
 import build.buildfarm.v1test.ScaleClusterRequest;
+import build.buildfarm.v1test.ShutDownWorkerGracefullyRequest;
+import build.buildfarm.v1test.ShutDownWorkerGracefullyRequestResults;
 import build.buildfarm.v1test.StopContainerRequest;
 import build.buildfarm.v1test.TerminateHostRequest;
 import com.google.rpc.Code;
@@ -163,27 +163,33 @@ public class AdminService extends AdminGrpc.AdminImplBase {
     }
   }
 
+  /**
+   * Server-side implementation of ShutDownWorkerGracefully. This will reroute the request to target
+   * worker.
+   *
+   * @param request ShutDownWorkerGracefullyRequest received through grpc
+   * @param responseObserver grpc response observer
+   */
   @Override
-  public void deregisterWorker(
-      DeregisterWorkerRequest request,
-      StreamObserver<DeregisterWorkerRequestResults> responseObserver) {
-    Instance instance;
+  public void shutDownWorkerGracefully(
+      ShutDownWorkerGracefullyRequest request,
+      StreamObserver<ShutDownWorkerGracefullyRequestResults> responseObserver) {
     try {
-      instance = instances.get(request.getInstanceName());
-      instance.deregisterWorker(request.getWorkerName());
-      responseObserver.onNext(DeregisterWorkerRequestResults.newBuilder().build());
+      ShutDownWorker.informWorkerToPrepareForShutdown(request.getWorkerName());
+      responseObserver.onNext(ShutDownWorkerGracefullyRequestResults.newBuilder().build());
       responseObserver.onCompleted();
     } catch (Exception e) {
-      logger.log(
-          Level.SEVERE,
-          String.format("Could not deregister worker: %s", request.getWorkerName()),
-          e);
-      responseObserver.onError(io.grpc.Status.fromThrowable(e).asException());
+      String errorMessage =
+          String.format(
+              "Could not inform the worker %s to prepare for graceful shutdown with error %s.",
+              request.getWorkerName(), e.getMessage());
+      logger.log(Level.SEVERE, errorMessage);
+      responseObserver.onError(new Exception(errorMessage));
     }
   }
 
   /**
-   * Server-side implementation of disableScaleProtection.
+   * Server-side implementation of disableScaleInProtection.
    *
    * @param request grpc request
    * @param responseObserver grpc response observer

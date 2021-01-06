@@ -41,7 +41,7 @@ import build.buildfarm.common.Write;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationsStatus;
-import build.buildfarm.v1test.ShutDownWorkerGracefullyResults;
+import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
 import build.buildfarm.v1test.WorkerListMessage;
 import build.buildfarm.v1test.WorkerProfileMessage;
 import com.google.common.collect.ImmutableList;
@@ -196,7 +196,7 @@ public class AbstractServerInstanceTest {
     }
 
     @Override
-    public ShutDownWorkerGracefullyResults shutDownWorkerGracefully(String worker) {
+    public PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully(String worker) {
       throw new UnsupportedOperationException();
     }
   }
