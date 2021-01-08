@@ -23,28 +23,25 @@ import java.util.List;
 import redis.clients.jedis.util.JedisClusterCRC16;
 
 /**
- * @class   RedisSlotToHash
- * @brief   Get a redis hash tag for the provided slot number.
- * @details Sometimes in redis you want to hash a particular key to a
- *          particular node in the redis cluster. You might decide to do this
- *          in order to distribute data evenly across nodes and balance cpu
- *          utilization. Since redis nodes are decided based on the slot
- *          number that a value hashes to, you can force. A key to land on a
- *          particular node by choosing a redis hashtag which you know
- *          corresponds to the appropriate slot number. The class is used to
- *          convert a slot number to a corresponding string (which when
- *          hashed by redis's crc16 algorithm will return that slot number.
+ * @class RedisSlotToHash
+ * @brief Get a redis hash tag for the provided slot number.
+ * @details Sometimes in redis you want to hash a particular key to a particular node in the redis
+ *     cluster. You might decide to do this in order to distribute data evenly across nodes and
+ *     balance cpu utilization. Since redis nodes are decided based on the slot number that a value
+ *     hashes to, you can force. A key to land on a particular node by choosing a redis hashtag
+ *     which you know corresponds to the appropriate slot number. The class is used to convert a
+ *     slot number to a corresponding string (which when hashed by redis's crc16 algorithm will
+ *     return that slot number.
  */
 public class RedisSlotToHash {
 
   /**
-   * @brief   Convert slot number into string that hashes to slot.
-   * @details A short alphanumeric string will be given which when hashed by
-   *          redis's crc16 algorithm will return the slot number that was
-   *          given.
-   * @param   slotNumber The slot number to find a hashable string for.
-   * @return  The string value to be used in a key's hashtag.
-   * @note    Suggested return identifier: hashtag.
+   * @brief Convert slot number into string that hashes to slot.
+   * @details A short alphanumeric string will be given which when hashed by redis's crc16 algorithm
+   *     will return the slot number that was given.
+   * @param slotNumber The slot number to find a hashable string for.
+   * @return The string value to be used in a key's hashtag.
+   * @note Suggested return identifier: hashtag.
    */
   public static String correlate(long slotNumber) {
     Preconditions.checkState(slotNumber >= 0 && slotNumber < HASHSLOTS);
@@ -52,14 +49,14 @@ public class RedisSlotToHash {
   }
 
   /**
-   * @brief   Dynamically convert a range of slot number into string that
-   *          hashes to a slot within the range.
-   * @details Dynamically generates hashtags and tests them for valid slot
-   *          number. Slower than static lookup, but less code.
-   * @param   start The starting slot range number to find a hashable string for.
-   * @param   end   The ending slot range number to find a hashable string for.
-   * @return  The string value to be used in a key's hashtag.
-   * @note    Suggested return identifier: hashtag.
+   * @brief Dynamically convert a range of slot number into string that hashes to a slot within the
+   *     range.
+   * @details Dynamically generates hashtags and tests them for valid slot number. Slower than
+   *     static lookup, but less code.
+   * @param start The starting slot range number to find a hashable string for.
+   * @param end The ending slot range number to find a hashable string for.
+   * @return The string value to be used in a key's hashtag.
+   * @note Suggested return identifier: hashtag.
    */
   public static String correlateRange(long start, long end) {
     Preconditions.checkState(start >= 0 && end < HASHSLOTS);
@@ -74,15 +71,15 @@ public class RedisSlotToHash {
   }
 
   /**
-   * @brief   Dynamically convert a range of slot number into string that
-   *          hashes to a slot within the range.
-   * @details Dynamically generates hashtags and tests them for valid slot
-   *          number. Slower than static lookup, but less code.
-   * @param   start  The starting slot range number to find a hashable string for.
-   * @param   end    The ending slot range number to find a hashable string for.
-   * @param   prefix A string prefix to include as part of the generated hashtag.
-   * @return  The string value to be used in a key's hashtag.
-   * @note    Suggested return identifier: hashtag.
+   * @brief Dynamically convert a range of slot number into string that hashes to a slot within the
+   *     range.
+   * @details Dynamically generates hashtags and tests them for valid slot number. Slower than
+   *     static lookup, but less code.
+   * @param start The starting slot range number to find a hashable string for.
+   * @param end The ending slot range number to find a hashable string for.
+   * @param prefix A string prefix to include as part of the generated hashtag.
+   * @return The string value to be used in a key's hashtag.
+   * @note Suggested return identifier: hashtag.
    */
   public static String correlateRangeWithPrefix(long start, long end, String prefix) {
     Preconditions.checkState(start >= 0 && end < HASHSLOTS);
@@ -97,23 +94,23 @@ public class RedisSlotToHash {
   }
 
   /**
-   * @brief   Create hashtag.
+   * @brief Create hashtag.
    * @details Combine prefix with a generated number.
-   * @param   prefix    A prefix of the hashtag.
-   * @param   generated A generated number for the balancing the hashtag.
-   * @return  Created hashtag.
-   * @note    Suggested return identifier: hashtag.
+   * @param prefix A prefix of the hashtag.
+   * @param generated A generated number for the balancing the hashtag.
+   * @return Created hashtag.
+   * @note Suggested return identifier: hashtag.
    */
   private static String createHashtag(String prefix, long generated) {
     return String.format("%s:%d", prefix, generated);
   }
 
   /**
-   * @brief   Convert the slot to a hashtag using a static lookup table.
+   * @brief Convert the slot to a hashtag using a static lookup table.
    * @details Fastest, but requires all keys in memory.
-   * @param   slotNumber The slot number to find a hashable string for.
-   * @return  The string value to be used in a key's hashtag.
-   * @note    Suggested return identifier: hashtag.
+   * @param slotNumber The slot number to find a hashable string for.
+   * @return The string value to be used in a key's hashtag.
+   * @note Suggested return identifier: hashtag.
    */
   private static String staticLookup(long slotNumber) {
     List<String> lookupTable = getLookupTable();
@@ -121,13 +118,12 @@ public class RedisSlotToHash {
   }
 
   /**
-   * @brief   A table of the shortest possible alphanumeric string that is
-   *          mapped by redis' crc16 to any given redis cluster slot.
-   * @details The array indices are slot numbers, so that given a desired
-   *          slot, this string is guaranteed to make redis cluster route a
-   *          request to the shard holding this slot.
-   * @return  The hashtags organized by slot index.
-   * @note    Suggested return identifier: lookupTable.
+   * @brief A table of the shortest possible alphanumeric string that is mapped by redis' crc16 to
+   *     any given redis cluster slot.
+   * @details The array indices are slot numbers, so that given a desired slot, this string is
+   *     guaranteed to make redis cluster route a request to the shard holding this slot.
+   * @return The hashtags organized by slot index.
+   * @note Suggested return identifier: lookupTable.
    */
   private static List<String> getLookupTable() {
     List<String> lookupTable = new ArrayList<String>();
@@ -139,13 +135,12 @@ public class RedisSlotToHash {
   }
 
   /**
-   * @brief   A table of the shortest possible alphanumeric string that is
-   *          mapped by redis' crc16 to any given redis cluster slot.
-   * @details The array indices are slot numbers, so that given a desired
-   *          slot, this string is guaranteed to make redis cluster route a
-   *          request to the shard holding this slot.
-   * @return  The hashtags organized by slot index.
-   * @note    Suggested return identifier: lookupTable.
+   * @brief A table of the shortest possible alphanumeric string that is mapped by redis' crc16 to
+   *     any given redis cluster slot.
+   * @details The array indices are slot numbers, so that given a desired slot, this string is
+   *     guaranteed to make redis cluster route a request to the shard holding this slot.
+   * @return The hashtags organized by slot index.
+   * @note Suggested return identifier: lookupTable.
    */
   private static List<String> slots0To4999() {
     List<String> lookupTable =
@@ -542,13 +537,12 @@ public class RedisSlotToHash {
   }
 
   /**
-   * @brief   A table of the shortest possible alphanumeric string that is
-   *          mapped by redis' crc16 to any given redis cluster slot.
-   * @details The array indices are slot numbers, so that given a desired
-   *          slot, this string is guaranteed to make redis cluster route a
-   *          request to the shard holding this slot.
-   * @return  The hashtags organized by slot index.
-   * @note    Suggested return identifier: lookupTable.
+   * @brief A table of the shortest possible alphanumeric string that is mapped by redis' crc16 to
+   *     any given redis cluster slot.
+   * @details The array indices are slot numbers, so that given a desired slot, this string is
+   *     guaranteed to make redis cluster route a request to the shard holding this slot.
+   * @return The hashtags organized by slot index.
+   * @note Suggested return identifier: lookupTable.
    */
   private static List<String> slots5000To9999() {
     List<String> lookupTable =
@@ -945,13 +939,12 @@ public class RedisSlotToHash {
   }
 
   /**
-   * @brief   A table of the shortest possible alphanumeric string that is
-   *          mapped by redis' crc16 to any given redis cluster slot.
-   * @details The array indices are slot numbers, so that given a desired
-   *          slot, this string is guaranteed to make redis cluster route a
-   *          request to the shard holding this slot.
-   * @return  The hashtags organized by slot index.
-   * @note    Suggested return identifier: lookupTable.
+   * @brief A table of the shortest possible alphanumeric string that is mapped by redis' crc16 to
+   *     any given redis cluster slot.
+   * @details The array indices are slot numbers, so that given a desired slot, this string is
+   *     guaranteed to make redis cluster route a request to the shard holding this slot.
+   * @return The hashtags organized by slot index.
+   * @note Suggested return identifier: lookupTable.
    */
   private static List<String> slots10000To14999() {
     List<String> lookupTable =
@@ -1348,13 +1341,12 @@ public class RedisSlotToHash {
   }
 
   /**
-   * @brief   A table of the shortest possible alphanumeric string that is
-   *          mapped by redis' crc16 to any given redis cluster slot.
-   * @details The array indices are slot numbers, so that given a desired
-   *          slot, this string is guaranteed to make redis cluster route a
-   *          request to the shard holding this slot.
-   * @return  The hashtags organized by slot index.
-   * @note    Suggested return identifier: lookupTable.
+   * @brief A table of the shortest possible alphanumeric string that is mapped by redis' crc16 to
+   *     any given redis cluster slot.
+   * @details The array indices are slot numbers, so that given a desired slot, this string is
+   *     guaranteed to make redis cluster route a request to the shard holding this slot.
+   * @return The hashtags organized by slot index.
+   * @note Suggested return identifier: lookupTable.
    */
   private static List<String> slots15000To16383() {
     List<String> lookupTable =

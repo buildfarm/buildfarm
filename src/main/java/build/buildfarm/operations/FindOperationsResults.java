@@ -18,25 +18,25 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * @class   FindOperationsResults
- * @brief   The results from searching for an operation.
+ * @class FindOperationsResults
+ * @brief The results from searching for an operation.
  * @details This will only observe operations; not affect their state.
  */
 public class FindOperationsResults {
 
   /**
-   * @field   operations
-   * @brief   All of the operations found based on the search query.
-   * @details The key is the operation keu, and the value is all the collected
-   *          information about the operation.
+   * @field operations
+   * @brief All of the operations found based on the search query.
+   * @details The key is the operation keu, and the value is all the collected information about the
+   *     operation.
    */
   public Map<String, EnrichedOperation> operations = new HashMap<String, EnrichedOperation>();
 
   /**
-   * @brief   Get a string message for the results.
+   * @brief Get a string message for the results.
    * @details This message is useful for logging.
-   * @return  A message representation of the FindOperationsResults.
-   * @note    Suggested return identifier: message.
+   * @return A message representation of the FindOperationsResults.
+   * @note Suggested return identifier: message.
    */
   public String toMessage() {
     StringBuilder message = new StringBuilder();

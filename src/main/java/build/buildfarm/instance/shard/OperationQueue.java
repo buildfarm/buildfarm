@@ -27,35 +27,34 @@ import java.util.List;
 import redis.clients.jedis.JedisCluster;
 
 /**
- * @class   OperationQueue
- * @brief   The operation queue of the shard backplane.
- * @details The operation queue can be split into multiple queues according
- *          to platform execution information.
+ * @class OperationQueue
+ * @brief The operation queue of the shard backplane.
+ * @details The operation queue can be split into multiple queues according to platform execution
+ *     information.
  */
 public class OperationQueue {
 
   /**
-   * @field   queues
-   * @brief   Different queues based on platform execution requirements.
+   * @field queues
+   * @brief Different queues based on platform execution requirements.
    * @details The appropriate queues are chosen based on given properties.
    */
   private List<ProvisionedRedisQueue> queues;
 
   /**
-   * @brief   Constructor.
-   * @details Construct the operation queue with various provisioned redis
-   *          queues.
-   * @param   queues Provisioned queues.
+   * @brief Constructor.
+   * @details Construct the operation queue with various provisioned redis queues.
+   * @param queues Provisioned queues.
    */
   public OperationQueue(List<ProvisionedRedisQueue> queues) {
     this.queues = queues;
   }
 
   /**
-   * @brief   Visit each element in the dequeue.
+   * @brief Visit each element in the dequeue.
    * @details Enacts a visitor over each element in the dequeue.
-   * @param   jedis   Jedis cluster client.
-   * @param   visitor A visitor for each visited element in the queue.
+   * @param jedis Jedis cluster client.
+   * @param visitor A visitor for each visited element in the queue.
    */
   public void visitDequeue(JedisCluster jedis, StringVisitor visitor) {
     for (ProvisionedRedisQueue provisionedQueue : queues) {
@@ -64,13 +63,12 @@ public class OperationQueue {
   }
 
   /**
-   * @brief   Remove element from dequeue.
-   * @details Removes an element from the dequeue and specifies whether it was
-   *          removed.
-   * @param   jedis Jedis cluster client.
-   * @param   val   The value to remove.
-   * @return  Whether or not the value was removed.
-   * @note    Suggested return identifier: wasRemoved.
+   * @brief Remove element from dequeue.
+   * @details Removes an element from the dequeue and specifies whether it was removed.
+   * @param jedis Jedis cluster client.
+   * @param val The value to remove.
+   * @return Whether or not the value was removed.
+   * @note Suggested return identifier: wasRemoved.
    */
   public boolean removeFromDequeue(JedisCluster jedis, String val) {
     for (ProvisionedRedisQueue provisionedQueue : queues) {
@@ -82,10 +80,10 @@ public class OperationQueue {
   }
 
   /**
-   * @brief   Visit each element in the queue.
+   * @brief Visit each element in the queue.
    * @details Enacts a visitor over each element in the queue.
-   * @param   jedis   Jedis cluster client.
-   * @param   visitor A visitor for each visited element in the queue.
+   * @param jedis Jedis cluster client.
+   * @param visitor A visitor for each visited element in the queue.
    */
   public void visit(JedisCluster jedis, StringVisitor visitor) {
     for (ProvisionedRedisQueue provisionedQueue : queues) {
@@ -94,11 +92,11 @@ public class OperationQueue {
   }
 
   /**
-   * @brief   Get size.
+   * @brief Get size.
    * @details Checks the current length of the queue.
-   * @param   jedis Jedis cluster client.
-   * @return  The current length of the queue.
-   * @note    Suggested return identifier: length.
+   * @param jedis Jedis cluster client.
+   * @return The current length of the queue.
+   * @note Suggested return identifier: length.
    */
   public long size(JedisCluster jedis) {
     // the accumulated size of all of the queues
@@ -106,27 +104,25 @@ public class OperationQueue {
   }
 
   /**
-   * @brief   Get dequeue name.
-   * @details Get the name of the internal dequeue used by the queue. since
-   *          each internal queue has their own dequeue, this name is generic
-   *          without the hashtag.
-   * @return  The name of the queue.
-   * @note    Overloaded.
-   * @note    Suggested return identifier: name.
+   * @brief Get dequeue name.
+   * @details Get the name of the internal dequeue used by the queue. since each internal queue has
+   *     their own dequeue, this name is generic without the hashtag.
+   * @return The name of the queue.
+   * @note Overloaded.
+   * @note Suggested return identifier: name.
    */
   public String getDequeueName() {
     return "operation_dequeue";
   }
 
   /**
-   * @brief   Get dequeue name.
-   * @details Get the name of the internal dequeue used by the queue. since
-   *          each internal queue has their own dequeue, this name is generic
-   *          without the hashtag.
-   * @param   provisions Provisions used to select an eligible queue.
-   * @return  The name of the queue.
-   * @note    Overloaded.
-   * @note    Suggested return identifier: name.
+   * @brief Get dequeue name.
+   * @details Get the name of the internal dequeue used by the queue. since each internal queue has
+   *     their own dequeue, this name is generic without the hashtag.
+   * @param provisions Provisions used to select an eligible queue.
+   * @return The name of the queue.
+   * @note Overloaded.
+   * @note Suggested return identifier: name.
    */
   public String getDequeueName(List<Platform.Property> provisions) {
     BalancedRedisQueue queue = chooseEligibleQueue(provisions);
@@ -134,11 +130,11 @@ public class OperationQueue {
   }
 
   /**
-   * @brief   Push a value onto the queue.
+   * @brief Push a value onto the queue.
    * @details Adds the value into one of the internal backend redis queues.
-   * @param   jedis      Jedis cluster client.
-   * @param   provisions Provisions used to select an eligible queue.
-   * @param   val        The value to push onto the queue.
+   * @param jedis Jedis cluster client.
+   * @param provisions Provisions used to select an eligible queue.
+   * @param val The value to push onto the queue.
    */
   public void push(JedisCluster jedis, List<Platform.Property> provisions, String val) {
     BalancedRedisQueue queue = chooseEligibleQueue(provisions);
@@ -146,14 +142,14 @@ public class OperationQueue {
   }
 
   /**
-   * @brief   Pop element into internal dequeue and return value.
-   * @details This pops the element from one queue atomically into an internal
-   *          list called the dequeue. It will perform an exponential backoff.
-   *          Null is returned if the overall backoff times out.
-   * @param   jedis      Jedis cluster client.
-   * @param   provisions Provisions used to select an eligible queue.
-   * @return  The value of the transfered element. null if the thread was interrupted.
-   * @note    Suggested return identifier: val.
+   * @brief Pop element into internal dequeue and return value.
+   * @details This pops the element from one queue atomically into an internal list called the
+   *     dequeue. It will perform an exponential backoff. Null is returned if the overall backoff
+   *     times out.
+   * @param jedis Jedis cluster client.
+   * @param provisions Provisions used to select an eligible queue.
+   * @return The value of the transfered element. null if the thread was interrupted.
+   * @note Suggested return identifier: val.
    */
   public String dequeue(JedisCluster jedis, List<Platform.Property> provisions)
       throws InterruptedException {
@@ -162,13 +158,12 @@ public class OperationQueue {
   }
 
   /**
-   * @brief   Get status information about the queue.
-   * @details Helpful for understanding the current load on the queue and how
-   *          elements are balanced.
-   * @param   jedis Jedis cluster client.
-   * @return  The current status of the queue.
-   * @note    Overloaded.
-   * @note    Suggested return identifier: status.
+   * @brief Get status information about the queue.
+   * @details Helpful for understanding the current load on the queue and how elements are balanced.
+   * @param jedis Jedis cluster client.
+   * @return The current status of the queue.
+   * @note Overloaded.
+   * @note Suggested return identifier: status.
    */
   public OperationQueueStatus status(JedisCluster jedis) {
     // get properties
@@ -184,14 +179,13 @@ public class OperationQueue {
   }
 
   /**
-   * @brief   Get status information about the queue.
-   * @details Helpful for understanding the current load on the queue and how
-   *          elements are balanced.
-   * @param   jedis      Jedis cluster client.
-   * @param   provisions Provisions used to select an eligible queue.
-   * @return  The current status of the queue.
-   * @note    Overloaded.
-   * @note    Suggested return identifier: status.
+   * @brief Get status information about the queue.
+   * @details Helpful for understanding the current load on the queue and how elements are balanced.
+   * @param jedis Jedis cluster client.
+   * @param provisions Provisions used to select an eligible queue.
+   * @return The current status of the queue.
+   * @note Overloaded.
+   * @note Suggested return identifier: status.
    */
   public QueueStatus status(JedisCluster jedis, List<Platform.Property> provisions) {
     BalancedRedisQueue queue = chooseEligibleQueue(provisions);
@@ -199,12 +193,12 @@ public class OperationQueue {
   }
 
   /**
-   * @brief   Checks required properties for eligibility.
-   * @details Checks whether the properties given fulfill all of the required
-   *          provisions for the operation queue to accept it.
-   * @param   properties Properties to check that requirements are met.
-   * @return  Whether the operation queue will accept an operation containing the given properties.
-   * @note    Suggested return identifier: isEligible.
+   * @brief Checks required properties for eligibility.
+   * @details Checks whether the properties given fulfill all of the required provisions for the
+   *     operation queue to accept it.
+   * @param properties Properties to check that requirements are met.
+   * @return Whether the operation queue will accept an operation containing the given properties.
+   * @note Suggested return identifier: isEligible.
    */
   public boolean isEligible(List<Platform.Property> properties) {
     for (ProvisionedRedisQueue provisionedQueue : queues) {
@@ -216,13 +210,12 @@ public class OperationQueue {
   }
 
   /**
-   * @brief   Choose an eligible queue based on given properties.
-   * @details We use the platform execution properties of a queue entry to
-   *          determine the appropriate queue. If there no eligible queues, an
-   *          exception is thrown.
-   * @param   provisions Provisions to check that requirements are met.
-   * @return  The chosen queue.
-   * @note    Suggested return identifier: queue.
+   * @brief Choose an eligible queue based on given properties.
+   * @details We use the platform execution properties of a queue entry to determine the appropriate
+   *     queue. If there no eligible queues, an exception is thrown.
+   * @param provisions Provisions to check that requirements are met.
+   * @return The chosen queue.
+   * @note Suggested return identifier: queue.
    */
   private BalancedRedisQueue chooseEligibleQueue(List<Platform.Property> provisions) {
     for (ProvisionedRedisQueue provisionedQueue : queues) {
@@ -237,12 +230,11 @@ public class OperationQueue {
   }
 
   /**
-   * @brief   Convert proto provisions into java multimap.
-   * @details This conversion is done to more easily check if a key/value
-   *          exists in the provisions.
-   * @param   provisions Provisions list to convert.
-   * @return  The provisions as a set.
-   * @note    Suggested return identifier: provisionSet.
+   * @brief Convert proto provisions into java multimap.
+   * @details This conversion is done to more easily check if a key/value exists in the provisions.
+   * @param provisions Provisions list to convert.
+   * @return The provisions as a set.
+   * @note Suggested return identifier: provisionSet.
    */
   private SetMultimap<String, String> toMultimap(List<Platform.Property> provisions) {
     SetMultimap<String, String> set = LinkedHashMultimap.create();

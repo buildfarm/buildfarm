@@ -32,23 +32,23 @@ import com.google.rpc.PreconditionFailure;
 import redis.clients.jedis.JedisCluster;
 
 /**
- * @class   EnrichedOperationBuilder
- * @brief   Builds an operation from an operation key with the operation's
- *          important metadata pre-populated.
- * @details For performance reasons, only build these enriched operations
- *          when you intend to use the extra provided metadata.
+ * @class EnrichedOperationBuilder
+ * @brief Builds an operation from an operation key with the operation's important metadata
+ *     pre-populated.
+ * @details For performance reasons, only build these enriched operations when you intend to use the
+ *     extra provided metadata.
  */
 public class EnrichedOperationBuilder {
 
   /**
-   * @brief   Create an enriched operation based on an operation key.
-   * @details This will make calls to get blobs, and resolve digests into the
-   *          appropriate data structures.
-   * @param   cluster      An established redis cluster.
-   * @param   instance     An instance is used to get additional information about the operation.
-   * @param   operationKey Key to get operation from.
-   * @return  Operation with populated metadata.
-   * @note    Suggested return identifier: operation.
+   * @brief Create an enriched operation based on an operation key.
+   * @details This will make calls to get blobs, and resolve digests into the appropriate data
+   *     structures.
+   * @param cluster An established redis cluster.
+   * @param instance An instance is used to get additional information about the operation.
+   * @param operationKey Key to get operation from.
+   * @return Operation with populated metadata.
+   * @note Suggested return identifier: operation.
    */
   public static EnrichedOperation build(
       JedisCluster cluster, Instance instance, String operationKey) {
@@ -62,13 +62,12 @@ public class EnrichedOperationBuilder {
   }
 
   /**
-   * @brief   Convert an operation key into the actual Operation type.
-   * @details Extracts json from redis and parses it. Null if json was
-   *          invalid.
-   * @param   cluster      An established redis cluster.
-   * @param   operationKey The key to lookup and get back the operation of.
-   * @return  The looked up operation.
-   * @note    Suggested return identifier: operation.
+   * @brief Convert an operation key into the actual Operation type.
+   * @details Extracts json from redis and parses it. Null if json was invalid.
+   * @param cluster An established redis cluster.
+   * @param operationKey The key to lookup and get back the operation of.
+   * @return The looked up operation.
+   * @note Suggested return identifier: operation.
    */
   private static Operation operationKeyToOperation(JedisCluster cluster, String operationKey) {
     String json = cluster.get(operationKey);
@@ -77,11 +76,11 @@ public class EnrichedOperationBuilder {
   }
 
   /**
-   * @brief   Convert string json into operation type.
+   * @brief Convert string json into operation type.
    * @details Parses json and returns null if invalid.
-   * @param   json The json to convert to Operation type.
-   * @return  The created operation.
-   * @note    Suggested return identifier: operation.
+   * @param json The json to convert to Operation type.
+   * @return The created operation.
+   * @note Suggested return identifier: operation.
    */
   private static Operation jsonToOperation(String json) {
     // create a json parser
@@ -110,11 +109,11 @@ public class EnrichedOperationBuilder {
   }
 
   /**
-   * @brief   Get the action digest of the operation.
+   * @brief Get the action digest of the operation.
    * @details Extracted out of the relevant operation metadata.
-   * @param   operation The operation.
-   * @return  The extracted digest.
-   * @note    Suggested return identifier: digest.
+   * @param operation The operation.
+   * @return The extracted digest.
+   * @note Suggested return identifier: digest.
    */
   private static Digest operationToActionDigest(Operation operation) {
     ExecuteOperationMetadata metadata;
@@ -149,12 +148,12 @@ public class EnrichedOperationBuilder {
   }
 
   /**
-   * @brief   Get the action based on the action digest.
+   * @brief Get the action based on the action digest.
    * @details Instance used to fetch the blob.
-   * @param   instance An instance is used to get additional information about the operation.
-   * @param   digest   The action digest.
-   * @return  The action from the provided digest.
-   * @note    Suggested return identifier: action.
+   * @param instance An instance is used to get additional information about the operation.
+   * @param digest The action digest.
+   * @return The action from the provided digest.
+   * @note Suggested return identifier: action.
    */
   private static Action actionDigestToAction(Instance instance, Digest digest) {
     try {
@@ -172,12 +171,12 @@ public class EnrichedOperationBuilder {
   }
 
   /**
-   * @brief   Get the command based on the command digest.
+   * @brief Get the command based on the command digest.
    * @details Instance used to fetch the blob.
-   * @param   instance An instance is used to get additional information about the operation.
-   * @param   digest   The command digest.
-   * @return  The Command from the provided digest.
-   * @note    Suggested return identifier: command.
+   * @param instance An instance is used to get additional information about the operation.
+   * @param digest The command digest.
+   * @return The Command from the provided digest.
+   * @note Suggested return identifier: command.
    */
   private static Command commandDigestToCommand(Instance instance, Digest digest) {
     try {
