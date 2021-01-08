@@ -20,13 +20,11 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-///
-/// @class   RedisHashtagsTest
-/// @brief   tests String utilities when dealing with key names that involve
-///          hashtags.
-/// @details Simple parsers for extracting out / adding hashtags to redis
-///          keys.
-///
+/**
+ * @class RedisHashtagsTest
+ * @brief tests String utilities when dealing with key names that involve hashtags.
+ * @details Simple parsers for extracting out / adding hashtags to redis keys.
+ */
 @RunWith(JUnit4.class)
 public class RedisHashtagsTest {
 
