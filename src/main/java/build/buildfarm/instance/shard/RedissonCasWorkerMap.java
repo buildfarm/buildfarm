@@ -180,6 +180,18 @@ public class RedissonCasWorkerMap implements AbstractCasWorkerMap {
       throws IOException {
     return getMapRedisson(blobDigests);
   }
+
+  ///
+  /// @brief   Get the size of the map.
+  /// @details Returns the number of key-value pairs in this multimap.
+  /// @param   client      Client used for interacting with redis when not using cacheMap.
+  /// @return  The size of the map.
+  /// @note    Suggested return identifier: mapSize.
+  ///
+  @Override
+  public int size(RedisClient client) throws IOException {
+    return cacheMap.size();
+  }
   ///
   /// @brief   Adjust blob mappings based on worker changes.
   /// @details Adjustments are made based on added and removed workers.
