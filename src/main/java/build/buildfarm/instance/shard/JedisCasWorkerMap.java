@@ -16,20 +16,14 @@ package build.buildfarm.instance.shard;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.ScanCount;
 import build.buildfarm.common.redis.RedisClient;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Sets;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.redisson.api.RSetMultimapCache;
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisClusterPipeline;
-import redis.clients.jedis.ScanParams;
-import redis.clients.jedis.ScanResult;
 
 ///
 /// @class   JedisCasWorkerMap
@@ -192,71 +186,7 @@ public class JedisCasWorkerMap implements AbstractCasWorkerMap {
   ///
   @Override
   public int size(RedisClient client) throws IOException {
-    return client.call(jedis -> scanSize(jedis, name + ":*"));
-  }
-
-  ///
-  /// @brief   Calculate the size of the container through scanning
-  /// @details We use a wildcard to scan over all elements
-  /// @param   cluster  An established redis cluster.
-  /// @return  The total number of keys scanned correlating to the size
-  /// @note    Suggested return identifier: size
-  ///
-  private int scanSize(JedisCluster cluster, String query) {
-
-    Set<String> keys = Sets.newHashSet();
-
-    // JedisCluster only supports SCAN commands with MATCH patterns containing hash-tags.
-    // This prevents us from using the cluster's SCAN to traverse all of the CAS.
-    // That's why we choose to scan each of the jedisNode's individually.
-    cluster.getClusterNodes().values().stream()
-        .forEach(
-            pool -> {
-              try (Jedis node = pool.getResource()) {
-                addKeys(cluster, node, query, keys);
-              }
-            });
-
-    return keys.size();
-  }
-
-  ///
-  /// @brief   Scan all CAS entires to accumulate a key count.
-  /// @details keys are accumulated onto.
-  /// @param   cluster An established redis cluster.
-  /// @param   node    A node of the cluster.
-  /// @param   keys    keys to accumulate while scanning.
-  ///
-  private void addKeys(JedisCluster cluster, Jedis node, String query, Set<String> keys) {
-    // iterate over all CAS entries via scanning
-    String cursor = "0";
-    do {
-      keys.addAll(scanCas(node, query, cursor));
-
-    } while (!cursor.equals("0"));
-  }
-
-  ///
-  /// @brief   Scan the cas to obtain CAS keys.
-  /// @details Scanning is done incrementally via a cursor.
-  /// @param   node     A node of the cluster.
-  /// @param   cursor   Scan cursor.
-  /// @return  Resulting CAS keys from scanning.
-  /// @note    Suggested return identifier: casKeys.
-  ///
-  private List<String> scanCas(Jedis node, String query, String cursor) {
-    // construct CAS query
-    ScanParams params = new ScanParams();
-    params.match(query);
-    params.count(1000);
-
-    // perform scan iteration
-    ScanResult scanResult = node.scan(cursor, params);
-    if (scanResult != null) {
-      cursor = scanResult.getCursor();
-      return scanResult.getResult();
-    }
-    return new ArrayList<>();
+    return client.call(jedis -> ScanCount.get(jedis, name + ":*", 1000));
   }
 
   ///

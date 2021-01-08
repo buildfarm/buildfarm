@@ -729,6 +729,8 @@ message OperationsStatus {
   repeated string active_workers = 4;
   
   int64 cas_lookup_size = 5;
+  
+  int64 action_cache_size = 6;
 }
 
 message QueuedOperationMetadata {
