@@ -29,20 +29,24 @@ operation_poll_period: {
   nanos: 0
 }
 
-# key/value set of defining capabilities of this worker
-# all execute requests must match perfectly with workers which
-# provide capabilities
-# so an action with a required platform: { arch: "x86_64" } must
-# match with a worker with at least { arch: "x86_64" } here
-platform: {
-  # commented out here for illustrative purposes, a default empty
-  # 'platform' is a sufficient starting point without specifying
-  # any platform requirements on the actions' side
-  ###
-  # property: {
-  #   name: "key_name"
-  #   value: "value_string"
-  # }
+dequeue_match_settings: {
+
+  # key/value set of defining capabilities of this worker
+  # all execute requests must match perfectly with workers which
+  # provide capabilities
+  # so an action with a required platform: { arch: "x86_64" } must
+  # match with a worker with at least { arch: "x86_64" } here
+  platform: {
+    # commented out here for illustrative purposes, a default empty
+    # 'platform' is a sufficient starting point without specifying
+    # any platform requirements on the actions' side
+    ###
+    # property: {
+    #   name: "key_name"
+    #   value: "value_string"
+    # }
+  }
+
 }
 
 # the worker CAS configuration

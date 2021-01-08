@@ -69,12 +69,12 @@ public class Pipeline {
     for (PipelineStage stage : stageClosePriorities.keySet()) {
       if (stage instanceof SuperscalarPipelineStage) {
         if (stage.isClaimed()) {
-          logger.log(Level.INFO, "SuperScalarPipelineStage is not empty yet!");
+          logger.log(Level.FINE, "SuperScalarPipelineStage is not empty yet!");
           return false;
         }
       } else { // not SuperScalar
         if (stage.claimed) {
-          logger.log(Level.INFO, "NonSuperScalarPipelineStage is not empty yet!");
+          logger.log(Level.FINE, "NonSuperScalarPipelineStage is not empty yet!");
           return false;
         }
       }
@@ -111,7 +111,7 @@ public class Pipeline {
             }
           }
           if (stageToClose != null && !stageToClose.isClosed()) {
-            logger.log(Level.INFO, "Closing stage at priority " + maxPriority);
+            logger.log(Level.FINE, "Closing stage at priority " + maxPriority);
             stageToClose.close();
           }
         }
@@ -134,7 +134,7 @@ public class Pipeline {
 
           if (!thread.isAlive()) {
             logger.log(
-                Level.INFO, "Stage has exited at priority " + stageClosePriorities.get(stage));
+                Level.FINE, "Stage has exited at priority " + stageClosePriorities.get(stage));
             inactiveStages.add(stage);
           } else if (stage.isClosed()) {
             logger.log(

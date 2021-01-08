@@ -12,25 +12,29 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker.shard;
+package build.buildfarm.server;
 
-import build.buildfarm.v1test.AdminGrpc;
-import build.buildfarm.v1test.DisableScaleInProtectionRequest;
+import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequest;
+import build.buildfarm.v1test.ShutDownWorkerGrpc;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.NegotiationType;
 import io.grpc.netty.NettyChannelBuilder;
+import java.util.logging.Logger;
 
-class AdminServiceClient {
+class ShutDownWorker {
+  private static final Logger logger = Logger.getLogger(ShutDownWorker.class.getName());
+
   private static ManagedChannel createChannel(String target) {
     NettyChannelBuilder builder =
         NettyChannelBuilder.forTarget(target).negotiationType(NegotiationType.PLAINTEXT);
     return builder.build();
   }
 
-  public static void disableScaleInProtection(String host, String instanceIp) {
+  public static void informWorkerToPrepareForShutdown(String host) {
     ManagedChannel channel = createChannel(host);
-    AdminGrpc.AdminBlockingStub adminBlockingStub = AdminGrpc.newBlockingStub(channel);
-    adminBlockingStub.disableScaleInProtection(
-        DisableScaleInProtectionRequest.newBuilder().setInstanceName(instanceIp).build());
+    ShutDownWorkerGrpc.ShutDownWorkerBlockingStub shutDownWorkerBlockingStub =
+        ShutDownWorkerGrpc.newBlockingStub(channel);
+    shutDownWorkerBlockingStub.prepareWorkerForGracefulShutdown(
+        PrepareWorkerForGracefulShutDownRequest.newBuilder().build());
   }
 }

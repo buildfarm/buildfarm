@@ -51,6 +51,7 @@ import build.buildfarm.v1test.ContentAddressableStorageConfig;
 import build.buildfarm.v1test.FilesystemCASConfig;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.ShardWorkerConfig;
+import build.buildfarm.worker.DequeueMatchSettings;
 import build.buildfarm.worker.ExecuteActionStage;
 import build.buildfarm.worker.FuseCAS;
 import build.buildfarm.worker.InputFetchStage;
@@ -232,7 +233,7 @@ public class Worker extends LoggingMain {
    * scale in protection when the worker is ready. If unexpected errors happened, it will cancel the
    * graceful shutdown progress make the worker available again.
    */
-  public void shutDownWorkerGracefully() {
+  public void prepareWorkerForGracefulShutdown() {
     inGracefulShutdown = true;
     logger.log(Level.INFO, "The current worker is deregistered and should be shutdown gracefully!");
     int scanRate = 30; // check every 30 seconds
@@ -378,10 +379,15 @@ public class Worker extends LoggingMain {
       writer = new LocalCasWriter();
     }
 
+    DequeueMatchSettings matchSettings = new DequeueMatchSettings();
+    matchSettings.acceptEverything = config.getDequeueMatchSettings().getAcceptEverything();
+    matchSettings.allowUnmatched = config.getDequeueMatchSettings().getAllowUnmatched();
+
     ShardWorkerContext context =
         new ShardWorkerContext(
             config.getPublicName(),
-            config.getPlatform(),
+            matchSettings,
+            config.getDequeueMatchSettings().getPlatform(),
             config.getOperationPollPeriod(),
             backplane::pollOperation,
             config.getInlineContentLimit(),

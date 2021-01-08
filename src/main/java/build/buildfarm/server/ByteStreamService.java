@@ -369,7 +369,7 @@ public class ByteStreamService extends ByteStreamImplBase {
       logger.log(Level.SEVERE, format("queryWriteStatus(%s)", resourceName), e);
       responseObserver.onError(INVALID_ARGUMENT.withDescription(e.getMessage()).asException());
     } catch (EntryLimitException e) {
-      logger.warning(format("queryWriteStatus(%s): %s", resourceName, e.getMessage()));
+      logger.log(Level.WARNING, format("queryWriteStatus(%s): %s", resourceName, e.getMessage()));
       responseObserver.onNext(QueryWriteStatusResponse.getDefaultInstance());
       responseObserver.onCompleted();
     } catch (RuntimeException e) {

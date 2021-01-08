@@ -40,7 +40,7 @@ service Admin {
     option (google.api.http) = { get: "/v1test/admin:reindexCas" };
   }
   
-  rpc DeregisterWorker(DeregisterWorkerRequest) returns (DeregisterWorkerRequestResults) {
+  rpc ShutDownWorkerGracefully(ShutDownWorkerGracefullyRequest) returns (ShutDownWorkerGracefullyRequestResults) {
     option (google.api.http) = { get: "/v1test/admin:deregisterWorker" };
   }
 
@@ -49,13 +49,13 @@ service Admin {
   }
 }
 
-message DeregisterWorkerRequest {
+message ShutDownWorkerGracefullyRequest{
   string instance_name = 1;
   
   string worker_name = 2;
 }
 
-message DeregisterWorkerRequestResults {
+message ShutDownWorkerGracefullyRequestResults {
 }
 
 message DisableScaleInProtectionRequest{
@@ -512,6 +512,8 @@ message ShardInstanceConfig {
   }
 
   int64 max_blob_size = 5;
+  
+  int32 max_cpu = 9;
 
   // maximum selectable timeout
   // a maximum threshold for an action's specified timeout,
@@ -545,6 +547,18 @@ message ShardWorkerInstanceConfig {
   google.protobuf.Duration grpc_timeout = 13;
 }
 
+message DequeueMatchSettings {
+  
+  // whether a worker should accept everything it gets off the queue.
+  bool accept_everything = 1;
+
+  // whether a worker should accept platform properties that it does not match with.
+  bool allow_unmatched = 2;
+  
+  // worker platform used to match operations
+  build.bazel.remote.execution.v2.Platform platform = 3;
+}
+
 message ShardWorkerConfig {
   ShardWorkerInstanceConfig shard_worker_instance_config = 1;
 
@@ -561,11 +575,8 @@ message ShardWorkerConfig {
   // period of poll requests during execution
   google.protobuf.Duration operation_poll_period = 13;
 
-  // initial platform used to match operations
-  build.bazel.remote.execution.v2.Platform platform = 14;
-
-  // default platform to populate matched commands
-  build.bazel.remote.execution.v2.Platform default_platform = 28;
+  //settings used to match with operations
+  DequeueMatchSettings dequeue_match_settings = 36;
 
   // total size of the inline content for
   // action results
@@ -1031,16 +1042,16 @@ service WorkerProfile {
   rpc GetWorkerList(WorkerListRequest) returns (WorkerListMessage) {}
 }
 
-message ShutDownWorkerGracefullyRequest {
+message PrepareWorkerForGracefulShutDownRequest{
   string instance_name = 1;
 
   string worker_name = 2;
 }
 
-message ShutDownWorkerGracefullyResults {
+message PrepareWorkerForGracefulShutDownRequestResults{
 }
 
 service ShutDownWorker {
-  rpc ShutDownWorkerGracefully(ShutDownWorkerGracefullyRequest) returns (ShutDownWorkerGracefullyResults) {}
+  rpc PrepareWorkerForGracefulShutdown(PrepareWorkerForGracefulShutDownRequest) returns (PrepareWorkerForGracefulShutDownRequestResults) {}
 }
 

@@ -105,6 +105,7 @@ class ShardWorkerContext implements WorkerContext {
 
   private final String name;
   private final Platform platform;
+  private final DequeueMatchSettings matchSettings;
   private final SetMultimap<String, String> matchProvisions;
   private final Duration operationPollPeriod;
   private final OperationPoller operationPoller;
@@ -142,6 +143,7 @@ class ShardWorkerContext implements WorkerContext {
 
   ShardWorkerContext(
       String name,
+      DequeueMatchSettings matchSettings,
       Platform platform,
       Duration operationPollPeriod,
       OperationPoller operationPoller,
@@ -163,6 +165,7 @@ class ShardWorkerContext implements WorkerContext {
       boolean errorOperationRemainingResources,
       Supplier<CasWriter> writer) {
     this.name = name;
+    this.matchSettings = matchSettings;
     this.platform = platform;
     this.matchProvisions = getMatchProvisions(platform, policies, executeStageWidth);
     this.operationPollPeriod = operationPollPeriod;
@@ -239,14 +242,14 @@ class ShardWorkerContext implements WorkerContext {
             logger.log(
                 Level.SEVERE, format("%s: poller: error while polling %s", name, operationName), e);
           }
-
-          logger.log(
-              Level.INFO,
-              format(
-                  "%s: poller: Completed Poll for %s: %s",
-                  name, operationName, success ? "OK" : "Failed"));
           if (!success) {
+            logger.log(
+                Level.INFO,
+                format("%s: poller: Completed Poll for %s: Failed", name, operationName));
             onFailure.run();
+          } else {
+            logger.log(
+                Level.INFO, format("%s: poller: Completed Poll for %s: OK", name, operationName));
           }
           return success;
         },
@@ -313,9 +316,7 @@ class ShardWorkerContext implements WorkerContext {
     }
     listener.onWaitEnd();
 
-    DequeueMatchSettings settings = new DequeueMatchSettings();
-    settings.allowUnmatched = true;
-    if (DequeueMatchEvaluator.shouldKeepOperation(settings, matchProvisions, queueEntry)) {
+    if (DequeueMatchEvaluator.shouldKeepOperation(matchSettings, matchProvisions, queueEntry)) {
       listener.onEntry(queueEntry);
     } else {
       backplane.rejectOperation(queueEntry);
@@ -529,12 +530,12 @@ class ShardWorkerContext implements WorkerContext {
       throws IOException, InterruptedException {
     Path outputPath = actionRoot.resolve(outputFile);
     if (!Files.exists(outputPath)) {
-      logger.log(Level.INFO, "ReportResultStage: " + outputFile + " does not exist...");
+      logger.log(Level.FINE, "ReportResultStage: " + outputFile + " does not exist...");
       return;
     }
 
     if (Files.isDirectory(outputPath)) {
-      logger.log(Level.INFO, "ReportResultStage: " + outputFile + " is a directory");
+      logger.log(Level.FINE, "ReportResultStage: " + outputFile + " is a directory");
       preconditionFailure
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
@@ -612,12 +613,12 @@ class ShardWorkerContext implements WorkerContext {
       throws IOException, InterruptedException {
     Path outputDirPath = actionRoot.resolve(outputDir);
     if (!Files.exists(outputDirPath)) {
-      logger.log(Level.INFO, "ReportResultStage: " + outputDir + " does not exist...");
+      logger.log(Level.FINE, "ReportResultStage: " + outputDir + " does not exist...");
       return;
     }
 
     if (!Files.isDirectory(outputDirPath)) {
-      logger.log(Level.INFO, "ReportResultStage: " + outputDir + " is not a directory...");
+      logger.log(Level.FINE, "ReportResultStage: " + outputDir + " is not a directory...");
       preconditionFailure
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
@@ -742,6 +743,7 @@ class ShardWorkerContext implements WorkerContext {
       throws IOException, InterruptedException {
     boolean success = createBackplaneRetrier().execute(() -> instance.putOperation(operation));
     if (success && operation.getDone()) {
+      // TODO: Convert to metrics
       logger.log(Level.INFO, "CompletedOperation: " + operation.getName());
     }
     return success;

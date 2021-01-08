@@ -69,9 +69,9 @@ import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.GetClientStartTimeResult;
+import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
-import build.buildfarm.v1test.ShutDownWorkerGracefullyResults;
 import build.buildfarm.v1test.Tree;
 import build.buildfarm.v1test.WorkerListMessage;
 import build.buildfarm.v1test.WorkerProfileMessage;
@@ -1731,7 +1731,7 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public ShutDownWorkerGracefullyResults shutDownWorkerGracefully(String worker) {
+  public PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully(String worker) {
     throw new UnsupportedOperationException(
         "AbstractServerInstance doesn't support drainWorkerPipeline() method.");
   }
