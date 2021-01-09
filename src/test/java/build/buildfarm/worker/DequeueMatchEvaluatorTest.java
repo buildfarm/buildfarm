@@ -24,29 +24,22 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-///
-/// @class   DequeueMatchEvaluatorTest
-/// @brief   tests Algorithm for deciding whether a worker should keep a dequeued
-///          operation.
-/// @details When a worker takes an entry off of the queue, should it decide
-///          to keep that entry or reject and requeue it? In some sense, it
-///          should keep all entries because they have already been vetted for
-///          that particular worker. This is because the scheduler matches
-///          operations to particular queues, and workers match themselves to
-///          which queues they want to read from. But should the worker always
-///          blindly take what it pops off? And can they trust the scheduler?
-///          There may be situations where the worker chooses to give
-///          operations back based on particular contexts not known to the
-///          scheduler. For example, you might have a variety of workers with
-///          different amounts of cpu cores all sharing the same queue. The
-///          queue may accept N-core operations, because N-core workers exist
-///          in the pool, but there are additionally some lower core workers
-///          that would need to forfeit running the operation. All the reasons
-///          a worker may decide it can't take on the operation and should
-///          give it back are implemented here. The settings provided allow
-///          varying amount of leniency when evaluating the platform
-///          properties.
-///
+/**
+ * @class DequeueMatchEvaluatorTest
+ * @brief tests Algorithm for deciding whether a worker should keep a dequeued operation.
+ * @details When a worker takes an entry off of the queue, should it decide to keep that entry or
+ *     reject and requeue it? In some sense, it should keep all entries because they have already
+ *     been vetted for that particular worker. This is because the scheduler matches operations to
+ *     particular queues, and workers match themselves to which queues they want to read from. But
+ *     should the worker always blindly take what it pops off? And can they trust the scheduler?
+ *     There may be situations where the worker chooses to give operations back based on particular
+ *     contexts not known to the scheduler. For example, you might have a variety of workers with
+ *     different amounts of cpu cores all sharing the same queue. The queue may accept N-core
+ *     operations, because N-core workers exist in the pool, but there are additionally some lower
+ *     core workers that would need to forfeit running the operation. All the reasons a worker may
+ *     decide it can't take on the operation and should give it back are implemented here. The
+ *     settings provided allow varying amount of leniency when evaluating the platform properties.
+ */
 @RunWith(JUnit4.class)
 public class DequeueMatchEvaluatorTest {
 

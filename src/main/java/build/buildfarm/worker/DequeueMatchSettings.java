@@ -14,30 +14,26 @@
 
 package build.buildfarm.worker;
 
-///
-/// @class   DequeueMatchSettings
-/// @brief   Settings used by a worker to determine whether they should keep
-///          dequeued operations.
-/// @details This determines whether workers keep operations or decide to
-///          requeue them for a different worker.
-///
+/**
+ * @class DequeueMatchSettings
+ * @brief Settings used by a worker to determine whether they should keep dequeued operations.
+ * @details This determines whether workers keep operations or decide to requeue them for a
+ *     different worker.
+ */
 public class DequeueMatchSettings {
 
-  ///
-  /// @field   acceptEverything
-  /// @brief   Whether or not the worker should accept everything it gets off
-  ///          the queue.
-  /// @details This will assume the worker can always execute operations from
-  ///          the queue it matches with.
-  ///
+  /**
+   * @field acceptEverything
+   * @brief Whether or not the worker should accept everything it gets off the queue.
+   * @details This will assume the worker can always execute operations from the queue it matches
+   *     with.
+   */
   public boolean acceptEverything = false;
 
-  ///
-  /// @field   allowUnmatched
-  /// @brief   Whether or not the worker should accept platform properties that
-  ///          it does not match with.
-  /// @details This is often necessary if the queue is also configured to allow
-  ///          unmatched properties.
-  ///
+  /**
+   * @field allowUnmatched
+   * @brief Whether or not the worker should accept platform properties that it does not match with.
+   * @details This is often necessary if the queue is also configured to allow unmatched properties.
+   */
   public boolean allowUnmatched = false;
 }
