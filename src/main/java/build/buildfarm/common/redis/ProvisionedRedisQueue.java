@@ -23,91 +23,82 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-///
-/// @class   ProvisionedRedisQueue
-/// @brief   A queue that is designed to hold particularly provisioned
-///          elements.
-/// @details A provisioned redis queue is an implementation of a queue data
-///          structure which internally uses a redis cluster to distribute the
-///          data across shards. Its important to know that the lifetime of
-///          the queue persists before and after the queue data structure is
-///          created (since it exists in redis). Therefore, two redis queues
-///          with the same name, would in fact be the same underlying redis
-///          queue. This redis queue comes with a list of required provisions.
-///          If the queue element does not meet the required provisions, it
-///          should not be stored in the queue. Provision queues are intended
-///          to represent particular operations that should only be processed
-///          by particular workers. An example use case for this would be to
-///          have two dedicated provision queues for CPU and GPU operations.
-///          CPU/GPU requirements would be determined through the remote api's
-///          command platform properties. We designate provision queues to
-///          have a set of "required provisions" (which match the platform
-///          properties). This allows the scheduler to distribute operations
-///          by their properties and allows workers to dequeue from particular
-///          queues.
-///
+/**
+ * @class ProvisionedRedisQueue
+ * @brief A queue that is designed to hold particularly provisioned elements.
+ * @details A provisioned redis queue is an implementation of a queue data structure which
+ *     internally uses a redis cluster to distribute the data across shards. Its important to know
+ *     that the lifetime of the queue persists before and after the queue data structure is created
+ *     (since it exists in redis). Therefore, two redis queues with the same name, would in fact be
+ *     the same underlying redis queue. This redis queue comes with a list of required provisions.
+ *     If the queue element does not meet the required provisions, it should not be stored in the
+ *     queue. Provision queues are intended to represent particular operations that should only be
+ *     processed by particular workers. An example use case for this would be to have two dedicated
+ *     provision queues for CPU and GPU operations. CPU/GPU requirements would be determined through
+ *     the remote api's command platform properties. We designate provision queues to have a set of
+ *     "required provisions" (which match the platform properties). This allows the scheduler to
+ *     distribute operations by their properties and allows workers to dequeue from particular
+ *     queues.
+ */
 public class ProvisionedRedisQueue {
 
-  ///
-  /// @field   WILDCARD_VALUE
-  /// @brief   Wildcard value.
-  /// @details Symbol for identifying wildcard in both key/value of provisions.
-  ///
+  /**
+   * @field WILDCARD_VALUE
+   * @brief Wildcard value.
+   * @details Symbol for identifying wildcard in both key/value of provisions.
+   */
   public static final String WILDCARD_VALUE = "*";
 
-  ///
-  /// @field   CHOOSE_QUEUE_KEY
-  /// @brief   Special key to allow directly matching with a queue.
-  /// @details This is to support another paradigm where actions want to
-  ///          specifically request the queue to be placed in. Its less generic
-  ///          than having buildfarm choose the queue for you, and it leaks
-  ///          implementation details about how buildfarm is queuing your work.
-  ///          However, its desirable to match similar remote execution
-  ///          solutions that use exec_properties to choose which "pool" they
-  ///          want to run in.
-  ///
+  /**
+   * @field CHOOSE_QUEUE_KEY
+   * @brief Special key to allow directly matching with a queue.
+   * @details This is to support another paradigm where actions want to specifically request the
+   *     queue to be placed in. Its less generic than having buildfarm choose the queue for you, and
+   *     it leaks implementation details about how buildfarm is queuing your work. However, its
+   *     desirable to match similar remote execution solutions that use exec_properties to choose
+   *     which "pool" they want to run in.
+   */
   public static final String CHOOSE_QUEUE_KEY = "choose-queue";
 
-  ///
-  /// @field   isFullyWildcard
-  /// @brief   If the queue will deem any set of properties eligible.
-  /// @details If any of the provision keys has a wildcard, we consider
-  ///          anything for the queue to be eligible.
-  ///
+  /**
+   * @field isFullyWildcard
+   * @brief If the queue will deem any set of properties eligible.
+   * @details If any of the provision keys has a wildcard, we consider anything for the queue to be
+   *     eligible.
+   */
   private final boolean isFullyWildcard;
 
-  ///
-  /// @field   allowUserUnmatched
-  /// @brief   Can the user provide extra platform properties that are not a
-  ///          part of the queue and still be matched with it?
-  /// @details If true, the user can provide a superset of platform properties
-  ///          and still be matched with the queue.
-  ///
+  /**
+   * @field allowUserUnmatched
+   * @brief Can the user provide extra platform properties that are not a part of the queue and
+   *     still be matched with it?
+   * @details If true, the user can provide a superset of platform properties and still be matched
+   *     with the queue.
+   */
   private final boolean allowUserUnmatched;
 
-  ///
-  /// @field   provisions
-  /// @brief   Provisions enforced by the queue.
-  /// @details The provisions are filtered by wildcard.
-  ///
+  /**
+   * @field provisions
+   * @brief Provisions enforced by the queue.
+   * @details The provisions are filtered by wildcard.
+   */
   private final FilteredProvisions provisions;
 
-  ///
-  /// @field   queue
-  /// @brief   The queue itself.
-  /// @details A balanced redis queue designed to hold particularly provisioned
-  ///          elements.
-  ///
+  /**
+   * @field queue
+   * @brief The queue itself.
+   * @details A balanced redis queue designed to hold particularly provisioned elements.
+   */
   private final BalancedRedisQueue queue;
 
-  ///
-  /// @brief   Constructor.
-  /// @details Construct the provision queue.
-  /// @param   name             The global name of the queue.
-  /// @param   hashtags         Hashtags to distribute queue data.
-  /// @param   filterProvisions The filtered provisions of the queue.
-  /// @note    Overloaded.
-  ///
+  /**
+   * @brief Constructor.
+   * @details Construct the provision queue.
+   * @param name The global name of the queue.
+   * @param hashtags Hashtags to distribute queue data.
+   * @param filterProvisions The filtered provisions of the queue.
+   * @note Overloaded.
+   */
   public ProvisionedRedisQueue(
       String name, List<String> hashtags, SetMultimap<String, String> filterProvisions) {
     this.queue = new BalancedRedisQueue(name, hashtags);
@@ -115,16 +106,17 @@ public class ProvisionedRedisQueue {
     provisions = filterProvisionsByWildcard(filterProvisions, isFullyWildcard, WILDCARD_VALUE);
     allowUserUnmatched = false;
   }
-  ///
-  /// @brief   Constructor.
-  /// @details Construct the provision queue.
-  /// @param   name               The global name of the queue.
-  /// @param   hashtags           Hashtags to distribute queue data.
-  /// @param   filterProvisions   The filtered provisions of the queue.
-  /// @param   allowUserUnmatched Whether the user can provide extra platform properties and still
-  // match the queue.
-  /// @note    Overloaded.
-  ///
+
+  /**
+   * @brief Constructor.
+   * @details Construct the provision queue.
+   * @param name The global name of the queue.
+   * @param hashtags Hashtags to distribute queue data.
+   * @param filterProvisions The filtered provisions of the queue.
+   * @param allowUserUnmatched Whether the user can provide extra platform properties and still
+   *     match the queue.
+   * @note Overloaded.
+   */
   public ProvisionedRedisQueue(
       String name,
       List<String> hashtags,
@@ -135,14 +127,15 @@ public class ProvisionedRedisQueue {
     provisions = filterProvisionsByWildcard(filterProvisions, isFullyWildcard, WILDCARD_VALUE);
     this.allowUserUnmatched = allowUserUnmatched;
   }
-  ///
-  /// @brief   Checks required properties.
-  /// @details Checks whether the properties given fulfill all of the required
-  ///          provisions of the queue.
-  /// @param   properties Properties to check that requirements are met.
-  /// @return  Whether the queue is eligible based on the properties given.
-  /// @note    Suggested return identifier: isEligible.
-  ///
+
+  /**
+   * @brief Checks required properties.
+   * @details Checks whether the properties given fulfill all of the required provisions of the
+   *     queue.
+   * @param properties Properties to check that requirements are met.
+   * @return Whether the queue is eligible based on the properties given.
+   * @note Suggested return identifier: isEligible.
+   */
   public boolean isEligible(SetMultimap<String, String> properties) {
     // check if a property is specifically requesting to match with the queue
     // any attempt to specifically match will not evaluate other properties
@@ -167,37 +160,39 @@ public class ProvisionedRedisQueue {
     }
     return requirements.isEmpty();
   }
-  ///
-  /// @brief   Explain eligibility.
-  /// @details Returns an explanation as to why the properties provided are
-  ///          eligible / ineligible to be placed on the queue.
-  /// @param   properties Properties to get an eligibility explanation of.
-  /// @return  An explanation on the eligibility of the provided properties.
-  /// @note    Suggested return identifier: explanation.
-  ///
+
+  /**
+   * @brief Explain eligibility.
+   * @details Returns an explanation as to why the properties provided are eligible / ineligible to
+   *     be placed on the queue.
+   * @param properties Properties to get an eligibility explanation of.
+   * @return An explanation on the eligibility of the provided properties.
+   * @note Suggested return identifier: explanation.
+   */
   public String explainEligibility(SetMultimap<String, String> properties) {
     EligibilityResult result = getEligibilityResult(properties);
     return toString(result);
   }
-  ///
-  /// @brief   Get queue.
-  /// @details Obtain the internal queue.
-  /// @return  The internal queue.
-  /// @note    Suggested return identifier: queue.
-  ///
+
+  /**
+   * @brief Get queue.
+   * @details Obtain the internal queue.
+   * @return The internal queue.
+   * @note Suggested return identifier: queue.
+   */
   public BalancedRedisQueue queue() {
     return queue;
   }
-  ///
-  /// @brief   Filter the provisions into separate sets by checking for the
-  ///          existence of wildcards.
-  /// @details This will organize the incoming provisions into separate sets.
-  /// @param   filterProvisions The filtered provisions of the queue.
-  /// @param   isFullyWildcard  If the queue will deem any set of properties eligible.
-  /// @param   wildcardValue    Symbol for identifying wildcard in both key/value of provisions.
-  /// @return  Provisions filtered by wildcard.
-  /// @note    Suggested return identifier: filteredProvisions.
-  ///
+
+  /**
+   * @brief Filter the provisions into separate sets by checking for the existence of wildcards.
+   * @details This will organize the incoming provisions into separate sets.
+   * @param filterProvisions The filtered provisions of the queue.
+   * @param isFullyWildcard If the queue will deem any set of properties eligible.
+   * @param wildcardValue Symbol for identifying wildcard in both key/value of provisions.
+   * @return Provisions filtered by wildcard.
+   * @note Suggested return identifier: filteredProvisions.
+   */
   private static FilteredProvisions filterProvisionsByWildcard(
       SetMultimap<String, String> filterProvisions, boolean isFullyWildcard, String wildcardValue) {
     FilteredProvisions provisions = new FilteredProvisions();
@@ -216,14 +211,14 @@ public class ProvisionedRedisQueue {
                 .collect(ImmutableSet.toImmutableSet());
     return provisions;
   }
-  ///
-  /// @brief   Get eligibility result.
-  /// @details Perform eligibility check with detailed information on
-  ///          evaluation.
-  /// @param   properties Properties to get an eligibility explanation of.
-  /// @return  Detailed results on the evaluation of an eligibility check.
-  /// @note    Suggested return identifier: eligibilityResult.
-  ///
+
+  /**
+   * @brief Get eligibility result.
+   * @details Perform eligibility check with detailed information on evaluation.
+   * @param properties Properties to get an eligibility explanation of.
+   * @return Detailed results on the evaluation of an eligibility check.
+   * @note Suggested return identifier: eligibilityResult.
+   */
   private EligibilityResult getEligibilityResult(SetMultimap<String, String> properties) {
     EligibilityResult result = new EligibilityResult();
     result.queueName = queue.getName();
@@ -259,14 +254,15 @@ public class ProvisionedRedisQueue {
 
     return result;
   }
-  ///
-  /// @brief   Convert map to printable string.
-  /// @details Uses streams.
-  /// @param   map Map to convert to string.
-  /// @return  String representation of map.
-  /// @note    Overloaded.
-  /// @note    Suggested return identifier: str.
-  ///
+
+  /**
+   * @brief Convert map to printable string.
+   * @details Uses streams.
+   * @param map Map to convert to string.
+   * @return String representation of map.
+   * @note Overloaded.
+   * @note Suggested return identifier: str.
+   */
   private static String toString(Map<String, ?> map) {
     String mapAsString =
         map.keySet().stream()
@@ -274,14 +270,15 @@ public class ProvisionedRedisQueue {
             .collect(Collectors.joining(", ", "{", "}"));
     return mapAsString;
   }
-  ///
-  /// @brief   Convert eligibility result to printable string.
-  /// @details Used for visibility / debugging.
-  /// @param   result Detailed results on the evaluation of an eligibility check.
-  /// @return  An explanation on the eligibility of the provided properties.
-  /// @note    Overloaded.
-  /// @note    Suggested return identifier: explanation.
-  ///
+
+  /**
+   * @brief Convert eligibility result to printable string.
+   * @details Used for visibility / debugging.
+   * @param result Detailed results on the evaluation of an eligibility check.
+   * @return An explanation on the eligibility of the provided properties.
+   * @note Overloaded.
+   * @note Suggested return identifier: explanation.
+   */
   private static String toString(EligibilityResult result) {
     String explanation = new String();
     if (result.isEligible) {

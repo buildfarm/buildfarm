@@ -25,16 +25,14 @@ import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import redis.clients.jedis.JedisCluster;
 
-///
-/// @class   RedisMapMockTest
-/// @brief   tests A redis map.
-/// @details A redis map is an implementation of a map data structure which
-///          internally uses redis to store and distribute the data. Its
-///          important to know that the lifetime of the map persists before
-///          and after the map data structure is created (since it exists in
-///          redis). Therefore, two redis maps with the same name, would in
-///          fact be the same underlying redis map.
-///
+/**
+ * @class RedisMapMockTest
+ * @brief tests A redis map.
+ * @details A redis map is an implementation of a map data structure which internally uses redis to
+ *     store and distribute the data. Its important to know that the lifetime of the map persists
+ *     before and after the map data structure is created (since it exists in redis). Therefore, two
+ *     redis maps with the same name, would in fact be the same underlying redis map.
+ */
 @RunWith(JUnit4.class)
 public class RedisMapMockTest {
 

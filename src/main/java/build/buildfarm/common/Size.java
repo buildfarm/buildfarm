@@ -14,70 +14,75 @@
 
 package build.buildfarm.common;
 
-///
-/// @class   Size
-/// @brief   Utilities related to file sizes.
-/// @details Contains converters between different time units.
-///
+/**
+ * @class Size
+ * @brief Utilities related to file sizes.
+ * @details Contains converters between different time units.
+ */
 public class Size {
 
-  ///
-  /// @brief   Kb to bytes.
-  /// @details Kb to bytes.
-  /// @param   sizeKb Size in KB to convert.
-  /// @return  The number of bytes converted from KB.
-  /// @note    Suggested return identifier: bytes.
-  ///
+  /**
+   * @brief Kb to bytes.
+   * @details Kb to bytes.
+   * @param sizeKb Size in KB to convert.
+   * @return The number of bytes converted from KB.
+   * @note Suggested return identifier: bytes.
+   */
   public static long kbToBytes(long sizeKb) {
     return sizeKb * 1024;
   }
-  ///
-  /// @brief   Bytes to kb.
-  /// @details Bytes to kb.
-  /// @param   bytes Size in bytes to convert.
-  /// @return  Size in KB converted from bytes.
-  /// @note    Suggested return identifier: sizeKb.
-  ///
+
+  /**
+   * @brief Bytes to kb.
+   * @details Bytes to kb.
+   * @param bytes Size in bytes to convert.
+   * @return Size in KB converted from bytes.
+   * @note Suggested return identifier: sizeKb.
+   */
   public static long bytesToKb(long bytes) {
     return bytes / 1024;
   }
-  ///
-  /// @brief   Mb to bytes.
-  /// @details Mb to bytes.
-  /// @param   sizeMb Size in MB to convert.
-  /// @return  The number of bytes converted from MB.
-  /// @note    Suggested return identifier: bytes.
-  ///
+
+  /**
+   * @brief Mb to bytes.
+   * @details Mb to bytes.
+   * @param sizeMb Size in MB to convert.
+   * @return The number of bytes converted from MB.
+   * @note Suggested return identifier: bytes.
+   */
   public static long mbToBytes(long sizeMb) {
     return sizeMb * 1024 * 1024;
   }
-  ///
-  /// @brief   Bytes to mb.
-  /// @details Bytes to mb.
-  /// @param   bytes Size in bytes to convert.
-  /// @return  Size in MB converted from bytes.
-  /// @note    Suggested return identifier: sizeMb.
-  ///
+
+  /**
+   * @brief Bytes to mb.
+   * @details Bytes to mb.
+   * @param bytes Size in bytes to convert.
+   * @return Size in MB converted from bytes.
+   * @note Suggested return identifier: sizeMb.
+   */
   public static long bytesToMb(long bytes) {
     return bytes / 1024 / 1024;
   }
-  ///
-  /// @brief   Gb to bytes.
-  /// @details Gb to bytes.
-  /// @param   sizeGb Size in GB to convert.
-  /// @return  The number of bytes converted from GB.
-  /// @note    Suggested return identifier: bytes.
-  ///
+
+  /**
+   * @brief Gb to bytes.
+   * @details Gb to bytes.
+   * @param sizeGb Size in GB to convert.
+   * @return The number of bytes converted from GB.
+   * @note Suggested return identifier: bytes.
+   */
   public static long gbToBytes(long sizeGb) {
     return sizeGb * 1024 * 1024 * 1024;
   }
-  ///
-  /// @brief   Bytes to gb.
-  /// @details Bytes to gb.
-  /// @param   bytes Size in bytes to convert.
-  /// @return  Size in GB converted from bytes.
-  /// @note    Suggested return identifier: sizeGb.
-  ///
+
+  /**
+   * @brief Bytes to gb.
+   * @details Bytes to gb.
+   * @param bytes Size in bytes to convert.
+   * @return Size in GB converted from bytes.
+   * @note Suggested return identifier: sizeGb.
+   */
   public static long bytesToGb(long bytes) {
     return bytes / 1024 / 1024 / 1024;
   }

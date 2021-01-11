@@ -22,12 +22,12 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-///
-/// @class   ResourceDeciderTest
-/// @brief   tests Decide the resource limitations for a given command.
-/// @details Platform properties from specified exec_properties are taken
-///          into account as well as global buildfarm configuration.
-///
+/**
+ * @class ResourceDeciderTest
+ * @brief tests Decide the resource limitations for a given command.
+ * @details Platform properties from specified exec_properties are taken into account as well as
+ *     global buildfarm configuration.
+ */
 @RunWith(JUnit4.class)
 public class ResourceDeciderTest {
 

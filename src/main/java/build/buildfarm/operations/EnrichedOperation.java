@@ -26,47 +26,44 @@ import com.google.rpc.PreconditionFailure;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 
-///
-/// @class   EnrichedOperation
-/// @brief   Operations with resolved metadata.
-/// @details Operations contain metadata which is not readily available when
-///          obtaining the operation. Additional calls must be made to
-///          retrieve parts of metadata based on digests. Often times an
-///          operation can't be evaluated without also evaluating the command
-///          of the operation. In these contexts, it would be more helpful to
-///          operate on an enriched operation that already has its important
-///          metadata resolved.
-///
+/**
+ * @class EnrichedOperation
+ * @brief Operations with resolved metadata.
+ * @details Operations contain metadata which is not readily available when obtaining the operation.
+ *     Additional calls must be made to retrieve parts of metadata based on digests. Often times an
+ *     operation can't be evaluated without also evaluating the command of the operation. In these
+ *     contexts, it would be more helpful to operate on an enriched operation that already has its
+ *     important metadata resolved.
+ */
 public class EnrichedOperation {
 
-  ///
-  /// @field   operation
-  /// @brief   The main operation object which contains digests to the
-  ///          remaining data members.
-  /// @details Its digests are used to resolve other data members.
-  ///
+  /**
+   * @field operation
+   * @brief The main operation object which contains digests to the remaining data members.
+   * @details Its digests are used to resolve other data members.
+   */
   public Operation operation;
 
-  ///
-  /// @field   action
-  /// @brief   The resolved action of the operation.
-  /// @details Created from the digest in the operation.
-  ///
+  /**
+   * @field action
+   * @brief The resolved action of the operation.
+   * @details Created from the digest in the operation.
+   */
   public Action action;
 
-  ///
-  /// @field   command
-  /// @brief   The resolved command of the action.
-  /// @details Created from the digest in the action.
-  ///
+  /**
+   * @field command
+   * @brief The resolved command of the action.
+   * @details Created from the digest in the action.
+   */
   public Command command;
 
-  ///
-  /// @brief   Convert the structure into a json string.
-  /// @details Uses proto to json serialization where appropriate.
-  /// @return  The structure as a json string.
-  /// @note    Suggested return identifier: json.
-  ///
+  /**
+   * @brief Convert the structure into a json string.
+   * @details Uses proto to json serialization where appropriate.
+   * @return The structure as a json string.
+   * @note Suggested return identifier: json.
+   */
   public String asJsonString() {
     JSONObject obj = new JSONObject();
     try {

@@ -29,15 +29,13 @@ import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisPool;
 
-///
-/// @class   RedisNodeHashesMockTest
-/// @brief   tests A list of redis hashtags that each map to different nodes in the
-///          cluster.
-/// @details When looking to evenly distribute keys across nodes, specific
-///          hashtags need obtained in which each hashtag hashes to a
-///          particular slot owned by a particular worker. This class is used
-///          to obtain the hashtags needed to hit every node in the cluster.
-///
+/**
+ * @class RedisNodeHashesMockTest
+ * @brief tests A list of redis hashtags that each map to different nodes in the cluster.
+ * @details When looking to evenly distribute keys across nodes, specific hashtags need obtained in
+ *     which each hashtag hashes to a particular slot owned by a particular worker. This class is
+ *     used to obtain the hashtags needed to hit every node in the cluster.
+ */
 @RunWith(JUnit4.class)
 public class RedisNodeHashesMockTest {
 
