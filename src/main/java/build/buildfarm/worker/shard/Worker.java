@@ -47,7 +47,9 @@ import build.buildfarm.instance.shard.WorkerStubs;
 import build.buildfarm.server.ByteStreamService;
 import build.buildfarm.server.ContentAddressableStorageService;
 import build.buildfarm.server.Instances;
+import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.ContentAddressableStorageConfig;
+import build.buildfarm.v1test.DisableScaleInProtectionRequest;
 import build.buildfarm.v1test.FilesystemCASConfig;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.ShardWorkerConfig;
@@ -76,11 +78,14 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.TextFormat;
 import com.google.protobuf.util.Durations;
+import io.grpc.ManagedChannel;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.Status;
 import io.grpc.Status.Code;
 import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
+import io.grpc.netty.NegotiationType;
+import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.services.HealthStatusManager;
 import java.io.IOException;
 import java.io.InputStream;
@@ -257,7 +262,7 @@ public class Worker extends LoggingMain {
               timeWaited,
               pipeline.isEmpty() ? "finish all actions" : "but still cannot finish all actions"));
       try {
-        AdminServiceClient.disableScaleInProtection(clusterId, config.getPublicName());
+        disableScaleInProtection(clusterId, config.getPublicName());
       } catch (Exception e) {
         logger.log(
             SEVERE,
@@ -269,6 +274,23 @@ public class Worker extends LoggingMain {
         inGracefulShutdown = false;
       }
     }
+  }
+
+  /**
+   * Make grpc call to Buildfarm endpoint to disable the scale in protection of the host with
+   * instanceIp.
+   *
+   * @param clusterId the Buildfarm endpoint.
+   * @param instanceIp Ip of the the instance that we want to disable scale in protection.
+   */
+  private void disableScaleInProtection(String clusterId, String instanceIp) {
+    NettyChannelBuilder builder =
+        NettyChannelBuilder.forTarget(clusterId).negotiationType(NegotiationType.PLAINTEXT);
+    ManagedChannel channel = builder.build();
+    AdminGrpc.AdminBlockingStub adminBlockingStub = AdminGrpc.newBlockingStub(channel);
+    adminBlockingStub.disableScaleInProtection(
+        DisableScaleInProtectionRequest.newBuilder().setInstanceName(instanceIp).build());
+    channel.shutdown();
   }
 
   private static Path getValidRoot(ShardWorkerConfig config) throws ConfigurationException {

@@ -29,15 +29,20 @@ import build.buildfarm.v1test.GetClientStartTimeRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.GetHostsRequest;
 import build.buildfarm.v1test.GetHostsResult;
+import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequest;
 import build.buildfarm.v1test.ReindexCasRequest;
 import build.buildfarm.v1test.ReindexCasRequestResults;
 import build.buildfarm.v1test.ScaleClusterRequest;
 import build.buildfarm.v1test.ShutDownWorkerGracefullyRequest;
 import build.buildfarm.v1test.ShutDownWorkerGracefullyRequestResults;
+import build.buildfarm.v1test.ShutDownWorkerGrpc;
 import build.buildfarm.v1test.StopContainerRequest;
 import build.buildfarm.v1test.TerminateHostRequest;
 import com.google.rpc.Code;
 import com.google.rpc.Status;
+import io.grpc.ManagedChannel;
+import io.grpc.netty.NegotiationType;
+import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.stub.StreamObserver;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -175,7 +180,7 @@ public class AdminService extends AdminGrpc.AdminImplBase {
       ShutDownWorkerGracefullyRequest request,
       StreamObserver<ShutDownWorkerGracefullyRequestResults> responseObserver) {
     try {
-      ShutDownWorker.informWorkerToPrepareForShutdown(request.getWorkerName());
+      informWorkerToPrepareForShutdown(request.getWorkerName());
       responseObserver.onNext(ShutDownWorkerGracefullyRequestResults.newBuilder().build());
       responseObserver.onCompleted();
     } catch (Exception e) {
@@ -186,6 +191,22 @@ public class AdminService extends AdminGrpc.AdminImplBase {
       logger.log(Level.SEVERE, errorMessage);
       responseObserver.onError(new Exception(errorMessage));
     }
+  }
+
+  /**
+   * Inform a worker to prepare for graceful shutdown.
+   *
+   * @param host the host that should be prepared for shutdown.
+   */
+  private void informWorkerToPrepareForShutdown(String host) {
+    NettyChannelBuilder builder =
+        NettyChannelBuilder.forTarget(host).negotiationType(NegotiationType.PLAINTEXT);
+    ManagedChannel channel = builder.build();
+    ShutDownWorkerGrpc.ShutDownWorkerBlockingStub shutDownWorkerBlockingStub =
+        ShutDownWorkerGrpc.newBlockingStub(channel);
+    shutDownWorkerBlockingStub.prepareWorkerForGracefulShutdown(
+        PrepareWorkerForGracefulShutDownRequest.newBuilder().build());
+    channel.shutdown();
   }
 
   /**
