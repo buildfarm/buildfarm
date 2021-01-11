@@ -199,14 +199,20 @@ public class AdminService extends AdminGrpc.AdminImplBase {
    * @param host the host that should be prepared for shutdown.
    */
   private void informWorkerToPrepareForShutdown(String host) {
-    NettyChannelBuilder builder =
-        NettyChannelBuilder.forTarget(host).negotiationType(NegotiationType.PLAINTEXT);
-    ManagedChannel channel = builder.build();
-    ShutDownWorkerGrpc.ShutDownWorkerBlockingStub shutDownWorkerBlockingStub =
-        ShutDownWorkerGrpc.newBlockingStub(channel);
-    shutDownWorkerBlockingStub.prepareWorkerForGracefulShutdown(
-        PrepareWorkerForGracefulShutDownRequest.newBuilder().build());
-    channel.shutdown();
+    ManagedChannel channel = null;
+    try {
+      NettyChannelBuilder builder =
+          NettyChannelBuilder.forTarget(host).negotiationType(NegotiationType.PLAINTEXT);
+      channel = builder.build();
+      ShutDownWorkerGrpc.ShutDownWorkerBlockingStub shutDownWorkerBlockingStub =
+          ShutDownWorkerGrpc.newBlockingStub(channel);
+      shutDownWorkerBlockingStub.prepareWorkerForGracefulShutdown(
+          PrepareWorkerForGracefulShutDownRequest.newBuilder().build());
+    } finally {
+      if (channel != null) {
+        channel.shutdown();
+      }
+    }
   }
 
   /**

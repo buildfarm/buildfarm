@@ -284,13 +284,19 @@ public class Worker extends LoggingMain {
    * @param instanceIp Ip of the the instance that we want to disable scale in protection.
    */
   private void disableScaleInProtection(String clusterId, String instanceIp) {
-    NettyChannelBuilder builder =
-        NettyChannelBuilder.forTarget(clusterId).negotiationType(NegotiationType.PLAINTEXT);
-    ManagedChannel channel = builder.build();
-    AdminGrpc.AdminBlockingStub adminBlockingStub = AdminGrpc.newBlockingStub(channel);
-    adminBlockingStub.disableScaleInProtection(
-        DisableScaleInProtectionRequest.newBuilder().setInstanceName(instanceIp).build());
-    channel.shutdown();
+    ManagedChannel channel = null;
+    try {
+      NettyChannelBuilder builder =
+          NettyChannelBuilder.forTarget(clusterId).negotiationType(NegotiationType.PLAINTEXT);
+      channel = builder.build();
+      AdminGrpc.AdminBlockingStub adminBlockingStub = AdminGrpc.newBlockingStub(channel);
+      adminBlockingStub.disableScaleInProtection(
+          DisableScaleInProtectionRequest.newBuilder().setInstanceName(instanceIp).build());
+    } finally {
+      if (channel != null) {
+        channel.shutdown();
+      }
+    }
   }
 
   private static Path getValidRoot(ShardWorkerConfig config) throws ConfigurationException {
