@@ -17,6 +17,7 @@ package build.buildfarm;
 import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.DisableScaleInProtectionRequest;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequest;
+import build.buildfarm.v1test.ShutDownWorkerGracefullyRequest;
 import build.buildfarm.v1test.ShutDownWorkerGrpc;
 import io.grpc.ManagedChannel;
 import io.grpc.netty.NegotiationType;
@@ -35,20 +36,36 @@ class GracefulShutdownTest {
    * @param args
    */
   private static void shutDownGracefully(String[] args) {
-    System.out.println("Sending ShutDownWorkerGracefully request to bf");
+    String workerName = args[1];
     String bfEndpoint = args[2];
-    String hostPrivateIp = args[1];
+    System.out.println(
+        "Sending ShutDownWorkerGracefully request to bf "
+            + bfEndpoint
+            + " to shut down worker "
+            + workerName
+            + " gracefully");
     ManagedChannel channel = createChannel(bfEndpoint);
+    AdminGrpc.AdminBlockingStub adminBlockingStub = AdminGrpc.newBlockingStub(channel);
+    adminBlockingStub.shutDownWorkerGracefully(
+        ShutDownWorkerGracefullyRequest.newBuilder().setWorkerName(workerName).build());
+
+    System.out.println("Request is sent");
   }
 
+  /**
+   * Example command: GracefulShutdownTest PrepareWorker WorkerIp:port
+   *
+   * @param args
+   */
   private static void prepareWorkerForShutDown(String[] args) {
-    System.out.println("Inform worker " + args[1] + " to prepare for shutdown!");
-    ManagedChannel channel = createChannel(args[1]);
+    String workerIpWithPort = args[1];
+    System.out.println("Inform worker " + workerIpWithPort + " to prepare for shutdown!");
+    ManagedChannel channel = createChannel(workerIpWithPort);
     ShutDownWorkerGrpc.ShutDownWorkerBlockingStub shutDownWorkerBlockingStub =
         ShutDownWorkerGrpc.newBlockingStub(channel);
     shutDownWorkerBlockingStub.prepareWorkerForGracefulShutdown(
         PrepareWorkerForGracefulShutDownRequest.newBuilder().build());
-    System.out.println("Worker " + args[1] + " informed!");
+    System.out.println("Worker " + workerIpWithPort + " informed!");
   }
 
   /**
@@ -58,8 +75,8 @@ class GracefulShutdownTest {
    * @param args
    */
   private static void disableScaleInProtection(String[] args) {
-    String bfEndpoint = args[2];
     String instancePrivateIp = args[1];
+    String bfEndpoint = args[2];
     System.out.println("Ready to disable scale in protection of " + instancePrivateIp);
     ManagedChannel channel = createChannel(bfEndpoint);
     AdminGrpc.AdminBlockingStub adminBlockingStub = AdminGrpc.newBlockingStub(channel);
@@ -68,12 +85,6 @@ class GracefulShutdownTest {
     System.out.println("Request for " + instancePrivateIp + " sent");
   }
 
-  /**
-   * Example command: GracefulShutdownTest PrepareWorker WorkerIp:port
-   *
-   * @param args
-   * @throws Exception
-   */
   public static void main(String[] args) throws Exception {
     if (args[0].equals("ShutDown")) {
       shutDownGracefully(args);
@@ -83,7 +94,7 @@ class GracefulShutdownTest {
       disableScaleInProtection(args);
     } else {
       System.out.println(
-          "The action your choose is wrong. Please choose between ShutDown, PrepareWorker, and DisableProtection");
+          "The action your choose is wrong. Please choose one from ShutDown, PrepareWorker, and DisableProtection");
     }
   }
 }

@@ -925,30 +925,13 @@ java_binary(
 java_binary(
     name = "GracefulShutdownTest",
     srcs = ["GracefulShutdownTest.java"],
-    classpath_resources = [
-        ":configs",
-    ],
     main_class = "build.buildfarm.GracefulShutdownTest",
     visibility = ["//visibility:public"],
     deps = [
-        ":common",
-        ":instance",
-        ":stub-instance",
-        ":shard-instance",
-        ":shard-worker",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
-        "//third_party/jedis",
-        "@maven//:com_google_guava_guava",
-        "@maven//:com_github_pcj_google_options",
-        "@maven//:com_google_protobuf_protobuf_java",
-        "@maven//:com_google_protobuf_protobuf_java_util",
-        "@maven//:io_grpc_grpc_api",
-        "@maven//:io_grpc_grpc_context",
-        "@maven//:io_grpc_grpc_core",
-        "@maven//:io_grpc_grpc_netty",
-        "@maven//:io_grpc_grpc_protobuf",
-        "@maven//:io_grpc_grpc_stub",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
+        "@maven//:io_grpc_grpc_api",
+        "@maven//:io_grpc_grpc_netty",
     ],
 )
 
