@@ -282,7 +282,7 @@ public class Worker extends LoggingMain {
    * Make grpc call to Buildfarm endpoint to disable the scale in protection of the host with
    * instanceIp.
    *
-   * @param clusterEndpoint the Buildfarm endpoint.
+   * @param clusterEndpoint the current Buildfarm endpoint.
    * @param instanceIp Ip of the the instance that we want to disable scale in protection.
    */
   private void disableScaleInProtection(String clusterEndpoint, String instanceIp) {
