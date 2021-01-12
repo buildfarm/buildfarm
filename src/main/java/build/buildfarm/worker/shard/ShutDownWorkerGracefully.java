@@ -45,10 +45,14 @@ public class ShutDownWorkerGracefully extends ShutDownWorkerGrpc.ShutDownWorkerI
       PrepareWorkerForGracefulShutDownRequest request,
       StreamObserver<PrepareWorkerForGracefulShutDownRequestResults> responseObserver) {
     String clusterId = config.getAdminConfig().getClusterId();
-    if (clusterId == null || clusterId.equals("")) {
+    String clusterEndpoint = config.getAdminConfig().getClusterEndpoint();
+    if (clusterId == null
+        || clusterId.equals("")
+        || clusterEndpoint == null
+        || clusterEndpoint.equals("")) {
       String errorMessage =
           String.format(
-              "Current AdminConfig doesn't have cluster_id set, "
+              "Current AdminConfig doesn't have cluster_id or cluster_endpoint set, "
                   + "the worker %s won't be shut down.",
               config.getPublicName());
       logger.log(WARNING, errorMessage);

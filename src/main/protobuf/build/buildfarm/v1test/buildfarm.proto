@@ -246,6 +246,8 @@ message AdminConfig {
 
   string cluster_id = 4;
 
+  string cluster_endpoint = 6;
+
   oneof type {
     AwsAdminConfig aws_admin_config = 2;
     GcpAdminConfig gcp_admin_config = 3;
