@@ -256,7 +256,7 @@ public class Worker extends LoggingMain {
       logger.log(Level.SEVERE, "The worker gracefully shutdown is interrupted: " + e.getMessage());
     } finally {
       // make a grpc call to disable scale protection
-      String clusterId = config.getAdminConfig().getClusterId();
+      String clusterEndpoint = config.getAdminConfig().getClusterEndpoint();
       logger.log(
           INFO,
           String.format(
@@ -264,7 +264,7 @@ public class Worker extends LoggingMain {
               timeWaited,
               pipeline.isEmpty() ? "finish all actions" : "but still cannot finish all actions"));
       try {
-        disableScaleInProtection(clusterId, config.getPublicName());
+        disableScaleInProtection(clusterEndpoint, config.getPublicName());
       } catch (Exception e) {
         logger.log(
             SEVERE,
@@ -282,14 +282,14 @@ public class Worker extends LoggingMain {
    * Make grpc call to Buildfarm endpoint to disable the scale in protection of the host with
    * instanceIp.
    *
-   * @param clusterId the Buildfarm endpoint.
+   * @param clusterEndpoint the Buildfarm endpoint.
    * @param instanceIp Ip of the the instance that we want to disable scale in protection.
    */
-  private void disableScaleInProtection(String clusterId, String instanceIp) {
+  private void disableScaleInProtection(String clusterEndpoint, String instanceIp) {
     ManagedChannel channel = null;
     try {
       NettyChannelBuilder builder =
-          NettyChannelBuilder.forTarget(clusterId).negotiationType(NegotiationType.PLAINTEXT);
+          NettyChannelBuilder.forTarget(clusterEndpoint).negotiationType(NegotiationType.PLAINTEXT);
       channel = builder.build();
       AdminGrpc.AdminBlockingStub adminBlockingStub = AdminGrpc.newBlockingStub(channel);
       adminBlockingStub.disableScaleInProtection(
