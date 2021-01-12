@@ -249,6 +249,8 @@ public class Worker extends LoggingMain {
       while (!pipeline.isEmpty() && timeWaited < timeOut) {
         SECONDS.sleep(scanRate);
         timeWaited += scanRate;
+        logger.log(
+            INFO, String.format("Pipeline is still not empty after %d seconds.", timeWaited));
       }
     } catch (InterruptedException e) {
       logger.log(Level.SEVERE, "The worker gracefully shutdown is interrupted: " + e.getMessage());
