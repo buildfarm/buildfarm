@@ -272,7 +272,7 @@ public class Worker extends LoggingMain {
                 "gRPC call to AdminService to disable scale in protection failed with exception: %s and stacktrace %s",
                 e.getMessage(), Arrays.toString(e.getStackTrace())));
         // Gracefully shutdown cannot be performed successfully because of error in
-        // AdminService side. Under this scenario, the worker has to be added back to worker pool.
+        // AdminService side. Under this scenario, the worker has to be added back to the worker pool.
         inGracefulShutdown = false;
       }
     }
