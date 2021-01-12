@@ -238,8 +238,9 @@ public class Worker extends LoggingMain {
    * scale in protection when the worker is ready. If unexpected errors happened, it will cancel the
    * graceful shutdown progress make the worker available again.
    */
-  public void prepareWorkerForGracefulShutdown() {
+  public void prepareWorkerForGracefulShutdown() throws IOException {
     inGracefulShutdown = true;
+    backplane.deregisterWorker(config.getPublicName());
     logger.log(Level.INFO, "The current worker is deregistered and should be shutdown gracefully!");
     int scanRate = 30; // check every 30 seconds
     int timeWaited = 0;
