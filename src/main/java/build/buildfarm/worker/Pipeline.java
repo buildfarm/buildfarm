@@ -60,6 +60,16 @@ public class Pipeline {
     join(true);
   }
 
+  /** Inform MatchStage to stop matching or picking up new Operations from queue. */
+  public void stopMatchingOperations() {
+    for (PipelineStage stage : stageClosePriorities.keySet()) {
+      if (stage instanceof MatchStage) {
+        ((MatchStage) stage).prepareForGracefulShutdown();
+        return;
+      }
+    }
+  }
+
   /**
    * Checking if there is any ongoing actions in any stages of the pipeline.
    *

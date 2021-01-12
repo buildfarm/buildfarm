@@ -923,6 +923,19 @@ java_binary(
 )
 
 java_binary(
+    name = "GracefulShutdownTest",
+    srcs = ["GracefulShutdownTest.java"],
+    main_class = "build.buildfarm.GracefulShutdownTest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
+        "@maven//:io_grpc_grpc_api",
+        "@maven//:io_grpc_grpc_netty",
+    ],
+)
+
+java_binary(
     name = "bf-hist",
     srcs = ["Hist.java"],
     main_class = "build.buildfarm.Hist",

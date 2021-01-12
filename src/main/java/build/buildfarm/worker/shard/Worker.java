@@ -240,7 +240,10 @@ public class Worker extends LoggingMain {
    */
   public void prepareWorkerForGracefulShutdown() {
     inGracefulShutdown = true;
-    logger.log(Level.INFO, "The current worker is deregistered and should be shutdown gracefully!");
+    logger.log(
+        Level.INFO,
+        "The current worker will not be registered again and should be shutdown gracefully!");
+    pipeline.stopMatchingOperations();
     int scanRate = 30; // check every 30 seconds
     int timeWaited = 0;
     int timeOut = 60 * 15; // 15 minutes

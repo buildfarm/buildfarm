@@ -226,12 +226,27 @@ public class AdminService extends AdminGrpc.AdminImplBase {
       DisableScaleInProtectionRequest request,
       StreamObserver<DisableScaleInProtectionRequestResults> responseObserver) {
     try {
-      adminController.disableHostScaleInProtection(request.getInstanceName());
+      String hostPrivateIp = trimHostPrivateDns(request.getInstanceName());
+      adminController.disableHostScaleInProtection(hostPrivateIp);
       responseObserver.onNext(DisableScaleInProtectionRequestResults.newBuilder().build());
       responseObserver.onCompleted();
     } catch (RuntimeException e) {
       responseObserver.onError(e);
     }
+  }
+
+  /**
+   * The private dns get from worker might be suffixed with ":portNumber", which should be trimmed.
+   *
+   * @param hostPrivateIp the private dns should be trimmed.
+   * @return
+   */
+  private String trimHostPrivateDns(String hostPrivateIp) {
+    String portSeparator = ":";
+    if (hostPrivateIp.contains(portSeparator)) {
+      hostPrivateIp = hostPrivateIp.split(portSeparator)[0];
+    }
+    return hostPrivateIp;
   }
 
   private static Admin getAdminController(AdminConfig config) {
