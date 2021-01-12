@@ -31,7 +31,7 @@ class GracefulShutdownTest {
   }
 
   /**
-   * Example command: GracefulShutdownTest ShutDown workerIp buildfarm-(@= env @).aws.uberatc.net
+   * Example command: GracefulShutdownTest ShutDown workerIp buildfarm-endpoint
    *
    * @param args
    */
@@ -69,8 +69,7 @@ class GracefulShutdownTest {
   }
 
   /**
-   * Example command: GracefulShutdownTest DisableProtection WorkerIp buildfarm-(@=
-   * env @).aws.uberatc.net
+   * Example command: GracefulShutdownTest DisableProtection WorkerIp buildfarm_endpoint
    *
    * @param args
    */
