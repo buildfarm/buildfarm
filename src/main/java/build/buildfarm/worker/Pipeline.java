@@ -63,7 +63,7 @@ public class Pipeline {
   /**
    * Checking if there is any ongoing actions in any stages of the pipeline.
    *
-   * @return
+   * @return true of all PilelineStages are empty.
    */
   public boolean isEmpty() {
     for (PipelineStage stage : stageClosePriorities.keySet()) {
