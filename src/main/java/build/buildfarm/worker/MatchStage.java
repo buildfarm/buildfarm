@@ -34,6 +34,7 @@ import javax.annotation.Nullable;
 
 public class MatchStage extends PipelineStage {
   private static final Logger logger = Logger.getLogger(MatchStage.class.getName());
+  private boolean inGracefulShutdown = false;
 
   public MatchStage(WorkerContext workerContext, PipelineStage output, PipelineStage error) {
     super("MatchStage", workerContext, output, error);
@@ -125,6 +126,10 @@ public class MatchStage extends PipelineStage {
 
   @Override
   protected void iterate() throws InterruptedException {
+    // stop matching and picking up any works if the worker is in graceful shutdown.
+    if (inGracefulShutdown) {
+      return;
+    }
     Stopwatch stopwatch = Stopwatch.createStarted();
     OperationContext operationContext = OperationContext.newBuilder().build();
     if (!output.claim(operationContext)) {
@@ -139,6 +144,10 @@ public class MatchStage extends PipelineStage {
         output.release();
       }
     }
+  }
+
+  void prepareForGracefulShutdown() {
+    inGracefulShutdown = true;
   }
 
   private OperationContext match(OperationContext operationContext) {
