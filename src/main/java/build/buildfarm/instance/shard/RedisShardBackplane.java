@@ -477,7 +477,7 @@ public class RedisShardBackplane implements ShardBackplane {
             client);
 
     // use Executors...
-    subscriptionThread = new Thread(operationSubscription);
+    subscriptionThread = new Thread(operationSubscription, "Operation Subscription");
 
     subscriptionThread.start();
   }
@@ -497,7 +497,8 @@ public class RedisShardBackplane implements ShardBackplane {
                   logger.log(Level.SEVERE, "error while updating watchers in failsafe", e);
                 }
               }
-            });
+            },
+            "Failsafe Operation");
 
     failsafeOperationThread.start();
   }
