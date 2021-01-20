@@ -80,7 +80,7 @@ def buildfarm_init(name = "buildfarm"):
                     ["io.grpc:grpc-%s:1.26.0" % module for module in IO_GRPC_MODULES] +
                     [
                         "junit:junit:4.12",
-                        "org.apache.commons:commons-pool2:2.4.3",
+                        "org.apache.commons:commons-pool2:2.9.0",
                         "org.checkerframework:checker-qual:2.5.2",
                         "org.mockito:mockito-core:2.25.0",
                         "org.openjdk.jmh:jmh-core:1.23",
