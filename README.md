@@ -85,8 +85,32 @@ bazel run //src/main/java/build/buildfarm:buildfarm-server -- --debug=5005 $PWD/
 
 ### Setting up intelliJ
 
-1. Follow the instructions in https://github.com/bazelbuild/intellij to install the bazel plugin for intelliJ
-1. Import the project using `ij.bazelproject`
+1. Check [which IntelliJ versions are supported by the Bazel
+   plugin](https://plugins.jetbrains.com/plugin/8609-bazel/versions)
+1. Make sure you have a supported IntelliJ version, otherwise [download one
+   here](https://www.jetbrains.com/idea/download/other.html)
+1. Follow [the Bazel plugin
+   instructions](https://ij.bazel.build/docs/import-project.html) and import
+   [`ij.bazelproject`](ij.bazelproject)
+1. Once IntelliJ is done loading your project, open
+   [`BuildFarmServer.java`](src/main/java/build/buildfarm/server/BuildFarmServer.java)
+   and find the `main()` method at the bottom
+1. Press the green play button symbol in the gutter next to `main()` to create a
+   Bazel build configuration for starting a server. Launching this configuration
+   should get you a help text from Buildfarm Server indicating missing a config
+   file.
+
+   This indicates a successful launch!
+1. To add a config file, edit your new run configuration and enter the absolute
+   path to [`examples/server.config.example`](examples/server.config.example) in
+   the "Executable flags" text box.
+
+Now, you should have something like this, and you can now run / debug Buildfarm
+Server from inside of IntelliJ, just like any other program:
+
+![IntelliJ Buildfarm Server run
+configuration](examples/intellij-server-run-config.png)
+
 
 ### Third-party Dependencies
 
