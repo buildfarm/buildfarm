@@ -224,7 +224,7 @@ public class OperationQueue {
       }
     }
 
-    // A this point, we were unable to match an action to an eligible queue.
+    // At this point, we were unable to match an action to an eligible queue.
     // We will build an error explaining why the matching failed. This will help user's properly
     // configure their queue or adjust the execution_properties of their actions.
     String eligibilityResults = "Below are the eligibility results for each provisioned queue:\n";
