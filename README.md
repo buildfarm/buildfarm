@@ -83,6 +83,35 @@ bazel run //src/main/java/build/buildfarm:buildfarm-server -- --debug=5005 $PWD/
 
 ## Developer Information
 
+### Setting up Redis for local testing
+
+This is done using [`examples/development-redis-cluster.sh`](examples/development-redis-cluster.sh).
+
+Tested with Redis `6.0.10`, other versions probably work fine as well.
+
+First of all you need Redis installed:
+* macOS: `brew install redis`
+* Debian / Ubuntu: `sudo apt-get update && sudo apt-get install redis-server redis-tools`
+
+Then  you need seven terminal panes for this, six for [a minimal Redis
+cluster](https://redis.io/topics/cluster-tutorial#creating-and-using-a-redis-cluster)
+and one for Buildfarm.
+
+* `./examples/development-redis-cluster.sh 0`
+* `./examples/development-redis-cluster.sh 1`
+* `./examples/development-redis-cluster.sh 2`
+* `./examples/development-redis-cluster.sh 3`
+* `./examples/development-redis-cluster.sh 4`
+* `./examples/development-redis-cluster.sh 5`
+* ```sh
+  redis-cli --cluster create 127.0.0.1:6379 127.0.0.1:6380 127.0.0.1:6381 127.0.0.1:6382 127.0.0.1:6383 127.0.0.1:6384 --cluster-replicas 1
+  ```
+
+Your Redis cluster is now up, and you can now start your Buildfarm server talking to it:
+```sh
+bazel run //src/main/java/build/buildfarm:buildfarm-server $PWD/examples/shard-server.config.example
+```
+
 ### Setting up intelliJ
 
 1. Check [which IntelliJ versions are supported by the Bazel
