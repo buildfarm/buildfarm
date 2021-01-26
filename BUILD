@@ -31,5 +31,8 @@ genrule(
 
 cc_binary(
     name = "as-nobody.binary",
-    srcs = ["as-nobody.c"],
+    srcs = select({
+        "//config:windows": ["as-nobody-windows.c"],
+        "//conditions:default": ["as-nobody.c"],
+    }),
 )
