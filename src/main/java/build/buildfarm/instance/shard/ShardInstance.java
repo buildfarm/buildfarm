@@ -463,7 +463,7 @@ public class ShardInstance extends AbstractServerInstance {
 
   @Override
   public void stop() throws InterruptedException {
-    if (stopped) {
+    if (stopped || stopping) {
       return;
     }
     stopping = true;
