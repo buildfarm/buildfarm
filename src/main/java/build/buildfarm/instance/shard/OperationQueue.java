@@ -223,10 +223,20 @@ public class OperationQueue {
         return provisionedQueue.queue();
       }
     }
+
+    // At this point, we were unable to match an action to an eligible queue.
+    // We will build an error explaining why the matching failed. This will help user's properly
+    // configure their queue or adjust the execution_properties of their actions.
+    String eligibilityResults = "Below are the eligibility results for each provisioned queue:\n";
+    for (ProvisionedRedisQueue provisionedQueue : queues) {
+      eligibilityResults += provisionedQueue.explainEligibility(toMultimap(provisions));
+    }
+
     throw new RuntimeException(
         "there are no eligible queues for the provided execution requirements."
             + " One solution to is to configure a provision queue with no requirements which would be eligible to all operations."
-            + " See https://github.com/bazelbuild/bazel-buildfarm/wiki/Shard-Platform-Operation-Queue for details");
+            + " See https://github.com/bazelbuild/bazel-buildfarm/wiki/Shard-Platform-Operation-Queue for details. "
+            + eligibilityResults);
   }
 
   /**
