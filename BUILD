@@ -8,6 +8,8 @@ buildifier(
 # For their availability on a worker, they should be provided to a java_image as a "runtime_dep".
 # The relevant configuration for workers is the "execution policy".
 # That is where these binaries can be used and stacked.
+# Be aware that the process-wrapper and linux-sandbox come from bazel itself.
+# Therefore, users may want to ensure that the same bazel version is sourced here as is used locally.
 genrule(
     name = "process-wrapper.binary",
     srcs = ["@bazel//src/main/tools:process-wrapper"],
