@@ -70,6 +70,16 @@ def archive_dependencies(third_party):
             "strip_prefix": "rules_docker-f4822f3921f0c343dd9e5ae65c760d0fb70be1b3",
             "urls": ["https://github.com/bazelbuild/rules_docker/archive/f4822f3921f0c343dd9e5ae65c760d0fb70be1b3.tar.gz"],
         },
+        
+        # Bazel is referenced as a dependency so that buildfarm can access the linux-sandbox as a potential execution wrapper.
+        {
+            "name": "bazel",
+            "sha256": "bca2303a43c696053317a8c7ac09a5e6d90a62fec4726e55357108bb60d7a807",
+            "strip_prefix": "bazel-3.7.2",
+            "urls": ["https://github.com/bazelbuild/bazel/archive/3.7.2.tar.gz"],
+            "patch_args": ["-p1"],
+            "patches": ["%s/bazel:bazel_visibility.patch" % third_party],
+        },
     ]
 
 def buildfarm_dependencies(repository_name = "build_buildfarm"):
