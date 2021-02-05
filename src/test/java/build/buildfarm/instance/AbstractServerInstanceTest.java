@@ -466,6 +466,31 @@ public class AbstractServerInstanceTest {
     assertThat(violation.getDescription()).isEqualTo("working directory is not an input directory");
   }
 
+  private static void doBlob(
+      ContentAddressableStorage contentAddressableStorage,
+      Digest digest,
+      ByteString content,
+      RequestMetadata requestMetadata) {
+    doAnswer(
+            new Answer<Void>() {
+              @Override
+              public Void answer(InvocationOnMock invocation) {
+                StreamObserver<ByteString> blobObserver =
+                    (StreamObserver) invocation.getArguments()[3];
+                blobObserver.onNext(content);
+                blobObserver.onCompleted();
+                return null;
+              }
+            })
+        .when(contentAddressableStorage)
+        .get(
+            eq(digest),
+            /* offset=*/ eq(0l),
+            eq(digest.getSizeBytes()),
+            any(ServerCallStreamObserver.class),
+            eq(requestMetadata));
+  }
+
   @Test
   public void outputDirectoriesFilesAreEnsuredPresent() throws Exception {
     // our test subjects - these should appear in the findMissingBlobs request
@@ -473,6 +498,8 @@ public class AbstractServerInstanceTest {
         DIGEST_UTIL.compute(ByteString.copyFromUtf8("Output Directory Root File Content"));
     Digest childFileDigest =
         DIGEST_UTIL.compute(ByteString.copyFromUtf8("Output Directory Child File Content"));
+    Digest otherFileDigest =
+        DIGEST_UTIL.compute(ByteString.copyFromUtf8("Another Output Directory File Content"));
 
     // setup block and ensureOutputsPresent trigger
     RequestMetadata requestMetadata =
@@ -496,30 +523,24 @@ public class AbstractServerInstanceTest {
                     .addFiles(FileNode.newBuilder().setDigest(childFileDigest))
                     .build())
             .build();
+    Tree otherTree =
+        Tree.newBuilder()
+            .setRoot(
+                Directory.newBuilder()
+                    .addFiles(FileNode.newBuilder().setDigest(otherFileDigest))
+                    .build())
+            .build();
     Digest treeDigest = DIGEST_UTIL.compute(tree);
-    doAnswer(
-            new Answer<Void>() {
-              @Override
-              public Void answer(InvocationOnMock invocation) {
-                StreamObserver<ByteString> blobObserver =
-                    (StreamObserver) invocation.getArguments()[3];
-                blobObserver.onNext(tree.toByteString());
-                blobObserver.onCompleted();
-                return null;
-              }
-            })
-        .when(contentAddressableStorage)
-        .get(
-            eq(treeDigest),
-            /* offset=*/ eq(0l),
-            eq(treeDigest.getSizeBytes()),
-            any(ServerCallStreamObserver.class),
-            eq(requestMetadata));
+    doBlob(contentAddressableStorage, treeDigest, tree.toByteString(), requestMetadata);
+    Digest otherTreeDigest = DIGEST_UTIL.compute(otherTree);
+    doBlob(contentAddressableStorage, otherTreeDigest, otherTree.toByteString(), requestMetadata);
     ActionKey actionKey =
         DigestUtil.asActionKey(DIGEST_UTIL.compute(ByteString.copyFromUtf8("action")));
     ActionResult actionResult =
         ActionResult.newBuilder()
             .addOutputDirectories(OutputDirectory.newBuilder().setTreeDigest(treeDigest).build())
+            .addOutputDirectories(
+                OutputDirectory.newBuilder().setTreeDigest(otherTreeDigest).build())
             .build();
     when(actionCache.get(actionKey)).thenReturn(immediateFuture(actionResult));
 
@@ -537,6 +558,7 @@ public class AbstractServerInstanceTest {
             any(ServerCallStreamObserver.class),
             eq(requestMetadata));
     verify(contentAddressableStorage, times(1)).findMissingBlobs(findMissingBlobsCaptor.capture());
-    assertThat(findMissingBlobsCaptor.getValue()).containsAtLeast(fileDigest, childFileDigest);
+    assertThat(findMissingBlobsCaptor.getValue())
+        .containsAtLeast(fileDigest, childFileDigest, otherFileDigest);
   }
 }
