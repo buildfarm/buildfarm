@@ -18,6 +18,7 @@ import static build.buildfarm.common.Actions.asExecutionStatus;
 import static build.buildfarm.common.Actions.checkPreconditionFailure;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
+import static build.buildfarm.common.Trees.enumerateTreeFileDigests;
 import static build.buildfarm.instance.Utils.putBlob;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
@@ -46,6 +47,7 @@ import build.bazel.remote.execution.v2.ExecutionCapabilities;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.FileNode;
+import build.bazel.remote.execution.v2.OutputDirectory;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
@@ -80,6 +82,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
+import com.google.common.util.concurrent.AsyncFunction;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -222,17 +225,39 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   protected ListenableFuture<Iterable<Digest>> findMissingActionResultOutputs(
-      @Nullable ActionResult result, RequestMetadata requestMetadata) {
+      @Nullable ActionResult result, Executor executor, RequestMetadata requestMetadata) {
     if (result == null) {
       return immediateFuture(ImmutableList.of());
     }
     // TODO Directories
-    return findMissingBlobs(
-        Iterables.concat(
-            Iterables.transform(result.getOutputFilesList(), outputFile -> outputFile.getDigest()),
-            // findMissingBlobs will weed out empties
-            ImmutableList.of(result.getStdoutDigest(), result.getStderrDigest())),
-        requestMetadata);
+    ImmutableList.Builder<Digest> digests = ImmutableList.builder();
+    digests.addAll(
+        Iterables.transform(result.getOutputFilesList(), outputFile -> outputFile.getDigest()));
+    // findMissingBlobs will weed out empties
+    digests.add(result.getStdoutDigest());
+    digests.add(result.getStderrDigest());
+    ListenableFuture<Void> digestsCompleteFuture = immediateFuture(null);
+    for (OutputDirectory directory : result.getOutputDirectoriesList()) {
+      // TODO make tree cache
+      // create an async function here to avoid initiating the calls to expect immediately
+      // no synchronization required on digests, since only one request is running at a time
+      AsyncFunction<Void, Void> next =
+          v ->
+              transform(
+                  expect(
+                      directory.getTreeDigest(),
+                      build.bazel.remote.execution.v2.Tree.parser(),
+                      executor,
+                      requestMetadata),
+                  tree -> {
+                    digests.addAll(enumerateTreeFileDigests(tree));
+                    return null;
+                  },
+                  executor);
+      digestsCompleteFuture = transformAsync(digestsCompleteFuture, next, executor);
+    }
+    return transformAsync(
+        digestsCompleteFuture, v -> findMissingBlobs(digests.build(), requestMetadata), executor);
   }
 
   protected ListenableFuture<ActionResult> ensureOutputsPresent(
@@ -240,7 +265,7 @@ public abstract class AbstractServerInstance implements Instance {
     ListenableFuture<Iterable<Digest>> missingOutputsFuture =
         transformAsync(
             resultFuture,
-            result -> findMissingActionResultOutputs(result, requestMetadata),
+            result -> findMissingActionResultOutputs(result, directExecutor(), requestMetadata),
             directExecutor());
     return transformAsync(
         missingOutputsFuture,
