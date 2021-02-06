@@ -364,7 +364,15 @@ public class MemoryInstance extends AbstractServerInstance {
       @Override
       public FeedbackOutputStream getOutput(
           long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+        // should be synchronized for a single active output
         return getStreamSource(name).getOutput();
+      }
+
+      @Override
+      public ListenableFuture<FeedbackOutputStream> getOutputFuture(
+          long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+        // should be futured for a single closed output
+        return immediateFuture(getOutput(deadlineAfter, deadlineAfterUnits, onReadyHandler));
       }
 
       @Override

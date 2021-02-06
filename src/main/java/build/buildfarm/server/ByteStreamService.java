@@ -18,6 +18,7 @@ import static build.buildfarm.common.UrlPath.detectResourceOperation;
 import static build.buildfarm.common.UrlPath.parseBlobDigest;
 import static build.buildfarm.common.UrlPath.parseUploadBlobDigest;
 import static build.buildfarm.common.UrlPath.parseUploadBlobUUID;
+import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static io.grpc.Status.INVALID_ARGUMENT;
 import static io.grpc.Status.NOT_FOUND;
 import static io.grpc.Status.OUT_OF_RANGE;
@@ -398,6 +399,12 @@ public class ByteStreamService extends ByteStreamImplBase {
       }
 
       @Override
+      public ListenableFuture<FeedbackOutputStream> getOutputFuture(
+          long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+        return immediateFailedFuture(new IOException("cannot get output of blob write"));
+      }
+
+      @Override
       public void reset() {
         throw new RuntimeException("cannot reset a blob write");
       }
@@ -441,7 +448,7 @@ public class ByteStreamService extends ByteStreamImplBase {
 
   private ServerCallStreamObserver<WriteResponse> initializeBackPressure(
       StreamObserver<WriteResponse> responseObserver) {
-    final ServerCallStreamObserver<WriteResponse> serverCallStreamObserver =
+    ServerCallStreamObserver<WriteResponse> serverCallStreamObserver =
         (ServerCallStreamObserver<WriteResponse>) responseObserver;
     serverCallStreamObserver.disableAutoInboundFlowControl();
     serverCallStreamObserver.request(1);

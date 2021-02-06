@@ -17,7 +17,6 @@ package build.buildfarm.server;
 import static build.buildfarm.common.UrlPath.detectResourceOperation;
 import static build.buildfarm.common.UrlPath.parseUploadBlobDigest;
 import static build.buildfarm.common.UrlPath.parseUploadBlobUUID;
-import static build.buildfarm.common.grpc.Retrier.DEFAULT_IS_RETRIABLE;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static io.grpc.Status.ABORTED;
@@ -64,6 +63,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private volatile boolean committed = false;
   private String name = null;
   private Write write = null;
+  private FeedbackOutputStream out = null;
   private Instance instance = null;
   private final AtomicReference<Throwable> exception = new AtomicReference<>(null);
   private final AtomicBoolean wasReady = new AtomicBoolean(false);
@@ -207,7 +207,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
         logger.log(
             Level.FINER,
             format(
-                "registering callback for %s: committed_size = %d, complete = %s",
+                "registering callback for %s: committed_size = %d (transient), complete = %s",
                 resourceName, write.getCommittedSize(), write.isComplete()));
         Futures.addCallback(
             write.getFuture(),
@@ -288,10 +288,22 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   }
 
   @GuardedBy("this")
+  private long getCommittedSizeForWrite() throws IOException {
+    getOutput(); // establish ownership for this output
+    return write.getCommittedSize();
+  }
+
+  @GuardedBy("this")
   private void handleWrite(String resourceName, long offset, ByteString data, boolean finishWrite)
       throws EntryLimitException {
-    long committedSize = write.getCommittedSize();
-    if (offset != 0 && offset != committedSize) {
+    long committedSize;
+    try {
+      committedSize = getCommittedSizeForWrite();
+    } catch (IOException e) {
+      errorResponse(e);
+      return;
+    }
+    if (offset != 0 && offset > committedSize) {
       // we are synchronized here for delivery, but not for asynchronous completion
       // of the write - if it has completed already, and that is the source of the
       // offset mismatch, perform nothing further and release sync to allow the
@@ -314,17 +326,30 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
     } else {
       if (offset == 0 && offset != committedSize) {
         write.reset();
+        committedSize = 0;
       }
       if (earliestOffset < 0 || offset < earliestOffset) {
         earliestOffset = offset;
       }
 
-      logger.log(
-          Level.FINER,
-          format(
-              "writing %d to %s at %d%s",
-              data.size(), name, offset, finishWrite ? " with finish_write" : ""));
-      if (!data.isEmpty()) {
+      // we may have a committedSize that is larger than our offset, in which case we want
+      // to skip the data bytes until the committedSize. This is practical with our streams,
+      // since they should be the same content between offset and committedSize
+      int bytesToWrite = data.size();
+      if (bytesToWrite == 0 || committedSize - offset >= bytesToWrite) {
+        requestNextIfReady();
+      } else {
+        // constrained to be within bytesToWrite
+        bytesToWrite -= (int) (committedSize - offset);
+        int skipBytes = data.size() - bytesToWrite;
+        if (skipBytes != 0) {
+          data = data.substring(skipBytes);
+        }
+        logger.log(
+            Level.FINER,
+            format(
+                "writing %d to %s at %d%s",
+                bytesToWrite, name, offset, finishWrite ? " with finish_write" : ""));
         writeData(data);
         requestCount++;
         requestBytes += data.size();
@@ -346,6 +371,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
         logger.log(Level.SEVERE, format("error closing stream for %s", name), e);
       }
     }
+    out = null;
   }
 
   @GuardedBy("this")
@@ -387,18 +413,22 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
   }
 
   private FeedbackOutputStream getOutput() throws IOException {
-    return write.getOutput(deadlineAfter, deadlineAfterUnits, this::onNewlyReadyRequestNext);
+    if (out == null) {
+      out = write.getOutput(deadlineAfter, deadlineAfterUnits, this::onNewlyReadyRequestNext);
+    }
+    return out;
   }
 
   @Override
   public void onError(Throwable t) {
     Status status = Status.fromThrowable(t);
-    if (initialized && !DEFAULT_IS_RETRIABLE.apply(status)) {
+    if (initialized) {
       try {
         getOutput().close();
       } catch (IOException e) {
         logger.log(Level.SEVERE, "error closing output stream after error", e);
       }
+      out = null;
     } else {
       if (!withCancellation.isCancelled()) {
         logger.log(

@@ -15,6 +15,7 @@
 package build.buildfarm.common;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 
 import build.buildfarm.common.io.FeedbackOutputStream;
@@ -31,6 +32,9 @@ public interface Write {
 
   FeedbackOutputStream getOutput(
       long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) throws IOException;
+
+  ListenableFuture<FeedbackOutputStream> getOutputFuture(
+      long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler);
 
   void reset();
 
@@ -78,6 +82,12 @@ public interface Write {
           return false;
         }
       };
+    }
+
+    @Override
+    public ListenableFuture<FeedbackOutputStream> getOutputFuture(
+        long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+      return immediateFuture(getOutput(deadlineAfter, deadlineAfterUnits, onReadyHandler));
     }
 
     @Override
@@ -136,6 +146,16 @@ public interface Write {
         long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler)
         throws IOException {
       return this;
+    }
+
+    @Override
+    public ListenableFuture<FeedbackOutputStream> getOutputFuture(
+        long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+      try {
+        return immediateFuture(getOutput(deadlineAfter, deadlineAfterUnits, onReadyHandler));
+      } catch (IOException e) {
+        return immediateFailedFuture(e);
+      }
     }
 
     @Override
