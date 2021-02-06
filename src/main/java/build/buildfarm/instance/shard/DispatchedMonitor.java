@@ -18,6 +18,7 @@ import static com.google.common.util.concurrent.Futures.successfulAsList;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.lang.String.format;
 
+import build.buildfarm.backplane.Backplane;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.QueueEntry;
 import com.google.common.collect.ImmutableList;
@@ -33,12 +34,12 @@ import java.util.logging.Logger;
 class DispatchedMonitor implements Runnable {
   private static final Logger logger = Logger.getLogger(DispatchedMonitor.class.getName());
 
-  private final ShardBackplane backplane;
+  private final Backplane backplane;
   private final Function<QueueEntry, ListenableFuture<Void>> requeuer;
   private final int intervalSeconds;
 
   DispatchedMonitor(
-      ShardBackplane backplane,
+      Backplane backplane,
       Function<QueueEntry, ListenableFuture<Void>> requeuer,
       int intervalSeconds) {
     this.backplane = backplane;

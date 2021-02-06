@@ -24,7 +24,7 @@ import static org.mockito.Mockito.verify;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.Platform.Property;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.instance.Instance.MatchListener;
+import build.buildfarm.instance.MatchListener;
 import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.QueueEntry;
 import com.google.common.collect.ImmutableList;
