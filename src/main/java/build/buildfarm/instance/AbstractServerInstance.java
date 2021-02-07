@@ -58,6 +58,7 @@ import build.bazel.remote.execution.v2.SymlinkNode;
 import build.buildfarm.ac.ActionCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
+import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
@@ -106,12 +107,10 @@ import io.netty.handler.codec.http.QueryStringDecoder;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.net.http.HttpResponse.BodyHandlers;
+import java.net.URL;
 import java.nio.file.NoSuchFileException;
 import java.util.HashSet;
 import java.util.Map;
@@ -546,38 +545,58 @@ public abstract class AbstractServerInstance implements Instance {
     return iter.toNextPageToken();
   }
 
+  private interface ContentOutputStreamFactory {
+    OutputStream create(long contentLength) throws IOException;
+  }
+
+  private static void downloadUri(String uri, ContentOutputStreamFactory getContentOutputStream)
+      throws IOException {
+    URL url = new URL(uri);
+    HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+    // connect timeout?
+    // proxy?
+    // authenticator?
+    connection.setInstanceFollowRedirects(true);
+    // request timeout?
+    long contentLength = connection.getContentLength();
+    int status = connection.getResponseCode();
+
+    if (status != HttpURLConnection.HTTP_OK) {
+      String message = connection.getResponseMessage();
+      // per docs, returns null if no valid string can be discerned
+      // from the responses, i.e. invalid HTTP
+      if (message == null) {
+        message = "Invalid HTTP Response";
+      }
+      message = "Download Failed: " + message + " from " + uri;
+      throw new IOException(message);
+    }
+
+    try (InputStream in = connection.getInputStream();
+        OutputStream out = getContentOutputStream.create(contentLength)) {
+      ByteStreams.copy(in, out);
+    }
+  }
+
   @Override
   public ListenableFuture<Digest> fetchBlob(
       Iterable<String> uris, Digest expectedDigest, RequestMetadata requestMetadata) {
     for (String uri : uris) {
       try {
-        HttpClient client =
-            HttpClient.newBuilder()
-                .version(HttpClient.Version.HTTP_1_1)
-                .followRedirects(HttpClient.Redirect.ALWAYS)
-                // connect timeout?
-                // proxy?
-                // authenticator?
-                .build();
-        HttpRequest request =
-            HttpRequest.newBuilder()
-                .uri(URI.create(uri))
-                // timeout
-                .build();
-        HttpResponse<InputStream> response = client.send(request, BodyHandlers.ofInputStream());
-        if (response.headers().firstValueAsLong("content-length").isEmpty()) {
-          logger.log(Level.INFO, response.headers().toString());
-        }
-        long contentLength = response.headers().firstValueAsLong("content-length").getAsLong();
-        // digest mismatch exception on incorrect size
-        Digest actualDigest = expectedDigest.toBuilder().setSizeBytes(contentLength).build();
-        try (InputStream in = response.body();
-            OutputStream out =
-                getBlobWrite(actualDigest, UUID.randomUUID(), requestMetadata)
-                    .getOutput(1, DAYS, () -> {})) {
-          ByteStreams.copy(in, out);
-        }
-        return immediateFuture(actualDigest);
+        // some minor abuse here, we want the download to set our built digest size as side effect
+        Digest.Builder actualDigestBuilder = expectedDigest.toBuilder();
+        downloadUri(
+            uri,
+            contentLength -> {
+              Digest actualDigest = actualDigestBuilder.setSizeBytes(contentLength).build();
+              if (expectedDigest.getSizeBytes() >= 0
+                  && expectedDigest.getSizeBytes() != contentLength) {
+                throw new DigestMismatchException(actualDigest, expectedDigest);
+              }
+              return getBlobWrite(actualDigest, UUID.randomUUID(), requestMetadata)
+                  .getOutput(1, DAYS, () -> {});
+            });
+        return immediateFuture(actualDigestBuilder.build());
       } catch (Exception e) {
         logger.log(Level.WARNING, "download attempt failed", e);
         // ignore?
