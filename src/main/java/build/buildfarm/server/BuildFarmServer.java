@@ -26,6 +26,7 @@ import build.buildfarm.metrics.MetricsPublisher;
 import build.buildfarm.metrics.aws.AwsMetricsPublisher;
 import build.buildfarm.metrics.gcp.GcpMetricsPublisher;
 import build.buildfarm.metrics.log.LogMetricsPublisher;
+import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.v1test.BuildFarmServerConfig;
 import build.buildfarm.v1test.MetricsConfig;
 import com.google.devtools.common.options.OptionsParser;
@@ -57,8 +58,6 @@ public class BuildFarmServer extends LoggingMain {
   // collected, which would cause us to loose their configuration.
   private static final java.util.logging.Logger nettyLogger =
       java.util.logging.Logger.getLogger("io.grpc.netty");
-  private static final java.util.logging.Logger grpcLogger =
-      java.util.logging.Logger.getLogger(Server.class.getName());
   private static final Logger logger = Logger.getLogger(BuildFarmServer.class.getName());
 
   private final ScheduledExecutorService keepaliveScheduler = newSingleThreadScheduledExecutor();
@@ -221,13 +220,18 @@ public class BuildFarmServer extends LoggingMain {
     session += "-" + UUID.randomUUID();
     BuildFarmServer server;
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
+      BuildFarmServerConfig config = toBuildFarmServerConfig(new InputStreamReader(configInputStream), options);
+      // Start Prometheus web server
+      PrometheusPublisher.startHttpServer(
+        config.getPrometheusConfig().getPort() > 0 ? config.getPrometheusConfig().getPort() : 9090);
       server =
           new BuildFarmServer(
-              session, toBuildFarmServerConfig(new InputStreamReader(configInputStream), options));
+              session, config);
       configInputStream.close();
       server.start(options.publicName);
       server.blockUntilShutdown();
       server.stop();
+      PrometheusPublisher.stopHttpServer();
       return true;
     } catch (IOException e) {
       System.err.println("error: " + formatIOError(e));
