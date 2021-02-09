@@ -124,6 +124,11 @@ public class GrpcCAS implements ContentAddressableStorage {
 
   @Override
   public Iterable<Digest> findMissingBlobs(Iterable<Digest> digests) {
+    digests = Iterables.filter(digests, digest -> digest.getSizeBytes() != 0);
+    if (Iterables.isEmpty(digests)) {
+      return ImmutableList.of();
+    }
+
     List<Digest> missingDigests =
         casBlockingStub
             .get()
