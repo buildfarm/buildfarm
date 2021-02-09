@@ -95,7 +95,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -128,7 +127,7 @@ class ShardWorkerContext implements WorkerContext {
   private final Map<String, QueueEntry> activeOperations = Maps.newConcurrentMap();
   private final Group executionsGroup = Group.getRoot().getChild("executions");
   private final Group operationsGroup = executionsGroup.getChild("operations");
-  private final Supplier<CasWriter> writer;
+  private final CasWriter writer;
   private final boolean errorOperationRemainingResources;
 
   static SetMultimap<String, String> getMatchProvisions(
@@ -164,7 +163,7 @@ class ShardWorkerContext implements WorkerContext {
       boolean limitGlobalExecution,
       boolean onlyMulticoreTests,
       boolean errorOperationRemainingResources,
-      Supplier<CasWriter> writer) {
+      CasWriter writer) {
     this.name = name;
     this.matchSettings = matchSettings;
     this.platform = platform;
@@ -493,13 +492,12 @@ class ShardWorkerContext implements WorkerContext {
   private void insertBlob(Digest digest, ByteString content)
       throws IOException, InterruptedException {
     if (digest.getSizeBytes() > 0) {
-      writer.get().insertBlob(digest, content);
+      writer.insertBlob(digest, content);
     }
   }
 
   private void insertFile(Digest digest, Path file) throws IOException, InterruptedException {
-
-    writer.get().write(digest, file);
+    writer.write(digest, file);
   }
 
   private void updateActionResultStdOutputs(ActionResult.Builder resultBuilder)

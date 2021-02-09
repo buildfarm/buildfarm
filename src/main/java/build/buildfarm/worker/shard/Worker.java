@@ -38,6 +38,7 @@ import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.LoggingMain;
 import build.buildfarm.common.Size;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.function.IOSupplier;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.RedisShardBackplane;
@@ -64,7 +65,6 @@ import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.ReportResultStage;
 import com.google.common.base.Strings;
-import com.google.common.base.Suppliers;
 import com.google.common.base.Throwables;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
@@ -106,7 +106,6 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
@@ -135,10 +134,12 @@ public class Worker extends LoggingMain {
 
   class LocalCasWriter implements CasWriter {
     public void write(Digest digest, Path file) throws IOException, InterruptedException {
+      insertStream(digest, () -> Files.newInputStream(file));
+    }
 
-      Write write = getLocalWrite(digest);
-      InputStream inputStream = Files.newInputStream(file);
-      insertStream(digest, Suppliers.ofInstance(inputStream));
+    public void insertBlob(Digest digest, ByteString content)
+        throws IOException, InterruptedException {
+      insertStream(digest, () -> content.newInput());
     }
 
     private Write getLocalWrite(Digest digest) throws IOException, InterruptedException {
@@ -149,17 +150,8 @@ public class Worker extends LoggingMain {
       return write;
     }
 
-    public void insertBlob(Digest digest, ByteString content)
+    private void insertStream(Digest digest, IOSupplier<InputStream> suppliedStream)
         throws IOException, InterruptedException {
-
-      Write write = getLocalWrite(digest);
-      Supplier<InputStream> suppliedStream = () -> content.newInput();
-      insertStream(digest, suppliedStream);
-    }
-
-    private void insertStream(Digest digest, Supplier<InputStream> suppliedStream)
-        throws IOException, InterruptedException {
-
       Write write = getLocalWrite(digest);
 
       try (OutputStream out =
@@ -443,7 +435,7 @@ public class Worker extends LoggingMain {
             config.getLimitGlobalExecution(),
             config.getOnlyMulticoreTests(),
             config.getErrorOperationRemainingResources(),
-            Suppliers.ofInstance(writer));
+            writer);
 
     PipelineStage completeStage =
         new PutOperationStage((operation) -> context.deactivate(operation.getName()));
