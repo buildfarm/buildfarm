@@ -79,6 +79,9 @@ def buildfarm_init(name = "buildfarm"):
                     ] + ["io.netty:netty-%s:4.1.38.Final" % module for module in IO_NETTY_MODULES] +
                     ["io.grpc:grpc-%s:1.26.0" % module for module in IO_GRPC_MODULES] +
                     [
+                        "io.prometheus:simpleclient:0.10.0",
+                        "io.prometheus:simpleclient_hotspot:0.10.0",
+                        "io.prometheus:simpleclient_httpserver:0.10.0",
                         "junit:junit:4.12",
                         "org.apache.commons:commons-pool2:2.9.0",
                         "org.checkerframework:checker-qual:2.5.2",

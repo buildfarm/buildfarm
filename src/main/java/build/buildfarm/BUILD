@@ -160,6 +160,7 @@ java_library(
         "metrics/MetricsPublisher.java",
     ]),
     deps = [
+        ":prometheus-metrics",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
         "@googleapis//:google_rpc_error_details_java_proto",
@@ -223,6 +224,18 @@ java_library(
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java_util",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+    ],
+)
+
+java_library(
+    name = "prometheus-metrics",
+    srcs = glob([
+        "metrics/prometheus/PrometheusPublisher.java",
+    ]),
+    deps = [
+        "@maven//:io_prometheus_simpleclient",
+        "@maven//:io_prometheus_simpleclient_hotspot",
+        "@maven//:io_prometheus_simpleclient_httpserver",
     ],
 )
 
@@ -394,6 +407,7 @@ java_library(
         ":common-grpc",
         ":common-redis",
         ":instance",
+        ":prometheus-metrics",
         ":server-instance",
         ":stub-instance",
         ":worker-queues",
@@ -464,6 +478,7 @@ java_library(
         ":log-metrics",
         ":memory-instance",
         ":metrics",
+        ":prometheus-metrics",
         ":shard-instance",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
@@ -563,6 +578,7 @@ java_library(
         ":common-grpc",
         ":instance",
         ":memory-instance",
+        "prometheus-metrics",
         ":server",
         ":server-instance",
         ":shard-instance",
@@ -645,6 +661,7 @@ java_library(
         ":cas",
         ":common",
         ":instance",
+        ":prometheus-metrics",
         ":stub-instance",
         ":worker-resources",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",

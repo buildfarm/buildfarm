@@ -44,6 +44,7 @@ import build.buildfarm.instance.shard.RedisShardBackplane;
 import build.buildfarm.instance.shard.RemoteInputStreamFactory;
 import build.buildfarm.instance.shard.ShardBackplane;
 import build.buildfarm.instance.shard.WorkerStubs;
+import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.server.ByteStreamService;
 import build.buildfarm.server.ContentAddressableStorageService;
 import build.buildfarm.server.Instances;
@@ -937,6 +938,7 @@ public class Worker extends LoggingMain {
   @Override
   protected void onShutdown() throws InterruptedException {
     logger.log(SEVERE, "*** shutting down gRPC server since JVM is shutting down");
+    PrometheusPublisher.stopHttpServer();
     stop();
     logger.log(SEVERE, "*** server shut down");
   }
@@ -988,12 +990,15 @@ public class Worker extends LoggingMain {
     String session = UUID.randomUUID().toString();
     Worker worker;
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
-      worker =
-          new Worker(
-              session,
-              toShardWorkerConfig(
-                  new InputStreamReader(configInputStream),
-                  parser.getOptions(WorkerOptions.class)));
+      ShardWorkerConfig config =
+          toShardWorkerConfig(
+              new InputStreamReader(configInputStream), parser.getOptions(WorkerOptions.class));
+      // Start Prometheus web server
+      PrometheusPublisher.startHttpServer(
+          config.getPrometheusConfig().getPort(),
+          config.getExecuteStageWidth(),
+          config.getInputFetchStageWidth());
+      worker = new Worker(session, config);
     }
     worker.start();
     worker.blockUntilShutdown();
