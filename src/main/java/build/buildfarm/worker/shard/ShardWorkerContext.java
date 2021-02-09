@@ -745,7 +745,7 @@ class ShardWorkerContext implements WorkerContext {
     boolean success = createBackplaneRetrier().execute(() -> instance.putOperation(operation));
     if (success && operation.getDone()) {
       PrometheusPublisher.updateCompletedOperations();
-      logger.log(Level.INFO, "CompletedOperation: " + operation.getName());
+      logger.log(Level.FINE, "CompletedOperation: " + operation.getName());
     }
     return success;
   }

@@ -994,7 +994,7 @@ public class Worker extends LoggingMain {
         new InputStreamReader(configInputStream), parser.getOptions(WorkerOptions.class));
       // Start Prometheus web server
       PrometheusPublisher.startHttpServer(
-        config.getPrometheusConfig().getPort() > 0 ? config.getPrometheusConfig().getPort() : 9090,
+        config.getPrometheusConfig().getPort(),
         config.getExecuteStageWidth(), config.getInputFetchStageWidth());
       worker =
           new Worker(

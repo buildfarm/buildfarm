@@ -222,8 +222,7 @@ public class BuildFarmServer extends LoggingMain {
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
       BuildFarmServerConfig config = toBuildFarmServerConfig(new InputStreamReader(configInputStream), options);
       // Start Prometheus web server
-      PrometheusPublisher.startHttpServer(
-        config.getPrometheusConfig().getPort() > 0 ? config.getPrometheusConfig().getPort() : 9090);
+      PrometheusPublisher.startHttpServer(config.getPrometheusConfig().getPort());
       server =
           new BuildFarmServer(
               session, config);
