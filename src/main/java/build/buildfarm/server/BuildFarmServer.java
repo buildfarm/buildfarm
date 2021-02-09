@@ -220,12 +220,11 @@ public class BuildFarmServer extends LoggingMain {
     session += "-" + UUID.randomUUID();
     BuildFarmServer server;
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
-      BuildFarmServerConfig config = toBuildFarmServerConfig(new InputStreamReader(configInputStream), options);
+      BuildFarmServerConfig config =
+          toBuildFarmServerConfig(new InputStreamReader(configInputStream), options);
       // Start Prometheus web server
       PrometheusPublisher.startHttpServer(config.getPrometheusConfig().getPort());
-      server =
-          new BuildFarmServer(
-              session, config);
+      server = new BuildFarmServer(session, config);
       configInputStream.close();
       server.start(options.publicName);
       server.blockUntilShutdown();

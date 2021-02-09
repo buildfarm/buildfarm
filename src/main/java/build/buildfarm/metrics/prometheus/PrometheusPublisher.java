@@ -12,22 +12,50 @@ public class PrometheusPublisher {
   private static int numExecuteStages = 0;
   private static int numInputFetchStages = 0;
 
-  private static final Gauge cpuQueueSize = Gauge.build().name("cpu_queue_size").help("[Server] CPU queue size.").register();
-  private static final Gauge gpuQueueSize = Gauge.build().name("gpu_queue_size").help("[Server] GPU queue size.").register();
-  private static final Gauge preQueueSize = Gauge.build().name("pre_queue_size").help("[Server] Pre queue size.").register();
-  private static final Gauge dispatchedOperations = Gauge.build().name("dispatched_operations_size").help("[Server] Dispatched operations size.").register();
-  private static final Gauge workerPoolSize = Gauge.build().name("worker_pool_size").help("[Server] Active worker pool size.").register();
-  private static final Gauge actionResults =  Gauge.build().name("action_results").help("[Server] Action results.").register();
-  private static final Gauge executionTime = Gauge.build().name("execution_time_ms").help("[Worker] Execution time in ms.").register();
-  private static final Gauge executionStallTime = Gauge.build().name("execution_stall_time_ms").help("[Worker] Execution stall time in ms.").register();
-  private static final Gauge executionSlotUsage = Gauge.build().name("execution_slot_usage").help("[Worker] Execution slot Usage.").register();
-  private static final Gauge inputFetchTime = Gauge.build().name("input_fetch_time_ms").help("[Worker] Input fetch time in ms.").register();
-  private static final Gauge inputFetchStallTime = Gauge.build().name("input_fetch_stall_time_ms").help("[Worker] Input fetch stall time in ms.").register();
-  private static final Gauge inputFetchSlotUsage = Gauge.build().name("input_fetch_slot_usage").help("[Worker] Input fetch slot Usage.").register();
-  private static final Gauge clusterUtilization = Gauge.build().name("cluster_utilization").help("[Server] Cluster utilization.").register();
-  private static final Gauge executionSuccess =  Gauge.build().name("execution_success").help("[Server] Execution success.").register();
-  private static final Gauge completedOperations =  Gauge.build().name("completed_operations").help("[Worker] Completed operations.").register();
-  private static final Gauge missingBlobs =  Gauge.build().name("missing_blobs").help("[Server] Find missing blobs.").register();
+  private static final Gauge cpuQueueSize =
+      Gauge.build().name("cpu_queue_size").help("[Server] CPU queue size.").register();
+  private static final Gauge gpuQueueSize =
+      Gauge.build().name("gpu_queue_size").help("[Server] GPU queue size.").register();
+  private static final Gauge preQueueSize =
+      Gauge.build().name("pre_queue_size").help("[Server] Pre queue size.").register();
+  private static final Gauge dispatchedOperations =
+      Gauge.build()
+          .name("dispatched_operations_size")
+          .help("[Server] Dispatched operations size.")
+          .register();
+  private static final Gauge workerPoolSize =
+      Gauge.build().name("worker_pool_size").help("[Server] Active worker pool size.").register();
+  private static final Gauge actionResults =
+      Gauge.build().name("action_results").help("[Server] Action results.").register();
+  private static final Gauge executionTime =
+      Gauge.build().name("execution_time_ms").help("[Worker] Execution time in ms.").register();
+  private static final Gauge executionStallTime =
+      Gauge.build()
+          .name("execution_stall_time_ms")
+          .help("[Worker] Execution stall time in ms.")
+          .register();
+  private static final Gauge executionSlotUsage =
+      Gauge.build().name("execution_slot_usage").help("[Worker] Execution slot Usage.").register();
+  private static final Gauge inputFetchTime =
+      Gauge.build().name("input_fetch_time_ms").help("[Worker] Input fetch time in ms.").register();
+  private static final Gauge inputFetchStallTime =
+      Gauge.build()
+          .name("input_fetch_stall_time_ms")
+          .help("[Worker] Input fetch stall time in ms.")
+          .register();
+  private static final Gauge inputFetchSlotUsage =
+      Gauge.build()
+          .name("input_fetch_slot_usage")
+          .help("[Worker] Input fetch slot Usage.")
+          .register();
+  private static final Gauge clusterUtilization =
+      Gauge.build().name("cluster_utilization").help("[Server] Cluster utilization.").register();
+  private static final Gauge executionSuccess =
+      Gauge.build().name("execution_success").help("[Server] Execution success.").register();
+  private static final Gauge completedOperations =
+      Gauge.build().name("completed_operations").help("[Worker] Completed operations.").register();
+  private static final Gauge missingBlobs =
+      Gauge.build().name("missing_blobs").help("[Server] Find missing blobs.").register();
 
   public static void startHttpServer(int port) {
     try {
@@ -115,8 +143,11 @@ public class PrometheusPublisher {
 
   public static void updateClusterUtilization() {
     try {
-      clusterUtilization.set(dispatchedOperations.get() * 100.0 / (workerPoolSize.get() * (numExecuteStages + numInputFetchStages)));
-      } catch (Exception e) {
+      clusterUtilization.set(
+          dispatchedOperations.get()
+              * 100.0
+              / (workerPoolSize.get() * (numExecuteStages + numInputFetchStages)));
+    } catch (Exception e) {
       clusterUtilization.set(0.0);
     }
   }

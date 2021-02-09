@@ -1493,26 +1493,28 @@ public class RedisShardBackplane implements ShardBackplane {
 
   private void startPrometheusMetricsCollector() {
     prometheusMetricsThread =
-      new Thread(
-        () -> {
-          while (true) {
-            try {
-              TimeUnit.SECONDS.sleep(30);
-              OperationsStatus operationsStatus = operationsStatus();
-              PrometheusPublisher.updateWorkerPoolSize(operationsStatus.getActiveWorkersCount());
-              PrometheusPublisher.updateDispatchedOperationsSize(operationsStatus.getDispatchedSize());
-              PrometheusPublisher.updatePreQueueSize(operationsStatus.getPrequeue().getSize());
-              PrometheusPublisher.updateClusterUtilization();
-              updateQueueSizes(operationsStatus.getOperationQueue().getProvisionsList());
-            } catch (InterruptedException e) {
-              Thread.currentThread().interrupt();
-              break;
-            } catch (Exception e) {
-              logger.log(Level.SEVERE, "Could not update RedisShardBackplane metrics", e);
-            }
-          }
-        },
-        "Prometheus Metrics Collector");
+        new Thread(
+            () -> {
+              while (true) {
+                try {
+                  TimeUnit.SECONDS.sleep(30);
+                  OperationsStatus operationsStatus = operationsStatus();
+                  PrometheusPublisher.updateWorkerPoolSize(
+                      operationsStatus.getActiveWorkersCount());
+                  PrometheusPublisher.updateDispatchedOperationsSize(
+                      operationsStatus.getDispatchedSize());
+                  PrometheusPublisher.updatePreQueueSize(operationsStatus.getPrequeue().getSize());
+                  PrometheusPublisher.updateClusterUtilization();
+                  updateQueueSizes(operationsStatus.getOperationQueue().getProvisionsList());
+                } catch (InterruptedException e) {
+                  Thread.currentThread().interrupt();
+                  break;
+                } catch (Exception e) {
+                  logger.log(Level.SEVERE, "Could not update RedisShardBackplane metrics", e);
+                }
+              }
+            },
+            "Prometheus Metrics Collector");
 
     prometheusMetricsThread.start();
   }

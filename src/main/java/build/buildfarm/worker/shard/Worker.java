@@ -990,16 +990,15 @@ public class Worker extends LoggingMain {
     String session = UUID.randomUUID().toString();
     Worker worker;
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
-      ShardWorkerConfig config = toShardWorkerConfig(
-        new InputStreamReader(configInputStream), parser.getOptions(WorkerOptions.class));
+      ShardWorkerConfig config =
+          toShardWorkerConfig(
+              new InputStreamReader(configInputStream), parser.getOptions(WorkerOptions.class));
       // Start Prometheus web server
       PrometheusPublisher.startHttpServer(
-        config.getPrometheusConfig().getPort(),
-        config.getExecuteStageWidth(), config.getInputFetchStageWidth());
-      worker =
-          new Worker(
-              session,
-              config);
+          config.getPrometheusConfig().getPort(),
+          config.getExecuteStageWidth(),
+          config.getInputFetchStageWidth());
+      worker = new Worker(session, config);
     }
     worker.start();
     worker.blockUntilShutdown();
