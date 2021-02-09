@@ -141,6 +141,7 @@ java_test(
         "@maven//:io_grpc_grpc_core",
         "@maven//:io_grpc_grpc_stub",
         "@maven//:org_mockito_mockito_core",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
     jvm_flags = ensure_accurate_metadata(),

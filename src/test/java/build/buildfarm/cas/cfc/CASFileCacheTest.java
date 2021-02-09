@@ -915,6 +915,12 @@ class CASFileCacheTest {
     }
   }
 
+  @Test
+  public void findMissingBlobsFiltersEmptyBlobs() throws Exception {
+    Digest emptyDigest = Digest.getDefaultInstance();
+    assertThat(fileCache.findMissingBlobs(ImmutableList.of(emptyDigest))).isEmpty();
+  }
+
   @RunWith(JUnit4.class)
   public static class NativeFileDirsIndexInMemoryCASFileCacheTest extends CASFileCacheTest {
     public NativeFileDirsIndexInMemoryCASFileCacheTest() throws IOException {
