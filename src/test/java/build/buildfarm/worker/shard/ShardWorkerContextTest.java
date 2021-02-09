@@ -65,7 +65,7 @@ public class ShardWorkerContextTest {
 
   @Mock private Instance instance;
 
-  @Mock private Supplier<CasWriter> writer;
+  @Mock private CasWriter writer;
 
   @Before
   public void setUp() throws Exception {
