@@ -1145,7 +1145,14 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                       isReset);
             }
             if (out == null) {
-              out = new CancellableOutputStream(nullOutputStream());
+              // duplicate output stream
+              out =
+                  new CancellableOutputStream(nullOutputStream()) {
+                    @Override
+                    public long getWritten() {
+                      return key.getDigest().getSizeBytes();
+                    }
+                  };
             } else {
               path = out.getPath();
             }
