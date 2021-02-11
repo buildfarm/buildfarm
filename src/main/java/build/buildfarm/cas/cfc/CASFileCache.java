@@ -444,7 +444,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     ImmutableList.Builder<Digest> builder = ImmutableList.builder();
     ImmutableList.Builder<String> found = ImmutableList.builder();
     for (Digest digest : digests) {
-      if (digest.getSizeBytes() == 0 || !containsLocal(digest, found::add)) {
+      if (digest.getSizeBytes() != 0 && !containsLocal(digest, found::add)) {
         builder.add(digest);
       }
     }
