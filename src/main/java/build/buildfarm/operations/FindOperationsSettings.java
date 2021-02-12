@@ -14,32 +14,32 @@
 
 package build.buildfarm.operations;
 
-///
-/// @class   FindOperationsSettings
-/// @brief   Settings used to find operations.
-/// @details These are used to discover the state of operations given a
-///          particular context (such as who spawned the operation).
-///
+/**
+ * @class FindOperationsSettings
+ * @brief Settings used to find operations.
+ * @details These are used to discover the state of operations given a particular context (such as
+ *     who spawned the operation).
+ */
 public class FindOperationsSettings {
 
-  ///
-  /// @field   filterPredicate
-  /// @brief   The search query used to find particular operations.
-  /// @details https://github.com/json-path/JsonPath#predicates
-  ///
+  /**
+   * @field filterPredicate
+   * @brief The search query used to find particular operations.
+   * @details https://github.com/json-path/JsonPath#predicates
+   */
   public String filterPredicate;
 
-  ///
-  /// @field   scanAmount
-  /// @brief   The number of redis entries to scan at a time.
-  /// @details Larger amounts will be faster but require more memory.
-  ///
+  /**
+   * @field scanAmount
+   * @brief The number of redis entries to scan at a time.
+   * @details Larger amounts will be faster but require more memory.
+   */
   public int scanAmount;
 
-  ///
-  /// @field   operationQuery
-  /// @brief   How to query all of the operation entries in redis.
-  /// @details The operation key is a global buildfarm config.
-  ///
+  /**
+   * @field operationQuery
+   * @brief How to query all of the operation entries in redis.
+   * @details The operation key is a global buildfarm config.
+   */
   public String operationQuery;
 }

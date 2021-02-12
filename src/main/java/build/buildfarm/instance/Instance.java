@@ -32,6 +32,7 @@ import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationsStatus;
+import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.Tree;
 import build.buildfarm.v1test.WorkerListMessage;
@@ -142,6 +143,8 @@ public interface Instance {
   WorkerProfileMessage getWorkerProfile();
 
   WorkerListMessage getWorkerList();
+
+  PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully(String worker);
 
   GetClientStartTimeResult getClientStartTime(String clientKey);
 

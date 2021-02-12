@@ -549,6 +549,48 @@ class CASFileCacheTest {
     assertThat(write.isComplete()).isTrue();
   }
 
+  @Test
+  public void writeOutputSynchronizesOnOutput() throws IOException {
+    ByteString content = ByteString.copyFromUtf8("Hello, World");
+    Digest digest = DIGEST_UTIL.compute(content);
+
+    AtomicBoolean writeClosed = new AtomicBoolean(false);
+    Write write = getWrite(digest);
+    OutputStream out = write.getOutput(1, SECONDS, () -> {});
+    // write is open and should block other output acquisition
+    Thread closer =
+        new Thread(
+            () -> {
+              try {
+                MICROSECONDS.sleep(1);
+                writeClosed.set(true);
+                out.close();
+              } catch (Exception e) {
+                throw new RuntimeException(e);
+              }
+            });
+    closer.start();
+    try (OutputStream secondOut = write.getOutput(1, SECONDS, () -> {})) {
+      assertThat(writeClosed.get()).isTrue();
+    }
+  }
+
+  @Test
+  public void writeOutputFutureIsSerialized() throws Exception {
+    ByteString content = ByteString.copyFromUtf8("Hello, World");
+    Digest digest = DIGEST_UTIL.compute(content);
+
+    Write write = getWrite(digest);
+    ListenableFuture<FeedbackOutputStream> firstOut = write.getOutputFuture(1, SECONDS, () -> {});
+    ListenableFuture<FeedbackOutputStream> secondOut = write.getOutputFuture(1, SECONDS, () -> {});
+    assertThat(firstOut.isDone()).isTrue();
+    assertThat(secondOut.isDone()).isFalse();
+    // close the first output
+    firstOut.get().close();
+    assertThat(secondOut.isDone()).isTrue();
+    secondOut.get().close();
+  }
+
   @Test(expected = DigestMismatchException.class)
   public void invalidContentThrowsDigestMismatch() throws IOException {
     ByteString content = ByteString.copyFromUtf8("Hello, World");
@@ -623,6 +665,12 @@ class CASFileCacheTest {
               throws IOException {
             canReset = true;
             throw new IOException(new InterruptedException());
+          }
+
+          @Override
+          public ListenableFuture<FeedbackOutputStream> getOutputFuture(
+              long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+            throw new UnsupportedOperationException();
           }
 
           @Override
@@ -865,6 +913,12 @@ class CASFileCacheTest {
     if (!shutdownAndAwaitTermination(service, 1, SECONDS)) {
       throw new RuntimeException("could not shut down service");
     }
+  }
+
+  @Test
+  public void findMissingBlobsFiltersEmptyBlobs() throws Exception {
+    Digest emptyDigest = Digest.getDefaultInstance();
+    assertThat(fileCache.findMissingBlobs(ImmutableList.of(emptyDigest))).isEmpty();
   }
 
   @RunWith(JUnit4.class)

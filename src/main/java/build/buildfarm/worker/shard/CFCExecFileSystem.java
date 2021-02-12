@@ -17,6 +17,7 @@ package build.buildfarm.worker.shard;
 import static build.buildfarm.common.io.Utils.getInterruptiblyOrIOException;
 import static build.buildfarm.common.io.Utils.readdir;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterables.concat;
 import static com.google.common.util.concurrent.Futures.allAsList;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
@@ -34,6 +35,7 @@ import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Directory;
 import build.bazel.remote.execution.v2.DirectoryNode;
 import build.bazel.remote.execution.v2.FileNode;
+import build.bazel.remote.execution.v2.SymlinkNode;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.common.DigestUtil;
@@ -152,6 +154,18 @@ class CFCExecFileSystem implements ExecFileSystem {
     return fileCache.newInput(digest, offset);
   }
 
+  private ListenableFuture<Void> putSymlink(Path path, SymlinkNode symlinkNode) {
+    Path symlinkPath = path.resolve(symlinkNode.getName());
+    Path relativeTargetPath = path.getFileSystem().getPath(symlinkNode.getTarget());
+    checkState(!relativeTargetPath.isAbsolute());
+    return listeningDecorator(fetchService)
+        .submit(
+            () -> {
+              Files.createSymbolicLink(symlinkPath, relativeTargetPath);
+              return null;
+            });
+  }
+
   private ListenableFuture<Void> put(
       Path path, FileNode fileNode, ImmutableList.Builder<String> inputFiles) {
     Path filePath = path.resolve(fileNode.getName());
@@ -203,8 +217,15 @@ class CFCExecFileSystem implements ExecFileSystem {
 
     Iterable<ListenableFuture<Void>> downloads =
         directory.getFilesList().stream()
-            .map((fileNode) -> put(path, fileNode, inputFiles))
+            .map(fileNode -> put(path, fileNode, inputFiles))
             .collect(ImmutableList.toImmutableList());
+
+    downloads =
+        concat(
+            downloads,
+            directory.getSymlinksList().stream()
+                .map(symlinkNode -> putSymlink(path, symlinkNode))
+                .collect(ImmutableList.toImmutableList()));
 
     for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
       Digest digest = directoryNode.getDigest();
@@ -306,7 +327,7 @@ class CFCExecFileSystem implements ExecFileSystem {
     ImmutableList.Builder<Digest> inputDirectories = new ImmutableList.Builder<>();
 
     logger.log(
-        Level.INFO, "ExecFileSystem::createExecDir(" + operationName + ") calling fetchInputs");
+        Level.FINE, "ExecFileSystem::createExecDir(" + operationName + ") calling fetchInputs");
     Iterable<ListenableFuture<Void>> fetchedFutures =
         fetchInputs(
             execDir,
@@ -359,7 +380,7 @@ class CFCExecFileSystem implements ExecFileSystem {
     rootInputDirectories.put(execDir, inputDirectories.build());
 
     logger.log(
-        Level.INFO,
+        Level.FINE,
         "ExecFileSystem::createExecDir(" + operationName + ") stamping output directories");
     boolean stamped = false;
     try {

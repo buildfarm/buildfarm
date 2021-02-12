@@ -45,6 +45,7 @@ import build.buildfarm.common.grpc.Retrier.Backoff;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.instance.shard.ShardBackplane;
+import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.QueueEntry;
@@ -94,7 +95,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -105,6 +105,7 @@ class ShardWorkerContext implements WorkerContext {
 
   private final String name;
   private final Platform platform;
+  private final DequeueMatchSettings matchSettings;
   private final SetMultimap<String, String> matchProvisions;
   private final Duration operationPollPeriod;
   private final OperationPoller operationPoller;
@@ -126,7 +127,7 @@ class ShardWorkerContext implements WorkerContext {
   private final Map<String, QueueEntry> activeOperations = Maps.newConcurrentMap();
   private final Group executionsGroup = Group.getRoot().getChild("executions");
   private final Group operationsGroup = executionsGroup.getChild("operations");
-  private final Supplier<CasWriter> writer;
+  private final CasWriter writer;
   private final boolean errorOperationRemainingResources;
 
   static SetMultimap<String, String> getMatchProvisions(
@@ -142,6 +143,7 @@ class ShardWorkerContext implements WorkerContext {
 
   ShardWorkerContext(
       String name,
+      DequeueMatchSettings matchSettings,
       Platform platform,
       Duration operationPollPeriod,
       OperationPoller operationPoller,
@@ -161,8 +163,9 @@ class ShardWorkerContext implements WorkerContext {
       boolean limitGlobalExecution,
       boolean onlyMulticoreTests,
       boolean errorOperationRemainingResources,
-      Supplier<CasWriter> writer) {
+      CasWriter writer) {
     this.name = name;
+    this.matchSettings = matchSettings;
     this.platform = platform;
     this.matchProvisions = getMatchProvisions(platform, policies, executeStageWidth);
     this.operationPollPeriod = operationPollPeriod;
@@ -239,14 +242,14 @@ class ShardWorkerContext implements WorkerContext {
             logger.log(
                 Level.SEVERE, format("%s: poller: error while polling %s", name, operationName), e);
           }
-
-          logger.log(
-              Level.INFO,
-              format(
-                  "%s: poller: Completed Poll for %s: %s",
-                  name, operationName, success ? "OK" : "Failed"));
           if (!success) {
+            logger.log(
+                Level.INFO,
+                format("%s: poller: Completed Poll for %s: Failed", name, operationName));
             onFailure.run();
+          } else {
+            logger.log(
+                Level.INFO, format("%s: poller: Completed Poll for %s: OK", name, operationName));
           }
           return success;
         },
@@ -313,9 +316,7 @@ class ShardWorkerContext implements WorkerContext {
     }
     listener.onWaitEnd();
 
-    DequeueMatchSettings settings = new DequeueMatchSettings();
-    settings.allowUnmatched = true;
-    if (DequeueMatchEvaluator.shouldKeepOperation(settings, matchProvisions, queueEntry)) {
+    if (DequeueMatchEvaluator.shouldKeepOperation(matchSettings, matchProvisions, queueEntry)) {
       listener.onEntry(queueEntry);
     } else {
       backplane.rejectOperation(queueEntry);
@@ -491,13 +492,12 @@ class ShardWorkerContext implements WorkerContext {
   private void insertBlob(Digest digest, ByteString content)
       throws IOException, InterruptedException {
     if (digest.getSizeBytes() > 0) {
-      writer.get().insertBlob(digest, content);
+      writer.insertBlob(digest, content);
     }
   }
 
   private void insertFile(Digest digest, Path file) throws IOException, InterruptedException {
-
-    writer.get().write(digest, file);
+    writer.write(digest, file);
   }
 
   private void updateActionResultStdOutputs(ActionResult.Builder resultBuilder)
@@ -529,12 +529,12 @@ class ShardWorkerContext implements WorkerContext {
       throws IOException, InterruptedException {
     Path outputPath = actionRoot.resolve(outputFile);
     if (!Files.exists(outputPath)) {
-      logger.log(Level.INFO, "ReportResultStage: " + outputFile + " does not exist...");
+      logger.log(Level.FINE, "ReportResultStage: " + outputFile + " does not exist...");
       return;
     }
 
     if (Files.isDirectory(outputPath)) {
-      logger.log(Level.INFO, "ReportResultStage: " + outputFile + " is a directory");
+      logger.log(Level.FINE, "ReportResultStage: " + outputFile + " is a directory");
       preconditionFailure
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
@@ -612,12 +612,12 @@ class ShardWorkerContext implements WorkerContext {
       throws IOException, InterruptedException {
     Path outputDirPath = actionRoot.resolve(outputDir);
     if (!Files.exists(outputDirPath)) {
-      logger.log(Level.INFO, "ReportResultStage: " + outputDir + " does not exist...");
+      logger.log(Level.FINE, "ReportResultStage: " + outputDir + " does not exist...");
       return;
     }
 
     if (!Files.isDirectory(outputDirPath)) {
-      logger.log(Level.INFO, "ReportResultStage: " + outputDir + " is not a directory...");
+      logger.log(Level.FINE, "ReportResultStage: " + outputDir + " is not a directory...");
       preconditionFailure
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
@@ -742,7 +742,8 @@ class ShardWorkerContext implements WorkerContext {
       throws IOException, InterruptedException {
     boolean success = createBackplaneRetrier().execute(() -> instance.putOperation(operation));
     if (success && operation.getDone()) {
-      logger.log(Level.INFO, "CompletedOperation: " + operation.getName());
+      PrometheusPublisher.updateCompletedOperations();
+      logger.log(Level.FINE, "CompletedOperation: " + operation.getName());
     }
     return success;
   }

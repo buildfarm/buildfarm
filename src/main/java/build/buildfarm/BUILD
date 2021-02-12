@@ -1,4 +1,5 @@
 load("@io_bazel_rules_docker//container:container.bzl", "container_image")
+load("//:defs.bzl", "ensure_accurate_metadata")
 
 package(
     default_visibility = ["//src:__subpackages__"],
@@ -159,6 +160,7 @@ java_library(
         "metrics/MetricsPublisher.java",
     ]),
     deps = [
+        ":prometheus-metrics",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
         "@googleapis//:google_rpc_error_details_java_proto",
@@ -222,6 +224,18 @@ java_library(
         "@maven//:com_google_guava_guava",
         "@maven//:com_google_protobuf_protobuf_java_util",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+    ],
+)
+
+java_library(
+    name = "prometheus-metrics",
+    srcs = glob([
+        "metrics/prometheus/PrometheusPublisher.java",
+    ]),
+    deps = [
+        "@maven//:io_prometheus_simpleclient",
+        "@maven//:io_prometheus_simpleclient_hotspot",
+        "@maven//:io_prometheus_simpleclient_httpserver",
     ],
 )
 
@@ -393,6 +407,7 @@ java_library(
         ":common-grpc",
         ":common-redis",
         ":instance",
+        ":prometheus-metrics",
         ":server-instance",
         ":stub-instance",
         ":worker-queues",
@@ -463,6 +478,7 @@ java_library(
         ":log-metrics",
         ":memory-instance",
         ":metrics",
+        ":prometheus-metrics",
         ":shard-instance",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
@@ -499,6 +515,7 @@ java_binary(
     runtime_deps = [
         ":server",
     ],
+    jvm_flags = ensure_accurate_metadata(),
 )
 
 container_image(
@@ -561,6 +578,7 @@ java_library(
         ":common-grpc",
         ":instance",
         ":memory-instance",
+        "prometheus-metrics",
         ":server",
         ":server-instance",
         ":shard-instance",
@@ -571,6 +589,7 @@ java_library(
         ":operations-finder",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
         "//src/main/java/build/buildfarm:common-cache",
+        "//src/main/java/build/buildfarm:operations",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_rpc_error_details_java_proto",
         "@maven//:com_github_pcj_google_options",
@@ -585,7 +604,6 @@ java_library(
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_services",
         "@maven//:io_grpc_grpc_stub",
-        "//src/main/java/build/buildfarm:operations",
     ],
 )
 
@@ -599,6 +617,7 @@ java_binary(
     runtime_deps = [
         ":shard-worker",
     ],
+    jvm_flags = ensure_accurate_metadata(),
 )
 
 container_image(
@@ -642,6 +661,7 @@ java_library(
         ":cas",
         ":common",
         ":instance",
+        ":prometheus-metrics",
         ":stub-instance",
         ":worker-resources",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
@@ -744,6 +764,7 @@ java_binary(
     runtime_deps = [
         ":operationqueue-worker",
     ],
+    jvm_flags = ensure_accurate_metadata(),
 )
 
 container_image(
@@ -916,6 +937,19 @@ java_binary(
         "@maven//:io_grpc_grpc_netty",
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
+    ],
+)
+
+java_binary(
+    name = "GracefulShutdownTest",
+    srcs = ["GracefulShutdownTest.java"],
+    main_class = "build.buildfarm.GracefulShutdownTest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
+        "@maven//:io_grpc_grpc_api",
+        "@maven//:io_grpc_grpc_netty",
     ],
 )
 

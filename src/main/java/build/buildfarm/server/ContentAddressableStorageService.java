@@ -38,6 +38,7 @@ import build.bazel.remote.execution.v2.GetTreeResponse;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.v1test.Tree;
 import com.google.common.base.Function;
 import com.google.common.base.Stopwatch;
@@ -110,8 +111,9 @@ public class ContentAddressableStorageService
               responseObserver.onNext(response);
               responseObserver.onCompleted();
               long elapsedMicros = stopwatch.elapsed(MICROSECONDS);
+              PrometheusPublisher.updateMissingBlobs(request.getBlobDigestsList().size());
               logger.log(
-                  requestLogLevel,
+                  Level.FINE,
                   new StringBuilder()
                       .append("FindMissingBlobs(")
                       .append(instance.getName())

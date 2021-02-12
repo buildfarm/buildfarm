@@ -25,24 +25,24 @@ import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.ScanParams;
 import redis.clients.jedis.ScanResult;
 
-///
-/// @class   OperationsFinder
-/// @brief   Finds operations based on search settings.
-/// @details Operations can be found based on different search queries
-///          depending on the context a caller has or wants to filter on.
-///
+/**
+ * @class OperationsFinder
+ * @brief Finds operations based on search settings.
+ * @details Operations can be found based on different search queries depending on the context a
+ *     caller has or wants to filter on.
+ */
 public class OperationsFinder {
 
-  ///
-  /// @brief   Finds operations based on search settings.
-  /// @details Operations can be found based on different search queries
-  ///          depending on the context a caller has or wants to filter on.
-  /// @param   cluster  An established redis cluster.
-  /// @param   instance An instance is used to get additional information about the operation.
-  /// @param   settings Settings on how to find and filter operations.
-  /// @return  Results from searching for operations.
-  /// @note    Suggested return identifier: results.
-  ///
+  /**
+   * @brief Finds operations based on search settings.
+   * @details Operations can be found based on different search queries depending on the context a
+   *     caller has or wants to filter on.
+   * @param cluster An established redis cluster.
+   * @param instance An instance is used to get additional information about the operation.
+   * @param settings Settings on how to find and filter operations.
+   * @return Results from searching for operations.
+   * @note Suggested return identifier: results.
+   */
   public static FindOperationsResults findOperations(
       JedisCluster cluster, Instance instance, FindOperationsSettings settings) {
     FindOperationsResults results = new FindOperationsResults();
@@ -63,12 +63,12 @@ public class OperationsFinder {
 
     return results;
   }
-  ///
-  /// @brief   Adjust the user provided filter if needed.
-  /// @details This is used to ensure certain expectations on particular given
-  ///          filters.
-  /// @param   settings Settings on how to find and filter operations.
-  ///
+
+  /**
+   * @brief Adjust the user provided filter if needed.
+   * @details This is used to ensure certain expectations on particular given filters.
+   * @param settings Settings on how to find and filter operations.
+   */
   private static void adjustFilter(FindOperationsSettings settings) {
     // be generous. if no filter is provided assume the user wants to select all operations instead
     // of no operations
@@ -76,16 +76,17 @@ public class OperationsFinder {
       settings.filterPredicate = "*";
     }
   }
-  ///
-  /// @brief   Scan all operation entires on existing Jedis node and keep ones
-  ///          that meet query requirements.
-  /// @details Results are accumulated onto.
-  /// @param   cluster  An established redis cluster.
-  /// @param   node     A node of the cluster.
-  /// @param   instance An instance is used to get additional information about the operation.
-  /// @param   settings Settings on what operations to find and keep.
-  /// @param   results  Accumulating results from performing a search.
-  ///
+
+  /**
+   * @brief Scan all operation entires on existing Jedis node and keep ones that meet query
+   *     requirements.
+   * @details Results are accumulated onto.
+   * @param cluster An established redis cluster.
+   * @param node A node of the cluster.
+   * @param instance An instance is used to get additional information about the operation.
+   * @param settings Settings on what operations to find and keep.
+   * @param results Accumulating results from performing a search.
+   */
   private static void findOperationNode(
       JedisCluster cluster,
       Jedis node,
@@ -100,15 +101,16 @@ public class OperationsFinder {
 
     } while (!cursor.equals("0"));
   }
-  ///
-  /// @brief   Scan the operations list to obtain operation keys.
-  /// @details Scanning is done incrementally via a cursor.
-  /// @param   node     A node of the cluster.
-  /// @param   cursor   Scan cursor.
-  /// @param   settings Settings on how to traverse the Operations.
-  /// @return  Resulting operation keys from scanning.
-  /// @note    Suggested return identifier: operationKeys.
-  ///
+
+  /**
+   * @brief Scan the operations list to obtain operation keys.
+   * @details Scanning is done incrementally via a cursor.
+   * @param node A node of the cluster.
+   * @param cursor Scan cursor.
+   * @param settings Settings on how to traverse the Operations.
+   * @return Resulting operation keys from scanning.
+   * @note Suggested return identifier: operationKeys.
+   */
   private static List<String> scanOperations(
       Jedis node, String cursor, FindOperationsSettings settings) {
     // construct query
@@ -124,16 +126,16 @@ public class OperationsFinder {
     }
     return new ArrayList<>();
   }
-  ///
-  /// @brief   Collect operations based on settings.
-  /// @details Populates results.
-  /// @param   cluster         An established redis cluster.
-  /// @param   instance        An instance is used to get additional information about the
-  // operation.
-  /// @param   operationKeys   Keys to get operations from.
-  /// @param   filterPredicate The search query used to find particular operations.
-  /// @param   results         Accumulating results from finding operations.
-  ///
+
+  /**
+   * @brief Collect operations based on settings.
+   * @details Populates results.
+   * @param cluster An established redis cluster.
+   * @param instance An instance is used to get additional information about the operation.
+   * @param operationKeys Keys to get operations from.
+   * @param filterPredicate The search query used to find particular operations.
+   * @param results Accumulating results from finding operations.
+   */
   private static void collectOperations(
       JedisCluster cluster,
       Instance instance,
@@ -147,15 +149,15 @@ public class OperationsFinder {
       }
     }
   }
-  ///
-  /// @brief   Whether or not to keep operation based on filter settings.
-  /// @details True if the operation should be returned. false if it should be
-  ///          ignored.
-  /// @param   operation       The operation to analyze based on filter settings.
-  /// @param   filterPredicate The search query used to find particular operations.
-  /// @return  Whether to keep the operation based on the filter settings.
-  /// @note    Suggested return identifier: shouldKeep.
-  ///
+
+  /**
+   * @brief Whether or not to keep operation based on filter settings.
+   * @details True if the operation should be returned. false if it should be ignored.
+   * @param operation The operation to analyze based on filter settings.
+   * @param filterPredicate The search query used to find particular operations.
+   * @return Whether to keep the operation based on the filter settings.
+   * @note Suggested return identifier: shouldKeep.
+   */
   private static boolean shouldKeepOperation(EnrichedOperation operation, String filterPredicate) {
     String json = operation.asJsonString();
     System.out.println(json);

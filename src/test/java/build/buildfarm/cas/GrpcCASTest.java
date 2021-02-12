@@ -23,6 +23,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 
+import build.bazel.remote.execution.v2.ContentAddressableStorageGrpc.ContentAddressableStorageImplBase;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
@@ -35,6 +36,7 @@ import build.buildfarm.instance.stub.Chunker;
 import com.google.bytestream.ByteStreamGrpc.ByteStreamImplBase;
 import com.google.bytestream.ByteStreamProto.ReadRequest;
 import com.google.bytestream.ByteStreamProto.ReadResponse;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.MultimapBuilder;
 import com.google.common.hash.HashCode;
@@ -188,5 +190,18 @@ public class GrpcCASTest {
       writeContent.substring(4).writeTo(writeOut);
     }
     assertThat(content.get(1, TimeUnit.SECONDS)).isEqualTo(writeContent);
+  }
+
+  @Test
+  public void findMissingBlobsSwallowsFilteredList() throws Exception {
+    Channel channel = InProcessChannelBuilder.forName(fakeServerName).directExecutor().build();
+    Runnable onExpiration = mock(Runnable.class);
+    GrpcCAS cas = new GrpcCAS("test", channel, null, onExpirations);
+    ContentAddressableStorageImplBase casService = mock(ContentAddressableStorageImplBase.class);
+    serviceRegistry.addService(casService);
+    Digest emptyDigest = Digest.getDefaultInstance();
+    assertThat(cas.findMissingBlobs(ImmutableList.of(emptyDigest))).isEmpty();
+    verifyZeroInteractions(casService);
+    verifyZeroInteractions(onExpiration);
   }
 }

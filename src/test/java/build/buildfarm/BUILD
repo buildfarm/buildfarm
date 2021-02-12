@@ -1,3 +1,5 @@
+load("//:defs.bzl", "ensure_accurate_metadata")
+
 filegroup(
     name = "configs",
     srcs = glob(["logging.properties"]),
@@ -65,6 +67,7 @@ java_test(
         "@maven//:io_grpc_grpc_testing",
         "@maven//:org_mockito_mockito_core",
     ],
+    jvm_flags = ensure_accurate_metadata(),
 )
 
 java_test(
@@ -138,8 +141,10 @@ java_test(
         "@maven//:io_grpc_grpc_core",
         "@maven//:io_grpc_grpc_stub",
         "@maven//:org_mockito_mockito_core",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
+    jvm_flags = ensure_accurate_metadata(),
 )
 
 config_setting(
@@ -334,6 +339,8 @@ java_test(
     test_class = "build.buildfarm.AllTests",
     deps = [
         ":test_runner",
+        "//src/main/java/build/buildfarm:ac",
+        "//src/main/java/build/buildfarm:cas",
         "//src/main/java/build/buildfarm:common",
         "//src/main/java/build/buildfarm:instance",
         "//src/main/java/build/buildfarm:server-instance",
@@ -341,7 +348,10 @@ java_test(
         "@googleapis//:google_longrunning_operations_java_proto",
         "@googleapis//:google_rpc_error_details_java_proto",
         "@maven//:com_google_guava_guava",
+        "@maven//:com_google_protobuf_protobuf_java",
         "@maven//:com_google_truth_truth",
+        "@maven//:io_grpc_grpc_stub",
+        "@maven//:org_mockito_mockito_core",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
         "//src/main/java/build/buildfarm:operations",
     ],
@@ -473,6 +483,7 @@ java_test(
         "common/redis/ProvisionedRedisQueueTest.java",
         "common/redis/RedisNodeHashesMockTest.java",
         "common/redis/RedisQueueMockTest.java",
+        "common/redis/RedisMapMockTest.java",
         "common/redis/RedisSlotToHashTest.java",
     ],
     test_class = "build.buildfarm.AllTests",

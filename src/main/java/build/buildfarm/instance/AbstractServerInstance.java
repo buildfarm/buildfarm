@@ -18,6 +18,7 @@ import static build.buildfarm.common.Actions.asExecutionStatus;
 import static build.buildfarm.common.Actions.checkPreconditionFailure;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
+import static build.buildfarm.common.Trees.enumerateTreeFileDigests;
 import static build.buildfarm.instance.Utils.putBlob;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
@@ -46,11 +47,13 @@ import build.bazel.remote.execution.v2.ExecutionCapabilities;
 import build.bazel.remote.execution.v2.ExecutionPolicy;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.FileNode;
+import build.bazel.remote.execution.v2.OutputDirectory;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.bazel.remote.execution.v2.SymlinkAbsolutePathStrategy;
+import build.bazel.remote.execution.v2.SymlinkNode;
 import build.buildfarm.ac.ActionCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
@@ -68,6 +71,7 @@ import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.GetClientStartTimeResult;
+import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.Tree;
@@ -78,6 +82,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
+import com.google.common.util.concurrent.AsyncFunction;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -220,17 +225,39 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   protected ListenableFuture<Iterable<Digest>> findMissingActionResultOutputs(
-      @Nullable ActionResult result, RequestMetadata requestMetadata) {
+      @Nullable ActionResult result, Executor executor, RequestMetadata requestMetadata) {
     if (result == null) {
       return immediateFuture(ImmutableList.of());
     }
     // TODO Directories
-    return findMissingBlobs(
-        Iterables.concat(
-            Iterables.transform(result.getOutputFilesList(), outputFile -> outputFile.getDigest()),
-            // findMissingBlobs will weed out empties
-            ImmutableList.of(result.getStdoutDigest(), result.getStderrDigest())),
-        requestMetadata);
+    ImmutableList.Builder<Digest> digests = ImmutableList.builder();
+    digests.addAll(
+        Iterables.transform(result.getOutputFilesList(), outputFile -> outputFile.getDigest()));
+    // findMissingBlobs will weed out empties
+    digests.add(result.getStdoutDigest());
+    digests.add(result.getStderrDigest());
+    ListenableFuture<Void> digestsCompleteFuture = immediateFuture(null);
+    for (OutputDirectory directory : result.getOutputDirectoriesList()) {
+      // TODO make tree cache
+      // create an async function here to avoid initiating the calls to expect immediately
+      // no synchronization required on digests, since only one request is running at a time
+      AsyncFunction<Void, Void> next =
+          v ->
+              transform(
+                  expect(
+                      directory.getTreeDigest(),
+                      build.bazel.remote.execution.v2.Tree.parser(),
+                      executor,
+                      requestMetadata),
+                  tree -> {
+                    digests.addAll(enumerateTreeFileDigests(tree));
+                    return null;
+                  },
+                  executor);
+      digestsCompleteFuture = transformAsync(digestsCompleteFuture, next, executor);
+    }
+    return transformAsync(
+        digestsCompleteFuture, v -> findMissingBlobs(digests.build(), requestMetadata), executor);
   }
 
   protected ListenableFuture<ActionResult> ensureOutputsPresent(
@@ -238,7 +265,7 @@ public abstract class AbstractServerInstance implements Instance {
     ListenableFuture<Iterable<Digest>> missingOutputsFuture =
         transformAsync(
             resultFuture,
-            result -> findMissingActionResultOutputs(result, requestMetadata),
+            result -> findMissingActionResultOutputs(result, directExecutor(), requestMetadata),
             directExecutor());
     return transformAsync(
         missingOutputsFuture,
@@ -616,7 +643,7 @@ public abstract class AbstractServerInstance implements Instance {
       }
       /* FIXME serverside validity check? regex?
       Preconditions.checkState(
-          fileName.isValidFilename(),
+          isValidFilename(fileName),
           INVALID_FILE_NAME);
       */
       lastFileName = fileName;
@@ -625,6 +652,34 @@ public abstract class AbstractServerInstance implements Instance {
       onInputDigest.accept(fileNode.getDigest());
       String filePath = directoryPath.isEmpty() ? fileName : (directoryPath + "/" + fileName);
       onInputFile.accept(filePath);
+    }
+    String lastSymlinkName = "";
+    for (SymlinkNode symlinkNode : directory.getSymlinksList()) {
+      String symlinkName = symlinkNode.getName();
+      if (entryNames.contains(symlinkName)) {
+        preconditionFailure
+            .addViolationsBuilder()
+            .setType(VIOLATION_TYPE_INVALID)
+            .setSubject("/" + directoryPath + ": " + symlinkName)
+            .setDescription(DUPLICATE_DIRENT);
+      } else if (lastSymlinkName.compareTo(symlinkName) > 0) {
+        preconditionFailure
+            .addViolationsBuilder()
+            .setType(VIOLATION_TYPE_INVALID)
+            .setSubject("/" + directoryPath + ": " + lastSymlinkName + " > " + symlinkName)
+            .setDescription(DIRECTORY_NOT_SORTED);
+      }
+      /* FIXME serverside validity check? regex?
+      Preconditions.checkState(
+          isValidFilename(symlinkName),
+          INVALID_FILE_NAME);
+      Preconditions.checkState(
+          isValidFilename(symlinkNode.getTarget()),
+          INVALID_FILE_NAME);
+      // FIXME verify that any relative pathing for the target is within the input root
+      */
+      lastSymlinkName = symlinkName;
+      entryNames.add(symlinkName);
     }
     String lastDirectoryName = "";
     for (DirectoryNode directoryNode : directory.getDirectoriesList()) {
@@ -645,7 +700,7 @@ public abstract class AbstractServerInstance implements Instance {
       }
       /* FIXME serverside validity check? regex?
       Preconditions.checkState(
-          directoryName.isValidFilename(),
+          isValidFilename(directoryName),
           INVALID_FILE_NAME);
       */
       lastDirectoryName = directoryName;
@@ -1698,6 +1753,12 @@ public abstract class AbstractServerInstance implements Instance {
   public WorkerListMessage getWorkerList() {
     throw new UnsupportedOperationException(
         "AbstractServerInstance doesn't support getWorkerList() method.");
+  }
+
+  @Override
+  public PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully(String worker) {
+    throw new UnsupportedOperationException(
+        "AbstractServerInstance doesn't support drainWorkerPipeline() method.");
   }
 
   @Override

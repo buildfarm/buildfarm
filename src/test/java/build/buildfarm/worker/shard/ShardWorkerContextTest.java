@@ -33,6 +33,7 @@ import build.buildfarm.instance.Instance.MatchListener;
 import build.buildfarm.instance.shard.ShardBackplane;
 import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.QueueEntry;
+import build.buildfarm.worker.DequeueMatchSettings;
 import build.buildfarm.worker.WorkerContext;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -43,7 +44,6 @@ import io.grpc.StatusException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.function.Supplier;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -65,7 +65,7 @@ public class ShardWorkerContextTest {
 
   @Mock private Instance instance;
 
-  @Mock private Supplier<CasWriter> writer;
+  @Mock private CasWriter writer;
 
   @Before
   public void setUp() throws Exception {
@@ -79,8 +79,10 @@ public class ShardWorkerContextTest {
   }
 
   WorkerContext createTestContext(Platform platform, Iterable<ExecutionPolicy> policies) {
+    DequeueMatchSettings matchSettings = new DequeueMatchSettings();
     return new ShardWorkerContext(
         "test",
+        matchSettings,
         platform,
         /* operationPollPeriod=*/ Duration.getDefaultInstance(),
         /* operationPoller=*/ (queueEntry, stage, requeueAt) -> {

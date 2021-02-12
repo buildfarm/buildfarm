@@ -35,9 +35,11 @@ import build.buildfarm.common.redis.BalancedRedisQueue;
 import build.buildfarm.common.redis.ProvisionedRedisQueue;
 import build.buildfarm.common.redis.RedisClient;
 import build.buildfarm.common.redis.RedisHashtags;
+import build.buildfarm.common.redis.RedisMap;
 import build.buildfarm.common.redis.RedisNodeHashes;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.RedisShardSubscriber.TimedWatchFuture;
+import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.operations.FindOperationsSettings;
 import build.buildfarm.operations.OperationsFinder;
@@ -50,6 +52,7 @@ import build.buildfarm.v1test.OperationChange;
 import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.ProvisionedQueue;
 import build.buildfarm.v1test.QueueEntry;
+import build.buildfarm.v1test.QueueStatus;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.RedisShardBackplaneConfig;
 import build.buildfarm.v1test.ShardWorker;
@@ -92,6 +95,8 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
 import redis.clients.jedis.JedisCluster;
@@ -137,6 +142,7 @@ public class RedisShardBackplane implements ShardBackplane {
   private @Nullable InterruptingRunnable onUnsubscribe = null;
   private Thread subscriptionThread = null;
   private Thread failsafeOperationThread = null;
+  private Thread prometheusMetricsThread = null;
   private RedisShardSubscriber subscriber = null;
   private RedisShardSubscription operationSubscription = null;
   private ExecutorService subscriberService = null;
@@ -146,6 +152,7 @@ public class RedisShardBackplane implements ShardBackplane {
   private Set<String> workerSet = Collections.synchronizedSet(new HashSet<>());
   private long workerSetExpiresAt = 0;
 
+  private RedisMap actionCache;
   private BalancedRedisQueue prequeue;
   private OperationQueue operationQueue;
 
@@ -321,10 +328,10 @@ public class RedisShardBackplane implements ShardBackplane {
 
     if (!expiringChannels.isEmpty()) {
       logger.log(
-          Level.INFO,
+          Level.FINE,
           format("Scan %d watches, %s, expiresAt: %s", expiringChannels.size(), now, expiresAt));
 
-      logger.log(Level.INFO, "Scan prequeue");
+      logger.log(Level.FINE, "Scan prequeue");
       // scan prequeue, pet watches
       scanPrequeue(jedis, resetChannel);
     }
@@ -333,7 +340,7 @@ public class RedisShardBackplane implements ShardBackplane {
     scanProcessing(jedis, resetChannel, now);
 
     if (!expiringChannels.isEmpty()) {
-      logger.log(Level.INFO, "Scan queue");
+      logger.log(Level.FINE, "Scan queue");
       // scan queue, pet watches
       scanQueue(jedis, resetChannel);
     }
@@ -342,7 +349,7 @@ public class RedisShardBackplane implements ShardBackplane {
     scanDispatching(jedis, resetChannel, now);
 
     if (!expiringChannels.isEmpty()) {
-      logger.log(Level.INFO, "Scan dispatched");
+      logger.log(Level.FINE, "Scan dispatched");
       // scan dispatched pet watches
       scanDispatched(jedis, resetChannel);
     }
@@ -439,7 +446,7 @@ public class RedisShardBackplane implements ShardBackplane {
         }
         subscriber.onOperation(operationChannel(operationName), operation, nextExpiresAt(now));
         logger.log(
-            Level.INFO,
+            Level.FINE,
             format(
                 "operation %s done due to %s",
                 operationName, operation == null ? "null" : "completed"));
@@ -473,7 +480,7 @@ public class RedisShardBackplane implements ShardBackplane {
             client);
 
     // use Executors...
-    subscriptionThread = new Thread(operationSubscription);
+    subscriptionThread = new Thread(operationSubscription, "Operation Subscription");
 
     subscriptionThread.start();
   }
@@ -493,7 +500,8 @@ public class RedisShardBackplane implements ShardBackplane {
                   logger.log(Level.SEVERE, "error while updating watchers in failsafe", e);
                 }
               }
-            });
+            },
+            "Failsafe Operation");
 
     failsafeOperationThread.start();
   }
@@ -513,6 +521,7 @@ public class RedisShardBackplane implements ShardBackplane {
     // multiple clients.
     client = new RedisClient(jedisClusterFactory.get());
 
+    actionCache = createActionCache(client, config);
     prequeue = createPrequeue(client, config);
     operationQueue = createOperationQueue(client, config);
 
@@ -523,9 +532,17 @@ public class RedisShardBackplane implements ShardBackplane {
       startFailsafeOperationThread();
     }
 
+    // Start Prometheus metrics collector
+    startPrometheusMetricsCollector();
+
     // Record client start time
     client.call(
         jedis -> jedis.set("startTime/" + clientPublicName, Long.toString(new Date().getTime())));
+  }
+
+  static RedisMap createActionCache(RedisClient client, RedisShardBackplaneConfig config)
+      throws IOException {
+    return new RedisMap(config.getActionCachePrefix());
   }
 
   static BalancedRedisQueue createPrequeue(RedisClient client, RedisShardBackplaneConfig config)
@@ -597,6 +614,11 @@ public class RedisShardBackplane implements ShardBackplane {
         subscriptionThread.join();
       }
       logger.log(Level.FINE, "subscriptionThread has been stopped");
+    }
+    if (prometheusMetricsThread != null) {
+      prometheusMetricsThread.stop();
+      prometheusMetricsThread.join();
+      logger.log(Level.FINE, "prometheusMetricsThread has been stopped");
     }
     if (subscriberService != null) {
       subscriberService.shutdown();
@@ -713,6 +735,28 @@ public class RedisShardBackplane implements ShardBackplane {
     return workerSet;
   }
 
+  // When performing a graceful scale down of workers, the backplane can provide worker names to the
+  // scale-down service. The algorithm in which the backplane chooses these workers can be made more
+  // sophisticated in the future. But for now, we'll give back n random workers.
+  public List<String> suggestedWorkersToScaleDown(int numWorkers) throws IOException {
+
+    // get all workers
+    List<String> allWorkers = new ArrayList<String>();
+    allWorkers.addAll(getWorkers());
+
+    // ensure selection amount is in range [0 - size]
+    numWorkers = Math.max(0, Math.min(numWorkers, allWorkers.size()));
+
+    // select n workers
+    return randomN(allWorkers, numWorkers);
+  }
+
+  public static <T> List<T> randomN(List<T> list, int n) {
+    return Stream.generate(() -> list.remove((int) (list.size() * Math.random())))
+        .limit(Math.min(list.size(), n))
+        .collect(Collectors.toList());
+  }
+
   private void removeInvalidWorkers(JedisCluster jedis, long testedAt, List<ShardWorker> workers) {
     if (!workers.isEmpty()) {
       for (ShardWorker worker : workers) {
@@ -775,7 +819,7 @@ public class RedisShardBackplane implements ShardBackplane {
 
   @Override
   public ActionResult getActionResult(ActionKey actionKey) throws IOException {
-    String json = client.call(jedis -> jedis.get(acKey(actionKey)));
+    String json = client.call(jedis -> actionCache.get(jedis, asDigestStr(actionKey)));
     if (json == null) {
       return null;
     }
@@ -797,11 +841,13 @@ public class RedisShardBackplane implements ShardBackplane {
   @Override
   public void putActionResult(ActionKey actionKey, ActionResult actionResult) throws IOException {
     String json = JsonFormat.printer().print(actionResult);
-    client.run(jedis -> jedis.setex(acKey(actionKey), config.getActionCacheExpire(), json));
+    client.run(
+        jedis ->
+            actionCache.insert(jedis, asDigestStr(actionKey), json, config.getActionCacheExpire()));
   }
 
   private void removeActionResult(JedisCluster jedis, ActionKey actionKey) {
-    jedis.del(acKey(actionKey));
+    actionCache.remove(jedis, asDigestStr(actionKey));
   }
 
   @Override
@@ -811,13 +857,17 @@ public class RedisShardBackplane implements ShardBackplane {
 
   @Override
   public void removeActionResults(Iterable<ActionKey> actionKeys) throws IOException {
+
+    // convert action keys to strings
+    List<String> keyNames = new ArrayList<String>();
+    actionKeys.forEach(
+        key -> {
+          keyNames.add(asDigestStr(key));
+        });
+
     client.run(
         jedis -> {
-          JedisClusterPipeline p = jedis.pipelined();
-          for (ActionKey actionKey : actionKeys) {
-            p.del(acKey(actionKey));
-          }
-          p.sync();
+          actionCache.remove(jedis, keyNames);
         });
   }
 
@@ -1351,8 +1401,8 @@ public class RedisShardBackplane implements ShardBackplane {
     return config.getCasPrefix() + ":" + DigestUtil.toString(blobDigest);
   }
 
-  private String acKey(ActionKey actionKey) {
-    return config.getActionCachePrefix() + ":" + DigestUtil.toString(actionKey.getDigest());
+  private String asDigestStr(ActionKey actionKey) {
+    return DigestUtil.toString(actionKey.getDigest());
   }
 
   String operationKey(String operationName) {
@@ -1438,6 +1488,44 @@ public class RedisShardBackplane implements ShardBackplane {
                   .build());
     } catch (NumberFormatException nfe) {
       return GetClientStartTimeResult.newBuilder().build();
+    }
+  }
+
+  private void startPrometheusMetricsCollector() {
+    prometheusMetricsThread =
+        new Thread(
+            () -> {
+              while (true) {
+                try {
+                  TimeUnit.SECONDS.sleep(30);
+                  OperationsStatus operationsStatus = operationsStatus();
+                  PrometheusPublisher.updateWorkerPoolSize(
+                      operationsStatus.getActiveWorkersCount());
+                  PrometheusPublisher.updateDispatchedOperationsSize(
+                      operationsStatus.getDispatchedSize());
+                  PrometheusPublisher.updatePreQueueSize(operationsStatus.getPrequeue().getSize());
+                  PrometheusPublisher.updateClusterUtilization();
+                  updateQueueSizes(operationsStatus.getOperationQueue().getProvisionsList());
+                } catch (InterruptedException e) {
+                  Thread.currentThread().interrupt();
+                  break;
+                } catch (Exception e) {
+                  logger.log(Level.SEVERE, "Could not update RedisShardBackplane metrics", e);
+                }
+              }
+            },
+            "Prometheus Metrics Collector");
+
+    prometheusMetricsThread.start();
+  }
+
+  private void updateQueueSizes(List<QueueStatus> queues) {
+    for (QueueStatus queueStatus : queues) {
+      if (queueStatus.getName().contains("cpu")) {
+        PrometheusPublisher.updateCpuQueueSize(queueStatus.getSize());
+      } else if (queueStatus.getName().contains("gpu")) {
+        PrometheusPublisher.updateGpuQueueSize(queueStatus.getSize());
+      }
     }
   }
 }

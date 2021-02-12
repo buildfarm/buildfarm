@@ -15,6 +15,7 @@
 package build.buildfarm.common.grpc;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static java.lang.String.format;
 import static java.util.logging.Level.WARNING;
 
@@ -187,7 +188,7 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
     }
   }
 
-  private synchronized void initiateWrite() throws IOException {
+  private synchronized void initiateWrite() {
     if (writeObserver == null) {
       checkNotNull(deadlineAfterUnits);
       writeObserver =
@@ -318,7 +319,7 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
 
   @Override
   public FeedbackOutputStream getOutput(
-      long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) throws IOException {
+      long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
     this.deadlineAfter = deadlineAfter;
     this.deadlineAfterUnits = deadlineAfterUnits;
     this.onReadyHandler = onReadyHandler;
@@ -328,6 +329,12 @@ public class StubWriteOutputStream extends FeedbackOutputStream implements Write
       }
     }
     return this;
+  }
+
+  @Override
+  public ListenableFuture<FeedbackOutputStream> getOutputFuture(
+      long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+    return immediateFuture(getOutput(deadlineAfter, deadlineAfterUnits, onReadyHandler));
   }
 
   @Override

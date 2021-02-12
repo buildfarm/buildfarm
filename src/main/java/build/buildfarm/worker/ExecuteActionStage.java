@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker;
 
+import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.Set;
@@ -91,6 +92,9 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
   public void releaseExecutor(
       String operationName, int claims, long usecs, long stallUSecs, int exitCode) {
     size = removeAndRelease(operationName, claims);
+    PrometheusPublisher.updateExecutionTime(usecs / 1000.0);
+    PrometheusPublisher.updateExecutionStallTime(stallUSecs / 1000.0);
+    PrometheusPublisher.updateExecutionSlotUsage(size);
     logComplete(
         operationName,
         usecs,
