@@ -1,5 +1,5 @@
 # A minimal container for building and running buildfarm services.
-# We copy in the current state of the reposiory in to test against PR changes.
+# We copy in the current state of the reposiory to test against PR changes.
 FROM ubuntu:18.04
 RUN apt-get update
 RUN apt-get -y install wget python gcc openjdk-8-jdk g++ redis redis-server
