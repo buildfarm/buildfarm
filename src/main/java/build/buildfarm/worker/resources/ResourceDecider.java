@@ -21,81 +21,75 @@ import java.util.Map;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
-  /**
-   * @field operation
-   * @brief The main operation object which contains digests to the remaining data members.
-   * @details Its digests are used to resolve other data members.
-   */
+/**
+ * @field operation
+ * @brief The main operation object which contains digests to the remaining data members.
+ * @details Its digests are used to resolve other data members.
+ */
 
-  /** 
-   *  @class   ResourceDecider
-   *  @brief   Decide the resource limitations for a given command.
-   *  @details Platform properties from specified exec_properties are taken
-   *           into account as well as global buildfarm configuration.
-   */
+/**
+ * @class ResourceDecider
+ * @brief Decide the resource limitations for a given command.
+ * @details Platform properties from specified exec_properties are taken into account as well as
+ *     global buildfarm configuration.
+ */
 public class ResourceDecider {
 
   /**
-   *  @field   EXEC_PROPERTY_MIN_CORES
-   *  @brief   The exec_property and platform property name for setting min
-   *           cores.
-   *  @details This is decided between client and server.
+   * @field EXEC_PROPERTY_MIN_CORES
+   * @brief The exec_property and platform property name for setting min cores.
+   * @details This is decided between client and server.
    */
   private static final String EXEC_PROPERTY_MIN_CORES = "min-cores";
 
   /**
-   *  @field   EXEC_PROPERTY_MAX_CORES
-   *  @brief   The exec_property and platform property name for setting max
-   *           cores.
-   *  @details This is decided between client and server.
+   * @field EXEC_PROPERTY_MAX_CORES
+   * @brief The exec_property and platform property name for setting max cores.
+   * @details This is decided between client and server.
    */
   private static final String EXEC_PROPERTY_MAX_CORES = "max-cores";
 
   /**
-   *  @field   EXEC_PROPERTY_ENV_VARS
-   *  @brief   The exec_property and platform property name for providing
-   *           additional environment variables.
-   *  @details This is decided between client and server.
+   * @field EXEC_PROPERTY_ENV_VARS
+   * @brief The exec_property and platform property name for providing additional environment
+   *     variables.
+   * @details This is decided between client and server.
    */
   private static final String EXEC_PROPERTY_ENV_VARS = "env-vars";
 
   /**
-   *  @field   EXEC_PROPERTY_ENV_VAR
-   *  @brief   The exec_property and platform property prefix name for
-   *           providing an additional environment variable.
-   *  @details This is decided between client and server.
+   * @field EXEC_PROPERTY_ENV_VAR
+   * @brief The exec_property and platform property prefix name for providing an additional
+   *     environment variable.
+   * @details This is decided between client and server.
    */
   private static final String EXEC_PROPERTY_ENV_VAR = "env-var:";
 
   /**
-   *  @field   EXEC_PROPERTY_DEBUG_BEFORE_EXECUTION
-   *  @brief   The exec_property and platform property name for indicating
-   *           whether a user wants to debug the before action state of an
-   *           execution.
-   *  @details This is intended to be used interactively to debug remote
-   *           executions.
+   * @field EXEC_PROPERTY_DEBUG_BEFORE_EXECUTION
+   * @brief The exec_property and platform property name for indicating whether a user wants to
+   *     debug the before action state of an execution.
+   * @details This is intended to be used interactively to debug remote executions.
    */
   private static final String EXEC_PROPERTY_DEBUG_BEFORE_EXECUTION = "debug-before-execution";
 
   /**
-   *  @field   EXEC_PROPERTY_DEBUG_AFTER_EXECUTION
-   *  @brief   The exec_property and platform property name for indicating
-   *           whether a user wants to get debug information from after the
-   *           execution.
-   *  @details This is intended to be used interactively to debug remote
-   *           executions.
+   * @field EXEC_PROPERTY_DEBUG_AFTER_EXECUTION
+   * @brief The exec_property and platform property name for indicating whether a user wants to get
+   *     debug information from after the execution.
+   * @details This is intended to be used interactively to debug remote executions.
    */
   private static final String EXEC_PROPERTY_DEBUG_AFTER_EXECUTION = "debug-after-execution";
 
   /**
-   *  @brief   Decide resource limitations for the given command.
-   *  @details Platform properties from specified exec_properties are taken
-   *           into account as well as global buildfarm configuration.
-   *  @param   command            The command to decide resource limitations for.
-   *  @param   onlyMulticoreTests Only allow ttests to be multicore.
-   *  @param   executeStageWidth  The maximum amount of cores available for the operation.
-   *  @return  Default resource limits.
-   *  @note    Suggested return identifier: resourceLimits.
+   * @brief Decide resource limitations for the given command.
+   * @details Platform properties from specified exec_properties are taken into account as well as
+   *     global buildfarm configuration.
+   * @param command The command to decide resource limitations for.
+   * @param onlyMulticoreTests Only allow ttests to be multicore.
+   * @param executeStageWidth The maximum amount of cores available for the operation.
+   * @return Default resource limits.
+   * @note Suggested return identifier: resourceLimits.
    */
   public static ResourceLimits decideResourceLimitations(
       Command command, boolean onlyMulticoreTests, int executeStageWidth) {
@@ -123,13 +117,12 @@ public class ResourceDecider {
 
     return limits;
   }
-  
+
   /**
-   *  @brief   Evaluate a given platform property of a command and use it to
-   *           adjust execution settings.
-   *  @details Parses the property key/value and stores them appropriately.
-   *  @param   limits   Current limits to apply changes to.
-   *  @param   property The property to store.
+   * @brief Evaluate a given platform property of a command and use it to adjust execution settings.
+   * @details Parses the property key/value and stores them appropriately.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
    */
   private static void evaluateProperty(ResourceLimits limits, Property property) {
     // handle cpu properties
@@ -153,32 +146,32 @@ public class ResourceDecider {
       storeAfterExecutionDebug(limits, property);
     }
   }
-  
+
   /**
-   *  @brief   Store the property for min cores.
-   *  @details Parses and stores the property.
-   *  @param   limits   Current limits to apply changes to.
-   *  @param   property The property to store.
+   * @brief Store the property for min cores.
+   * @details Parses and stores the property.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
    */
   private static void storeMinCores(ResourceLimits limits, Property property) {
     limits.cpu.min = Integer.parseInt(property.getValue());
   }
-  
+
   /**
-   *  @brief   Store the property for max cores.
-   *  @details Parses and stores the property.
-   *  @param   limits   Current limits to apply changes to.
-   *  @param   property The property to store.
+   * @brief Store the property for max cores.
+   * @details Parses and stores the property.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
    */
   private static void storeMaxCores(ResourceLimits limits, Property property) {
     limits.cpu.max = Integer.parseInt(property.getValue());
   }
-  
+
   /**
-   *  @brief   Store the property for env vars.
-   *  @details Parses the property as json.
-   *  @param   limits   Current limits to apply changes to.
-   *  @param   property The property to store.
+   * @brief Store the property for env vars.
+   * @details Parses the property as json.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
    */
   private static void storeEnvVars(ResourceLimits limits, Property property) {
     try {
@@ -187,12 +180,12 @@ public class ResourceDecider {
     } catch (ParseException pe) {
     }
   }
-  
+
   /**
-   *  @brief   Store the property for an env var.
-   *  @details Parses the property key name for the env var name.
-   *  @param   limits   Current limits to apply changes to.
-   *  @param   property The property to store.
+   * @brief Store the property for an env var.
+   * @details Parses the property key name for the env var name.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
    */
   private static void storeEnvVar(ResourceLimits limits, Property property) {
     String keyValue[] = property.getName().split(":", 2);
@@ -200,32 +193,32 @@ public class ResourceDecider {
     String value = property.getValue();
     limits.extraEnvironmentVariables.put(key, value);
   }
-  
+
   /**
-   *  @brief   Store the property for debugging before an execution.
-   *  @details Parses and stores a boolean.
-   *  @param   limits   Current limits to apply changes to.
-   *  @param   property The property to store.
+   * @brief Store the property for debugging before an execution.
+   * @details Parses and stores a boolean.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
    */
   private static void storeBeforeExecutionDebug(ResourceLimits limits, Property property) {
     limits.debugBeforeExecution = Boolean.parseBoolean(property.getValue());
   }
-  
+
   /**
-   *  @brief   Store the property for debugging after an execution.
-   *  @details Parses and stores a boolean.
-   *  @param   limits   Current limits to apply changes to.
-   *  @param   property The property to store.
+   * @brief Store the property for debugging after an execution.
+   * @details Parses and stores a boolean.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
    */
   private static void storeAfterExecutionDebug(ResourceLimits limits, Property property) {
     limits.debugAfterExecution = Boolean.parseBoolean(property.getValue());
   }
-  
+
   /**
-   *  @brief   Resolve any templates found in the env variables.
-   *  @details This assumes the other values that will be resolving the
-   *           templates have already been decided.
-   *  @param   limits Current limits to have resolved.
+   * @brief Resolve any templates found in the env variables.
+   * @details This assumes the other values that will be resolving the templates have already been
+   *     decided.
+   * @param limits Current limits to have resolved.
    */
   private static void resolveEnvironmentVariables(ResourceLimits limits) {
     // resolve any template values
@@ -237,14 +230,13 @@ public class ResourceDecider {
           return val;
         });
   }
-  
+
   /**
-   *  @brief   Derive if command is a test run.
-   *  @details Find a reliable way to identify whether a command is a test or
-   *           not.
-   *  @param   command The command to identify as a test command.
-   *  @return  Whether the command is a test.
-   *  @note    Suggested return identifier: exists.
+   * @brief Derive if command is a test run.
+   * @details Find a reliable way to identify whether a command is a test or not.
+   * @param command The command to identify as a test command.
+   * @return Whether the command is a test.
+   * @note Suggested return identifier: exists.
    */
   private static boolean commandIsTest(Command command) {
     // only tests are setting this currently - other mechanisms are unreliable
