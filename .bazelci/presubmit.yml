@@ -2,10 +2,12 @@
 buildifier: latest
 tasks:
   format_check:
+    name: "Code Format"
     platform: ubuntu1804
     shell_commands:
     - ./.bazelci/format.sh --check
   code_coverage:
+    name: "Code Coverage"
     platform: ubuntu1804
     shell_commands:
     - export BUILDFARM_SKIP_COVERAGE_HOST=true
@@ -33,6 +35,7 @@ tasks:
     test_targets:
     - "..."
   integration_test:
+    name: "Integration Test"
     platform: ubuntu1804
     shell_commands:
     - ./.bazelci/integration_test.sh
