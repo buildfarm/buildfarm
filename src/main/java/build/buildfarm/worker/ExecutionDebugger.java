@@ -80,6 +80,7 @@ public class ExecutionDebugger {
       ProcessBuilder processBuilder, ResourceLimits limits, ActionResult.Builder resultBuilder) {
     String message = "Buildfarm debug information before execution:\n";
     Gson gson = new Gson();
+    message += String.join(" ", processBuilder.command()) + "\n";
     message += gson.toJson(limits);
     return message;
   }
@@ -96,6 +97,7 @@ public class ExecutionDebugger {
       ProcessBuilder processBuilder, ResourceLimits limits, ActionResult.Builder resultBuilder) {
     String message = "Buildfarm debug information after execution:\n";
     Gson gson = new Gson();
+    message += String.join(" ", processBuilder.command()) + "\n";
     message += gson.toJson(limits);
     return message;
   }
