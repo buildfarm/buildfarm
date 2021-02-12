@@ -43,4 +43,22 @@ public class ResourceLimits {
    *     Command.
    */
   public Map<String, String> extraEnvironmentVariables = new HashMap<String, String>();
+
+  ///
+  /// @field   debugBeforeExecution
+  /// @brief   If the user want to get debug information right before the
+  ///          actual execution.
+  /// @details This is a debugging flag and is not intended for normal
+  ///          execution.
+  ///
+  public boolean debugBeforeExecution = false;
+
+  ///
+  /// @field   debugAfterExecution
+  /// @brief   If the user want to get debug information right after the
+  ///          execution.
+  /// @details This is a debugging flag and is not intended for normal
+  ///          execution.
+  ///
+  public boolean debugAfterExecution = false;
 }

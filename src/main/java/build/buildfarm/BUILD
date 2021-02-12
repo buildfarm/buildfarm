@@ -683,6 +683,7 @@ java_library(
         "@maven//:io_grpc_grpc_netty",
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
+        "@maven//:com_google_code_gson_gson",
     ],
 )
 
