@@ -738,6 +738,8 @@ message QueueEntry {
   build.bazel.remote.execution.v2.Digest queued_operation_digest = 2;
 
   build.bazel.remote.execution.v2.Platform platform = 3;
+
+  int32 requeue_attempts = 4;
 }
 
 message QueueStatus {

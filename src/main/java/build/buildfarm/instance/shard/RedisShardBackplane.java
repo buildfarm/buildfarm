@@ -1225,7 +1225,8 @@ public class RedisShardBackplane implements ShardBackplane {
       logger.log(Level.SEVERE, "error parsing queue entry", e);
       return null;
     }
-    QueueEntry queueEntry = queueEntryBuilder.build();
+    QueueEntry queueEntry =
+        queueEntryBuilder.setRequeueAttempts(queueEntryBuilder.getRequeueAttempts() + 1).build();
 
     String operationName = queueEntry.getExecuteEntry().getOperationName();
     Operation operation = keepaliveOperation(operationName);

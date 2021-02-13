@@ -175,6 +175,7 @@ public class ShardInstance extends AbstractServerInstance {
   private final Random rand = new Random();
   private final Writes writes = new Writes(this::writeInstanceSupplier);
   private final int maxCpu;
+  private final int maxRequeueAttempts = 5; // TODO: get from config
 
   private final ListeningExecutorService operationTransformService =
       listeningDecorator(newFixedThreadPool(24));
@@ -1588,7 +1589,24 @@ public class ShardInstance extends AbstractServerInstance {
             Operation.newBuilder()
                 .setName(operationName)
                 .setDone(true)
-                .setResponse(Any.pack(blacklistResponse(executeEntry.getActionDigest())))
+                .setResponse(
+                    Any.pack(
+                        blacklistResponse(
+                            executeEntry.getActionDigest(), "This execute request is forbidden")))
+                .build());
+        return IMMEDIATE_VOID_FUTURE;
+      } else if (queueEntry.getRequeueAttempts() > maxRequeueAttempts) {
+        logger.log(
+            Level.WARNING, "Operation " + operationName + " has been requeued too many times.");
+        putOperation(
+            Operation.newBuilder()
+                .setName(operationName)
+                .setDone(true)
+                .setResponse(
+                    Any.pack(
+                        blacklistResponse(
+                            executeEntry.getActionDigest(),
+                            "This execute request has been requeued too many times")))
                 .build());
         return IMMEDIATE_VOID_FUTURE;
       }
@@ -1739,7 +1757,8 @@ public class ShardInstance extends AbstractServerInstance {
             operation
                 .toBuilder()
                 .setDone(true)
-                .setResponse(Any.pack(blacklistResponse(actionDigest)))
+                .setResponse(
+                    Any.pack(blacklistResponse(actionDigest, "This execute request is forbidden")))
                 .build());
         return immediateFuture(null);
       }
@@ -1753,13 +1772,13 @@ public class ShardInstance extends AbstractServerInstance {
     }
   }
 
-  private static ExecuteResponse blacklistResponse(Digest actionDigest) {
+  private static ExecuteResponse blacklistResponse(Digest actionDigest, String description) {
     PreconditionFailure.Builder preconditionFailureBuilder = PreconditionFailure.newBuilder();
     preconditionFailureBuilder
         .addViolationsBuilder()
         .setType(VIOLATION_TYPE_MISSING)
         .setSubject("blobs/" + DigestUtil.toString(actionDigest))
-        .setDescription("This execute request is forbidden");
+        .setDescription(description);
     PreconditionFailure preconditionFailure = preconditionFailureBuilder.build();
     return ExecuteResponse.newBuilder()
         .setStatus(
