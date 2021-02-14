@@ -199,7 +199,6 @@ public class ShardWorkerInstance extends AbstractServerInstance {
     while (!backplane.isStopped()) {
       listener.onWaitStart();
       try {
-
         List<Platform.Property> provisions = new ArrayList<>();
         QueueEntry queueEntry = backplane.dispatchOperation(provisions);
         if (queueEntry != null) {
