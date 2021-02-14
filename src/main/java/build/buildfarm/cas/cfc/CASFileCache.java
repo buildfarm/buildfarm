@@ -350,31 +350,36 @@ public abstract class CASFileCache implements ContentAddressableStorage {
    * <p>if size > 0, consider the filename invalid if it does not match
    */
   private FileEntryKey parseFileEntryKey(String fileName, long size, DigestUtil digestUtil) {
-
     String[] components = fileName.split("_");
-    if (components.length < 1 || components.length > 2) {
+    if (components.length > 3) {
       return null;
     }
 
     boolean isExecutable = false;
-    long parsedSizeComponent = 0;
+    boolean hasSizeComponent = false;
     Digest digest;
     try {
+      // Can be legacy: <hash>_<size>[_exec]
+      // Or new: <hash>[_exec]
+      // Streamline when legacy is removed for #677
       String hashComponent = components[0];
       digest = digestUtil.build(hashComponent, size);
-      if (components.length == 2) {
-        if (components[1].equals("exec")) {
-          isExecutable = true;
-        } else {
-          return null;
-        }
+      isExecutable = components[components.length - 1].equals("exec");
+      // must be executable for 3 fields
+      if (!isExecutable && components.length > 2) {
+        return null;
+      }
+      hasSizeComponent = components.length == (isExecutable ? 3 : 2);
+      long parsedSizeComponent = hasSizeComponent ? Long.parseLong(components[1]) : size;
+      if (size != parsedSizeComponent) {
+        return null;
       }
     } catch (NumberFormatException e) {
       return null;
     }
 
     return new FileEntryKey(
-        getKey(digest, isExecutable), parsedSizeComponent, isExecutable, digest);
+        getKey(digest, isExecutable), size, isExecutable, digest, hasSizeComponent);
   }
 
   private FileEntryKey parseFileEntryKey(String fileName, long size) {
@@ -1104,12 +1109,14 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     private final long size;
     private final boolean isExecutable;
     private final Digest digest;
+    private final boolean legacy; // file is in old format name, should be renamed
 
-    FileEntryKey(String key, long size, boolean isExecutable, Digest digest) {
+    FileEntryKey(String key, long size, boolean isExecutable, Digest digest, boolean legacy) {
       this.key = key;
       this.size = size;
       this.isExecutable = isExecutable;
       this.digest = digest;
+      this.legacy = legacy;
     }
 
     String getKey() {
@@ -1126,6 +1133,10 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
     Digest getDigest() {
       return digest;
+    }
+
+    boolean isLegacy() {
+      return legacy;
     }
   }
 
@@ -1340,10 +1351,15 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             deleteFiles.add(file);
           }
         } else {
-          // populate key it is not currently stored.
           String key = fileEntryKey.getKey();
+          Path keyPath = getPath(key);
+          // remove/refactor when #677 is closed
+          if (fileEntryKey.isLegacy()) {
+            Files.move(file, keyPath);
+          }
+          // populate key it is not currently stored.
           Entry e = new Entry(key, size, Deadline.after(10, SECONDS));
-          Object fileKey = getFileKey(entryPathStrategy.getPath(key), stat);
+          Object fileKey = getFileKey(keyPath, stat);
           synchronized (fileKeys) {
             fileKeys.put(fileKey, e);
           }
@@ -1385,13 +1401,24 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
               Digest digest = directory == null ? null : digestUtil.compute(directory);
 
-              if (digest != null && getDirectoryPath(digest).equals(path)) {
+              // apply legacy rename if possible
+              // Remove on major release or when #677 is closed
+              Path dirPath = path;
+              String basename = path.getFileName().toString();
+              if (basename == digest.getHash() + "_" + digest.getSizeBytes() + "_dir") {
+                Path legacyPath = path;
+                dirPath = getDirectoryPath(digest);
+                Files.move(legacyPath, dirPath);
+              }
+              // end legacy support, drop modified dirPath
+
+              if (digest != null && getDirectoryPath(digest).equals(dirPath)) {
                 DirectoryEntry e = new DirectoryEntry(directory, Deadline.after(10, SECONDS));
                 directoriesIndex.put(digest, inputsBuilder.build());
                 directoryStorage.put(digest, e);
               } else {
                 synchronized (invalidDirectories) {
-                  invalidDirectories.add(path);
+                  invalidDirectories.add(dirPath);
                 }
               }
             } catch (Exception e) {
