@@ -33,6 +33,7 @@ import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.Tree;
+import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
@@ -43,8 +44,7 @@ import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.Retrier.Backoff;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.instance.Instance.MatchListener;
-import build.buildfarm.instance.shard.ShardBackplane;
+import build.buildfarm.instance.MatchListener;
 import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.v1test.ExecutionPolicy;
@@ -112,7 +112,7 @@ class ShardWorkerContext implements WorkerContext {
   private final int inlineContentLimit;
   private final int inputFetchStageWidth;
   private final int executeStageWidth;
-  private final ShardBackplane backplane;
+  private final Backplane backplane;
   private final ExecFileSystem execFileSystem;
   private final InputStreamFactory inputStreamFactory;
   private final ListMultimap<String, ExecutionPolicy> policies;
@@ -150,7 +150,7 @@ class ShardWorkerContext implements WorkerContext {
       int inlineContentLimit,
       int inputFetchStageWidth,
       int executeStageWidth,
-      ShardBackplane backplane,
+      Backplane backplane,
       ExecFileSystem execFileSystem,
       InputStreamFactory inputStreamFactory,
       Iterable<ExecutionPolicy> policies,

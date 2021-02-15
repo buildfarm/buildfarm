@@ -20,9 +20,9 @@ import static build.bazel.remote.execution.v2.ExecutionStage.Value.QUEUED;
 import static build.buildfarm.common.Actions.invalidActionVerboseMessage;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
-import static build.buildfarm.instance.AbstractServerInstance.INVALID_PLATFORM;
-import static build.buildfarm.instance.AbstractServerInstance.MISSING_ACTION;
-import static build.buildfarm.instance.AbstractServerInstance.MISSING_COMMAND;
+import static build.buildfarm.instance.server.AbstractServerInstance.INVALID_PLATFORM;
+import static build.buildfarm.instance.server.AbstractServerInstance.MISSING_ACTION;
+import static build.buildfarm.instance.server.AbstractServerInstance.MISSING_COMMAND;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
@@ -55,6 +55,7 @@ import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ToolDetails;
+import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
@@ -113,7 +114,7 @@ public class ShardInstanceTest {
   private ShardInstance instance;
   private Set<Digest> blobDigests;
 
-  @Mock private ShardBackplane mockBackplane;
+  @Mock private Backplane mockBackplane;
 
   @Mock private Runnable mockOnStop;
 

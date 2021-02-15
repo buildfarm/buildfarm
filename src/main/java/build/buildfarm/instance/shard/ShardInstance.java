@@ -56,6 +56,7 @@ import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.Platform.Property;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
+import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
@@ -70,8 +71,9 @@ import build.buildfarm.common.cache.Cache;
 import build.buildfarm.common.cache.CacheBuilder;
 import build.buildfarm.common.cache.CacheLoader.InvalidCacheLoadException;
 import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
-import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.instance.MatchListener;
+import build.buildfarm.instance.server.AbstractServerInstance;
 import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.ExecuteEntry;
@@ -156,7 +158,7 @@ public class ShardInstance extends AbstractServerInstance {
 
   private final Runnable onStop;
   private final long maxBlobSize;
-  private final ShardBackplane backplane;
+  private final Backplane backplane;
   private final ReadThroughActionCache readThroughActionCache;
   private final RemoteInputStreamFactory remoteInputStreamFactory;
   private final com.google.common.cache.LoadingCache<String, Instance> workerStubs;
@@ -207,7 +209,7 @@ public class ShardInstance extends AbstractServerInstance {
     return defaultDuration;
   }
 
-  private static ShardBackplane createBackplane(ShardInstanceConfig config, String identifier)
+  private static Backplane createBackplane(ShardInstanceConfig config, String identifier)
       throws ConfigurationException {
     ShardInstanceConfig.BackplaneCase backplaneCase = config.getBackplaneCase();
     switch (backplaneCase) {
@@ -244,7 +246,7 @@ public class ShardInstance extends AbstractServerInstance {
   private ShardInstance(
       String name,
       DigestUtil digestUtil,
-      ShardBackplane backplane,
+      Backplane backplane,
       ShardInstanceConfig config,
       Runnable onStop,
       ListeningExecutorService actionCacheFetchService)
@@ -269,7 +271,7 @@ public class ShardInstance extends AbstractServerInstance {
   public ShardInstance(
       String name,
       DigestUtil digestUtil,
-      ShardBackplane backplane,
+      Backplane backplane,
       ReadThroughActionCache readThroughActionCache,
       boolean runDispatchedMonitor,
       int dispatchedMonitorIntervalSeconds,

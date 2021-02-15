@@ -28,6 +28,7 @@ import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.backplane.Backplane;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.cas.MemoryCAS;
@@ -43,7 +44,6 @@ import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.RedisShardBackplane;
 import build.buildfarm.instance.shard.RemoteInputStreamFactory;
-import build.buildfarm.instance.shard.ShardBackplane;
 import build.buildfarm.instance.shard.WorkerStubs;
 import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.server.ByteStreamService;
@@ -129,7 +129,7 @@ public class Worker extends LoggingMain {
   private final DigestUtil digestUtil;
   private final ExecFileSystem execFileSystem;
   private final Pipeline pipeline;
-  private final ShardBackplane backplane;
+  private final Backplane backplane;
   private final LoadingCache<String, Instance> workerStubs;
 
   class LocalCasWriter implements CasWriter {
