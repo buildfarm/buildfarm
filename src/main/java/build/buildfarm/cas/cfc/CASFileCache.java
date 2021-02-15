@@ -1405,7 +1405,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               // Remove on major release or when #677 is closed
               Path dirPath = path;
               String basename = path.getFileName().toString();
-              if (basename == digest.getHash() + "_" + digest.getSizeBytes() + "_dir") {
+              if (basename.equals(digest.getHash() + "_" + digest.getSizeBytes() + "_dir")) {
                 Path legacyPath = path;
                 dirPath = getDirectoryPath(digest);
                 Files.move(legacyPath, dirPath);
