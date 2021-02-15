@@ -93,7 +93,9 @@ public class PrometheusPublisher {
   }
 
   public static void stopHttpServer() {
-    server.stop();
+    if (server != null) {
+      server.stop();
+    }
   }
 
   public static void updateCpuQueueSize(long val) {
@@ -157,13 +159,6 @@ public class PrometheusPublisher {
   }
 
   public static void updateClusterUtilization() {
-    try {
-      clusterUtilization.set(
-          dispatchedOperations.get()
-              * 100.0
-              / (workerPoolSize.get() * (numExecuteStages + numInputFetchStages)));
-    } catch (Exception e) {
-      clusterUtilization.set(0.0);
-    }
+    clusterUtilization.set(executionSlotUsage.get() * 100 / numExecuteStages);
   }
 }
