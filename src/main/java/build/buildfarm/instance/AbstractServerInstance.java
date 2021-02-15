@@ -29,6 +29,7 @@ import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static java.lang.String.format;
+import static java.util.concurrent.TimeUnit.DAYS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 import build.bazel.remote.execution.v2.Action;
@@ -57,6 +58,7 @@ import build.bazel.remote.execution.v2.SymlinkNode;
 import build.buildfarm.ac.ActionCache;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
+import build.buildfarm.cas.DigestMismatchException;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
@@ -82,6 +84,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
+import com.google.common.io.ByteStreams;
 import com.google.common.util.concurrent.AsyncFunction;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
@@ -103,8 +106,12 @@ import io.grpc.stub.ServerCallStreamObserver;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.file.NoSuchFileException;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -446,8 +453,9 @@ public abstract class AbstractServerInstance implements Instance {
   }
 
   @Override
-  public boolean containsBlob(Digest digest, RequestMetadata requestMetadata) {
-    return contentAddressableStorage.contains(digest);
+  public boolean containsBlob(
+      Digest digest, Digest.Builder result, RequestMetadata requestMetadata) {
+    return contentAddressableStorage.contains(digest, result);
   }
 
   @Override
@@ -535,6 +543,66 @@ public abstract class AbstractServerInstance implements Instance {
       }
     }
     return iter.toNextPageToken();
+  }
+
+  private interface ContentOutputStreamFactory {
+    OutputStream create(long contentLength) throws IOException;
+  }
+
+  private static void downloadUri(String uri, ContentOutputStreamFactory getContentOutputStream)
+      throws IOException {
+    URL url = new URL(uri);
+    HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+    // connect timeout?
+    // proxy?
+    // authenticator?
+    connection.setInstanceFollowRedirects(true);
+    // request timeout?
+    long contentLength = connection.getContentLength();
+    int status = connection.getResponseCode();
+
+    if (status != HttpURLConnection.HTTP_OK) {
+      String message = connection.getResponseMessage();
+      // per docs, returns null if no valid string can be discerned
+      // from the responses, i.e. invalid HTTP
+      if (message == null) {
+        message = "Invalid HTTP Response";
+      }
+      message = "Download Failed: " + message + " from " + uri;
+      throw new IOException(message);
+    }
+
+    try (InputStream in = connection.getInputStream();
+        OutputStream out = getContentOutputStream.create(contentLength)) {
+      ByteStreams.copy(in, out);
+    }
+  }
+
+  @Override
+  public ListenableFuture<Digest> fetchBlob(
+      Iterable<String> uris, Digest expectedDigest, RequestMetadata requestMetadata) {
+    for (String uri : uris) {
+      try {
+        // some minor abuse here, we want the download to set our built digest size as side effect
+        Digest.Builder actualDigestBuilder = expectedDigest.toBuilder();
+        downloadUri(
+            uri,
+            contentLength -> {
+              Digest actualDigest = actualDigestBuilder.setSizeBytes(contentLength).build();
+              if (expectedDigest.getSizeBytes() >= 0
+                  && expectedDigest.getSizeBytes() != contentLength) {
+                throw new DigestMismatchException(actualDigest, expectedDigest);
+              }
+              return getBlobWrite(actualDigest, UUID.randomUUID(), requestMetadata)
+                  .getOutput(1, DAYS, () -> {});
+            });
+        return immediateFuture(actualDigestBuilder.build());
+      } catch (Exception e) {
+        logger.log(Level.WARNING, "download attempt failed", e);
+        // ignore?
+      }
+    }
+    return immediateFailedFuture(new NoSuchFileException(expectedDigest.getHash()));
   }
 
   protected String createOperationName(String id) {

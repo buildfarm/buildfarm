@@ -388,7 +388,8 @@ public class ByteStreamService extends ByteStreamImplBase {
 
       @Override
       public boolean isComplete() {
-        return instance.containsBlob(digest, TracingMetadataUtils.fromCurrentContext());
+        return instance.containsBlob(
+            digest, Digest.newBuilder(), TracingMetadataUtils.fromCurrentContext());
       }
 
       @Override

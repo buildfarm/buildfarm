@@ -117,8 +117,12 @@ public class GrpcCAS implements ContentAddressableStorage {
   }
 
   @Override
-  public boolean contains(Digest digest) {
+  public boolean contains(Digest digest, Digest.Builder result) {
     // QueryWriteStatusRequest?
+    if (digest.getSizeBytes() < 0) {
+      throw new UnsupportedOperationException("cannot lookup hash without size via grpc cas");
+    }
+    result.mergeFrom(digest);
     return Iterables.isEmpty(findMissingBlobs(ImmutableList.of(digest)));
   }
 
