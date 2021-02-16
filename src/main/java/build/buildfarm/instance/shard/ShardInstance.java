@@ -1594,7 +1594,8 @@ public class ShardInstance extends AbstractServerInstance {
                 .setResponse(
                     Any.pack(
                         denyActionResponse(
-                            executeEntry.getActionDigest(), "This execute request is in block list and is forbidden")))
+                            executeEntry.getActionDigest(),
+                            "This execute request is in block list and is forbidden")))
                 .build());
         return IMMEDIATE_VOID_FUTURE;
       } else if (queueEntry.getRequeueAttempts() > maxRequeueAttempts) {
@@ -1760,7 +1761,10 @@ public class ShardInstance extends AbstractServerInstance {
                 .toBuilder()
                 .setDone(true)
                 .setResponse(
-                    Any.pack(denyActionResponse(actionDigest, "This execute request is in block list and is forbidden")))
+                    Any.pack(
+                        denyActionResponse(
+                            actionDigest,
+                            "This execute request is in block list and is forbidden")))
                 .build());
         return immediateFuture(null);
       }
