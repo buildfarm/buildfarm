@@ -1,0 +1,33 @@
+java_library(
+    name = "operations",
+    srcs = glob(
+        ["*.java"],
+        exclude = [
+            "OperationsFinder.java",
+            "EnrichedOperationBuilder.java",
+        ],
+    ),
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src/main/java/build/buildfarm/common",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "//src/main/protobuf:build_buildfarm_v1test_buildfarm_proto",
+        "@googleapis//:google_bytestream_bytestream_java_grpc",
+        "@googleapis//:google_bytestream_bytestream_java_proto",
+        "@googleapis//:google_rpc_code_java_proto",
+        "@googleapis//:google_rpc_error_details_java_proto",
+        "@googleapis//:google_rpc_error_details_proto",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:com_google_protobuf_protobuf_java",
+        "@maven//:com_google_protobuf_protobuf_java_util",
+        "@maven//:com_googlecode_json_simple_json_simple",
+        "@maven//:com_jayway_jsonpath_json_path",
+        "@maven//:io_grpc_grpc_api",
+        "@maven//:io_grpc_grpc_context",
+        "@maven//:io_grpc_grpc_core",
+        "@maven//:io_grpc_grpc_protobuf",
+        "@maven//:io_grpc_grpc_stub",
+        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
+    ],
+)

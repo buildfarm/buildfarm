@@ -23,8 +23,10 @@ import build.buildfarm.v1test.QueuedOperationMetadata;
 import com.google.longrunning.Operation;
 import com.google.protobuf.util.JsonFormat;
 import com.google.rpc.PreconditionFailure;
+import java.io.IOException;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
 
 /**
  * @class EnrichedOperation
@@ -65,9 +67,7 @@ public class EnrichedOperation {
    * @note Suggested return identifier: json.
    */
   public String asJsonString() {
-    JSONObject obj = new JSONObject();
     try {
-
       JsonFormat.Printer operationPrinter =
           JsonFormat.printer()
               .usingTypeRegistry(
@@ -80,11 +80,13 @@ public class EnrichedOperation {
                       .build());
 
       JSONParser j = new JSONParser();
+      JSONObject obj = new JSONObject();
       obj.put("operation", j.parse(operationPrinter.print(operation)));
       obj.put("action", j.parse(JsonFormat.printer().print(action)));
       obj.put("command", j.parse(JsonFormat.printer().print(command)));
-    } catch (Exception e) {
+      return obj.toJSONString();
+    } catch (IOException | ParseException e) {
+      throw new RuntimeException(e);
     }
-    return obj.toJSONString();
   }
 }

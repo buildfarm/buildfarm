@@ -21,6 +21,7 @@ import static java.lang.String.format;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.instance.Instance;
@@ -70,7 +71,7 @@ public class Util {
   }
 
   public static ListenableFuture<Set<String>> correctMissingBlob(
-      ShardBackplane backplane,
+      Backplane backplane,
       Set<String> workerSet,
       Set<String> originalLocationSet,
       Function<String, Instance> workerInstanceFactory,
@@ -113,7 +114,7 @@ public class Util {
   }
 
   static ListenableFuture<Void> correctMissingBlobSynchronized(
-      ShardBackplane backplane,
+      Backplane backplane,
       Set<String> workerSet,
       Set<String> originalLocationSet,
       Function<String, Instance> workerInstanceFactory,

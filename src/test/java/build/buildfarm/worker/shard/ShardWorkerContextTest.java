@@ -25,12 +25,12 @@ import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.Platform.Property;
+import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.instance.Instance.MatchListener;
-import build.buildfarm.instance.shard.ShardBackplane;
+import build.buildfarm.instance.MatchListener;
 import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.worker.DequeueMatchSettings;
@@ -57,7 +57,7 @@ public class ShardWorkerContextTest {
 
   private Path root;
 
-  @Mock private ShardBackplane backplane;
+  @Mock private Backplane backplane;
 
   @Mock private ExecFileSystem execFileSystem;
 
