@@ -973,7 +973,7 @@ public class ShardInstance extends AbstractServerInstance {
     try {
       if (backplane.isBlacklisted(requestMetadata)) {
         throw Status.UNAVAILABLE
-            .withDescription("This write request is forbidden")
+            .withDescription("This write request is in block list and is forbidden")
             .asRuntimeException();
       }
     } catch (IOException e) {
@@ -1593,8 +1593,8 @@ public class ShardInstance extends AbstractServerInstance {
                 .setDone(true)
                 .setResponse(
                     Any.pack(
-                        blacklistResponse(
-                            executeEntry.getActionDigest(), "This execute request is forbidden")))
+                        denyActionResponse(
+                            executeEntry.getActionDigest(), "This execute request is in block list and is forbidden")))
                 .build());
         return IMMEDIATE_VOID_FUTURE;
       } else if (queueEntry.getRequeueAttempts() > maxRequeueAttempts) {
@@ -1606,7 +1606,7 @@ public class ShardInstance extends AbstractServerInstance {
                 .setDone(true)
                 .setResponse(
                     Any.pack(
-                        blacklistResponse(
+                        denyActionResponse(
                             executeEntry.getActionDigest(),
                             "This execute request has been requeued too many times")))
                 .build());
@@ -1760,7 +1760,7 @@ public class ShardInstance extends AbstractServerInstance {
                 .toBuilder()
                 .setDone(true)
                 .setResponse(
-                    Any.pack(blacklistResponse(actionDigest, "This execute request is forbidden")))
+                    Any.pack(denyActionResponse(actionDigest, "This execute request is in block list and is forbidden")))
                 .build());
         return immediateFuture(null);
       }
@@ -1774,7 +1774,7 @@ public class ShardInstance extends AbstractServerInstance {
     }
   }
 
-  private static ExecuteResponse blacklistResponse(Digest actionDigest, String description) {
+  private static ExecuteResponse denyActionResponse(Digest actionDigest, String description) {
     PreconditionFailure.Builder preconditionFailureBuilder = PreconditionFailure.newBuilder();
     preconditionFailureBuilder
         .addViolationsBuilder()
