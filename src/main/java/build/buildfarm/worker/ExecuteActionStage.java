@@ -14,8 +14,9 @@
 
 package build.buildfarm.worker;
 
-import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import com.google.common.collect.Sets;
+import io.prometheus.client.Gauge;
+import io.prometheus.client.Summary;
 import java.io.IOException;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -27,6 +28,15 @@ import java.util.logging.Logger;
 
 public class ExecuteActionStage extends SuperscalarPipelineStage {
   private static final Logger logger = Logger.getLogger(ExecuteActionStage.class.getName());
+  private static final Gauge executionSlotUsage =
+      Gauge.build().name("execution_slot_usage").help("Execution slot Usage.").register();
+  private static final Summary executionTime =
+      Summary.build().name("execution_time_ms").help("Execution time in ms.").register();
+  private static final Summary executionStallTime =
+      Summary.build()
+          .name("execution_stall_time_ms")
+          .help("Execution stall time in ms.")
+          .register();
 
   private final Set<Thread> executors = Sets.newHashSet();
   private final AtomicInteger executorClaims = new AtomicInteger(0);
@@ -92,9 +102,9 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
   public void releaseExecutor(
       String operationName, int claims, long usecs, long stallUSecs, int exitCode) {
     size = removeAndRelease(operationName, claims);
-    PrometheusPublisher.updateExecutionTime(usecs / 1000.0);
-    PrometheusPublisher.updateExecutionStallTime(stallUSecs / 1000.0);
-    PrometheusPublisher.updateExecutionSlotUsage(size);
+    executionTime.observe(usecs / 1000.0);
+    executionStallTime.observe(stallUSecs / 1000.0);
+    executionSlotUsage.set(size);
     logComplete(
         operationName,
         usecs,

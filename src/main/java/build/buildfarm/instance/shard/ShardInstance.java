@@ -74,14 +74,15 @@ import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.instance.server.AbstractServerInstance;
-import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationIteratorToken;
 import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.ProfiledQueuedOperationMetadata;
+import build.buildfarm.v1test.ProvisionedQueue;
 import build.buildfarm.v1test.QueueEntry;
+import build.buildfarm.v1test.QueueStatus;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ShardInstanceConfig;
@@ -116,6 +117,8 @@ import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
 import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.ServerCallStreamObserver;
+import io.prometheus.client.Counter;
+import io.prometheus.client.Gauge;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -156,6 +159,20 @@ public class ShardInstance extends AbstractServerInstance {
 
   private static final int DEFAULT_MAX_LOCAL_ACTION_CACHE_SIZE = 1000000;
 
+  private static final Counter executionSuccess =
+      Counter.build().name("execution_success").help("Execution success.").register();
+  private static final Gauge preQueueSize =
+      Gauge.build().name("pre_queue_size").help("Pre queue size.").register();
+  private static final Gauge dispatchedOperations =
+      Gauge.build()
+          .name("dispatched_operations_size")
+          .help("Dispatched operations size.")
+          .register();
+  private static final Gauge workerPoolSize =
+      Gauge.build().name("worker_pool_size").help("Active worker pool size.").register();
+  private static final Gauge queueSize =
+      Gauge.build().name("queue_size").labelNames("queue_name").help("Queue size.").register();
+
   private final Runnable onStop;
   private final long maxBlobSize;
   private final Backplane backplane;
@@ -189,6 +206,7 @@ public class ShardInstance extends AbstractServerInstance {
   private Thread operationQueuer;
   private boolean stopping = false;
   private boolean stopped = true;
+  private Thread prometheusMetricsThread;
 
   private static Duration getGrpcTimeout(ShardInstanceConfig config) {
 
@@ -263,6 +281,7 @@ public class ShardInstance extends AbstractServerInstance {
         config.getMaxBlobSize(),
         config.getMaxCpu(),
         config.getMaximumActionTimeout(),
+        config.getRedisShardBackplaneConfig().getProvisionedQueues().getQueuesList(),
         onStop,
         WorkerStubs.create(digestUtil, getGrpcTimeout(config)),
         actionCacheFetchService);
@@ -279,6 +298,7 @@ public class ShardInstance extends AbstractServerInstance {
       long maxBlobSize,
       int maxCpu,
       Duration maxActionTimeout,
+      List<ProvisionedQueue> queues,
       Runnable onStop,
       com.google.common.cache.LoadingCache<String, Instance> workerStubs,
       ListeningExecutorService actionCacheFetchService)
@@ -432,6 +452,35 @@ public class ShardInstance extends AbstractServerInstance {
     } else {
       operationQueuer = null;
     }
+
+    prometheusMetricsThread =
+        new Thread(
+            () -> {
+              while (true) {
+                try {
+                  TimeUnit.SECONDS.sleep(30);
+                  OperationsStatus operationsStatus = operationsStatus();
+                  workerPoolSize.set(operationsStatus.getActiveWorkersCount());
+                  dispatchedOperations.set(operationsStatus.getDispatchedSize());
+                  preQueueSize.set(operationsStatus.getPrequeue().getSize());
+                  updateQueueSizes(operationsStatus.getOperationQueue().getProvisionsList());
+                } catch (InterruptedException e) {
+                  Thread.currentThread().interrupt();
+                  break;
+                } catch (Exception e) {
+                  logger.log(Level.SEVERE, "Could not update RedisShardBackplane metrics", e);
+                }
+              }
+            },
+            "Prometheus Metrics Collector");
+  }
+
+  private void updateQueueSizes(List<QueueStatus> queues) {
+    if (queueSize != null) {
+      for (QueueStatus queueStatus : queues) {
+        queueSize.labels(queueStatus.getName()).set(queueStatus.getSize());
+      }
+    }
   }
 
   private void ensureCanQueue(Stopwatch stopwatch) throws IOException, InterruptedException {
@@ -463,6 +512,10 @@ public class ShardInstance extends AbstractServerInstance {
     if (operationQueuer != null) {
       operationQueuer.start();
     }
+
+    if (prometheusMetricsThread != null) {
+      prometheusMetricsThread.start();
+    }
   }
 
   @Override
@@ -477,6 +530,9 @@ public class ShardInstance extends AbstractServerInstance {
     }
     if (dispatchedMonitor != null) {
       dispatchedMonitor.stop();
+    }
+    if (prometheusMetricsThread != null) {
+      prometheusMetricsThread.stop();
     }
     contextDeadlineScheduler.shutdown();
     operationDeletionService.shutdown();
@@ -1704,7 +1760,7 @@ public class ShardInstance extends AbstractServerInstance {
 
       String operationName = createOperationName(UUID.randomUUID().toString());
 
-      PrometheusPublisher.updateExecutionSuccess();
+      executionSuccess.inc();
       logger.log(
           Level.FINE,
           new StringBuilder()
