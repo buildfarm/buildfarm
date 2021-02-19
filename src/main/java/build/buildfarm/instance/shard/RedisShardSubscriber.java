@@ -18,7 +18,7 @@ import static build.buildfarm.instance.shard.RedisShardBackplane.parseOperationC
 import static build.buildfarm.instance.shard.RedisShardBackplane.parseWorkerChange;
 import static java.lang.String.format;
 
-import build.buildfarm.instance.WatchFuture;
+import build.buildfarm.instance.server.WatchFuture;
 import build.buildfarm.v1test.OperationChange;
 import build.buildfarm.v1test.WorkerChange;
 import com.google.common.collect.ImmutableList;

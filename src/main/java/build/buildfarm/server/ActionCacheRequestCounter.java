@@ -21,6 +21,7 @@ import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
+import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import com.google.common.util.concurrent.ListenableFuture;
 import java.time.Duration;
 import java.util.concurrent.ScheduledExecutorService;
@@ -54,8 +55,8 @@ class ActionCacheRequestCounter {
   private void logRequests() {
     long requestCount = counter.getAndSet(0l);
     if (requestCount > 0) {
-      // TODO: Convert to metrics
-      logger.log(Level.INFO, String.format("GetActionResult %d Requests", requestCount));
+      PrometheusPublisher.updateActionResults(requestCount);
+      logger.log(Level.FINE, String.format("GetActionResult %d Requests", requestCount));
     }
     schedule();
   }

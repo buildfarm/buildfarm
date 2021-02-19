@@ -335,6 +335,7 @@ class Executor {
             }
             requestObserver.onNext(request.build());
             writtenBytes += len;
+            first = false;
           }
           WriteResponse response = writtenFuture.get();
           System.out.println(

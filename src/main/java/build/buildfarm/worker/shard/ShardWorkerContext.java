@@ -33,6 +33,7 @@ import build.bazel.remote.execution.v2.FileNode;
 import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.Tree;
+import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
@@ -43,8 +44,8 @@ import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.Retrier.Backoff;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.instance.Instance.MatchListener;
-import build.buildfarm.instance.shard.ShardBackplane;
+import build.buildfarm.instance.MatchListener;
+import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.QueueEntry;
@@ -94,7 +95,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -112,7 +112,7 @@ class ShardWorkerContext implements WorkerContext {
   private final int inlineContentLimit;
   private final int inputFetchStageWidth;
   private final int executeStageWidth;
-  private final ShardBackplane backplane;
+  private final Backplane backplane;
   private final ExecFileSystem execFileSystem;
   private final InputStreamFactory inputStreamFactory;
   private final ListMultimap<String, ExecutionPolicy> policies;
@@ -127,7 +127,7 @@ class ShardWorkerContext implements WorkerContext {
   private final Map<String, QueueEntry> activeOperations = Maps.newConcurrentMap();
   private final Group executionsGroup = Group.getRoot().getChild("executions");
   private final Group operationsGroup = executionsGroup.getChild("operations");
-  private final Supplier<CasWriter> writer;
+  private final CasWriter writer;
   private final boolean errorOperationRemainingResources;
 
   static SetMultimap<String, String> getMatchProvisions(
@@ -150,7 +150,7 @@ class ShardWorkerContext implements WorkerContext {
       int inlineContentLimit,
       int inputFetchStageWidth,
       int executeStageWidth,
-      ShardBackplane backplane,
+      Backplane backplane,
       ExecFileSystem execFileSystem,
       InputStreamFactory inputStreamFactory,
       Iterable<ExecutionPolicy> policies,
@@ -163,7 +163,7 @@ class ShardWorkerContext implements WorkerContext {
       boolean limitGlobalExecution,
       boolean onlyMulticoreTests,
       boolean errorOperationRemainingResources,
-      Supplier<CasWriter> writer) {
+      CasWriter writer) {
     this.name = name;
     this.matchSettings = matchSettings;
     this.platform = platform;
@@ -492,13 +492,12 @@ class ShardWorkerContext implements WorkerContext {
   private void insertBlob(Digest digest, ByteString content)
       throws IOException, InterruptedException {
     if (digest.getSizeBytes() > 0) {
-      writer.get().insertBlob(digest, content);
+      writer.insertBlob(digest, content);
     }
   }
 
   private void insertFile(Digest digest, Path file) throws IOException, InterruptedException {
-
-    writer.get().write(digest, file);
+    writer.write(digest, file);
   }
 
   private void updateActionResultStdOutputs(ActionResult.Builder resultBuilder)
@@ -743,8 +742,8 @@ class ShardWorkerContext implements WorkerContext {
       throws IOException, InterruptedException {
     boolean success = createBackplaneRetrier().execute(() -> instance.putOperation(operation));
     if (success && operation.getDone()) {
-      // TODO: Convert to metrics
-      logger.log(Level.INFO, "CompletedOperation: " + operation.getName());
+      PrometheusPublisher.updateCompletedOperations();
+      logger.log(Level.FINE, "CompletedOperation: " + operation.getName());
     }
     return success;
   }

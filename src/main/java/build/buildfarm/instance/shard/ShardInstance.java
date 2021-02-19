@@ -56,6 +56,7 @@ import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.Platform.Property;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
+import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
@@ -70,8 +71,10 @@ import build.buildfarm.common.cache.Cache;
 import build.buildfarm.common.cache.CacheBuilder;
 import build.buildfarm.common.cache.CacheLoader.InvalidCacheLoadException;
 import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
-import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.instance.MatchListener;
+import build.buildfarm.instance.server.AbstractServerInstance;
+import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.GetClientStartTimeResult;
@@ -155,7 +158,7 @@ public class ShardInstance extends AbstractServerInstance {
 
   private final Runnable onStop;
   private final long maxBlobSize;
-  private final ShardBackplane backplane;
+  private final Backplane backplane;
   private final ReadThroughActionCache readThroughActionCache;
   private final RemoteInputStreamFactory remoteInputStreamFactory;
   private final com.google.common.cache.LoadingCache<String, Instance> workerStubs;
@@ -174,6 +177,7 @@ public class ShardInstance extends AbstractServerInstance {
   private final Random rand = new Random();
   private final Writes writes = new Writes(this::writeInstanceSupplier);
   private final int maxCpu;
+  private final int maxRequeueAttempts = 5; // TODO: get from config
 
   private final ListeningExecutorService operationTransformService =
       listeningDecorator(newFixedThreadPool(24));
@@ -205,7 +209,7 @@ public class ShardInstance extends AbstractServerInstance {
     return defaultDuration;
   }
 
-  private static ShardBackplane createBackplane(ShardInstanceConfig config, String identifier)
+  private static Backplane createBackplane(ShardInstanceConfig config, String identifier)
       throws ConfigurationException {
     ShardInstanceConfig.BackplaneCase backplaneCase = config.getBackplaneCase();
     switch (backplaneCase) {
@@ -242,7 +246,7 @@ public class ShardInstance extends AbstractServerInstance {
   private ShardInstance(
       String name,
       DigestUtil digestUtil,
-      ShardBackplane backplane,
+      Backplane backplane,
       ShardInstanceConfig config,
       Runnable onStop,
       ListeningExecutorService actionCacheFetchService)
@@ -267,7 +271,7 @@ public class ShardInstance extends AbstractServerInstance {
   public ShardInstance(
       String name,
       DigestUtil digestUtil,
-      ShardBackplane backplane,
+      Backplane backplane,
       ReadThroughActionCache readThroughActionCache,
       boolean runDispatchedMonitor,
       int dispatchedMonitorIntervalSeconds,
@@ -367,7 +371,7 @@ public class ShardInstance extends AbstractServerInstance {
                     long operationTransformDispatchUSecs =
                         stopwatch.elapsed(MICROSECONDS) - canQueueUSecs;
                     logger.log(
-                        Level.INFO,
+                        Level.FINE,
                         format(
                             "OperationQueuer: Dispatched To Transform %s: %dus in canQueue, %dus in transform dispatch",
                             operationName, canQueueUSecs, operationTransformDispatchUSecs));
@@ -463,7 +467,7 @@ public class ShardInstance extends AbstractServerInstance {
 
   @Override
   public void stop() throws InterruptedException {
-    if (stopped) {
+    if (stopped || stopping) {
       return;
     }
     stopping = true;
@@ -969,7 +973,7 @@ public class ShardInstance extends AbstractServerInstance {
     try {
       if (backplane.isBlacklisted(requestMetadata)) {
         throw Status.UNAVAILABLE
-            .withDescription("This write request is forbidden")
+            .withDescription("This write request is in block list and is forbidden")
             .asRuntimeException();
       }
     } catch (IOException e) {
@@ -1587,7 +1591,25 @@ public class ShardInstance extends AbstractServerInstance {
             Operation.newBuilder()
                 .setName(operationName)
                 .setDone(true)
-                .setResponse(Any.pack(blacklistResponse(executeEntry.getActionDigest())))
+                .setResponse(
+                    Any.pack(
+                        denyActionResponse(
+                            executeEntry.getActionDigest(),
+                            "This execute request is in block list and is forbidden")))
+                .build());
+        return IMMEDIATE_VOID_FUTURE;
+      } else if (queueEntry.getRequeueAttempts() > maxRequeueAttempts) {
+        logger.log(
+            Level.WARNING, "Operation " + operationName + " has been requeued too many times.");
+        putOperation(
+            Operation.newBuilder()
+                .setName(operationName)
+                .setDone(true)
+                .setResponse(
+                    Any.pack(
+                        denyActionResponse(
+                            executeEntry.getActionDigest(),
+                            "This execute request has been requeued too many times")))
                 .build());
         return IMMEDIATE_VOID_FUTURE;
       }
@@ -1682,9 +1704,9 @@ public class ShardInstance extends AbstractServerInstance {
 
       String operationName = createOperationName(UUID.randomUUID().toString());
 
-      // TODO: Convert to metrics
+      PrometheusPublisher.updateExecutionSuccess();
       logger.log(
-          Level.INFO,
+          Level.FINE,
           new StringBuilder()
               .append("ExecutionSuccess: ")
               .append(requestMetadata.getToolInvocationId())
@@ -1738,7 +1760,11 @@ public class ShardInstance extends AbstractServerInstance {
             operation
                 .toBuilder()
                 .setDone(true)
-                .setResponse(Any.pack(blacklistResponse(actionDigest)))
+                .setResponse(
+                    Any.pack(
+                        denyActionResponse(
+                            actionDigest,
+                            "This execute request is in block list and is forbidden")))
                 .build());
         return immediateFuture(null);
       }
@@ -1752,13 +1778,13 @@ public class ShardInstance extends AbstractServerInstance {
     }
   }
 
-  private static ExecuteResponse blacklistResponse(Digest actionDigest) {
+  private static ExecuteResponse denyActionResponse(Digest actionDigest, String description) {
     PreconditionFailure.Builder preconditionFailureBuilder = PreconditionFailure.newBuilder();
     preconditionFailureBuilder
         .addViolationsBuilder()
         .setType(VIOLATION_TYPE_MISSING)
         .setSubject("blobs/" + DigestUtil.toString(actionDigest))
-        .setDescription("This execute request is forbidden");
+        .setDescription(description);
     PreconditionFailure preconditionFailure = preconditionFailureBuilder.build();
     return ExecuteResponse.newBuilder()
         .setStatus(

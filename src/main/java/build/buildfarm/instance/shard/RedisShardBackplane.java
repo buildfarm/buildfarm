@@ -23,6 +23,7 @@ import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.CasIndexSettings;
 import build.buildfarm.common.DigestUtil;
@@ -39,9 +40,10 @@ import build.buildfarm.common.redis.RedisMap;
 import build.buildfarm.common.redis.RedisNodeHashes;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.RedisShardSubscriber.TimedWatchFuture;
+import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.operations.FindOperationsSettings;
-import build.buildfarm.operations.OperationsFinder;
+import build.buildfarm.operations.finder.OperationsFinder;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
@@ -51,6 +53,7 @@ import build.buildfarm.v1test.OperationChange;
 import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.ProvisionedQueue;
 import build.buildfarm.v1test.QueueEntry;
+import build.buildfarm.v1test.QueueStatus;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.RedisShardBackplaneConfig;
 import build.buildfarm.v1test.ShardWorker;
@@ -103,7 +106,7 @@ import redis.clients.jedis.Response;
 import redis.clients.jedis.ScanParams;
 import redis.clients.jedis.ScanResult;
 
-public class RedisShardBackplane implements ShardBackplane {
+public class RedisShardBackplane implements Backplane {
   private static final Logger logger = Logger.getLogger(RedisShardBackplane.class.getName());
 
   private static final JsonFormat.Parser operationParser =
@@ -140,6 +143,7 @@ public class RedisShardBackplane implements ShardBackplane {
   private @Nullable InterruptingRunnable onUnsubscribe = null;
   private Thread subscriptionThread = null;
   private Thread failsafeOperationThread = null;
+  private Thread prometheusMetricsThread = null;
   private RedisShardSubscriber subscriber = null;
   private RedisShardSubscription operationSubscription = null;
   private ExecutorService subscriberService = null;
@@ -477,7 +481,7 @@ public class RedisShardBackplane implements ShardBackplane {
             client);
 
     // use Executors...
-    subscriptionThread = new Thread(operationSubscription);
+    subscriptionThread = new Thread(operationSubscription, "Operation Subscription");
 
     subscriptionThread.start();
   }
@@ -497,7 +501,8 @@ public class RedisShardBackplane implements ShardBackplane {
                   logger.log(Level.SEVERE, "error while updating watchers in failsafe", e);
                 }
               }
-            });
+            },
+            "Failsafe Operation");
 
     failsafeOperationThread.start();
   }
@@ -527,6 +532,9 @@ public class RedisShardBackplane implements ShardBackplane {
     if (config.getRunFailsafeOperation()) {
       startFailsafeOperationThread();
     }
+
+    // Start Prometheus metrics collector
+    startPrometheusMetricsCollector();
 
     // Record client start time
     client.call(
@@ -607,6 +615,11 @@ public class RedisShardBackplane implements ShardBackplane {
         subscriptionThread.join();
       }
       logger.log(Level.FINE, "subscriptionThread has been stopped");
+    }
+    if (prometheusMetricsThread != null) {
+      prometheusMetricsThread.stop();
+      prometheusMetricsThread.join();
+      logger.log(Level.FINE, "prometheusMetricsThread has been stopped");
     }
     if (subscriberService != null) {
       subscriberService.shutdown();
@@ -1213,7 +1226,8 @@ public class RedisShardBackplane implements ShardBackplane {
       logger.log(Level.SEVERE, "error parsing queue entry", e);
       return null;
     }
-    QueueEntry queueEntry = queueEntryBuilder.build();
+    QueueEntry queueEntry =
+        queueEntryBuilder.setRequeueAttempts(queueEntryBuilder.getRequeueAttempts() + 1).build();
 
     String operationName = queueEntry.getExecuteEntry().getOperationName();
     Operation operation = keepaliveOperation(operationName);
@@ -1476,6 +1490,44 @@ public class RedisShardBackplane implements ShardBackplane {
                   .build());
     } catch (NumberFormatException nfe) {
       return GetClientStartTimeResult.newBuilder().build();
+    }
+  }
+
+  private void startPrometheusMetricsCollector() {
+    prometheusMetricsThread =
+        new Thread(
+            () -> {
+              while (true) {
+                try {
+                  TimeUnit.SECONDS.sleep(30);
+                  OperationsStatus operationsStatus = operationsStatus();
+                  PrometheusPublisher.updateWorkerPoolSize(
+                      operationsStatus.getActiveWorkersCount());
+                  PrometheusPublisher.updateDispatchedOperationsSize(
+                      operationsStatus.getDispatchedSize());
+                  PrometheusPublisher.updatePreQueueSize(operationsStatus.getPrequeue().getSize());
+                  PrometheusPublisher.updateClusterUtilization();
+                  updateQueueSizes(operationsStatus.getOperationQueue().getProvisionsList());
+                } catch (InterruptedException e) {
+                  Thread.currentThread().interrupt();
+                  break;
+                } catch (Exception e) {
+                  logger.log(Level.SEVERE, "Could not update RedisShardBackplane metrics", e);
+                }
+              }
+            },
+            "Prometheus Metrics Collector");
+
+    prometheusMetricsThread.start();
+  }
+
+  private void updateQueueSizes(List<QueueStatus> queues) {
+    for (QueueStatus queueStatus : queues) {
+      if (queueStatus.getName().contains("cpu")) {
+        PrometheusPublisher.updateCpuQueueSize(queueStatus.getSize());
+      } else if (queueStatus.getName().contains("gpu")) {
+        PrometheusPublisher.updateGpuQueueSize(queueStatus.getSize());
+      }
     }
   }
 }
