@@ -16,6 +16,7 @@ package build.buildfarm.worker;
 
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Platform.Property;
+import build.buildfarm.common.ExecutionProperties;
 import com.google.common.collect.Iterables;
 import java.util.Map;
 import org.json.simple.parser.JSONParser;
@@ -34,52 +35,6 @@ import org.json.simple.parser.ParseException;
  *     global buildfarm configuration.
  */
 public class ResourceDecider {
-
-  /**
-   * @field EXEC_PROPERTY_MIN_CORES
-   * @brief The exec_property and platform property name for setting min cores.
-   * @details This is decided between client and server.
-   */
-  private static final String EXEC_PROPERTY_MIN_CORES = "min-cores";
-
-  /**
-   * @field EXEC_PROPERTY_MAX_CORES
-   * @brief The exec_property and platform property name for setting max cores.
-   * @details This is decided between client and server.
-   */
-  private static final String EXEC_PROPERTY_MAX_CORES = "max-cores";
-
-  /**
-   * @field EXEC_PROPERTY_ENV_VARS
-   * @brief The exec_property and platform property name for providing additional environment
-   *     variables.
-   * @details This is decided between client and server.
-   */
-  private static final String EXEC_PROPERTY_ENV_VARS = "env-vars";
-
-  /**
-   * @field EXEC_PROPERTY_ENV_VAR
-   * @brief The exec_property and platform property prefix name for providing an additional
-   *     environment variable.
-   * @details This is decided between client and server.
-   */
-  private static final String EXEC_PROPERTY_ENV_VAR = "env-var:";
-
-  /**
-   * @field EXEC_PROPERTY_DEBUG_BEFORE_EXECUTION
-   * @brief The exec_property and platform property name for indicating whether a user wants to
-   *     debug the before action state of an execution.
-   * @details This is intended to be used interactively to debug remote executions.
-   */
-  private static final String EXEC_PROPERTY_DEBUG_BEFORE_EXECUTION = "debug-before-execution";
-
-  /**
-   * @field EXEC_PROPERTY_DEBUG_AFTER_EXECUTION
-   * @brief The exec_property and platform property name for indicating whether a user wants to get
-   *     debug information from after the execution.
-   * @details This is intended to be used interactively to debug remote executions.
-   */
-  private static final String EXEC_PROPERTY_DEBUG_AFTER_EXECUTION = "debug-after-execution";
 
   /**
    * @brief Decide resource limitations for the given command.
@@ -126,23 +81,23 @@ public class ResourceDecider {
    */
   private static void evaluateProperty(ResourceLimits limits, Property property) {
     // handle cpu properties
-    if (property.getName().equals(EXEC_PROPERTY_MIN_CORES)) {
+    if (property.getName().equals(ExecutionProperties.MIN_CORES)) {
       storeMinCores(limits, property);
-    } else if (property.getName().equals(EXEC_PROPERTY_MAX_CORES)) {
+    } else if (property.getName().equals(ExecutionProperties.MAX_CORES)) {
       storeMaxCores(limits, property);
     }
 
     // handle env properties
-    else if (property.getName().equals(EXEC_PROPERTY_ENV_VARS)) {
+    else if (property.getName().equals(ExecutionProperties.ENV_VARS)) {
       storeEnvVars(limits, property);
-    } else if (property.getName().startsWith(EXEC_PROPERTY_ENV_VAR)) {
+    } else if (property.getName().startsWith(ExecutionProperties.ENV_VAR)) {
       storeEnvVar(limits, property);
     }
 
     // handle debug properties
-    else if (property.getName().equals(EXEC_PROPERTY_DEBUG_BEFORE_EXECUTION)) {
+    else if (property.getName().equals(ExecutionProperties.DEBUG_BEFORE_EXECUTION)) {
       storeBeforeExecutionDebug(limits, property);
-    } else if (property.getName().equals(EXEC_PROPERTY_DEBUG_AFTER_EXECUTION)) {
+    } else if (property.getName().equals(ExecutionProperties.DEBUG_AFTER_EXECUTION)) {
       storeAfterExecutionDebug(limits, property);
     }
   }
