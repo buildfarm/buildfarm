@@ -364,23 +364,15 @@ class CASFileCacheTest {
   public void startRemovesInvalidEntries() throws IOException, InterruptedException {
     Path tooFewComponents = root.resolve("00").resolve("toofewcomponents");
     Path tooManyComponents = root.resolve("00").resolve("too_many_components_here");
-    Path invalidDigest = root.resolve("00").resolve("digest_10");
+    Path invalidDigest = root.resolve("00").resolve("digest");
     ByteString validBlob = ByteString.copyFromUtf8("valid");
     Digest validDigest = DIGEST_UTIL.compute(ByteString.copyFromUtf8("valid"));
     String validHash = validDigest.getHash();
-    Path invalidSize = root.resolve(validHash.substring(0, 2)).resolve(validHash + "_ten");
-    Path incorrectSize =
-        fileCache.getPath(
-            fileCache.getKey(
-                validDigest.toBuilder().setSizeBytes(validDigest.getSizeBytes() + 1).build(),
-                false));
     Path invalidExec = fileCache.getPath(CASFileCache.getFileName(validDigest, false) + "_regular");
 
     Files.write(tooFewComponents, ImmutableList.of("Too Few Components"), StandardCharsets.UTF_8);
     Files.write(tooManyComponents, ImmutableList.of("Too Many Components"), StandardCharsets.UTF_8);
     Files.write(invalidDigest, ImmutableList.of("Digest is not valid"), StandardCharsets.UTF_8);
-    Files.write(invalidSize, validBlob.toByteArray()); // content would match but for size field
-    Files.write(incorrectSize, validBlob.toByteArray()); // content would match but for size match
     Files.write(
         invalidExec, validBlob.toByteArray()); // content would match but for invalid exec field
 
@@ -389,8 +381,6 @@ class CASFileCacheTest {
     assertThat(!Files.exists(tooFewComponents)).isTrue();
     assertThat(!Files.exists(tooManyComponents)).isTrue();
     assertThat(!Files.exists(invalidDigest)).isTrue();
-    assertThat(!Files.exists(invalidSize)).isTrue();
-    assertThat(!Files.exists(incorrectSize)).isTrue();
     assertThat(!Files.exists(invalidExec)).isTrue();
   }
 
@@ -481,6 +471,31 @@ class CASFileCacheTest {
     assertThat(storage.get(pathThree).after).isEqualTo(storage.get(pathOne));
   }
 
+  @Test
+  public void mismatchedSizeIsNotContained() throws InterruptedException {
+    ByteString content = ByteString.copyFromUtf8("mismatched");
+    Blob blob = new Blob(content, DIGEST_UTIL);
+    Digest digest = blob.getDigest();
+    fileCache.put(blob);
+
+    Digest mismatchedDigest = digest.toBuilder().setSizeBytes(digest.getSizeBytes() + 1).build();
+    assertThat(fileCache.contains(digest, /* result=*/ null)).isTrue();
+    assertThat(fileCache.contains(mismatchedDigest, /* result=*/ null)).isFalse();
+  }
+
+  @Test
+  public void negativeSizeIsContainedAndPopulatesResult() throws InterruptedException {
+    ByteString content = ByteString.copyFromUtf8("lookup");
+    Blob blob = new Blob(content, DIGEST_UTIL);
+    Digest digest = blob.getDigest();
+    fileCache.put(blob);
+
+    Digest.Builder result = Digest.newBuilder();
+    Digest lookupDigest = digest.toBuilder().setSizeBytes(-1).build();
+    assertThat(fileCache.contains(lookupDigest, result)).isTrue();
+    assertThat(result.build()).isEqualTo(digest);
+  }
+
   Write getWrite(Digest digest) throws IOException {
     return fileCache.getWrite(digest, UUID.randomUUID(), RequestMetadata.getDefaultInstance());
   }
@@ -547,6 +562,48 @@ class CASFileCacheTest {
     assertThat(notified.get()).isTrue();
     assertThat(write.getCommittedSize()).isEqualTo(digest.getSizeBytes());
     assertThat(write.isComplete()).isTrue();
+  }
+
+  @Test
+  public void writeOutputSynchronizesOnOutput() throws IOException {
+    ByteString content = ByteString.copyFromUtf8("Hello, World");
+    Digest digest = DIGEST_UTIL.compute(content);
+
+    AtomicBoolean writeClosed = new AtomicBoolean(false);
+    Write write = getWrite(digest);
+    OutputStream out = write.getOutput(1, SECONDS, () -> {});
+    // write is open and should block other output acquisition
+    Thread closer =
+        new Thread(
+            () -> {
+              try {
+                MICROSECONDS.sleep(1);
+                writeClosed.set(true);
+                out.close();
+              } catch (Exception e) {
+                throw new RuntimeException(e);
+              }
+            });
+    closer.start();
+    try (OutputStream secondOut = write.getOutput(1, SECONDS, () -> {})) {
+      assertThat(writeClosed.get()).isTrue();
+    }
+  }
+
+  @Test
+  public void writeOutputFutureIsSerialized() throws Exception {
+    ByteString content = ByteString.copyFromUtf8("Hello, World");
+    Digest digest = DIGEST_UTIL.compute(content);
+
+    Write write = getWrite(digest);
+    ListenableFuture<FeedbackOutputStream> firstOut = write.getOutputFuture(1, SECONDS, () -> {});
+    ListenableFuture<FeedbackOutputStream> secondOut = write.getOutputFuture(1, SECONDS, () -> {});
+    assertThat(firstOut.isDone()).isTrue();
+    assertThat(secondOut.isDone()).isFalse();
+    // close the first output
+    firstOut.get().close();
+    assertThat(secondOut.isDone()).isTrue();
+    secondOut.get().close();
   }
 
   @Test(expected = DigestMismatchException.class)
@@ -623,6 +680,12 @@ class CASFileCacheTest {
               throws IOException {
             canReset = true;
             throw new IOException(new InterruptedException());
+          }
+
+          @Override
+          public ListenableFuture<FeedbackOutputStream> getOutputFuture(
+              long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+            throw new UnsupportedOperationException();
           }
 
           @Override
@@ -865,6 +928,12 @@ class CASFileCacheTest {
     if (!shutdownAndAwaitTermination(service, 1, SECONDS)) {
       throw new RuntimeException("could not shut down service");
     }
+  }
+
+  @Test
+  public void findMissingBlobsFiltersEmptyBlobs() throws Exception {
+    Digest emptyDigest = Digest.getDefaultInstance();
+    assertThat(fileCache.findMissingBlobs(ImmutableList.of(emptyDigest))).isEmpty();
   }
 
   @RunWith(JUnit4.class)

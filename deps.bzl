@@ -70,6 +70,16 @@ def archive_dependencies(third_party):
             "strip_prefix": "rules_docker-f4822f3921f0c343dd9e5ae65c760d0fb70be1b3",
             "urls": ["https://github.com/bazelbuild/rules_docker/archive/f4822f3921f0c343dd9e5ae65c760d0fb70be1b3.tar.gz"],
         },
+
+        # Bazel is referenced as a dependency so that buildfarm can access the linux-sandbox as a potential execution wrapper.
+        {
+            "name": "bazel",
+            "sha256": "bca2303a43c696053317a8c7ac09a5e6d90a62fec4726e55357108bb60d7a807",
+            "strip_prefix": "bazel-3.7.2",
+            "urls": ["https://github.com/bazelbuild/bazel/archive/3.7.2.tar.gz"],
+            "patch_args": ["-p1"],
+            "patches": ["%s/bazel:bazel_visibility.patch" % third_party],
+        },
     ]
 
 def buildfarm_dependencies(repository_name = "build_buildfarm"):
@@ -86,6 +96,18 @@ def buildfarm_dependencies(repository_name = "build_buildfarm"):
         name = params.pop("name")
         maybe(http_archive, name, **params)
 
+    # Enhanced jedis 3.2.0 containing several convenience, performance, and
+    # robustness changes.
+    # Notable features include:
+    #   Cluster request pipelining, used for batching requests for operation
+    #   monitors and CAS index.
+    #   Blocking request (b* prefix) interruptibility, using client
+    #   connection reset.
+    #   Singleton-redis-as-cluster - support treating a non-clustered redis
+    #   endpoint as a cluster of 1 node.
+    # Other changes are redis version-forward treatment of spop and visibility
+    # into errors in cluster unreachable and cluster retry exhaustion.
+    # Details at https://github.com/werkt/jedis/releases/tag/3.2.0-e82e68e2f7
     maybe(
         http_jar,
         "jedis",

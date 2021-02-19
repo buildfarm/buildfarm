@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker;
 
+import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import com.google.common.collect.Sets;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -56,6 +57,9 @@ public class InputFetchStage extends SuperscalarPipelineStage {
   public void releaseInputFetcher(
       String operationName, long usecs, long stallUSecs, boolean success) {
     int size = removeAndRelease(operationName);
+    PrometheusPublisher.updateInputFetchTime(usecs / 1000.0);
+    PrometheusPublisher.updateInputFetchStallTime(stallUSecs / 1000.0);
+    PrometheusPublisher.updateInputFetchSlotUsage(size);
     logComplete(
         operationName,
         usecs,

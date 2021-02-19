@@ -52,13 +52,14 @@ import build.buildfarm.common.Watchdog;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.io.FeedbackOutputStream;
-import build.buildfarm.instance.AbstractServerInstance;
-import build.buildfarm.instance.OperationsMap;
-import build.buildfarm.instance.WatchFuture;
-import build.buildfarm.instance.memory.queues.Worker;
-import build.buildfarm.instance.memory.queues.WorkerQueue;
-import build.buildfarm.instance.memory.queues.WorkerQueueConfigurations;
-import build.buildfarm.instance.memory.queues.WorkerQueues;
+import build.buildfarm.instance.MatchListener;
+import build.buildfarm.instance.queues.Worker;
+import build.buildfarm.instance.queues.WorkerQueue;
+import build.buildfarm.instance.queues.WorkerQueueConfigurations;
+import build.buildfarm.instance.queues.WorkerQueues;
+import build.buildfarm.instance.server.AbstractServerInstance;
+import build.buildfarm.instance.server.OperationsMap;
+import build.buildfarm.instance.server.WatchFuture;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.ActionCacheConfig;
 import build.buildfarm.v1test.ExecuteEntry;
@@ -364,7 +365,15 @@ public class MemoryInstance extends AbstractServerInstance {
       @Override
       public FeedbackOutputStream getOutput(
           long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+        // should be synchronized for a single active output
         return getStreamSource(name).getOutput();
+      }
+
+      @Override
+      public ListenableFuture<FeedbackOutputStream> getOutputFuture(
+          long deadlineAfter, TimeUnit deadlineAfterUnits, Runnable onReadyHandler) {
+        // should be futured for a single closed output
+        return immediateFuture(getOutput(deadlineAfter, deadlineAfterUnits, onReadyHandler));
       }
 
       @Override

@@ -40,18 +40,29 @@ service Admin {
     option (google.api.http) = { get: "/v1test/admin:reindexCas" };
   }
   
-  rpc DeregisterWorker(DeregisterWorkerRequest) returns (DeregisterWorkerRequestResults) {
+  rpc ShutDownWorkerGracefully(ShutDownWorkerGracefullyRequest) returns (ShutDownWorkerGracefullyRequestResults) {
     option (google.api.http) = { get: "/v1test/admin:deregisterWorker" };
+  }
+
+  rpc DisableScaleInProtection(DisableScaleInProtectionRequest) returns (DisableScaleInProtectionRequestResults) {
+    option (google.api.http) = { get: "/v1test/admin:disableScaleInProtection" };
   }
 }
 
-message DeregisterWorkerRequest {
+message ShutDownWorkerGracefullyRequest{
   string instance_name = 1;
   
   string worker_name = 2;
 }
 
-message DeregisterWorkerRequestResults {
+message ShutDownWorkerGracefullyRequestResults {
+}
+
+message DisableScaleInProtectionRequest{
+  string instance_name = 1;
+}
+
+message DisableScaleInProtectionRequestResults{
 }
 
 message ReindexCasRequest {
@@ -198,6 +209,8 @@ message BuildFarmServerConfig {
   MetricsConfig metrics_config = 5;
 
   AdminConfig admin_config = 6;
+
+  PrometheusConfig prometheus_config = 7;
 }
 
 message MetricsConfig {
@@ -230,13 +243,23 @@ message LogMetricsConfig {
   string log_level = 1;
 }
 
+message PrometheusConfig {
+  int32 port = 1;
+}
+
 message AdminConfig {
   string deployment_environment = 1;
+
+  string cluster_id = 4;
+
+  string cluster_endpoint = 6;
 
   oneof type {
     AwsAdminConfig aws_admin_config = 2;
     GcpAdminConfig gcp_admin_config = 3;
   }
+
+  bool enable_graceful_shutdown = 5;
 }
 
 message AwsAdminConfig {
@@ -500,6 +523,8 @@ message ShardInstanceConfig {
   }
 
   int64 max_blob_size = 5;
+  
+  int32 max_cpu = 9;
 
   // maximum selectable timeout
   // a maximum threshold for an action's specified timeout,
@@ -533,6 +558,18 @@ message ShardWorkerInstanceConfig {
   google.protobuf.Duration grpc_timeout = 13;
 }
 
+message DequeueMatchSettings {
+  
+  // whether a worker should accept everything it gets off the queue.
+  bool accept_everything = 1;
+
+  // whether a worker should accept platform properties that it does not match with.
+  bool allow_unmatched = 2;
+  
+  // worker platform used to match operations
+  build.bazel.remote.execution.v2.Platform platform = 3;
+}
+
 message ShardWorkerConfig {
   ShardWorkerInstanceConfig shard_worker_instance_config = 1;
 
@@ -549,11 +586,8 @@ message ShardWorkerConfig {
   // period of poll requests during execution
   google.protobuf.Duration operation_poll_period = 13;
 
-  // initial platform used to match operations
-  build.bazel.remote.execution.v2.Platform platform = 14;
-
-  // default platform to populate matched commands
-  build.bazel.remote.execution.v2.Platform default_platform = 28;
+  //settings used to match with operations
+  DequeueMatchSettings dequeue_match_settings = 36;
 
   // total size of the inline content for
   // action results
@@ -608,6 +642,10 @@ message ShardWorkerConfig {
   bool omit_from_cas = 33;
   
   bool error_operation_remaining_resources = 34;
+
+  AdminConfig admin_config = 35;
+
+  PrometheusConfig prometheus_config = 37;
 }
 
 message ShardWorker {
@@ -703,6 +741,8 @@ message QueueEntry {
   build.bazel.remote.execution.v2.Digest queued_operation_digest = 2;
 
   build.bazel.remote.execution.v2.Platform platform = 3;
+
+  int32 requeue_attempts = 4;
 }
 
 message QueueStatus {
@@ -1016,3 +1056,17 @@ service WorkerProfile {
 
   rpc GetWorkerList(WorkerListRequest) returns (WorkerListMessage) {}
 }
+
+message PrepareWorkerForGracefulShutDownRequest{
+  string instance_name = 1;
+
+  string worker_name = 2;
+}
+
+message PrepareWorkerForGracefulShutDownRequestResults{
+}
+
+service ShutDownWorker {
+  rpc PrepareWorkerForGracefulShutdown(PrepareWorkerForGracefulShutDownRequest) returns (PrepareWorkerForGracefulShutDownRequestResults) {}
+}
+

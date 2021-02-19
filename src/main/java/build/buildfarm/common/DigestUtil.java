@@ -28,6 +28,7 @@ import com.google.common.hash.Hashing;
 import com.google.common.hash.HashingOutputStream;
 import com.google.common.io.ByteSource;
 import com.google.protobuf.ByteString;
+import com.google.protobuf.Descriptors.EnumValueDescriptor;
 import com.google.protobuf.Message;
 import java.io.IOException;
 import java.io.InputStream;
@@ -145,9 +146,12 @@ public class DigestUtil {
   private final Digest empty;
 
   public static DigestUtil forHash(String hashName) {
-    DigestFunction.Value digestFunction =
-        DigestFunction.Value.valueOf(
-            DigestFunction.Value.getDescriptor().findValueByName(hashName));
+    EnumValueDescriptor hashEnumDescriptor =
+        DigestFunction.Value.getDescriptor().findValueByName(hashName);
+    if (hashEnumDescriptor == null) {
+      throw new IllegalArgumentException("hash type unrecognized: " + hashName);
+    }
+    DigestFunction.Value digestFunction = DigestFunction.Value.valueOf(hashEnumDescriptor);
     HashFunction hashFunction = HashFunction.get(digestFunction);
     return new DigestUtil(hashFunction);
   }
@@ -194,6 +198,10 @@ public class DigestUtil {
           String.format("[%s] is not a valid %s hash.", hexHash, hashFn.name()));
     }
     return buildDigest(hexHash, size);
+  }
+
+  public Digest build(byte[] hash, long size) {
+    return build(HashCode.fromBytes(hash).toString(), size);
   }
 
   /**

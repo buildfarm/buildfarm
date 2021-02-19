@@ -29,4 +29,6 @@ public interface Admin {
       Integer maxHosts,
       Integer targetHosts,
       Integer targetReservedHostsPercent);
+
+  void disableHostScaleInProtection(String instanceName);
 }

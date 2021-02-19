@@ -14,51 +14,47 @@
 
 package build.buildfarm.worker;
 
-///
-/// @class   CpuLimits
-/// @brief   CPU resource limitations imposed on specific actions.
-/// @details These resource limitations are often specified by the client
-///          (via: exec_properties), but ultimately validated and decided by
-///          the server. Restricting core count can be beneficial to
-///          preventing hungry actions from bogging down the worker and
-///          affecting neighboring actions that may be sharing the same
-///          hardware. More importantly, being able to apply restrictions
-///          allows for a more efficient utilization of shared compute across
-///          different workers and action profiles. One might also consider
-///          even using higher core machine to take on highly parallel
-///          actions, while allowing lower core machines to take on single
-///          threaded actions. These restrictions will ultimately encourage
-///          action writers to implement their actions more efficiently or opt
-///          for local execution as an alternative.
-///
+/**
+ * @class CpuLimits
+ * @brief CPU resource limitations imposed on specific actions.
+ * @details These resource limitations are often specified by the client (via: exec_properties), but
+ *     ultimately validated and decided by the server. Restricting core count can be beneficial to
+ *     preventing hungry actions from bogging down the worker and affecting neighboring actions that
+ *     may be sharing the same hardware. More importantly, being able to apply restrictions allows
+ *     for a more efficient utilization of shared compute across different workers and action
+ *     profiles. One might also consider even using higher core machine to take on highly parallel
+ *     actions, while allowing lower core machines to take on single threaded actions. These
+ *     restrictions will ultimately encourage action writers to implement their actions more
+ *     efficiently or opt for local execution as an alternative.
+ */
 public class CpuLimits {
 
-  ///
-  /// @field   limit
-  /// @brief   Whether or not we perform CPU core limiting on the action.
-  /// @details Depending on the server implementation, we may skip applying any
-  ///          restrictions to core usage.
-  ///
+  /**
+   * @field limit
+   * @brief Whether or not we perform CPU core limiting on the action.
+   * @details Depending on the server implementation, we may skip applying any restrictions to core
+   *     usage.
+   */
   public boolean limit = true;
 
-  ///
-  /// @field   min
-  /// @brief   The minimum CPU cores required.
-  /// @details Client can suggest this though exec_properties.
-  ///
+  /**
+   * @field min
+   * @brief The minimum CPU cores required.
+   * @details Client can suggest this though exec_properties.
+   */
   public int min = 1;
 
-  ///
-  /// @field   max
-  /// @brief   The maximum CPU cores required.
-  /// @details Client can suggest this though exec_properties.
-  ///
+  /**
+   * @field max
+   * @brief The maximum CPU cores required.
+   * @details Client can suggest this though exec_properties.
+   */
   public int max = 1;
 
-  ///
-  /// @field   claimed
-  /// @brief   The amount of cores actually claimed for the action.
-  /// @details This will be in the range of (min,max) when limited.
-  ///
+  /**
+   * @field claimed
+   * @brief The amount of cores actually claimed for the action.
+   * @details This will be in the range of (min,max) when limited.
+   */
   public int claimed = 1;
 }

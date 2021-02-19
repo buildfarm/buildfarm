@@ -28,6 +28,7 @@ import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.backplane.Backplane;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.cas.MemoryCAS;
@@ -38,19 +39,23 @@ import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.LoggingMain;
 import build.buildfarm.common.Size;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.function.IOSupplier;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.RedisShardBackplane;
 import build.buildfarm.instance.shard.RemoteInputStreamFactory;
-import build.buildfarm.instance.shard.ShardBackplane;
 import build.buildfarm.instance.shard.WorkerStubs;
+import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.server.ByteStreamService;
 import build.buildfarm.server.ContentAddressableStorageService;
 import build.buildfarm.server.Instances;
+import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.ContentAddressableStorageConfig;
+import build.buildfarm.v1test.DisableScaleInProtectionRequest;
 import build.buildfarm.v1test.FilesystemCASConfig;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.ShardWorkerConfig;
+import build.buildfarm.worker.DequeueMatchSettings;
 import build.buildfarm.worker.ExecuteActionStage;
 import build.buildfarm.worker.FuseCAS;
 import build.buildfarm.worker.InputFetchStage;
@@ -60,7 +65,6 @@ import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.ReportResultStage;
 import com.google.common.base.Strings;
-import com.google.common.base.Suppliers;
 import com.google.common.base.Throwables;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
@@ -75,11 +79,14 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.Duration;
 import com.google.protobuf.TextFormat;
 import com.google.protobuf.util.Durations;
+import io.grpc.ManagedChannel;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.Status;
 import io.grpc.Status.Code;
 import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
+import io.grpc.netty.NegotiationType;
+import io.grpc.netty.NettyChannelBuilder;
 import io.grpc.services.HealthStatusManager;
 import java.io.IOException;
 import java.io.InputStream;
@@ -89,6 +96,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.UserPrincipal;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -98,7 +106,6 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
@@ -112,6 +119,8 @@ public class Worker extends LoggingMain {
   private static final int shutdownWaitTimeInSeconds = 10;
   private final boolean isCasShard;
 
+  private boolean inGracefulShutdown = false;
+
   private final ShardWorkerConfig config;
   private final ShardWorkerInstance instance;
   private final HealthStatusManager healthStatusManager;
@@ -120,15 +129,17 @@ public class Worker extends LoggingMain {
   private final DigestUtil digestUtil;
   private final ExecFileSystem execFileSystem;
   private final Pipeline pipeline;
-  private final ShardBackplane backplane;
+  private final Backplane backplane;
   private final LoadingCache<String, Instance> workerStubs;
 
   class LocalCasWriter implements CasWriter {
     public void write(Digest digest, Path file) throws IOException, InterruptedException {
+      insertStream(digest, () -> Files.newInputStream(file));
+    }
 
-      Write write = getLocalWrite(digest);
-      InputStream inputStream = Files.newInputStream(file);
-      insertStream(digest, Suppliers.ofInstance(inputStream));
+    public void insertBlob(Digest digest, ByteString content)
+        throws IOException, InterruptedException {
+      insertStream(digest, () -> content.newInput());
     }
 
     private Write getLocalWrite(Digest digest) throws IOException, InterruptedException {
@@ -139,17 +150,8 @@ public class Worker extends LoggingMain {
       return write;
     }
 
-    public void insertBlob(Digest digest, ByteString content)
+    private void insertStream(Digest digest, IOSupplier<InputStream> suppliedStream)
         throws IOException, InterruptedException {
-
-      Write write = getLocalWrite(digest);
-      Supplier<InputStream> suppliedStream = () -> content.newInput();
-      insertStream(digest, suppliedStream);
-    }
-
-    private void insertStream(Digest digest, Supplier<InputStream> suppliedStream)
-        throws IOException, InterruptedException {
-
       Write write = getLocalWrite(digest);
 
       try (OutputStream out =
@@ -222,6 +224,78 @@ public class Worker extends LoggingMain {
 
   public Worker(String session, ShardWorkerConfig config) throws ConfigurationException {
     this(session, ServerBuilder.forPort(config.getPort()), config);
+  }
+
+  /**
+   * The method will prepare the worker for graceful shutdown and send out grpc request to disable
+   * scale in protection when the worker is ready. If unexpected errors happened, it will cancel the
+   * graceful shutdown progress make the worker available again.
+   */
+  public void prepareWorkerForGracefulShutdown() {
+    inGracefulShutdown = true;
+    logger.log(
+        Level.INFO,
+        "The current worker will not be registered again and should be shutdown gracefully!");
+    pipeline.stopMatchingOperations();
+    int scanRate = 30; // check every 30 seconds
+    int timeWaited = 0;
+    int timeOut = 60 * 15; // 15 minutes
+
+    try {
+      while (!pipeline.isEmpty() && timeWaited < timeOut) {
+        SECONDS.sleep(scanRate);
+        timeWaited += scanRate;
+        logger.log(
+            INFO, String.format("Pipeline is still not empty after %d seconds.", timeWaited));
+      }
+    } catch (InterruptedException e) {
+      logger.log(Level.SEVERE, "The worker gracefully shutdown is interrupted: " + e.getMessage());
+    } finally {
+      // make a grpc call to disable scale protection
+      String clusterEndpoint = config.getAdminConfig().getClusterEndpoint();
+      logger.log(
+          INFO,
+          String.format(
+              "It took the worker %d seconds to %s",
+              timeWaited,
+              pipeline.isEmpty() ? "finish all actions" : "but still cannot finish all actions"));
+      try {
+        disableScaleInProtection(clusterEndpoint, config.getPublicName());
+      } catch (Exception e) {
+        logger.log(
+            SEVERE,
+            String.format(
+                "gRPC call to AdminService to disable scale in protection failed with exception: %s and stacktrace %s",
+                e.getMessage(), Arrays.toString(e.getStackTrace())));
+        // Gracefully shutdown cannot be performed successfully because of error in
+        // AdminService side. Under this scenario, the worker has to be added back to the worker
+        // pool.
+        inGracefulShutdown = false;
+      }
+    }
+  }
+
+  /**
+   * Make grpc call to Buildfarm endpoint to disable the scale in protection of the host with
+   * instanceIp.
+   *
+   * @param clusterEndpoint the current Buildfarm endpoint.
+   * @param instanceIp Ip of the the instance that we want to disable scale in protection.
+   */
+  private void disableScaleInProtection(String clusterEndpoint, String instanceIp) {
+    ManagedChannel channel = null;
+    try {
+      NettyChannelBuilder builder =
+          NettyChannelBuilder.forTarget(clusterEndpoint).negotiationType(NegotiationType.PLAINTEXT);
+      channel = builder.build();
+      AdminGrpc.AdminBlockingStub adminBlockingStub = AdminGrpc.newBlockingStub(channel);
+      adminBlockingStub.disableScaleInProtection(
+          DisableScaleInProtectionRequest.newBuilder().setInstanceName(instanceIp).build());
+    } finally {
+      if (channel != null) {
+        channel.shutdown();
+      }
+    }
   }
 
   private static Path getValidRoot(ShardWorkerConfig config) throws ConfigurationException {
@@ -332,10 +406,15 @@ public class Worker extends LoggingMain {
       writer = new LocalCasWriter();
     }
 
+    DequeueMatchSettings matchSettings = new DequeueMatchSettings();
+    matchSettings.acceptEverything = config.getDequeueMatchSettings().getAcceptEverything();
+    matchSettings.allowUnmatched = config.getDequeueMatchSettings().getAllowUnmatched();
+
     ShardWorkerContext context =
         new ShardWorkerContext(
             config.getPublicName(),
-            config.getPlatform(),
+            matchSettings,
+            config.getDequeueMatchSettings().getPlatform(),
             config.getOperationPollPeriod(),
             backplane::pollOperation,
             config.getInlineContentLimit(),
@@ -356,7 +435,7 @@ public class Worker extends LoggingMain {
             config.getLimitGlobalExecution(),
             config.getOnlyMulticoreTests(),
             config.getErrorOperationRemainingResources(),
-            Suppliers.ofInstance(writer));
+            writer);
 
     PipelineStage completeStage =
         new PutOperationStage((operation) -> context.deactivate(operation.getName()));
@@ -391,6 +470,7 @@ public class Worker extends LoggingMain {
                     context,
                     completeStage,
                     backplane))
+            .addService(new ShutDownWorkerGracefully(this, config))
             .build();
 
     logger.log(INFO, String.format("%s initialized", identifier));
@@ -790,7 +870,7 @@ public class Worker extends LoggingMain {
 
               void registerIfExpired() {
                 long now = System.currentTimeMillis();
-                if (now >= workerRegistrationExpiresAt) {
+                if (now >= workerRegistrationExpiresAt && !inGracefulShutdown) {
                   // worker must be registered to match
                   addWorker(nextRegistration(now));
                   // update every 10 seconds
@@ -850,6 +930,7 @@ public class Worker extends LoggingMain {
   @Override
   protected void onShutdown() throws InterruptedException {
     logger.log(SEVERE, "*** shutting down gRPC server since JVM is shutting down");
+    PrometheusPublisher.stopHttpServer();
     stop();
     logger.log(SEVERE, "*** server shut down");
   }
@@ -901,12 +982,15 @@ public class Worker extends LoggingMain {
     String session = UUID.randomUUID().toString();
     Worker worker;
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
-      worker =
-          new Worker(
-              session,
-              toShardWorkerConfig(
-                  new InputStreamReader(configInputStream),
-                  parser.getOptions(WorkerOptions.class)));
+      ShardWorkerConfig config =
+          toShardWorkerConfig(
+              new InputStreamReader(configInputStream), parser.getOptions(WorkerOptions.class));
+      // Start Prometheus web server
+      PrometheusPublisher.startHttpServer(
+          config.getPrometheusConfig().getPort(),
+          config.getExecuteStageWidth(),
+          config.getInputFetchStageWidth());
+      worker = new Worker(session, config);
     }
     worker.start();
     worker.blockUntilShutdown();
