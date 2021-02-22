@@ -886,6 +886,8 @@ public class Worker extends LoggingMain {
                     SECONDS.sleep(1);
                   }
                 } catch (InterruptedException e) {
+                  // ignore
+                } finally {
                   try {
                     stop();
                   } catch (InterruptedException ie) {

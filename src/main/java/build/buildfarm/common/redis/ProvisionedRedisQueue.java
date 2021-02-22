@@ -14,6 +14,7 @@
 
 package build.buildfarm.common.redis;
 
+import build.buildfarm.common.ExecutionProperties;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.SetMultimap;
@@ -48,17 +49,6 @@ public class ProvisionedRedisQueue {
    * @details Symbol for identifying wildcard in both key/value of provisions.
    */
   public static final String WILDCARD_VALUE = "*";
-
-  /**
-   * @field CHOOSE_QUEUE_KEY
-   * @brief Special key to allow directly matching with a queue.
-   * @details This is to support another paradigm where actions want to specifically request the
-   *     queue to be placed in. Its less generic than having buildfarm choose the queue for you, and
-   *     it leaks implementation details about how buildfarm is queuing your work. However, its
-   *     desirable to match similar remote execution solutions that use exec_properties to choose
-   *     which "pool" they want to run in.
-   */
-  public static final String CHOOSE_QUEUE_KEY = "choose-queue";
 
   /**
    * @field isFullyWildcard
@@ -139,7 +129,7 @@ public class ProvisionedRedisQueue {
   public boolean isEligible(SetMultimap<String, String> properties) {
     // check if a property is specifically requesting to match with the queue
     // any attempt to specifically match will not evaluate other properties
-    Set<String> selected = properties.get(CHOOSE_QUEUE_KEY);
+    Set<String> selected = properties.get(ExecutionProperties.CHOOSE_QUEUE);
     if (!selected.isEmpty()) {
       return selected.contains(queue.getName());
     }
@@ -229,7 +219,7 @@ public class ProvisionedRedisQueue {
 
     // check if a property is specifically requesting to match with the queue
     // any attempt to specifically match will not evaluate other properties
-    Set<String> selected = properties.get(CHOOSE_QUEUE_KEY);
+    Set<String> selected = properties.get(ExecutionProperties.CHOOSE_QUEUE);
     if (!selected.isEmpty()) {
       result.isSpecificallyChosen = selected.contains(queue.getName());
     }
