@@ -61,6 +61,7 @@ import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
+import build.buildfarm.common.ExecutionProperties;
 import build.buildfarm.common.Poller;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator;
@@ -1461,7 +1462,8 @@ public class ShardInstance extends AbstractServerInstance {
 
     for (Property property : platform.getPropertiesList()) {
       /* FIXME generalize with config */
-      if (property.getName().equals("min-cores") || property.getName().equals("max-cores")) {
+      if (property.getName().equals(ExecutionProperties.MIN_CORES)
+          || property.getName().equals(ExecutionProperties.MAX_CORES)) {
         try {
           int intValue = Integer.parseInt(property.getValue());
           if (intValue <= 0 || intValue > maxCpu) {
@@ -1495,7 +1497,13 @@ public class ShardInstance extends AbstractServerInstance {
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
           .setSubject(INVALID_PLATFORM)
-          .setDescription(format("max-cores (%d) must be >= min-cores (%d)", maxCores, minCores));
+          .setDescription(
+              format(
+                  "%s (%d) must be >= %s (%d)",
+                  ExecutionProperties.MAX_CORES,
+                  maxCores,
+                  ExecutionProperties.MIN_CORES,
+                  minCores));
     }
   }
 
