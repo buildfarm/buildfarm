@@ -87,6 +87,13 @@ public class ResourceDecider {
       storeMaxCores(limits, property);
     }
 
+    // handle mem properties
+    if (property.getName().equals(ExecutionProperties.MIN_MEM)) {
+      storeMinMem(limits, property);
+    } else if (property.getName().equals(ExecutionProperties.MAX_MEM)) {
+      storeMaxMem(limits, property);
+    }
+
     // handle env properties
     else if (property.getName().equals(ExecutionProperties.ENV_VARS)) {
       storeEnvVars(limits, property);
@@ -120,6 +127,26 @@ public class ResourceDecider {
    */
   private static void storeMaxCores(ResourceLimits limits, Property property) {
     limits.cpu.max = Integer.parseInt(property.getValue());
+  }
+
+  /**
+   * @brief Store the property for min mem.
+   * @details Parses and stores the property.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
+   */
+  private static void storeMinMem(ResourceLimits limits, Property property) {
+    limits.mem.min = Integer.parseInt(property.getValue());
+  }
+
+  /**
+   * @brief Store the property for max mem.
+   * @details Parses and stores the property.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
+   */
+  private static void storeMaxMem(ResourceLimits limits, Property property) {
+    limits.mem.max = Integer.parseInt(property.getValue());
   }
 
   /**

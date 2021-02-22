@@ -1,4 +1,4 @@
-// Copyright 2020 The Bazel Authors. All rights reserved.
+// Copyright 2021 The Bazel Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -37,6 +37,13 @@ public class ResourceLimits {
   public CpuLimits cpu = new CpuLimits();
 
   /**
+   * @field mem
+   * @brief Resource limitations on memory usage.
+   * @details Decides specific memory limitations and whether to apply them for a given action.
+   */
+  public MemLimits mem = new MemLimits();
+
+  /**
    * @field extraEnvironmentVariables
    * @brief Decides whether we should add extra environment variables when executing an operation.
    * @details These variables are added to the end of the existing environment variables in the
@@ -44,21 +51,17 @@ public class ResourceLimits {
    */
   public Map<String, String> extraEnvironmentVariables = new HashMap<String, String>();
 
-  ///
-  /// @field   debugBeforeExecution
-  /// @brief   If the user want to get debug information right before the
-  ///          actual execution.
-  /// @details This is a debugging flag and is not intended for normal
-  ///          execution.
-  ///
+  /**
+   * @field debugBeforeExecution
+   * @brief If the user want to get debug information right before the actual execution.
+   * @details This is a debugging flag and is not intended for normal execution.
+   */
   public boolean debugBeforeExecution = false;
 
-  ///
-  /// @field   debugAfterExecution
-  /// @brief   If the user want to get debug information right after the
-  ///          execution.
-  /// @details This is a debugging flag and is not intended for normal
-  ///          execution.
-  ///
+  /**
+   * @field debugAfterExecution
+   * @brief If the user want to get debug information right after the execution.
+   * @details This is a debugging flag and is not intended for normal execution.
+   */
   public boolean debugAfterExecution = false;
 }

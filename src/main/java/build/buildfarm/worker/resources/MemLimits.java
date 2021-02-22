@@ -15,46 +15,46 @@
 package build.buildfarm.worker;
 
 /**
- * @class CpuLimits
- * @brief CPU resource limitations imposed on specific actions.
+ * @class MemLimits
+ * @brief Memory resource limitations imposed on specific actions.
  * @details These resource limitations are often specified by the client (via: exec_properties), but
- *     ultimately validated and decided by the server. Restricting core count can be beneficial to
+ *     ultimately validated and decided by the server. Restricting memory usage can be beneficial to
  *     preventing hungry actions from bogging down the worker and affecting neighboring actions that
  *     may be sharing the same hardware. More importantly, being able to apply restrictions allows
  *     for a more efficient utilization of shared compute across different workers and action
- *     profiles. One might also consider even using higher core machine to take on highly parallel
- *     actions, while allowing lower core machines to take on single threaded actions. These
- *     restrictions will ultimately encourage action writers to implement their actions more
- *     efficiently or opt for local execution as an alternative.
+ *     profiles. One might also consider using certain workers for particular memory loads, or
+ *     allowing workers to schedule actions based on memory availability. These restrictions will
+ *     ultimately encourage action writers to implement their actions more efficiently or opt for
+ *     local execution as an alternative.
  */
-public class CpuLimits {
+public class MemLimits {
 
   /**
    * @field limit
-   * @brief Whether or not we perform CPU core limiting on the action.
-   * @details Depending on the server implementation, we may skip applying any restrictions to core
-   *     usage.
+   * @brief Whether or not we perform memory limiting on the action.
+   * @details Depending on the server implementation, we may skip applying any restrictions to
+   *     memory usage.
    */
   public boolean limit = true;
 
   /**
    * @field min
-   * @brief The minimum CPU cores required.
+   * @brief The minimum memory required.
    * @details Client can suggest this though exec_properties.
    */
-  public int min = 1;
+  public int min = 0;
 
   /**
    * @field max
-   * @brief The maximum CPU cores required.
+   * @brief The maximum memory required.
    * @details Client can suggest this though exec_properties.
    */
-  public int max = 1;
+  public int max = 0;
 
   /**
    * @field claimed
-   * @brief The amount of cores actually claimed for the action.
+   * @brief The amount of memory actually claimed for the action.
    * @details This will be in the range of (min,max) when limited.
    */
-  public int claimed = 1;
+  public int claimed = 0;
 }
