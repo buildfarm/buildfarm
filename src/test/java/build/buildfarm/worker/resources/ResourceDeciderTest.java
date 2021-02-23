@@ -82,6 +82,30 @@ public class ResourceDeciderTest {
   }
 
   // Function under test: decideResourceLimitations
+  // Reason for testing: test that mem constraints can be set
+  // Failure explanation: mem limits were not decided as expected
+  @Test
+  public void decideResourceLimitationsTestMemSetting() throws Exception {
+
+    // ARRANGE
+    Command command =
+        Command.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(Platform.Property.newBuilder().setName("min-mem").setValue("5"))
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("max-mem").setValue("10")))
+            .build();
+
+    // ACT
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, 100);
+
+    // ASSERT
+    assertThat(limits.mem.min).isEqualTo(5);
+    assertThat(limits.mem.max).isEqualTo(10);
+  }
+
+  // Function under test: decideResourceLimitations
   // Reason for testing: if the user does not pass extra environment variables via platform
   // properties they appear empty
   // Failure explanation: the parsing crashed or did not provide an empty map
