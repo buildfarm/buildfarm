@@ -40,7 +40,6 @@ import build.buildfarm.common.redis.RedisMap;
 import build.buildfarm.common.redis.RedisNodeHashes;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.RedisShardSubscriber.TimedWatchFuture;
-import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.operations.FindOperationsSettings;
 import build.buildfarm.operations.finder.OperationsFinder;
@@ -53,7 +52,6 @@ import build.buildfarm.v1test.OperationChange;
 import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.ProvisionedQueue;
 import build.buildfarm.v1test.QueueEntry;
-import build.buildfarm.v1test.QueueStatus;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.RedisShardBackplaneConfig;
 import build.buildfarm.v1test.ShardWorker;
@@ -143,7 +141,6 @@ public class RedisShardBackplane implements Backplane {
   private @Nullable InterruptingRunnable onUnsubscribe = null;
   private Thread subscriptionThread = null;
   private Thread failsafeOperationThread = null;
-  private Thread prometheusMetricsThread = null;
   private RedisShardSubscriber subscriber = null;
   private RedisShardSubscription operationSubscription = null;
   private ExecutorService subscriberService = null;
@@ -533,9 +530,6 @@ public class RedisShardBackplane implements Backplane {
       startFailsafeOperationThread();
     }
 
-    // Start Prometheus metrics collector
-    startPrometheusMetricsCollector();
-
     // Record client start time
     client.call(
         jedis -> jedis.set("startTime/" + clientPublicName, Long.toString(new Date().getTime())));
@@ -615,11 +609,6 @@ public class RedisShardBackplane implements Backplane {
         subscriptionThread.join();
       }
       logger.log(Level.FINE, "subscriptionThread has been stopped");
-    }
-    if (prometheusMetricsThread != null) {
-      prometheusMetricsThread.stop();
-      prometheusMetricsThread.join();
-      logger.log(Level.FINE, "prometheusMetricsThread has been stopped");
     }
     if (subscriberService != null) {
       subscriberService.shutdown();
@@ -1490,44 +1479,6 @@ public class RedisShardBackplane implements Backplane {
                   .build());
     } catch (NumberFormatException nfe) {
       return GetClientStartTimeResult.newBuilder().build();
-    }
-  }
-
-  private void startPrometheusMetricsCollector() {
-    prometheusMetricsThread =
-        new Thread(
-            () -> {
-              while (true) {
-                try {
-                  TimeUnit.SECONDS.sleep(30);
-                  OperationsStatus operationsStatus = operationsStatus();
-                  PrometheusPublisher.updateWorkerPoolSize(
-                      operationsStatus.getActiveWorkersCount());
-                  PrometheusPublisher.updateDispatchedOperationsSize(
-                      operationsStatus.getDispatchedSize());
-                  PrometheusPublisher.updatePreQueueSize(operationsStatus.getPrequeue().getSize());
-                  PrometheusPublisher.updateClusterUtilization();
-                  updateQueueSizes(operationsStatus.getOperationQueue().getProvisionsList());
-                } catch (InterruptedException e) {
-                  Thread.currentThread().interrupt();
-                  break;
-                } catch (Exception e) {
-                  logger.log(Level.SEVERE, "Could not update RedisShardBackplane metrics", e);
-                }
-              }
-            },
-            "Prometheus Metrics Collector");
-
-    prometheusMetricsThread.start();
-  }
-
-  private void updateQueueSizes(List<QueueStatus> queues) {
-    for (QueueStatus queueStatus : queues) {
-      if (queueStatus.getName().contains("cpu")) {
-        PrometheusPublisher.updateCpuQueueSize(queueStatus.getSize());
-      } else if (queueStatus.getName().contains("gpu")) {
-        PrometheusPublisher.updateGpuQueueSize(queueStatus.getSize());
-      }
     }
   }
 }

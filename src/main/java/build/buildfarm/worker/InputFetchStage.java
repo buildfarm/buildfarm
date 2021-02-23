@@ -14,8 +14,9 @@
 
 package build.buildfarm.worker;
 
-import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import com.google.common.collect.Sets;
+import io.prometheus.client.Gauge;
+import io.prometheus.client.Summary;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -23,6 +24,15 @@ import java.util.logging.Logger;
 
 public class InputFetchStage extends SuperscalarPipelineStage {
   private static final Logger logger = Logger.getLogger(InputFetchStage.class.getName());
+  private static final Gauge inputFetchSlotUsage =
+      Gauge.build().name("input_fetch_slot_usage").help("Input fetch slot Usage.").register();
+  private static final Summary inputFetchTime =
+      Summary.build().name("input_fetch_time_ms").help("Input fetch time in ms.").register();
+  private static final Summary inputFetchStallTime =
+      Summary.build()
+          .name("input_fetch_stall_time_ms")
+          .help("Input fetch stall time in ms.")
+          .register();
 
   private final Set<Thread> fetchers = Sets.newHashSet();
   private final BlockingQueue<OperationContext> queue = new ArrayBlockingQueue<>(1);
@@ -57,9 +67,9 @@ public class InputFetchStage extends SuperscalarPipelineStage {
   public void releaseInputFetcher(
       String operationName, long usecs, long stallUSecs, boolean success) {
     int size = removeAndRelease(operationName);
-    PrometheusPublisher.updateInputFetchTime(usecs / 1000.0);
-    PrometheusPublisher.updateInputFetchStallTime(stallUSecs / 1000.0);
-    PrometheusPublisher.updateInputFetchSlotUsage(size);
+    inputFetchTime.observe(usecs / 1000.0);
+    inputFetchStallTime.observe(stallUSecs / 1000.0);
+    inputFetchSlotUsage.set(size);
     logComplete(
         operationName,
         usecs,

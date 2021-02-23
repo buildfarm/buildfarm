@@ -135,7 +135,7 @@ public class BuildFarmServerTest {
             "test",
             InProcessServerBuilder.forName(uniqueServerName).directExecutor(),
             configBuilder.build());
-    server.start("startTime/test:0000");
+    server.start("startTime/test:0000", 0);
     inProcessChannel = InProcessChannelBuilder.forName(uniqueServerName).directExecutor().build();
   }
 
