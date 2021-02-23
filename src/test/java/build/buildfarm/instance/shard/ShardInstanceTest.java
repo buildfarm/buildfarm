@@ -87,6 +87,7 @@ import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -140,6 +141,7 @@ public class ShardInstanceTest {
             /* maxBlobSize=*/ 0,
             /* maxCpu=*/ 1,
             /* maxActionTimeout=*/ Duration.getDefaultInstance(),
+            new ArrayList<>(),
             mockOnStop,
             CacheBuilder.newBuilder().build(mockInstanceLoader),
             /* actionCacheFetchService=*/ listeningDecorator(newSingleThreadExecutor()));
