@@ -1,6 +1,8 @@
 java_library(
-    name = "prometheus-metrics",
-    srcs = glob(["*.java"]),
+    name = "prometheus",
+    srcs = [
+        "PrometheusPublisher.java",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         "@maven//:io_prometheus_simpleclient",

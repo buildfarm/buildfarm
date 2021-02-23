@@ -131,6 +131,7 @@ public class Worker extends LoggingMain {
   private final Pipeline pipeline;
   private final Backplane backplane;
   private final LoadingCache<String, Instance> workerStubs;
+  private final PrometheusPublisher prometheusPublisher;
 
   class LocalCasWriter implements CasWriter {
     public void write(Digest digest, Path file) throws IOException, InterruptedException {
@@ -472,6 +473,8 @@ public class Worker extends LoggingMain {
                     backplane))
             .addService(new ShutDownWorkerGracefully(this, config))
             .build();
+
+    prometheusPublisher = new PrometheusPublisher();
 
     logger.log(INFO, String.format("%s initialized", identifier));
   }
@@ -913,6 +916,7 @@ public class Worker extends LoggingMain {
       server.start();
       healthStatusManager.setStatus(
           HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
+      prometheusPublisher.startHttpServer(config.getPrometheusConfig().getPort());
       // Not all workers need to be registered and visible in the backplane.
       // For example, a GPU worker may wish to perform work that we do not want to cache locally for
       // other workers.
@@ -932,7 +936,7 @@ public class Worker extends LoggingMain {
   @Override
   protected void onShutdown() throws InterruptedException {
     logger.log(SEVERE, "*** shutting down gRPC server since JVM is shutting down");
-    PrometheusPublisher.stopHttpServer();
+    prometheusPublisher.stopHttpServer();
     stop();
     logger.log(SEVERE, "*** server shut down");
   }
@@ -987,11 +991,6 @@ public class Worker extends LoggingMain {
       ShardWorkerConfig config =
           toShardWorkerConfig(
               new InputStreamReader(configInputStream), parser.getOptions(WorkerOptions.class));
-      // Start Prometheus web server
-      PrometheusPublisher.startHttpServer(
-          config.getPrometheusConfig().getPort(),
-          config.getExecuteStageWidth(),
-          config.getInputFetchStageWidth());
       worker = new Worker(session, config);
     }
     worker.start();

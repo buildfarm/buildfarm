@@ -45,7 +45,6 @@ import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.Retrier.Backoff;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.MatchListener;
-import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.QueueEntry;
@@ -79,6 +78,7 @@ import com.google.rpc.PreconditionFailure;
 import io.grpc.Deadline;
 import io.grpc.Status;
 import io.grpc.StatusException;
+import io.prometheus.client.Counter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.FileVisitResult;
@@ -102,6 +102,9 @@ class ShardWorkerContext implements WorkerContext {
   private static final Logger logger = Logger.getLogger(ShardWorkerContext.class.getName());
 
   private static final String PROVISION_CORES_NAME = "cores";
+
+  private static final Counter completedOperations =
+      Counter.build().name("completed_operations").help("Completed operations.").register();
 
   private final String name;
   private final Platform platform;
@@ -742,7 +745,7 @@ class ShardWorkerContext implements WorkerContext {
       throws IOException, InterruptedException {
     boolean success = createBackplaneRetrier().execute(() -> instance.putOperation(operation));
     if (success && operation.getDone()) {
-      PrometheusPublisher.updateCompletedOperations();
+      completedOperations.inc();
       logger.log(Level.FINE, "CompletedOperation: " + operation.getName());
     }
     return success;

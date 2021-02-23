@@ -35,6 +35,7 @@ import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.ServerInterceptor;
 import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
+import io.grpc.protobuf.services.ProtoReflectionService;
 import io.grpc.services.HealthStatusManager;
 import io.grpc.util.TransmitStatusRuntimeExceptionInterceptor;
 import java.io.IOException;
@@ -66,6 +67,7 @@ public class BuildFarmServer extends LoggingMain {
   private final HealthStatusManager healthStatusManager;
   private final Server server;
   private boolean stopping = false;
+  private final PrometheusPublisher prometheusPublisher;
 
   public BuildFarmServer(String session, BuildFarmServerConfig config)
       throws InterruptedException, ConfigurationException {
@@ -109,9 +111,12 @@ public class BuildFarmServer extends LoggingMain {
             .addService(new OperationsService(instances))
             .addService(new AdminService(config.getAdminConfig(), instances))
             .addService(new FetchService(instances))
+            .addService(ProtoReflectionService.newInstance())
             .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
             .intercept(headersInterceptor)
             .build();
+
+    prometheusPublisher = new PrometheusPublisher();
 
     logger.log(Level.INFO, String.format("%s initialized", session));
   }
@@ -137,13 +142,14 @@ public class BuildFarmServer extends LoggingMain {
     }
   }
 
-  public synchronized void start(String publicName) throws IOException {
+  public synchronized void start(String publicName, int prometheusPort) throws IOException {
     checkState(!stopping, "must not call start after stop");
     actionCacheRequestCounter.start();
     instances.start(publicName);
     server.start();
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
+    prometheusPublisher.startHttpServer(prometheusPort);
   }
 
   @Override
@@ -162,6 +168,7 @@ public class BuildFarmServer extends LoggingMain {
     }
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.NOT_SERVING);
+    prometheusPublisher.stopHttpServer();
     try {
       if (server != null) {
         server.shutdown();
@@ -227,7 +234,7 @@ public class BuildFarmServer extends LoggingMain {
       PrometheusPublisher.startHttpServer(config.getPrometheusConfig().getPort());
       server = new BuildFarmServer(session, config);
       configInputStream.close();
-      server.start(options.publicName);
+      server.start(options.publicName, config.getPrometheusConfig().getPort());
       server.blockUntilShutdown();
       server.stop();
       PrometheusPublisher.stopHttpServer();

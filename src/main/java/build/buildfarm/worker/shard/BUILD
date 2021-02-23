@@ -13,7 +13,7 @@ java_library(
         "//src/main/java/build/buildfarm/instance/server",
         "//src/main/java/build/buildfarm/instance/shard",
         "//src/main/java/build/buildfarm/instance/stub",
-        "//src/main/java/build/buildfarm/metrics/prometheus:prometheus-metrics",
+        "//src/main/java/build/buildfarm/metrics/prometheus",
         "//src/main/java/build/buildfarm/operations",
         "//src/main/java/build/buildfarm/operations/finder",
         "//src/main/java/build/buildfarm/server",
@@ -35,5 +35,6 @@ java_library(
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_services",
         "@maven//:io_grpc_grpc_stub",
+        "@maven//:io_prometheus_simpleclient",
     ],
 )

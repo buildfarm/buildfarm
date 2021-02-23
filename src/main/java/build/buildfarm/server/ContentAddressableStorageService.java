@@ -38,7 +38,6 @@ import build.bazel.remote.execution.v2.GetTreeResponse;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.grpc.TracingMetadataUtils;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.v1test.Tree;
 import com.google.common.base.Function;
 import com.google.common.base.Stopwatch;
@@ -49,6 +48,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import io.grpc.Status;
 import io.grpc.Status.Code;
 import io.grpc.stub.StreamObserver;
+import io.prometheus.client.Summary;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -58,6 +58,8 @@ public class ContentAddressableStorageService
     extends ContentAddressableStorageGrpc.ContentAddressableStorageImplBase {
   private static final Logger logger =
       Logger.getLogger(ContentAddressableStorageService.class.getName());
+  private static final Summary missingBlobs =
+      Summary.build().name("missing_blobs").help("Find missing blobs.").register();
 
   private final Instances instances;
   private final long writeDeadlineAfter;
@@ -111,7 +113,7 @@ public class ContentAddressableStorageService
               responseObserver.onNext(response);
               responseObserver.onCompleted();
               long elapsedMicros = stopwatch.elapsed(MICROSECONDS);
-              PrometheusPublisher.updateMissingBlobs(request.getBlobDigestsList().size());
+              missingBlobs.observe(request.getBlobDigestsList().size());
               logger.log(
                   Level.FINE,
                   new StringBuilder()
