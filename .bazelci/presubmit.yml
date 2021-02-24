@@ -13,21 +13,25 @@ tasks:
     - export BUILDFARM_SKIP_COVERAGE_HOST=true
     - ./generate_coverage.sh
   ubuntu1604:
+    name: "Unit Tests"
     build_targets:
     - "..."
     test_targets:
     - "..."
   ubuntu1804:
+    name: "Unit Tests"
     build_targets:
     - "..."
     test_targets:
     - "..."
   macos:
+    name: "Unit Tests"
     build_targets:
     - "..."
     test_targets:
     - "..."
   windows:
+    name: "Unit Tests"
     build_flags:
     - "--build_tag_filters=-container"
     build_targets:
