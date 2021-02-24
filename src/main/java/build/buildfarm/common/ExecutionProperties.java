@@ -15,6 +15,7 @@
 package build.buildfarm.common;
 
 /**
+ * @class ExecutionProperties
  * @brief Execution properties understood and used by buildfarm.
  * @details These are the execution property key names that have special meaning when applied to
  *     actions. Users can still configure their own unique execution properties along side these for
@@ -35,6 +36,20 @@ public class ExecutionProperties {
    * @details This is decided between client and server. The key value is expected to be an integer.
    */
   public static final String MAX_CORES = "max-cores";
+
+  /**
+   * @field MIN_MEM
+   * @brief The exec_property and platform property name for setting mim memory usage.
+   * @details This is decided between client and server. The key value is expected to be an integer.
+   */
+  public static final String MIN_MEM = "min-mem";
+
+  /**
+   * @field MAX_MEM
+   * @brief The exec_property and platform property name for setting max memory usage.
+   * @details This is decided between client and server. The key value is expected to be an integer.
+   */
+  public static final String MAX_MEM = "max-mem";
 
   /**
    * @field ENV_VARS
