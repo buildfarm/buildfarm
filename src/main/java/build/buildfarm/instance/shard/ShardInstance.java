@@ -1029,9 +1029,7 @@ public class ShardInstance extends AbstractServerInstance {
       throws EntryLimitException {
     try {
       if (backplane.isBlacklisted(requestMetadata)) {
-        throw Status.UNAVAILABLE
-            .withDescription("This write request is in block list and is forbidden")
-            .asRuntimeException();
+        throw Status.UNAVAILABLE.withDescription(blockListErrorMessage()).asRuntimeException();
       }
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
@@ -1041,6 +1039,14 @@ public class ShardInstance extends AbstractServerInstance {
     }
     // FIXME small blob write to proto cache
     return writes.get(digest, uuid, requestMetadata);
+  }
+
+  private String blockListErrorMessage() {
+    StringBuilder message = new StringBuilder();
+    message.append("This request is in block list and is forbidden.  ");
+    message.append(
+        "To resolve this error, you should tag the rule with 'no-remote', or adjust the action behavior to attempt a different action hash.  ");
+    return message.toString();
   }
 
   protected int getTreeDefaultPageSize() {
@@ -1658,8 +1664,7 @@ public class ShardInstance extends AbstractServerInstance {
                 .setResponse(
                     Any.pack(
                         denyActionResponse(
-                            executeEntry.getActionDigest(),
-                            "This execute request is in block list and is forbidden")))
+                            executeEntry.getActionDigest(), blockListErrorMessage())))
                 .build());
         return IMMEDIATE_VOID_FUTURE;
       } else if (queueEntry.getRequeueAttempts() > maxRequeueAttempts) {
@@ -1824,11 +1829,7 @@ public class ShardInstance extends AbstractServerInstance {
             operation
                 .toBuilder()
                 .setDone(true)
-                .setResponse(
-                    Any.pack(
-                        denyActionResponse(
-                            actionDigest,
-                            "This execute request is in block list and is forbidden")))
+                .setResponse(Any.pack(denyActionResponse(actionDigest, blockListErrorMessage())))
                 .build());
         return immediateFuture(null);
       }
