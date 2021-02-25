@@ -457,7 +457,7 @@ public class ShardInstance extends AbstractServerInstance {
     prometheusMetricsThread =
         new Thread(
             () -> {
-              while (true) {
+              while (!Thread.currentThread().isInterrupted()) {
                 try {
                   TimeUnit.SECONDS.sleep(30);
                   OperationsStatus operationsStatus = operationsStatus();
@@ -530,10 +530,10 @@ public class ShardInstance extends AbstractServerInstance {
       operationQueuer.stop();
     }
     if (dispatchedMonitor != null) {
-      dispatchedMonitor.stop();
+      dispatchedMonitor.interrupt();
     }
     if (prometheusMetricsThread != null) {
-      prometheusMetricsThread.stop();
+      prometheusMetricsThread.interrupt();
     }
     contextDeadlineScheduler.shutdown();
     operationDeletionService.shutdown();

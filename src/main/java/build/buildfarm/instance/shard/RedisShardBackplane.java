@@ -487,7 +487,7 @@ public class RedisShardBackplane implements Backplane {
     failsafeOperationThread =
         new Thread(
             () -> {
-              while (true) {
+              while (!Thread.currentThread().isInterrupted()) {
                 try {
                   TimeUnit.SECONDS.sleep(10);
                   client.run(this::updateWatchers);
@@ -599,7 +599,7 @@ public class RedisShardBackplane implements Backplane {
   @Override
   public synchronized void stop() throws InterruptedException {
     if (failsafeOperationThread != null) {
-      failsafeOperationThread.stop();
+      failsafeOperationThread.interrupt();
       failsafeOperationThread.join();
       logger.log(Level.FINE, "failsafeOperationThread has been stopped");
     }
