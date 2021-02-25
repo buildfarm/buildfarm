@@ -1041,14 +1041,6 @@ public class ShardInstance extends AbstractServerInstance {
     return writes.get(digest, uuid, requestMetadata);
   }
 
-  private String blockListErrorMessage() {
-    StringBuilder message = new StringBuilder();
-    message.append("This request is in block list and is forbidden.  ");
-    message.append(
-        "To resolve this error, you should tag the rule with 'no-remote', or adjust the action behavior to attempt a different action hash.  ");
-    return message.toString();
-  }
-
   protected int getTreeDefaultPageSize() {
     return 1024;
   }
@@ -1841,6 +1833,14 @@ public class ShardInstance extends AbstractServerInstance {
     } catch (IOException e) {
       return immediateFailedFuture(e);
     }
+  }
+
+  private String blockListErrorMessage() {
+    StringBuilder message = new StringBuilder();
+    message.append("This request is in block list and is forbidden.  ");
+    message.append("To resolve this error, you can tag the rule with 'no-remote'.  ");
+    message.append("You can also adjust the action behavior to attempt a different action hash.  ");
+    return message.toString();
   }
 
   private static ExecuteResponse denyActionResponse(Digest actionDigest, String description) {
