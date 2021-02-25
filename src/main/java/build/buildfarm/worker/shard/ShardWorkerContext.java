@@ -59,6 +59,7 @@ import build.buildfarm.worker.RetryingMatchListener;
 import build.buildfarm.worker.WorkerContext;
 import build.buildfarm.worker.cgroup.Cpu;
 import build.buildfarm.worker.cgroup.Group;
+import build.buildfarm.worker.cgroup.Mem;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
@@ -947,8 +948,31 @@ class ShardWorkerContext implements WorkerContext {
             }
           };
     }
-    if (limitGlobalExecution || group != operationsGroup) {
-      arguments.add("/usr/bin/cgexec", "-g", group.getCpu().getName() + ":" + group.getHierarchy());
+
+    // Possibly set memory restrictions.
+    // The decision to restrict memory has already been decided within the ResourceLimits object.
+    try {
+      if (limits.mem.limit) {
+        Mem mem = group.getMem();
+        mem.setMemoryLimit(limits.mem.claimed);
+      }
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+
+    // Decide which groups to use when running under cgroups.
+    ArrayList<String> usedGroups = new ArrayList<String>();
+    if (group != operationsGroup) {
+      usedGroups.add(group.getCpu().getName());
+    }
+    if (limits.mem.limit) {
+      usedGroups.add(group.getMem().getName());
+    }
+
+    // Decide the CLI for running under cgroups
+    if (limitGlobalExecution || !usedGroups.isEmpty()) {
+      arguments.add(
+          "/usr/bin/cgexec", "-g", String.join(",", usedGroups) + ":" + group.getHierarchy());
     }
     return resource;
   }
