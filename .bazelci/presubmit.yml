@@ -38,8 +38,9 @@ tasks:
     - "..."
     test_targets:
     - "..."
-  integration_test:
-    name: "Integration Test"
-    platform: ubuntu1804
-    shell_commands:
-    - ./.bazelci/integration_test.sh
+#  Disabled due to package fetch failure.
+#  integration_test:
+#    name: "Integration Test"
+#    platform: ubuntu1804
+#    shell_commands:
+#    - ./.bazelci/integration_test.sh
