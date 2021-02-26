@@ -906,7 +906,10 @@ class ShardWorkerContext implements WorkerContext {
       ResourceLimits limits, String operationName, ImmutableList.Builder<String> arguments) {
     final IOResource resource;
     final Group group;
-    if (limits.cpu.min > 0 || limits.cpu.max > 0) {
+    
+    // Possibly set core restrictions.
+    // The decision to restrict cores has already been decided within the ResourceLimits object.
+    if (limits.cpu.limit) {
       String operationId = getOperationId(operationName);
       group = operationsGroup.getChild(operationId);
       Cpu cpu = group.getCpu();
@@ -936,17 +939,7 @@ class ShardWorkerContext implements WorkerContext {
       resource = cpu;
     } else {
       group = operationsGroup;
-      resource =
-          new IOResource() {
-            @Override
-            public void close() {}
-
-            @Override
-            public boolean isReferenced() {
-              // no way to isolate references to this shared group
-              return false;
-            }
-          };
+      resource = defaultIOResource();
     }
 
     // Possibly set memory restrictions.
@@ -962,7 +955,7 @@ class ShardWorkerContext implements WorkerContext {
 
     // Decide which groups to use when running under cgroups.
     ArrayList<String> usedGroups = new ArrayList<String>();
-    if (group != operationsGroup) {
+    if (limits.cpu.limit) {
       usedGroups.add(group.getCpu().getName());
     }
     if (limits.mem.limit) {
@@ -974,6 +967,22 @@ class ShardWorkerContext implements WorkerContext {
       arguments.add(
           "/usr/bin/cgexec", "-g", String.join(",", usedGroups) + ":" + group.getHierarchy());
     }
+    
+    //The executor expects a single IOResource.  
+    //However, we may have multiple IOResources due to using multiple cgroup groups.
+    //We construct a single IOResource to account for this.
     return resource;
   }
+}
+
+private IOResource defaultIOResource(){
+return new IOResource() {
+    @Override
+    public void close() {}
+
+    @Override
+    public boolean isReferenced() {
+      return false;
+    }
+  };
 }
