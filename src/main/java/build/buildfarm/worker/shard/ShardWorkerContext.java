@@ -904,61 +904,24 @@ class ShardWorkerContext implements WorkerContext {
 
   IOResource limitSpecifiedExecution(
       ResourceLimits limits, String operationName, ImmutableList.Builder<String> arguments) {
-    final IOResource resource;
-    final Group group;
-    
+
+    // The decision to apply resource restrictions has already been decided within the
+    // ResourceLimits object.
+    // We apply the cgroup settings to file resources and add collect group names to use on the CLI.
+    String operationId = getOperationId(operationName);
+    final Group group = operationsGroup.getChild(operationId);
+    ArrayList<IOResource> resources = new ArrayList<IOResource>();
+    ArrayList<String> usedGroups = new ArrayList<String>();
+
     // Possibly set core restrictions.
-    // The decision to restrict cores has already been decided within the ResourceLimits object.
     if (limits.cpu.limit) {
-      String operationId = getOperationId(operationName);
-      group = operationsGroup.getChild(operationId);
-      Cpu cpu = group.getCpu();
-      try {
-        cpu.close();
-        if (limits.cpu.max > 0) {
-          /* period of 100ms */
-          cpu.setCFSPeriod(100000);
-          cpu.setCFSQuota(limits.cpu.max * 100000);
-        }
-        if (limits.cpu.min > 0) {
-          cpu.setShares(limits.cpu.min * 1024);
-        }
-      } catch (IOException e) {
-        // clear interrupt flag if set due to ClosedByInterruptException
-        boolean wasInterrupted = Thread.interrupted();
-        try {
-          cpu.close();
-        } catch (IOException closeEx) {
-          e.addSuppressed(closeEx);
-        }
-        if (wasInterrupted) {
-          Thread.currentThread().interrupt();
-        }
-        throw new RuntimeException(e);
-      }
-      resource = cpu;
-    } else {
-      group = operationsGroup;
-      resource = defaultIOResource();
+      applyCpuLimits(group, limits, resources);
+      usedGroups.add(group.getCpu().getName());
     }
 
     // Possibly set memory restrictions.
-    // The decision to restrict memory has already been decided within the ResourceLimits object.
-    try {
-      if (limits.mem.limit) {
-        Mem mem = group.getMem();
-        mem.setMemoryLimit(limits.mem.claimed);
-      }
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-
-    // Decide which groups to use when running under cgroups.
-    ArrayList<String> usedGroups = new ArrayList<String>();
-    if (limits.cpu.limit) {
-      usedGroups.add(group.getCpu().getName());
-    }
     if (limits.mem.limit) {
+      applyMemLimits(group, limits, resources);
       usedGroups.add(group.getMem().getName());
     }
 
@@ -967,22 +930,75 @@ class ShardWorkerContext implements WorkerContext {
       arguments.add(
           "/usr/bin/cgexec", "-g", String.join(",", usedGroups) + ":" + group.getHierarchy());
     }
-    
-    //The executor expects a single IOResource.  
-    //However, we may have multiple IOResources due to using multiple cgroup groups.
-    //We construct a single IOResource to account for this.
-    return resource;
+
+    // The executor expects a single IOResource.
+    // However, we may have multiple IOResources due to using multiple cgroup groups.
+    // We construct a single IOResource to account for this.
+    return combineResources(resources);
   }
-}
 
-private IOResource defaultIOResource(){
-return new IOResource() {
-    @Override
-    public void close() {}
+  private void applyCpuLimits(Group group, ResourceLimits limits, ArrayList<IOResource> resources) {
 
-    @Override
-    public boolean isReferenced() {
-      return false;
+    Cpu cpu = group.getCpu();
+    try {
+      cpu.close();
+      if (limits.cpu.max > 0) {
+        /* period of 100ms */
+        cpu.setCFSPeriod(100000);
+        cpu.setCFSQuota(limits.cpu.max * 100000);
+      }
+      if (limits.cpu.min > 0) {
+        cpu.setShares(limits.cpu.min * 1024);
+      }
+    } catch (IOException e) {
+      // clear interrupt flag if set due to ClosedByInterruptException
+      boolean wasInterrupted = Thread.interrupted();
+      try {
+        cpu.close();
+      } catch (IOException closeEx) {
+        e.addSuppressed(closeEx);
+      }
+      if (wasInterrupted) {
+        Thread.currentThread().interrupt();
+      }
+      throw new RuntimeException(e);
     }
-  };
+    resources.add(cpu);
+  }
+
+  private void applyMemLimits(Group group, ResourceLimits limits, ArrayList<IOResource> resources) {
+
+    try {
+      Mem mem = group.getMem();
+      mem.setMemoryLimit(limits.mem.claimed);
+      resources.add(mem);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private IOResource combineResources(ArrayList<IOResource> resources) {
+    return new IOResource() {
+      @Override
+      public void close() {
+        for (IOResource resource : resources) {
+          try {
+            resource.close();
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        }
+      }
+
+      @Override
+      public boolean isReferenced() {
+        for (IOResource resource : resources) {
+          if (resource.isReferenced()) {
+            return true;
+          }
+        }
+        return false;
+      }
+    };
+  }
 }

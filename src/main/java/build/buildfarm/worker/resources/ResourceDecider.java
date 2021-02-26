@@ -69,7 +69,7 @@ public class ResourceDecider {
     // Claim minimal core amount with regards to execute stage width.
     limits.cpu.limit = (limits.cpu.min > 0 || limits.cpu.max > 0);
     limits.cpu.claimed = Math.min(limits.cpu.min, executeStageWidth);
-    
+
     // Should we limit the memory of the action during execution? by default, no.
     // If the action has suggested memory restrictions on itself, then yes.
     // Claim minimal memory amount based on action's suggestion.
