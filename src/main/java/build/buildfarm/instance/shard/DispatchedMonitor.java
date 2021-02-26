@@ -127,6 +127,9 @@ class DispatchedMonitor implements Runnable {
 
   private void runInterruptibly() throws InterruptedException {
     while (!backplane.isStopped()) {
+      if (Thread.currentThread().isInterrupted()) {
+        throw new InterruptedException();
+      }
       TimeUnit.SECONDS.sleep(intervalSeconds);
       iterate();
     }
