@@ -19,6 +19,7 @@ import static com.google.common.util.concurrent.Futures.catching;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
 import build.bazel.remote.execution.v2.ActionResult;
+import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.cache.CacheBuilder;
 import build.buildfarm.common.cache.CacheLoader;
@@ -30,11 +31,10 @@ import io.grpc.Status;
 import java.io.IOException;
 
 class ShardActionCache implements ReadThroughActionCache {
-  private final ShardBackplane backplane;
+  private final Backplane backplane;
   private final LoadingCache<ActionKey, ActionResult> actionResultCache;
 
-  ShardActionCache(
-      int maxLocalCacheSize, ShardBackplane backplane, ListeningExecutorService service) {
+  ShardActionCache(int maxLocalCacheSize, Backplane backplane, ListeningExecutorService service) {
     this.backplane = backplane;
     actionResultCache =
         CacheBuilder.newBuilder()

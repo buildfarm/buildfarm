@@ -67,6 +67,7 @@ import build.buildfarm.common.grpc.ByteStreamHelper;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.common.grpc.StubWriteOutputStream;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.instance.MatchListener;
 import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.AdminGrpc.AdminBlockingStub;
 import build.buildfarm.v1test.GetClientStartTimeResult;
@@ -438,6 +439,13 @@ public class StubInstance implements Instance {
         batchResponse.getResponsesList(), (response) -> response.getDigest());
   }
 
+  @Override
+  public ListenableFuture<Digest> fetchBlob(
+      Iterable<String> uris, Digest expectedDigest, RequestMetadata requestMetadata) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
   public Write getOperationStreamWrite(String name) {
     return getWrite(
         name,
@@ -599,7 +607,9 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public boolean containsBlob(Digest digest, RequestMetadata requestMetadata) {
+  public boolean containsBlob(
+      Digest digest, Digest.Builder result, RequestMetadata requestMetadata) {
+    result.mergeFrom(digest);
     try {
       return Iterables.isEmpty(findMissingBlobs(ImmutableList.of(digest), requestMetadata).get());
     } catch (ExecutionException e) {

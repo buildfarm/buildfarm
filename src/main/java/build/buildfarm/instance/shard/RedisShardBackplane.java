@@ -23,6 +23,7 @@ import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.CasIndexSettings;
 import build.buildfarm.common.DigestUtil;
@@ -41,7 +42,7 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.RedisShardSubscriber.TimedWatchFuture;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.operations.FindOperationsSettings;
-import build.buildfarm.operations.OperationsFinder;
+import build.buildfarm.operations.finder.OperationsFinder;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
@@ -103,7 +104,7 @@ import redis.clients.jedis.Response;
 import redis.clients.jedis.ScanParams;
 import redis.clients.jedis.ScanResult;
 
-public class RedisShardBackplane implements ShardBackplane {
+public class RedisShardBackplane implements Backplane {
   private static final Logger logger = Logger.getLogger(RedisShardBackplane.class.getName());
 
   private static final JsonFormat.Parser operationParser =
@@ -486,7 +487,7 @@ public class RedisShardBackplane implements ShardBackplane {
     failsafeOperationThread =
         new Thread(
             () -> {
-              while (true) {
+              while (!Thread.currentThread().isInterrupted()) {
                 try {
                   TimeUnit.SECONDS.sleep(10);
                   client.run(this::updateWatchers);
@@ -598,7 +599,7 @@ public class RedisShardBackplane implements ShardBackplane {
   @Override
   public synchronized void stop() throws InterruptedException {
     if (failsafeOperationThread != null) {
-      failsafeOperationThread.stop();
+      failsafeOperationThread.interrupt();
       failsafeOperationThread.join();
       logger.log(Level.FINE, "failsafeOperationThread has been stopped");
     }
@@ -1214,7 +1215,8 @@ public class RedisShardBackplane implements ShardBackplane {
       logger.log(Level.SEVERE, "error parsing queue entry", e);
       return null;
     }
-    QueueEntry queueEntry = queueEntryBuilder.build();
+    QueueEntry queueEntry =
+        queueEntryBuilder.setRequeueAttempts(queueEntryBuilder.getRequeueAttempts() + 1).build();
 
     String operationName = queueEntry.getExecuteEntry().getOperationName();
     Operation operation = keepaliveOperation(operationName);

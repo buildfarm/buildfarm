@@ -30,6 +30,7 @@ import static org.mockito.Mockito.when;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.backplane.Backplane;
 import build.buildfarm.instance.Instance;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -63,7 +64,7 @@ public class UtilTest {
     when(missingInstance.findMissingBlobs(eq(digests), any(RequestMetadata.class)))
         .thenReturn(immediateFuture(ImmutableList.of(digest)));
 
-    ShardBackplane backplane = mock(ShardBackplane.class);
+    Backplane backplane = mock(Backplane.class);
 
     Function<String, Instance> workerInstanceFactory =
         new Function<String, Instance>() {
@@ -98,7 +99,7 @@ public class UtilTest {
   @Test
   public void correctMissingBlobFailsImmediatelyOnUnretriable() throws InterruptedException {
     String workerName = "worker";
-    ShardBackplane backplane = mock(ShardBackplane.class);
+    Backplane backplane = mock(Backplane.class);
     Set<String> workerSet = ImmutableSet.of(workerName);
     Digest digest =
         Digest.newBuilder()
@@ -147,7 +148,7 @@ public class UtilTest {
   public void correctMissingBlobIgnoresUnavailableWorkers() throws Exception {
     String workerName = "worker";
     String unavailableWorkerName = "unavailableWorker";
-    ShardBackplane backplane = mock(ShardBackplane.class);
+    Backplane backplane = mock(Backplane.class);
     Set<String> workerSet = ImmutableSet.of(workerName, unavailableWorkerName);
 
     Digest digest = Digest.newBuilder().setHash("digest").setSizeBytes(1).build();
@@ -193,7 +194,7 @@ public class UtilTest {
   @Test
   public void correctMissingBlobRetriesRetriable() throws Exception {
     String workerName = "worker";
-    ShardBackplane backplane = mock(ShardBackplane.class);
+    Backplane backplane = mock(Backplane.class);
     Set<String> workerSet = ImmutableSet.of(workerName);
 
     Digest digest = Digest.newBuilder().setHash("digest").setSizeBytes(1).build();
@@ -242,7 +243,7 @@ public class UtilTest {
         .thenReturn(immediateFailedFuture(Status.UNKNOWN.asRuntimeException()))
         .thenReturn(immediateFuture(ImmutableList.of()));
 
-    ShardBackplane backplane = mock(ShardBackplane.class);
+    Backplane backplane = mock(Backplane.class);
     doThrow(new IOException("failed to adjustBlobLocations"))
         .when(backplane)
         .adjustBlobLocations(eq(digest), eq(ImmutableSet.of(workerName)), eq(ImmutableSet.of()));

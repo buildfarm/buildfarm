@@ -209,6 +209,8 @@ message BuildFarmServerConfig {
   MetricsConfig metrics_config = 5;
 
   AdminConfig admin_config = 6;
+
+  PrometheusConfig prometheus_config = 7;
 }
 
 message MetricsConfig {
@@ -239,6 +241,10 @@ message GcpMetricsConfig {
 
 message LogMetricsConfig {
   string log_level = 1;
+}
+
+message PrometheusConfig {
+  int32 port = 1;
 }
 
 message AdminConfig {
@@ -635,6 +641,8 @@ message ShardWorkerConfig {
   bool error_operation_remaining_resources = 34;
 
   AdminConfig admin_config = 35;
+
+  PrometheusConfig prometheus_config = 37;
 }
 
 message ShardWorker {
@@ -730,6 +738,8 @@ message QueueEntry {
   build.bazel.remote.execution.v2.Digest queued_operation_digest = 2;
 
   build.bazel.remote.execution.v2.Platform platform = 3;
+
+  int32 requeue_attempts = 4;
 }
 
 message QueueStatus {

@@ -56,10 +56,12 @@ import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.Platform.Property;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
+import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
+import build.buildfarm.common.ExecutionProperties;
 import build.buildfarm.common.Poller;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator;
@@ -70,15 +72,18 @@ import build.buildfarm.common.cache.Cache;
 import build.buildfarm.common.cache.CacheBuilder;
 import build.buildfarm.common.cache.CacheLoader.InvalidCacheLoadException;
 import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
-import build.buildfarm.instance.AbstractServerInstance;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.instance.MatchListener;
+import build.buildfarm.instance.server.AbstractServerInstance;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationIteratorToken;
 import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.ProfiledQueuedOperationMetadata;
+import build.buildfarm.v1test.ProvisionedQueue;
 import build.buildfarm.v1test.QueueEntry;
+import build.buildfarm.v1test.QueueStatus;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ShardInstanceConfig;
@@ -113,6 +118,8 @@ import io.grpc.StatusException;
 import io.grpc.StatusRuntimeException;
 import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.ServerCallStreamObserver;
+import io.prometheus.client.Counter;
+import io.prometheus.client.Gauge;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -153,9 +160,23 @@ public class ShardInstance extends AbstractServerInstance {
 
   private static final int DEFAULT_MAX_LOCAL_ACTION_CACHE_SIZE = 1000000;
 
+  private static final Counter executionSuccess =
+      Counter.build().name("execution_success").help("Execution success.").register();
+  private static final Gauge preQueueSize =
+      Gauge.build().name("pre_queue_size").help("Pre queue size.").register();
+  private static final Gauge dispatchedOperations =
+      Gauge.build()
+          .name("dispatched_operations_size")
+          .help("Dispatched operations size.")
+          .register();
+  private static final Gauge workerPoolSize =
+      Gauge.build().name("worker_pool_size").help("Active worker pool size.").register();
+  private static final Gauge queueSize =
+      Gauge.build().name("queue_size").labelNames("queue_name").help("Queue size.").register();
+
   private final Runnable onStop;
   private final long maxBlobSize;
-  private final ShardBackplane backplane;
+  private final Backplane backplane;
   private final ReadThroughActionCache readThroughActionCache;
   private final RemoteInputStreamFactory remoteInputStreamFactory;
   private final com.google.common.cache.LoadingCache<String, Instance> workerStubs;
@@ -174,6 +195,7 @@ public class ShardInstance extends AbstractServerInstance {
   private final Random rand = new Random();
   private final Writes writes = new Writes(this::writeInstanceSupplier);
   private final int maxCpu;
+  private final int maxRequeueAttempts = 5; // TODO: get from config
 
   private final ListeningExecutorService operationTransformService =
       listeningDecorator(newFixedThreadPool(24));
@@ -185,6 +207,7 @@ public class ShardInstance extends AbstractServerInstance {
   private Thread operationQueuer;
   private boolean stopping = false;
   private boolean stopped = true;
+  private Thread prometheusMetricsThread;
 
   private static Duration getGrpcTimeout(ShardInstanceConfig config) {
 
@@ -205,7 +228,7 @@ public class ShardInstance extends AbstractServerInstance {
     return defaultDuration;
   }
 
-  private static ShardBackplane createBackplane(ShardInstanceConfig config, String identifier)
+  private static Backplane createBackplane(ShardInstanceConfig config, String identifier)
       throws ConfigurationException {
     ShardInstanceConfig.BackplaneCase backplaneCase = config.getBackplaneCase();
     switch (backplaneCase) {
@@ -242,7 +265,7 @@ public class ShardInstance extends AbstractServerInstance {
   private ShardInstance(
       String name,
       DigestUtil digestUtil,
-      ShardBackplane backplane,
+      Backplane backplane,
       ShardInstanceConfig config,
       Runnable onStop,
       ListeningExecutorService actionCacheFetchService)
@@ -259,6 +282,7 @@ public class ShardInstance extends AbstractServerInstance {
         config.getMaxBlobSize(),
         config.getMaxCpu(),
         config.getMaximumActionTimeout(),
+        config.getRedisShardBackplaneConfig().getProvisionedQueues().getQueuesList(),
         onStop,
         WorkerStubs.create(digestUtil, getGrpcTimeout(config)),
         actionCacheFetchService);
@@ -267,7 +291,7 @@ public class ShardInstance extends AbstractServerInstance {
   public ShardInstance(
       String name,
       DigestUtil digestUtil,
-      ShardBackplane backplane,
+      Backplane backplane,
       ReadThroughActionCache readThroughActionCache,
       boolean runDispatchedMonitor,
       int dispatchedMonitorIntervalSeconds,
@@ -275,6 +299,7 @@ public class ShardInstance extends AbstractServerInstance {
       long maxBlobSize,
       int maxCpu,
       Duration maxActionTimeout,
+      List<ProvisionedQueue> queues,
       Runnable onStop,
       com.google.common.cache.LoadingCache<String, Instance> workerStubs,
       ListeningExecutorService actionCacheFetchService)
@@ -367,7 +392,7 @@ public class ShardInstance extends AbstractServerInstance {
                     long operationTransformDispatchUSecs =
                         stopwatch.elapsed(MICROSECONDS) - canQueueUSecs;
                     logger.log(
-                        Level.INFO,
+                        Level.FINE,
                         format(
                             "OperationQueuer: Dispatched To Transform %s: %dus in canQueue, %dus in transform dispatch",
                             operationName, canQueueUSecs, operationTransformDispatchUSecs));
@@ -428,6 +453,35 @@ public class ShardInstance extends AbstractServerInstance {
     } else {
       operationQueuer = null;
     }
+
+    prometheusMetricsThread =
+        new Thread(
+            () -> {
+              while (!Thread.currentThread().isInterrupted()) {
+                try {
+                  TimeUnit.SECONDS.sleep(30);
+                  OperationsStatus operationsStatus = operationsStatus();
+                  workerPoolSize.set(operationsStatus.getActiveWorkersCount());
+                  dispatchedOperations.set(operationsStatus.getDispatchedSize());
+                  preQueueSize.set(operationsStatus.getPrequeue().getSize());
+                  updateQueueSizes(operationsStatus.getOperationQueue().getProvisionsList());
+                } catch (InterruptedException e) {
+                  Thread.currentThread().interrupt();
+                  break;
+                } catch (Exception e) {
+                  logger.log(Level.SEVERE, "Could not update RedisShardBackplane metrics", e);
+                }
+              }
+            },
+            "Prometheus Metrics Collector");
+  }
+
+  private void updateQueueSizes(List<QueueStatus> queues) {
+    if (queueSize != null) {
+      for (QueueStatus queueStatus : queues) {
+        queueSize.labels(queueStatus.getName()).set(queueStatus.getSize());
+      }
+    }
   }
 
   private void ensureCanQueue(Stopwatch stopwatch) throws IOException, InterruptedException {
@@ -459,6 +513,10 @@ public class ShardInstance extends AbstractServerInstance {
     if (operationQueuer != null) {
       operationQueuer.start();
     }
+
+    if (prometheusMetricsThread != null) {
+      prometheusMetricsThread.start();
+    }
   }
 
   @Override
@@ -472,7 +530,10 @@ public class ShardInstance extends AbstractServerInstance {
       operationQueuer.stop();
     }
     if (dispatchedMonitor != null) {
-      dispatchedMonitor.stop();
+      dispatchedMonitor.interrupt();
+    }
+    if (prometheusMetricsThread != null) {
+      prometheusMetricsThread.interrupt();
     }
     contextDeadlineScheduler.shutdown();
     operationDeletionService.shutdown();
@@ -969,7 +1030,7 @@ public class ShardInstance extends AbstractServerInstance {
     try {
       if (backplane.isBlacklisted(requestMetadata)) {
         throw Status.UNAVAILABLE
-            .withDescription("This write request is forbidden")
+            .withDescription("This write request is in block list and is forbidden")
             .asRuntimeException();
       }
     } catch (IOException e) {
@@ -1401,7 +1462,8 @@ public class ShardInstance extends AbstractServerInstance {
 
     for (Property property : platform.getPropertiesList()) {
       /* FIXME generalize with config */
-      if (property.getName().equals("min-cores") || property.getName().equals("max-cores")) {
+      if (property.getName().equals(ExecutionProperties.MIN_CORES)
+          || property.getName().equals(ExecutionProperties.MAX_CORES)) {
         try {
           int intValue = Integer.parseInt(property.getValue());
           if (intValue <= 0 || intValue > maxCpu) {
@@ -1435,7 +1497,13 @@ public class ShardInstance extends AbstractServerInstance {
           .addViolationsBuilder()
           .setType(VIOLATION_TYPE_INVALID)
           .setSubject(INVALID_PLATFORM)
-          .setDescription(format("max-cores (%d) must be >= min-cores (%d)", maxCores, minCores));
+          .setDescription(
+              format(
+                  "%s (%d) must be >= %s (%d)",
+                  ExecutionProperties.MAX_CORES,
+                  maxCores,
+                  ExecutionProperties.MIN_CORES,
+                  minCores));
     }
   }
 
@@ -1587,7 +1655,25 @@ public class ShardInstance extends AbstractServerInstance {
             Operation.newBuilder()
                 .setName(operationName)
                 .setDone(true)
-                .setResponse(Any.pack(blacklistResponse(executeEntry.getActionDigest())))
+                .setResponse(
+                    Any.pack(
+                        denyActionResponse(
+                            executeEntry.getActionDigest(),
+                            "This execute request is in block list and is forbidden")))
+                .build());
+        return IMMEDIATE_VOID_FUTURE;
+      } else if (queueEntry.getRequeueAttempts() > maxRequeueAttempts) {
+        logger.log(
+            Level.WARNING, "Operation " + operationName + " has been requeued too many times.");
+        putOperation(
+            Operation.newBuilder()
+                .setName(operationName)
+                .setDone(true)
+                .setResponse(
+                    Any.pack(
+                        denyActionResponse(
+                            executeEntry.getActionDigest(),
+                            "This execute request has been requeued too many times")))
                 .build());
         return IMMEDIATE_VOID_FUTURE;
       }
@@ -1682,9 +1768,9 @@ public class ShardInstance extends AbstractServerInstance {
 
       String operationName = createOperationName(UUID.randomUUID().toString());
 
-      // TODO: Convert to metrics
+      executionSuccess.inc();
       logger.log(
-          Level.INFO,
+          Level.FINE,
           new StringBuilder()
               .append("ExecutionSuccess: ")
               .append(requestMetadata.getToolInvocationId())
@@ -1738,7 +1824,11 @@ public class ShardInstance extends AbstractServerInstance {
             operation
                 .toBuilder()
                 .setDone(true)
-                .setResponse(Any.pack(blacklistResponse(actionDigest)))
+                .setResponse(
+                    Any.pack(
+                        denyActionResponse(
+                            actionDigest,
+                            "This execute request is in block list and is forbidden")))
                 .build());
         return immediateFuture(null);
       }
@@ -1752,13 +1842,13 @@ public class ShardInstance extends AbstractServerInstance {
     }
   }
 
-  private static ExecuteResponse blacklistResponse(Digest actionDigest) {
+  private static ExecuteResponse denyActionResponse(Digest actionDigest, String description) {
     PreconditionFailure.Builder preconditionFailureBuilder = PreconditionFailure.newBuilder();
     preconditionFailureBuilder
         .addViolationsBuilder()
         .setType(VIOLATION_TYPE_MISSING)
         .setSubject("blobs/" + DigestUtil.toString(actionDigest))
-        .setDescription("This execute request is forbidden");
+        .setDescription(description);
     PreconditionFailure preconditionFailure = preconditionFailureBuilder.build();
     return ExecuteResponse.newBuilder()
         .setStatus(

@@ -19,7 +19,7 @@ import static java.util.concurrent.TimeUnit.MICROSECONDS;
 
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.buildfarm.common.Poller;
-import build.buildfarm.instance.Instance.MatchListener;
+import build.buildfarm.instance.MatchListener;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;
 import com.google.common.base.Preconditions;

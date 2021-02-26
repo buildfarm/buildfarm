@@ -67,9 +67,14 @@ public interface ContentAddressableStorage extends InputStreamFactory {
     }
   }
 
-  /** Indicates presence in the CAS for a single digest. */
+  /**
+   * Indicates presence in the CAS for a single digest.
+   *
+   * <p>If supported, a size_bytes of -1 may be used to look up the size of a digest A size
+   * mismatch, if partial key selection is supported, may result in correction
+   */
   @ThreadSafe
-  boolean contains(Digest digest);
+  boolean contains(Digest digest, Digest.Builder result);
 
   /** Indicates presence in the CAS for a sequence of digests. */
   @ThreadSafe

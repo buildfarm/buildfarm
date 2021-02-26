@@ -28,6 +28,7 @@ import static java.util.logging.Level.SEVERE;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.backplane.Backplane;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.ContentAddressableStorage.Blob;
 import build.buildfarm.cas.MemoryCAS;
@@ -38,12 +39,13 @@ import build.buildfarm.common.InputStreamFactory;
 import build.buildfarm.common.LoggingMain;
 import build.buildfarm.common.Size;
 import build.buildfarm.common.Write;
+import build.buildfarm.common.function.IOSupplier;
 import build.buildfarm.common.io.FeedbackOutputStream;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.RedisShardBackplane;
 import build.buildfarm.instance.shard.RemoteInputStreamFactory;
-import build.buildfarm.instance.shard.ShardBackplane;
 import build.buildfarm.instance.shard.WorkerStubs;
+import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.server.ByteStreamService;
 import build.buildfarm.server.ContentAddressableStorageService;
 import build.buildfarm.server.Instances;
@@ -63,7 +65,6 @@ import build.buildfarm.worker.PipelineStage;
 import build.buildfarm.worker.PutOperationStage;
 import build.buildfarm.worker.ReportResultStage;
 import com.google.common.base.Strings;
-import com.google.common.base.Suppliers;
 import com.google.common.base.Throwables;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
@@ -105,7 +106,6 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
@@ -129,15 +129,18 @@ public class Worker extends LoggingMain {
   private final DigestUtil digestUtil;
   private final ExecFileSystem execFileSystem;
   private final Pipeline pipeline;
-  private final ShardBackplane backplane;
+  private final Backplane backplane;
   private final LoadingCache<String, Instance> workerStubs;
+  private final PrometheusPublisher prometheusPublisher;
 
   class LocalCasWriter implements CasWriter {
     public void write(Digest digest, Path file) throws IOException, InterruptedException {
+      insertStream(digest, () -> Files.newInputStream(file));
+    }
 
-      Write write = getLocalWrite(digest);
-      InputStream inputStream = Files.newInputStream(file);
-      insertStream(digest, Suppliers.ofInstance(inputStream));
+    public void insertBlob(Digest digest, ByteString content)
+        throws IOException, InterruptedException {
+      insertStream(digest, () -> content.newInput());
     }
 
     private Write getLocalWrite(Digest digest) throws IOException, InterruptedException {
@@ -148,17 +151,8 @@ public class Worker extends LoggingMain {
       return write;
     }
 
-    public void insertBlob(Digest digest, ByteString content)
+    private void insertStream(Digest digest, IOSupplier<InputStream> suppliedStream)
         throws IOException, InterruptedException {
-
-      Write write = getLocalWrite(digest);
-      Supplier<InputStream> suppliedStream = () -> content.newInput();
-      insertStream(digest, suppliedStream);
-    }
-
-    private void insertStream(Digest digest, Supplier<InputStream> suppliedStream)
-        throws IOException, InterruptedException {
-
       Write write = getLocalWrite(digest);
 
       try (OutputStream out =
@@ -442,7 +436,7 @@ public class Worker extends LoggingMain {
             config.getLimitGlobalExecution(),
             config.getOnlyMulticoreTests(),
             config.getErrorOperationRemainingResources(),
-            Suppliers.ofInstance(writer));
+            writer);
 
     PipelineStage completeStage =
         new PutOperationStage((operation) -> context.deactivate(operation.getName()));
@@ -479,6 +473,8 @@ public class Worker extends LoggingMain {
                     backplane))
             .addService(new ShutDownWorkerGracefully(this, config))
             .build();
+
+    prometheusPublisher = new PrometheusPublisher();
 
     logger.log(INFO, String.format("%s initialized", identifier));
   }
@@ -893,6 +889,8 @@ public class Worker extends LoggingMain {
                     SECONDS.sleep(1);
                   }
                 } catch (InterruptedException e) {
+                  // ignore
+                } finally {
                   try {
                     stop();
                   } catch (InterruptedException ie) {
@@ -918,6 +916,7 @@ public class Worker extends LoggingMain {
       server.start();
       healthStatusManager.setStatus(
           HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
+      prometheusPublisher.startHttpServer(config.getPrometheusConfig().getPort());
       // Not all workers need to be registered and visible in the backplane.
       // For example, a GPU worker may wish to perform work that we do not want to cache locally for
       // other workers.
@@ -937,6 +936,7 @@ public class Worker extends LoggingMain {
   @Override
   protected void onShutdown() throws InterruptedException {
     logger.log(SEVERE, "*** shutting down gRPC server since JVM is shutting down");
+    prometheusPublisher.stopHttpServer();
     stop();
     logger.log(SEVERE, "*** server shut down");
   }
@@ -988,12 +988,10 @@ public class Worker extends LoggingMain {
     String session = UUID.randomUUID().toString();
     Worker worker;
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
-      worker =
-          new Worker(
-              session,
-              toShardWorkerConfig(
-                  new InputStreamReader(configInputStream),
-                  parser.getOptions(WorkerOptions.class)));
+      ShardWorkerConfig config =
+          toShardWorkerConfig(
+              new InputStreamReader(configInputStream), parser.getOptions(WorkerOptions.class));
+      worker = new Worker(session, config);
     }
     worker.start();
     worker.blockUntilShutdown();
