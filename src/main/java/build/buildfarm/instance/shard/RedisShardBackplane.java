@@ -525,14 +525,8 @@ public class RedisShardBackplane implements Backplane {
     // multiple clients.
     client = new RedisClient(jedisClusterFactory.get());
 
-    if (config.getCacheCas()) {
-      redissonClient = createRedissonClient(config);
-      casWorkerMap =
-          new RedissonCasWorkerMap(redissonClient, config.getCasPrefix(), config.getCasExpire());
-    } else {
-      casWorkerMap = new JedisCasWorkerMap(config.getCasPrefix(), config.getCasExpire());
-    }
-
+    // Create containers that make up the backplane
+    casWorkerMap = createCasWorkerMap(redissonClient, config);
     actionCache = createActionCache(client, config);
     prequeue = createPrequeue(client, config);
     operationQueue = createOperationQueue(client, config);
@@ -547,6 +541,16 @@ public class RedisShardBackplane implements Backplane {
     // Record client start time
     client.call(
         jedis -> jedis.set("startTime/" + clientPublicName, Long.toString(new Date().getTime())));
+  }
+
+  static AbstractCasWorkerMap createCasWorkerMap(
+      RedissonClient client, RedisShardBackplaneConfig config) throws IOException {
+    if (config.getCacheCas()) {
+      client = createRedissonClient(config);
+      return new RedissonCasWorkerMap(client, config.getCasPrefix(), config.getCasExpire());
+    } else {
+      return new JedisCasWorkerMap(config.getCasPrefix(), config.getCasExpire());
+    }
   }
 
   static RedissonClient createRedissonClient(RedisShardBackplaneConfig config) throws IOException {
