@@ -1029,7 +1029,7 @@ public class ShardInstance extends AbstractServerInstance {
       throws EntryLimitException {
     try {
       if (backplane.isBlacklisted(requestMetadata)) {
-        throw Status.UNAVAILABLE.withDescription(blockListErrorMessage()).asRuntimeException();
+        throw Status.UNAVAILABLE.withDescription(BLOCK_LIST_ERROR).asRuntimeException();
       }
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
@@ -1654,9 +1654,7 @@ public class ShardInstance extends AbstractServerInstance {
                 .setName(operationName)
                 .setDone(true)
                 .setResponse(
-                    Any.pack(
-                        denyActionResponse(
-                            executeEntry.getActionDigest(), blockListErrorMessage())))
+                    Any.pack(denyActionResponse(executeEntry.getActionDigest(), BLOCK_LIST_ERROR)))
                 .build());
         return IMMEDIATE_VOID_FUTURE;
       } else if (queueEntry.getRequeueAttempts() > maxRequeueAttempts) {
@@ -1821,7 +1819,7 @@ public class ShardInstance extends AbstractServerInstance {
             operation
                 .toBuilder()
                 .setDone(true)
-                .setResponse(Any.pack(denyActionResponse(actionDigest, blockListErrorMessage())))
+                .setResponse(Any.pack(denyActionResponse(actionDigest, BLOCK_LIST_ERROR)))
                 .build());
         return immediateFuture(null);
       }
@@ -1833,14 +1831,6 @@ public class ShardInstance extends AbstractServerInstance {
     } catch (IOException e) {
       return immediateFailedFuture(e);
     }
-  }
-
-  private String blockListErrorMessage() {
-    StringBuilder message = new StringBuilder();
-    message.append("This request is in block list and is forbidden.  ");
-    message.append("To resolve this error, you can tag the rule with 'no-remote'.  ");
-    message.append("You can also adjust the action behavior to attempt a different action hash.  ");
-    return message.toString();
   }
 
   private static ExecuteResponse denyActionResponse(Digest actionDigest, String description) {
