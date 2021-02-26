@@ -123,7 +123,7 @@ class DirectoriesTest {
       // If the unit tests were run as root,
       // Java's isWritable will show true despite the correct permissions being set.
       // This can be seen when running unit tests in docker, or directly with sudo.
-      if (!System.getProperty("user.name").equals("root")){
+      if (!System.getProperty("user.name").equals("root")) {
         assertThat(Files.isWritable(tree)).isFalse();
         assertThat(Files.isWritable(subdir)).isFalse();
       }
