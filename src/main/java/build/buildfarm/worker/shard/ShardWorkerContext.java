@@ -906,8 +906,8 @@ class ShardWorkerContext implements WorkerContext {
       ResourceLimits limits, String operationName, ImmutableList.Builder<String> arguments) {
 
     // The decision to apply resource restrictions has already been decided within the
-    // ResourceLimits object.
-    // We apply the cgroup settings to file resources and add collect group names to use on the CLI.
+    // ResourceLimits object. We apply the cgroup settings to file resources
+    // and collect group names to use on the CLI.
     String operationId = getOperationId(operationName);
     final Group group = operationsGroup.getChild(operationId);
     ArrayList<IOResource> resources = new ArrayList<IOResource>();
