@@ -194,7 +194,8 @@ public class Worker extends LoggingMain {
             root.resolve(casCacheDirectory),
             config.getCasCacheMaxSizeBytes(),
             config.getCasCacheMaxEntrySizeBytes(),
-            /* storeFileDirsIndexInMemory= */ true,
+            config.getCasCacheHexBucketLevels(),
+            config.getCasCacheFileDirectoriesIndexInMemory(),
             casInstance.getDigestUtil(),
             newDirectExecutorService(),
             directExecutor());
