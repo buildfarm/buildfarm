@@ -903,6 +903,15 @@ message WorkerConfig {
   // from CAS in the cache
   int64 cas_cache_max_entry_size_bytes = 24;
 
+  // exponential levels of blob bucketing by digest
+  // if digest is afcd0123, with 2 here, it will live in af/cd/af0123
+  // 0 (default) here will put all entries at the cache root
+  int32 cas_cache_hex_bucket_levels = 27;
+
+  // whether the file directories bidirectional mapping should be stored in memory (HashMap) or
+  // in sqlite
+  bool cas_cache_file_directories_index_in_memory = 28;
+
   // total size of the inline content for
   // action results
   int32 inline_content_limit = 8;

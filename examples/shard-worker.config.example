@@ -69,6 +69,17 @@ cas: {
     # whether the file directories bidirectional mapping should be stored in memory (HashMap) or
     # in sqlite
     file_directories_index_in_memory: false
+
+    # create entry files in a directory for each leveled leading byte of the hash
+    # the default, unspecified value is 0, to create all digests in the cas path itself
+    # for each level > 0, a directory is created for all byte representations, 00-ff, with
+    # as many sublevels as requested.
+    #
+    # This can provide a performance benefit for file access and manipulation for filesystems
+    # which have problems with directories with many (e.g. millions) of files in them.
+    # The CFC creates these directories upfront, resulting in a delay while each is verified or
+    # created. Be cautious with large values, as the subdivision is 256^n
+    # hex_bucket_levels: 0
   }
 
   # whether the transient data on the worker should be loaded into the CAS on worker startup.
