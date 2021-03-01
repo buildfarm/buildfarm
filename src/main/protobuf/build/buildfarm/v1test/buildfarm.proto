@@ -477,6 +477,9 @@ message RedisShardBackplaneConfig {
 
   // the expiration time in seconds for cas sets
   int32 cas_expire = 11;
+  
+  //whether or not to cache the cas set in memory
+  bool cache_cas = 35;
 
   // whether to listen to the backplane communication streams for shard lifecycle
   // events and watched operations. This is required for failsafe operation below

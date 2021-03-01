@@ -98,6 +98,10 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
+import org.redisson.Redisson;
+import org.redisson.api.RedissonClient;
+import org.redisson.config.ClusterServersConfig;
+import org.redisson.config.Config;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisClusterPipeline;
 import redis.clients.jedis.Response;
@@ -146,6 +150,7 @@ public class RedisShardBackplane implements Backplane {
   private ExecutorService subscriberService = null;
   private boolean poolStarted = false;
   private @Nullable RedisClient client = null;
+  private @Nullable RedissonClient redissonClient = null;
 
   private Set<String> workerSet = Collections.synchronizedSet(new HashSet<>());
   private long workerSetExpiresAt = 0;
@@ -153,6 +158,7 @@ public class RedisShardBackplane implements Backplane {
   private RedisMap actionCache;
   private BalancedRedisQueue prequeue;
   private OperationQueue operationQueue;
+  private CasWorkerMap casWorkerMap;
 
   public RedisShardBackplane(
       RedisShardBackplaneConfig config,
@@ -519,6 +525,8 @@ public class RedisShardBackplane implements Backplane {
     // multiple clients.
     client = new RedisClient(jedisClusterFactory.get());
 
+    // Create containers that make up the backplane
+    casWorkerMap = createCasWorkerMap(redissonClient, config);
     actionCache = createActionCache(client, config);
     prequeue = createPrequeue(client, config);
     operationQueue = createOperationQueue(client, config);
@@ -533,6 +541,30 @@ public class RedisShardBackplane implements Backplane {
     // Record client start time
     client.call(
         jedis -> jedis.set("startTime/" + clientPublicName, Long.toString(new Date().getTime())));
+  }
+
+  static CasWorkerMap createCasWorkerMap(RedissonClient client, RedisShardBackplaneConfig config)
+      throws IOException {
+    if (config.getCacheCas()) {
+      client = createRedissonClient(config);
+      return new RedissonCasWorkerMap(client, config.getCasPrefix(), config.getCasExpire());
+    } else {
+      return new JedisCasWorkerMap(config.getCasPrefix(), config.getCasExpire());
+    }
+  }
+
+  static RedissonClient createRedissonClient(RedisShardBackplaneConfig config) throws IOException {
+
+    Config redissonConfig = new Config();
+
+    ClusterServersConfig finalConfig =
+        redissonConfig
+            .useClusterServers()
+            .addNodeAddress(config.getRedisUri())
+            .setCheckSlotsCoverage(false);
+
+    RedissonClient client = Redisson.create(redissonConfig);
+    return client;
   }
 
   static RedisMap createActionCache(RedisClient client, RedisShardBackplaneConfig config)
@@ -907,88 +939,44 @@ public class RedisShardBackplane implements Backplane {
   @Override
   public void adjustBlobLocations(
       Digest blobDigest, Set<String> addWorkers, Set<String> removeWorkers) throws IOException {
-    String key = casKey(blobDigest);
-    client.run(
-        jedis -> {
-          for (String workerName : addWorkers) {
-            jedis.sadd(key, workerName);
-          }
-          for (String workerName : removeWorkers) {
-            jedis.srem(key, workerName);
-          }
-          jedis.expire(key, config.getCasExpire());
-        });
+    casWorkerMap.adjust(client, blobDigest, addWorkers, removeWorkers);
   }
 
   @Override
   public void addBlobLocation(Digest blobDigest, String workerName) throws IOException {
-    String key = casKey(blobDigest);
-    client.run(
-        jedis -> {
-          jedis.sadd(key, workerName);
-          jedis.expire(key, config.getCasExpire());
-        });
+    casWorkerMap.add(client, blobDigest, workerName);
   }
 
   @Override
   public void addBlobsLocation(Iterable<Digest> blobDigests, String workerName) throws IOException {
-    client.run(
-        jedis -> {
-          JedisClusterPipeline p = jedis.pipelined();
-          for (Digest blobDigest : blobDigests) {
-            String key = casKey(blobDigest);
-            p.sadd(key, workerName);
-            p.expire(key, config.getCasExpire());
-          }
-          p.sync();
-        });
+    casWorkerMap.addAll(client, blobDigests, workerName);
   }
 
   @Override
   public void removeBlobLocation(Digest blobDigest, String workerName) throws IOException {
-    String key = casKey(blobDigest);
-    client.run(jedis -> jedis.srem(key, workerName));
+    casWorkerMap.remove(client, blobDigest, workerName);
   }
 
   @Override
   public void removeBlobsLocation(Iterable<Digest> blobDigests, String workerName)
       throws IOException {
-    client.run(
-        jedis -> {
-          JedisClusterPipeline p = jedis.pipelined();
-          for (Digest blobDigest : blobDigests) {
-            p.srem(casKey(blobDigest), workerName);
-          }
-          p.sync();
-        });
+    casWorkerMap.removeAll(client, blobDigests, workerName);
   }
 
   @Override
   public String getBlobLocation(Digest blobDigest) throws IOException {
-    return client.call(jedis -> jedis.srandmember(casKey(blobDigest)));
+    return casWorkerMap.getAny(client, blobDigest);
   }
 
   @Override
   public Set<String> getBlobLocationSet(Digest blobDigest) throws IOException {
-    return client.call(jedis -> jedis.smembers(casKey(blobDigest)));
+    return casWorkerMap.get(client, blobDigest);
   }
 
   @Override
   public Map<Digest, Set<String>> getBlobDigestsWorkers(Iterable<Digest> blobDigests)
       throws IOException {
-    // FIXME pipeline
-    ImmutableMap.Builder<Digest, Set<String>> blobDigestsWorkers = new ImmutableMap.Builder<>();
-    client.run(
-        jedis -> {
-          for (Digest blobDigest : blobDigests) {
-            Set<String> workers = jedis.smembers(casKey(blobDigest));
-            if (workers.isEmpty()) {
-              continue;
-            }
-            blobDigestsWorkers.put(blobDigest, workers);
-          }
-        });
-    return blobDigestsWorkers.build();
+    return casWorkerMap.getMap(client, blobDigests);
   }
 
   public static WorkerChange parseWorkerChange(String workerChangeJson)
@@ -1386,10 +1374,6 @@ public class RedisShardBackplane implements Backplane {
 
           publishReset(jedis, o);
         });
-  }
-
-  private String casKey(Digest blobDigest) {
-    return config.getCasPrefix() + ":" + DigestUtil.toString(blobDigest);
   }
 
   private String asDigestStr(ActionKey actionKey) {
