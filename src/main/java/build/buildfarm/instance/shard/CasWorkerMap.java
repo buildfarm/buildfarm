@@ -20,7 +20,7 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
 
-public interface AbstractCasWorkerMap {
+public interface CasWorkerMap {
 
   ///
   /// @brief   Adjust blob mappings based on worker changes.
