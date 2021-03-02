@@ -15,8 +15,6 @@
 package build.buildfarm.common;
 
 import com.google.common.collect.Sets;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Set;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
@@ -70,35 +68,22 @@ public class ScanCount {
   ///
   private static void addKeys(
       JedisCluster cluster, Jedis node, Set<String> keys, String query, int scanCount) {
-    // iterate over all entries via scanning
-    String cursor = "0";
-    do {
-      keys.addAll(scan(node, cursor, query, scanCount));
 
-    } while (!cursor.equals("0"));
-  }
-  ///
-  /// @brief   Run scan query to get keys.
-  /// @details Scanning is done incrementally via a cursor.
-  /// @param   node      A node of the cluster.
-  /// @param   cursor    Scan cursor.
-  /// @param   query     The query to perform.
-  /// @param   scanCount The count per scan.
-  /// @return  Resulting keys from scanning.
-  /// @note    Suggested return identifier: keys.
-  ///
-  private static List<String> scan(Jedis node, String cursor, String query, int scanCount) {
     // construct query
     ScanParams params = new ScanParams();
     params.match(query);
     params.count(scanCount);
 
-    // perform scan iteration
-    ScanResult scanResult = node.scan(cursor, params);
-    if (scanResult != null) {
-      cursor = scanResult.getCursor();
-      return scanResult.getResult();
-    }
-    return new ArrayList<>();
+    // iterate over all entries via scanning
+    String cursor = "0";
+    ScanResult scanResult;
+    do {
+      scanResult = node.scan(cursor, params);
+      if (scanResult != null) {
+        keys.addAll(scanResult.getResult());
+        cursor = scanResult.getCursor();
+      }
+
+    } while (!cursor.equals("0"));
   }
 }
