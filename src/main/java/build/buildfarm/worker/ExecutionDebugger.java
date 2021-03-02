@@ -79,19 +79,16 @@ public class ExecutionDebugger {
   ///
   private static String getBeforeExecutionDebugInfo(
       ProcessBuilder processBuilder, ResourceLimits limits, ActionResult.Builder resultBuilder) {
-    
+
     // construct debug object
     ExecutionDebugInfo info = new ExecutionDebugInfo();
     info.description = "Buildfarm debug information before execution";
     info.command = String.join(" ", processBuilder.command());
     info.workingDirectory = processBuilder.directory().getAbsolutePath();
     info.limits = limits;
-    
-    
+
     // convert to json
-    Gson gson = new GsonBuilder()
-            .setPrettyPrinting()
-            .create(); 
+    Gson gson = new GsonBuilder().setPrettyPrinting().create();
     return gson.toJson(info) + "\n";
   }
   ///
@@ -105,18 +102,16 @@ public class ExecutionDebugger {
   ///
   private static String getAfterExecutionDebugInfo(
       ProcessBuilder processBuilder, ResourceLimits limits, ActionResult.Builder resultBuilder) {
-    
-    //construct debug object
+
+    // construct debug object
     ExecutionDebugInfo info = new ExecutionDebugInfo();
     info.description = "Buildfarm debug information after execution";
     info.command = String.join(" ", processBuilder.command());
     info.workingDirectory = processBuilder.directory().getAbsolutePath();
     info.limits = limits;
-    
+
     // convert to json
-    Gson gson = new GsonBuilder()
-            .setPrettyPrinting()
-            .create(); 
+    Gson gson = new GsonBuilder().setPrettyPrinting().create();
     return gson.toJson(info) + "\n";
   }
 }
