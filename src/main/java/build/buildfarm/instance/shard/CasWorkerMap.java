@@ -104,4 +104,12 @@ public interface CasWorkerMap {
   ///
   public Map<Digest, Set<String>> getMap(RedisClient client, Iterable<Digest> blobDigests)
       throws IOException;
+  ///
+  /// @brief   Get the size of the map.
+  /// @details Returns the number of key-value pairs in this multimap.
+  /// @param   client      Client used for interacting with redis when not using cacheMap.
+  /// @return  The size of the map.
+  /// @note    Suggested return identifier: mapSize.
+  ///
+  public int size(RedisClient client) throws IOException;
 }
