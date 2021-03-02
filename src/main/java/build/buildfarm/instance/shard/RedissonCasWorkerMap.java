@@ -211,6 +211,16 @@ public class RedissonCasWorkerMap implements CasWorkerMap {
   }
 
   ///
+  /// @brief   Get the size of the map.
+  /// @param   client      Client used for interacting with redis when not using cacheMap.
+  /// @return  The size of the map.
+  /// @note    Suggested return identifier: size.
+  ///
+  public int size(RedisClient client) throws IOException {
+    return cacheMap.size();
+  }
+
+  ///
   /// @brief   Get a random element from the set.
   /// @details Assumes the set is not empty.
   /// @param   set The set to get a random element from.
