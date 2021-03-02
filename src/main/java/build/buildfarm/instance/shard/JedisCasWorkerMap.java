@@ -96,7 +96,6 @@ public class JedisCasWorkerMap implements CasWorkerMap {
           jedis.expire(key, keyExpiration_s);
         });
   }
-
   ///
   /// @brief   Update the blob entry for the worker.
   /// @details This may add a new key if the blob did not previously exist, or
@@ -115,7 +114,6 @@ public class JedisCasWorkerMap implements CasWorkerMap {
           jedis.expire(key, keyExpiration_s);
         });
   }
-
   ///
   /// @brief   Update multiple blob entries for a worker.
   /// @details This may add a new key if the blob did not previously exist, or
@@ -139,7 +137,6 @@ public class JedisCasWorkerMap implements CasWorkerMap {
           p.sync();
         });
   }
-
   ///
   /// @brief   Remove worker value from blob key.
   /// @details If the blob is already missing, or the worker doesn't exist,
@@ -153,7 +150,6 @@ public class JedisCasWorkerMap implements CasWorkerMap {
     String key = redisCasKey(blobDigest);
     client.run(jedis -> jedis.srem(key, workerName));
   }
-
   ///
   /// @brief   Remove worker value from all blob keys.
   /// @details If the blob is already missing, or the worker doesn't exist,
@@ -162,7 +158,6 @@ public class JedisCasWorkerMap implements CasWorkerMap {
   /// @param   blobDigests The blob digests to remove the worker from.
   /// @param   workerName  The worker name to remove.
   ///
-
   @Override
   public void removeAll(RedisClient client, Iterable<Digest> blobDigests, String workerName)
       throws IOException {
@@ -176,7 +171,6 @@ public class JedisCasWorkerMap implements CasWorkerMap {
           p.sync();
         });
   }
-
   ///
   /// @brief   Get a random worker for where the blob resides.
   /// @details Picking a worker may done differently in the future.
@@ -231,7 +225,6 @@ public class JedisCasWorkerMap implements CasWorkerMap {
         });
     return blobDigestsWorkers.build();
   }
-
   ///
   /// @brief   Get the size of the map.
   /// @details May be inefficient to due scanning into memory and
@@ -243,7 +236,6 @@ public class JedisCasWorkerMap implements CasWorkerMap {
   public int size(RedisClient client) throws IOException {
     return client.call(jedis -> ScanCount.get(jedis, name + ":*", 1000));
   }
-
   ///
   /// @brief   Get the redis key name.
   /// @details This is to be used for the direct redis implementation.

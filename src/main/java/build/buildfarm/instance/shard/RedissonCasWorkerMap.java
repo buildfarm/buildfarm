@@ -172,16 +172,6 @@ public class RedissonCasWorkerMap implements CasWorkerMap {
     return getRandomElement(all);
   }
   ///
-  /// @brief   Get a random element from the set.
-  /// @details Assumes the set is not empty.
-  /// @param   set The set to get a random element from.
-  /// @return  A random element from the set.
-  /// @note    Suggested return identifier: randomElement.
-  ///
-  private <T> T getRandomElement(Set<T> set) {
-    return set.stream().skip(new Random().nextInt(set.size())).findFirst().orElse(null);
-  }
-  ///
   /// @brief   Get all of the workers for where a blob resides.
   /// @details Set is empty if the locaion of the blob is unknown.
   /// @param   client     Client used for interacting with redis when not using cacheMap.
@@ -228,6 +218,17 @@ public class RedissonCasWorkerMap implements CasWorkerMap {
   ///
   public int size(RedisClient client) throws IOException {
     return cacheMap.size();
+  }
+
+  ///
+  /// @brief   Get a random element from the set.
+  /// @details Assumes the set is not empty.
+  /// @param   set The set to get a random element from.
+  /// @return  A random element from the set.
+  /// @note    Suggested return identifier: randomElement.
+  ///
+  private <T> T getRandomElement(Set<T> set) {
+    return set.stream().skip(new Random().nextInt(set.size())).findFirst().orElse(null);
   }
 
   ///
