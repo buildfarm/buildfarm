@@ -22,12 +22,12 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 
-///
-/// @class   ResourceDeciderTest
-/// @brief   tests Decide the resource limitations for a given command.
-/// @details Platform properties from specified exec_properties are taken
-///          into account as well as global buildfarm configuration.
-///
+/**
+ * @class ResourceDeciderTest
+ * @brief tests Decide the resource limitations for a given command.
+ * @details Platform properties from specified exec_properties are taken into account as well as
+ *     global buildfarm configuration.
+ */
 @RunWith(JUnit4.class)
 public class ResourceDeciderTest {
 
@@ -79,6 +79,30 @@ public class ResourceDeciderTest {
     // ASSERT
     assertThat(limits.cpu.min).isEqualTo(1);
     assertThat(limits.cpu.max).isEqualTo(1);
+  }
+
+  // Function under test: decideResourceLimitations
+  // Reason for testing: test that mem constraints can be set
+  // Failure explanation: mem limits were not decided as expected
+  @Test
+  public void decideResourceLimitationsTestMemSetting() throws Exception {
+
+    // ARRANGE
+    Command command =
+        Command.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(Platform.Property.newBuilder().setName("min-mem").setValue("5"))
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("max-mem").setValue("10")))
+            .build();
+
+    // ACT
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, 100);
+
+    // ASSERT
+    assertThat(limits.mem.min).isEqualTo(5);
+    assertThat(limits.mem.max).isEqualTo(10);
   }
 
   // Function under test: decideResourceLimitations
@@ -313,5 +337,77 @@ public class ResourceDeciderTest {
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(1);
     assertThat(limits.extraEnvironmentVariables.containsKey("foo")).isTrue();
     assertThat(limits.extraEnvironmentVariables.get("foo")).isEqualTo("");
+  }
+
+  // Function under test: decideResourceLimitations
+  // Reason for testing: we can parse out a positive bool for "before execution debugging"
+  // Failure explanation: the bool was not parsed as true like we would have expected
+  @Test
+  public void decideResourceLimitationsTestDebugBeforeParse() throws Exception {
+
+    // ARRANGE
+    Command command =
+        Command.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(
+                        Platform.Property.newBuilder()
+                            .setName("debug-before-execution")
+                            .setValue("true")))
+            .build();
+
+    // ACT
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+
+    // ASSERT
+    assertThat(limits.debugBeforeExecution).isTrue();
+  }
+
+  // Function under test: decideResourceLimitations
+  // Reason for testing: we can parse out a positive bool for "after execution debugging"
+  // Failure explanation: the bool was not parsed as true like we would have expected
+  @Test
+  public void decideResourceLimitationsTestDebugAfterParse() throws Exception {
+
+    // ARRANGE
+    Command command =
+        Command.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(
+                        Platform.Property.newBuilder()
+                            .setName("debug-after-execution")
+                            .setValue("true")))
+            .build();
+
+    // ACT
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+
+    // ASSERT
+    assertThat(limits.debugAfterExecution).isTrue();
+  }
+
+  // Function under test: decideResourceLimitations
+  // Reason for testing: if we provide an invalid boolean value, it is stored as false
+  // Failure explanation: the value was not parsed gracefully or was somehow interpreted as true
+  @Test
+  public void decideResourceLimitationsTestInvalidDebugParse() throws Exception {
+
+    // ARRANGE
+    Command command =
+        Command.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(
+                        Platform.Property.newBuilder()
+                            .setName("debug-before-execution")
+                            .setValue("BAD_FORMAT")))
+            .build();
+
+    // ACT
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+
+    // ASSERT
+    assertThat(limits.debugBeforeExecution).isFalse();
   }
 }

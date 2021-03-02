@@ -24,6 +24,7 @@ import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
+import build.buildfarm.backplane.Backplane;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
@@ -33,8 +34,8 @@ import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
-import build.buildfarm.instance.AbstractServerInstance;
-import build.buildfarm.instance.shard.ShardBackplane;
+import build.buildfarm.instance.MatchListener;
+import build.buildfarm.instance.server.AbstractServerInstance;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
@@ -66,12 +67,12 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   private static final Logger logger = Logger.getLogger(ShardWorkerInstance.class.getName());
 
   private final ShardWorkerInstanceConfig config;
-  private final ShardBackplane backplane;
+  private final Backplane backplane;
 
   public ShardWorkerInstance(
       String name,
       DigestUtil digestUtil,
-      ShardBackplane backplane,
+      Backplane backplane,
       ContentAddressableStorage contentAddressableStorage,
       ShardWorkerInstanceConfig config)
       throws ConfigurationException {
@@ -199,7 +200,6 @@ public class ShardWorkerInstance extends AbstractServerInstance {
     while (!backplane.isStopped()) {
       listener.onWaitStart();
       try {
-
         List<Platform.Property> provisions = new ArrayList<>();
         QueueEntry queueEntry = backplane.dispatchOperation(provisions);
         if (queueEntry != null) {

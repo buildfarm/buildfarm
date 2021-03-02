@@ -30,11 +30,6 @@ import redis.clients.jedis.JedisPubSub;
 class RedisShardSubscription implements Runnable {
   private static final Logger logger = Logger.getLogger(RedisShardSubscription.class.getName());
 
-  @FunctionalInterface
-  interface IOSupplier<T> {
-    T get() throws IOException;
-  }
-
   private final JedisPubSub subscriber;
   private final InterruptingRunnable onUnsubscribe;
   private final Consumer<JedisCluster> onReset;

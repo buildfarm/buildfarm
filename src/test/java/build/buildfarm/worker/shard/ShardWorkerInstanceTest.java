@@ -24,11 +24,11 @@ import static org.mockito.Mockito.when;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.backplane.Backplane;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.HashFunction;
-import build.buildfarm.instance.Instance.MatchListener;
-import build.buildfarm.instance.shard.ShardBackplane;
+import build.buildfarm.instance.MatchListener;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.ShardWorkerInstanceConfig;
@@ -54,7 +54,7 @@ import org.mockito.MockitoAnnotations;
 public class ShardWorkerInstanceTest {
   private final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
 
-  @Mock private ShardBackplane backplane;
+  @Mock private Backplane backplane;
 
   @Mock private ContentAddressableStorage storage;
 

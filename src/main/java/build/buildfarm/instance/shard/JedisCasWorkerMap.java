@@ -16,7 +16,10 @@ package build.buildfarm.instance.shard;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
+<<<<<<< HEAD
 import build.buildfarm.common.ScanCount;
+=======
+>>>>>>> master
 import build.buildfarm.common.redis.RedisClient;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -32,7 +35,7 @@ import redis.clients.jedis.JedisClusterPipeline;
 /// @details This is used to identify the location of blobs within the shard.
 ///          {blob digest -> set(worker1,worker2)}.
 ///
-public class JedisCasWorkerMap implements AbstractCasWorkerMap {
+public class JedisCasWorkerMap implements CasWorkerMap {
 
   ///
   /// @field   name
@@ -84,123 +87,6 @@ public class JedisCasWorkerMap implements AbstractCasWorkerMap {
   public void adjust(
       RedisClient client, Digest blobDigest, Set<String> addWorkers, Set<String> removeWorkers)
       throws IOException {
-    adjustJedis(client, blobDigest, addWorkers, removeWorkers);
-  }
-  ///
-  /// @brief   Update the blob entry for the worker.
-  /// @details This may add a new key if the blob did not previously exist, or
-  ///          it will adjust the worker values based on the worker name. The
-  ///          expiration time is always refreshed.
-  /// @param   client     Client used for interacting with redis when not using cacheMap.
-  /// @param   blobDigest The blob digest to adjust worker information from.
-  /// @param   workerName The worker to add for looking up the blob.
-  ///
-  @Override
-  public void add(RedisClient client, Digest blobDigest, String workerName) throws IOException {
-    addJedis(client, blobDigest, workerName);
-  }
-  ///
-  /// @brief   Update multiple blob entries for a worker.
-  /// @details This may add a new key if the blob did not previously exist, or
-  ///          it will adjust the worker values based on the worker name. The
-  ///          expiration time is always refreshed.
-  /// @param   client      Client used for interacting with redis when not using cacheMap.
-  /// @param   blobDigests The blob digests to adjust worker information from.
-  /// @param   workerName  The worker to add for looking up the blobs.
-  ///
-  @Override
-  public void addAll(RedisClient client, Iterable<Digest> blobDigests, String workerName)
-      throws IOException {
-    addAllJedis(client, blobDigests, workerName);
-  }
-  ///
-  /// @brief   Remove worker value from blob key.
-  /// @details If the blob is already missing, or the worker doesn't exist,
-  ///          this will have no effect.
-  /// @param   client     Client used for interacting with redis when not using cacheMap.
-  /// @param   blobDigest The blob digest to remove the worker from.
-  /// @param   workerName The worker name to remove.
-  ///
-  @Override
-  public void remove(RedisClient client, Digest blobDigest, String workerName) throws IOException {
-    removeJedis(client, blobDigest, workerName);
-  }
-  ///
-  /// @brief   Remove worker value from all blob keys.
-  /// @details If the blob is already missing, or the worker doesn't exist,
-  ///          this will be no effect on the key.
-  /// @param   client      Client used for interacting with redis when not using cacheMap.
-  /// @param   blobDigests The blob digests to remove the worker from.
-  /// @param   workerName  The worker name to remove.
-  ///
-  @Override
-  public void removeAll(RedisClient client, Iterable<Digest> blobDigests, String workerName)
-      throws IOException {
-    removeAllJedis(client, blobDigests, workerName);
-  }
-  ///
-  /// @brief   Get a random worker for where the blob resides.
-  /// @details Picking a worker may done differently in the future.
-  /// @param   client     Client used for interacting with redis when not using cacheMap.
-  /// @param   blobDigest The blob digest to lookup a worker for.
-  /// @return  A worker for where the blob is.
-  /// @note    Suggested return identifier: workerName.
-  ///
-  @Override
-  public String getAny(RedisClient client, Digest blobDigest) throws IOException {
-    return getAnyJedis(client, blobDigest);
-  }
-  ///
-  /// @brief   Get all of the workers for where a blob resides.
-  /// @details Set is empty if the locaion of the blob is unknown.
-  /// @param   client     Client used for interacting with redis when not using cacheMap.
-  /// @param   blobDigest The blob digest to lookup a worker for.
-  /// @return  All the workers where the blob is expected to be.
-  /// @note    Suggested return identifier: workerNames.
-  ///
-  @Override
-  public Set<String> get(RedisClient client, Digest blobDigest) throws IOException {
-    return getJedis(client, blobDigest);
-  }
-  ///
-  /// @brief   Get all of the key values as a map from the digests given.
-  /// @details If there are no workers for the digest, the key is left out of
-  ///          the returned map.
-  /// @param   client      Client used for interacting with redis when not using cacheMap.
-  /// @param   blobDigests The blob digests to get the key/values for.
-  /// @return  The key/value map for digests to workers.
-  /// @note    Suggested return identifier: casWorkerMap.
-  ///
-  @Override
-  public Map<Digest, Set<String>> getMap(RedisClient client, Iterable<Digest> blobDigests)
-      throws IOException {
-    return getMapJedis(client, blobDigests);
-  }
-
-  ///
-  /// @brief   Get the size of the map.
-  /// @details Returns the number of key-value pairs in this multimap.
-  /// @param   client      Client used for interacting with redis when not using cacheMap.
-  /// @return  The size of the map.
-  /// @note    Suggested return identifier: mapSize.
-  ///
-  @Override
-  public int size(RedisClient client) throws IOException {
-    return client.call(jedis -> ScanCount.get(jedis, name + ":*", 1000));
-  }
-
-  ///
-  /// @brief   Adjust blob mappings based on worker changes.
-  /// @details Adjustments are made based on added and removed workers.
-  ///          Expirations are refreshed.
-  /// @param   client        Client used for interacting with redis when not using cacheMap.
-  /// @param   blobDigest    The blob digest to adjust worker information from.
-  /// @param   addWorkers    Workers to add.
-  /// @param   removeWorkers Workers to remove.
-  ///
-  private void adjustJedis(
-      RedisClient client, Digest blobDigest, Set<String> addWorkers, Set<String> removeWorkers)
-      throws IOException {
     String key = redisCasKey(blobDigest);
     client.run(
         jedis -> {
@@ -223,8 +109,8 @@ public class JedisCasWorkerMap implements AbstractCasWorkerMap {
   /// @param   blobDigest The blob digest to adjust worker information from.
   /// @param   workerName The worker to add for looking up the blob.
   ///
-  private void addJedis(RedisClient client, Digest blobDigest, String workerName)
-      throws IOException {
+  @Override
+  public void add(RedisClient client, Digest blobDigest, String workerName) throws IOException {
     String key = redisCasKey(blobDigest);
     client.run(
         jedis -> {
@@ -242,7 +128,8 @@ public class JedisCasWorkerMap implements AbstractCasWorkerMap {
   /// @param   blobDigests The blob digests to adjust worker information from.
   /// @param   workerName  The worker to add for looking up the blobs.
   ///
-  private void addAllJedis(RedisClient client, Iterable<Digest> blobDigests, String workerName)
+  @Override
+  public void addAll(RedisClient client, Iterable<Digest> blobDigests, String workerName)
       throws IOException {
     client.run(
         jedis -> {
@@ -264,8 +151,8 @@ public class JedisCasWorkerMap implements AbstractCasWorkerMap {
   /// @param   blobDigest The blob digest to remove the worker from.
   /// @param   workerName The worker name to remove.
   ///
-  private void removeJedis(RedisClient client, Digest blobDigest, String workerName)
-      throws IOException {
+  @Override
+  public void remove(RedisClient client, Digest blobDigest, String workerName) throws IOException {
     String key = redisCasKey(blobDigest);
     client.run(jedis -> jedis.srem(key, workerName));
   }
@@ -278,7 +165,9 @@ public class JedisCasWorkerMap implements AbstractCasWorkerMap {
   /// @param   blobDigests The blob digests to remove the worker from.
   /// @param   workerName  The worker name to remove.
   ///
-  private void removeAllJedis(RedisClient client, Iterable<Digest> blobDigests, String workerName)
+
+  @Override
+  public void removeAll(RedisClient client, Iterable<Digest> blobDigests, String workerName)
       throws IOException {
     client.run(
         jedis -> {
@@ -299,7 +188,8 @@ public class JedisCasWorkerMap implements AbstractCasWorkerMap {
   /// @return  A worker for where the blob is.
   /// @note    Suggested return identifier: workerName.
   ///
-  private String getAnyJedis(RedisClient client, Digest blobDigest) throws IOException {
+  @Override
+  public String getAny(RedisClient client, Digest blobDigest) throws IOException {
     String key = redisCasKey(blobDigest);
     return client.call(jedis -> jedis.srandmember(key));
   }
@@ -311,7 +201,8 @@ public class JedisCasWorkerMap implements AbstractCasWorkerMap {
   /// @return  All the workers where the blob is expected to be.
   /// @note    Suggested return identifier: workerNames.
   ///
-  private Set<String> getJedis(RedisClient client, Digest blobDigest) throws IOException {
+  @Override
+  public Set<String> get(RedisClient client, Digest blobDigest) throws IOException {
     String key = redisCasKey(blobDigest);
     return client.call(jedis -> jedis.smembers(key));
   }
@@ -324,7 +215,8 @@ public class JedisCasWorkerMap implements AbstractCasWorkerMap {
   /// @return  The key/value map for digests to workers.
   /// @note    Suggested return identifier: casWorkerMap.
   ///
-  private Map<Digest, Set<String>> getMapJedis(RedisClient client, Iterable<Digest> blobDigests)
+  @Override
+  public Map<Digest, Set<String>> getMap(RedisClient client, Iterable<Digest> blobDigests)
       throws IOException {
     ImmutableMap.Builder<Digest, Set<String>> blobDigestsWorkers = new ImmutableMap.Builder<>();
     client.run(
@@ -342,7 +234,7 @@ public class JedisCasWorkerMap implements AbstractCasWorkerMap {
         });
     return blobDigestsWorkers.build();
   }
-  ///
+
   /// @brief   Get the redis key name.
   /// @details This is to be used for the direct redis implementation.
   /// @param   blobDigest The blob digest to be made part of the key.

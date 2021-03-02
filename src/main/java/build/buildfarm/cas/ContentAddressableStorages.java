@@ -126,20 +126,25 @@ public final class ContentAddressableStorages {
   }
 
   /** decorates a map with a CAS interface, does not react to removals with expirations */
-  public static ContentAddressableStorage casMapDecorator(Map<Digest, ByteString> map) {
+  public static ContentAddressableStorage casMapDecorator(Map<String, ByteString> map) {
     return new ContentAddressableStorage() {
       final Writes writes = new Writes(this);
 
       @Override
-      public boolean contains(Digest digest) {
-        return map.containsKey(digest);
+      public boolean contains(Digest digest, Digest.Builder result) {
+        ByteString data = getData(digest);
+        if (data != null) {
+          result.mergeFrom(digest).setSizeBytes(data.size());
+          return true;
+        }
+        return false;
       }
 
       @Override
       public Iterable<Digest> findMissingBlobs(Iterable<Digest> digests) {
         ImmutableList.Builder<Digest> missing = ImmutableList.builder();
         for (Digest digest : digests) {
-          if (digest.getSizeBytes() != 0 && !map.containsKey(digest)) {
+          if (getData(digest) == null) {
             missing.add(digest);
           }
         }
@@ -153,7 +158,7 @@ public final class ContentAddressableStorages {
 
       @Override
       public InputStream newInput(Digest digest, long offset) throws IOException {
-        ByteString data = map.get(digest);
+        ByteString data = getData(digest);
         if (data == null) {
           throw new NoSuchFileException(digest.getHash());
         }
@@ -169,23 +174,34 @@ public final class ContentAddressableStorages {
           long count,
           ServerCallStreamObserver<ByteString> responseObserver,
           RequestMetadata requestMetadata) {
-        ByteString data = map.get(digest);
-        if (data == null) {
-          responseObserver.onError(Status.NOT_FOUND.asException());
-        } else {
-          responseObserver.onNext(map.get(digest));
+        ByteString data = getData(digest);
+        if (data != null) {
+          responseObserver.onNext(data);
           responseObserver.onCompleted();
+        } else {
+          responseObserver.onError(Status.NOT_FOUND.asException());
         }
+      }
+
+      private ByteString getData(Digest digest) {
+        if (digest.getSizeBytes() == 0) {
+          return ByteString.EMPTY;
+        }
+        ByteString data = map.get(digest.getHash());
+        if (data == null || (digest.getSizeBytes() > 0 && digest.getSizeBytes() != data.size())) {
+          return null;
+        }
+        return data;
       }
 
       @Override
       public ListenableFuture<Iterable<Response>> getAllFuture(Iterable<Digest> digests) {
-        return immediateFuture(MemoryCAS.getAll(digests, map::get));
+        return immediateFuture(MemoryCAS.getAll(digests, this::getData));
       }
 
       @Override
       public Blob get(Digest digest) {
-        ByteString data = map.get(digest);
+        ByteString data = getData(digest);
         if (data == null) {
           return null;
         }
@@ -194,7 +210,7 @@ public final class ContentAddressableStorages {
 
       @Override
       public void put(Blob blob) {
-        map.put(blob.getDigest(), blob.getData());
+        map.put(blob.getDigest().getHash(), blob.getData());
 
         writes.getFuture(blob.getDigest()).set(blob.getData());
       }

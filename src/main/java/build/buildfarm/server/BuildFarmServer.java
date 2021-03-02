@@ -26,6 +26,7 @@ import build.buildfarm.metrics.MetricsPublisher;
 import build.buildfarm.metrics.aws.AwsMetricsPublisher;
 import build.buildfarm.metrics.gcp.GcpMetricsPublisher;
 import build.buildfarm.metrics.log.LogMetricsPublisher;
+import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.v1test.BuildFarmServerConfig;
 import build.buildfarm.v1test.MetricsConfig;
 import com.google.devtools.common.options.OptionsParser;
@@ -34,6 +35,7 @@ import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.ServerInterceptor;
 import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
+import io.grpc.protobuf.services.ProtoReflectionService;
 import io.grpc.services.HealthStatusManager;
 import io.grpc.util.TransmitStatusRuntimeExceptionInterceptor;
 import java.io.IOException;
@@ -57,8 +59,6 @@ public class BuildFarmServer extends LoggingMain {
   // collected, which would cause us to loose their configuration.
   private static final java.util.logging.Logger nettyLogger =
       java.util.logging.Logger.getLogger("io.grpc.netty");
-  private static final java.util.logging.Logger grpcLogger =
-      java.util.logging.Logger.getLogger(Server.class.getName());
   private static final Logger logger = Logger.getLogger(BuildFarmServer.class.getName());
 
   private final ScheduledExecutorService keepaliveScheduler = newSingleThreadScheduledExecutor();
@@ -67,6 +67,7 @@ public class BuildFarmServer extends LoggingMain {
   private final HealthStatusManager healthStatusManager;
   private final Server server;
   private boolean stopping = false;
+  private final PrometheusPublisher prometheusPublisher;
 
   public BuildFarmServer(String session, BuildFarmServerConfig config)
       throws InterruptedException, ConfigurationException {
@@ -109,9 +110,13 @@ public class BuildFarmServer extends LoggingMain {
             .addService(new OperationQueueService(instances))
             .addService(new OperationsService(instances))
             .addService(new AdminService(config.getAdminConfig(), instances))
+            .addService(new FetchService(instances))
+            .addService(ProtoReflectionService.newInstance())
             .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
             .intercept(headersInterceptor)
             .build();
+
+    prometheusPublisher = new PrometheusPublisher();
 
     logger.log(Level.INFO, String.format("%s initialized", session));
   }
@@ -137,13 +142,14 @@ public class BuildFarmServer extends LoggingMain {
     }
   }
 
-  public synchronized void start(String publicName) throws IOException {
+  public synchronized void start(String publicName, int prometheusPort) throws IOException {
     checkState(!stopping, "must not call start after stop");
     actionCacheRequestCounter.start();
     instances.start(publicName);
     server.start();
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
+    prometheusPublisher.startHttpServer(prometheusPort);
   }
 
   @Override
@@ -162,6 +168,7 @@ public class BuildFarmServer extends LoggingMain {
     }
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.NOT_SERVING);
+    prometheusPublisher.stopHttpServer();
     try {
       if (server != null) {
         server.shutdown();
@@ -221,13 +228,16 @@ public class BuildFarmServer extends LoggingMain {
     session += "-" + UUID.randomUUID();
     BuildFarmServer server;
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
-      server =
-          new BuildFarmServer(
-              session, toBuildFarmServerConfig(new InputStreamReader(configInputStream), options));
+      BuildFarmServerConfig config =
+          toBuildFarmServerConfig(new InputStreamReader(configInputStream), options);
+      // Start Prometheus web server
+      PrometheusPublisher.startHttpServer(config.getPrometheusConfig().getPort());
+      server = new BuildFarmServer(session, config);
       configInputStream.close();
-      server.start(options.publicName);
+      server.start(options.publicName, config.getPrometheusConfig().getPort());
       server.blockUntilShutdown();
       server.stop();
+      PrometheusPublisher.stopHttpServer();
       return true;
     } catch (IOException e) {
       System.err.println("error: " + formatIOError(e));

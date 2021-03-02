@@ -63,4 +63,15 @@ public class HexBucketEntryPathStrategyTest {
     }
     assertThat(paths.hasNext()).isFalse();
   }
+
+  @Test
+  public void getPathMatchesLevels() {
+    Path path = Paths.get("cache");
+    EntryPathStrategy entryPathStrategy = new HexBucketEntryPathStrategy(path, 2);
+
+    String key = "aa55bb1100bb";
+    Path blobPath = entryPathStrategy.getPath(key);
+    assertThat(blobPath.toString())
+        .isEqualTo(path.resolve("aa").resolve("55").resolve(key).toString());
+  }
 }

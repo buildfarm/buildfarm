@@ -17,27 +17,25 @@ package build.buildfarm.common.redis;
 import java.util.Map;
 import java.util.Set;
 
-///
-/// @class   FilteredProvisions
-/// @brief   Provisions of a provisioned redis queue.
-/// @details These provisions are filtered by wildcards and used by the
-///          provisioned redis queue.
-///
+/**
+ * @class FilteredProvisions
+ * @brief Provisions of a provisioned redis queue.
+ * @details These provisions are filtered by wildcards and used by the provisioned redis queue.
+ */
 public class FilteredProvisions {
 
-  ///
-  /// @field   wildcard
-  /// @brief   The wildcard provisions of the queue.
-  /// @details A filtered set of all provisions that use wildcards.
-  ///
+  /**
+   * @field wildcard
+   * @brief The wildcard provisions of the queue.
+   * @details A filtered set of all provisions that use wildcards.
+   */
   public Set<String> wildcard;
 
-  ///
-  /// @field   required
-  /// @brief   The required provisions of the queue.
-  /// @details The required provisions to allow workers and operations to be
-  ///          added to the queue. These often match the remote api's command
-  ///          platform properties.
-  ///
+  /**
+   * @field required
+   * @brief The required provisions of the queue.
+   * @details The required provisions to allow workers and operations to be added to the queue.
+   *     These often match the remote api's command platform properties.
+   */
   public Set<Map.Entry<String, String>> required;
 }

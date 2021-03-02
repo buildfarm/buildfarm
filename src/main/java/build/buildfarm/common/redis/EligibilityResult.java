@@ -16,69 +16,67 @@ package build.buildfarm.common.redis;
 
 import com.google.common.collect.SetMultimap;
 
-///
-/// @class   EligibilityResult
-/// @brief   Detailed results from checking eligibility of properties on a
-///          provisioned redis queue.
-/// @details Useful for visibility and debugging into the queue selection
-///          algorithm.
-///
+/**
+ * @class EligibilityResult
+ * @brief Detailed results from checking eligibility of properties on a provisioned redis queue.
+ * @details Useful for visibility and debugging into the queue selection algorithm.
+ */
 public class EligibilityResult {
 
-  ///
-  /// @field   queueName
-  /// @brief   The name of the queue the eligibility was tested on.
-  /// @details The name of the provisioned redis queue.
-  ///
+  /**
+   * @field queueName
+   * @brief The name of the queue the eligibility was tested on.
+   * @details The name of the provisioned redis queue.
+   */
   public String queueName;
 
-  ///
-  /// @field   allowsUnmatched
-  /// @brief   Determines how unmatched properties effect eligibility.
-  /// @details If true, properties can remain unmatched yet still eligible.
-  ///
+  /**
+   * @field allowsUnmatched
+   * @brief Determines how unmatched properties effect eligibility.
+   * @details If true, properties can remain unmatched yet still eligible.
+   */
   public boolean allowsUnmatched;
 
-  ///
-  /// @field   isEligible
-  /// @brief   Whether the properties were eligible for the queue.
-  /// @details Determined the same way queues are selected.
-  ///
+  /**
+   * @field isEligible
+   * @brief Whether the properties were eligible for the queue.
+   * @details Determined the same way queues are selected.
+   */
   public boolean isEligible;
 
-  ///
-  /// @field   isFullyWildcard
-  /// @brief   Whether the queue is fully wildcard.
-  /// @details Fully wildcard queues accept all properties.
-  ///
+  /**
+   * @field isFullyWildcard
+   * @brief Whether the queue is fully wildcard.
+   * @details Fully wildcard queues accept all properties.
+   */
   public boolean isFullyWildcard;
 
-  ///
-  /// @field   isSpecificallyChosen
-  /// @brief   Whether the queue was specifically chosen.
-  /// @details A special property was used to specifically match to the queue.
-  ///          This automatically makes it eligible.
-  ///
+  /**
+   * @field isSpecificallyChosen
+   * @brief Whether the queue was specifically chosen.
+   * @details A special property was used to specifically match to the queue. This automatically
+   *     makes it eligible.
+   */
   public boolean isSpecificallyChosen;
 
-  ///
-  /// @field   matched
-  /// @brief   Properties that were correctly matched for the queue.
-  /// @details Contribute to successful eligibility.
-  ///
+  /**
+   * @field matched
+   * @brief Properties that were correctly matched for the queue.
+   * @details Contribute to successful eligibility.
+   */
   public SetMultimap<String, String> matched;
 
-  ///
-  /// @field   unmatched
-  /// @brief   Properties that were not correctly matched for the queue.
-  /// @details Contribute to failure of eligibility.
-  ///
+  /**
+   * @field unmatched
+   * @brief Properties that were not correctly matched for the queue.
+   * @details Contribute to failure of eligibility.
+   */
   public SetMultimap<String, String> unmatched;
 
-  ///
-  /// @field   stillRequired
-  /// @brief   Properties that are still required for the queue.
-  /// @details Contribute to failure of eligibility.
-  ///
+  /**
+   * @field stillRequired
+   * @brief Properties that are still required for the queue.
+   * @details Contribute to failure of eligibility.
+   */
   public SetMultimap<String, String> stillRequired;
 }

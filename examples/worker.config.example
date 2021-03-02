@@ -46,6 +46,30 @@ root: "/tmp/worker"
 # the local cache location relative to the 'root', or absolute
 cas_cache_directory: "cache"
 
+# limit for contents of files retained
+# from CAS in the cache
+cas_cache_max_size_bytes: 2147483648 # 2 * 1024 * 1024 * 1024
+
+# limit for content size of files retained
+# from CAS in the cache
+cas_cache_max_entry_size_bytes: 2147483648 # 2 * 1024 * 1024 * 1024
+
+# whether the file directories bidirectional mapping should be stored in memory (HashMap) or
+# in sqlite
+# cas_cache_file_directories_index_in_memory: true
+
+# create entry files in a directory for each leveled leading byte of the hash
+# the default, unspecified value is 0, to create all digests in the cas path itself
+# for each level > 0, a directory is created for all byte representations, 00-ff, with
+# as many sublevels as requested.
+#
+# This can provide a performance benefit for file access and manipulation for filesystems
+# which have problems with directories with many (e.g. millions) of files in them.
+# The CFC creates these directories upfront, resulting in a delay while each is verified or
+# created. Be cautious with large values, as the subdivision is 256^n
+#
+cas_cache_hex_bucket_levels: 0
+
 # total size in bytes of inline content for action results
 # output files, stdout, and stderr content, in that order
 # will be inlined if their cumulative size does not exceed this limit.
@@ -107,14 +131,6 @@ default_platform: {
   #   value: "1"
   # }
 }
-
-# limit for contents of files retained
-# from CAS in the cache
-cas_cache_max_size_bytes: 2147483648 # 2 * 1024 * 1024 * 1024
-
-# limit for content size of files retained
-# from CAS in the cache
-cas_cache_max_entry_size_bytes: 2147483648 # 2 * 1024 * 1024 * 1024
 
 # the number of concurrently available slots in the execute phase
 execute_stage_width: 1

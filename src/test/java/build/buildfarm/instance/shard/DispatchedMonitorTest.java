@@ -25,6 +25,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyZeroInteractions;
 import static org.mockito.Mockito.when;
 
+import build.buildfarm.backplane.Backplane;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;
@@ -44,7 +45,7 @@ import org.mockito.MockitoAnnotations;
 
 @RunWith(JUnit4.class)
 public class DispatchedMonitorTest {
-  @Mock private ShardBackplane backplane;
+  @Mock private Backplane backplane;
 
   @Mock private Function<QueueEntry, ListenableFuture<Void>> requeuer;
 

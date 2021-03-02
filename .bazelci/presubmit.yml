@@ -1,29 +1,45 @@
 ---
 buildifier: latest
-platforms:
+tasks:
+  format_check:
+    name: "Code Format"
+    platform: ubuntu1804
+    shell_commands:
+    - ./.bazelci/format.sh --check
+  code_coverage:
+    name: "Code Coverage"
+    platform: ubuntu1804
+    shell_commands:
+    - export BUILDFARM_SKIP_COVERAGE_HOST=true
+    - ./generate_coverage.sh
   ubuntu1604:
+    name: "Unit Tests"
     build_targets:
     - "..."
     test_targets:
     - "..."
   ubuntu1804:
-    shell_commands:
-    - ./.bazelci/format.sh --check
-    - export BUILDFARM_SKIP_COVERAGE_HOST=true
-    - ./generate_coverage.sh
+    name: "Unit Tests"
     build_targets:
     - "..."
     test_targets:
     - "..."
   macos:
+    name: "Unit Tests"
     build_targets:
     - "..."
     test_targets:
     - "..."
   windows:
+    name: "Unit Tests"
     build_flags:
     - "--build_tag_filters=-container"
     build_targets:
     - "..."
     test_targets:
     - "..."
+  integration_test:
+    name: "Integration Test"
+    platform: ubuntu1804
+    shell_commands:
+    - ./.bazelci/integration_test.sh

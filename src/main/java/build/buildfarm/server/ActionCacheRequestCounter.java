@@ -22,6 +22,7 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 import com.google.common.util.concurrent.ListenableFuture;
+import io.prometheus.client.Summary;
 import java.time.Duration;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
@@ -29,6 +30,9 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 class ActionCacheRequestCounter {
+  private static final Summary actionResults =
+      Summary.build().name("action_results").help("Action results.").register();
+
   private final Logger logger;
   private final Duration delay;
   private final AtomicLong counter = new AtomicLong(0l);
@@ -54,7 +58,8 @@ class ActionCacheRequestCounter {
   private void logRequests() {
     long requestCount = counter.getAndSet(0l);
     if (requestCount > 0) {
-      logger.log(Level.INFO, String.format("GetActionResult %d Requests", requestCount));
+      actionResults.observe(requestCount);
+      logger.log(Level.FINE, String.format("GetActionResult %d Requests", requestCount));
     }
     schedule();
   }

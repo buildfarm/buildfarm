@@ -33,7 +33,7 @@ import org.redisson.api.RedissonClient;
 /// @details This is used to identify the location of blobs within the shard.
 ///          {blob digest -> set(worker1,worker2)}.
 ///
-public class RedissonCasWorkerMap implements AbstractCasWorkerMap {
+public class RedissonCasWorkerMap implements CasWorkerMap {
 
   ///
   /// @field   name
@@ -88,7 +88,12 @@ public class RedissonCasWorkerMap implements AbstractCasWorkerMap {
   public void adjust(
       RedisClient client, Digest blobDigest, Set<String> addWorkers, Set<String> removeWorkers)
       throws IOException {
-    adjustRedisson(blobDigest, addWorkers, removeWorkers);
+    String key = cacheMapCasKey(blobDigest);
+    cacheMap.putAll(key, addWorkers);
+    for (String workerName : removeWorkers) {
+      cacheMap.remove(key, workerName);
+    }
+    cacheMap.expireKey(key, keyExpiration_s, TimeUnit.SECONDS);
   }
   ///
   /// @brief   Update the blob entry for the worker.
@@ -101,7 +106,9 @@ public class RedissonCasWorkerMap implements AbstractCasWorkerMap {
   ///
   @Override
   public void add(RedisClient client, Digest blobDigest, String workerName) throws IOException {
-    addRedisson(blobDigest, workerName);
+    String key = cacheMapCasKey(blobDigest);
+    cacheMap.put(key, workerName);
+    cacheMap.expireKey(key, keyExpiration_s, TimeUnit.SECONDS);
   }
   ///
   /// @brief   Update multiple blob entries for a worker.
@@ -115,7 +122,11 @@ public class RedissonCasWorkerMap implements AbstractCasWorkerMap {
   @Override
   public void addAll(RedisClient client, Iterable<Digest> blobDigests, String workerName)
       throws IOException {
-    addAllRedisson(blobDigests, workerName);
+    for (Digest blobDigest : blobDigests) {
+      String key = cacheMapCasKey(blobDigest);
+      cacheMap.put(key, workerName);
+      cacheMap.expireKey(key, keyExpiration_s, TimeUnit.SECONDS);
+    }
   }
   ///
   /// @brief   Remove worker value from blob key.
@@ -127,7 +138,8 @@ public class RedissonCasWorkerMap implements AbstractCasWorkerMap {
   ///
   @Override
   public void remove(RedisClient client, Digest blobDigest, String workerName) throws IOException {
-    removeRedisson(blobDigest, workerName);
+    String key = cacheMapCasKey(blobDigest);
+    cacheMap.remove(key, workerName);
   }
   ///
   /// @brief   Remove worker value from all blob keys.
@@ -140,7 +152,10 @@ public class RedissonCasWorkerMap implements AbstractCasWorkerMap {
   @Override
   public void removeAll(RedisClient client, Iterable<Digest> blobDigests, String workerName)
       throws IOException {
-    removeAllRedisson(blobDigests, workerName);
+    for (Digest blobDigest : blobDigests) {
+      String key = cacheMapCasKey(blobDigest);
+      cacheMap.remove(key, workerName);
+    }
   }
   ///
   /// @brief   Get a random worker for where the blob resides.
@@ -152,124 +167,6 @@ public class RedissonCasWorkerMap implements AbstractCasWorkerMap {
   ///
   @Override
   public String getAny(RedisClient client, Digest blobDigest) throws IOException {
-    return getAnyRedisson(blobDigest);
-  }
-  ///
-  /// @brief   Get all of the workers for where a blob resides.
-  /// @details Set is empty if the locaion of the blob is unknown.
-  /// @param   client     Client used for interacting with redis when not using cacheMap.
-  /// @param   blobDigest The blob digest to lookup a worker for.
-  /// @return  All the workers where the blob is expected to be.
-  /// @note    Suggested return identifier: workerNames.
-  ///
-  @Override
-  public Set<String> get(RedisClient client, Digest blobDigest) throws IOException {
-    return getRedisson(blobDigest);
-  }
-  ///
-  /// @brief   Get all of the key values as a map from the digests given.
-  /// @details If there are no workers for the digest, the key is left out of
-  ///          the returned map.
-  /// @param   client      Client used for interacting with redis when not using cacheMap.
-  /// @param   blobDigests The blob digests to get the key/values for.
-  /// @return  The key/value map for digests to workers.
-  /// @note    Suggested return identifier: casWorkerMap.
-  ///
-  @Override
-  public Map<Digest, Set<String>> getMap(RedisClient client, Iterable<Digest> blobDigests)
-      throws IOException {
-    return getMapRedisson(blobDigests);
-  }
-
-  ///
-  /// @brief   Get the size of the map.
-  /// @details Returns the number of key-value pairs in this multimap.
-  /// @param   client      Client used for interacting with redis when not using cacheMap.
-  /// @return  The size of the map.
-  /// @note    Suggested return identifier: mapSize.
-  ///
-  @Override
-  public int size(RedisClient client) throws IOException {
-    return cacheMap.size();
-  }
-  ///
-  /// @brief   Adjust blob mappings based on worker changes.
-  /// @details Adjustments are made based on added and removed workers.
-  ///          Expirations are refreshed.
-  /// @param   blobDigest    The blob digest to adjust worker information from.
-  /// @param   addWorkers    Workers to add.
-  /// @param   removeWorkers Workers to remove.
-  ///
-  private void adjustRedisson(Digest blobDigest, Set<String> addWorkers, Set<String> removeWorkers)
-      throws IOException {
-    String key = cacheMapCasKey(blobDigest);
-    cacheMap.putAll(key, addWorkers);
-    for (String workerName : removeWorkers) {
-      cacheMap.remove(key, workerName);
-    }
-    cacheMap.expireKey(key, keyExpiration_s, TimeUnit.SECONDS);
-  }
-  ///
-  /// @brief   Update the blob entry for the worker.
-  /// @details This may add a new key if the blob did not previously exist, or
-  ///          it will adjust the worker values based on the worker name. The
-  ///          expiration time is always refreshed.
-  /// @param   blobDigest The blob digest to adjust worker information from.
-  /// @param   workerName The worker to add for looking up the blob.
-  ///
-  private void addRedisson(Digest blobDigest, String workerName) throws IOException {
-    String key = cacheMapCasKey(blobDigest);
-    cacheMap.put(key, workerName);
-    cacheMap.expireKey(key, keyExpiration_s, TimeUnit.SECONDS);
-  }
-  ///
-  /// @brief   Update multiple blob entries for a worker.
-  /// @details This may add a new key if the blob did not previously exist, or
-  ///          it will adjust the worker values based on the worker name. The
-  ///          expiration time is always refreshed.
-  /// @param   blobDigests The blob digests to adjust worker information from.
-  /// @param   workerName  The worker to add for looking up the blobs.
-  ///
-  private void addAllRedisson(Iterable<Digest> blobDigests, String workerName) throws IOException {
-    for (Digest blobDigest : blobDigests) {
-      String key = cacheMapCasKey(blobDigest);
-      cacheMap.put(key, workerName);
-      cacheMap.expireKey(key, keyExpiration_s, TimeUnit.SECONDS);
-    }
-  }
-  ///
-  /// @brief   Remove worker value from blob key.
-  /// @details If the blob is already missing, or the worker doesn't exist,
-  ///          this will have no effect.
-  /// @param   blobDigest The blob digest to remove the worker from.
-  /// @param   workerName The worker name to remove.
-  ///
-  private void removeRedisson(Digest blobDigest, String workerName) throws IOException {
-    String key = cacheMapCasKey(blobDigest);
-    cacheMap.remove(key, workerName);
-  }
-  ///
-  /// @brief   Remove worker value from all blob keys.
-  /// @details If the blob is already missing, or the worker doesn't exist,
-  ///          this will be no effect on the key.
-  /// @param   blobDigests The blob digests to remove the worker from.
-  /// @param   workerName  The worker name to remove.
-  ///
-  private void removeAllRedisson(Iterable<Digest> blobDigests, String workerName)
-      throws IOException {
-    for (Digest blobDigest : blobDigests) {
-      String key = cacheMapCasKey(blobDigest);
-      cacheMap.remove(key, workerName);
-    }
-  }
-  ///
-  /// @brief   Get a random worker for where the blob resides.
-  /// @details Picking a worker may done differently in the future.
-  /// @param   blobDigest The blob digest to lookup a worker for.
-  /// @return  A worker for where the blob is.
-  /// @note    Suggested return identifier: workerName.
-  ///
-  private String getAnyRedisson(Digest blobDigest) throws IOException {
     String key = cacheMapCasKey(blobDigest);
     Set<String> all = cacheMap.get(key).readAll();
     return getRandomElement(all);
@@ -287,11 +184,13 @@ public class RedissonCasWorkerMap implements AbstractCasWorkerMap {
   ///
   /// @brief   Get all of the workers for where a blob resides.
   /// @details Set is empty if the locaion of the blob is unknown.
+  /// @param   client     Client used for interacting with redis when not using cacheMap.
   /// @param   blobDigest The blob digest to lookup a worker for.
   /// @return  All the workers where the blob is expected to be.
   /// @note    Suggested return identifier: workerNames.
   ///
-  private Set<String> getRedisson(Digest blobDigest) throws IOException {
+  @Override
+  public Set<String> get(RedisClient client, Digest blobDigest) throws IOException {
     String key = cacheMapCasKey(blobDigest);
     return cacheMap.get(key).readAll();
   }
@@ -299,11 +198,14 @@ public class RedissonCasWorkerMap implements AbstractCasWorkerMap {
   /// @brief   Get all of the key values as a map from the digests given.
   /// @details If there are no workers for the digest, the key is left out of
   ///          the returned map.
+  /// @param   client      Client used for interacting with redis when not using cacheMap.
   /// @param   blobDigests The blob digests to get the key/values for.
   /// @return  The key/value map for digests to workers.
   /// @note    Suggested return identifier: casWorkerMap.
   ///
-  private Map<Digest, Set<String>> getMapRedisson(Iterable<Digest> blobDigests) throws IOException {
+  @Override
+  public Map<Digest, Set<String>> getMap(RedisClient client, Iterable<Digest> blobDigests)
+      throws IOException {
     ImmutableMap.Builder<Digest, Set<String>> blobDigestsWorkers = new ImmutableMap.Builder<>();
     for (Digest blobDigest : blobDigests) {
 
@@ -317,6 +219,7 @@ public class RedissonCasWorkerMap implements AbstractCasWorkerMap {
     }
     return blobDigestsWorkers.build();
   }
+
   ///
   /// @brief   Get the cacheMap key name.
   /// @details This is to be used for the cache map implementation.

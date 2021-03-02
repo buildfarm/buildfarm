@@ -14,9 +14,9 @@
 
 package build.buildfarm.worker.shard;
 
+import build.buildfarm.backplane.Backplane;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.cas.cfc.CASFileCache;
-import build.buildfarm.instance.shard.ShardBackplane;
 import build.buildfarm.v1test.OperationTimesBetweenStages;
 import build.buildfarm.v1test.StageInformation;
 import build.buildfarm.v1test.WorkerListMessage;
@@ -39,7 +39,7 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
   private final ExecuteActionStage executeActionStage;
   private final WorkerContext context;
   private final PutOperationStage completeStage;
-  private final ShardBackplane backplane;
+  private final Backplane backplane;
 
   public WorkerProfileService(
       ContentAddressableStorage storage,
@@ -47,7 +47,7 @@ public class WorkerProfileService extends WorkerProfileGrpc.WorkerProfileImplBas
       PipelineStage executeActionStage,
       WorkerContext context,
       PipelineStage completeStage,
-      ShardBackplane backplane) {
+      Backplane backplane) {
     this.storage = (CASFileCache) storage;
     this.inputFetchStage = (InputFetchStage) inputFetchStage;
     this.executeActionStage = (ExecuteActionStage) executeActionStage;

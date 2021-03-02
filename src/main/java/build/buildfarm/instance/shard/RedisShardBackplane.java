@@ -23,6 +23,7 @@ import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
 import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.CasIndexSettings;
 import build.buildfarm.common.DigestUtil;
@@ -41,7 +42,7 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.RedisShardSubscriber.TimedWatchFuture;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.operations.FindOperationsSettings;
-import build.buildfarm.operations.OperationsFinder;
+import build.buildfarm.operations.finder.OperationsFinder;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
@@ -107,7 +108,7 @@ import redis.clients.jedis.Response;
 import redis.clients.jedis.ScanParams;
 import redis.clients.jedis.ScanResult;
 
-public class RedisShardBackplane implements ShardBackplane {
+public class RedisShardBackplane implements Backplane {
   private static final Logger logger = Logger.getLogger(RedisShardBackplane.class.getName());
 
   private static final JsonFormat.Parser operationParser =
@@ -157,7 +158,7 @@ public class RedisShardBackplane implements ShardBackplane {
   private RedisMap actionCache;
   private BalancedRedisQueue prequeue;
   private OperationQueue operationQueue;
-  private AbstractCasWorkerMap casWorkerMap;
+  private CasWorkerMap casWorkerMap;
 
   public RedisShardBackplane(
       RedisShardBackplaneConfig config,
@@ -331,10 +332,10 @@ public class RedisShardBackplane implements ShardBackplane {
 
     if (!expiringChannels.isEmpty()) {
       logger.log(
-          Level.INFO,
+          Level.FINE,
           format("Scan %d watches, %s, expiresAt: %s", expiringChannels.size(), now, expiresAt));
 
-      logger.log(Level.INFO, "Scan prequeue");
+      logger.log(Level.FINE, "Scan prequeue");
       // scan prequeue, pet watches
       scanPrequeue(jedis, resetChannel);
     }
@@ -343,7 +344,7 @@ public class RedisShardBackplane implements ShardBackplane {
     scanProcessing(jedis, resetChannel, now);
 
     if (!expiringChannels.isEmpty()) {
-      logger.log(Level.INFO, "Scan queue");
+      logger.log(Level.FINE, "Scan queue");
       // scan queue, pet watches
       scanQueue(jedis, resetChannel);
     }
@@ -352,7 +353,7 @@ public class RedisShardBackplane implements ShardBackplane {
     scanDispatching(jedis, resetChannel, now);
 
     if (!expiringChannels.isEmpty()) {
-      logger.log(Level.INFO, "Scan dispatched");
+      logger.log(Level.FINE, "Scan dispatched");
       // scan dispatched pet watches
       scanDispatched(jedis, resetChannel);
     }
@@ -449,7 +450,7 @@ public class RedisShardBackplane implements ShardBackplane {
         }
         subscriber.onOperation(operationChannel(operationName), operation, nextExpiresAt(now));
         logger.log(
-            Level.INFO,
+            Level.FINE,
             format(
                 "operation %s done due to %s",
                 operationName, operation == null ? "null" : "completed"));
@@ -483,7 +484,7 @@ public class RedisShardBackplane implements ShardBackplane {
             client);
 
     // use Executors...
-    subscriptionThread = new Thread(operationSubscription);
+    subscriptionThread = new Thread(operationSubscription, "Operation Subscription");
 
     subscriptionThread.start();
   }
@@ -492,7 +493,7 @@ public class RedisShardBackplane implements ShardBackplane {
     failsafeOperationThread =
         new Thread(
             () -> {
-              while (true) {
+              while (!Thread.currentThread().isInterrupted()) {
                 try {
                   TimeUnit.SECONDS.sleep(10);
                   client.run(this::updateWatchers);
@@ -503,7 +504,8 @@ public class RedisShardBackplane implements ShardBackplane {
                   logger.log(Level.SEVERE, "error while updating watchers in failsafe", e);
                 }
               }
-            });
+            },
+            "Failsafe Operation");
 
     failsafeOperationThread.start();
   }
@@ -523,14 +525,8 @@ public class RedisShardBackplane implements ShardBackplane {
     // multiple clients.
     client = new RedisClient(jedisClusterFactory.get());
 
-    if (config.getCacheCas()) {
-      redissonClient = createRedissonClient(config);
-      casWorkerMap =
-          new RedissonCasWorkerMap(redissonClient, config.getCasPrefix(), config.getCasExpire());
-    } else {
-      casWorkerMap = new JedisCasWorkerMap(config.getCasPrefix(), config.getCasExpire());
-    }
-
+    // Create containers that make up the backplane
+    casWorkerMap = createCasWorkerMap(redissonClient, config);
     actionCache = createActionCache(client, config);
     prequeue = createPrequeue(client, config);
     operationQueue = createOperationQueue(client, config);
@@ -546,6 +542,18 @@ public class RedisShardBackplane implements ShardBackplane {
     client.call(
         jedis -> jedis.set("startTime/" + clientPublicName, Long.toString(new Date().getTime())));
   }
+
+
+  static CasWorkerMap createCasWorkerMap(RedissonClient client, RedisShardBackplaneConfig config)
+      throws IOException {
+    if (config.getCacheCas()) {
+      client = createRedissonClient(config);
+      return new RedissonCasWorkerMap(client, config.getCasPrefix(), config.getCasExpire());
+    } else {
+      return new JedisCasWorkerMap(config.getCasPrefix(), config.getCasExpire());
+    }
+  }
+
 
   static RedissonClient createRedissonClient(RedisShardBackplaneConfig config) throws IOException {
 
@@ -625,7 +633,7 @@ public class RedisShardBackplane implements ShardBackplane {
   @Override
   public synchronized void stop() throws InterruptedException {
     if (failsafeOperationThread != null) {
-      failsafeOperationThread.stop();
+      failsafeOperationThread.interrupt();
       failsafeOperationThread.join();
       logger.log(Level.FINE, "failsafeOperationThread has been stopped");
     }
@@ -1197,7 +1205,8 @@ public class RedisShardBackplane implements ShardBackplane {
       logger.log(Level.SEVERE, "error parsing queue entry", e);
       return null;
     }
-    QueueEntry queueEntry = queueEntryBuilder.build();
+    QueueEntry queueEntry =
+        queueEntryBuilder.setRequeueAttempts(queueEntryBuilder.getRequeueAttempts() + 1).build();
 
     String operationName = queueEntry.getExecuteEntry().getOperationName();
     Operation operation = keepaliveOperation(operationName);

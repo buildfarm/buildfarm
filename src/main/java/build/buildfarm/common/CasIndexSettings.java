@@ -14,34 +14,31 @@
 
 package build.buildfarm.common;
 
-///
-/// @class   CasIndexSettings
-/// @brief   Settings used to determine how to index CAS entries and remove
-///          worker entries.
-/// @details These are used for reindexing when a worker is leaving the
-///          cluster.
-///
+/**
+ * @class CasIndexSettings
+ * @brief Settings used to determine how to index CAS entries and remove worker entries.
+ * @details These are used for reindexing when a worker is leaving the cluster.
+ */
 public class CasIndexSettings {
 
-  ///
-  /// @field   hostName
-  /// @brief   The name of the worker.
-  /// @details This correlates the the worker that needs removed from CAS
-  ///          entries.
-  ///
+  /**
+   * @field hostName
+   * @brief The name of the worker.
+   * @details This correlates the the worker that needs removed from CAS entries.
+   */
   public String hostName;
 
-  ///
-  /// @field   scanAmount
-  /// @brief   The number of redis entries to scan at a time.
-  /// @details Larger amounts will be faster but require more memory.
-  ///
+  /**
+   * @field scanAmount
+   * @brief The number of redis entries to scan at a time.
+   * @details Larger amounts will be faster but require more memory.
+   */
   public int scanAmount;
 
-  ///
-  /// @field   casQuery
-  /// @brief   How to query all of the CAS entries in redis.
-  /// @details The cas key is a global buildfarm config.
-  ///
+  /**
+   * @field casQuery
+   * @brief How to query all of the CAS entries in redis.
+   * @details The cas key is a global buildfarm config.
+   */
   public String casQuery;
 }
