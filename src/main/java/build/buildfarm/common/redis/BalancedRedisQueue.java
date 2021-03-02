@@ -92,7 +92,6 @@ public class BalancedRedisQueue {
    * @details Construct a named redis queue with an established redis cluster.
    * @param name The global name of the queue.
    * @param hashtags Hashtags to distribute queue data.
-   * @param maxQueueSize The maximum amount of elements that should be added to the queue.
    * @note Overloaded.
    */
   public BalancedRedisQueue(String name, List<String> hashtags) {
