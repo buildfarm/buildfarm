@@ -160,6 +160,7 @@ public class ShardInstance extends AbstractServerInstance {
 
   private static final int DEFAULT_MAX_LOCAL_ACTION_CACHE_SIZE = 1000000;
 
+  //Prometheus metrics
   private static final Counter executionSuccess =
       Counter.build().name("execution_success").help("Execution success.").register();
   private static final Gauge preQueueSize =
@@ -173,6 +174,10 @@ public class ShardInstance extends AbstractServerInstance {
       Gauge.build().name("worker_pool_size").help("Active worker pool size.").register();
   private static final Gauge queueSize =
       Gauge.build().name("queue_size").labelNames("queue_name").help("Queue size.").register();
+  private static final Gauge casLookupSize =
+      Gauge.build().name("cas_lookup_size").labelNames("cas_lookup_size").help("CAS lookup size.").register();
+  private static final Gauge actionCacheLookupSize =
+      Gauge.build().name("action_cache_lookup_size").labelNames("action_cache_lookup_size").help("Action Cache lookup size.").register();
 
   private final Runnable onStop;
   private final long maxBlobSize;
@@ -465,6 +470,8 @@ public class ShardInstance extends AbstractServerInstance {
                   dispatchedOperations.set(operationsStatus.getDispatchedSize());
                   preQueueSize.set(operationsStatus.getPrequeue().getSize());
                   updateQueueSizes(operationsStatus.getOperationQueue().getProvisionsList());
+                  casLookupSize.set(operationsStatus.getCasLookupSize());
+                  actionCacheLookupSize.set(operationsStatus.getActionCacheSize());
                 } catch (InterruptedException e) {
                   Thread.currentThread().interrupt();
                   break;
