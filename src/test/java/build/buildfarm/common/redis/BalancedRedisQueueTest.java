@@ -60,7 +60,7 @@ public class BalancedRedisQueueTest {
   public void balancedRedisQueueCreateHashesConstructsWithoutError() throws Exception {
 
     // ACT
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of());
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of(), 0);
   }
 
   // Function under test: push
@@ -71,7 +71,7 @@ public class BalancedRedisQueueTest {
 
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, 0);
 
     // ACT
     queue.push(redis, "foo");
@@ -85,7 +85,7 @@ public class BalancedRedisQueueTest {
 
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, 0);
 
     // ACT
     queue.push(redis, "foo");
@@ -100,7 +100,7 @@ public class BalancedRedisQueueTest {
 
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, 0);
 
     // ACT
     queue.push(redis, "foo");
@@ -115,7 +115,7 @@ public class BalancedRedisQueueTest {
 
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, 0);
 
     // ACT
     for (int i = 0; i < 1000; ++i) {
@@ -131,7 +131,7 @@ public class BalancedRedisQueueTest {
 
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, 0);
 
     // ACT / ASSERT
     assertThat(queue.size(redis)).isEqualTo(0);
@@ -167,7 +167,7 @@ public class BalancedRedisQueueTest {
 
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, 0);
 
     // ACT
     Boolean success = queue.removeFromDequeue(redis, "foo");
@@ -186,7 +186,7 @@ public class BalancedRedisQueueTest {
 
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, 0);
 
     // ACT
     queue.push(redis, "foo");
@@ -208,7 +208,7 @@ public class BalancedRedisQueueTest {
 
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, 0);
 
     // ACT
     queue.push(redis, "foo");
@@ -231,7 +231,7 @@ public class BalancedRedisQueueTest {
 
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("queue_name", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("queue_name", hashtags, 0);
 
     // ACT
     String name = queue.getName();
@@ -248,7 +248,7 @@ public class BalancedRedisQueueTest {
 
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("{hash}queue_name", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("{hash}queue_name", hashtags, 0);
 
     // ACT
     String name = queue.getName();
@@ -266,7 +266,7 @@ public class BalancedRedisQueueTest {
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
     // similar to what has been seen in configuration files
-    BalancedRedisQueue queue = new BalancedRedisQueue("{Execution}:QueuedOperations", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("{Execution}:QueuedOperations", hashtags, 0);
 
     // ACT
     String name = queue.getName();
@@ -283,7 +283,7 @@ public class BalancedRedisQueueTest {
 
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("queue_name{hash}", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("queue_name{hash}", hashtags, 0);
 
     // ACT
     String name = queue.getName();
@@ -300,7 +300,7 @@ public class BalancedRedisQueueTest {
 
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("queue_{hash}name", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("queue_{hash}name", hashtags, 0);
 
     // ACT
     String name = queue.getName();
@@ -317,7 +317,7 @@ public class BalancedRedisQueueTest {
 
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("{hash}queue_name{hash}", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("{hash}queue_name{hash}", hashtags, 0);
 
     // ACT
     String name = queue.getName();
@@ -334,7 +334,7 @@ public class BalancedRedisQueueTest {
 
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, 0);
 
     // ACT / ASSERT
     assertThat(queue.size(redis)).isEqualTo(0);
@@ -372,7 +372,7 @@ public class BalancedRedisQueueTest {
 
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, 0);
     queue.push(redis, "element 1");
     queue.push(redis, "element 2");
     queue.push(redis, "element 3");
@@ -412,7 +412,7 @@ public class BalancedRedisQueueTest {
 
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, 0);
 
     // ACT
     Boolean isEvenlyDistributed = queue.isEvenlyDistributed(redis);
@@ -430,7 +430,7 @@ public class BalancedRedisQueueTest {
 
     // ARRANGE
     List<String> hashtags = Arrays.asList("node1", "node2", "node3", "node4");
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, 0);
 
     // ACT
     for (int i = 0; i < 400; ++i) {
@@ -451,7 +451,7 @@ public class BalancedRedisQueueTest {
 
     // ARRANGE
     List<String> hashtags = Arrays.asList("node1", "node2", "node3", "node4");
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, 0);
 
     // ACT
     for (int i = 0; i < 401; ++i) {
@@ -472,7 +472,7 @@ public class BalancedRedisQueueTest {
 
     // ARRANGE
     List<String> hashtags = Arrays.asList("single_node");
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, 0);
 
     // ACT / ASSERT
     queue.push(redis, "foo");
@@ -501,7 +501,7 @@ public class BalancedRedisQueueTest {
 
     // ARRANGE
     List<String> hashtags = Arrays.asList("node_1", "node_2");
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags, 0);
 
     // ACT / ASSERT
     assertThat(queue.isEvenlyDistributed(redis)).isTrue();
