@@ -33,6 +33,14 @@ import redis.clients.jedis.JedisCluster;
  *     information.
  */
 public class OperationQueue {
+  
+  /**
+   * @field maxQueueSize
+   * @brief The maximum amount of elements that should be added to the queue.
+   * @details This is used to avoid placing too many elements onto the queue at any given time. For
+   *     infinitely sized queues, use -1.
+   */
+  private final int maxQueueSize;
 
   /**
    * @field queues
@@ -45,6 +53,16 @@ public class OperationQueue {
    * @brief Constructor.
    * @details Construct the operation queue with various provisioned redis queues.
    * @param queues Provisioned queues.
+   */
+  public OperationQueue(List<ProvisionedRedisQueue> queues) {
+    this.queues = queues;
+  }
+  
+  /**
+   * @brief Constructor.
+   * @details Construct the operation queue with various provisioned redis queues.
+   * @param queues Provisioned queues.
+   * @param maxQueueSize The maximum amount of elements that should be added to the queue.
    */
   public OperationQueue(List<ProvisionedRedisQueue> queues) {
     this.queues = queues;
