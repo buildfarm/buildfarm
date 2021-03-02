@@ -16,6 +16,7 @@ package build.buildfarm.worker;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.protobuf.ByteString;
 import com.google.rpc.Code;
 
@@ -78,11 +79,20 @@ public class ExecutionDebugger {
   ///
   private static String getBeforeExecutionDebugInfo(
       ProcessBuilder processBuilder, ResourceLimits limits, ActionResult.Builder resultBuilder) {
-    String message = "Buildfarm debug information before execution:\n";
-    Gson gson = new Gson();
-    message += String.join(" ", processBuilder.command()) + "\n";
-    message += gson.toJson(limits);
-    return message;
+    
+    // construct debug object
+    ExecutionDebugInfo info = new ExecutionDebugInfo();
+    info.description = "Buildfarm debug information before execution";
+    info.command = String.join(" ", processBuilder.command());
+    info.workingDirectory = processBuilder.directory().getAbsolutePath();
+    info.limits = limits;
+    
+    
+    // convert to json
+    Gson gson = new GsonBuilder()
+            .setPrettyPrinting()
+            .create(); 
+    return gson.toJson(info);
   }
   ///
   /// @brief   Build the debug log message that we want users to see.
@@ -95,10 +105,18 @@ public class ExecutionDebugger {
   ///
   private static String getAfterExecutionDebugInfo(
       ProcessBuilder processBuilder, ResourceLimits limits, ActionResult.Builder resultBuilder) {
-    String message = "Buildfarm debug information after execution:\n";
-    Gson gson = new Gson();
-    message += String.join(" ", processBuilder.command()) + "\n";
-    message += gson.toJson(limits);
-    return message;
+    
+    //construct debug object
+    ExecutionDebugInfo info = new ExecutionDebugInfo();
+    info.description = "Buildfarm debug information after execution";
+    info.command = String.join(" ", processBuilder.command());
+    info.workingDirectory = processBuilder.directory().getAbsolutePath();
+    info.limits = limits;
+    
+    // convert to json
+    Gson gson = new GsonBuilder()
+            .setPrettyPrinting()
+            .create(); 
+    return gson.toJson(info);
   }
 }
