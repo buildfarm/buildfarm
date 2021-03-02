@@ -91,7 +91,7 @@ public class ProvisionedRedisQueue {
    */
   public ProvisionedRedisQueue(
       String name, List<String> hashtags, SetMultimap<String, String> filterProvisions) {
-    this.queue = new BalancedRedisQueue(name, hashtags, 0);
+    this.queue = new BalancedRedisQueue(name, hashtags);
     isFullyWildcard = filterProvisions.containsKey(WILDCARD_VALUE);
     provisions = filterProvisionsByWildcard(filterProvisions, isFullyWildcard, WILDCARD_VALUE);
     allowUserUnmatched = false;
@@ -112,7 +112,7 @@ public class ProvisionedRedisQueue {
       List<String> hashtags,
       SetMultimap<String, String> filterProvisions,
       boolean allowUserUnmatched) {
-    this.queue = new BalancedRedisQueue(name, hashtags, 0);
+    this.queue = new BalancedRedisQueue(name, hashtags);
     isFullyWildcard = filterProvisions.containsKey(WILDCARD_VALUE);
     provisions = filterProvisionsByWildcard(filterProvisions, isFullyWildcard, WILDCARD_VALUE);
     this.allowUserUnmatched = allowUserUnmatched;

@@ -60,7 +60,7 @@ public class BalancedRedisQueueMockTest {
 
     // ARRANGE
     when(redis.lrem(any(String.class), any(Long.class), any(String.class))).thenReturn(0L);
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of(), 0);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of());
 
     // ACT
     Boolean success = queue.removeFromDequeue(redis, "foo");
@@ -79,7 +79,7 @@ public class BalancedRedisQueueMockTest {
 
     // ARRANGE
     when(redis.lrem(any(String.class), any(Long.class), any(String.class))).thenReturn(0L);
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of(), 0);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of());
 
     // ACT
     Boolean success = queue.removeFromDequeue(redis, "baz");
@@ -97,7 +97,7 @@ public class BalancedRedisQueueMockTest {
 
     // ARRANGE
     when(redis.lrem(any(String.class), any(Long.class), any(String.class))).thenReturn(1L);
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of(), 0);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of());
 
     // ACT
     Boolean success = queue.removeFromDequeue(redis, "bar");
@@ -116,7 +116,7 @@ public class BalancedRedisQueueMockTest {
     when(redis.rpoplpush(any(String.class), any(String.class))).thenReturn("foo");
 
     // ARRANGE
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of(), 0);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of());
 
     // ACT
     String val = queue.dequeue(redis);
@@ -136,7 +136,7 @@ public class BalancedRedisQueueMockTest {
     when(redis.brpoplpush(any(String.class), any(String.class), any(int.class))).thenReturn("foo");
 
     // ARRANGE
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of(), 0);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of());
 
     // ACT
     String val = queue.dequeue(redis);
@@ -152,7 +152,7 @@ public class BalancedRedisQueueMockTest {
   public void getCurrentPopQueueCanGet() throws Exception {
 
     // ARRANGE
-    BalancedRedisQueue queue = new BalancedRedisQueue("queue_name", ImmutableList.of(), 0);
+    BalancedRedisQueue queue = new BalancedRedisQueue("queue_name", ImmutableList.of());
 
     // ACT
     RedisQueue internalQueue = queue.getCurrentPopQueue();
@@ -165,7 +165,7 @@ public class BalancedRedisQueueMockTest {
   public void getCurrentPopQueueIndexCanGet() throws Exception {
 
     // ARRANGE
-    BalancedRedisQueue queue = new BalancedRedisQueue("queue_name", ImmutableList.of(), 0);
+    BalancedRedisQueue queue = new BalancedRedisQueue("queue_name", ImmutableList.of());
 
     // ACT
     int index = queue.getCurrentPopQueueIndex();
@@ -178,7 +178,7 @@ public class BalancedRedisQueueMockTest {
   public void getInternalQueueCanGet() throws Exception {
 
     // ARRANGE
-    BalancedRedisQueue queue = new BalancedRedisQueue("queue_name", ImmutableList.of(), 0);
+    BalancedRedisQueue queue = new BalancedRedisQueue("queue_name", ImmutableList.of());
 
     // ACT
     RedisQueue internalQueue = queue.getInternalQueue(0);
@@ -191,7 +191,7 @@ public class BalancedRedisQueueMockTest {
   public void getDequeueNameCanGet() throws Exception {
 
     // ARRANGE
-    BalancedRedisQueue queue = new BalancedRedisQueue("queue_name", ImmutableList.of(), 0);
+    BalancedRedisQueue queue = new BalancedRedisQueue("queue_name", ImmutableList.of());
 
     // ACT
     String name = queue.getDequeueName();
@@ -207,7 +207,7 @@ public class BalancedRedisQueueMockTest {
   public void getNameNameIsStored() throws Exception {
 
     // ARRANGE
-    BalancedRedisQueue queue = new BalancedRedisQueue("queue_name", ImmutableList.of(), 0);
+    BalancedRedisQueue queue = new BalancedRedisQueue("queue_name", ImmutableList.of());
 
     // ACT
     String name = queue.getName();
@@ -226,7 +226,7 @@ public class BalancedRedisQueueMockTest {
     when(redis.llen(any(String.class))).thenReturn(0L);
 
     // ARRANGE
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of(), 0);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of());
 
     // ACT
     long size = queue.size(redis);
@@ -255,7 +255,7 @@ public class BalancedRedisQueueMockTest {
                 "element 8"));
 
     // ARRANGE
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of(), 0);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of());
     queue.push(redis, "element 1");
     queue.push(redis, "element 2");
     queue.push(redis, "element 3");
@@ -307,7 +307,7 @@ public class BalancedRedisQueueMockTest {
                 "element 8"));
 
     // ARRANGE
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of(), 0);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of());
 
     // ACT
     List<String> visited = new ArrayList<String>();
@@ -341,7 +341,7 @@ public class BalancedRedisQueueMockTest {
     when(redis.llen(any(String.class))).thenReturn(0L);
 
     // ARRANGE
-    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of(), 0);
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of());
 
     // ACT
     Boolean isEvenlyDistributed = queue.isEvenlyDistributed(redis);

@@ -93,6 +93,22 @@ public class BalancedRedisQueue {
    * @param name The global name of the queue.
    * @param hashtags Hashtags to distribute queue data.
    * @param maxQueueSize The maximum amount of elements that should be added to the queue.
+   * @note Overloaded.
+   */
+  public BalancedRedisQueue(String name, List<String> hashtags) {
+    this.originalHashtag = RedisHashtags.existingHash(name);
+    this.name = RedisHashtags.unhashedName(name);
+    this.maxQueueSize = -1; // infinite size
+    createHashedQueues(this.name, hashtags);
+  }
+
+  /**
+   * @brief Constructor.
+   * @details Construct a named redis queue with an established redis cluster.
+   * @param name The global name of the queue.
+   * @param hashtags Hashtags to distribute queue data.
+   * @param maxQueueSize The maximum amount of elements that should be added to the queue.
+   * @note Overloaded.
    */
   public BalancedRedisQueue(String name, List<String> hashtags, int maxQueueSize) {
     this.originalHashtag = RedisHashtags.existingHash(name);
