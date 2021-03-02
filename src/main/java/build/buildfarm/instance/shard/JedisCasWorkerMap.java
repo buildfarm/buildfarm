@@ -16,6 +16,7 @@ package build.buildfarm.instance.shard;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
+import build.buildfarm.common.ScanCount;
 import build.buildfarm.common.redis.RedisClient;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -229,6 +230,18 @@ public class JedisCasWorkerMap implements CasWorkerMap {
           }
         });
     return blobDigestsWorkers.build();
+  }
+
+  ///
+  /// @brief   Get the size of the map.
+  /// @details May be inefficient to due scanning into memory and
+  ///          deduplicating.
+  /// @param   client      Client used for interacting with redis when not using cacheMap.
+  /// @return  The size of the map.
+  /// @note    Suggested return identifier: size.
+  ///
+  public int size(RedisClient client) throws IOException {
+    return client.call(jedis -> ScanCount.get(jedis, name + ":*", 1000));
   }
 
   ///

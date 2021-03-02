@@ -221,6 +221,16 @@ public class RedissonCasWorkerMap implements CasWorkerMap {
   }
 
   ///
+  /// @brief   Get the size of the map.
+  /// @param   client      Client used for interacting with redis when not using cacheMap.
+  /// @return  The size of the map.
+  /// @note    Suggested return identifier: size.
+  ///
+  public int size(RedisClient client) throws IOException {
+    return cacheMap.size();
+  }
+
+  ///
   /// @brief   Get the cacheMap key name.
   /// @details This is to be used for the cache map implementation.
   /// @param   blobDigest The blob digest to be made part of the key.
