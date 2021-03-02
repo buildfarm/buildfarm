@@ -92,7 +92,7 @@ public class ExecutionDebugger {
     Gson gson = new GsonBuilder()
             .setPrettyPrinting()
             .create(); 
-    return gson.toJson(info);
+    return gson.toJson(info) + "\n";
   }
   ///
   /// @brief   Build the debug log message that we want users to see.
@@ -117,6 +117,6 @@ public class ExecutionDebugger {
     Gson gson = new GsonBuilder()
             .setPrettyPrinting()
             .create(); 
-    return gson.toJson(info);
+    return gson.toJson(info) + "\n";
   }
 }
