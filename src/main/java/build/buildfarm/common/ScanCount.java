@@ -21,26 +21,25 @@ import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.ScanParams;
 import redis.clients.jedis.ScanResult;
 
-///
-/// @class   ScanCount
-/// @brief   Count element of a scan query.
-/// @details Some things are laid out in redis where in order to get their
-///          conceptual size we need to query for wildcard keys and count
-///          non-duplicates. This may not scale because we need to filter non
-///          duplicates.
-///
+/**
+ * @class ScanCount
+ * @brief Count element of a scan query.
+ * @details Some things are laid out in redis where in order to get their conceptual size we need to
+ *     query for wildcard keys and count non-duplicates. This may not scale because we need to
+ *     filter non duplicates.
+ */
 public class ScanCount {
 
-  ///
-  /// @brief   Run a scan and count the results.
-  /// @details This is intended to get the size of certain conceptual
-  ///          containers made of many different keys.
-  /// @param   cluster   An established redis cluster.
-  /// @param   query     The query to perform.
-  /// @param   scanCount The count per scan.
-  /// @return  Total number of query results.
-  /// @note    Suggested return identifier: count.
-  ///
+  /**
+   * @brief Run a scan and count the results.
+   * @details This is intended to get the size of certain conceptual containers made of many
+   *     different keys.
+   * @param cluster An established redis cluster.
+   * @param query The query to perform.
+   * @param scanCount The count per scan.
+   * @return Total number of query results.
+   * @note Suggested return identifier: count.
+   */
   public static int get(JedisCluster cluster, String query, int scanCount) {
     Set<String> keys = Sets.newHashSet();
 
@@ -57,15 +56,16 @@ public class ScanCount {
 
     return keys.size();
   }
-  ///
-  /// @brief   Scan all entires on node to get key count.
-  /// @details Keys are accumulated onto.
-  /// @param   cluster   An established redis cluster.
-  /// @param   node      A node of the cluster.
-  /// @param   keys      Keys to accumulate.
-  /// @param   query     The query to perform.
-  /// @param   scanCount The count per scan.
-  ///
+
+  /**
+   * @brief Scan all entires on node to get key count.
+   * @details Keys are accumulated onto.
+   * @param cluster An established redis cluster.
+   * @param node A node of the cluster.
+   * @param keys Keys to accumulate.
+   * @param query The query to perform.
+   * @param scanCount The count per scan.
+   */
   private static void addKeys(
       JedisCluster cluster, Jedis node, Set<String> keys, String query, int scanCount) {
 
