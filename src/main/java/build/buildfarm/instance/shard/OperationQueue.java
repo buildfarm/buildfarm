@@ -56,6 +56,7 @@ public class OperationQueue {
    */
   public OperationQueue(List<ProvisionedRedisQueue> queues) {
     this.queues = queues;
+    this.maxQueueSize = -1; //infinite size
   }
   
   /**
@@ -64,8 +65,9 @@ public class OperationQueue {
    * @param queues Provisioned queues.
    * @param maxQueueSize The maximum amount of elements that should be added to the queue.
    */
-  public OperationQueue(List<ProvisionedRedisQueue> queues) {
+  public OperationQueue(List<ProvisionedRedisQueue> queues, int maxQueueSize) {
     this.queues = queues;
+    this.maxQueueSize = maxQueueSize;
   }
 
   /**
@@ -225,6 +227,18 @@ public class OperationQueue {
       }
     }
     return false;
+  }
+  
+  /**
+   * @brief Whether or not more elements can be added to the queue based on the queue's configured
+   *     max size.
+   * @details Compares the size of the queue to configured max size. Queues may be configured to be
+   *     infinite in size.
+   * @param jedis Jedis cluster client.
+   * @return Whether are not a new element can be added to the queue based on its current size.
+   */
+  public boolean canQueue(JedisCluster jedis) {
+    return maxQueueSize < 0 || size(jedis) < maxQueueSize;
   }
 
   /**
