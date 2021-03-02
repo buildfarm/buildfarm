@@ -616,7 +616,7 @@ public class RedisShardBackplane implements Backplane {
       provisionedQueues.add(defaultQueue);
     }
 
-    return new OperationQueue(provisionedQueues.build(),config.getMaxQueueDepth());
+    return new OperationQueue(provisionedQueues.build(), config.getMaxQueueDepth());
   }
 
   static List<String> getQueueHashes(RedisClient client, String queueName) throws IOException {
