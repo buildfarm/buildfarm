@@ -14,7 +14,6 @@
 
 package build.buildfarm.worker;
 
-
 /**
  * @class ExecutionDebugInfo
  * @brief All debug information provided by buildfarm when debugging the execution of an action.
