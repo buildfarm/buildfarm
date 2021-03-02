@@ -16,10 +16,6 @@ package build.buildfarm.instance.shard;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.buildfarm.common.DigestUtil;
-<<<<<<< HEAD
-import build.buildfarm.common.ScanCount;
-=======
->>>>>>> master
 import build.buildfarm.common.redis.RedisClient;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -235,6 +231,7 @@ public class JedisCasWorkerMap implements CasWorkerMap {
     return blobDigestsWorkers.build();
   }
 
+  ///
   /// @brief   Get the redis key name.
   /// @details This is to be used for the direct redis implementation.
   /// @param   blobDigest The blob digest to be made part of the key.

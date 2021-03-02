@@ -95,12 +95,11 @@ public class RedisMap {
     return jedis.get(createKeyName(key));
   }
   /**
-   * @brief   Get the size of the map.
-   * @details May be inefficient to due scanning into memory and
-   *          deduplicating.
-   * @param   jedis Jedis cluster client.
-   * @return  The size of the map.
-   * @note    Suggested return identifier: size.
+   * @brief Get the size of the map.
+   * @details May be inefficient to due scanning into memory and deduplicating.
+   * @param jedis Jedis cluster client.
+   * @return The size of the map.
+   * @note Suggested return identifier: size.
    */
   public int size(JedisCluster jedis) {
     return ScanCount.get(jedis, name + ":*", 1000);
