@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <ruleset name="static analysis checks">
   <description>
-  This rule set gates on static analysis checks for buildfarm source code.
-  Some rules may be disabled. As code is adjusted, rules can be enabled to start gating.  
-  If rules are purposefully not checked for, we will provide a comment for why its disabled.
+  This rule set performs static analysis on buildfarm source code.
+  Some checks may be disabled. As code is adjusted, these rules can be enabled to start gating on them.
+  If rules are purposefully excluded, we will provide a comment for why its disabled.
   These rules can be found here:
   https://pmd.github.io/pmd-6.32.0/pmd_userdocs_making_rulesets.html#referencing-a-single-rule
   https://github.com/pmd/pmd/tree/master/pmd-java/src/main/resources
