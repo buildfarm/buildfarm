@@ -299,7 +299,7 @@
     <exclude name="UnsynchronizedStaticDateFormatter"/>
     <exclude name="UnsynchronizedStaticFormatter"/>
     <exclude name="UseConcurrentHashMap"/>
-<!--     <exclude name="UseNotifyAllInsteadOfNotify"/> -->
+    <exclude name="UseNotifyAllInsteadOfNotify"/>
 </rule>
 
 <rule ref="category/java/performance.xml">
