@@ -1,0 +1,78 @@
+<?xml version="1.0"?>
+<ruleset name="static analysis checks">
+  <description>
+  This rule set gates on static analysis checks for buildfarm source code.
+  Some rules may be disabled. As code is adjusted, rules can be enabled to start gating.  
+  If rules are purposefully not checked for, we will provide a comment for why its disabled.
+  These rules can be found here:
+  https://pmd.github.io/pmd-6.32.0/pmd_userdocs_making_rulesets.html#referencing-a-single-rule
+  https://github.com/pmd/pmd/tree/master/pmd-java/src/main/resources
+  </description>
+
+
+<rule ref="category/java/codestyle.xml">
+    <exclude name="AbstractNaming"/>
+    <exclude name="AtLeastOneConstructor"/>
+    <exclude name="AvoidDollarSigns"/>
+    <exclude name="AvoidFinalLocalVariable"/>
+    <exclude name="AvoidPrefixingMethodParameters"/>
+    <exclude name="AvoidProtectedFieldInFinalClass"/>
+    <exclude name="AvoidProtectedMethodInFinalClassNotExtending"/>
+    <exclude name="AvoidUsingNativeCode"/>
+    <exclude name="BooleanGetMethodName"/>
+    <exclude name="CallSuperInConstructor"/>
+    <exclude name="ClassNamingConventions"/>
+    <exclude name="CommentDefaultAccessModifier"/>
+    <exclude name="ConfusingTernary"/>
+    <exclude name="ControlStatementBraces"/>
+    <exclude name="DefaultPackage"/>
+    <exclude name="DontImportJavaLang"/>
+    <exclude name="DuplicateImports"/>
+    <exclude name="EmptyMethodInAbstractClassShouldBeAbstract"/>
+    <exclude name="ExtendsObject"/>
+    <exclude name="FieldDeclarationsShouldBeAtStartOfClass"/>
+    <exclude name="FieldNamingConventions"/>
+    <exclude name="ForLoopShouldBeWhileLoop"/>
+    <exclude name="ForLoopsMustUseBraces"/>
+    <exclude name="FormalParameterNamingConventions"/>
+    <exclude name="GenericsNaming"/>
+    <exclude name="IdenticalCatchBranches"/>
+    <exclude name="IfElseStmtsMustUseBraces"/>
+    <exclude name="IfStmtsMustUseBraces"/>
+    <exclude name="LinguisticNaming"/>
+    <exclude name="LocalHomeNamingConvention"/>
+    <exclude name="LocalInterfaceSessionNamingConvention"/>
+    <exclude name="LocalVariableCouldBeFinal"/>
+    <exclude name="LocalVariableNamingConventions"/>
+    <exclude name="LongVariable"/>
+    <exclude name="MDBAndSessionBeanNamingConvention"/>
+    <exclude name="MethodArgumentCouldBeFinal"/>
+    <exclude name="MethodNamingConventions"/>
+    <exclude name="MIsLeadingVariableName"/>
+<!--     <exclude name="NoPackage"/> -->
+    <exclude name="OnlyOneReturn"/>
+    <exclude name="PackageCase"/>
+    <exclude name="PrematureDeclaration"/>
+    <exclude name="RemoteInterfaceNamingConvention"/>
+    <exclude name="RemoteSessionInterfaceNamingConvention"/>
+    <exclude name="ShortClassName"/>
+    <exclude name="ShortMethodName"/>
+    <exclude name="ShortVariable"/>
+    <exclude name="SuspiciousConstantFieldName"/>
+    <exclude name="TooManyStaticImports"/>
+    <exclude name="UnnecessaryAnnotationValueElement"/>
+    <exclude name="UnnecessaryCast"/>
+    <exclude name="UnnecessaryConstructor"/>
+    <exclude name="UnnecessaryFullyQualifiedName"/>
+    <exclude name="UnnecessaryLocalBeforeReturn"/>
+    <exclude name="UnnecessaryModifier"/>
+    <exclude name="UnnecessaryReturn"/>
+    <exclude name="UseDiamondOperator"/>
+    <exclude name="UselessParentheses"/>
+    <exclude name="UselessQualifiedThis"/>
+    <exclude name="UseShortArrayInitializer"/>
+    <exclude name="UseUnderscoresInNumericLiterals"/>
+    <exclude name="VariableNamingConventions"/>
+    <exclude name="WhileLoopsMustUseBraces"/>
+</rule>
+</ruleset>
