@@ -94,6 +94,19 @@ public class RedisMap {
   public String get(JedisCluster jedis, String key) {
     return jedis.get(createKeyName(key));
   }
+
+  /**
+   * @brief whether the key exists
+   * @details True if key exists. False if key does not exist.
+   * @param jedis Jedis cluster client.
+   * @param key The name of the key.
+   * @return Whether the key exists or not.
+   * @note Suggested return identifier: exists.
+   */
+  public boolean exists(JedisCluster jedis, String key) {
+    return jedis.exists(createKeyName(key));
+  }
+
   /**
    * @brief Get the size of the map.
    * @details May be inefficient to due scanning into memory and deduplicating.
