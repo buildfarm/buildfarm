@@ -7,7 +7,7 @@ tasks:
     shell_commands:
     - ./.bazelci/format.sh --check
   static_analysis_check:
-    name: "Static Analyze"
+    name: "Static Analysis"
     platform: ubuntu1804
     shell_commands:
     - ./.bazelci/static_analyze.sh
