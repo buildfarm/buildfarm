@@ -9,10 +9,10 @@ RULESET=".bazelci/static_analysis_checks.xml"
 REPORT_FILE="/tmp/static_analysis.txt"
 
 # Print an error such that it will surface in the context of buildkite
-print_buildkite_error () {
+print_error () {
     >&2 echo "$1"
     if [ -v BUILDKITE ] ; then
-        buildkite-agent annotate "$1" --style 'error' --context 'ctx-error'
+        buildkite-agent annotate "$1" --append --style 'error' --context 'ctx-error'
     fi
 }
 
@@ -42,10 +42,10 @@ analyze_results () {
        exit 0
     else
         # Show the errors both in a buildkite message and the terminal.
-        print_buildkite_error 'Code has not passed static analysis'
-        BUILDKITE_RESULTS=$(<$REPORT_FILE)
-        print_buildkite_error $BUILDKITE_RESULTS
-        cat $REPORT_FILE
+        print_error 'Code has not passed static analysis'
+        while read line; do
+            print_error "$line"
+        done <$REPORT_FILE
         exit 1
     fi
 }
