@@ -43,8 +43,8 @@ analyze_results () {
     else
         # Show the errors both in a buildkite message and the terminal.
         print_buildkite_error 'Code has not passed static analysis'
-        print_buildkite_error `cat $REPORT_FILE`
-        cat $REPORT_FILE
+        print_buildkite_error `cat $REPORT_FILE | tr -d "\\\\n"`
+        cat $REPORT_FILE | tr -d "\\\\n"
         exit 1
     fi
 }
