@@ -49,7 +49,7 @@ import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationChange;
-import build.buildfarm.v1test.OperationsStatus;
+import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.ProvisionedQueue;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperationMetadata;
@@ -1442,11 +1442,11 @@ public class RedisShardBackplane implements Backplane {
   }
 
   @Override
-  public OperationsStatus operationsStatus() throws IOException {
+  public BackplaneStatus backplaneStatus() throws IOException {
     int casLookupSize = casWorkerMap.size(client);
     return client.call(
         jedis ->
-            OperationsStatus.newBuilder()
+            BackplaneStatus.newBuilder()
                 .setPrequeue(prequeue.status(jedis))
                 .setOperationQueue(operationQueue.status(jedis))
                 .setCasLookupSize(casLookupSize)

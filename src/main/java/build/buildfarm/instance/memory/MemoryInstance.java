@@ -69,7 +69,7 @@ import build.buildfarm.v1test.GrpcACConfig;
 import build.buildfarm.v1test.MemoryInstanceConfig;
 import build.buildfarm.v1test.OperationIteratorToken;
 import build.buildfarm.v1test.OperationQueueStatus;
-import build.buildfarm.v1test.OperationsStatus;
+import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.Tree;
@@ -885,8 +885,8 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  public OperationsStatus operationsStatus() {
-    OperationsStatus.Builder status = OperationsStatus.newBuilder();
+  public BackplaneStatus backplaneStatus() {
+    BackplaneStatus.Builder status = BackplaneStatus.newBuilder();
     OperationQueueStatus.Builder queueStatus = status.getOperationQueueBuilder();
     long totalSize = 0;
     for (WorkerQueue queue : queuedOperations) {
