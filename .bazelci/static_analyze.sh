@@ -38,14 +38,13 @@ run_tool () {
 analyze_results () {
     if [ $? -eq 0 ]
     then
-       echo "Code has passed static analysis"
+       echo "Code has passed static analysis.  "
        exit 0
     else
         # Show the errors both in a buildkite message and the terminal.
-        print_error "* Code has not passed static analysis"
+        print_error "Code has not passed static analysis.  "
         while read line; do
-            print_error "* "
-            print_error "$line"
+            print_error "$line  "
         done <$REPORT_FILE
         exit 1
     fi
