@@ -1,4 +1,4 @@
-// Copyright 2020 The Bazel Authors. All rights reserved.
+// Copyright 2021 The Bazel Authors. All rights reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,6 +14,7 @@
 
 package build.buildfarm.common.redis;
 
+import build.buildfarm.common.ScanCount;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisClusterPipeline;
 
@@ -92,6 +93,16 @@ public class RedisMap {
    */
   public String get(JedisCluster jedis, String key) {
     return jedis.get(createKeyName(key));
+  }
+  /**
+   * @brief Get the size of the map.
+   * @details May be inefficient to due scanning into memory and deduplicating.
+   * @param jedis Jedis cluster client.
+   * @return The size of the map.
+   * @note Suggested return identifier: size.
+   */
+  public int size(JedisCluster jedis) {
+    return ScanCount.get(jedis, name + ":*", 1000);
   }
 
   /**
