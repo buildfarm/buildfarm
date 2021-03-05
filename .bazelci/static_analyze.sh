@@ -42,9 +42,9 @@ analyze_results () {
        exit 0
     else
         # Show the errors both in a buildkite message and the terminal.
-        print_error "Code has not passed static analysis"
-        print_error ""
+        print_error "* Code has not passed static analysis"
         while read line; do
+            print_error "* "
             print_error "$line"
         done <$REPORT_FILE
         exit 1
