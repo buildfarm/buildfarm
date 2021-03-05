@@ -26,7 +26,8 @@ if [ ! -d "$TOOL_FOLDER" ] ; then
     mv pmd-* $TOOL_FOLDER;
 fi
 
-pmd/bin/run.sh pmd -R .bazelci/static_analysis_checks.xml -format text -shortnames -benchmark -dir src/main
+echo $PWD
+pmd/bin/run.sh pmd -R .bazelci/static_analysis_checks.xml -format text -shortnames -dir src
 
 if [ $? -eq 0 ]
 then

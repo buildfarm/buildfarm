@@ -9,7 +9,6 @@
   https://github.com/pmd/pmd/tree/master/pmd-java/src/main/resources
   </description>
 
-
 <rule ref="category/java/codestyle.xml">
     <exclude name="AbstractNaming"/>
     <exclude name="AtLeastOneConstructor"/>
