@@ -56,7 +56,6 @@ import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.RedisShardBackplaneConfig;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.WorkerChange;
-import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -138,8 +137,6 @@ public class RedisShardBackplane implements Backplane {
   private final String source; // used in operation change publication
   private final Function<Operation, Operation> onPublish;
   private final Function<Operation, Operation> onComplete;
-  private final Predicate<Operation> isPrequeued;
-  private final Predicate<Operation> isDispatched;
   private final Supplier<JedisCluster> jedisClusterFactory;
 
   private @Nullable InterruptingRunnable onUnsubscribe = null;
@@ -166,18 +163,9 @@ public class RedisShardBackplane implements Backplane {
       RedisShardBackplaneConfig config,
       String source,
       Function<Operation, Operation> onPublish,
-      Function<Operation, Operation> onComplete,
-      Predicate<Operation> isPrequeued,
-      Predicate<Operation> isDispatched)
+      Function<Operation, Operation> onComplete)
       throws ConfigurationException {
-    this(
-        config,
-        source,
-        onPublish,
-        onComplete,
-        isPrequeued,
-        isDispatched,
-        JedisClusterFactory.create(config));
+    this(config, source, onPublish, onComplete, JedisClusterFactory.create(config));
   }
 
   public RedisShardBackplane(
@@ -185,15 +173,11 @@ public class RedisShardBackplane implements Backplane {
       String source,
       Function<Operation, Operation> onPublish,
       Function<Operation, Operation> onComplete,
-      Predicate<Operation> isPrequeued,
-      Predicate<Operation> isDispatched,
       Supplier<JedisCluster> jedisClusterFactory) {
     this.config = config;
     this.source = source;
     this.onPublish = onPublish;
     this.onComplete = onComplete;
-    this.isPrequeued = isPrequeued;
-    this.isDispatched = isDispatched;
     this.jedisClusterFactory = jedisClusterFactory;
   }
 

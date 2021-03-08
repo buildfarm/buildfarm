@@ -22,7 +22,6 @@ import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static build.buildfarm.instance.shard.Util.SHARD_IS_RETRIABLE;
 import static build.buildfarm.instance.shard.Util.correctMissingBlob;
 import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.base.Predicates.or;
 import static com.google.common.util.concurrent.Futures.addCallback;
 import static com.google.common.util.concurrent.Futures.allAsList;
 import static com.google.common.util.concurrent.Futures.catching;
@@ -252,9 +251,7 @@ public class ShardInstance extends AbstractServerInstance {
             config.getRedisShardBackplaneConfig(),
             identifier,
             ShardInstance::stripOperation,
-            ShardInstance::stripQueuedOperation,
-            /* isPrequeued=*/ ShardInstance::isUnknown,
-            /* isExecuting=*/ or(ShardInstance::isExecuting, ShardInstance::isQueued));
+            ShardInstance::stripQueuedOperation);
     }
   }
 
