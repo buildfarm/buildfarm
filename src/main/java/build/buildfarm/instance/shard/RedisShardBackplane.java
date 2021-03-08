@@ -43,20 +43,19 @@ import build.buildfarm.instance.shard.RedisShardSubscriber.TimedWatchFuture;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.operations.FindOperationsSettings;
 import build.buildfarm.operations.finder.OperationsFinder;
+import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationChange;
-import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.ProvisionedQueue;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.RedisShardBackplaneConfig;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.WorkerChange;
-import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -98,6 +97,10 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
+import org.redisson.Redisson;
+import org.redisson.api.RedissonClient;
+import org.redisson.config.ClusterServersConfig;
+import org.redisson.config.Config;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisClusterPipeline;
 import redis.clients.jedis.Response;
@@ -134,8 +137,6 @@ public class RedisShardBackplane implements Backplane {
   private final String source; // used in operation change publication
   private final Function<Operation, Operation> onPublish;
   private final Function<Operation, Operation> onComplete;
-  private final Predicate<Operation> isPrequeued;
-  private final Predicate<Operation> isDispatched;
   private final Supplier<JedisCluster> jedisClusterFactory;
 
   private @Nullable InterruptingRunnable onUnsubscribe = null;
@@ -146,30 +147,25 @@ public class RedisShardBackplane implements Backplane {
   private ExecutorService subscriberService = null;
   private boolean poolStarted = false;
   private @Nullable RedisClient client = null;
+  private @Nullable RedissonClient redissonClient = null;
 
   private Set<String> workerSet = Collections.synchronizedSet(new HashSet<>());
   private long workerSetExpiresAt = 0;
 
   private RedisMap actionCache;
+  private RedisMap blockedActions;
+  private RedisMap blockedInvocations;
   private BalancedRedisQueue prequeue;
   private OperationQueue operationQueue;
+  private CasWorkerMap casWorkerMap;
 
   public RedisShardBackplane(
       RedisShardBackplaneConfig config,
       String source,
       Function<Operation, Operation> onPublish,
-      Function<Operation, Operation> onComplete,
-      Predicate<Operation> isPrequeued,
-      Predicate<Operation> isDispatched)
+      Function<Operation, Operation> onComplete)
       throws ConfigurationException {
-    this(
-        config,
-        source,
-        onPublish,
-        onComplete,
-        isPrequeued,
-        isDispatched,
-        JedisClusterFactory.create(config));
+    this(config, source, onPublish, onComplete, JedisClusterFactory.create(config));
   }
 
   public RedisShardBackplane(
@@ -177,15 +173,11 @@ public class RedisShardBackplane implements Backplane {
       String source,
       Function<Operation, Operation> onPublish,
       Function<Operation, Operation> onComplete,
-      Predicate<Operation> isPrequeued,
-      Predicate<Operation> isDispatched,
       Supplier<JedisCluster> jedisClusterFactory) {
     this.config = config;
     this.source = source;
     this.onPublish = onPublish;
     this.onComplete = onComplete;
-    this.isPrequeued = isPrequeued;
-    this.isDispatched = isDispatched;
     this.jedisClusterFactory = jedisClusterFactory;
   }
 
@@ -519,9 +511,13 @@ public class RedisShardBackplane implements Backplane {
     // multiple clients.
     client = new RedisClient(jedisClusterFactory.get());
 
+    // Create containers that make up the backplane
+    casWorkerMap = createCasWorkerMap(redissonClient, config);
     actionCache = createActionCache(client, config);
     prequeue = createPrequeue(client, config);
     operationQueue = createOperationQueue(client, config);
+    blockedActions = new RedisMap(config.getActionBlacklistPrefix());
+    blockedInvocations = new RedisMap(config.getInvocationBlacklistPrefix());
 
     if (config.getSubscribeToBackplane()) {
       startSubscriptionThread();
@@ -533,6 +529,30 @@ public class RedisShardBackplane implements Backplane {
     // Record client start time
     client.call(
         jedis -> jedis.set("startTime/" + clientPublicName, Long.toString(new Date().getTime())));
+  }
+
+  static CasWorkerMap createCasWorkerMap(RedissonClient client, RedisShardBackplaneConfig config)
+      throws IOException {
+    if (config.getCacheCas()) {
+      client = createRedissonClient(config);
+      return new RedissonCasWorkerMap(client, config.getCasPrefix(), config.getCasExpire());
+    } else {
+      return new JedisCasWorkerMap(config.getCasPrefix(), config.getCasExpire());
+    }
+  }
+
+  static RedissonClient createRedissonClient(RedisShardBackplaneConfig config) throws IOException {
+
+    Config redissonConfig = new Config();
+
+    ClusterServersConfig finalConfig =
+        redissonConfig
+            .useClusterServers()
+            .addNodeAddress(config.getRedisUri())
+            .setCheckSlotsCoverage(false);
+
+    RedissonClient client = Redisson.create(redissonConfig);
+    return client;
   }
 
   static RedisMap createActionCache(RedisClient client, RedisShardBackplaneConfig config)
@@ -825,7 +845,7 @@ public class RedisShardBackplane implements Backplane {
   @Override
   public void blacklistAction(String actionId) throws IOException {
     client.run(
-        jedis -> jedis.setex(actionBlacklistKey(actionId), config.getActionBlacklistExpire(), ""));
+        jedis -> blockedActions.insert(jedis, actionId, "", config.getActionBlacklistExpire()));
   }
 
   @Override
@@ -907,88 +927,44 @@ public class RedisShardBackplane implements Backplane {
   @Override
   public void adjustBlobLocations(
       Digest blobDigest, Set<String> addWorkers, Set<String> removeWorkers) throws IOException {
-    String key = casKey(blobDigest);
-    client.run(
-        jedis -> {
-          for (String workerName : addWorkers) {
-            jedis.sadd(key, workerName);
-          }
-          for (String workerName : removeWorkers) {
-            jedis.srem(key, workerName);
-          }
-          jedis.expire(key, config.getCasExpire());
-        });
+    casWorkerMap.adjust(client, blobDigest, addWorkers, removeWorkers);
   }
 
   @Override
   public void addBlobLocation(Digest blobDigest, String workerName) throws IOException {
-    String key = casKey(blobDigest);
-    client.run(
-        jedis -> {
-          jedis.sadd(key, workerName);
-          jedis.expire(key, config.getCasExpire());
-        });
+    casWorkerMap.add(client, blobDigest, workerName);
   }
 
   @Override
   public void addBlobsLocation(Iterable<Digest> blobDigests, String workerName) throws IOException {
-    client.run(
-        jedis -> {
-          JedisClusterPipeline p = jedis.pipelined();
-          for (Digest blobDigest : blobDigests) {
-            String key = casKey(blobDigest);
-            p.sadd(key, workerName);
-            p.expire(key, config.getCasExpire());
-          }
-          p.sync();
-        });
+    casWorkerMap.addAll(client, blobDigests, workerName);
   }
 
   @Override
   public void removeBlobLocation(Digest blobDigest, String workerName) throws IOException {
-    String key = casKey(blobDigest);
-    client.run(jedis -> jedis.srem(key, workerName));
+    casWorkerMap.remove(client, blobDigest, workerName);
   }
 
   @Override
   public void removeBlobsLocation(Iterable<Digest> blobDigests, String workerName)
       throws IOException {
-    client.run(
-        jedis -> {
-          JedisClusterPipeline p = jedis.pipelined();
-          for (Digest blobDigest : blobDigests) {
-            p.srem(casKey(blobDigest), workerName);
-          }
-          p.sync();
-        });
+    casWorkerMap.removeAll(client, blobDigests, workerName);
   }
 
   @Override
   public String getBlobLocation(Digest blobDigest) throws IOException {
-    return client.call(jedis -> jedis.srandmember(casKey(blobDigest)));
+    return casWorkerMap.getAny(client, blobDigest);
   }
 
   @Override
   public Set<String> getBlobLocationSet(Digest blobDigest) throws IOException {
-    return client.call(jedis -> jedis.smembers(casKey(blobDigest)));
+    return casWorkerMap.get(client, blobDigest);
   }
 
   @Override
   public Map<Digest, Set<String>> getBlobDigestsWorkers(Iterable<Digest> blobDigests)
       throws IOException {
-    // FIXME pipeline
-    ImmutableMap.Builder<Digest, Set<String>> blobDigestsWorkers = new ImmutableMap.Builder<>();
-    client.run(
-        jedis -> {
-          for (Digest blobDigest : blobDigests) {
-            Set<String> workers = jedis.smembers(casKey(blobDigest));
-            if (workers.isEmpty()) {
-              continue;
-            }
-            blobDigestsWorkers.put(blobDigest, workers);
-          }
-        });
-    return blobDigestsWorkers.build();
+    return casWorkerMap.getMap(client, blobDigests);
   }
 
   public static WorkerChange parseWorkerChange(String workerChangeJson)
@@ -1388,10 +1364,6 @@ public class RedisShardBackplane implements Backplane {
         });
   }
 
-  private String casKey(Digest blobDigest) {
-    return config.getCasPrefix() + ":" + DigestUtil.toString(blobDigest);
-  }
-
   private String asDigestStr(ActionKey actionKey) {
     return DigestUtil.toString(actionKey.getDigest());
   }
@@ -1410,14 +1382,6 @@ public class RedisShardBackplane implements Backplane {
 
   private String dispatchingKey(String operationName) {
     return config.getDispatchingPrefix() + ":" + operationName;
-  }
-
-  private String actionBlacklistKey(String actionId) {
-    return config.getActionBlacklistPrefix() + ":" + actionId;
-  }
-
-  private String invocationBlacklistKey(String toolInvocationId) {
-    return config.getInvocationBlacklistPrefix() + ":" + toolInvocationId;
   }
 
   public static String parseOperationChannel(String channel) {
@@ -1439,10 +1403,13 @@ public class RedisShardBackplane implements Backplane {
   }
 
   private boolean isBlacklisted(JedisCluster jedis, RequestMetadata requestMetadata) {
-    return (!requestMetadata.getActionId().isEmpty()
-            && jedis.exists(actionBlacklistKey(requestMetadata.getActionId())))
-        || (!requestMetadata.getToolInvocationId().isEmpty()
-            && jedis.exists(invocationBlacklistKey(requestMetadata.getToolInvocationId())));
+    boolean isActionBlocked =
+        (!requestMetadata.getActionId().isEmpty()
+            && blockedActions.exists(jedis, requestMetadata.getActionId()));
+    boolean isInvocationBlocked =
+        (!requestMetadata.getToolInvocationId().isEmpty()
+            && blockedInvocations.exists(jedis, requestMetadata.getToolInvocationId()));
+    return isActionBlocked || isInvocationBlocked;
   }
 
   @Override
@@ -1458,12 +1425,17 @@ public class RedisShardBackplane implements Backplane {
   }
 
   @Override
-  public OperationsStatus operationsStatus() throws IOException {
+  public BackplaneStatus backplaneStatus() throws IOException {
+    int casLookupSize = casWorkerMap.size(client);
     return client.call(
         jedis ->
-            OperationsStatus.newBuilder()
+            BackplaneStatus.newBuilder()
                 .setPrequeue(prequeue.status(jedis))
                 .setOperationQueue(operationQueue.status(jedis))
+                .setCasLookupSize(casLookupSize)
+                .setActionCacheSize(actionCache.size(jedis))
+                .setBlockedActionsSize(blockedActions.size(jedis))
+                .setBlockedInvocationsSize(blockedInvocations.size(jedis))
                 .setDispatchedSize(jedis.hlen(config.getDispatchedOperationsHashName()))
                 .addAllActiveWorkers(workerSet)
                 .build());

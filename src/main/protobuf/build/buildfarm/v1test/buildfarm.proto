@@ -165,12 +165,12 @@ service OperationQueue {
     option (google.api.http) = { get: "/v1test/{instance_name=**}/operation:poll" };
   }
 
-  rpc Status(OperationsStatusRequest) returns (OperationsStatus) {
+  rpc Status(BackplaneStatusRequest) returns (BackplaneStatus) {
     option (google.api.http) = { get: "/v1test/{instance_name=**}/operation:status" };
   }
 }
 
-message OperationsStatusRequest {
+message BackplaneStatusRequest {
   string instance_name = 1;
 }
 
@@ -477,6 +477,9 @@ message RedisShardBackplaneConfig {
 
   // the expiration time in seconds for cas sets
   int32 cas_expire = 11;
+  
+  //whether or not to cache the cas set in memory
+  bool cache_cas = 35;
 
   // whether to listen to the backplane communication streams for shard lifecycle
   // events and watched operations. This is required for failsafe operation below
@@ -756,7 +759,7 @@ message OperationQueueStatus {
   int64 size = 2;
 }
 
-message OperationsStatus {
+message BackplaneStatus {
   QueueStatus prequeue = 1;
 
   OperationQueueStatus operation_queue = 2;
@@ -764,6 +767,14 @@ message OperationsStatus {
   int64 dispatched_size = 3;
 
   repeated string active_workers = 4;
+  
+  int64 cas_lookup_size = 5;
+  
+  int64 action_cache_size = 6;
+  
+  int64 blocked_actions_size = 7;
+  
+  int64 blocked_invocations_size = 8;
 }
 
 message QueuedOperationMetadata {
@@ -899,6 +910,15 @@ message WorkerConfig {
   // limit for contents of a single file retained
   // from CAS in the cache
   int64 cas_cache_max_entry_size_bytes = 24;
+
+  // exponential levels of blob bucketing by digest
+  // if digest is afcd0123, with 2 here, it will live in af/cd/af0123
+  // 0 (default) here will put all entries at the cache root
+  int32 cas_cache_hex_bucket_levels = 27;
+
+  // whether the file directories bidirectional mapping should be stored in memory (HashMap) or
+  // in sqlite
+  bool cas_cache_file_directories_index_in_memory = 28;
 
   // total size of the inline content for
   // action results

@@ -19,7 +19,6 @@ import build.buildfarm.operations.EnrichedOperation;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.operations.FindOperationsSettings;
 import com.jayway.jsonpath.JsonPath;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -97,37 +96,22 @@ public class OperationsFinder {
       FindOperationsSettings settings,
       FindOperationsResults results) {
     // iterate over all operation entries via scanning
-    String cursor = "0";
-    do {
-      List<String> operationKeys = scanOperations(node, cursor, settings);
-      collectOperations(cluster, instance, operationKeys, settings.filterPredicate, results);
 
-    } while (!cursor.equals("0"));
-  }
-
-  /**
-   * @brief Scan the operations list to obtain operation keys.
-   * @details Scanning is done incrementally via a cursor.
-   * @param node A node of the cluster.
-   * @param cursor Scan cursor.
-   * @param settings Settings on how to traverse the Operations.
-   * @return Resulting operation keys from scanning.
-   * @note Suggested return identifier: operationKeys.
-   */
-  private static List<String> scanOperations(
-      Jedis node, String cursor, FindOperationsSettings settings) {
     // construct query
     ScanParams params = new ScanParams();
     params.match(settings.operationQuery);
     params.count(settings.scanAmount);
 
-    // perform scan iteration
-    ScanResult scanResult = node.scan(cursor, params);
-    if (scanResult != null) {
-      cursor = scanResult.getCursor();
-      return scanResult.getResult();
-    }
-    return new ArrayList<>();
+    String cursor = "0";
+    ScanResult scanResult;
+    do {
+      scanResult = node.scan(cursor, params);
+      if (scanResult != null) {
+        cursor = scanResult.getCursor();
+        collectOperations(
+            cluster, instance, scanResult.getResult(), settings.filterPredicate, results);
+      }
+    } while (!cursor.equals("0"));
   }
 
   /**

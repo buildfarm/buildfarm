@@ -26,10 +26,10 @@ import build.buildfarm.common.Watcher;
 import build.buildfarm.common.function.InterruptingRunnable;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.operations.FindOperationsResults;
+import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.GetClientStartTimeResult;
-import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.ShardWorker;
 import com.google.common.collect.ImmutableList;
@@ -306,7 +306,7 @@ public interface Backplane {
   boolean canPrequeue() throws IOException;
 
   @ThreadSafe
-  OperationsStatus operationsStatus() throws IOException;
+  BackplaneStatus backplaneStatus() throws IOException;
 
   @ThreadSafe
   Boolean propertiesEligibleForQueue(List<Platform.Property> provisions);
