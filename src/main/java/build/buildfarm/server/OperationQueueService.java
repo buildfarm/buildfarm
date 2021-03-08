@@ -17,9 +17,9 @@ package build.buildfarm.server;
 import build.buildfarm.common.function.InterruptingPredicate;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.MatchListener;
+import build.buildfarm.v1test.BackplaneStatus;
+import build.buildfarm.v1test.BackplaneStatusRequest;
 import build.buildfarm.v1test.OperationQueueGrpc;
-import build.buildfarm.v1test.OperationsStatus;
-import build.buildfarm.v1test.OperationsStatusRequest;
 import build.buildfarm.v1test.PollOperationRequest;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.TakeOperationRequest;
@@ -130,7 +130,7 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
 
   @Override
   public void status(
-      OperationsStatusRequest request, StreamObserver<OperationsStatus> responseObserver) {
+      BackplaneStatusRequest request, StreamObserver<BackplaneStatus> responseObserver) {
     Instance instance;
     try {
       instance = instances.get(request.getInstanceName());
@@ -140,7 +140,7 @@ public class OperationQueueService extends OperationQueueGrpc.OperationQueueImpl
     }
 
     try {
-      responseObserver.onNext(instance.operationsStatus());
+      responseObserver.onNext(instance.backplaneStatus());
       responseObserver.onCompleted();
     } catch (RuntimeException e) {
       responseObserver.onError(Status.fromThrowable(e).asException());
