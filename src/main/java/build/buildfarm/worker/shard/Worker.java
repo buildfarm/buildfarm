@@ -361,9 +361,7 @@ public class Worker extends LoggingMain {
                 config.getRedisShardBackplaneConfig(),
                 identifier,
                 this::stripOperation,
-                this::stripQueuedOperation,
-                (o) -> false,
-                (o) -> false);
+                this::stripQueuedOperation);
         break;
     }
 
