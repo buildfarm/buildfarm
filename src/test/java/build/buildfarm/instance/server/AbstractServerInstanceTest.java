@@ -53,8 +53,8 @@ import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.operations.FindOperationsResults;
+import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.GetClientStartTimeResult;
-import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
 import build.buildfarm.v1test.WorkerListMessage;
 import build.buildfarm.v1test.WorkerProfileMessage;
@@ -176,7 +176,7 @@ public class AbstractServerInstanceTest {
     }
 
     @Override
-    public OperationsStatus operationsStatus() {
+    public BackplaneStatus backplaneStatus() {
       throw new UnsupportedOperationException();
     }
 

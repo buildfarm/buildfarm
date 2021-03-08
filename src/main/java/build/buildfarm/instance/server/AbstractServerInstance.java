@@ -199,6 +199,11 @@ public abstract class AbstractServerInstance implements Instance {
   public static final String OUTPUT_DIRECTORY_IS_OUTPUT_ANCESTOR =
       "An output directory is an ancestor to another output";
 
+  public static final String BLOCK_LIST_ERROR =
+      "This request is in block list and is forbidden.  "
+          + "To resolve this error, you can tag the rule with 'no-remote'.  "
+          + "You can also adjust the action behavior to attempt a different action hash.";
+
   public AbstractServerInstance(
       String name,
       DigestUtil digestUtil,
