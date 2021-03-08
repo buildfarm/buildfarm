@@ -30,6 +30,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.StringVisitor;
 import build.buildfarm.common.Watcher;
+import build.buildfarm.common.Time;
 import build.buildfarm.common.WorkerIndexer;
 import build.buildfarm.common.function.InterruptingRunnable;
 import build.buildfarm.common.redis.BalancedRedisQueue;
@@ -155,6 +156,8 @@ public class RedisShardBackplane implements Backplane {
   private RedisMap actionCache;
   private RedisMap blockedActions;
   private RedisMap blockedInvocations;
+  private RedisMap processingOperations;
+  private RedisMap dispatchedOperations;
   private BalancedRedisQueue prequeue;
   private OperationQueue operationQueue;
   private CasWorkerMap casWorkerMap;
@@ -188,24 +191,6 @@ public class RedisShardBackplane implements Backplane {
     return oldOnUnsubscribe;
   }
 
-  private Instant getExpiresAt(JedisCluster jedis, String key, Instant now) {
-    String value = jedis.get(key);
-    if (value != null) {
-      try {
-        return Instant.ofEpochMilli(Long.parseLong(value));
-      } catch (NumberFormatException e) {
-        logger.log(Level.SEVERE, format("invalid expiration %s for %s", value, key));
-      }
-    }
-
-    Instant expiresAt = now.plusMillis(config.getProcessingTimeoutMillis());
-    jedis.setex(
-        key,
-        /* expire=*/ (config.getProcessingTimeoutMillis() * 2) / 1000,
-        String.format("%d", expiresAt.toEpochMilli()));
-    return expiresAt;
-  }
-
   abstract static class QueueEntryListVisitor extends StringVisitor {
     protected abstract void visit(QueueEntry queueEntry, String queueEntryJson);
 
@@ -234,6 +219,17 @@ public class RedisShardBackplane implements Backplane {
     }
   }
 
+  private Instant convertToMilliInstant(String value, String key) {
+    if (value != null) {
+      try {
+        return Instant.ofEpochMilli(Long.parseLong(value));
+      } catch (NumberFormatException e) {
+        logger.log(Level.SEVERE, format("invalid expiration %s for %s", value, key));
+      }
+    }
+    return null;
+  }
+
   private void scanProcessing(JedisCluster jedis, Consumer<String> onOperationName, Instant now) {
     prequeue.visitDequeue(
         jedis,
@@ -241,14 +237,26 @@ public class RedisShardBackplane implements Backplane {
           @Override
           protected void visit(ExecuteEntry executeEntry, String executeEntryJson) {
             String operationName = executeEntry.getOperationName();
-            String operationProcessingKey = processingKey(operationName);
+            String value = processingOperations.get(jedis, operationName);
+            int defaultTimeout_ms = config.getProcessingTimeoutMillis();
 
-            Instant expiresAt = getExpiresAt(jedis, operationProcessingKey, now);
+            // get the operation's expiration
+            Instant expiresAt = convertToMilliInstant(value, operationName);
+
+            // if expiration is invalid, add a valid one.
+            if (expiresAt == null) {
+              expiresAt = now.plusMillis(defaultTimeout_ms);
+              String keyValue = String.format("%d", expiresAt.toEpochMilli());
+              int timeout_s = Time.millisecondsToSeconds(defaultTimeout_ms);
+              processingOperations.insert(jedis, operationName, keyValue, timeout_s);
+            }
+
+            // handle expiration
             if (now.isBefore(expiresAt)) {
               onOperationName.accept(operationName);
             } else {
               if (prequeue.removeFromDequeue(jedis, executeEntryJson)) {
-                jedis.del(operationProcessingKey);
+                processingOperations.remove(jedis, operationName);
               }
             }
           }
@@ -262,14 +270,26 @@ public class RedisShardBackplane implements Backplane {
           @Override
           protected void visit(QueueEntry queueEntry, String queueEntryJson) {
             String operationName = queueEntry.getExecuteEntry().getOperationName();
-            String operationDispatchingKey = dispatchingKey(operationName);
+            String value = dispatchedOperations.get(jedis, operationName);
+            int defaultTimeout_ms = config.getDispatchingTimeoutMillis();
 
-            Instant expiresAt = getExpiresAt(jedis, operationDispatchingKey, now);
+            // get the operation's expiration
+            Instant expiresAt = convertToMilliInstant(value, operationName);
+
+            // if expiration is invalid, add a valid one.
+            if (expiresAt == null) {
+              expiresAt = now.plusMillis(defaultTimeout_ms);
+              String keyValue = String.format("%d", expiresAt.toEpochMilli());
+              int timeout_s = Time.millisecondsToSeconds(defaultTimeout_ms);
+              dispatchedOperations.insert(jedis, operationName, keyValue, timeout_s);
+            }
+
+            // handle expiration
             if (now.isBefore(expiresAt)) {
               onOperationName.accept(operationName);
             } else {
               if (operationQueue.removeFromDequeue(jedis, queueEntryJson)) {
-                jedis.del(operationDispatchingKey);
+                dispatchedOperations.remove(jedis, operationName);
               }
             }
           }
@@ -518,6 +538,8 @@ public class RedisShardBackplane implements Backplane {
     operationQueue = createOperationQueue(client, config);
     blockedActions = new RedisMap(config.getActionBlacklistPrefix());
     blockedInvocations = new RedisMap(config.getInvocationBlacklistPrefix());
+    processingOperations = new RedisMap(config.getProcessingPrefix());
+    dispatchedOperations = new RedisMap(config.getDispatchingPrefix());
 
     if (config.getSubscribeToBackplane()) {
       startSubscriptionThread();
@@ -1163,7 +1185,7 @@ public class RedisShardBackplane implements Backplane {
             format("could not remove %s from %s", operationName, prequeue.getDequeueName()));
         return null;
       }
-      jedis.del(processingKey(operationName)); // may or may not exist
+      processingOperations.remove(jedis, operationName);
       return executeEntry;
     } catch (InvalidProtocolBufferException e) {
       logger.log(Level.SEVERE, "error parsing execute entry", e);
@@ -1223,7 +1245,7 @@ public class RedisShardBackplane implements Backplane {
                 "operation %s was missing in %s, may be orphaned",
                 operationName, operationQueue.getDequeueName()));
       }
-      jedis.del(dispatchingKey(operationName)); // may or may not exist
+      dispatchedOperations.remove(jedis, operationName);
       return queueEntry;
     }
     return null;
@@ -1374,14 +1396,6 @@ public class RedisShardBackplane implements Backplane {
 
   String operationChannel(String operationName) {
     return config.getOperationChannelPrefix() + ":" + operationName;
-  }
-
-  private String processingKey(String operationName) {
-    return config.getProcessingPrefix() + ":" + operationName;
-  }
-
-  private String dispatchingKey(String operationName) {
-    return config.getDispatchingPrefix() + ":" + operationName;
   }
 
   public static String parseOperationChannel(String channel) {
