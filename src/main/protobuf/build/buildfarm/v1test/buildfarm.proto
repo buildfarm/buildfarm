@@ -165,12 +165,12 @@ service OperationQueue {
     option (google.api.http) = { get: "/v1test/{instance_name=**}/operation:poll" };
   }
 
-  rpc Status(OperationsStatusRequest) returns (OperationsStatus) {
+  rpc Status(BackplaneStatusRequest) returns (BackplaneStatus) {
     option (google.api.http) = { get: "/v1test/{instance_name=**}/operation:status" };
   }
 }
 
-message OperationsStatusRequest {
+message BackplaneStatusRequest {
   string instance_name = 1;
 }
 
@@ -759,7 +759,7 @@ message OperationQueueStatus {
   int64 size = 2;
 }
 
-message OperationsStatus {
+message BackplaneStatus {
   QueueStatus prequeue = 1;
 
   OperationQueueStatus operation_queue = 2;
