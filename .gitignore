@@ -12,3 +12,6 @@ java_formatter.jar
 # Eclipse
 /.project
 /.classpath
+
+#Static Analysis
+/pmd

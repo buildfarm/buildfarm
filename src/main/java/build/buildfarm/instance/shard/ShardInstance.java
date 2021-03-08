@@ -22,7 +22,6 @@ import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static build.buildfarm.instance.shard.Util.SHARD_IS_RETRIABLE;
 import static build.buildfarm.instance.shard.Util.correctMissingBlob;
 import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.base.Predicates.or;
 import static com.google.common.util.concurrent.Futures.addCallback;
 import static com.google.common.util.concurrent.Futures.allAsList;
 import static com.google.common.util.concurrent.Futures.catching;
@@ -76,10 +75,10 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.instance.server.AbstractServerInstance;
 import build.buildfarm.operations.FindOperationsResults;
+import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationIteratorToken;
-import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.ProfiledQueuedOperationMetadata;
 import build.buildfarm.v1test.ProvisionedQueue;
 import build.buildfarm.v1test.QueueEntry;
@@ -160,6 +159,7 @@ public class ShardInstance extends AbstractServerInstance {
 
   private static final int DEFAULT_MAX_LOCAL_ACTION_CACHE_SIZE = 1000000;
 
+  // Prometheus metrics
   private static final Counter executionSuccess =
       Counter.build().name("execution_success").help("Execution success.").register();
   private static final Gauge preQueueSize =
@@ -173,6 +173,17 @@ public class ShardInstance extends AbstractServerInstance {
       Gauge.build().name("worker_pool_size").help("Active worker pool size.").register();
   private static final Gauge queueSize =
       Gauge.build().name("queue_size").labelNames("queue_name").help("Queue size.").register();
+  private static final Gauge casLookupSize =
+      Gauge.build().name("cas_lookup_size").help("CAS lookup size.").register();
+  private static final Gauge actionCacheLookupSize =
+      Gauge.build().name("action_cache_lookup_size").help("Action Cache lookup size.").register();
+  private static final Gauge blockedActionsSize =
+      Gauge.build().name("blocked_actions_size").help("The number of blocked actions").register();
+  private static final Gauge blockedInvocationsSize =
+      Gauge.build()
+          .name("blocked_invocations_size")
+          .help("The number of blocked invocations")
+          .register();
 
   private final Runnable onStop;
   private final long maxBlobSize;
@@ -240,9 +251,7 @@ public class ShardInstance extends AbstractServerInstance {
             config.getRedisShardBackplaneConfig(),
             identifier,
             ShardInstance::stripOperation,
-            ShardInstance::stripQueuedOperation,
-            /* isPrequeued=*/ ShardInstance::isUnknown,
-            /* isExecuting=*/ or(ShardInstance::isExecuting, ShardInstance::isQueued));
+            ShardInstance::stripQueuedOperation);
     }
   }
 
@@ -460,11 +469,15 @@ public class ShardInstance extends AbstractServerInstance {
               while (!Thread.currentThread().isInterrupted()) {
                 try {
                   TimeUnit.SECONDS.sleep(30);
-                  OperationsStatus operationsStatus = operationsStatus();
-                  workerPoolSize.set(operationsStatus.getActiveWorkersCount());
-                  dispatchedOperations.set(operationsStatus.getDispatchedSize());
-                  preQueueSize.set(operationsStatus.getPrequeue().getSize());
-                  updateQueueSizes(operationsStatus.getOperationQueue().getProvisionsList());
+                  BackplaneStatus backplaneStatus = backplaneStatus();
+                  workerPoolSize.set(backplaneStatus.getActiveWorkersCount());
+                  dispatchedOperations.set(backplaneStatus.getDispatchedSize());
+                  preQueueSize.set(backplaneStatus.getPrequeue().getSize());
+                  updateQueueSizes(backplaneStatus.getOperationQueue().getProvisionsList());
+                  casLookupSize.set(backplaneStatus.getCasLookupSize());
+                  actionCacheLookupSize.set(backplaneStatus.getActionCacheSize());
+                  blockedActionsSize.set(backplaneStatus.getBlockedActionsSize());
+                  blockedInvocationsSize.set(backplaneStatus.getBlockedInvocationsSize());
                 } catch (InterruptedException e) {
                   Thread.currentThread().interrupt();
                   break;
@@ -1029,9 +1042,7 @@ public class ShardInstance extends AbstractServerInstance {
       throws EntryLimitException {
     try {
       if (backplane.isBlacklisted(requestMetadata)) {
-        throw Status.UNAVAILABLE
-            .withDescription("This write request is in block list and is forbidden")
-            .asRuntimeException();
+        throw Status.UNAVAILABLE.withDescription(BLOCK_LIST_ERROR).asRuntimeException();
       }
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
@@ -1656,10 +1667,7 @@ public class ShardInstance extends AbstractServerInstance {
                 .setName(operationName)
                 .setDone(true)
                 .setResponse(
-                    Any.pack(
-                        denyActionResponse(
-                            executeEntry.getActionDigest(),
-                            "This execute request is in block list and is forbidden")))
+                    Any.pack(denyActionResponse(executeEntry.getActionDigest(), BLOCK_LIST_ERROR)))
                 .build());
         return IMMEDIATE_VOID_FUTURE;
       } else if (queueEntry.getRequeueAttempts() > maxRequeueAttempts) {
@@ -1824,11 +1832,7 @@ public class ShardInstance extends AbstractServerInstance {
             operation
                 .toBuilder()
                 .setDone(true)
-                .setResponse(
-                    Any.pack(
-                        denyActionResponse(
-                            actionDigest,
-                            "This execute request is in block list and is forbidden")))
+                .setResponse(Any.pack(denyActionResponse(actionDigest, BLOCK_LIST_ERROR)))
                 .build());
         return immediateFuture(null);
       }
@@ -2241,9 +2245,9 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @Override
-  public OperationsStatus operationsStatus() {
+  public BackplaneStatus backplaneStatus() {
     try {
-      return backplane.operationsStatus();
+      return backplane.backplaneStatus();
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }
