@@ -771,6 +771,10 @@ message BackplaneStatus {
   int64 cas_lookup_size = 5;
   
   int64 action_cache_size = 6;
+  
+  int64 blocked_actions_size = 7;
+  
+  int64 blocked_invocations_size = 8;
 }
 
 message QueuedOperationMetadata {
