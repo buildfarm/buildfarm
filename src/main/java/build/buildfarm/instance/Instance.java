@@ -30,8 +30,8 @@ import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
+import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.GetClientStartTimeResult;
-import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
 import build.buildfarm.v1test.Tree;
 import build.buildfarm.v1test.WorkerListMessage;
@@ -120,7 +120,7 @@ public interface Instance {
 
   void match(Platform platform, MatchListener listener) throws InterruptedException;
 
-  OperationsStatus operationsStatus();
+  BackplaneStatus backplaneStatus();
 
   boolean putOperation(Operation operation) throws InterruptedException;
 
