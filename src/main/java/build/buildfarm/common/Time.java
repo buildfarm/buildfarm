@@ -59,7 +59,7 @@ public class Time {
   public static long secondsToNanoseconds(long seconds) {
     return seconds * 1000000000;
   }
-  
+
   /**
    * @brief Milliseconds to seconds.
    * @details Milliseconds to seconds.
