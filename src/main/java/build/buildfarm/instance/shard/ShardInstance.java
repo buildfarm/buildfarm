@@ -22,7 +22,6 @@ import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static build.buildfarm.instance.shard.Util.SHARD_IS_RETRIABLE;
 import static build.buildfarm.instance.shard.Util.correctMissingBlob;
 import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.base.Predicates.or;
 import static com.google.common.util.concurrent.Futures.addCallback;
 import static com.google.common.util.concurrent.Futures.allAsList;
 import static com.google.common.util.concurrent.Futures.catching;
@@ -178,6 +177,13 @@ public class ShardInstance extends AbstractServerInstance {
       Gauge.build().name("cas_lookup_size").help("CAS lookup size.").register();
   private static final Gauge actionCacheLookupSize =
       Gauge.build().name("action_cache_lookup_size").help("Action Cache lookup size.").register();
+  private static final Gauge blockedActionsSize =
+      Gauge.build().name("blocked_actions_size").help("The number of blocked actions").register();
+  private static final Gauge blockedInvocationsSize =
+      Gauge.build()
+          .name("blocked_invocations_size")
+          .help("The number of blocked invocations")
+          .register();
 
   private final Runnable onStop;
   private final long maxBlobSize;
@@ -245,9 +251,7 @@ public class ShardInstance extends AbstractServerInstance {
             config.getRedisShardBackplaneConfig(),
             identifier,
             ShardInstance::stripOperation,
-            ShardInstance::stripQueuedOperation,
-            /* isPrequeued=*/ ShardInstance::isUnknown,
-            /* isExecuting=*/ or(ShardInstance::isExecuting, ShardInstance::isQueued));
+            ShardInstance::stripQueuedOperation);
     }
   }
 
@@ -472,6 +476,8 @@ public class ShardInstance extends AbstractServerInstance {
                   updateQueueSizes(backplaneStatus.getOperationQueue().getProvisionsList());
                   casLookupSize.set(backplaneStatus.getCasLookupSize());
                   actionCacheLookupSize.set(backplaneStatus.getActionCacheSize());
+                  blockedActionsSize.set(backplaneStatus.getBlockedActionsSize());
+                  blockedInvocationsSize.set(backplaneStatus.getBlockedInvocationsSize());
                 } catch (InterruptedException e) {
                   Thread.currentThread().interrupt();
                   break;
