@@ -13,7 +13,6 @@
     <exclude name="AbstractClassWithoutAbstractMethod"/>
     <exclude name="AccessorClassGeneration"/>
     <exclude name="AccessorMethodGeneration"/>
-    <exclude name="ArrayIsStoredDirectly"/>
     <exclude name="AvoidMessageDigestField"/>
     <exclude name="AvoidPrintStackTrace"/>
     <exclude name="AvoidReassigningCatchVariables"/>

@@ -94,7 +94,7 @@ class Executor {
         Digest actionDigest,
         ScheduledExecutorService service) {
       this.countdown = countdown;
-      this.statusCounts = statusCounts;
+      this.statusCounts = statusCounts.clone();
       this.execStub = execStub;
       this.instanceName = instanceName;
       this.actionDigest = actionDigest;
