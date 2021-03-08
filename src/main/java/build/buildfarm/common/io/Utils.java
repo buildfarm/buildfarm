@@ -266,7 +266,7 @@ public class Utils {
 
     @Override
     public String toString() {
-      StringBuilder sb = new StringBuilder();
+      StringBuilder sb = new StringBuilder(50);
       sb.append("(volSerialNumber=")
           .append(volSerialNumber)
           .append(",fileIndexHigh=")
