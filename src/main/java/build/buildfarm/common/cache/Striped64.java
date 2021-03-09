@@ -101,7 +101,7 @@ abstract class Striped64 extends Number {
       value = x;
     }
 
-    final boolean cas(long cmp, long val) {
+    boolean cas(long cmp, long val) {
       return UNSAFE.compareAndSwapLong(this, valueOffset, cmp, val);
     }
 

@@ -57,7 +57,7 @@ public class Utils {
             return osName.startsWith("mac");
           });
 
-  private static final jnr.ffi.Runtime runtime() {
+  private static jnr.ffi.Runtime runtime() {
     return jnr.ffi.Runtime.getRuntime(libc.get());
   }
 

@@ -44,7 +44,7 @@ final class LongAdder extends Striped64 implements Serializable, LongAddable {
   private static final long serialVersionUID = 7249069246863182397L;
 
   /** Version of plus for use in retryUpdate */
-  final long fn(long v, long x) {
+  long fn(long v, long x) {
     return v + x;
   }
 

@@ -97,7 +97,7 @@ public interface Backplane {
   void deregisterWorker(String hostName) throws IOException;
 
   @ThreadSafe
-  public FindOperationsResults findOperations(Instance instance, String filterPredicate)
+  FindOperationsResults findOperations(Instance instance, String filterPredicate)
       throws IOException;
 
   /** Returns a set of the names of all active workers. */

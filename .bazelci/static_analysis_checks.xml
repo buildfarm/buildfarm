@@ -60,6 +60,7 @@
 </rule>
 
 <rule ref="category/java/codestyle.xml">
+    <exclude name="LongVariable"/> <!-- some of these long variable names are helpful -->
     <exclude name="AbstractNaming"/>
     <exclude name="AtLeastOneConstructor"/>
     <exclude name="AvoidDollarSigns"/>
@@ -75,8 +76,6 @@
     <exclude name="ConfusingTernary"/>
     <exclude name="ControlStatementBraces"/>
     <exclude name="DefaultPackage"/>
-    <exclude name="DontImportJavaLang"/>
-    <exclude name="DuplicateImports"/>
     <exclude name="EmptyMethodInAbstractClassShouldBeAbstract"/>
     <exclude name="ExtendsObject"/>
     <exclude name="FieldDeclarationsShouldBeAtStartOfClass"/>
@@ -86,14 +85,11 @@
     <exclude name="FormalParameterNamingConventions"/>
     <exclude name="GenericsNaming"/>
     <exclude name="IdenticalCatchBranches"/>
-    <exclude name="IfElseStmtsMustUseBraces"/>
-    <exclude name="IfStmtsMustUseBraces"/>
     <exclude name="LinguisticNaming"/>
     <exclude name="LocalHomeNamingConvention"/>
     <exclude name="LocalInterfaceSessionNamingConvention"/>
     <exclude name="LocalVariableCouldBeFinal"/>
     <exclude name="LocalVariableNamingConventions"/>
-    <exclude name="LongVariable"/>
     <exclude name="MDBAndSessionBeanNamingConvention"/>
     <exclude name="MethodArgumentCouldBeFinal"/>
     <exclude name="MethodNamingConventions"/>
@@ -113,8 +109,6 @@
     <exclude name="UnnecessaryConstructor"/>
     <exclude name="UnnecessaryFullyQualifiedName"/>
     <exclude name="UnnecessaryLocalBeforeReturn"/>
-    <exclude name="UnnecessaryModifier"/>
-    <exclude name="UnnecessaryReturn"/>
     <exclude name="UseDiamondOperator"/>
     <exclude name="UselessParentheses"/>
     <exclude name="UselessQualifiedThis"/>
