@@ -70,7 +70,6 @@ import build.buildfarm.common.Write;
 import build.buildfarm.common.cache.Cache;
 import build.buildfarm.common.cache.CacheBuilder;
 import build.buildfarm.common.cache.CacheLoader.InvalidCacheLoadException;
-import build.buildfarm.common.cache.CacheStats;
 import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.MatchListener;
@@ -190,31 +189,79 @@ public class ShardInstance extends AbstractServerInstance {
 
   // metrics for individual local action cache held on each instance
   private static final Gauge localActionCacheSize =
-      Gauge.build().name("ac_size").labelNames("instance_name").register();
+      Gauge.build().name("ac_size").labelNames("instance_name").help("local ac size").register();
   private static final Gauge localActionCacheRequestCount =
-      Gauge.build().name("ac_request_count").labelNames("instance_name").register();
+      Gauge.build()
+          .name("ac_request_count")
+          .labelNames("instance_name")
+          .help("local ac request count")
+          .register();
   private static final Gauge localActionCacheHitCount =
-      Gauge.build().name("ac_hit_count").labelNames("instance_name").register();
+      Gauge.build()
+          .name("ac_hit_count")
+          .labelNames("instance_name")
+          .help("local ac hit count")
+          .register();
   private static final Gauge localActionCacheHitRate =
-      Gauge.build().name("ac_hit_rate").labelNames("instance_name").register();
+      Gauge.build()
+          .name("ac_hit_rate")
+          .labelNames("instance_name")
+          .help("local ac hit rate")
+          .register();
   private static final Gauge localActionCacheMissCount =
-      Gauge.build().name("ac_miss_count").labelNames("instance_name").register();
+      Gauge.build()
+          .name("ac_miss_count")
+          .labelNames("instance_name")
+          .help("local ac miss count")
+          .register();
   private static final Gauge localActionCacheMissRate =
-      Gauge.build().name("ac_miss_rate").labelNames("instance_name").register();
+      Gauge.build()
+          .name("ac_miss_rate")
+          .labelNames("instance_name")
+          .help("local ac miss rate")
+          .register();
   private static final Gauge localActionLoadCount =
-      Gauge.build().name("ac_load_count").labelNames("instance_name").register();
+      Gauge.build()
+          .name("ac_load_count")
+          .labelNames("instance_name")
+          .help("local ac load count")
+          .register();
   private static final Gauge localActionLoadSuccessCount =
-      Gauge.build().name("ac_load_success_count").labelNames("instance_name").register();
+      Gauge.build()
+          .name("ac_load_success_count")
+          .labelNames("instance_name")
+          .help("local ac load success count")
+          .register();
   private static final Gauge localActionLoadExceptionCount =
-      Gauge.build().name("ac_load_exception_count").labelNames("instance_name").register();
+      Gauge.build()
+          .name("ac_load_exception_count")
+          .labelNames("instance_name")
+          .help("local ac exception count")
+          .register();
   private static final Gauge localActionCacheLoadExceptionRate =
-      Gauge.build().name("ac_load_exception_rate").labelNames("instance_name").register();
+      Gauge.build()
+          .name("ac_load_exception_rate")
+          .labelNames("instance_name")
+          .help("local ac exception rate")
+          .register();
   private static final Gauge localActionCacheTotalLoadTime =
-      Gauge.build().name("ac_total_load_time").labelNames("instance_name").register();
+      Gauge.build()
+          .name("ac_total_load_time")
+          .labelNames("instance_name")
+          .help("local ac total load time")
+          .register();
   private static final Gauge localActionCacheAverageLoadPenalty =
-      Gauge.build().name("ac_average_load_penalty").labelNames("instance_name").register();
+      Gauge.build()
+          .name("ac_average_load_penalty")
+          .labelNames("instance_name")
+          .help("local ac average load penalty")
+          .register();
   private static final Gauge localActionCacheEvictionCount =
-      Gauge.build().name("ac_eviction_count").labelNames("instance_name").register();
+      Gauge.build()
+          .name("ac_eviction_count")
+          .labelNames("instance_name")
+          .help("local ac eviction count")
+          .register();
 
   private final Runnable onStop;
   private final long maxBlobSize;
@@ -524,24 +571,24 @@ public class ShardInstance extends AbstractServerInstance {
   private void updateReadThroughCacheStats() {
 
     // extract metrics from the instance's local action cache
-    String name = getName();
-    long size = readThroughActionCache.size();
-    CacheStats stats = readThroughActionCache.stats();
+    // String name = getName();
+    // long size = readThroughActionCache.size();
+    // CacheStats stats = readThroughActionCache.stats();
 
-    // publish those metrics
-    localActionCacheSize.labels(name).set(size);
-    localActionCacheRequestCount.labels(name).set(stats.requestCount());
-    localActionCacheHitCount.labels(name).set(stats.hitCount());
-    localActionCacheHitRate.labels(name).set(stats.hitRate());
-    localActionCacheMissCount.labels(name).set(stats.missCount());
-    localActionCacheMissRate.labels(name).set(stats.hitRate());
-    localActionLoadCount.labels(name).set(stats.loadCount());
-    localActionLoadSuccessCount.labels(name).set(stats.loadSuccessCount());
-    localActionLoadExceptionCount.labels(name).set(stats.loadExceptionCount());
-    localActionCacheLoadExceptionRate.labels(name).set(stats.loadExceptionRate());
-    localActionCacheTotalLoadTime.labels(name).set(stats.totalLoadTime());
-    localActionCacheAverageLoadPenalty.labels(name).set(stats.averageLoadPenalty());
-    localActionCacheEvictionCount.labels(name).set(stats.evictionCount());
+    // // publish those metrics
+    // localActionCacheSize.labels(name).set(size);
+    // localActionCacheRequestCount.labels(name).set(stats.requestCount());
+    // localActionCacheHitCount.labels(name).set(stats.hitCount());
+    // localActionCacheHitRate.labels(name).set(stats.hitRate());
+    // localActionCacheMissCount.labels(name).set(stats.missCount());
+    // localActionCacheMissRate.labels(name).set(stats.hitRate());
+    // localActionLoadCount.labels(name).set(stats.loadCount());
+    // localActionLoadSuccessCount.labels(name).set(stats.loadSuccessCount());
+    // localActionLoadExceptionCount.labels(name).set(stats.loadExceptionCount());
+    // localActionCacheLoadExceptionRate.labels(name).set(stats.loadExceptionRate());
+    // localActionCacheTotalLoadTime.labels(name).set(stats.totalLoadTime());
+    // localActionCacheAverageLoadPenalty.labels(name).set(stats.averageLoadPenalty());
+    // localActionCacheEvictionCount.labels(name).set(stats.evictionCount());
   }
 
   private void updateQueueSizes(List<QueueStatus> queues) {
