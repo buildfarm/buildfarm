@@ -1204,18 +1204,13 @@ public class ShardInstance extends AbstractServerInstance {
               directoryBlobDigest,
               new Callable<Directory>() {
                 @Override
-                public Directory call() {
+                public Directory call() throws Exception {
                   logger.log(
                       Level.FINE,
                       format(
                           "transformQueuedOperation(%s): fetching directory %s",
                           reason, DigestUtil.toString(directoryBlobDigest)));
-
-                  try {
-                    return fetcher.get().get();
-                  } catch (Exception e) {
-                    return null;
-                  }
+                  return fetcher.get().get();
                 }
               }));
     } catch (Exception e) {
@@ -1261,12 +1256,8 @@ public class ShardInstance extends AbstractServerInstance {
               commandBlobDigest,
               new Callable<Command>() {
                 @Override
-                public Command call() {
-                  try {
-                    return fetcher.get().get();
-                  } catch (Exception e) {
-                    return null;
-                  }
+                public Command call() throws Exception {
+                  return fetcher.get().get();
                 }
               }));
     } catch (Exception e) {
@@ -1295,12 +1286,8 @@ public class ShardInstance extends AbstractServerInstance {
               actionBlobDigest,
               new Callable<Action>() {
                 @Override
-                public Action call() {
-                  try {
-                    return fetcher.get().get();
-                  } catch (Exception e) {
-                    return null;
-                  }
+                public Action call() throws Exception {
+                  return fetcher.get().get();
                 }
               }));
 
