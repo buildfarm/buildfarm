@@ -10,13 +10,8 @@
   </description>
 
 <rule ref="category/java/bestpractices.xml">
-    <exclude name="AbstractClassWithoutAbstractMethod"/>
-    <exclude name="AccessorClassGeneration"/>
-    <exclude name="AccessorMethodGeneration"/>
     <exclude name="ArrayIsStoredDirectly"/>
-    <exclude name="AvoidMessageDigestField"/>
     <exclude name="AvoidPrintStackTrace"/>
-    <exclude name="AvoidReassigningCatchVariables"/>
     <exclude name="AvoidReassigningLoopVariables"/>
     <exclude name="AvoidReassigningParameters"/>
     <exclude name="AvoidStringBufferField"/>
