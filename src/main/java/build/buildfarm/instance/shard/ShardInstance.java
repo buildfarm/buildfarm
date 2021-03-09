@@ -70,6 +70,7 @@ import build.buildfarm.common.Write;
 import build.buildfarm.common.cache.Cache;
 import build.buildfarm.common.cache.CacheBuilder;
 import build.buildfarm.common.cache.CacheLoader.InvalidCacheLoadException;
+import build.buildfarm.common.cache.CacheStats;
 import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.MatchListener;
@@ -175,8 +176,6 @@ public class ShardInstance extends AbstractServerInstance {
       Gauge.build().name("queue_size").labelNames("queue_name").help("Queue size.").register();
   private static final Gauge casLookupSize =
       Gauge.build().name("cas_lookup_size").help("CAS lookup size.").register();
-  private static final Gauge actionCacheLookupSize =
-      Gauge.build().name("action_cache_lookup_size").help("Action Cache lookup size.").register();
   private static final Gauge blockedActionsSize =
       Gauge.build().name("blocked_actions_size").help("The number of blocked actions").register();
   private static final Gauge blockedInvocationsSize =
@@ -184,6 +183,38 @@ public class ShardInstance extends AbstractServerInstance {
           .name("blocked_invocations_size")
           .help("The number of blocked invocations")
           .register();
+
+  // metrics for the distributed action cache of the backplane
+  private static final Gauge actionCacheLookupSize =
+      Gauge.build().name("action_cache_lookup_size").help("Action Cache lookup size.").register();
+
+  // metrics for individual local action cache held on each instance
+  private static final Gauge localActionCacheSize =
+      Gauge.build().name("ac_size").labelNames("instance_name").register();
+  private static final Gauge localActionCacheRequestCount =
+      Gauge.build().name("ac_request_count").labelNames("instance_name").register();
+  private static final Gauge localActionCacheHitCount =
+      Gauge.build().name("ac_hit_count").labelNames("instance_name").register();
+  private static final Gauge localActionCacheHitRate =
+      Gauge.build().name("ac_hit_rate").labelNames("instance_name").register();
+  private static final Gauge localActionCacheMissCount =
+      Gauge.build().name("ac_miss_count").labelNames("instance_name").register();
+  private static final Gauge localActionCacheMissRate =
+      Gauge.build().name("ac_miss_rate").labelNames("instance_name").register();
+  private static final Gauge localActionLoadCount =
+      Gauge.build().name("ac_load_count").labelNames("instance_name").register();
+  private static final Gauge localActionLoadSuccessCount =
+      Gauge.build().name("ac_load_success_count").labelNames("instance_name").register();
+  private static final Gauge localActionLoadExceptionCount =
+      Gauge.build().name("ac_load_exception_count").labelNames("instance_name").register();
+  private static final Gauge localActionCacheLoadExceptionRate =
+      Gauge.build().name("ac_load_exception_rate").labelNames("instance_name").register();
+  private static final Gauge localActionCacheTotalLoadTime =
+      Gauge.build().name("ac_total_load_time").labelNames("instance_name").register();
+  private static final Gauge localActionCacheAverageLoadPenalty =
+      Gauge.build().name("ac_average_load_penalty").labelNames("instance_name").register();
+  private static final Gauge localActionCacheEvictionCount =
+      Gauge.build().name("ac_eviction_count").labelNames("instance_name").register();
 
   private final Runnable onStop;
   private final long maxBlobSize;
@@ -478,6 +509,7 @@ public class ShardInstance extends AbstractServerInstance {
                   actionCacheLookupSize.set(backplaneStatus.getActionCacheSize());
                   blockedActionsSize.set(backplaneStatus.getBlockedActionsSize());
                   blockedInvocationsSize.set(backplaneStatus.getBlockedInvocationsSize());
+                  updateReadThroughCacheStats();
                 } catch (InterruptedException e) {
                   Thread.currentThread().interrupt();
                   break;
@@ -487,6 +519,29 @@ public class ShardInstance extends AbstractServerInstance {
               }
             },
             "Prometheus Metrics Collector");
+  }
+
+  private void updateReadThroughCacheStats() {
+
+    // extract metrics from the instance's local action cache
+    String name = getName();
+    long size = readThroughActionCache.size();
+    CacheStats stats = readThroughActionCache.stats();
+
+    // publish those metrics
+    localActionCacheSize.labels(name).set(size);
+    localActionCacheRequestCount.labels(name).set(stats.requestCount());
+    localActionCacheHitCount.labels(name).set(stats.hitCount());
+    localActionCacheHitRate.labels(name).set(stats.hitRate());
+    localActionCacheMissCount.labels(name).set(stats.missCount());
+    localActionCacheMissRate.labels(name).set(stats.hitRate());
+    localActionLoadCount.labels(name).set(stats.loadCount());
+    localActionLoadSuccessCount.labels(name).set(stats.loadSuccessCount());
+    localActionLoadExceptionCount.labels(name).set(stats.loadExceptionCount());
+    localActionCacheLoadExceptionRate.labels(name).set(stats.loadExceptionRate());
+    localActionCacheTotalLoadTime.labels(name).set(stats.totalLoadTime());
+    localActionCacheAverageLoadPenalty.labels(name).set(stats.averageLoadPenalty());
+    localActionCacheEvictionCount.labels(name).set(stats.evictionCount());
   }
 
   private void updateQueueSizes(List<QueueStatus> queues) {

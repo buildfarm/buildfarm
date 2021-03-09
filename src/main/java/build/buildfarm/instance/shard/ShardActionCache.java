@@ -24,6 +24,7 @@ import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.cache.CacheBuilder;
 import build.buildfarm.common.cache.CacheLoader;
 import build.buildfarm.common.cache.CacheLoader.InvalidCacheLoadException;
+import build.buildfarm.common.cache.CacheStats;
 import build.buildfarm.common.cache.LoadingCache;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
@@ -82,5 +83,15 @@ class ShardActionCache implements ReadThroughActionCache {
   @Override
   public void readThrough(ActionKey actionKey, ActionResult actionResult) {
     actionResultCache.put(actionKey, actionResult);
+  }
+
+  @Override
+  public long size() {
+    return actionResultCache.size();
+  }
+
+  @Override
+  public CacheStats stats() {
+    return actionResultCache.stats();
   }
 }

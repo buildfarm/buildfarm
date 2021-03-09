@@ -17,9 +17,14 @@ package build.buildfarm.instance.shard;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.buildfarm.ac.ActionCache;
 import build.buildfarm.common.DigestUtil.ActionKey;
+import build.buildfarm.common.cache.CacheStats;
 
 interface ReadThroughActionCache extends ActionCache {
   void invalidate(ActionKey actionKey);
 
   void readThrough(ActionKey actionKey, ActionResult actionResult);
+
+  long size();
+
+  public CacheStats stats();
 }
