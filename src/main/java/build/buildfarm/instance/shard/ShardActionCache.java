@@ -21,12 +21,13 @@ import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.DigestUtil.ActionKey;
-import build.buildfarm.common.cache.CacheBuilder;
-import build.buildfarm.common.cache.CacheLoader;
-import build.buildfarm.common.cache.CacheLoader.InvalidCacheLoadException;
-import build.buildfarm.common.cache.LoadingCache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
+import com.google.common.cache.LoadingCache;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.SettableFuture;
 import io.grpc.Status;
 import java.io.IOException;
 
@@ -42,25 +43,27 @@ class ShardActionCache implements ReadThroughActionCache {
             .build(
                 new CacheLoader<ActionKey, ActionResult>() {
                   @Override
-                  public ListenableFuture<ActionResult> load(ActionKey actionKey) {
-                    return catching(
-                        service.submit(() -> backplane.getActionResult(actionKey)),
-                        IOException.class,
-                        e -> {
-                          throw Status.fromThrowable(e).asRuntimeException();
-                        },
-                        directExecutor());
+                  public ActionResult load(ActionKey actionKey) {
+                    try {
+                      return backplane.getActionResult(actionKey);
+                    } catch (Exception e) {
+                      return null;
+                    }
                   }
                 });
   }
 
   @Override
   public ListenableFuture<ActionResult> get(ActionKey actionKey) {
+    SettableFuture<ActionResult> result = SettableFuture.create();
+
+    try {
+      result.set(actionResultCache.get(actionKey));
+    } catch (Exception e) {
+      result.setException(e);
+    }
     return catching(
-        checkNotNull(actionResultCache.get(actionKey)),
-        InvalidCacheLoadException.class,
-        e -> null,
-        directExecutor());
+        checkNotNull(result), InvalidCacheLoadException.class, e -> null, directExecutor());
   }
 
   @Override

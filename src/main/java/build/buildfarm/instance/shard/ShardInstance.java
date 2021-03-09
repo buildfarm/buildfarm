@@ -67,9 +67,6 @@ import build.buildfarm.common.TreeIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
-import build.buildfarm.common.cache.Cache;
-import build.buildfarm.common.cache.CacheBuilder;
-import build.buildfarm.common.cache.CacheLoader.InvalidCacheLoadException;
 import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.MatchListener;
@@ -90,6 +87,9 @@ import build.buildfarm.v1test.Tree;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Throwables;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
@@ -1195,21 +1195,34 @@ public class ShardInstance extends AbstractServerInstance {
         () ->
             notFoundNull(
                 expect(directoryBlobDigest, Directory.parser(), executor, requestMetadata));
-    // is there a better interface to use for the cache with these nice futures?
+
+    SettableFuture<Directory> directoryFuture = SettableFuture.create();
+
+    try {
+      directoryFuture.set(
+          directoryCache.get(
+              directoryBlobDigest,
+              new Callable<Directory>() {
+                @Override
+                public Directory call() {
+                  logger.log(
+                      Level.FINE,
+                      format(
+                          "transformQueuedOperation(%s): fetching directory %s",
+                          reason, DigestUtil.toString(directoryBlobDigest)));
+
+                  try {
+                    return fetcher.get().get();
+                  } catch (Exception e) {
+                    return null;
+                  }
+                }
+              }));
+    } catch (Exception e) {
+      directoryFuture.setException(e);
+    }
     return catching(
-        directoryCache.get(
-            directoryBlobDigest,
-            new Callable<ListenableFuture<? extends Directory>>() {
-              @Override
-              public ListenableFuture<Directory> call() {
-                logger.log(
-                    Level.FINE,
-                    format(
-                        "transformQueuedOperation(%s): fetching directory %s",
-                        reason, DigestUtil.toString(directoryBlobDigest)));
-                return fetcher.get();
-              }
-            }),
+        directoryFuture,
         InvalidCacheLoadException.class,
         (e) -> {
           return null;
@@ -1239,15 +1252,29 @@ public class ShardInstance extends AbstractServerInstance {
       Digest commandBlobDigest, Executor executor, RequestMetadata requestMetadata) {
     Supplier<ListenableFuture<Command>> fetcher =
         () -> notFoundNull(expect(commandBlobDigest, Command.parser(), executor, requestMetadata));
+
+    SettableFuture<Command> commandFuture = SettableFuture.create();
+
+    try {
+      commandFuture.set(
+          commandCache.get(
+              commandBlobDigest,
+              new Callable<Command>() {
+                @Override
+                public Command call() {
+                  try {
+                    return fetcher.get().get();
+                  } catch (Exception e) {
+                    return null;
+                  }
+                }
+              }));
+    } catch (Exception e) {
+      commandFuture.setException(e);
+    }
+
     return catching(
-        commandCache.get(
-            commandBlobDigest,
-            new Callable<ListenableFuture<? extends Command>>() {
-              @Override
-              public ListenableFuture<Command> call() {
-                return fetcher.get();
-              }
-            }),
+        commandFuture,
         InvalidCacheLoadException.class,
         (e) -> {
           return null;
@@ -1259,15 +1286,30 @@ public class ShardInstance extends AbstractServerInstance {
       Digest actionBlobDigest, Executor executor, RequestMetadata requestMetadata) {
     Supplier<ListenableFuture<Action>> fetcher =
         () -> notFoundNull(expect(actionBlobDigest, Action.parser(), executor, requestMetadata));
+
+    SettableFuture<Action> actionFuture = SettableFuture.create();
+
+    try {
+      actionFuture.set(
+          actionCache.get(
+              actionBlobDigest,
+              new Callable<Action>() {
+                @Override
+                public Action call() {
+                  try {
+                    return fetcher.get().get();
+                  } catch (Exception e) {
+                    return null;
+                  }
+                }
+              }));
+
+    } catch (Exception e) {
+      actionFuture.setException(e);
+    }
+
     return catching(
-        actionCache.get(
-            actionBlobDigest,
-            new Callable<ListenableFuture<? extends Action>>() {
-              @Override
-              public ListenableFuture<Action> call() {
-                return fetcher.get();
-              }
-            }),
+        actionFuture,
         InvalidCacheLoadException.class,
         (e) -> {
           return null;
