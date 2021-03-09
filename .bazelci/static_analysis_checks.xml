@@ -10,13 +10,8 @@
   </description>
 
 <rule ref="category/java/bestpractices.xml">
-    <exclude name="AbstractClassWithoutAbstractMethod"/>
-    <exclude name="AccessorClassGeneration"/>
-    <exclude name="AccessorMethodGeneration"/>
     <exclude name="ArrayIsStoredDirectly"/>
-    <exclude name="AvoidMessageDigestField"/>
     <exclude name="AvoidPrintStackTrace"/>
-    <exclude name="AvoidReassigningCatchVariables"/>
     <exclude name="AvoidReassigningLoopVariables"/>
     <exclude name="AvoidReassigningParameters"/>
     <exclude name="AvoidStringBufferField"/>
@@ -303,29 +298,11 @@
 </rule>
 
 <rule ref="category/java/performance.xml">
-    <exclude name="AddEmptyString"/>
-    <exclude name="AppendCharacterWithChar"/>
-    <exclude name="AvoidArrayLoops"/>
     <exclude name="AvoidCalendarDateCreation"/>
     <exclude name="AvoidFileStream"/>
     <exclude name="AvoidInstantiatingObjectsInLoops"/>
-    <exclude name="AvoidUsingShortType"/>
-    <exclude name="BigIntegerInstantiation"/>
-    <exclude name="BooleanInstantiation"/>
-    <exclude name="ByteInstantiation"/>
-    <exclude name="ConsecutiveAppendsShouldReuse"/>
-    <exclude name="ConsecutiveLiteralAppends"/>
-    <exclude name="InefficientEmptyStringCheck"/>
-    <exclude name="InefficientStringBuffering"/>
-    <exclude name="InsufficientStringBufferDeclaration"/>
-    <exclude name="IntegerInstantiation"/>
-    <exclude name="LongInstantiation"/>
     <exclude name="OptimizableToArrayCall"/>
     <exclude name="RedundantFieldInitializer"/>
-    <exclude name="ShortInstantiation"/>
-    <exclude name="SimplifyStartsWith"/>
-    <exclude name="StringInstantiation"/>
-    <exclude name="StringToString"/>
     <exclude name="TooFewBranchesForASwitchStatement"/>
     <exclude name="UnnecessaryWrapperObjectCreation"/>
     <exclude name="UseArrayListInsteadOfVector"/>
@@ -334,7 +311,6 @@
     <exclude name="UseIOStreamsWithApacheCommonsFileItem"/>
     <exclude name="UselessStringValueOf"/>
     <exclude name="UseStringBufferForStringAppends"/>
-    <exclude name="UseStringBufferLength"/>
 </rule>
 
 <rule ref="category/java/security.xml">
