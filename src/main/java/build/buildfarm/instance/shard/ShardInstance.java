@@ -571,24 +571,24 @@ public class ShardInstance extends AbstractServerInstance {
   private void updateReadThroughCacheStats() {
 
     // extract metrics from the instance's local action cache
-    // String name = getName();
-    // long size = readThroughActionCache.size();
-    // CacheStats stats = readThroughActionCache.stats();
+    String name = getName();
+    long size = readThroughActionCache.size();
+    CacheStats stats = readThroughActionCache.stats();
 
-    // // publish those metrics
-    // localActionCacheSize.labels(name).set(size);
-    // localActionCacheRequestCount.labels(name).set(stats.requestCount());
-    // localActionCacheHitCount.labels(name).set(stats.hitCount());
-    // localActionCacheHitRate.labels(name).set(stats.hitRate());
-    // localActionCacheMissCount.labels(name).set(stats.missCount());
-    // localActionCacheMissRate.labels(name).set(stats.hitRate());
-    // localActionLoadCount.labels(name).set(stats.loadCount());
-    // localActionLoadSuccessCount.labels(name).set(stats.loadSuccessCount());
-    // localActionLoadExceptionCount.labels(name).set(stats.loadExceptionCount());
-    // localActionCacheLoadExceptionRate.labels(name).set(stats.loadExceptionRate());
-    // localActionCacheTotalLoadTime.labels(name).set(stats.totalLoadTime());
-    // localActionCacheAverageLoadPenalty.labels(name).set(stats.averageLoadPenalty());
-    // localActionCacheEvictionCount.labels(name).set(stats.evictionCount());
+    // publish those metrics
+    localActionCacheSize.labels(name).set(size);
+    localActionCacheRequestCount.labels(name).set(stats.requestCount());
+    localActionCacheHitCount.labels(name).set(stats.hitCount());
+    localActionCacheHitRate.labels(name).set(stats.hitRate());
+    localActionCacheMissCount.labels(name).set(stats.missCount());
+    localActionCacheMissRate.labels(name).set(stats.hitRate());
+    localActionLoadCount.labels(name).set(stats.loadCount());
+    localActionLoadSuccessCount.labels(name).set(stats.loadSuccessCount());
+    localActionLoadExceptionCount.labels(name).set(stats.loadExceptionCount());
+    localActionCacheLoadExceptionRate.labels(name).set(stats.loadExceptionRate());
+    localActionCacheTotalLoadTime.labels(name).set(stats.totalLoadTime());
+    localActionCacheAverageLoadPenalty.labels(name).set(stats.averageLoadPenalty());
+    localActionCacheEvictionCount.labels(name).set(stats.evictionCount());
   }
 
   private void updateQueueSizes(List<QueueStatus> queues) {
