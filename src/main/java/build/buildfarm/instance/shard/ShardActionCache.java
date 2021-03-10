@@ -17,25 +17,22 @@ package build.buildfarm.instance.shard;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.util.concurrent.Futures.catching;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
-import static net.javacrumbs.futureconverter.java8guava.FutureConverter.toListenableFuture;
 import static net.javacrumbs.futureconverter.java8guava.FutureConverter.toCompletableFuture;
+import static net.javacrumbs.futureconverter.java8guava.FutureConverter.toListenableFuture;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.DigestUtil.ActionKey;
-import com.github.benmanes.caffeine.cache.CacheLoader;
-import java.util.concurrent.Executor;
 import com.github.benmanes.caffeine.cache.AsyncCacheLoader;
-import com.github.benmanes.caffeine.cache.Caffeine;
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.LoadingCache;
 import com.github.benmanes.caffeine.cache.AsyncLoadingCache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
-import java.util.concurrent.CompletableFuture;
-import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
 import io.grpc.Status;
 import java.io.IOException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 
 class ShardActionCache implements ReadThroughActionCache {
   private final Backplane backplane;
@@ -43,24 +40,24 @@ class ShardActionCache implements ReadThroughActionCache {
 
   ShardActionCache(int maxLocalCacheSize, Backplane backplane, ListeningExecutorService service) {
     this.backplane = backplane;
-    actionResultCache =
-        Caffeine.newBuilder()
-            .maximumSize(maxLocalCacheSize)
-            .buildAsync(
-                new AsyncCacheLoader<ActionKey, ActionResult>() {
-                  
-                  @Override
-                  public CompletableFuture<ActionResult> asyncLoad​(ActionKey actionKey, Executor executor) {
-                    return toCompletableFuture(catching(
-                        service.submit(() -> backplane.getActionResult(actionKey)),
-                        IOException.class,
-                        e -> {
-                          throw Status.fromThrowable(e).asRuntimeException();
-                        },
-                        executor));
-                  }
-                  
-                });
+
+    AsyncCacheLoader<ActionKey, ActionResult> loader =
+        new AsyncCacheLoader<ActionKey, ActionResult>() {
+
+          @Override
+          public CompletableFuture<ActionResult> asyncLoad(ActionKey actionKey, Executor executor) {
+            return toCompletableFuture(
+                catching(
+                    service.submit(() -> backplane.getActionResult(actionKey)),
+                    IOException.class,
+                    e -> {
+                      throw Status.fromThrowable(e).asRuntimeException();
+                    },
+                    executor));
+          }
+        };
+
+    actionResultCache = Caffeine.newBuilder().maximumSize(maxLocalCacheSize).buildAsync(loader);
   }
 
   @Override
