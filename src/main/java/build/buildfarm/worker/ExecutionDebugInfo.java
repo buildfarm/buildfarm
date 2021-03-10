@@ -26,21 +26,21 @@ public class ExecutionDebugInfo {
    * @brief A description of the data for how it was populated.
    * @details This is useful for knowing if it was populated before/after the execution.
    */
-  public String description = new String();
+  public String description = "";
 
   /**
    * @field command
    * @brief The command that buildfarm is running for the action.
    * @details The original command of the action is often modified with execution wrappers.
    */
-  public String command = new String();
+  public String command = "";
 
   /**
    * @field workingDirectory
    * @brief The working directory when running the action.
    * @details This correlates the command field.
    */
-  public String workingDirectory = new String();
+  public String workingDirectory = "";
 
   /**
    * @field limits
