@@ -6,7 +6,7 @@ java_library(
         "//src/main/java/build/buildfarm/backplane",
         "//src/main/java/build/buildfarm/cas",
         "//src/main/java/build/buildfarm/common",
-        "//src/main/java/build/buildfarm/common/cache",
+        "@maven//:com_github_ben_manes_caffeine_caffeine",
         "//src/main/java/build/buildfarm/common/grpc",
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/instance/memory",

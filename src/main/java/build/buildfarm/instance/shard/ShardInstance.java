@@ -67,9 +67,6 @@ import build.buildfarm.common.TreeIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
-import build.buildfarm.common.cache.Cache;
-import build.buildfarm.common.cache.CacheBuilder;
-import build.buildfarm.common.cache.CacheLoader.InvalidCacheLoadException;
 import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.MatchListener;
@@ -87,9 +84,12 @@ import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ShardInstanceConfig;
 import build.buildfarm.v1test.Tree;
+import com.github.benmanes.caffeine.cache.AsyncCache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Throwables;
+import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
@@ -135,6 +135,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
@@ -142,6 +143,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.logging.Level;
@@ -193,15 +195,14 @@ public class ShardInstance extends AbstractServerInstance {
   private final com.google.common.cache.LoadingCache<String, Instance> workerStubs;
   private final Thread dispatchedMonitor;
   private final Duration maxActionTimeout;
-  private final Cache<Digest, Directory> directoryCache =
-      CacheBuilder.newBuilder().maximumSize(64 * 1024).build();
-  private final Cache<Digest, Command> commandCache =
-      CacheBuilder.newBuilder().maximumSize(64 * 1024).build();
-  private final Cache<Digest, Action> actionCache =
-      CacheBuilder.newBuilder().maximumSize(64 * 1024).build();
-  private final com.google.common.cache.Cache<RequestMetadata, Boolean>
-      recentCacheServedExecutions =
-          com.google.common.cache.CacheBuilder.newBuilder().maximumSize(64 * 1024).build();
+  private final AsyncCache<Digest, Directory> directoryCache =
+      Caffeine.newBuilder().newBuilder().maximumSize(64 * 1024).buildAsync();
+  private final AsyncCache<Digest, Command> commandCache =
+      Caffeine.newBuilder().newBuilder().maximumSize(64 * 1024).buildAsync();
+  private final AsyncCache<Digest, Action> actionCache =
+      Caffeine.newBuilder().newBuilder().maximumSize(64 * 1024).buildAsync();
+  private final AsyncCache<RequestMetadata, Boolean> recentCacheServedExecutions =
+      Caffeine.newBuilder().newBuilder().maximumSize(64 * 1024).buildAsync();
 
   private final Random rand = new Random();
   private final Writes writes = new Writes(this::writeInstanceSupplier);
@@ -1195,26 +1196,29 @@ public class ShardInstance extends AbstractServerInstance {
         () ->
             notFoundNull(
                 expect(directoryBlobDigest, Directory.parser(), executor, requestMetadata));
-    // is there a better interface to use for the cache with these nice futures?
-    return catching(
-        directoryCache.get(
-            directoryBlobDigest,
-            new Callable<ListenableFuture<? extends Directory>>() {
-              @Override
-              public ListenableFuture<Directory> call() {
-                logger.log(
-                    Level.FINE,
-                    format(
-                        "transformQueuedOperation(%s): fetching directory %s",
-                        reason, DigestUtil.toString(directoryBlobDigest)));
-                return fetcher.get();
-              }
-            }),
-        InvalidCacheLoadException.class,
-        (e) -> {
-          return null;
-        },
-        directExecutor());
+
+    BiFunction<Digest, Executor, CompletableFuture<? extends Directory>> getCallback =
+        new BiFunction<Digest, Executor, CompletableFuture<? extends Directory>>() {
+          @Override
+          public CompletableFuture<Directory> apply(Digest digest, Executor executor) {
+            //   // logger.log(
+            //   //     Level.FINE,
+            //   //     format(
+            //   //         "transformQueuedOperation(%s): fetching directory %s",
+            //   //         reason, DigestUtil.toString(directoryBlobDigest)));
+            //   // return fetcher.get();
+            return null;
+          }
+        };
+
+    // return catching(
+    //     directoryCache.get(directoryBlobDigest, getCallback),
+    //     InvalidCacheLoadException.class,
+    //     (e) -> {
+    //       return null;
+    //     },
+    //     directExecutor());
+    return null;
   }
 
   @Override
@@ -1239,40 +1243,54 @@ public class ShardInstance extends AbstractServerInstance {
       Digest commandBlobDigest, Executor executor, RequestMetadata requestMetadata) {
     Supplier<ListenableFuture<Command>> fetcher =
         () -> notFoundNull(expect(commandBlobDigest, Command.parser(), executor, requestMetadata));
-    return catching(
-        commandCache.get(
-            commandBlobDigest,
-            new Callable<ListenableFuture<? extends Command>>() {
-              @Override
-              public ListenableFuture<Command> call() {
-                return fetcher.get();
+        
+    BiFunction<Digest, Executor, CompletableFuture<? extends Command>> getCallback =
+        new BiFunction<Digest, Executor, CompletableFuture<? extends Command>>() {
+          @Override
+          public CompletableFuture<Command> apply(Digest digest, Executor executor) {
+                // return fetcher.get();
+                return null;
               }
-            }),
-        InvalidCacheLoadException.class,
-        (e) -> {
-          return null;
-        },
-        directExecutor());
+            };
+            
+    // return catching(
+    //     commandCache.get(
+    //         commandBlobDigest,getCallback),
+    //     InvalidCacheLoadException.class,
+    //     (e) -> {
+    //       return null;
+    //     },
+    //     directExecutor());
+    
+    return null;
   }
 
   ListenableFuture<Action> expectAction(
       Digest actionBlobDigest, Executor executor, RequestMetadata requestMetadata) {
     Supplier<ListenableFuture<Action>> fetcher =
         () -> notFoundNull(expect(actionBlobDigest, Action.parser(), executor, requestMetadata));
-    return catching(
-        actionCache.get(
-            actionBlobDigest,
-            new Callable<ListenableFuture<? extends Action>>() {
-              @Override
-              public ListenableFuture<Action> call() {
-                return fetcher.get();
+        
+        
+    BiFunction<Digest, Executor, CompletableFuture<? extends Action>> getCallback =
+        new BiFunction<Digest, Executor, CompletableFuture<? extends Action>>() {
+          @Override
+          public CompletableFuture<Action> apply(Digest digest, Executor executor) {
+                // return fetcher.get();
+                return null;
               }
-            }),
-        InvalidCacheLoadException.class,
-        (e) -> {
-          return null;
-        },
-        directExecutor());
+            };
+            
+    // return catching(
+    //     actionCache.get(
+    //         actionBlobDigest,
+    //         getCallback),
+    //     InvalidCacheLoadException.class,
+    //     (e) -> {
+    //       return null;
+    //     },
+    //     directExecutor());
+    
+    return null;
   }
 
   private void removeMalfunctioningWorker(String worker, Throwable t, String context) {
@@ -1904,7 +1922,7 @@ public class ShardInstance extends AbstractServerInstance {
       Operation operation,
       RequestMetadata requestMetadata)
       throws Exception {
-    recentCacheServedExecutions.put(requestMetadata, true);
+    recentCacheServedExecutions.put(requestMetadata, CompletableFuture.completedFuture(true));
 
     ExecuteOperationMetadata completeMetadata =
         ExecuteOperationMetadata.newBuilder()

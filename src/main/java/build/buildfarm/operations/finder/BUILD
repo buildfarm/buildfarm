@@ -8,7 +8,7 @@ java_library(
     deps = [
         "//src/main/java/build/buildfarm/ac",
         "//src/main/java/build/buildfarm/common",
-        "//src/main/java/build/buildfarm/common/cache",
+        "@maven//:com_github_ben_manes_caffeine_caffeine",
         "//src/main/java/build/buildfarm/common/grpc",
         "//src/main/java/build/buildfarm/common/redis",
         "//src/main/java/build/buildfarm/instance",
