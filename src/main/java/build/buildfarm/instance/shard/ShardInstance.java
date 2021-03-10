@@ -1198,8 +1198,8 @@ public class ShardInstance extends AbstractServerInstance {
             notFoundNull(
                 expect(directoryBlobDigest, Directory.parser(), executor, requestMetadata));
 
-    BiFunction<Digest, Executor, CompletableFuture<? extends Directory>> getCallback =
-        new BiFunction<Digest, Executor, CompletableFuture<? extends Directory>>() {
+    BiFunction<Digest, Executor, CompletableFuture<Directory>> getCallback =
+        new BiFunction<Digest, Executor, CompletableFuture<Directory>>() {
           @Override
           public CompletableFuture<Directory> apply(Digest digest, Executor executor) {
             logger.log(
@@ -1243,8 +1243,8 @@ public class ShardInstance extends AbstractServerInstance {
     Supplier<ListenableFuture<Command>> fetcher =
         () -> notFoundNull(expect(commandBlobDigest, Command.parser(), executor, requestMetadata));
 
-    BiFunction<Digest, Executor, CompletableFuture<? extends Command>> getCallback =
-        new BiFunction<Digest, Executor, CompletableFuture<? extends Command>>() {
+    BiFunction<Digest, Executor, CompletableFuture<Command>> getCallback =
+        new BiFunction<Digest, Executor, CompletableFuture<Command>>() {
           @Override
           public CompletableFuture<Command> apply(Digest digest, Executor executor) {
             return toCompletableFuture(fetcher.get());
@@ -1265,8 +1265,8 @@ public class ShardInstance extends AbstractServerInstance {
     Supplier<ListenableFuture<Action>> fetcher =
         () -> notFoundNull(expect(actionBlobDigest, Action.parser(), executor, requestMetadata));
 
-    BiFunction<Digest, Executor, CompletableFuture<? extends Action>> getCallback =
-        new BiFunction<Digest, Executor, CompletableFuture<? extends Action>>() {
+    BiFunction<Digest, Executor, CompletableFuture<Action>> getCallback =
+        new BiFunction<Digest, Executor, CompletableFuture<Action>>() {
           @Override
           public CompletableFuture<Action> apply(Digest digest, Executor executor) {
             return toCompletableFuture(fetcher.get());
