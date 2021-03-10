@@ -67,7 +67,6 @@ import build.buildfarm.common.Poller;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
-import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
@@ -92,6 +91,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Throwables;
+import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
@@ -1202,12 +1202,12 @@ public class ShardInstance extends AbstractServerInstance {
         new BiFunction<Digest, Executor, CompletableFuture<? extends Directory>>() {
           @Override
           public CompletableFuture<Directory> apply(Digest digest, Executor executor) {
-              logger.log(
-                  Level.FINE,
-                  format(
-                      "transformQueuedOperation(%s): fetching directory %s",
-                      reason, DigestUtil.toString(directoryBlobDigest)));
-              return toCompletableFuture(fetcher.get());
+            logger.log(
+                Level.FINE,
+                format(
+                    "transformQueuedOperation(%s): fetching directory %s",
+                    reason, DigestUtil.toString(directoryBlobDigest)));
+            return toCompletableFuture(fetcher.get());
           }
         };
 
@@ -1252,13 +1252,12 @@ public class ShardInstance extends AbstractServerInstance {
         };
 
     return catching(
-        toListenableFuture(commandCache.get(commandBlobDigest,getCallback)),
+        toListenableFuture(commandCache.get(commandBlobDigest, getCallback)),
         InvalidCacheLoadException.class,
         (e) -> {
           return null;
         },
         directExecutor());
-
   }
 
   ListenableFuture<Action> expectAction(
@@ -1275,9 +1274,7 @@ public class ShardInstance extends AbstractServerInstance {
         };
 
     return catching(
-        toListenableFuture(actionCache.get(
-            actionBlobDigest,
-            getCallback)),
+        toListenableFuture(actionCache.get(actionBlobDigest, getCallback)),
         InvalidCacheLoadException.class,
         (e) -> {
           return null;
