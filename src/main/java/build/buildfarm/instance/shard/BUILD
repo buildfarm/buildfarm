@@ -34,5 +34,6 @@ java_library(
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
         "@maven//:org_redisson_redisson",
+        "@maven//:net_javacrumbs_future_converter_future_converter_java8_guava",
     ],
 )

@@ -89,7 +89,6 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Throwables;
-import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
@@ -134,7 +133,6 @@ import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
@@ -1243,16 +1241,16 @@ public class ShardInstance extends AbstractServerInstance {
       Digest commandBlobDigest, Executor executor, RequestMetadata requestMetadata) {
     Supplier<ListenableFuture<Command>> fetcher =
         () -> notFoundNull(expect(commandBlobDigest, Command.parser(), executor, requestMetadata));
-        
+
     BiFunction<Digest, Executor, CompletableFuture<? extends Command>> getCallback =
         new BiFunction<Digest, Executor, CompletableFuture<? extends Command>>() {
           @Override
           public CompletableFuture<Command> apply(Digest digest, Executor executor) {
-                // return fetcher.get();
-                return null;
-              }
-            };
-            
+            // return fetcher.get();
+            return null;
+          }
+        };
+
     // return catching(
     //     commandCache.get(
     //         commandBlobDigest,getCallback),
@@ -1261,7 +1259,7 @@ public class ShardInstance extends AbstractServerInstance {
     //       return null;
     //     },
     //     directExecutor());
-    
+
     return null;
   }
 
@@ -1269,17 +1267,16 @@ public class ShardInstance extends AbstractServerInstance {
       Digest actionBlobDigest, Executor executor, RequestMetadata requestMetadata) {
     Supplier<ListenableFuture<Action>> fetcher =
         () -> notFoundNull(expect(actionBlobDigest, Action.parser(), executor, requestMetadata));
-        
-        
+
     BiFunction<Digest, Executor, CompletableFuture<? extends Action>> getCallback =
         new BiFunction<Digest, Executor, CompletableFuture<? extends Action>>() {
           @Override
           public CompletableFuture<Action> apply(Digest digest, Executor executor) {
-                // return fetcher.get();
-                return null;
-              }
-            };
-            
+            // return fetcher.get();
+            return null;
+          }
+        };
+
     // return catching(
     //     actionCache.get(
     //         actionBlobDigest,
@@ -1289,7 +1286,7 @@ public class ShardInstance extends AbstractServerInstance {
     //       return null;
     //     },
     //     directExecutor());
-    
+
     return null;
   }
 

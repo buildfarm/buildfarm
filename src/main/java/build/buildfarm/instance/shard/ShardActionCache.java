@@ -17,6 +17,8 @@ package build.buildfarm.instance.shard;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.util.concurrent.Futures.catching;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+import static net.javacrumbs.futureconverter.java8guava.FutureConverter.toListenableFuture;
+import static net.javacrumbs.futureconverter.java8guava.FutureConverter.toCompletableFuture;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.buildfarm.backplane.Backplane;
@@ -31,6 +33,7 @@ import com.github.benmanes.caffeine.cache.AsyncLoadingCache;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import java.util.concurrent.CompletableFuture;
+import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
 import io.grpc.Status;
 import java.io.IOException;
 
@@ -45,28 +48,28 @@ class ShardActionCache implements ReadThroughActionCache {
             .maximumSize(maxLocalCacheSize)
             .buildAsync(
                 new AsyncCacheLoader<ActionKey, ActionResult>() {
+                  
                   @Override
                   public CompletableFuture<ActionResult> asyncLoad​(ActionKey actionKey, Executor executor) {
-                    // return catching(
-                    //     service.submit(() -> backplane.getActionResult(actionKey)),
-                    //     IOException.class,
-                    //     e -> {
-                    //       throw Status.fromThrowable(e).asRuntimeException();
-                    //     },
-                    //     directExecutor());
-                    return null;
+                    return toCompletableFuture(catching(
+                        service.submit(() -> backplane.getActionResult(actionKey)),
+                        IOException.class,
+                        e -> {
+                          throw Status.fromThrowable(e).asRuntimeException();
+                        },
+                        executor));
                   }
+                  
                 });
   }
 
   @Override
   public ListenableFuture<ActionResult> get(ActionKey actionKey) {
-    // return catching(
-    //     checkNotNull(actionResultCache.get(actionKey)),
-    //     InvalidCacheLoadException.class,
-    //     e -> null,
-    //     directExecutor());
-    return null;
+    return catching(
+        checkNotNull(toListenableFuture(actionResultCache.get(actionKey))),
+        InvalidCacheLoadException.class,
+        e -> null,
+        directExecutor());
   }
 
   @Override

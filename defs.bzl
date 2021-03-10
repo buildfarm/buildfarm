@@ -78,6 +78,7 @@ def buildfarm_init(name = "buildfarm"):
                         "com.google.code.gson:gson:2.8.6",
                         "com.jayway.jsonpath:json-path:2.4.0",
                         "com.github.ben-manes.caffeine:caffeine:3.0.0",
+                        "net.javacrumbs.future-converter:future-converter-java8-guava:1.2.0",
                     ] + ["io.netty:netty-%s:4.1.38.Final" % module for module in IO_NETTY_MODULES] +
                     ["io.grpc:grpc-%s:1.26.0" % module for module in IO_GRPC_MODULES] +
                     [
