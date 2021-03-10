@@ -37,10 +37,10 @@ import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.instance.server.AbstractServerInstance;
 import build.buildfarm.operations.FindOperationsResults;
+import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.GetClientStartTimeResult;
-import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ShardWorkerInstanceConfig;
@@ -222,7 +222,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  public OperationsStatus operationsStatus() {
+  public BackplaneStatus backplaneStatus() {
     throw new UnsupportedOperationException();
   }
 

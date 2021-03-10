@@ -43,20 +43,19 @@ import build.buildfarm.instance.shard.RedisShardSubscriber.TimedWatchFuture;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.operations.FindOperationsSettings;
 import build.buildfarm.operations.finder.OperationsFinder;
+import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.DispatchedOperation;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationChange;
-import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.ProvisionedQueue;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.RedisShardBackplaneConfig;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.WorkerChange;
-import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -138,8 +137,6 @@ public class RedisShardBackplane implements Backplane {
   private final String source; // used in operation change publication
   private final Function<Operation, Operation> onPublish;
   private final Function<Operation, Operation> onComplete;
-  private final Predicate<Operation> isPrequeued;
-  private final Predicate<Operation> isDispatched;
   private final Supplier<JedisCluster> jedisClusterFactory;
 
   private @Nullable InterruptingRunnable onUnsubscribe = null;
@@ -156,6 +153,8 @@ public class RedisShardBackplane implements Backplane {
   private long workerSetExpiresAt = 0;
 
   private RedisMap actionCache;
+  private RedisMap blockedActions;
+  private RedisMap blockedInvocations;
   private BalancedRedisQueue prequeue;
   private OperationQueue operationQueue;
   private CasWorkerMap casWorkerMap;
@@ -164,18 +163,9 @@ public class RedisShardBackplane implements Backplane {
       RedisShardBackplaneConfig config,
       String source,
       Function<Operation, Operation> onPublish,
-      Function<Operation, Operation> onComplete,
-      Predicate<Operation> isPrequeued,
-      Predicate<Operation> isDispatched)
+      Function<Operation, Operation> onComplete)
       throws ConfigurationException {
-    this(
-        config,
-        source,
-        onPublish,
-        onComplete,
-        isPrequeued,
-        isDispatched,
-        JedisClusterFactory.create(config));
+    this(config, source, onPublish, onComplete, JedisClusterFactory.create(config));
   }
 
   public RedisShardBackplane(
@@ -183,15 +173,11 @@ public class RedisShardBackplane implements Backplane {
       String source,
       Function<Operation, Operation> onPublish,
       Function<Operation, Operation> onComplete,
-      Predicate<Operation> isPrequeued,
-      Predicate<Operation> isDispatched,
       Supplier<JedisCluster> jedisClusterFactory) {
     this.config = config;
     this.source = source;
     this.onPublish = onPublish;
     this.onComplete = onComplete;
-    this.isPrequeued = isPrequeued;
-    this.isDispatched = isDispatched;
     this.jedisClusterFactory = jedisClusterFactory;
   }
 
@@ -530,6 +516,8 @@ public class RedisShardBackplane implements Backplane {
     actionCache = createActionCache(client, config);
     prequeue = createPrequeue(client, config);
     operationQueue = createOperationQueue(client, config);
+    blockedActions = new RedisMap(config.getActionBlacklistPrefix());
+    blockedInvocations = new RedisMap(config.getInvocationBlacklistPrefix());
 
     if (config.getSubscribeToBackplane()) {
       startSubscriptionThread();
@@ -857,7 +845,7 @@ public class RedisShardBackplane implements Backplane {
   @Override
   public void blacklistAction(String actionId) throws IOException {
     client.run(
-        jedis -> jedis.setex(actionBlacklistKey(actionId), config.getActionBlacklistExpire(), ""));
+        jedis -> blockedActions.insert(jedis, actionId, "", config.getActionBlacklistExpire()));
   }
 
   @Override
@@ -1396,14 +1384,6 @@ public class RedisShardBackplane implements Backplane {
     return config.getDispatchingPrefix() + ":" + operationName;
   }
 
-  private String actionBlacklistKey(String actionId) {
-    return config.getActionBlacklistPrefix() + ":" + actionId;
-  }
-
-  private String invocationBlacklistKey(String toolInvocationId) {
-    return config.getInvocationBlacklistPrefix() + ":" + toolInvocationId;
-  }
-
   public static String parseOperationChannel(String channel) {
     return channel.split(":")[1];
   }
@@ -1423,10 +1403,13 @@ public class RedisShardBackplane implements Backplane {
   }
 
   private boolean isBlacklisted(JedisCluster jedis, RequestMetadata requestMetadata) {
-    return (!requestMetadata.getActionId().isEmpty()
-            && jedis.exists(actionBlacklistKey(requestMetadata.getActionId())))
-        || (!requestMetadata.getToolInvocationId().isEmpty()
-            && jedis.exists(invocationBlacklistKey(requestMetadata.getToolInvocationId())));
+    boolean isActionBlocked =
+        (!requestMetadata.getActionId().isEmpty()
+            && blockedActions.exists(jedis, requestMetadata.getActionId()));
+    boolean isInvocationBlocked =
+        (!requestMetadata.getToolInvocationId().isEmpty()
+            && blockedInvocations.exists(jedis, requestMetadata.getToolInvocationId()));
+    return isActionBlocked || isInvocationBlocked;
   }
 
   @Override
@@ -1442,15 +1425,17 @@ public class RedisShardBackplane implements Backplane {
   }
 
   @Override
-  public OperationsStatus operationsStatus() throws IOException {
+  public BackplaneStatus backplaneStatus() throws IOException {
     int casLookupSize = casWorkerMap.size(client);
     return client.call(
         jedis ->
-            OperationsStatus.newBuilder()
+            BackplaneStatus.newBuilder()
                 .setPrequeue(prequeue.status(jedis))
                 .setOperationQueue(operationQueue.status(jedis))
                 .setCasLookupSize(casLookupSize)
                 .setActionCacheSize(actionCache.size(jedis))
+                .setBlockedActionsSize(blockedActions.size(jedis))
+                .setBlockedInvocationsSize(blockedInvocations.size(jedis))
                 .setDispatchedSize(jedis.hlen(config.getDispatchedOperationsHashName()))
                 .addAllActiveWorkers(workerSet)
                 .build());

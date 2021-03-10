@@ -70,11 +70,11 @@ import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.v1test.AdminGrpc;
 import build.buildfarm.v1test.AdminGrpc.AdminBlockingStub;
+import build.buildfarm.v1test.BackplaneStatus;
+import build.buildfarm.v1test.BackplaneStatusRequest;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationQueueGrpc;
 import build.buildfarm.v1test.OperationQueueGrpc.OperationQueueBlockingStub;
-import build.buildfarm.v1test.OperationsStatus;
-import build.buildfarm.v1test.OperationsStatusRequest;
 import build.buildfarm.v1test.PollOperationRequest;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequest;
 import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
@@ -736,10 +736,10 @@ public class StubInstance implements Instance {
   }
 
   @Override
-  public OperationsStatus operationsStatus() {
+  public BackplaneStatus backplaneStatus() {
     throwIfStopped();
     return deadlined(operationQueueBlockingStub)
-        .status(OperationsStatusRequest.newBuilder().setInstanceName(getName()).build());
+        .status(BackplaneStatusRequest.newBuilder().setInstanceName(getName()).build());
   }
 
   @Override
