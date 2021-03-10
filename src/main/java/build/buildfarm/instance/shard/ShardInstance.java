@@ -40,6 +40,8 @@ import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.INFO;
+import static net.javacrumbs.futureconverter.java8guava.FutureConverter.toCompletableFuture;
+import static net.javacrumbs.futureconverter.java8guava.FutureConverter.toListenableFuture;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
@@ -65,6 +67,7 @@ import build.buildfarm.common.Poller;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
+import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
@@ -1199,24 +1202,22 @@ public class ShardInstance extends AbstractServerInstance {
         new BiFunction<Digest, Executor, CompletableFuture<? extends Directory>>() {
           @Override
           public CompletableFuture<Directory> apply(Digest digest, Executor executor) {
-            //   // logger.log(
-            //   //     Level.FINE,
-            //   //     format(
-            //   //         "transformQueuedOperation(%s): fetching directory %s",
-            //   //         reason, DigestUtil.toString(directoryBlobDigest)));
-            //   // return fetcher.get();
-            return null;
+              logger.log(
+                  Level.FINE,
+                  format(
+                      "transformQueuedOperation(%s): fetching directory %s",
+                      reason, DigestUtil.toString(directoryBlobDigest)));
+              return toCompletableFuture(fetcher.get());
           }
         };
 
-    // return catching(
-    //     directoryCache.get(directoryBlobDigest, getCallback),
-    //     InvalidCacheLoadException.class,
-    //     (e) -> {
-    //       return null;
-    //     },
-    //     directExecutor());
-    return null;
+    return catching(
+        toListenableFuture(directoryCache.get(directoryBlobDigest, getCallback)),
+        InvalidCacheLoadException.class,
+        (e) -> {
+          return null;
+        },
+        directExecutor());
   }
 
   @Override
@@ -1246,21 +1247,18 @@ public class ShardInstance extends AbstractServerInstance {
         new BiFunction<Digest, Executor, CompletableFuture<? extends Command>>() {
           @Override
           public CompletableFuture<Command> apply(Digest digest, Executor executor) {
-            // return fetcher.get();
-            return null;
+            return toCompletableFuture(fetcher.get());
           }
         };
 
-    // return catching(
-    //     commandCache.get(
-    //         commandBlobDigest,getCallback),
-    //     InvalidCacheLoadException.class,
-    //     (e) -> {
-    //       return null;
-    //     },
-    //     directExecutor());
+    return catching(
+        toListenableFuture(commandCache.get(commandBlobDigest,getCallback)),
+        InvalidCacheLoadException.class,
+        (e) -> {
+          return null;
+        },
+        directExecutor());
 
-    return null;
   }
 
   ListenableFuture<Action> expectAction(
@@ -1272,22 +1270,19 @@ public class ShardInstance extends AbstractServerInstance {
         new BiFunction<Digest, Executor, CompletableFuture<? extends Action>>() {
           @Override
           public CompletableFuture<Action> apply(Digest digest, Executor executor) {
-            // return fetcher.get();
-            return null;
+            return toCompletableFuture(fetcher.get());
           }
         };
 
-    // return catching(
-    //     actionCache.get(
-    //         actionBlobDigest,
-    //         getCallback),
-    //     InvalidCacheLoadException.class,
-    //     (e) -> {
-    //       return null;
-    //     },
-    //     directExecutor());
-
-    return null;
+    return catching(
+        toListenableFuture(actionCache.get(
+            actionBlobDigest,
+            getCallback)),
+        InvalidCacheLoadException.class,
+        (e) -> {
+          return null;
+        },
+        directExecutor());
   }
 
   private void removeMalfunctioningWorker(String worker, Throwable t, String context) {
