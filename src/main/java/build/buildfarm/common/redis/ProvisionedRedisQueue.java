@@ -270,7 +270,7 @@ public class ProvisionedRedisQueue {
    * @note Suggested return identifier: explanation.
    */
   private static String toString(EligibilityResult result) {
-    String explanation = new String();
+    String explanation = "";
     if (result.isEligible) {
       explanation += "The properties are eligible for the " + result.queueName + " queue.\n";
     } else {

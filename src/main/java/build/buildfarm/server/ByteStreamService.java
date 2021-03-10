@@ -147,9 +147,10 @@ public class ByteStreamService extends ByteStreamImplBase {
             e.addSuppressed(closeEx);
           }
           if (e instanceof UnexpectedEndOfStreamException) {
-            e = Status.UNAVAILABLE.withCause(e).asException();
+            target.onError(Status.UNAVAILABLE.withCause(e).asException());
+          } else {
+            target.onError(e);
           }
-          target.onError(e);
         }
       }
     }
