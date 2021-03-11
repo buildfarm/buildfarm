@@ -24,22 +24,25 @@ import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.cache.CacheBuilder;
 import build.buildfarm.common.cache.CacheLoader;
 import build.buildfarm.common.cache.CacheLoader.InvalidCacheLoadException;
-import build.buildfarm.common.cache.CacheStats;
 import build.buildfarm.common.cache.LoadingCache;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import io.grpc.Status;
+import io.prometheus.client.guava.cache.CacheMetricsCollector;
 import java.io.IOException;
 
 class ShardActionCache implements ReadThroughActionCache {
   private final Backplane backplane;
   private final LoadingCache<ActionKey, ActionResult> actionResultCache;
+  private final CacheMetricsCollector cacheMetrics = new CacheMetricsCollector().register();
 
-  ShardActionCache(int maxLocalCacheSize, Backplane backplane, ListeningExecutorService service) {
+  ShardActionCache(
+      int maxLocalCacheSize, String name, Backplane backplane, ListeningExecutorService service) {
     this.backplane = backplane;
     actionResultCache =
         CacheBuilder.newBuilder()
             .maximumSize(maxLocalCacheSize)
+            .recordStats()
             .build(
                 new CacheLoader<ActionKey, ActionResult>() {
                   @Override
@@ -53,6 +56,7 @@ class ShardActionCache implements ReadThroughActionCache {
                         directExecutor());
                   }
                 });
+    cacheMetrics.addCache(name, (com.google.common.cache.Cache) actionResultCache);
   }
 
   @Override
@@ -83,15 +87,5 @@ class ShardActionCache implements ReadThroughActionCache {
   @Override
   public void readThrough(ActionKey actionKey, ActionResult actionResult) {
     actionResultCache.put(actionKey, actionResult);
-  }
-
-  @Override
-  public long size() {
-    return actionResultCache.size();
-  }
-
-  @Override
-  public CacheStats stats() {
-    return actionResultCache.stats();
   }
 }
