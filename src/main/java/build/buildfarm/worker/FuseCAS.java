@@ -477,14 +477,6 @@ public class FuseCAS extends FuseStubFS {
     decMounts();
   }
 
-  private DirectoryEntry containingDirectoryForPath(String path) {
-    int endIndex = path.lastIndexOf('/');
-    if (endIndex == 0) {
-      endIndex = 1;
-    }
-    return directoryForPath(path.substring(0, endIndex));
-  }
-
   private DirectoryEntry containingDirectoryForCreate(String path) {
     int endIndex = path.lastIndexOf('/');
     if (endIndex == 0) {

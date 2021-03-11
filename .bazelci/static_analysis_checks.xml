@@ -48,8 +48,6 @@
     <exclude name="UnusedFormalParameter"/>
     <exclude name="UnusedImports"/>
     <exclude name="UnusedLocalVariable"/>
-    <exclude name="UnusedPrivateField"/>
-    <exclude name="UnusedPrivateMethod"/>
     <exclude name="UseAssertEqualsInsteadOfAssertTrue"/>
     <exclude name="UseAssertNullInsteadOfAssertTrue"/>
     <exclude name="UseAssertSameInsteadOfAssertTrue"/>

@@ -74,8 +74,6 @@ class CFCExecFileSystem implements ExecFileSystem {
   private final ExecutorService fetchService = newWorkStealingPool(128);
   private final ExecutorService removeDirectoryService;
   private final ExecutorService accessRecorder;
-  private final long deadlineAfter;
-  private final TimeUnit deadlineAfterUnits;
 
   CFCExecFileSystem(
       Path root,
@@ -92,8 +90,6 @@ class CFCExecFileSystem implements ExecFileSystem {
     this.linkInputDirectories = linkInputDirectories;
     this.removeDirectoryService = removeDirectoryService;
     this.accessRecorder = accessRecorder;
-    this.deadlineAfter = deadlineAfter;
-    this.deadlineAfterUnits = deadlineAfterUnits;
   }
 
   @Override

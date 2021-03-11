@@ -138,8 +138,6 @@ public abstract class AbstractServerInstance implements Instance {
   protected final Map<Digest, ByteString> activeBlobWrites;
   protected final DigestUtil digestUtil;
 
-  private static int VALIDATE_TIMEOUT_SECONDS = 30;
-
   public static final String ACTION_INPUT_ROOT_DIRECTORY_PATH = "";
 
   public static final String DUPLICATE_DIRENT =
@@ -178,11 +176,6 @@ public abstract class AbstractServerInstance implements Instance {
   public static final String INVALID_COMMAND = "The `Command` of the `Action` was invalid.";
 
   public static final String INVALID_PLATFORM = "The `Platform` of the `Command` was invalid.";
-
-  private static final String INVALID_FILE_NAME =
-      "One of the input `PathNode`s has an invalid name, such as a name containing a `/` character"
-          + " or another character which cannot be used in a file's name on the filesystem of the"
-          + " worker.";
 
   private static final String OUTPUT_FILE_DIRECTORY_COLLISION =
       "An output file has the same path as an output directory";

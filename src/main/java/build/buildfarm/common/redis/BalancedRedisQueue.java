@@ -371,20 +371,6 @@ public class BalancedRedisQueue {
   }
 
   /**
-   * @brief Get the previous queue in the round robin.
-   * @details If we are currently on the first queue it becomes the last queue.
-   * @param index Current queue index.
-   * @return And adjusted val based on the current queue index.
-   * @note Suggested return identifier: adjustedCurrentQueue.
-   */
-  private int previousQueueInRoundRobin(int index) {
-    if (index == 0) {
-      return queues.size() - 1;
-    }
-    return index - 1;
-  }
-
-  /**
    * @brief List of queues in a particular order for full iteration over all of the queues.
    * @details An ordered list of queues for operations that assume to traverse over all of the
    *     queues. Some operations like clear() / size() require calling methods on all of the
