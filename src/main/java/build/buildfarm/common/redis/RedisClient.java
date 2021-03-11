@@ -122,7 +122,7 @@ public class RedisClient implements Closeable {
         }
         throw e;
       }
-    } catch (JedisMisconfigurationException e) {
+    } catch (JedisMisconfigurationException | JedisNoReachableClusterNodeException e) {
       // the backplane is configured not to accept writes currently
       // as a result of an error. The error is meant to indicate
       // that substantial resources were unavailable.
@@ -130,8 +130,6 @@ public class RedisClient implements Closeable {
       // this looks simply to me like a good opportunity to use UNAVAILABLE
       // we are technically not at RESOURCE_EXHAUSTED, this is a
       // persistent state which can exist long past the error
-      throw new IOException(Status.UNAVAILABLE.withCause(e).asRuntimeException());
-    } catch (JedisNoReachableClusterNodeException e) {
       throw new IOException(Status.UNAVAILABLE.withCause(e).asRuntimeException());
     } catch (JedisConnectionException e) {
       if ((e.getMessage() != null && e.getMessage().equals("Unexpected end of stream."))
