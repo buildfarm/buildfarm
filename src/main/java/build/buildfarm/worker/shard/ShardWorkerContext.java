@@ -925,7 +925,7 @@ class ShardWorkerContext implements WorkerContext {
 
     // Possibly set network restrictions.
     if (limits.network.blockNetwork) {
-      arguments.add("/usr/bin/unshare", "-n","-r");
+      arguments.add("/usr/bin/unshare", "-n", "-r");
     }
 
     // Decide the CLI for running under cgroups
