@@ -923,6 +923,11 @@ class ShardWorkerContext implements WorkerContext {
       usedGroups.add(group.getMem().getName());
     }
 
+    // Possibly set network restrictions.
+    if (limits.network.blockNetwork) {
+      arguments.add("/usr/bin/unshare", "-n");
+    }
+
     // Decide the CLI for running under cgroups
     if (limitGlobalExecution || !usedGroups.isEmpty()) {
       arguments.add(

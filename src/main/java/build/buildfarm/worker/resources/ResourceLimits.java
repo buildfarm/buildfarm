@@ -44,6 +44,13 @@ public class ResourceLimits {
   public MemLimits mem = new MemLimits();
 
   /**
+   * @field network
+   * @brief Resource limitations on network usage.
+   * @details Decides specific network limitations and whether to apply them for a given action.
+   */
+  public NetworkLimits network = new NetworkLimits();
+
+  /**
    * @field extraEnvironmentVariables
    * @brief Decides whether we should add extra environment variables when executing an operation.
    * @details These variables are added to the end of the existing environment variables in the
