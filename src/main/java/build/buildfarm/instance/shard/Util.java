@@ -21,8 +21,8 @@ import static java.lang.String.format;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.DigestUtil;
-import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.grpc.Retrier;
 import build.buildfarm.instance.Instance;
 import com.google.common.collect.ImmutableList;
@@ -71,7 +71,7 @@ public class Util {
   }
 
   public static ListenableFuture<Set<String>> correctMissingBlob(
-      ShardBackplane backplane,
+      Backplane backplane,
       Set<String> workerSet,
       Set<String> originalLocationSet,
       Function<String, Instance> workerInstanceFactory,
@@ -114,7 +114,7 @@ public class Util {
   }
 
   static ListenableFuture<Void> correctMissingBlobSynchronized(
-      ShardBackplane backplane,
+      Backplane backplane,
       Set<String> workerSet,
       Set<String> originalLocationSet,
       Function<String, Instance> workerInstanceFactory,
@@ -148,7 +148,7 @@ public class Util {
           }
         };
     logger.log(
-        Level.INFO,
+        Level.FINE,
         format(
             "scanning through %d workers to find %s",
             workerSet.size(), DigestUtil.toString(digest)));
@@ -190,7 +190,7 @@ public class Util {
           public void onSuccess(Iterable<Digest> missingDigests) {
             boolean found = Iterables.isEmpty(missingDigests);
             logger.log(
-                Level.INFO,
+                Level.FINE,
                 format(
                     "check missing response for %s to %s was %sfound",
                     DigestUtil.toString(digest), worker, found ? "" : "not "));
@@ -202,7 +202,7 @@ public class Util {
             Status status = Status.fromThrowable(t);
             if (status.getCode() == Code.UNAVAILABLE) {
               logger.log(
-                  Level.INFO,
+                  Level.FINE,
                   format(
                       "check missing response for %s to %s was not found for unavailable",
                       DigestUtil.toString(digest), worker));

@@ -17,9 +17,6 @@ package build.buildfarm.common;
 import static java.lang.String.format;
 
 import build.bazel.remote.execution.v2.Digest;
-import build.bazel.remote.execution.v2.Platform;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.SetMultimap;
 import com.google.protobuf.Any;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.rpc.Code;
@@ -101,32 +98,5 @@ public final class Actions {
       }
     }
     return true; // if *all* > 0 violations have type MISSING
-  }
-
-  private static boolean satisfiesRequirement(
-      SetMultimap<String, String> provisions, String requirement, String value) {
-    if (requirement.equals("min-cores")) {
-      if (!provisions.containsKey("cores")) {
-        return false;
-      }
-      int mincores = Integer.parseInt(value);
-      int cores = Integer.parseInt(Iterables.getOnlyElement(provisions.get("cores")));
-      return cores >= mincores;
-    }
-    if (requirement.equals("max-cores")) {
-      return true;
-    }
-    return provisions.containsEntry(requirement, value)
-        || provisions.containsEntry(requirement, "*");
-  }
-
-  public static boolean satisfiesRequirements(
-      SetMultimap<String, String> provisions, Platform requirements) {
-    for (Platform.Property property : requirements.getPropertiesList()) {
-      if (!satisfiesRequirement(provisions, property.getName(), property.getValue())) {
-        return false;
-      }
-    }
-    return true;
   }
 }

@@ -15,7 +15,7 @@
 package build.buildfarm.worker.operationqueue;
 
 import build.bazel.remote.execution.v2.Digest;
-import build.buildfarm.cas.CASFileCache;
+import build.buildfarm.cas.cfc.CASFileCache;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.InputStreamFactory;
 import java.io.IOException;
@@ -32,6 +32,7 @@ class InjectedCASFileCache extends CASFileCache {
       Path root,
       long maxSizeInBytes,
       long maxEntrySizeInBytes,
+      int hexBucketLevels,
       boolean storeFileDirsIndexInMemory,
       DigestUtil digestUtil,
       ExecutorService expireService,
@@ -40,6 +41,7 @@ class InjectedCASFileCache extends CASFileCache {
         root,
         maxSizeInBytes,
         maxEntrySizeInBytes,
+        hexBucketLevels,
         storeFileDirsIndexInMemory,
         digestUtil,
         expireService,

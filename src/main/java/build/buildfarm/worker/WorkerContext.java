@@ -24,7 +24,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.Poller;
 import build.buildfarm.common.Write;
-import build.buildfarm.instance.Instance.MatchListener;
+import build.buildfarm.instance.MatchListener;
 import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.QueueEntry;
@@ -113,9 +113,9 @@ public interface WorkerContext {
 
   Write getOperationStreamWrite(String name) throws IOException;
 
-  int getStandardOutputLimit();
+  long getStandardOutputLimit();
 
-  int getStandardErrorLimit();
+  long getStandardErrorLimit();
 
   void createExecutionLimits();
 
@@ -125,4 +125,6 @@ public interface WorkerContext {
       String operationName, ImmutableList.Builder<String> arguments, Command command);
 
   int commandExecutionClaims(Command command);
+
+  ResourceLimits commandExecutionSettings(Command command);
 }

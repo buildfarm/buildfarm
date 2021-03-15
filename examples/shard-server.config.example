@@ -147,20 +147,13 @@ instances {
       # dispatching_list_name.
       queued_operations_list_name: "{Execution}:QueuedOperations"
 
-      # The redis key of a list used to ensure reliable processing of
-      # ready-to-run queue entries together with operation watch
-      # monitoring.
-      # The string contained within {} must match that of
-      # queued_operations_list_name.
-      dispatching_list_name: "{Execution}:DispatchingOperations"
-
       # A redis key prefix for operations which are being dequeued
       # from the ready-to-run queue. The key is suffixed with the
       # operation name and contains the expiration time in epoch
       # milliseconds after which the operation is considered lost.
       dispatching_prefix: "Dispatching"
 
-      # The delay in milliseconds used to populate dispathing operation
+      # The delay in milliseconds used to populate dispatching operation
       # entries
       dispatching_timeout_millis: 10000
 

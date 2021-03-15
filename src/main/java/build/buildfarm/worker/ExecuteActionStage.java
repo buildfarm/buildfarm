@@ -15,6 +15,8 @@
 package build.buildfarm.worker;
 
 import com.google.common.collect.Sets;
+import io.prometheus.client.Gauge;
+import io.prometheus.client.Summary;
 import java.io.IOException;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -26,6 +28,15 @@ import java.util.logging.Logger;
 
 public class ExecuteActionStage extends SuperscalarPipelineStage {
   private static final Logger logger = Logger.getLogger(ExecuteActionStage.class.getName());
+  private static final Gauge executionSlotUsage =
+      Gauge.build().name("execution_slot_usage").help("Execution slot Usage.").register();
+  private static final Summary executionTime =
+      Summary.build().name("execution_time_ms").help("Execution time in ms.").register();
+  private static final Summary executionStallTime =
+      Summary.build()
+          .name("execution_stall_time_ms")
+          .help("Execution stall time in ms.")
+          .register();
 
   private final Set<Thread> executors = Sets.newHashSet();
   private final AtomicInteger executorClaims = new AtomicInteger(0);
@@ -91,6 +102,9 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
   public void releaseExecutor(
       String operationName, int claims, long usecs, long stallUSecs, int exitCode) {
     size = removeAndRelease(operationName, claims);
+    executionTime.observe(usecs / 1000.0);
+    executionStallTime.observe(stallUSecs / 1000.0);
+    executionSlotUsage.set(size);
     logComplete(
         operationName,
         usecs,
@@ -117,13 +131,13 @@ public class ExecuteActionStage extends SuperscalarPipelineStage {
   @Override
   protected void iterate() throws InterruptedException {
     OperationContext operationContext = take();
-    int claims = claimsRequired(operationContext);
+    ResourceLimits limits = workerContext.commandExecutionSettings(operationContext.command);
     Executor executor = new Executor(workerContext, operationContext, this);
-    Thread executorThread = new Thread(() -> executor.run(claims));
+    Thread executorThread = new Thread(() -> executor.run(limits));
 
     synchronized (this) {
       executors.add(executorThread);
-      size = executorClaims.addAndGet(claims);
+      size = executorClaims.addAndGet(limits.cpu.claimed);
       logStart(operationContext.operation.getName(), getUsage(size));
       executorThread.start();
     }

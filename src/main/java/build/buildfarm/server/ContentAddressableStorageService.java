@@ -48,6 +48,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import io.grpc.Status;
 import io.grpc.Status.Code;
 import io.grpc.stub.StreamObserver;
+import io.prometheus.client.Summary;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -57,6 +58,8 @@ public class ContentAddressableStorageService
     extends ContentAddressableStorageGrpc.ContentAddressableStorageImplBase {
   private static final Logger logger =
       Logger.getLogger(ContentAddressableStorageService.class.getName());
+  private static final Summary missingBlobs =
+      Summary.build().name("missing_blobs").help("Find missing blobs.").register();
 
   private final Instances instances;
   private final long writeDeadlineAfter;
@@ -110,8 +113,9 @@ public class ContentAddressableStorageService
               responseObserver.onNext(response);
               responseObserver.onCompleted();
               long elapsedMicros = stopwatch.elapsed(MICROSECONDS);
+              missingBlobs.observe(request.getBlobDigestsList().size());
               logger.log(
-                  requestLogLevel,
+                  Level.FINE,
                   new StringBuilder()
                       .append("FindMissingBlobs(")
                       .append(instance.getName())

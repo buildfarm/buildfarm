@@ -74,17 +74,24 @@ def buildfarm_init(name = "buildfarm"):
                         "com.google.protobuf:protobuf-java:3.10.0",
                         "com.google.protobuf:protobuf-java-util:3.10.0",
                         "com.google.truth:truth:0.44",
+                        "com.googlecode.json-simple:json-simple:1.1.1",
+                        "com.google.code.gson:gson:2.8.6",
+                        "com.jayway.jsonpath:json-path:2.4.0",
                     ] + ["io.netty:netty-%s:4.1.38.Final" % module for module in IO_NETTY_MODULES] +
                     ["io.grpc:grpc-%s:1.26.0" % module for module in IO_GRPC_MODULES] +
                     [
+                        "io.prometheus:simpleclient:0.10.0",
+                        "io.prometheus:simpleclient_hotspot:0.10.0",
+                        "io.prometheus:simpleclient_httpserver:0.10.0",
                         "junit:junit:4.12",
-                        "org.apache.commons:commons-pool2:2.4.3",
+                        "org.apache.commons:commons-pool2:2.9.0",
                         "org.checkerframework:checker-qual:2.5.2",
                         "org.mockito:mockito-core:2.25.0",
                         "org.openjdk.jmh:jmh-core:1.23",
                         "org.openjdk.jmh:jmh-generator-annprocess:1.23",
                         "org.threeten:threetenbp:1.3.3",
                         "org.xerial:sqlite-jdbc:3.31.1",
+                        "org.redisson:redisson:3.13.1",
                     ],
         repositories = [
             "https://repo.maven.apache.org/maven2",
@@ -107,3 +114,9 @@ def buildfarm_init(name = "buildfarm"):
         name = "jar/redis/clients/jedis",
         actual = "@jedis//jar",
     )
+
+def ensure_accurate_metadata():
+    return select({
+        "//conditions:default": [],
+        "//config:windows": ["-Dsun.nio.fs.ensureAccurateMetadata=true"],
+    })

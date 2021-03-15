@@ -31,17 +31,15 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import redis.clients.jedis.JedisCluster;
 
-///
-/// @class   BalancedRedisQueueMockTest
-/// @brief   tests A balanced redis queue.
-/// @details A balanced redis queue is an implementation of a queue data
-///          structure which internally uses multiple redis nodes to
-///          distribute the data across the cluster. Its important to know
-///          that the lifetime of the queue persists before and after the
-///          queue data structure is created (since it exists in redis).
-///          Therefore, two redis queues with the same name, would in fact be
-///          the same underlying redis queues.
-///
+/**
+ * @class BalancedRedisQueueMockTest
+ * @brief tests A balanced redis queue.
+ * @details A balanced redis queue is an implementation of a queue data structure which internally
+ *     uses multiple redis nodes to distribute the data across the cluster. Its important to know
+ *     that the lifetime of the queue persists before and after the queue data structure is created
+ *     (since it exists in redis). Therefore, two redis queues with the same name, would in fact be
+ *     the same underlying redis queues.
+ */
 @RunWith(JUnit4.class)
 public class BalancedRedisQueueMockTest {
 

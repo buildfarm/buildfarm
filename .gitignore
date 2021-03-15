@@ -1,4 +1,17 @@
 bazel-*
 .ijwb/
-.vscode/
 java_formatter.jar
+
+# Visual Studio Code
+/.vscode/
+
+# IntelliJ IDEA
+/.idea/
+*.iml
+
+# Eclipse
+/.project
+/.classpath
+
+#Static Analysis
+/pmd

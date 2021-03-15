@@ -30,10 +30,11 @@ import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
+import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.GetClientStartTimeResult;
-import build.buildfarm.v1test.OperationsStatus;
-import build.buildfarm.v1test.QueueEntry;
+import build.buildfarm.v1test.PrepareWorkerForGracefulShutDownRequestResults;
 import build.buildfarm.v1test.Tree;
+import build.buildfarm.v1test.WorkerListMessage;
 import build.buildfarm.v1test.WorkerProfileMessage;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
@@ -47,7 +48,6 @@ import java.io.InputStream;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Nullable;
 
 public interface Instance {
   String getName();
@@ -66,7 +66,7 @@ public interface Instance {
   ListenableFuture<Iterable<Digest>> findMissingBlobs(
       Iterable<Digest> digests, RequestMetadata requestMetadata);
 
-  boolean containsBlob(Digest digest, RequestMetadata requestMetadata);
+  boolean containsBlob(Digest digest, Digest.Builder result, RequestMetadata requestMetadata);
 
   String getBlobName(Digest blobDigest);
 
@@ -96,6 +96,9 @@ public interface Instance {
   Iterable<Digest> putAllBlobs(Iterable<ByteString> blobs, RequestMetadata requestMetadata)
       throws EntryLimitException, IOException, IllegalArgumentException, InterruptedException;
 
+  ListenableFuture<Digest> fetchBlob(
+      Iterable<String> uris, Digest expectedDigest, RequestMetadata requestMetadata);
+
   Write getOperationStreamWrite(String name);
 
   InputStream newOperationStreamInput(
@@ -117,7 +120,7 @@ public interface Instance {
 
   void match(Platform platform, MatchListener listener) throws InterruptedException;
 
-  OperationsStatus operationsStatus();
+  BackplaneStatus backplaneStatus();
 
   boolean putOperation(Operation operation) throws InterruptedException;
 
@@ -140,24 +143,15 @@ public interface Instance {
 
   WorkerProfileMessage getWorkerProfile();
 
+  WorkerListMessage getWorkerList();
+
+  PrepareWorkerForGracefulShutDownRequestResults shutDownWorkerGracefully(String worker);
+
   GetClientStartTimeResult getClientStartTime(String clientKey);
 
   CasIndexResults reindexCas(String hostName);
 
-  interface MatchListener {
-    // start/end pair called for each wait period
-    void onWaitStart();
-
-    void onWaitEnd();
-
-    // returns false if this listener will not handle this match
-    boolean onEntry(@Nullable QueueEntry queueEntry) throws InterruptedException;
-
-    void onError(Throwable t);
-
-    // method that should be called when this match is cancelled and no longer valid
-    void setOnCancelHandler(Runnable onCancelHandler);
-  }
+  void deregisterWorker(String workerName);
 
   class PutAllBlobsException extends RuntimeException {
     private final List<BatchUpdateBlobsResponse.Response> failedResponses = Lists.newArrayList();

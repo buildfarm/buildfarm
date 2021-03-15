@@ -21,7 +21,7 @@ import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.buildfarm.common.Write;
 import build.buildfarm.instance.Instance;
-import build.buildfarm.instance.Instance.MatchListener;
+import build.buildfarm.instance.MatchListener;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.QueueEntry;
@@ -77,7 +77,8 @@ class OperationQueueClient {
             ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
             String operationName = executeEntry.getOperationName();
             if (activeOperations.contains(operationName)) {
-              logger.severe(
+              logger.log(
+                  SEVERE,
                   "WorkerContext::match: WARNING matched duplicate operation " + operationName);
               return false;
             }

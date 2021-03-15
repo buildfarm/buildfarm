@@ -17,44 +17,44 @@ package build.buildfarm.common.redis;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-///
-/// @class   RedisHashtags
-/// @brief   String utilities when dealing with key names that involve
-///          hashtags.
-/// @details Simple parsers for extracting out / adding hashtags to redis
-///          keys.
-///
+/**
+ * @class RedisHashtags
+ * @brief String utilities when dealing with key names that involve hashtags.
+ * @details Simple parsers for extracting out / adding hashtags to redis keys.
+ */
 public class RedisHashtags {
 
-  ///
-  /// @brief   Append the hashtag value to the base queue name.
-  /// @details Creates a valid queue name for one of the entire queues.
-  /// @param   name    The global name of the queue.
-  /// @param   hashtag A hashtag for an individual internal queue.
-  /// @return  A valid queue name for one of the internal queues.
-  /// @note    Suggested return identifier: queueName.
-  ///
+  /**
+   * @brief Append the hashtag value to the base queue name.
+   * @details Creates a valid queue name for one of the entire queues.
+   * @param name The global name of the queue.
+   * @param hashtag A hashtag for an individual internal queue.
+   * @return A valid queue name for one of the internal queues.
+   * @note Suggested return identifier: queueName.
+   */
   public static String hashedName(String name, String hashtag) {
     return "{" + hashtag + "}" + name;
   }
-  ///
-  /// @brief   Remove any existing redis hashtag from the key name.
-  /// @details Creates a valid key name with any existing hashtags removed.
-  /// @param   name The global name of the queue.
-  /// @return  A valid keyname without hashtags.
-  /// @note    Suggested return identifier: queueName.
-  ///
+
+  /**
+   * @brief Remove any existing redis hashtag from the key name.
+   * @details Creates a valid key name with any existing hashtags removed.
+   * @param name The global name of the queue.
+   * @return A valid keyname without hashtags.
+   * @note Suggested return identifier: queueName.
+   */
   public static String unhashedName(String name) {
     return name.replaceAll("\\{.*?\\}", "");
   }
-  ///
-  /// @brief   Get the existing hashtag of the name.
-  /// @details Parses out the first redis hashtag found. If no hashtags are
-  ///          found, an empty string is returned.
-  /// @param   name The global name of the queue.
-  /// @return  The existing hashtag name found in the string (brackets are removed).
-  /// @note    Suggested return identifier: hashtag.
-  ///
+
+  /**
+   * @brief Get the existing hashtag of the name.
+   * @details Parses out the first redis hashtag found. If no hashtags are found, an empty string is
+   *     returned.
+   * @param name The global name of the queue.
+   * @return The existing hashtag name found in the string (brackets are removed).
+   * @note Suggested return identifier: hashtag.
+   */
   public static String existingHash(String name) {
     String regex = "\\{.*?\\}";
     Pattern pattern = Pattern.compile(regex);

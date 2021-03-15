@@ -23,25 +23,22 @@ import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.exceptions.JedisException;
 import redis.clients.jedis.exceptions.JedisNoReachableClusterNodeException;
 
-///
-/// @class   RedisNodeHashes
-/// @brief   A list of redis hashtags that each map to different nodes in the
-///          cluster.
-/// @details When looking to evenly distribute keys across nodes, specific
-///          hashtags need obtained in which each hashtag hashes to a
-///          particular slot owned by a particular worker. This class is used
-///          to obtain the hashtags needed to hit every node in the cluster.
-///
+/**
+ * @class RedisNodeHashes
+ * @brief A list of redis hashtags that each map to different nodes in the cluster.
+ * @details When looking to evenly distribute keys across nodes, specific hashtags need obtained in
+ *     which each hashtag hashes to a particular slot owned by a particular worker. This class is
+ *     used to obtain the hashtags needed to hit every node in the cluster.
+ */
 public class RedisNodeHashes {
 
-  ///
-  /// @brief   Get a list of evenly distributing hashtags for the provided
-  ///          redis cluster.
-  /// @details Each hashtag will map to a slot on a different node.
-  /// @param   jedis An established jedis client.
-  /// @return  Hashtags that will each has to a slot on a different node.
-  /// @note    Suggested return identifier: hashtags.
-  ///
+  /**
+   * @brief Get a list of evenly distributing hashtags for the provided redis cluster.
+   * @details Each hashtag will map to a slot on a different node.
+   * @param jedis An established jedis client.
+   * @return Hashtags that will each has to a slot on a different node.
+   * @note Suggested return identifier: hashtags.
+   */
   public static List<String> getEvenlyDistributedHashes(JedisCluster jedis) {
     try {
       List<List<Long>> slotRanges = getSlotRanges(jedis);
@@ -57,15 +54,15 @@ public class RedisNodeHashes {
       return ImmutableList.of();
     }
   }
-  ///
-  /// @brief   Get a list of evenly distributing hashtags for the provided
-  ///          redis cluster.
-  /// @details Each hashtag will map to a slot on a different node.
-  /// @param   jedis  An established jedis client.
-  /// @param   prefix The prefix to include as part of hashtags.
-  /// @return  Hashtags that will each has to a slot on a different node.
-  /// @note    Suggested return identifier: hashtags.
-  ///
+
+  /**
+   * @brief Get a list of evenly distributing hashtags for the provided redis cluster.
+   * @details Each hashtag will map to a slot on a different node.
+   * @param jedis An established jedis client.
+   * @param prefix The prefix to include as part of hashtags.
+   * @return Hashtags that will each has to a slot on a different node.
+   * @note Suggested return identifier: hashtags.
+   */
   public static List<String> getEvenlyDistributedHashesWithPrefix(
       JedisCluster jedis, String prefix) {
     try {
@@ -83,14 +80,14 @@ public class RedisNodeHashes {
       return ImmutableList.of();
     }
   }
-  ///
-  /// @brief   Get a list of slot ranges for each of the nodes in the cluster.
-  /// @details This information can be found from any of the redis nodes in the
-  ///          cluster.
-  /// @param   jedis An established jedis client.
-  /// @return  Slot ranges for all of the nodes in the cluster.
-  /// @note    Suggested return identifier: slotRanges.
-  ///
+
+  /**
+   * @brief Get a list of slot ranges for each of the nodes in the cluster.
+   * @details This information can be found from any of the redis nodes in the cluster.
+   * @param jedis An established jedis client.
+   * @return Slot ranges for all of the nodes in the cluster.
+   * @note Suggested return identifier: slotRanges.
+   */
   private static List<List<Long>> getSlotRanges(JedisCluster jedis) {
     // get slot information for each node
     List<Object> slots = getClusterSlots(jedis);
@@ -105,24 +102,25 @@ public class RedisNodeHashes {
 
     return slotRanges.build();
   }
-  ///
-  /// @brief   Convert a jedis slotInfo object to a range or slot numbers.
-  /// @details Every redis node has a range of slots represented as integers.
-  /// @param   slotInfo Slot info objects from a redis node.
-  /// @return  The slot number range for the particular redis node.
-  /// @note    Suggested return identifier: slotRange.
-  ///
+
+  /**
+   * @brief Convert a jedis slotInfo object to a range or slot numbers.
+   * @details Every redis node has a range of slots represented as integers.
+   * @param slotInfo Slot info objects from a redis node.
+   * @return The slot number range for the particular redis node.
+   * @note Suggested return identifier: slotRange.
+   */
   private static List<Long> slotInfoToSlotRange(List<Object> slotInfo) {
     return ImmutableList.of((Long) slotInfo.get(0), (Long) slotInfo.get(1));
   }
-  ///
-  /// @brief   Query slot information for each redis node.
-  /// @details Obtains cluster information for understanding slot ranges for
-  ///          balancing.
-  /// @param   jedis An established jedis client.
-  /// @return  Cluster slot information.
-  /// @note    Suggested return identifier: clusterSlots.
-  ///
+
+  /**
+   * @brief Query slot information for each redis node.
+   * @details Obtains cluster information for understanding slot ranges for balancing.
+   * @param jedis An established jedis client.
+   * @return Cluster slot information.
+   * @note Suggested return identifier: clusterSlots.
+   */
   private static List<Object> getClusterSlots(JedisCluster jedis) {
     JedisException nodeException = null;
     for (Map.Entry<String, JedisPool> node : jedis.getClusterNodes().entrySet()) {

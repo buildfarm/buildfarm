@@ -24,7 +24,7 @@ import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.Poller;
 import build.buildfarm.common.Write;
-import build.buildfarm.instance.Instance.MatchListener;
+import build.buildfarm.instance.MatchListener;
 import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.QueueEntry;
@@ -178,12 +178,12 @@ class StubWorkerContext implements WorkerContext {
   }
 
   @Override
-  public int getStandardOutputLimit() {
+  public long getStandardOutputLimit() {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  public int getStandardErrorLimit() {
+  public long getStandardErrorLimit() {
     throw new UnsupportedOperationException();
   }
 
@@ -205,6 +205,11 @@ class StubWorkerContext implements WorkerContext {
 
   @Override
   public int commandExecutionClaims(Command command) {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public ResourceLimits commandExecutionSettings(Command command) {
     throw new UnsupportedOperationException();
   }
 

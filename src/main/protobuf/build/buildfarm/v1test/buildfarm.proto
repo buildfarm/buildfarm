@@ -39,6 +39,30 @@ service Admin {
   rpc ReindexCas(ReindexCasRequest) returns (ReindexCasRequestResults) {
     option (google.api.http) = { get: "/v1test/admin:reindexCas" };
   }
+  
+  rpc ShutDownWorkerGracefully(ShutDownWorkerGracefullyRequest) returns (ShutDownWorkerGracefullyRequestResults) {
+    option (google.api.http) = { get: "/v1test/admin:deregisterWorker" };
+  }
+
+  rpc DisableScaleInProtection(DisableScaleInProtectionRequest) returns (DisableScaleInProtectionRequestResults) {
+    option (google.api.http) = { get: "/v1test/admin:disableScaleInProtection" };
+  }
+}
+
+message ShutDownWorkerGracefullyRequest{
+  string instance_name = 1;
+  
+  string worker_name = 2;
+}
+
+message ShutDownWorkerGracefullyRequestResults {
+}
+
+message DisableScaleInProtectionRequest{
+  string instance_name = 1;
+}
+
+message DisableScaleInProtectionRequestResults{
 }
 
 message ReindexCasRequest {
@@ -141,12 +165,12 @@ service OperationQueue {
     option (google.api.http) = { get: "/v1test/{instance_name=**}/operation:poll" };
   }
 
-  rpc Status(OperationsStatusRequest) returns (OperationsStatus) {
+  rpc Status(BackplaneStatusRequest) returns (BackplaneStatus) {
     option (google.api.http) = { get: "/v1test/{instance_name=**}/operation:status" };
   }
 }
 
-message OperationsStatusRequest {
+message BackplaneStatusRequest {
   string instance_name = 1;
 }
 
@@ -185,6 +209,8 @@ message BuildFarmServerConfig {
   MetricsConfig metrics_config = 5;
 
   AdminConfig admin_config = 6;
+
+  PrometheusConfig prometheus_config = 7;
 }
 
 message MetricsConfig {
@@ -217,13 +243,23 @@ message LogMetricsConfig {
   string log_level = 1;
 }
 
+message PrometheusConfig {
+  int32 port = 1;
+}
+
 message AdminConfig {
   string deployment_environment = 1;
+
+  string cluster_id = 4;
+
+  string cluster_endpoint = 6;
 
   oneof type {
     AwsAdminConfig aws_admin_config = 2;
     GcpAdminConfig gcp_admin_config = 3;
   }
+
+  bool enable_graceful_shutdown = 5;
 }
 
 message AwsAdminConfig {
@@ -258,6 +294,11 @@ message FilesystemCASConfig {
   // limit for contents of a single file retained
   // from CAS in the cache
   int64 max_entry_size_bytes = 3;
+
+  // exponential levels of blob bucketing by digest
+  // if digest is afcd0123, with 2 here, it will live in af/cd/af0123
+  // 0 (default) here will put all entries at the cache root
+  int32 hex_bucket_levels = 5;
 
   // whether the file directories bidirectional mapping should be stored in memory (HashMap) or
   // in sqlite
@@ -344,6 +385,8 @@ message MemoryInstanceConfig {
 message ProvisionedQueue {
   string name = 1;
   
+  bool allow_unmatched = 3;
+  
   build.bazel.remote.execution.v2.Platform platform = 2;
 }
 
@@ -411,9 +454,6 @@ message RedisShardBackplaneConfig {
   // the ready-to-run operation queue. Contains QueueEntry messages
   string queued_operations_list_name = 7;
 
-  // the atomic target list for reliable ready-to-run queue removal
-  string dispatching_list_name = 22;
-
   // the prefix of the dispatching list timeout monitor key
   string dispatching_prefix = 23;
 
@@ -437,6 +477,9 @@ message RedisShardBackplaneConfig {
 
   // the expiration time in seconds for cas sets
   int32 cas_expire = 11;
+  
+  //whether or not to cache the cas set in memory
+  bool cache_cas = 35;
 
   // whether to listen to the backplane communication streams for shard lifecycle
   // events and watched operations. This is required for failsafe operation below
@@ -480,6 +523,8 @@ message ShardInstanceConfig {
   }
 
   int64 max_blob_size = 5;
+  
+  int32 max_cpu = 9;
 
   // maximum selectable timeout
   // a maximum threshold for an action's specified timeout,
@@ -513,6 +558,18 @@ message ShardWorkerInstanceConfig {
   google.protobuf.Duration grpc_timeout = 13;
 }
 
+message DequeueMatchSettings {
+  
+  // whether a worker should accept everything it gets off the queue.
+  bool accept_everything = 1;
+
+  // whether a worker should accept platform properties that it does not match with.
+  bool allow_unmatched = 2;
+  
+  // worker platform used to match operations
+  build.bazel.remote.execution.v2.Platform platform = 3;
+}
+
 message ShardWorkerConfig {
   ShardWorkerInstanceConfig shard_worker_instance_config = 1;
 
@@ -529,11 +586,8 @@ message ShardWorkerConfig {
   // period of poll requests during execution
   google.protobuf.Duration operation_poll_period = 13;
 
-  // initial platform used to match operations
-  build.bazel.remote.execution.v2.Platform platform = 14;
-
-  // default platform to populate matched commands
-  build.bazel.remote.execution.v2.Platform default_platform = 28;
+  //settings used to match with operations
+  DequeueMatchSettings dequeue_match_settings = 36;
 
   // total size of the inline content for
   // action results
@@ -588,6 +642,10 @@ message ShardWorkerConfig {
   bool omit_from_cas = 33;
   
   bool error_operation_remaining_resources = 34;
+
+  AdminConfig admin_config = 35;
+
+  PrometheusConfig prometheus_config = 37;
 }
 
 message ShardWorker {
@@ -683,6 +741,8 @@ message QueueEntry {
   build.bazel.remote.execution.v2.Digest queued_operation_digest = 2;
 
   build.bazel.remote.execution.v2.Platform platform = 3;
+
+  int32 requeue_attempts = 4;
 }
 
 message QueueStatus {
@@ -699,7 +759,7 @@ message OperationQueueStatus {
   int64 size = 2;
 }
 
-message OperationsStatus {
+message BackplaneStatus {
   QueueStatus prequeue = 1;
 
   OperationQueueStatus operation_queue = 2;
@@ -707,6 +767,14 @@ message OperationsStatus {
   int64 dispatched_size = 3;
 
   repeated string active_workers = 4;
+  
+  int64 cas_lookup_size = 5;
+  
+  int64 action_cache_size = 6;
+  
+  int64 blocked_actions_size = 7;
+  
+  int64 blocked_invocations_size = 8;
 }
 
 message QueuedOperationMetadata {
@@ -843,6 +911,15 @@ message WorkerConfig {
   // from CAS in the cache
   int64 cas_cache_max_entry_size_bytes = 24;
 
+  // exponential levels of blob bucketing by digest
+  // if digest is afcd0123, with 2 here, it will live in af/cd/af0123
+  // 0 (default) here will put all entries at the cache root
+  int32 cas_cache_hex_bucket_levels = 27;
+
+  // whether the file directories bidirectional mapping should be stored in memory (HashMap) or
+  // in sqlite
+  bool cas_cache_file_directories_index_in_memory = 28;
+
   // total size of the inline content for
   // action results
   int32 inline_content_limit = 8;
@@ -952,6 +1029,15 @@ message WorkerProfileMessage {
   // number of Entry in CAS
   int64 cas_entry_count = 1;
 
+  // current size of the CAS as sum of entries
+  int64 cas_size = 12;
+
+  // configured maximum size of the CAS
+  int64 cas_max_size = 13;
+
+  // configured maximum entry size of the CAS
+  int64 cas_max_entry_size = 14;
+
   // number of unreferenced Entry in CAS
   int64 cas_unreferenced_entry_count = 11;
 
@@ -975,6 +1061,29 @@ message WorkerProfileMessage {
 message WorkerProfileRequest {
 }
 
+message WorkerListRequest {
+}
+
+message WorkerListMessage {
+  repeated string workers = 1;
+}
+
 service WorkerProfile {
   rpc GetWorkerProfile(WorkerProfileRequest) returns (WorkerProfileMessage) {}
+
+  rpc GetWorkerList(WorkerListRequest) returns (WorkerListMessage) {}
 }
+
+message PrepareWorkerForGracefulShutDownRequest{
+  string instance_name = 1;
+
+  string worker_name = 2;
+}
+
+message PrepareWorkerForGracefulShutDownRequestResults{
+}
+
+service ShutDownWorker {
+  rpc PrepareWorkerForGracefulShutdown(PrepareWorkerForGracefulShutDownRequest) returns (PrepareWorkerForGracefulShutDownRequestResults) {}
+}
+

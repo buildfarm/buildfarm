@@ -24,21 +24,23 @@ import build.bazel.remote.execution.v2.ExecutionStage;
 import build.bazel.remote.execution.v2.Platform;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
+import build.buildfarm.backplane.Backplane;
 import build.buildfarm.cas.ContentAddressableStorage;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
-import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.TokenizableIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
 import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
-import build.buildfarm.instance.AbstractServerInstance;
+import build.buildfarm.instance.MatchListener;
+import build.buildfarm.instance.server.AbstractServerInstance;
+import build.buildfarm.operations.FindOperationsResults;
+import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.GetClientStartTimeResult;
-import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ShardWorkerInstanceConfig;
@@ -65,12 +67,12 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   private static final Logger logger = Logger.getLogger(ShardWorkerInstance.class.getName());
 
   private final ShardWorkerInstanceConfig config;
-  private final ShardBackplane backplane;
+  private final Backplane backplane;
 
   public ShardWorkerInstance(
       String name,
       DigestUtil digestUtil,
-      ShardBackplane backplane,
+      Backplane backplane,
       ContentAddressableStorage contentAddressableStorage,
       ShardWorkerInstanceConfig config)
       throws ConfigurationException {
@@ -198,7 +200,6 @@ public class ShardWorkerInstance extends AbstractServerInstance {
     while (!backplane.isStopped()) {
       listener.onWaitStart();
       try {
-
         List<Platform.Property> provisions = new ArrayList<>();
         QueueEntry queueEntry = backplane.dispatchOperation(provisions);
         if (queueEntry != null) {
@@ -221,7 +222,7 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   }
 
   @Override
-  public OperationsStatus operationsStatus() {
+  public BackplaneStatus backplaneStatus() {
     throw new UnsupportedOperationException();
   }
 
@@ -383,6 +384,24 @@ public class ShardWorkerInstance extends AbstractServerInstance {
   public CasIndexResults reindexCas(String hostName) {
     try {
       return backplane.reindexCas(hostName);
+    } catch (IOException e) {
+      throw Status.fromThrowable(e).asRuntimeException();
+    }
+  }
+
+  @Override
+  public FindOperationsResults findOperations(String filterPredicate) {
+    try {
+      return backplane.findOperations(this, filterPredicate);
+    } catch (IOException e) {
+      throw Status.fromThrowable(e).asRuntimeException();
+    }
+  }
+
+  @Override
+  public void deregisterWorker(String workerName) {
+    try {
+      backplane.deregisterWorker(workerName);
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }

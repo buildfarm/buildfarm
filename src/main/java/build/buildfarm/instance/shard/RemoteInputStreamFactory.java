@@ -25,9 +25,9 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.RequestMetadata;
+import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.InputStreamFactory;
-import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.shard.ShardInstance.WorkersCallback;
 import com.google.common.base.Throwables;
@@ -63,13 +63,13 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
   }
 
   private final @Nullable String publicName;
-  private final ShardBackplane backplane;
+  private final Backplane backplane;
   private final Random rand;
   private final LoadingCache<String, Instance> workerStubs;
   private final UnavailableConsumer onUnavailable;
 
   RemoteInputStreamFactory(
-      ShardBackplane backplane,
+      Backplane backplane,
       Random rand,
       LoadingCache<String, Instance> workerStubs,
       UnavailableConsumer onUnavailable) {
@@ -78,7 +78,7 @@ public class RemoteInputStreamFactory implements InputStreamFactory {
 
   public RemoteInputStreamFactory(
       String publicName,
-      ShardBackplane backplane,
+      Backplane backplane,
       Random rand,
       LoadingCache<String, Instance> workerStubs,
       UnavailableConsumer onUnavailable) {

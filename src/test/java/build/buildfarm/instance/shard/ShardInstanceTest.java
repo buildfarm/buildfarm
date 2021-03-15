@@ -20,9 +20,9 @@ import static build.bazel.remote.execution.v2.ExecutionStage.Value.QUEUED;
 import static build.buildfarm.common.Actions.invalidActionVerboseMessage;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_INVALID;
 import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
-import static build.buildfarm.instance.AbstractServerInstance.INVALID_PLATFORM;
-import static build.buildfarm.instance.AbstractServerInstance.MISSING_ACTION;
-import static build.buildfarm.instance.AbstractServerInstance.MISSING_COMMAND;
+import static build.buildfarm.instance.server.AbstractServerInstance.INVALID_PLATFORM;
+import static build.buildfarm.instance.server.AbstractServerInstance.MISSING_ACTION;
+import static build.buildfarm.instance.server.AbstractServerInstance.MISSING_COMMAND;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
@@ -55,11 +55,11 @@ import build.bazel.remote.execution.v2.OutputFile;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.bazel.remote.execution.v2.ResultsCachePolicy;
 import build.bazel.remote.execution.v2.ToolDetails;
+import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.DigestUtil.HashFunction;
 import build.buildfarm.common.Poller;
-import build.buildfarm.common.ShardBackplane;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write.NullWrite;
 import build.buildfarm.instance.Instance;
@@ -87,6 +87,7 @@ import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -114,7 +115,7 @@ public class ShardInstanceTest {
   private ShardInstance instance;
   private Set<Digest> blobDigests;
 
-  @Mock private ShardBackplane mockBackplane;
+  @Mock private Backplane mockBackplane;
 
   @Mock private Runnable mockOnStop;
 
@@ -138,7 +139,9 @@ public class ShardInstanceTest {
             /* dispatchedMonitorIntervalSeconds=*/ 0,
             /* runOperationQueuer=*/ false,
             /* maxBlobSize=*/ 0,
+            /* maxCpu=*/ 1,
             /* maxActionTimeout=*/ Duration.getDefaultInstance(),
+            new ArrayList<>(),
             mockOnStop,
             CacheBuilder.newBuilder().build(mockInstanceLoader),
             /* actionCacheFetchService=*/ listeningDecorator(newSingleThreadExecutor()));
