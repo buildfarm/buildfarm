@@ -87,6 +87,7 @@ import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ShardInstanceConfig;
 import build.buildfarm.v1test.Tree;
 import com.github.benmanes.caffeine.cache.AsyncCache;
+import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Stopwatch;
@@ -202,8 +203,8 @@ public class ShardInstance extends AbstractServerInstance {
       Caffeine.newBuilder().newBuilder().maximumSize(64 * 1024).buildAsync();
   private final AsyncCache<Digest, Action> actionCache =
       Caffeine.newBuilder().newBuilder().maximumSize(64 * 1024).buildAsync();
-  private final AsyncCache<RequestMetadata, Boolean> recentCacheServedExecutions =
-      Caffeine.newBuilder().newBuilder().maximumSize(64 * 1024).buildAsync();
+  private final Cache<RequestMetadata, Boolean> recentCacheServedExecutions =
+      Caffeine.newBuilder().newBuilder().maximumSize(64 * 1024).build();
 
   private final Random rand = new Random();
   private final Writes writes = new Writes(this::writeInstanceSupplier);
@@ -1911,7 +1912,7 @@ public class ShardInstance extends AbstractServerInstance {
       Operation operation,
       RequestMetadata requestMetadata)
       throws Exception {
-    recentCacheServedExecutions.put(requestMetadata, CompletableFuture.completedFuture(true));
+    recentCacheServedExecutions.put(requestMetadata, true);
 
     ExecuteOperationMetadata completeMetadata =
         ExecuteOperationMetadata.newBuilder()
