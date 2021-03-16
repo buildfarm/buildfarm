@@ -92,7 +92,6 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Throwables;
-import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
@@ -1213,13 +1212,7 @@ public class ShardInstance extends AbstractServerInstance {
           }
         };
 
-    return catching(
-        toListenableFuture(directoryCache.get(directoryBlobDigest, getCallback)),
-        InvalidCacheLoadException.class,
-        (e) -> {
-          return null;
-        },
-        directExecutor());
+    return toListenableFuture(directoryCache.get(directoryBlobDigest, getCallback));
   }
 
   @Override
@@ -1255,13 +1248,7 @@ public class ShardInstance extends AbstractServerInstance {
           }
         };
 
-    return catching(
-        toListenableFuture(commandCache.get(commandBlobDigest, getCallback)),
-        InvalidCacheLoadException.class,
-        (e) -> {
-          return null;
-        },
-        directExecutor());
+    return toListenableFuture(commandCache.get(commandBlobDigest, getCallback));
   }
 
   ListenableFuture<Action> expectAction(
@@ -1279,13 +1266,7 @@ public class ShardInstance extends AbstractServerInstance {
           }
         };
 
-    return catching(
-        toListenableFuture(actionCache.get(actionBlobDigest, getCallback)),
-        InvalidCacheLoadException.class,
-        (e) -> {
-          return null;
-        },
-        directExecutor());
+    return toListenableFuture(actionCache.get(actionBlobDigest, getCallback));
   }
 
   private void removeMalfunctioningWorker(String worker, Throwable t, String context) {
