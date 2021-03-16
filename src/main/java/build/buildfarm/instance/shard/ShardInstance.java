@@ -1194,10 +1194,6 @@ public class ShardInstance extends AbstractServerInstance {
     if (directoryBlobDigest.getSizeBytes() == 0) {
       return immediateFuture(Directory.getDefaultInstance());
     }
-    Supplier<ListenableFuture<Directory>> fetcher =
-        () ->
-            notFoundNull(
-                expect(directoryBlobDigest, Directory.parser(), executor, requestMetadata));
 
     BiFunction<Digest, Executor, CompletableFuture<Directory>> getCallback =
         new BiFunction<Digest, Executor, CompletableFuture<Directory>>() {
@@ -1208,6 +1204,11 @@ public class ShardInstance extends AbstractServerInstance {
                 format(
                     "transformQueuedOperation(%s): fetching directory %s",
                     reason, DigestUtil.toString(directoryBlobDigest)));
+
+            Supplier<ListenableFuture<Directory>> fetcher =
+                () ->
+                    notFoundNull(
+                        expect(directoryBlobDigest, Directory.parser(), executor, requestMetadata));
             return toCompletableFuture(fetcher.get());
           }
         };
@@ -1241,13 +1242,15 @@ public class ShardInstance extends AbstractServerInstance {
 
   ListenableFuture<Command> expectCommand(
       Digest commandBlobDigest, Executor executor, RequestMetadata requestMetadata) {
-    Supplier<ListenableFuture<Command>> fetcher =
-        () -> notFoundNull(expect(commandBlobDigest, Command.parser(), executor, requestMetadata));
 
     BiFunction<Digest, Executor, CompletableFuture<Command>> getCallback =
         new BiFunction<Digest, Executor, CompletableFuture<Command>>() {
           @Override
           public CompletableFuture<Command> apply(Digest digest, Executor executor) {
+            Supplier<ListenableFuture<Command>> fetcher =
+                () ->
+                    notFoundNull(
+                        expect(commandBlobDigest, Command.parser(), executor, requestMetadata));
             return toCompletableFuture(fetcher.get());
           }
         };
@@ -1263,13 +1266,15 @@ public class ShardInstance extends AbstractServerInstance {
 
   ListenableFuture<Action> expectAction(
       Digest actionBlobDigest, Executor executor, RequestMetadata requestMetadata) {
-    Supplier<ListenableFuture<Action>> fetcher =
-        () -> notFoundNull(expect(actionBlobDigest, Action.parser(), executor, requestMetadata));
 
     BiFunction<Digest, Executor, CompletableFuture<Action>> getCallback =
         new BiFunction<Digest, Executor, CompletableFuture<Action>>() {
           @Override
           public CompletableFuture<Action> apply(Digest digest, Executor executor) {
+            Supplier<ListenableFuture<Action>> fetcher =
+                () ->
+                    notFoundNull(
+                        expect(actionBlobDigest, Action.parser(), executor, requestMetadata));
             return toCompletableFuture(fetcher.get());
           }
         };
