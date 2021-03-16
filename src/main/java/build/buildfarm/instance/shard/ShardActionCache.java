@@ -14,7 +14,6 @@
 
 package build.buildfarm.instance.shard;
 
-import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.util.concurrent.Futures.catching;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static net.javacrumbs.futureconverter.java8guava.FutureConverter.toCompletableFuture;
@@ -63,7 +62,7 @@ class ShardActionCache implements ReadThroughActionCache {
   @Override
   public ListenableFuture<ActionResult> get(ActionKey actionKey) {
     return catching(
-        checkNotNull(toListenableFuture(actionResultCache.get(actionKey))),
+        toListenableFuture(actionResultCache.get(actionKey)),
         InvalidCacheLoadException.class,
         e -> null,
         directExecutor());
