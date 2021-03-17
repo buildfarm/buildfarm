@@ -52,6 +52,7 @@ public class MemoryCAS implements ContentAddressableStorage {
   static final Status NOT_FOUND = Status.newBuilder().setCode(Code.NOT_FOUND.getNumber()).build();
 
   private final long maxSizeInBytes;
+  private final Consumer<Digest> onPut;
 
   @GuardedBy("this")
   private final Map<String, Entry> storage;
@@ -72,6 +73,7 @@ public class MemoryCAS implements ContentAddressableStorage {
   public MemoryCAS(
       long maxSizeInBytes, Consumer<Digest> onPut, ContentAddressableStorage delegate) {
     this.maxSizeInBytes = maxSizeInBytes;
+    this.onPut = onPut;
     this.delegate = delegate;
     sizeInBytes = 0;
     header.before = header.after = header;
@@ -242,6 +244,7 @@ public class MemoryCAS implements ContentAddressableStorage {
   @Override
   public void put(Blob blob) {
     put(blob, null);
+    onPut.accept(blob.getDigest());
   }
 
   @Override
@@ -252,6 +255,7 @@ public class MemoryCAS implements ContentAddressableStorage {
 
     if (add(blob, onExpiration)) {
       writes.getFuture(blob.getDigest()).set(blob.getData());
+      onPut.accept(blob.getDigest());
     }
   }
 
