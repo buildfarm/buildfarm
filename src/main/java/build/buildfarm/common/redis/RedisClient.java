@@ -123,6 +123,7 @@ public class RedisClient implements Closeable {
         throw e;
       }
     } catch (JedisMisconfigurationException | JedisNoReachableClusterNodeException e) {
+      // In regards to a Jedis misconfiguration,
       // the backplane is configured not to accept writes currently
       // as a result of an error. The error is meant to indicate
       // that substantial resources were unavailable.
