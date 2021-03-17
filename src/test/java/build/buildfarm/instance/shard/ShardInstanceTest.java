@@ -67,6 +67,8 @@ import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
+import com.github.benmanes.caffeine.cache.AsyncCache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.collect.ImmutableList;
@@ -91,7 +93,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.function.Function;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -958,5 +962,26 @@ public class ShardInstanceTest {
     verify(mockWatcher, times(1)).observe(completedOperation);
     assertThat(instance.getActionResult(actionKey, RequestMetadata.getDefaultInstance()).get())
         .isEqualTo(actionResult);
+  }
+
+  @Test
+  public void cacheReturnsNullWhenMissing() throws Exception {
+
+    // create cache
+    AsyncCache<String, String> cache =
+        Caffeine.newBuilder().newBuilder().maximumSize(64).buildAsync();
+
+    // ensure callback returns null
+    Function<String, String> getCallback =
+        new Function<String, String>() {
+          @Override
+          public String apply(String s) {
+            return null;
+          }
+        };
+
+    // check that result is null (i.e. no exceptions thrown)
+    CompletableFuture<String> result = cache.get("missing", getCallback);
+    assertThat(result.get()).isNull();
   }
 }
