@@ -1035,17 +1035,6 @@ public abstract class AbstractServerInstance implements Instance {
     filesUniqueAndSortedPrecondition(command.getOutputFilesList(), preconditionFailure);
     filesUniqueAndSortedPrecondition(command.getOutputDirectoriesList(), preconditionFailure);
 
-    // validate Inputs
-    for (String inputFile : inputFiles) {
-      if (inputFile.contains("/")) {
-        preconditionFailure
-            .addViolationsBuilder()
-            .setType(VIOLATION_TYPE_INVALID)
-            .setSubject(INVALID_COMMAND)
-            .setDescription(INVALID_FILE_NAME);
-      }
-    }
-
     validateOutputs(
         inputFiles,
         inputDirectories,
