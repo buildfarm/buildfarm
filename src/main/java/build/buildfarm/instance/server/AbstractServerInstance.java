@@ -177,6 +177,11 @@ public abstract class AbstractServerInstance implements Instance {
 
   public static final String INVALID_PLATFORM = "The `Platform` of the `Command` was invalid.";
 
+  private static final String INVALID_FILE_NAME =
+      "One of the input `PathNode`s has an invalid name, such as a name containing a `/` character"
+          + " or another character which cannot be used in a file's name on the filesystem of the"
+          + " worker.";
+
   private static final String OUTPUT_FILE_DIRECTORY_COLLISION =
       "An output file has the same path as an output directory";
 
@@ -1029,6 +1034,17 @@ public abstract class AbstractServerInstance implements Instance {
     // invalid action?
     filesUniqueAndSortedPrecondition(command.getOutputFilesList(), preconditionFailure);
     filesUniqueAndSortedPrecondition(command.getOutputDirectoriesList(), preconditionFailure);
+
+    // validate Inputs
+    for (String inputFile : inputFiles) {
+      if (inputFile.contains("/")) {
+        preconditionFailure
+            .addViolationsBuilder()
+            .setType(VIOLATION_TYPE_INVALID)
+            .setSubject(INVALID_COMMAND)
+            .setDescription(INVALID_FILE_NAME);
+      }
+    }
 
     validateOutputs(
         inputFiles,
