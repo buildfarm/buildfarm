@@ -6,7 +6,9 @@ load("@io_bazel_rules_docker//repositories:deps.bzl", container_deps = "deps")
 load("@io_bazel_rules_docker//container:container.bzl", "container_pull")
 
 def buildfarm_images():
-"""Pull the necessary base containers to be used for image definitions."""
+"""
+Pull the necessary base containers to be used for image definitions.
+"""
 
     container_deps()
 
