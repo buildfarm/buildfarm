@@ -46,11 +46,11 @@ java_image(
     name = "buildfarm-server",
     base = "@amazon_corretto_java_image_base//image",
     classpath_resources = [
-        "@build_buildfarm//src/main/java/build/buildfarm:configs",
+        "//src/main/java/build/buildfarm:configs",
     ],
     main_class = "build.buildfarm.server.BuildFarmServer",
     runtime_deps = [
-        "@build_buildfarm//src/main/java/build/buildfarm/server",
+        "//src/main/java/build/buildfarm/server",
     ],
 )
 
@@ -58,7 +58,7 @@ java_image(
     name = "buildfarm-shard-worker",
     base = "@ubuntu-bionic//image",
     classpath_resources = [
-        "@build_buildfarm//src/main/java/build/buildfarm:configs",
+        "//src/main/java/build/buildfarm:configs",
     ],
     entrypoint = [
         "/app/buildfarm/tini",
@@ -68,6 +68,6 @@ java_image(
     runtime_deps = [
         ":process-wrapper.binary",
         ":tini.binary",
-        "@build_buildfarm//src/main/java/build/buildfarm/worker/shard",
+        "//src/main/java/build/buildfarm/worker/shard",
     ],
 )
