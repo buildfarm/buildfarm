@@ -52,6 +52,7 @@ java_image(
     runtime_deps = [
         "//src/main/java/build/buildfarm/server",
     ],
+    tags = ["container"],
 )
 
 java_image(
@@ -70,4 +71,5 @@ java_image(
         ":tini.binary",
         "//src/main/java/build/buildfarm/worker/shard",
     ],
+    tags = ["container"],
 )
