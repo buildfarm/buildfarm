@@ -21,3 +21,17 @@ def buildfarm_images():
         registry = "gcr.io",
         repository = "distroless/java",
     )
+
+    container_pull(
+        name = "ubuntu-bionic",
+        registry = "index.docker.io",
+        repository = "bazelbuild/buildfarm-worker-base",
+        tag = "bionic-java11-gcc",
+    )
+
+    container_pull(
+        name = "amazon_corretto_java_image_base",
+        registry = "index.docker.io",
+        repository = "amazoncorretto",
+        tag = "15"
+    )
