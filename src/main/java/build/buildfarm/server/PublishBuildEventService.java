@@ -14,7 +14,6 @@
 
 package build.buildfarm.server;
 
-
 import com.google.devtools.build.v1.PublishBuildEventGrpc.PublishBuildEventImplBase;
 import com.google.devtools.build.v1.PublishBuildToolEventStreamRequest;
 import com.google.devtools.build.v1.PublishBuildToolEventStreamResponse;
