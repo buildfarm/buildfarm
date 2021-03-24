@@ -46,7 +46,7 @@ def archive_dependencies(third_party):
             "build_file": "%s:BUILD.googleapis" % third_party,
             "patch_cmds": ["find google -name 'BUILD.bazel' -type f -delete"],
             #"patch_cmds_win": ["cd google; DEL /S /Q BUILD.bazel"],
-            "patch_cmds_win": ["Get-ChildItem google -Recurse | Where-Object *.bazel | Remove-Item -Force"],
+            "patch_cmds_win": ["Get-ChildItem google -Recurse | Where-Object ($_.FullName -like \"*.bazel\") | Remove-Item -Force"],
             "sha256": "745cb3c2e538e33a07e2e467a15228ccbecadc1337239f6740d57a74d9cdef81",
             "strip_prefix": "googleapis-6598bb829c9e9a534be674649ffd1b4671a821f9",
             "url": "https://github.com/googleapis/googleapis/archive/6598bb829c9e9a534be674649ffd1b4671a821f9.zip",
