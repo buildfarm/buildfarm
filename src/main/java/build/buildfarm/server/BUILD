@@ -28,6 +28,7 @@ java_library(
         "@googleapis//:google_devtools_build_v1_publish_build_event_java_proto",
         "@googleapis//:google_devtools_build_v1_build_events_proto",
         "@googleapis//:google_rpc_code_java_proto",
+        "@googleapis//:google_devtools_build_v1_build_events_java_proto",
         "@maven//:com_github_pcj_google_options",
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_guava",
