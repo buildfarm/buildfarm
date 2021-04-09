@@ -94,6 +94,8 @@ public class ResourceDecider {
       storeMinCores(limits, property);
     } else if (property.getName().equals(ExecutionProperties.MAX_CORES)) {
       storeMaxCores(limits, property);
+    } else if (property.getName().equals(ExecutionProperties.CORES)) {
+      storeCores(limits, property);
     }
 
     // handle mem properties
@@ -121,6 +123,18 @@ public class ResourceDecider {
     } else if (property.getName().equals(ExecutionProperties.DEBUG_AFTER_EXECUTION)) {
       storeAfterExecutionDebug(limits, property);
     }
+  }
+
+  /**
+   * @brief Store the property for both min/max cores.
+   * @details Parses and stores the property.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
+   */
+  private static void storeCores(ResourceLimits limits, Property property) {
+    int amount = Integer.parseInt(property.getValue());
+    limits.cpu.min = amount;
+    limits.cpu.max = amount;
   }
 
   /**
