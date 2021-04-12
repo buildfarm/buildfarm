@@ -83,6 +83,7 @@ public class ExecutionDebugger {
     ExecutionDebugInfo info = new ExecutionDebugInfo();
     info.description = "Buildfarm debug information before execution";
     info.command = String.join(" ", processBuilder.command());
+    info.environment = processBuilder.environment();
     info.workingDirectory = processBuilder.directory().getAbsolutePath();
     info.limits = limits;
 
@@ -107,6 +108,7 @@ public class ExecutionDebugger {
     ExecutionDebugInfo info = new ExecutionDebugInfo();
     info.description = "Buildfarm debug information after execution";
     info.command = String.join(" ", processBuilder.command());
+    info.environment = processBuilder.environment();
     info.workingDirectory = processBuilder.directory().getAbsolutePath();
     info.limits = limits;
 
