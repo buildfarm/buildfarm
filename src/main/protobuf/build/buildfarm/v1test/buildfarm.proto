@@ -978,6 +978,9 @@ message WorkerConfig {
   repeated ExecutionPolicy execution_policies = 22;
   
   bool error_operation_remaining_resources = 26;
+
+  // user principal name for executions
+  string exec_owner = 29;
 }
 
 message TreeIteratorToken {
