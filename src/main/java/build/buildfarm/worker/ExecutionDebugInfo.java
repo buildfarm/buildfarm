@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker;
 
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -42,7 +43,7 @@ public class ExecutionDebugInfo {
    * @brief The environment variables for the command.
    * @details The environment variables are decided by both users and buildfarm.
    */
-  public Map<String, String> environment = new Map<String, String>();
+  public Map<String, String> environment = new HashMap<String, String>();;
 
   /**
    * @field workingDirectory
