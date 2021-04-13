@@ -59,7 +59,10 @@ class ShardActionCache implements ReadThroughActionCache {
           }
         };
 
-    actionResultCache = Caffeine.newBuilder().maximumSize(maxLocalCacheSize).recordStats().buildAsync(loader);
+    actionResultCache =
+        Caffeine.newBuilder().maximumSize(maxLocalCacheSize).recordStats().buildAsync(loader);
+        
+    //cacheMetrics.addCache(name, actionResultCache);
   }
 
   @Override

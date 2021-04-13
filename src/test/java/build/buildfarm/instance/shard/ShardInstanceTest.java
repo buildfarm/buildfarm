@@ -113,6 +113,7 @@ import org.mockito.stubbing.Answer;
 public class ShardInstanceTest {
   private static final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
   private static final long QUEUE_TEST_TIMEOUT_SECONDS = 3;
+  private static int uniqueCounter = 0;
   private static final Command SIMPLE_COMMAND =
       Command.newBuilder().addAllArguments(ImmutableList.of("true")).build();
 
@@ -131,8 +132,10 @@ public class ShardInstanceTest {
   public void setUp() throws InterruptedException {
     MockitoAnnotations.initMocks(this);
     blobDigests = Sets.newHashSet();
+    
+    ++uniqueCounter;
     ReadThroughActionCache actionCache =
-        new ShardActionCache(10, mockBackplane, newDirectExecutorService());
+        new ShardActionCache(10, "name" + String.valueOf(uniqueCounter), mockBackplane, newDirectExecutorService());
     instance =
         new ShardInstance(
             "shard",
