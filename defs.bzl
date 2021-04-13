@@ -83,6 +83,7 @@ def buildfarm_init(name = "buildfarm"):
                     [
                         "io.prometheus:simpleclient:0.10.0",
                         "io.prometheus:simpleclient_guava:0.10.0",
+                        "io.prometheus:simpleclient_caffeine:0.10.0",
                         "io.prometheus:simpleclient_hotspot:0.10.0",
                         "io.prometheus:simpleclient_httpserver:0.10.0",
                         "junit:junit:4.12",

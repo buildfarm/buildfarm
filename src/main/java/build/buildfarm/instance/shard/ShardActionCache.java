@@ -29,7 +29,7 @@ import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import io.grpc.Status;
-import io.prometheus.client.guava.cache.CacheMetricsCollector;
+import io.prometheus.client.cache.caffeine.CacheMetricsCollector;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
@@ -37,7 +37,7 @@ import java.util.concurrent.Executor;
 class ShardActionCache implements ReadThroughActionCache {
   private final Backplane backplane;
   private final AsyncLoadingCache<ActionKey, ActionResult> actionResultCache;
-  private final CacheMetricsCollector cacheMetrics = new CacheMetricsCollector().register();
+  private static final CacheMetricsCollector cacheMetrics = new CacheMetricsCollector().register();
 
   ShardActionCache(
       int maxLocalCacheSize, String name, Backplane backplane, ListeningExecutorService service) {
@@ -61,8 +61,7 @@ class ShardActionCache implements ReadThroughActionCache {
 
     actionResultCache =
         Caffeine.newBuilder().maximumSize(maxLocalCacheSize).recordStats().buildAsync(loader);
-        
-    //cacheMetrics.addCache(name, actionResultCache);
+    cacheMetrics.addCache(name, actionResultCache);
   }
 
   @Override

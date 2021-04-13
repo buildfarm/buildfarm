@@ -30,7 +30,7 @@ java_library(
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
         "@maven//:io_prometheus_simpleclient",
-        "@maven//:io_prometheus_simpleclient_guava",
+        "@maven//:io_prometheus_simpleclient_caffeine",
         "@maven//:net_javacrumbs_future_converter_future_converter_java8_guava",
         "@maven//:org_apache_commons_commons_pool2",
         "@maven//:org_redisson_redisson",
