@@ -33,6 +33,7 @@ public class Group {
   private @Nullable String name;
   private @Nullable Group parent;
   private Cpu cpu;
+  private Mem mem;
 
   public static Group getRoot() {
     return root;
@@ -42,6 +43,7 @@ public class Group {
     this.name = name;
     this.parent = parent;
     cpu = new Cpu(this);
+    mem = new Mem(this);
   }
 
   public Group getChild(String name) {
@@ -54,6 +56,10 @@ public class Group {
 
   public Cpu getCpu() {
     return cpu;
+  }
+
+  public Mem getMem() {
+    return mem;
   }
 
   public String getHierarchy() {
