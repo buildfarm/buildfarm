@@ -348,6 +348,9 @@ public class ResourceDeciderTest {
     // ARRANGE
     Command command =
         Command.newBuilder()
+            .addEnvironmentVariables(
+                Command.EnvironmentVariable.newBuilder()
+                    .setName("XML_OUTPUT_FILE")) // make action look like test
             .setPlatform(
                 Platform.newBuilder()
                     .addProperties(
@@ -372,6 +375,9 @@ public class ResourceDeciderTest {
     // ARRANGE
     Command command =
         Command.newBuilder()
+            .addEnvironmentVariables(
+                Command.EnvironmentVariable.newBuilder()
+                    .setName("XML_OUTPUT_FILE")) // make action look like test
             .setPlatform(
                 Platform.newBuilder()
                     .addProperties(
@@ -396,6 +402,9 @@ public class ResourceDeciderTest {
     // ARRANGE
     Command command =
         Command.newBuilder()
+            .addEnvironmentVariables(
+                Command.EnvironmentVariable.newBuilder()
+                    .setName("XML_OUTPUT_FILE")) // make action look like test
             .setPlatform(
                 Platform.newBuilder()
                     .addProperties(

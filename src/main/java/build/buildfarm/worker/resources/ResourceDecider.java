@@ -73,6 +73,12 @@ public class ResourceDecider {
       limits.cpu.max = override.coreMax;
     }
 
+    // adjust debugging based on whether its a test
+    if (limits.debugTestsOnly && !commandIsTest(command)) {
+      limits.debugBeforeExecution = false;
+      limits.debugAfterExecution = false;
+    }
+
     // Should we limit the cores of the action during execution? by default, no.
     // If the action has suggested core restrictions on itself, then yes.
     // Claim minimal core amount with regards to execute stage width.
@@ -131,6 +137,8 @@ public class ResourceDecider {
       storeBeforeExecutionDebug(limits, property);
     } else if (property.getName().equals(ExecutionProperties.DEBUG_AFTER_EXECUTION)) {
       storeAfterExecutionDebug(limits, property);
+    } else if (property.getName().equals(ExecutionProperties.DEBUG_TESTS_ONLY)) {
+      storeDebugTestsOnly(limits, property);
     }
   }
 
@@ -241,6 +249,16 @@ public class ResourceDecider {
    */
   private static void storeAfterExecutionDebug(ResourceLimits limits, Property property) {
     limits.debugAfterExecution = Boolean.parseBoolean(property.getValue());
+  }
+
+  /**
+   * @brief Store the property for debugging tests only.
+   * @details Parses and stores a boolean.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
+   */
+  private static void storeDebugTestsOnly(ResourceLimits limits, Property property) {
+    limits.debugTestsOnly = Boolean.parseBoolean(property.getValue());
   }
 
   /**
