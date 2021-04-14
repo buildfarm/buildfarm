@@ -30,6 +30,8 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 import com.google.rpc.PreconditionFailure;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import redis.clients.jedis.JedisCluster;
 
 /**
@@ -40,6 +42,8 @@ import redis.clients.jedis.JedisCluster;
  *     extra provided metadata.
  */
 public class EnrichedOperationBuilder {
+
+  private static final Logger logger = Logger.getLogger(EnrichedOperationBuilder.class.getName());
 
   /**
    * @brief Create an enriched operation based on an operation key.
@@ -55,8 +59,20 @@ public class EnrichedOperationBuilder {
       JedisCluster cluster, Instance instance, String operationKey) {
     EnrichedOperation operationWithMetadata = new EnrichedOperation();
     operationWithMetadata.operation = operationKeyToOperation(cluster, operationKey);
+
+    // the operation could not be fetched so there is nothing further to derive
+    if (operationWithMetadata.operation == null) {
+      return operationWithMetadata;
+    }
+
     operationWithMetadata.action =
         actionDigestToAction(instance, operationToActionDigest(operationWithMetadata.operation));
+
+    // the action could not be fetched so there is nothing further to derive
+    if (operationWithMetadata.action == null) {
+      return operationWithMetadata;
+    }
+
     operationWithMetadata.command =
         commandDigestToCommand(instance, operationWithMetadata.action.getCommandDigest());
     return operationWithMetadata;
@@ -98,6 +114,7 @@ public class EnrichedOperationBuilder {
             .ignoringUnknownFields();
 
     if (json == null) {
+      logger.log(Level.SEVERE, "Operation Json is empty");
       return null;
     }
     try {
@@ -105,6 +122,7 @@ public class EnrichedOperationBuilder {
       operationParser.merge(json, operationBuilder);
       return operationBuilder.build();
     } catch (InvalidProtocolBufferException e) {
+      logger.log(Level.SEVERE, e.getMessage());
       return null;
     }
   }
@@ -142,6 +160,7 @@ public class EnrichedOperationBuilder {
       }
 
     } catch (InvalidProtocolBufferException e) {
+      logger.log(Level.SEVERE, e.getMessage());
       metadata = null;
     }
 
@@ -164,9 +183,11 @@ public class EnrichedOperationBuilder {
         action = Action.parseFrom(blob);
         return action;
       } catch (InvalidProtocolBufferException e) {
+        logger.log(Level.SEVERE, e.getMessage());
         return null;
       }
     } catch (Exception e) {
+      logger.log(Level.SEVERE, e.getMessage());
       return null;
     }
   }
@@ -187,9 +208,11 @@ public class EnrichedOperationBuilder {
         command = Command.parseFrom(blob);
         return command;
       } catch (InvalidProtocolBufferException e) {
+        logger.log(Level.SEVERE, e.getMessage());
         return null;
       }
     } catch (Exception e) {
+      logger.log(Level.SEVERE, e.getMessage());
       return null;
     }
   }
