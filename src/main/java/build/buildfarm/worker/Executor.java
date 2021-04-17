@@ -176,7 +176,7 @@ class Executor {
       timeout = add(timeout, fromSeconds(settings.timeoutPaddingSeconds));
     }
 
-    // Ensure the timeout is not too large by comparing it to the maximum allowed timeout
+    // Ensure the timeout is not too long by comparing it to the maximum allowed timeout
     if (compare(timeout, settings.maxTimeout) > 0) {
       timeout = settings.maxTimeout;
     }
