@@ -6,8 +6,8 @@ BUILDFARM_WORKER_TARGET="//src/main/java/build/buildfarm:buildfarm-operationqueu
 BUILDFARM_SHARD_WORKER_TAERGET="//src/main/java/build/buildfarm:buildfarm-shard-worker"
 
 #The configs used by the targets
-BUILDFARM_SERVER_CONFIG="$PWD/examples/server.config.example"
-BUILDFARM_WORKER_CONFIG="$PWD/examples/worker.config.example"
+BUILDFARM_SERVER_CONFIG="/buildfarm/examples/server.config.example"
+BUILDFARM_WORKER_CONFIG="/buildfarm/examples/worker.config.example"
 BUILDFARM_SHARD_SERVER_CONFIG="/buildfarm/examples/shard-server.config.example"
 BUILDFARM_SHARD_WORKER_CONFIG="/buildfarm/examples/shard-worker.config.example"
 
