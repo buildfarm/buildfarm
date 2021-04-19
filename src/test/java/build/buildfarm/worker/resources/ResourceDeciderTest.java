@@ -80,7 +80,7 @@ public class ResourceDeciderTest {
     assertThat(limits.cpu.min).isEqualTo(1);
     assertThat(limits.cpu.max).isEqualTo(1);
   }
-  
+
   // Function under test: decideResourceLimitations
   // Reason for testing: test that claims remains 1 regardless of min/max cores.
   // Failure explanation: claims were not 1 as expected
@@ -104,7 +104,7 @@ public class ResourceDeciderTest {
     // ASSERT
     assertThat(limits.cpu.claimed).isEqualTo(1);
   }
-  
+
   // Function under test: decideResourceLimitations
   // Reason for testing: test that claims are set to the specified minimum
   // Failure explanation: claims were not the same as minimum
@@ -128,7 +128,7 @@ public class ResourceDeciderTest {
     // ASSERT
     assertThat(limits.cpu.claimed).isEqualTo(3);
   }
-  
+
   // Function under test: decideResourceLimitations
   // Reason for testing: test that claims are set to 1 regardless of the min-cores
   // Failure explanation: claims were not 1 as expected

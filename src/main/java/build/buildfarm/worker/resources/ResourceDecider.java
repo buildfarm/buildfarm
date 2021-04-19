@@ -69,9 +69,9 @@ public class ResourceDecider {
     // Claim minimal core amount with regards to execute stage width.
     limits.cpu.limit = (limits.cpu.min > 0 || limits.cpu.max > 0);
     limits.cpu.claimed = Math.min(limits.cpu.min, executeStageWidth);
-    
+
     // Claims cannot be 0 as they are used by Execute Stage.
-    if (limits.cpu.claimed == 0){
+    if (limits.cpu.claimed == 0) {
       limits.cpu.claimed = 1;
     }
 
