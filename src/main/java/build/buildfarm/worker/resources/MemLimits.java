@@ -35,7 +35,7 @@ public class MemLimits {
    * @details Depending on the server implementation, we may skip applying any restrictions to
    *     memory usage.
    */
-  public boolean limit = false;
+  public boolean limit = true;
 
   /**
    * @field min
