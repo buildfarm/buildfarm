@@ -18,6 +18,8 @@ BUILDFARM_SHARD_WORKER_CONFIG="/buildfarm/examples/shard-worker.config.example"
 
 if [ "${TEST_SHARD:-false}" = true ]; then
 
+    echo "Testing with Shard Instances."
+
     # Start the server.
     ./bazelw run $BUILDFARM_SERVER_TARGET -- $BUILDFARM_SHARD_SERVER_CONFIG > server.log 2>&1 &
     SERVER_PID=$!
@@ -26,6 +28,9 @@ if [ "${TEST_SHARD:-false}" = true ]; then
     ./bazelw run $BUILDFARM_SHARD_WORKER_TAERGET -- $BUILDFARM_SHARD_WORKER_CONFIG > worker.log 2>&1 &
     WORKER_PID=$!
 else
+
+    echo "Testing with Memory Instances."
+
     # Start the server.
     ./bazelw run $BUILDFARM_SERVER_TARGET -- $BUILDFARM_SERVER_CONFIG > server.log 2>&1 &
     SERVER_PID=$!
