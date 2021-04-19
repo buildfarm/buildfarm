@@ -80,6 +80,78 @@ public class ResourceDeciderTest {
     assertThat(limits.cpu.min).isEqualTo(1);
     assertThat(limits.cpu.max).isEqualTo(1);
   }
+  
+  // Function under test: decideResourceLimitations
+  // Reason for testing: test that claims remains 1 regardless of min/max cores.
+  // Failure explanation: claims were not 1 as expected
+  @Test
+  public void decideResourceLimitationsEnsureClaimsOne() throws Exception {
+
+    // ARRANGE
+    Command command =
+        Command.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("min-cores").setValue("0"))
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("max-cores").setValue("0")))
+            .build();
+
+    // ACT
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, 100);
+
+    // ASSERT
+    assertThat(limits.cpu.claimed).isEqualTo(1);
+  }
+  
+  // Function under test: decideResourceLimitations
+  // Reason for testing: test that claims are set to the specified minimum
+  // Failure explanation: claims were not the same as minimum
+  @Test
+  public void decideResourceLimitationsEnsureClaimsAreMin() throws Exception {
+
+    // ARRANGE
+    Command command =
+        Command.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("min-cores").setValue("3"))
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("max-cores").setValue("6")))
+            .build();
+
+    // ACT
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, 100);
+
+    // ASSERT
+    assertThat(limits.cpu.claimed).isEqualTo(3);
+  }
+  
+  // Function under test: decideResourceLimitations
+  // Reason for testing: test that claims are set to 1 regardless of the min-cores
+  // Failure explanation: claims were not 1 as expected
+  @Test
+  public void decideResourceLimitationsEnsureClaimsAreOneNotMin() throws Exception {
+
+    // ARRANGE
+    Command command =
+        Command.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("min-cores").setValue("0"))
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("max-cores").setValue("6")))
+            .build();
+
+    // ACT
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, 100);
+
+    // ASSERT
+    assertThat(limits.cpu.claimed).isEqualTo(1);
+  }
 
   // Function under test: decideResourceLimitations
   // Reason for testing: test that mem constraints can be set
