@@ -175,6 +175,7 @@ public final class Chunker {
     maybeInitialize();
 
     if (size == 0) {
+      data.close();
       data = null;
       return emptyChunk;
     }
@@ -183,6 +184,7 @@ public final class Chunker {
     int bytesToRead = (int) Math.min(bytesLeft(), chunkSize);
     if (bytesToRead == 0) {
       chunkCache = null;
+      data.close();
       data = null;
       throw new NoSuchElementException();
     }
