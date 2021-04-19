@@ -1,0 +1,191 @@
+Loading: 
+Loading: 0 packages loaded
+Analyzing: target //src/main/java/build/buildfarm:buildfarm-operationqueue-worker (0 packages loaded, 0 targets configured)
+DEBUG: /home/luxe/.cache/bazel/_bazel_luxe/56c589a07cdcca616ecf15fab617b563/external/io_grpc_grpc_java/java_grpc_library.bzl:82:14: in srcs attribute of @remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc: Proto source with label @remote_apis//build/bazel/remote/execution/v2:remote_execution_proto should be in same package as consuming rule
+INFO: Analyzed target //src/main/java/build/buildfarm:buildfarm-operationqueue-worker (0 packages loaded, 0 targets configured).
+INFO: Found 1 target...
+[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt
+Target //src/main/java/build/buildfarm:buildfarm-operationqueue-worker up-to-date:
+  bazel-bin/src/main/java/build/buildfarm/buildfarm-operationqueue-worker.jar
+  bazel-bin/src/main/java/build/buildfarm/buildfarm-operationqueue-worker
+INFO: Elapsed time: 0.070s, Critical Path: 0.00s
+INFO: 1 process: 1 internal.
+INFO: Build completed successfully, 1 total action
+INFO: Running command line: bazel-bin/src/main/java/build/buildfarm/buildfarm-operationqueue-worker /home/luxe/Desktop/repos/bazel-buildfarm/examples/worker.config.example
+INFO: Build completed successfully, 1 total action
+SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
+SLF4J: Defaulting to no-operation (NOP) logger implementation
+SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
+Apr 19, 2021 12:45:26 PM build.buildfarm.cas.cfc.CASFileCache start
+INFO: Initializing cache at: /tmp/worker/cache
+Apr 19, 2021 12:45:26 PM build.buildfarm.cas.cfc.CASFileCache logCacheScanResults
+INFO: {"keys":0,"dirs":0,"delete":0}
+Apr 19, 2021 12:45:26 PM build.buildfarm.cas.cfc.CASFileCache logComputeDirectoriesResults
+INFO: {"invalid dirs":0}
+Apr 19, 2021 12:45:26 PM build.buildfarm.cas.cfc.CASFileCache start
+INFO: Creating Index
+Apr 19, 2021 12:45:26 PM build.buildfarm.cas.cfc.CASFileCache start
+INFO: Index Created
+Apr 19, 2021 12:45:26 PM build.buildfarm.cas.cfc.CASFileCache start
+INFO: Startup Time: 0s
+Apr 19, 2021 12:45:27 PM build.buildfarm.worker.Executor run
+SEVERE: errored during execution of default_memory_instance/operations/1713a779-22c4-4de3-bc05-f7c24f325a1f
+io.grpc.StatusRuntimeException: UNAVAILABLE: io exception
+	at io.grpc.stub.ClientCalls.toStatusRuntimeException(ClientCalls.java:262)
+	at io.grpc.stub.ClientCalls.getUnchecked(ClientCalls.java:243)
+	at io.grpc.stub.ClientCalls.blockingUnaryCall(ClientCalls.java:156)
+	at build.buildfarm.v1test.OperationQueueGrpc$OperationQueueBlockingStub.put(OperationQueueGrpc.java:335)
+	at build.buildfarm.instance.stub.StubInstance.putOperation(StubInstance.java:748)
+	at build.buildfarm.worker.operationqueue.OperationQueueClient.put(OperationQueueClient.java:145)
+	at build.buildfarm.worker.operationqueue.OperationQueueWorkerContext.putOperation(OperationQueueWorkerContext.java:346)
+	at build.buildfarm.worker.Executor.runInterruptible(Executor.java:117)
+	at build.buildfarm.worker.Executor.run(Executor.java:309)
+	at build.buildfarm.worker.ExecuteActionStage.lambda$iterate$0(ExecuteActionStage.java:136)
+	at java.base/java.lang.Thread.run(Thread.java:832)
+Caused by: io.netty.channel.AbstractChannel$AnnotatedConnectException: Connection refused: localhost/127.0.0.1:8980
+Caused by: java.net.ConnectException: Connection refused
+	at java.base/sun.nio.ch.Net.pollConnect(Native Method)
+	at java.base/sun.nio.ch.Net.pollConnectNow(Net.java:660)
+	at java.base/sun.nio.ch.SocketChannelImpl.finishConnect(SocketChannelImpl.java:875)
+	at io.netty.channel.socket.nio.NioSocketChannel.doFinishConnect(NioSocketChannel.java:330)
+	at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.finishConnect(AbstractNioChannel.java:334)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:702)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:650)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:576)
+	at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:493)
+	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:989)
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:832)
+
+Apr 19, 2021 12:45:27 PM build.buildfarm.worker.PipelineStage run
+SEVERE: MatchStage::run(): stage terminated due to exception
+io.grpc.StatusRuntimeException: UNAVAILABLE: io exception
+	at io.grpc.stub.ClientCalls.toStatusRuntimeException(ClientCalls.java:262)
+	at io.grpc.stub.ClientCalls.getUnchecked(ClientCalls.java:243)
+	at io.grpc.stub.ClientCalls.blockingUnaryCall(ClientCalls.java:156)
+	at build.buildfarm.v1test.OperationQueueGrpc$OperationQueueBlockingStub.take(OperationQueueGrpc.java:328)
+	at build.buildfarm.instance.stub.StubInstance.match(StubInstance.java:716)
+	at build.buildfarm.worker.operationqueue.OperationQueueClient.match(OperationQueueClient.java:119)
+	at build.buildfarm.worker.operationqueue.OperationQueueWorkerContext.match(OperationQueueWorkerContext.java:175)
+	at build.buildfarm.worker.MatchStage.iterate(MatchStage.java:141)
+	at build.buildfarm.worker.PipelineStage.runInterruptible(PipelineStage.java:44)
+	at build.buildfarm.worker.PipelineStage.run(PipelineStage.java:51)
+	at java.base/java.lang.Thread.run(Thread.java:832)
+Caused by: io.netty.channel.AbstractChannel$AnnotatedConnectException: Connection refused: localhost/127.0.0.1:8980
+Caused by: java.net.ConnectException: Connection refused
+	at java.base/sun.nio.ch.Net.pollConnect(Native Method)
+	at java.base/sun.nio.ch.Net.pollConnectNow(Net.java:660)
+	at java.base/sun.nio.ch.SocketChannelImpl.finishConnect(SocketChannelImpl.java:875)
+	at io.netty.channel.socket.nio.NioSocketChannel.doFinishConnect(NioSocketChannel.java:330)
+	at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.finishConnect(AbstractNioChannel.java:334)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:702)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:650)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:576)
+	at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:493)
+	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:989)
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:832)
+
+Exception in thread "Thread-67" io.grpc.StatusRuntimeException: UNAVAILABLE: io exception
+	at io.grpc.stub.ClientCalls.toStatusRuntimeException(ClientCalls.java:262)
+	at io.grpc.stub.ClientCalls.getUnchecked(ClientCalls.java:243)
+	at io.grpc.stub.ClientCalls.blockingUnaryCall(ClientCalls.java:156)
+	at build.buildfarm.v1test.OperationQueueGrpc$OperationQueueBlockingStub.put(OperationQueueGrpc.java:335)
+	at build.buildfarm.instance.stub.StubInstance.putOperation(StubInstance.java:748)
+	at build.buildfarm.worker.operationqueue.OperationQueueClient.put(OperationQueueClient.java:145)
+	at build.buildfarm.worker.operationqueue.OperationQueueWorkerContext.putOperation(OperationQueueWorkerContext.java:346)
+	at build.buildfarm.worker.Executor.runInterruptible(Executor.java:117)
+	at build.buildfarm.worker.Executor.run(Executor.java:309)
+	at build.buildfarm.worker.ExecuteActionStage.lambda$iterate$0(ExecuteActionStage.java:136)
+	at java.base/java.lang.Thread.run(Thread.java:832)
+Caused by: io.netty.channel.AbstractChannel$AnnotatedConnectException: Connection refused: localhost/127.0.0.1:8980
+Caused by: java.net.ConnectException: Connection refused
+	at java.base/sun.nio.ch.Net.pollConnect(Native Method)
+	at java.base/sun.nio.ch.Net.pollConnectNow(Net.java:660)
+	at java.base/sun.nio.ch.SocketChannelImpl.finishConnect(SocketChannelImpl.java:875)
+	at io.netty.channel.socket.nio.NioSocketChannel.doFinishConnect(NioSocketChannel.java:330)
+	at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.finishConnect(AbstractNioChannel.java:334)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:702)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:650)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:576)
+	at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:493)
+	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:989)
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:832)
+Exception in thread "Thread-68" io.grpc.StatusRuntimeException: UNAVAILABLE: io exception
+	at io.grpc.stub.ClientCalls.toStatusRuntimeException(ClientCalls.java:262)
+	at io.grpc.stub.ClientCalls.getUnchecked(ClientCalls.java:243)
+	at io.grpc.stub.ClientCalls.blockingUnaryCall(ClientCalls.java:156)
+	at build.buildfarm.v1test.OperationQueueGrpc$OperationQueueBlockingStub.poll(OperationQueueGrpc.java:342)
+	at build.buildfarm.instance.stub.StubInstance.pollOperation(StubInstance.java:760)
+	at build.buildfarm.worker.operationqueue.OperationQueueClient.poll(OperationQueueClient.java:153)
+	at build.buildfarm.worker.operationqueue.OperationQueueWorkerContext.lambda$resumePoller$1(OperationQueueWorkerContext.java:150)
+	at build.buildfarm.common.Poller$ActivePoller.run(Poller.java:74)
+	at java.base/java.lang.Thread.run(Thread.java:832)
+Caused by: io.netty.channel.AbstractChannel$AnnotatedConnectException: Connection refused: localhost/127.0.0.1:8980
+Caused by: java.net.ConnectException: Connection refused
+	at java.base/sun.nio.ch.Net.pollConnect(Native Method)
+	at java.base/sun.nio.ch.Net.pollConnectNow(Net.java:660)
+	at java.base/sun.nio.ch.SocketChannelImpl.finishConnect(SocketChannelImpl.java:875)
+	at io.netty.channel.socket.nio.NioSocketChannel.doFinishConnect(NioSocketChannel.java:330)
+	at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.finishConnect(AbstractNioChannel.java:334)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:702)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:650)
+	at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:576)
+	at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:493)
+	at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:989)
+	at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+	at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+	at java.base/java.lang.Thread.run(Thread.java:832)
+Apr 19, 2021 12:45:29 PM build.buildfarm.worker.Pipeline join
+INFO: Interrupting unterminated closed thread at priority 3
+Apr 19, 2021 12:45:30 PM build.buildfarm.worker.PipelineStage run
+SEVERE: ReportResultStage::run(): stage terminated due to exception
+io.grpc.StatusRuntimeException: UNAVAILABLE: io exception
+	at io.grpc.Status.asRuntimeException(Status.java:524)
+	at build.buildfarm.instance.stub.ByteStreamUploader$AsyncUpload$1.onClose(ByteStreamUploader.java:399)
+	at io.grpc.PartialForwardingClientCallListener.onClose(PartialForwardingClientCallListener.java:39)
+	at io.grpc.ForwardingClientCallListener.onClose(ForwardingClientCallListener.java:23)
+	at io.grpc.ForwardingClientCallListener$SimpleForwardingClientCallListener.onClose(ForwardingClientCallListener.java:40)
+	at io.grpc.internal.CensusStatsModule$StatsClientInterceptor$1$1.onClose(CensusStatsModule.java:700)
+	at io.grpc.PartialForwardingClientCallListener.onClose(PartialForwardingClientCallListener.java:39)
+	at io.grpc.ForwardingClientCallListener.onClose(ForwardingClientCallListener.java:23)
+	at io.grpc.ForwardingClientCallListener$SimpleForwardingClientCallListener.onClose(ForwardingClientCallListener.java:40)
+	at io.grpc.internal.CensusTracingModule$TracingClientInterceptor$1$1.onClose(CensusTracingModule.java:399)
+	at io.grpc.internal.ClientCallImpl.closeObserver(ClientCallImpl.java:521)
+	at io.grpc.internal.ClientCallImpl.access$300(ClientCallImpl.java:66)
+	at io.grpc.internal.ClientCallImpl$ClientStreamListenerImpl.close(ClientCallImpl.java:641)
+	at io.grpc.internal.ClientCallImpl$ClientStreamListenerImpl.access$700(ClientCallImpl.java:529)
+	at io.grpc.internal.ClientCallImpl$ClientStreamListenerImpl$1StreamClosed.runInternal(ClientCallImpl.java:703)
+	at io.grpc.internal.ClientCallImpl$ClientStreamListenerImpl$1StreamClosed.runInContext(ClientCallImpl.java:692)
+	at io.grpc.internal.ContextRunnable.run(ContextRunnable.java:37)
+	at io.grpc.internal.SerializingExecutor.run(SerializingExecutor.java:123)
+	at java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1130)
+	at java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:630)
+	at java.base/java.lang.Thread.run(Thread.java:832)
+	Suppressed: io.grpc.StatusRuntimeException: UNAVAILABLE: io exception
+		at io.grpc.Status.asRuntimeException(Status.java:533)
+		at io.grpc.stub.ClientCalls$UnaryStreamToFuture.onClose(ClientCalls.java:533)
+		... 19 more
+	Caused by: io.netty.channel.AbstractChannel$AnnotatedConnectException: Connection refused: localhost/127.0.0.1:8980
+	Caused by: java.net.ConnectException: Connection refused
+		at java.base/sun.nio.ch.Net.pollConnect(Native Method)
+		at java.base/sun.nio.ch.Net.pollConnectNow(Net.java:660)
+		at java.base/sun.nio.ch.SocketChannelImpl.finishConnect(SocketChannelImpl.java:875)
+		at io.netty.channel.socket.nio.NioSocketChannel.doFinishConnect(NioSocketChannel.java:330)
+		at io.netty.channel.nio.AbstractNioChannel$AbstractNioUnsafe.finishConnect(AbstractNioChannel.java:334)
+		at io.netty.channel.nio.NioEventLoop.processSelectedKey(NioEventLoop.java:702)
+		at io.netty.channel.nio.NioEventLoop.processSelectedKeysOptimized(NioEventLoop.java:650)
+		at io.netty.channel.nio.NioEventLoop.processSelectedKeys(NioEventLoop.java:576)
+		at io.netty.channel.nio.NioEventLoop.run(NioEventLoop.java:493)
+		at io.netty.util.concurrent.SingleThreadEventExecutor$4.run(SingleThreadEventExecutor.java:989)
+		at io.netty.util.internal.ThreadExecutorMap$2.run(ThreadExecutorMap.java:74)
+		at io.netty.util.concurrent.FastThreadLocalRunnable.run(FastThreadLocalRunnable.java:30)
+		at java.base/java.lang.Thread.run(Thread.java:832)
+Caused by: [CIRCULAR REFERENCE: io.netty.channel.AbstractChannel$AnnotatedConnectException: Connection refused: localhost/127.0.0.1:8980]
+
+Apr 19, 2021 12:45:30 PM build.buildfarm.worker.operationqueue.Worker stop
+INFO: Closing the pipeline

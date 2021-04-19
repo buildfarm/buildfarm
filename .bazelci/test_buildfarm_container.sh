@@ -1,15 +1,39 @@
 #!/bin/bash
-# This script is to be called within a built container reflecting the changes of a PR
-# We start the server and the worker, and test that they can complete builds for a bazel client.
-cd buildfarm;
 
-# Start the server.
-./bazelw run //src/main/java/build/buildfarm:buildfarm-server -- /buildfarm/examples/shard-server.config.example > server.log 2>&1 &
-SERVER_PID=$!
+#Various targets to be tested
+BUILDFARM_SERVER_TARGET="//src/main/java/build/buildfarm:buildfarm-server"
+BUILDFARM_WORKER_TARGET="//src/main/java/build/buildfarm:buildfarm-operationqueue-worker"
+BUILDFARM_SHARD_WORKER_TAERGET="//src/main/java/build/buildfarm:buildfarm-shard-worker"
 
-# Start the worker.
-./bazelw run //src/main/java/build/buildfarm:buildfarm-shard-worker -- /buildfarm/examples/shard-worker.config.example > worker.log 2>&1 &
-WORKER_PID=$!
+#The configs used by the targets
+BUILDFARM_SERVER_CONFIG="$PWD/examples/server.config.example"
+BUILDFARM_WORKER_CONFIG="$PWD/examples/worker.config.example"
+BUILDFARM_SHARD_SERVER_CONFIG="/buildfarm/examples/shard-server.config.example"
+BUILDFARM_SHARD_WORKER_CONFIG="/buildfarm/examples/shard-worker.config.example"
+
+
+if [ "${TEST_SHARD:-false}" = true ]; then
+
+    # This script is to be called within a built container reflecting the changes of a PR
+    # We start the server and the worker, and test that they can complete builds for a bazel client.
+    cd buildfarm;
+
+    # Start the server.
+    ./bazelw run $BUILDFARM_SERVER_TARGET -- $BUILDFARM_SHARD_SERVER_CONFIG > server.log 2>&1 &
+    SERVER_PID=$!
+
+    # Start the worker.
+    ./bazelw run $BUILDFARM_SHARD_WORKER_TAERGET -- $BUILDFARM_SHARD_WORKER_CONFIG > worker.log 2>&1 &
+    WORKER_PID=$!
+else
+    # Start the server.
+    ./bazelw run $BUILDFARM_SERVER_TARGET -- $BUILDFARM_SERVER_CONFIG > server.log 2>&1 &
+    SERVER_PID=$!
+
+    # Start the worker.
+    ./bazelw run $BUILDFARM_WORKER_TARGET -- $BUILDFARM_WORKER_CONFIG > worker.log 2>&1 &
+    WORKER_PID=$!
+fi
 
 # We cannot do a test build until the server is properly started.
 # In order to determine when the server is started, we can watch the server's log for the proper startup message.
