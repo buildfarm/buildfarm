@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# This script is to be called within a built container reflecting the changes of a PR
+# We start the server and the worker, and test that they can complete builds for a bazel client.
+cd buildfarm;
+
 #Various targets to be tested
 BUILDFARM_SERVER_TARGET="//src/main/java/build/buildfarm:buildfarm-server"
 BUILDFARM_WORKER_TARGET="//src/main/java/build/buildfarm:buildfarm-operationqueue-worker"
@@ -13,10 +17,6 @@ BUILDFARM_SHARD_WORKER_CONFIG="/buildfarm/examples/shard-worker.config.example"
 
 
 if [ "${TEST_SHARD:-false}" = true ]; then
-
-    # This script is to be called within a built container reflecting the changes of a PR
-    # We start the server and the worker, and test that they can complete builds for a bazel client.
-    cd buildfarm;
 
     # Start the server.
     ./bazelw run $BUILDFARM_SERVER_TARGET -- $BUILDFARM_SHARD_SERVER_CONFIG > server.log 2>&1 &
