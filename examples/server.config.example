@@ -121,7 +121,7 @@ instances {
 }
 
 # the listening port of the buildfarm grpc server
-port: 8080
+port: 8880
 
 # the instance to which all requests with an empty/missing
 # instance name are routed
