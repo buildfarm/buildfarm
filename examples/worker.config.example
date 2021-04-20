@@ -6,7 +6,7 @@ digest_function: SHA256
 
 # the endpoint used to execute operations
 operation_queue: {
-  target: "localhost:8980"
+  target: "localhost:8080"
 
   # the instance domain that this worker will execute work in
   # all requests will be tagged with this instance name
@@ -18,7 +18,7 @@ operation_queue: {
 
 # the endpoint used for cas interactions
 content_addressable_storage: {
-  target: "localhost:8980"
+  target: "localhost:8080"
 
   # the instance domain that this worker will make resource requests in
   # all requests will be tagged with this instance name
@@ -30,7 +30,7 @@ content_addressable_storage: {
 
 # the endpoint used for action cache interactions
 action_cache: {
-  target: "localhost:8980"
+  target: "localhost:8080"
 
   # the instance domain that this worker will make resource requests in
   # all requests will be tagged with this instance name
