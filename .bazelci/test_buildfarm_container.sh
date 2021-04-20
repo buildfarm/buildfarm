@@ -14,6 +14,51 @@ BUILDFARM_WORKER_CONFIG="/buildfarm/examples/worker.config.example"
 BUILDFARM_SHARD_SERVER_CONFIG="/buildfarm/examples/shard-server.config.example"
 BUILDFARM_SHARD_WORKER_CONFIG="/buildfarm/examples/shard-worker.config.example"
 
+ensure_server_is_up(){
+    # We cannot do a test build until the server is properly started.
+    # In order to determine when the server is started, we can watch the server's log for the proper startup message.
+    # We also capture the PID to monitor any crashes.
+    # In the future, we will want a better way to confirm the buildfarm cluster is ready to take on work.
+    FILE_TO_CHECK="server.log"
+    LINE_TO_CONTAIN="initialized"
+    SLEEP_TIME=10
+    COUNT=0
+    MAX_COUNT=5
+
+    # Wait for the server to start
+    while [[ ! $(grep $LINE_TO_CONTAIN $FILE_TO_CHECK) ]];
+    do
+        echo "Waiting for Server to start..."
+        sleep ${SLEEP_TIME}
+        COUNT=$(($COUNT + 1))
+
+       # Give up waiting for the server to start.
+       if [ $COUNT -eq $MAX_COUNT ]; then
+          echo "Server did not start."
+          break
+       fi
+
+       # Give up because the server crashed.
+       if [ ! -n "$(ps -p $SERVER_PID -o pid=)" ]; then
+          echo "Server crashed."
+          break
+       fi;
+    done
+}
+check_for_crashes(){
+    while :
+    do
+        if [ ! -n "$(ps -p $SERVER_PID -o pid=)" ]; then
+	    echo "Server crashed."
+            cat server.log
+	fi;
+        if [ ! -n "$(ps -p $WORKER_PID -o pid=)" ]; then
+	    echo "Worker crashed."
+            cat worker.log
+	fi;
+    done
+}
+
 
 if [ "${TEST_SHARD:-false}" = true ]; then
 
@@ -22,6 +67,8 @@ if [ "${TEST_SHARD:-false}" = true ]; then
     # Start the server.
     ./bazelw run $BUILDFARM_SERVER_TARGET -- $BUILDFARM_SHARD_SERVER_CONFIG > server.log 2>&1 &
     SERVER_PID=$!
+    
+    ensure_server_is_up
 
     # Start the worker.
     ./bazelw run $BUILDFARM_SHARD_WORKER_TAERGET -- $BUILDFARM_SHARD_WORKER_CONFIG > worker.log 2>&1 &
@@ -31,51 +78,23 @@ else
     echo "Testing with Memory Instances."
 
     # Start the server.
-    cat $BUILDFARM_SERVER_CONFIG
     ./bazelw run $BUILDFARM_SERVER_TARGET -- $BUILDFARM_SERVER_CONFIG > server.log 2>&1 &
     SERVER_PID=$!
+    
+    ensure_server_is_up
 
     # Start the worker.
-    cat $BUILDFARM_WORKER_CONFIG
     ./bazelw run $BUILDFARM_WORKER_TARGET -- $BUILDFARM_WORKER_CONFIG > worker.log 2>&1 &
     WORKER_PID=$!
 fi
-
-# We cannot do a test build until the server is properly started.
-# In order to determine when the server is started, we can watch the server's log for the proper startup message.
-# We also capture the PID to monitor any crashes.
-# In the future, we will want a better way to confirm the buildfarm cluster is ready to take on work.
-FILE_TO_CHECK="server.log"
-LINE_TO_CONTAIN="initialized"
-SLEEP_TIME=10
-COUNT=0
-MAX_COUNT=5
-
-# Wait for the server to start
-while [[ ! $(grep $LINE_TO_CONTAIN $FILE_TO_CHECK) ]];
-do
-    echo "Waiting for Server to start..."
-    sleep ${SLEEP_TIME}
-    COUNT=$(($COUNT + 1))
-
-   # Give up waiting for the server to start.
-   if [ $COUNT -eq $MAX_COUNT ]; then
-      echo "Server did not start."
-      break
-   fi
-
-   # Give up because the server crashed.
-   if [ ! -n "$(ps -p $SERVER_PID -o pid=)" ]; then
-      echo "Server crashed."
-      break
-   fi;
-done
 
 # Show startup logs
 echo "Server log:"
 cat server.log
 echo "Worker log:"
 cat server.log
+
+check_for_crashes &
 
 # Build bazel targets with buildfarm
 cd src/test/many;

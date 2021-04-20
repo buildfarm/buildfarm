@@ -8,27 +8,9 @@ INFO: Found 1 target...
 Target //src/main/java/build/buildfarm:buildfarm-operationqueue-worker up-to-date:
   bazel-bin/src/main/java/build/buildfarm/buildfarm-operationqueue-worker.jar
   bazel-bin/src/main/java/build/buildfarm/buildfarm-operationqueue-worker
-INFO: Elapsed time: 0.077s, Critical Path: 0.01s
+INFO: Elapsed time: 0.094s, Critical Path: 0.01s
 INFO: 1 process: 1 internal.
 INFO: Build completed successfully, 1 total action
-INFO: Running command line: bazel-bin/src/main/java/build/buildfarm/buildfarm-operationqueue-worker /home/luxe/Desktop/repos/bazel-buildfarm/examples/worker.config.example
+INFO: Running command line: bazel-bin/src/main/java/build/buildfarm/buildfarm-operationqueue-worker /buildfarm/examples/worker.config.example
 INFO: Build completed successfully, 1 total action
-SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
-SLF4J: Defaulting to no-operation (NOP) logger implementation
-SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
-Apr 20, 2021 12:23:32 AM build.buildfarm.cas.cfc.CASFileCache start
-INFO: Initializing cache at: /tmp/worker/cache
-Apr 20, 2021 12:23:32 AM build.buildfarm.cas.cfc.CASFileCache joinThreads
-INFO: Scanning Cache Root...
-Apr 20, 2021 12:23:32 AM build.buildfarm.cas.cfc.CASFileCache logCacheScanResults
-INFO: {"keys":704,"dirs":51,"delete":51}
-Apr 20, 2021 12:23:32 AM build.buildfarm.cas.cfc.CASFileCache joinThreads
-INFO: Populating Directories...
-Apr 20, 2021 12:23:32 AM build.buildfarm.cas.cfc.CASFileCache logComputeDirectoriesResults
-INFO: {"invalid dirs":0}
-Apr 20, 2021 12:23:32 AM build.buildfarm.cas.cfc.CASFileCache start
-INFO: Creating Index
-Apr 20, 2021 12:23:32 AM build.buildfarm.cas.cfc.CASFileCache start
-INFO: Index Created
-Apr 20, 2021 12:23:32 AM build.buildfarm.cas.cfc.CASFileCache start
-INFO: Startup Time: 0s
+error: /buildfarm/examples/worker.config.example: no such file

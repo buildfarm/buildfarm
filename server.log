@@ -1,5 +1,5 @@
 Another command holds the client lock: 
-pid=15285
+pid=22561
 owner=client
 cwd=/home/luxe/Desktop/repos/bazel-buildfarm
 
@@ -15,18 +15,9 @@ INFO: Found 1 target...
 Target //src/main/java/build/buildfarm:buildfarm-server up-to-date:
   bazel-bin/src/main/java/build/buildfarm/buildfarm-server.jar
   bazel-bin/src/main/java/build/buildfarm/buildfarm-server
-INFO: Elapsed time: 0.605s, Critical Path: 0.01s
+INFO: Elapsed time: 0.596s, Critical Path: 0.00s
 INFO: 1 process: 1 internal.
 INFO: Build completed successfully, 1 total action
-INFO: Running command line: bazel-bin/src/main/java/build/buildfarm/buildfarm-server /home/luxe/Desktop/repos/bazel-buildfarm/examples/server.config.example
+INFO: Running command line: bazel-bin/src/main/java/build/buildfarm/buildfarm-server /buildfarm/examples/server.config.example
 INFO: Build completed successfully, 1 total action
-Apr 20, 2021 12:23:32 AM build.buildfarm.metrics.prometheus.PrometheusPublisher startHttpServer
-INFO: Prometheus port is not configured. HTTP Server will not be started
-SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
-SLF4J: Defaulting to no-operation (NOP) logger implementation
-SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
-Apr 20, 2021 12:23:33 AM build.buildfarm.server.BuildFarmServer <init>
-INFO: buildfarm-server-5b825053-e0cd-42d3-8023-c57d77aa5911 initialized
-error: Failed to bind
-*** shutting down gRPC server since JVM is shutting down
-*** server shut down
+error: /buildfarm/examples/server.config.example: no such file
