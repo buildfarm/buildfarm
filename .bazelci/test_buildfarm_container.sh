@@ -31,10 +31,12 @@ else
     echo "Testing with Memory Instances."
 
     # Start the server.
+    cat $BUILDFARM_SERVER_CONFIG
     ./bazelw run $BUILDFARM_SERVER_TARGET -- $BUILDFARM_SERVER_CONFIG > server.log 2>&1 &
     SERVER_PID=$!
 
     # Start the worker.
+    cat $BUILDFARM_WORKER_CONFIG
     ./bazelw run $BUILDFARM_WORKER_TARGET -- $BUILDFARM_WORKER_CONFIG > worker.log 2>&1 &
     WORKER_PID=$!
 fi
