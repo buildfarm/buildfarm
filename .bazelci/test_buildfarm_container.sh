@@ -51,10 +51,12 @@ check_for_crashes(){
         if [ ! -n "$(ps -p $SERVER_PID -o pid=)" ]; then
 	    echo "Server crashed."
             cat server.log
+            exit -1;
 	fi;
         if [ ! -n "$(ps -p $WORKER_PID -o pid=)" ]; then
 	    echo "Worker crashed."
             cat worker.log
+            exit -1;
 	fi;
     done
 }
