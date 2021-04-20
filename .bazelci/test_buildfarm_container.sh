@@ -45,6 +45,7 @@ ensure_server_is_up(){
        fi;
     done
 }
+
 check_for_crashes(){
     while :
     do
@@ -61,34 +62,37 @@ check_for_crashes(){
     done
 }
 
+start_server_and_worker(){
+    if [ "${TEST_SHARD:-false}" = true ]; then
 
-if [ "${TEST_SHARD:-false}" = true ]; then
+        echo "Testing with Shard Instances."
 
-    echo "Testing with Shard Instances."
+        # Start the server.
+        ./bazelw run $BUILDFARM_SERVER_TARGET -- $BUILDFARM_SHARD_SERVER_CONFIG > server.log 2>&1 &
+        SERVER_PID=$!
+        
+        ensure_server_is_up
 
-    # Start the server.
-    ./bazelw run $BUILDFARM_SERVER_TARGET -- $BUILDFARM_SHARD_SERVER_CONFIG > server.log 2>&1 &
-    SERVER_PID=$!
-    
-    ensure_server_is_up
+        # Start the worker.
+        ./bazelw run $BUILDFARM_SHARD_WORKER_TAERGET -- $BUILDFARM_SHARD_WORKER_CONFIG > worker.log 2>&1 &
+        WORKER_PID=$!
+    else
 
-    # Start the worker.
-    ./bazelw run $BUILDFARM_SHARD_WORKER_TAERGET -- $BUILDFARM_SHARD_WORKER_CONFIG > worker.log 2>&1 &
-    WORKER_PID=$!
-else
+        echo "Testing with Memory Instances."
 
-    echo "Testing with Memory Instances."
+        # Start the server.
+        ./bazelw run $BUILDFARM_SERVER_TARGET -- $BUILDFARM_SERVER_CONFIG > server.log 2>&1 &
+        SERVER_PID=$!
+        
+        ensure_server_is_up
 
-    # Start the server.
-    ./bazelw run $BUILDFARM_SERVER_TARGET -- $BUILDFARM_SERVER_CONFIG > server.log 2>&1 &
-    SERVER_PID=$!
-    
-    ensure_server_is_up
+        # Start the worker.
+        ./bazelw run $BUILDFARM_WORKER_TARGET -- $BUILDFARM_WORKER_CONFIG > worker.log 2>&1 &
+        WORKER_PID=$!
+    fi
+}
 
-    # Start the worker.
-    ./bazelw run $BUILDFARM_WORKER_TARGET -- $BUILDFARM_WORKER_CONFIG > worker.log 2>&1 &
-    WORKER_PID=$!
-fi
+start_server_and_worker
 
 # Show startup logs
 echo "Server log:"
