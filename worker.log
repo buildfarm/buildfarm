@@ -1,0 +1,34 @@
+Loading: 
+Loading: 0 packages loaded
+Analyzing: target //src/main/java/build/buildfarm:buildfarm-operationqueue-worker (0 packages loaded, 0 targets configured)
+DEBUG: /home/luxe/.cache/bazel/_bazel_luxe/56c589a07cdcca616ecf15fab617b563/external/io_grpc_grpc_java/java_grpc_library.bzl:82:14: in srcs attribute of @remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc: Proto source with label @remote_apis//build/bazel/remote/execution/v2:remote_execution_proto should be in same package as consuming rule
+INFO: Analyzed target //src/main/java/build/buildfarm:buildfarm-operationqueue-worker (0 packages loaded, 0 targets configured).
+INFO: Found 1 target...
+[0 / 1] [Prepa] BazelWorkspaceStatusAction stable-status.txt
+Target //src/main/java/build/buildfarm:buildfarm-operationqueue-worker up-to-date:
+  bazel-bin/src/main/java/build/buildfarm/buildfarm-operationqueue-worker.jar
+  bazel-bin/src/main/java/build/buildfarm/buildfarm-operationqueue-worker
+INFO: Elapsed time: 0.063s, Critical Path: 0.00s
+INFO: 1 process: 1 internal.
+INFO: Build completed successfully, 1 total action
+INFO: Running command line: bazel-bin/src/main/java/build/buildfarm/buildfarm-operationqueue-worker /home/luxe/Desktop/repos/bazel-buildfarm/examples/worker.config.example
+INFO: Build completed successfully, 1 total action
+SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder".
+SLF4J: Defaulting to no-operation (NOP) logger implementation
+SLF4J: See http://www.slf4j.org/codes.html#StaticLoggerBinder for further details.
+Apr 19, 2021 9:43:45 PM build.buildfarm.cas.cfc.CASFileCache start
+INFO: Initializing cache at: /tmp/worker/cache
+Apr 19, 2021 9:43:45 PM build.buildfarm.cas.cfc.CASFileCache joinThreads
+INFO: Scanning Cache Root...
+Apr 19, 2021 9:43:45 PM build.buildfarm.cas.cfc.CASFileCache logCacheScanResults
+INFO: {"keys":754,"dirs":52,"delete":52}
+Apr 19, 2021 9:43:45 PM build.buildfarm.cas.cfc.CASFileCache joinThreads
+INFO: Populating Directories...
+Apr 19, 2021 9:43:46 PM build.buildfarm.cas.cfc.CASFileCache logComputeDirectoriesResults
+INFO: {"invalid dirs":0}
+Apr 19, 2021 9:43:46 PM build.buildfarm.cas.cfc.CASFileCache start
+INFO: Creating Index
+Apr 19, 2021 9:43:46 PM build.buildfarm.cas.cfc.CASFileCache start
+INFO: Index Created
+Apr 19, 2021 9:43:46 PM build.buildfarm.cas.cfc.CASFileCache start
+INFO: Startup Time: 0s
