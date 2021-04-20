@@ -773,8 +773,8 @@ class Cat {
       System.out.println("Listing Operations");
       listOperations(instance);
     }
-    if (type.equals("OperationsStatus") && args.length == 4) {
-      System.out.println(instance.operationsStatus());
+    if (type.equals("BackplaneStatus") && args.length == 4) {
+      System.out.println(instance.backplaneStatus());
     }
     // should do something to match caps against requested digests
     if (type.equals("Missing")) {

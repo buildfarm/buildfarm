@@ -14,50 +14,55 @@
 
 package build.buildfarm.instance.shard;
 
-import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.util.concurrent.Futures.catching;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
+import static net.javacrumbs.futureconverter.java8guava.FutureConverter.toCompletableFuture;
+import static net.javacrumbs.futureconverter.java8guava.FutureConverter.toListenableFuture;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.DigestUtil.ActionKey;
-import build.buildfarm.common.cache.CacheBuilder;
-import build.buildfarm.common.cache.CacheLoader;
-import build.buildfarm.common.cache.CacheLoader.InvalidCacheLoadException;
-import build.buildfarm.common.cache.LoadingCache;
+import com.github.benmanes.caffeine.cache.AsyncCacheLoader;
+import com.github.benmanes.caffeine.cache.AsyncLoadingCache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import com.google.common.cache.CacheLoader.InvalidCacheLoadException;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import io.grpc.Status;
 import java.io.IOException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 
 class ShardActionCache implements ReadThroughActionCache {
   private final Backplane backplane;
-  private final LoadingCache<ActionKey, ActionResult> actionResultCache;
+  private final AsyncLoadingCache<ActionKey, ActionResult> actionResultCache;
 
   ShardActionCache(int maxLocalCacheSize, Backplane backplane, ListeningExecutorService service) {
     this.backplane = backplane;
-    actionResultCache =
-        CacheBuilder.newBuilder()
-            .maximumSize(maxLocalCacheSize)
-            .build(
-                new CacheLoader<ActionKey, ActionResult>() {
-                  @Override
-                  public ListenableFuture<ActionResult> load(ActionKey actionKey) {
-                    return catching(
-                        service.submit(() -> backplane.getActionResult(actionKey)),
-                        IOException.class,
-                        e -> {
-                          throw Status.fromThrowable(e).asRuntimeException();
-                        },
-                        directExecutor());
-                  }
-                });
+
+    AsyncCacheLoader<ActionKey, ActionResult> loader =
+        new AsyncCacheLoader<ActionKey, ActionResult>() {
+
+          @Override
+          public CompletableFuture<ActionResult> asyncLoad(ActionKey actionKey, Executor executor) {
+            return toCompletableFuture(
+                catching(
+                    service.submit(() -> backplane.getActionResult(actionKey)),
+                    IOException.class,
+                    e -> {
+                      throw Status.fromThrowable(e).asRuntimeException();
+                    },
+                    executor));
+          }
+        };
+
+    actionResultCache = Caffeine.newBuilder().maximumSize(maxLocalCacheSize).buildAsync(loader);
   }
 
   @Override
   public ListenableFuture<ActionResult> get(ActionKey actionKey) {
     return catching(
-        checkNotNull(actionResultCache.get(actionKey)),
+        toListenableFuture(actionResultCache.get(actionKey)),
         InvalidCacheLoadException.class,
         e -> null,
         directExecutor());
@@ -76,11 +81,11 @@ class ShardActionCache implements ReadThroughActionCache {
 
   @Override
   public void invalidate(ActionKey actionKey) {
-    actionResultCache.invalidate(actionKey);
+    actionResultCache.synchronous().invalidate(actionKey);
   }
 
   @Override
   public void readThrough(ActionKey actionKey, ActionResult actionResult) {
-    actionResultCache.put(actionKey, actionResult);
+    actionResultCache.put(actionKey, CompletableFuture.completedFuture(actionResult));
   }
 }

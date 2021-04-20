@@ -6,6 +6,11 @@ tasks:
     platform: ubuntu1804
     shell_commands:
     - ./.bazelci/format.sh --check
+  static_analysis_check:
+    name: "Static Analysis"
+    platform: ubuntu1804
+    shell_commands:
+    - ./.bazelci/static_analyze.sh
   code_coverage:
     name: "Code Coverage"
     platform: ubuntu1804

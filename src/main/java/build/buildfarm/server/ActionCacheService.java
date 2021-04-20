@@ -27,8 +27,8 @@ import build.buildfarm.instance.Instance;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.grpc.Status;
-import io.grpc.Status.Code;
 import io.grpc.StatusRuntimeException;
+import io.grpc.stub.ServerCallStreamObserver;
 import io.grpc.stub.StreamObserver;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -64,6 +64,9 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
     addCallback(
         resultFuture,
         new FutureCallback<ActionResult>() {
+          ServerCallStreamObserver<ActionResult> call =
+              (ServerCallStreamObserver<ActionResult>) responseObserver;
+
           @Override
           public void onSuccess(@Nullable ActionResult actionResult) {
             try {
@@ -87,7 +90,7 @@ public class ActionCacheService extends ActionCacheGrpc.ActionCacheImplBase {
                     request.getInstanceName(), DigestUtil.toString(request.getActionDigest())),
                 t);
             Status status = Status.fromThrowable(t);
-            if (status.getCode() != Code.CANCELLED) {
+            if (!call.isCancelled()) {
               try {
                 responseObserver.onError(status.asException());
               } catch (StatusRuntimeException e) {

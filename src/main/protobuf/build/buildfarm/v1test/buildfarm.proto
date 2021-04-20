@@ -165,12 +165,12 @@ service OperationQueue {
     option (google.api.http) = { get: "/v1test/{instance_name=**}/operation:poll" };
   }
 
-  rpc Status(OperationsStatusRequest) returns (OperationsStatus) {
+  rpc Status(BackplaneStatusRequest) returns (BackplaneStatus) {
     option (google.api.http) = { get: "/v1test/{instance_name=**}/operation:status" };
   }
 }
 
-message OperationsStatusRequest {
+message BackplaneStatusRequest {
   string instance_name = 1;
 }
 
@@ -477,6 +477,9 @@ message RedisShardBackplaneConfig {
 
   // the expiration time in seconds for cas sets
   int32 cas_expire = 11;
+  
+  //whether or not to cache the cas set in memory
+  bool cache_cas = 35;
 
   // whether to listen to the backplane communication streams for shard lifecycle
   // events and watched operations. This is required for failsafe operation below
@@ -756,7 +759,7 @@ message OperationQueueStatus {
   int64 size = 2;
 }
 
-message OperationsStatus {
+message BackplaneStatus {
   QueueStatus prequeue = 1;
 
   OperationQueueStatus operation_queue = 2;
@@ -764,6 +767,14 @@ message OperationsStatus {
   int64 dispatched_size = 3;
 
   repeated string active_workers = 4;
+  
+  int64 cas_lookup_size = 5;
+  
+  int64 action_cache_size = 6;
+  
+  int64 blocked_actions_size = 7;
+  
+  int64 blocked_invocations_size = 8;
 }
 
 message QueuedOperationMetadata {
@@ -967,6 +978,9 @@ message WorkerConfig {
   repeated ExecutionPolicy execution_policies = 22;
   
   bool error_operation_remaining_resources = 26;
+
+  // user principal name for executions
+  string exec_owner = 29;
 }
 
 message TreeIteratorToken {

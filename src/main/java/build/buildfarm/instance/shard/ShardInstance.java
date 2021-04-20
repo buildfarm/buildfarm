@@ -22,7 +22,6 @@ import static build.buildfarm.common.Errors.VIOLATION_TYPE_MISSING;
 import static build.buildfarm.instance.shard.Util.SHARD_IS_RETRIABLE;
 import static build.buildfarm.instance.shard.Util.correctMissingBlob;
 import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.base.Predicates.or;
 import static com.google.common.util.concurrent.Futures.addCallback;
 import static com.google.common.util.concurrent.Futures.allAsList;
 import static com.google.common.util.concurrent.Futures.catching;
@@ -41,6 +40,8 @@ import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.INFO;
+import static net.javacrumbs.futureconverter.java8guava.FutureConverter.toCompletableFuture;
+import static net.javacrumbs.futureconverter.java8guava.FutureConverter.toListenableFuture;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
@@ -68,18 +69,15 @@ import build.buildfarm.common.TreeIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
-import build.buildfarm.common.cache.Cache;
-import build.buildfarm.common.cache.CacheBuilder;
-import build.buildfarm.common.cache.CacheLoader.InvalidCacheLoadException;
 import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.MatchListener;
 import build.buildfarm.instance.server.AbstractServerInstance;
 import build.buildfarm.operations.FindOperationsResults;
+import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationIteratorToken;
-import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.ProfiledQueuedOperationMetadata;
 import build.buildfarm.v1test.ProvisionedQueue;
 import build.buildfarm.v1test.QueueEntry;
@@ -88,6 +86,9 @@ import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ShardInstanceConfig;
 import build.buildfarm.v1test.Tree;
+import com.github.benmanes.caffeine.cache.AsyncCache;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Throwables;
@@ -135,7 +136,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
@@ -143,6 +144,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.logging.Level;
@@ -160,6 +162,7 @@ public class ShardInstance extends AbstractServerInstance {
 
   private static final int DEFAULT_MAX_LOCAL_ACTION_CACHE_SIZE = 1000000;
 
+  // Prometheus metrics
   private static final Counter executionSuccess =
       Counter.build().name("execution_success").help("Execution success.").register();
   private static final Gauge preQueueSize =
@@ -173,6 +176,17 @@ public class ShardInstance extends AbstractServerInstance {
       Gauge.build().name("worker_pool_size").help("Active worker pool size.").register();
   private static final Gauge queueSize =
       Gauge.build().name("queue_size").labelNames("queue_name").help("Queue size.").register();
+  private static final Gauge casLookupSize =
+      Gauge.build().name("cas_lookup_size").help("CAS lookup size.").register();
+  private static final Gauge actionCacheLookupSize =
+      Gauge.build().name("action_cache_lookup_size").help("Action Cache lookup size.").register();
+  private static final Gauge blockedActionsSize =
+      Gauge.build().name("blocked_actions_size").help("The number of blocked actions").register();
+  private static final Gauge blockedInvocationsSize =
+      Gauge.build()
+          .name("blocked_invocations_size")
+          .help("The number of blocked invocations")
+          .register();
 
   private final Runnable onStop;
   private final long maxBlobSize;
@@ -182,15 +196,14 @@ public class ShardInstance extends AbstractServerInstance {
   private final com.google.common.cache.LoadingCache<String, Instance> workerStubs;
   private final Thread dispatchedMonitor;
   private final Duration maxActionTimeout;
-  private final Cache<Digest, Directory> directoryCache =
-      CacheBuilder.newBuilder().maximumSize(64 * 1024).build();
-  private final Cache<Digest, Command> commandCache =
-      CacheBuilder.newBuilder().maximumSize(64 * 1024).build();
-  private final Cache<Digest, Action> actionCache =
-      CacheBuilder.newBuilder().maximumSize(64 * 1024).build();
-  private final com.google.common.cache.Cache<RequestMetadata, Boolean>
-      recentCacheServedExecutions =
-          com.google.common.cache.CacheBuilder.newBuilder().maximumSize(64 * 1024).build();
+  private final AsyncCache<Digest, Directory> directoryCache =
+      Caffeine.newBuilder().newBuilder().maximumSize(64 * 1024).buildAsync();
+  private final AsyncCache<Digest, Command> commandCache =
+      Caffeine.newBuilder().newBuilder().maximumSize(64 * 1024).buildAsync();
+  private final AsyncCache<Digest, Action> actionCache =
+      Caffeine.newBuilder().newBuilder().maximumSize(64 * 1024).buildAsync();
+  private final Cache<RequestMetadata, Boolean> recentCacheServedExecutions =
+      Caffeine.newBuilder().newBuilder().maximumSize(64 * 1024).build();
 
   private final Random rand = new Random();
   private final Writes writes = new Writes(this::writeInstanceSupplier);
@@ -240,9 +253,7 @@ public class ShardInstance extends AbstractServerInstance {
             config.getRedisShardBackplaneConfig(),
             identifier,
             ShardInstance::stripOperation,
-            ShardInstance::stripQueuedOperation,
-            /* isPrequeued=*/ ShardInstance::isUnknown,
-            /* isExecuting=*/ or(ShardInstance::isExecuting, ShardInstance::isQueued));
+            ShardInstance::stripQueuedOperation);
     }
   }
 
@@ -460,11 +471,15 @@ public class ShardInstance extends AbstractServerInstance {
               while (!Thread.currentThread().isInterrupted()) {
                 try {
                   TimeUnit.SECONDS.sleep(30);
-                  OperationsStatus operationsStatus = operationsStatus();
-                  workerPoolSize.set(operationsStatus.getActiveWorkersCount());
-                  dispatchedOperations.set(operationsStatus.getDispatchedSize());
-                  preQueueSize.set(operationsStatus.getPrequeue().getSize());
-                  updateQueueSizes(operationsStatus.getOperationQueue().getProvisionsList());
+                  BackplaneStatus backplaneStatus = backplaneStatus();
+                  workerPoolSize.set(backplaneStatus.getActiveWorkersCount());
+                  dispatchedOperations.set(backplaneStatus.getDispatchedSize());
+                  preQueueSize.set(backplaneStatus.getPrequeue().getSize());
+                  updateQueueSizes(backplaneStatus.getOperationQueue().getProvisionsList());
+                  casLookupSize.set(backplaneStatus.getCasLookupSize());
+                  actionCacheLookupSize.set(backplaneStatus.getActionCacheSize());
+                  blockedActionsSize.set(backplaneStatus.getBlockedActionsSize());
+                  blockedInvocationsSize.set(backplaneStatus.getBlockedInvocationsSize());
                 } catch (InterruptedException e) {
                   Thread.currentThread().interrupt();
                   break;
@@ -1029,9 +1044,7 @@ public class ShardInstance extends AbstractServerInstance {
       throws EntryLimitException {
     try {
       if (backplane.isBlacklisted(requestMetadata)) {
-        throw Status.UNAVAILABLE
-            .withDescription("This write request is in block list and is forbidden")
-            .asRuntimeException();
+        throw Status.UNAVAILABLE.withDescription(BLOCK_LIST_ERROR).asRuntimeException();
       }
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
@@ -1180,30 +1193,26 @@ public class ShardInstance extends AbstractServerInstance {
     if (directoryBlobDigest.getSizeBytes() == 0) {
       return immediateFuture(Directory.getDefaultInstance());
     }
-    Supplier<ListenableFuture<Directory>> fetcher =
-        () ->
-            notFoundNull(
-                expect(directoryBlobDigest, Directory.parser(), executor, requestMetadata));
-    // is there a better interface to use for the cache with these nice futures?
-    return catching(
-        directoryCache.get(
-            directoryBlobDigest,
-            new Callable<ListenableFuture<? extends Directory>>() {
-              @Override
-              public ListenableFuture<Directory> call() {
-                logger.log(
-                    Level.FINE,
-                    format(
-                        "transformQueuedOperation(%s): fetching directory %s",
-                        reason, DigestUtil.toString(directoryBlobDigest)));
-                return fetcher.get();
-              }
-            }),
-        InvalidCacheLoadException.class,
-        (e) -> {
-          return null;
-        },
-        directExecutor());
+
+    BiFunction<Digest, Executor, CompletableFuture<Directory>> getCallback =
+        new BiFunction<Digest, Executor, CompletableFuture<Directory>>() {
+          @Override
+          public CompletableFuture<Directory> apply(Digest digest, Executor executor) {
+            logger.log(
+                Level.FINE,
+                format(
+                    "transformQueuedOperation(%s): fetching directory %s",
+                    reason, DigestUtil.toString(directoryBlobDigest)));
+
+            Supplier<ListenableFuture<Directory>> fetcher =
+                () ->
+                    notFoundNull(
+                        expect(directoryBlobDigest, Directory.parser(), executor, requestMetadata));
+            return toCompletableFuture(fetcher.get());
+          }
+        };
+
+    return toListenableFuture(directoryCache.get(directoryBlobDigest, getCallback));
   }
 
   @Override
@@ -1226,42 +1235,38 @@ public class ShardInstance extends AbstractServerInstance {
 
   ListenableFuture<Command> expectCommand(
       Digest commandBlobDigest, Executor executor, RequestMetadata requestMetadata) {
-    Supplier<ListenableFuture<Command>> fetcher =
-        () -> notFoundNull(expect(commandBlobDigest, Command.parser(), executor, requestMetadata));
-    return catching(
-        commandCache.get(
-            commandBlobDigest,
-            new Callable<ListenableFuture<? extends Command>>() {
-              @Override
-              public ListenableFuture<Command> call() {
-                return fetcher.get();
-              }
-            }),
-        InvalidCacheLoadException.class,
-        (e) -> {
-          return null;
-        },
-        directExecutor());
+
+    BiFunction<Digest, Executor, CompletableFuture<Command>> getCallback =
+        new BiFunction<Digest, Executor, CompletableFuture<Command>>() {
+          @Override
+          public CompletableFuture<Command> apply(Digest digest, Executor executor) {
+            Supplier<ListenableFuture<Command>> fetcher =
+                () ->
+                    notFoundNull(
+                        expect(commandBlobDigest, Command.parser(), executor, requestMetadata));
+            return toCompletableFuture(fetcher.get());
+          }
+        };
+
+    return toListenableFuture(commandCache.get(commandBlobDigest, getCallback));
   }
 
   ListenableFuture<Action> expectAction(
       Digest actionBlobDigest, Executor executor, RequestMetadata requestMetadata) {
-    Supplier<ListenableFuture<Action>> fetcher =
-        () -> notFoundNull(expect(actionBlobDigest, Action.parser(), executor, requestMetadata));
-    return catching(
-        actionCache.get(
-            actionBlobDigest,
-            new Callable<ListenableFuture<? extends Action>>() {
-              @Override
-              public ListenableFuture<Action> call() {
-                return fetcher.get();
-              }
-            }),
-        InvalidCacheLoadException.class,
-        (e) -> {
-          return null;
-        },
-        directExecutor());
+
+    BiFunction<Digest, Executor, CompletableFuture<Action>> getCallback =
+        new BiFunction<Digest, Executor, CompletableFuture<Action>>() {
+          @Override
+          public CompletableFuture<Action> apply(Digest digest, Executor executor) {
+            Supplier<ListenableFuture<Action>> fetcher =
+                () ->
+                    notFoundNull(
+                        expect(actionBlobDigest, Action.parser(), executor, requestMetadata));
+            return toCompletableFuture(fetcher.get());
+          }
+        };
+
+    return toListenableFuture(actionCache.get(actionBlobDigest, getCallback));
   }
 
   private void removeMalfunctioningWorker(String worker, Throwable t, String context) {
@@ -1656,10 +1661,7 @@ public class ShardInstance extends AbstractServerInstance {
                 .setName(operationName)
                 .setDone(true)
                 .setResponse(
-                    Any.pack(
-                        denyActionResponse(
-                            executeEntry.getActionDigest(),
-                            "This execute request is in block list and is forbidden")))
+                    Any.pack(denyActionResponse(executeEntry.getActionDigest(), BLOCK_LIST_ERROR)))
                 .build());
         return IMMEDIATE_VOID_FUTURE;
       } else if (queueEntry.getRequeueAttempts() > maxRequeueAttempts) {
@@ -1824,11 +1826,7 @@ public class ShardInstance extends AbstractServerInstance {
             operation
                 .toBuilder()
                 .setDone(true)
-                .setResponse(
-                    Any.pack(
-                        denyActionResponse(
-                            actionDigest,
-                            "This execute request is in block list and is forbidden")))
+                .setResponse(Any.pack(denyActionResponse(actionDigest, BLOCK_LIST_ERROR)))
                 .build());
         return immediateFuture(null);
       }
@@ -2241,9 +2239,9 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   @Override
-  public OperationsStatus operationsStatus() {
+  public BackplaneStatus backplaneStatus() {
     try {
-      return backplane.operationsStatus();
+      return backplane.backplaneStatus();
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }
