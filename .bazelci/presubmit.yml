@@ -47,7 +47,7 @@ tasks:
     name: "Integration Test"
     platform: ubuntu1804
     shell_commands:
-    - ./.bazelci/test_buildfarm_container.sh
+    - ./.bazelci/integration_test.sh
   integration_test_shard:
     name: "Integration Test (Shard)"
     platform: ubuntu1804
