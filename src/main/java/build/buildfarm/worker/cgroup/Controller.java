@@ -22,9 +22,20 @@ import java.io.Reader;
 import java.io.Writer;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 abstract class Controller implements IOResource {
   protected final Group group;
+
+  private static final Logger logger = Logger.getLogger(Controller.class.getName());
 
   private boolean opened = false;
 
@@ -47,13 +58,49 @@ abstract class Controller implements IOResource {
 
   /**
    * This method requires that all processes under the cgroup are no longer desirable and should be
-   * killed as a result
-   *
-   * <p>This requires a posix environment, as with cgroups, and will take reasonable action to
-   * attempt to end the process.
+   * killed as a result. This requires a posix environment, as with cgroups, and will take
+   * reasonable action to attempt to end the process.
    */
   @Override
   public void close() throws IOException {
+
+    ExecutorService executor = Executors.newCachedThreadPool();
+
+    // an exception safe call to cleaning up the cgroup resources
+    Callable<Void> task =
+        new Callable<Void>() {
+          public Void call() {
+
+            try {
+              killAllCgroupProcesses();
+            } catch (IOException e) {
+              logger.log(Level.SEVERE, "Failure to kill all processes after action execution.", e);
+            }
+            return null;
+          }
+        };
+
+    // perform cleanup
+    Future<Void> future = executor.submit(task);
+
+    // ensure cleanup does not get stuck indefinitely
+    waitUpToNSeconds(future, 10);
+  }
+
+  private void waitUpToNSeconds(Future<Void> future, long nSeconds) throws IOException {
+    try {
+      future.get(nSeconds, TimeUnit.SECONDS);
+    } catch (TimeoutException e) {
+      logger.log(
+          Level.SEVERE,
+          "Killing all processes did not complete in a reasonable amount of time.",
+          e);
+    } catch (InterruptedException | ExecutionException e) {
+      logger.log(Level.SEVERE, "Failure to kill all processes after action execution.", e);
+    }
+  }
+
+  private void killAllCgroupProcesses() throws IOException {
     Path path = getPath();
     boolean exists = true;
     while (exists) {
