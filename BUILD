@@ -68,6 +68,7 @@ java_image(
     main_class = "build.buildfarm.worker.shard.Worker",
     runtime_deps = [
         ":process-wrapper.binary",
+        ":linux-sandbox.binary",
         ":tini.binary",
         "//src/main/java/build/buildfarm/worker/shard",
     ],
