@@ -40,7 +40,6 @@ cc_binary(
     }),
 )
 
-
 # Docker images for buildfarm components
 java_image(
     name = "buildfarm-server",
@@ -49,10 +48,10 @@ java_image(
         "//src/main/java/build/buildfarm:configs",
     ],
     main_class = "build.buildfarm.server.BuildFarmServer",
+    tags = ["container"],
     runtime_deps = [
         "//src/main/java/build/buildfarm/server",
     ],
-    tags = ["container"],
 )
 
 java_image(
@@ -66,11 +65,11 @@ java_image(
         "--",
     ],
     main_class = "build.buildfarm.worker.shard.Worker",
+    tags = ["container"],
     runtime_deps = [
-        ":process-wrapper.binary",
         ":linux-sandbox.binary",
+        ":process-wrapper.binary",
         ":tini.binary",
         "//src/main/java/build/buildfarm/worker/shard",
     ],
-    tags = ["container"],
 )
