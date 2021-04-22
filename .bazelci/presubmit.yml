@@ -44,7 +44,13 @@ tasks:
     test_targets:
     - "..."
   integration_test:
-    name: "Integration Test"
+    name: "Integration Test (Memory)"
     platform: ubuntu1804
     shell_commands:
+    - ./.bazelci/integration_test.sh
+  integration_test_shard:
+    name: "Integration Test (Shard)"
+    platform: ubuntu1804
+    shell_commands:
+    - export TEST_SHARD=true
     - ./.bazelci/integration_test.sh
