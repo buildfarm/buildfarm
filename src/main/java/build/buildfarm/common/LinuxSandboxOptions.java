@@ -103,13 +103,6 @@ public class LinuxSandboxOptions {
   public String statsPath = "";
 
   /**
-   * @field statsPath
-   * @brief Where to write stats, in protobuf format.
-   * @details Flag value: -S.
-   */
-  public String statsPath = "";
-
-  /**
    * @field fakeHostname
    * @brief Set the hostname inside the sandbox to 'localhost'.
    * @details Flag value: -H.
