@@ -25,8 +25,9 @@ import redis.clients.jedis.ScanResult;
  * @class ScanCount
  * @brief Count element of a scan query.
  * @details Some things are laid out in redis where in order to get their conceptual size we need to
- *     query for wildcard keys and count non-duplicates. This may not scale because we need to
- *     filter non duplicates.
+ *     query for wildcard keys and count non-duplicates. This will not scale because we need to
+ *     filter non duplicates. It's O(n) time and memory. It is not recommended when matching large
+ *     key patterns.
  */
 public class ScanCount {
 

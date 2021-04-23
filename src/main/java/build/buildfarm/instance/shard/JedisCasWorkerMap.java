@@ -228,7 +228,7 @@ public class JedisCasWorkerMap implements CasWorkerMap {
 
   /**
    * @brief Get the size of the map.
-   * @details May be inefficient to due scanning into memory and deduplicating.
+   * @details O(1).
    * @param client Client used for interacting with redis when not using cacheMap.
    * @return The size of the map.
    * @note Suggested return identifier: size.
