@@ -413,7 +413,9 @@ class OperationQueueWorkerContext implements WorkerContext {
 
   @Override
   public ResourceLimits commandExecutionSettings(Command command) {
-    return new ResourceLimits();
+    ResourceLimits limits = new ResourceLimits();
+    limits.claimed = 1;
+    return limits;
   }
 
   private static void uploadManifest(UploadManifest manifest, ByteStreamUploader uploader)
