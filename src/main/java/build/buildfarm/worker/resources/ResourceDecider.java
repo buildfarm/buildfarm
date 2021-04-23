@@ -70,8 +70,10 @@ public class ResourceDecider {
     limits.cpu.limit = (limits.cpu.min > 0 || limits.cpu.max > 0);
     limits.cpu.claimed = Math.min(limits.cpu.min, executeStageWidth);
 
-    // Claims cannot be 0 as they are used by Execute Stage.
+    // Cannot be 0 as they are used by Execute Stage.
     if (limits.cpu.claimed <= 0) {
+      limits.cpu.min = 1;
+      limits.cpu.max = 1;
       limits.cpu.claimed = 1;
     }
 
