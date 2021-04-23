@@ -414,7 +414,7 @@ class OperationQueueWorkerContext implements WorkerContext {
   @Override
   public ResourceLimits commandExecutionSettings(Command command) {
     ResourceLimits limits = new ResourceLimits();
-    limits.claimed = 1;
+    limits.cpu.claimed = 1;
     return limits;
   }
 
