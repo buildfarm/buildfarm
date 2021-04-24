@@ -80,39 +80,35 @@ public class RedissonMap {
     cacheMap.fastRemove(StreamSupport.stream(keys.spliterator(), false).toArray(String[]::new));
   }
 
-  // /**
-  //  * @brief Get the value of the key.
-  //  * @details If the key does not exist, null is returned.
-  //  * @param jedis Jedis cluster client.
-  //  * @param key The name of the key.
-  //  * @return The value of the key. null if key does not exist.
-  //  * @note Suggested return identifier: value.
-  //  */
-  // public String get(JedisCluster jedis, String key) {
-  //   return jedis.get(createKeyName(key));
-  // }
+  /**
+   * @brief Get the value of the key.
+   * @details If the key does not exist, null is returned.
+   * @param key The name of the key.
+   * @return The value of the key. null if key does not exist.
+   * @note Suggested return identifier: value.
+   */
+  public String get(String key) {
+    return cacheMap.get(key);
+  }
 
-  // /**
-  //  * @brief whether the key exists
-  //  * @details True if key exists. False if key does not exist.
-  //  * @param jedis Jedis cluster client.
-  //  * @param key The name of the key.
-  //  * @return Whether the key exists or not.
-  //  * @note Suggested return identifier: exists.
-  //  */
-  // public boolean exists(JedisCluster jedis, String key) {
-  //   return jedis.exists(createKeyName(key));
-  // }
+  /**
+   * @brief whether the key exists
+   * @details True if key exists. False if key does not exist.
+   * @param key The name of the key.
+   * @return Whether the key exists or not.
+   * @note Suggested return identifier: exists.
+   */
+  public boolean exists(String key) {
+    return get(key) != null;
+  }
 
-  // /**
-  //  * @brief Get the size of the map.
-  //  * @details May be inefficient to due scanning into memory and deduplicating.
-  //  * @param jedis Jedis cluster client.
-  //  * @return The size of the map.
-  //  * @note Suggested return identifier: size.
-  //  */
-  // public int size(JedisCluster jedis) {
-  //   return ScanCount.get(jedis, name + ":*", 1000);
-  // }
-
+  /**
+   * @brief Get the size of the map.
+   * @details O(1).
+   * @return The size of the map.
+   * @note Suggested return identifier: size.
+   */
+  public int size() {
+    return cacheMap.size();
+  }
 }
