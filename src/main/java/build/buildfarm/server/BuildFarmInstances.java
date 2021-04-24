@@ -23,11 +23,11 @@ import build.buildfarm.instance.shard.ShardInstance;
 import build.buildfarm.v1test.InstanceConfig;
 import io.grpc.Status;
 import io.grpc.StatusException;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.naming.ConfigurationException;
-import java.io.IOException;
 
 public class BuildFarmInstances implements Instances {
   public static StatusException toStatusException(InstanceNotFoundException e) {

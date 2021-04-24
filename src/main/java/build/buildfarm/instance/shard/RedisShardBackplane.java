@@ -550,17 +550,16 @@ public class RedisShardBackplane implements Backplane {
 
   static RedissonClient createRedissonClient(RedisShardBackplaneConfig config) {
 
-    
-      Config redissonConfig = new Config();
+    Config redissonConfig = new Config();
 
-      ClusterServersConfig finalConfig =
-          redissonConfig
-              .useClusterServers()
-              .addNodeAddress(config.getRedisUri())
-              .setCheckSlotsCoverage(false);
+    ClusterServersConfig finalConfig =
+        redissonConfig
+            .useClusterServers()
+            .addNodeAddress(config.getRedisUri())
+            .setCheckSlotsCoverage(false);
 
-      RedissonClient client = Redisson.create(redissonConfig);
-    
+    RedissonClient client = Redisson.create(redissonConfig);
+
     return client;
   }
 

@@ -14,19 +14,14 @@
 
 package build.buildfarm.common.redis;
 
-import build.buildfarm.common.ScanCount;
-import redis.clients.jedis.JedisCluster;
-import redis.clients.jedis.JedisClusterPipeline;
-import java.util.concurrent.TimeUnit;
-import org.redisson.api.RSetMultimapCache;
 import org.redisson.api.RMapCache;
 import org.redisson.api.RedissonClient;
 
 /**
  * @class RedissonMap
  * @brief A redis map.
- * @details A redis map is an implementation of a map data structure which internally uses redisson to
- *     store and distribute the data. Its important to know that the lifetime of the map persists
+ * @details A redis map is an implementation of a map data structure which internally uses redisson
+ *     to store and distribute the data. Its important to know that the lifetime of the map persists
  *     before and after the map data structure is created (since it exists in redis). Therefore, two
  *     redis maps with the same name, would in fact be the same underlying redis map.
  */
@@ -50,7 +45,8 @@ public class RedissonMap {
   }
 
   // /**
-  //  * @brief Set key to hold the string value and set key to timeout after a given number of seconds.
+  //  * @brief Set key to hold the string value and set key to timeout after a given number of
+  // seconds.
   //  * @details If the key already exists, then the value is replaced.
   //  * @param jedis Jedis cluster client.
   //  * @param key The name of the key.
