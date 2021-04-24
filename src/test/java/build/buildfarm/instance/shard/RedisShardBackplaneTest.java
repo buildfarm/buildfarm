@@ -270,7 +270,7 @@ public class RedisShardBackplaneTest {
 
     // mock jedis
     JedisCluster jedisCluster = mock(JedisCluster.class);
-    String invocationBlacklistKey = config.getInvocationBlacklistPrefix() + ":" + toolInvocationId;
+    String invocationBlacklistKey = "" + toolInvocationId;
     when(jedisCluster.exists(invocationBlacklistKey)).thenReturn(true);
     when(mockJedisClusterFactory.get()).thenReturn(jedisCluster);
 
@@ -292,5 +292,8 @@ public class RedisShardBackplaneTest {
                     .setToolInvocationId(toolInvocationId.toString())
                     .build()))
         .isTrue();
+
+    verify(mockRedissonClient, times(1)).getMapCache("InvocationBlacklist");
+    verify(cacheMapMock, times(1)).get(invocationBlacklistKey);
   }
 }
