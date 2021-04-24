@@ -59,7 +59,7 @@ public class RedisShardBackplaneTest {
   @Test
   public void workersWithInvalidProtobufAreRemoved() throws IOException {
     RedisShardBackplaneConfig config =
-        RedisShardBackplanekplaneConfig.newBuilder()
+        RedisShardBackplaneConfig.newBuilder()
             .setWorkersHashName("Workers")
             .setWorkerChannel("WorkerChannel")
             .build();

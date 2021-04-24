@@ -164,7 +164,7 @@ public class RedisShardBackplane implements Backplane {
       String source,
       Function<Operation, Operation> onPublish,
       Function<Operation, Operation> onComplete)
-      throws ConfigurationException, IOException {
+      throws ConfigurationException {
     this(
         config,
         source,
@@ -518,7 +518,6 @@ public class RedisShardBackplane implements Backplane {
     // We wish to avoid various synchronous and error handling issues that could occur when using
     // multiple clients.
     client = new RedisClient(jedisClusterFactory.get());
-    // redissonClient = createRedissonClient(config);
 
     // Create containers that make up the backplane
     casWorkerMap = createCasWorkerMap(redissonClient, config);
@@ -549,17 +548,19 @@ public class RedisShardBackplane implements Backplane {
     }
   }
 
-  static RedissonClient createRedissonClient(RedisShardBackplaneConfig config) throws IOException {
+  static RedissonClient createRedissonClient(RedisShardBackplaneConfig config) {
 
-    Config redissonConfig = new Config();
+    
+      Config redissonConfig = new Config();
 
-    ClusterServersConfig finalConfig =
-        redissonConfig
-            .useClusterServers()
-            .addNodeAddress(config.getRedisUri())
-            .setCheckSlotsCoverage(false);
+      ClusterServersConfig finalConfig =
+          redissonConfig
+              .useClusterServers()
+              .addNodeAddress(config.getRedisUri())
+              .setCheckSlotsCoverage(false);
 
-    RedissonClient client = Redisson.create(redissonConfig);
+      RedissonClient client = Redisson.create(redissonConfig);
+    
     return client;
   }
 

@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.naming.ConfigurationException;
+import java.io.IOException;
 
 public class BuildFarmInstances implements Instances {
   public static StatusException toStatusException(InstanceNotFoundException e) {
@@ -42,7 +43,7 @@ public class BuildFarmInstances implements Instances {
       List<InstanceConfig> instanceConfigs,
       String defaultInstanceName,
       Runnable onStop)
-      throws InterruptedException, ConfigurationException {
+      throws InterruptedException, ConfigurationException, IOException {
     instances = new HashMap<String, Instance>();
     createInstances(session, instanceConfigs, onStop);
     if (!defaultInstanceName.isEmpty()) {
@@ -116,7 +117,7 @@ public class BuildFarmInstances implements Instances {
 
   private void createInstances(
       String session, List<InstanceConfig> instanceConfigs, Runnable onStop)
-      throws InterruptedException, ConfigurationException {
+      throws InterruptedException, ConfigurationException, IOException {
     for (InstanceConfig instanceConfig : instanceConfigs) {
       String name = instanceConfig.getName();
       HashFunction hashFunction = getValidHashFunction(instanceConfig);
