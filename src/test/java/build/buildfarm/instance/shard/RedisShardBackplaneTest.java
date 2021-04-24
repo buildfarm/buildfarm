@@ -16,6 +16,7 @@ package build.buildfarm.instance.shard;
 
 import static build.buildfarm.instance.shard.RedisShardBackplane.parseOperationChange;
 import static com.google.common.truth.Truth.assertThat;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -41,6 +42,7 @@ import org.junit.runners.JUnit4;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.redisson.api.RMapCache;
 import org.redisson.api.RedissonClient;
 import redis.clients.jedis.JedisCluster;
 
@@ -260,10 +262,18 @@ public class RedisShardBackplaneTest {
             .setInvocationBlacklistPrefix("InvocationBlacklist")
             .build();
     UUID toolInvocationId = UUID.randomUUID();
+
+    // mock redisson
+    RMapCache<Object, Object> cacheMapMock = mock(RMapCache.class);
+    when(mockRedissonClient.getMapCache(any(String.class))).thenReturn(cacheMapMock);
+    when(cacheMapMock.get(any(String.class))).thenReturn("found");
+
+    // mock jedis
     JedisCluster jedisCluster = mock(JedisCluster.class);
     String invocationBlacklistKey = config.getInvocationBlacklistPrefix() + ":" + toolInvocationId;
     when(jedisCluster.exists(invocationBlacklistKey)).thenReturn(true);
     when(mockJedisClusterFactory.get()).thenReturn(jedisCluster);
+
     backplane =
         new RedisShardBackplane(
             config,
@@ -282,8 +292,5 @@ public class RedisShardBackplaneTest {
                     .setToolInvocationId(toolInvocationId.toString())
                     .build()))
         .isTrue();
-
-    verify(mockJedisClusterFactory, times(1)).get();
-    verify(jedisCluster, times(1)).exists(invocationBlacklistKey);
   }
 }
