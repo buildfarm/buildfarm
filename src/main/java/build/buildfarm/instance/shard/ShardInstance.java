@@ -242,7 +242,7 @@ public class ShardInstance extends AbstractServerInstance {
   }
 
   private static Backplane createBackplane(ShardInstanceConfig config, String identifier)
-      throws ConfigurationException {
+      throws ConfigurationException, IOException {
     ShardInstanceConfig.BackplaneCase backplaneCase = config.getBackplaneCase();
     switch (backplaneCase) {
       default:
@@ -263,7 +263,7 @@ public class ShardInstance extends AbstractServerInstance {
       DigestUtil digestUtil,
       ShardInstanceConfig config,
       Runnable onStop)
-      throws InterruptedException, ConfigurationException {
+      throws InterruptedException, ConfigurationException, IOException {
     this(
         name,
         digestUtil,

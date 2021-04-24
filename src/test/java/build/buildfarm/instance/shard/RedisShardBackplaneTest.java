@@ -41,6 +41,7 @@ import org.junit.runners.JUnit4;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.redisson.api.RedissonClient;
 import redis.clients.jedis.JedisCluster;
 
 @RunWith(JUnit4.class)
@@ -48,6 +49,7 @@ public class RedisShardBackplaneTest {
   private RedisShardBackplane backplane;
 
   @Mock Supplier<JedisCluster> mockJedisClusterFactory;
+  @Mock RedissonClient mockRedissonClient;
 
   @Before
   public void setUp() {
@@ -57,7 +59,7 @@ public class RedisShardBackplaneTest {
   @Test
   public void workersWithInvalidProtobufAreRemoved() throws IOException {
     RedisShardBackplaneConfig config =
-        RedisShardBackplaneConfig.newBuilder()
+        RedisShardBackplanekplaneConfig.newBuilder()
             .setWorkersHashName("Workers")
             .setWorkerChannel("WorkerChannel")
             .build();
@@ -72,7 +74,8 @@ public class RedisShardBackplaneTest {
             "invalid-protobuf-worker-removed-test",
             (o) -> o,
             (o) -> o,
-            mockJedisClusterFactory);
+            mockJedisClusterFactory,
+            mockRedissonClient);
     backplane.start("startTime/test:0000");
 
     assertThat(backplane.getWorkers()).isEmpty();
@@ -108,7 +111,12 @@ public class RedisShardBackplaneTest {
     when(mockJedisClusterFactory.get()).thenReturn(jedisCluster);
     backplane =
         new RedisShardBackplane(
-            config, "prequeue-operation-test", (o) -> o, (o) -> o, mockJedisClusterFactory);
+            config,
+            "prequeue-operation-test",
+            (o) -> o,
+            (o) -> o,
+            mockJedisClusterFactory,
+            mockRedissonClient);
     backplane.start("startTime/test:0000");
 
     final String opName = "op";
@@ -137,7 +145,12 @@ public class RedisShardBackplaneTest {
     when(mockJedisClusterFactory.get()).thenReturn(jedisCluster);
     backplane =
         new RedisShardBackplane(
-            config, "requeue-operation-test", (o) -> o, (o) -> o, mockJedisClusterFactory);
+            config,
+            "requeue-operation-test",
+            (o) -> o,
+            (o) -> o,
+            mockJedisClusterFactory,
+            mockRedissonClient);
     backplane.start("startTime/test:0000");
 
     final String opName = "op";
@@ -159,7 +172,12 @@ public class RedisShardBackplaneTest {
     when(mockJedisClusterFactory.get()).thenReturn(jedisCluster);
     backplane =
         new RedisShardBackplane(
-            config, "requeue-operation-test", (o) -> o, (o) -> o, mockJedisClusterFactory);
+            config,
+            "requeue-operation-test",
+            (o) -> o,
+            (o) -> o,
+            mockJedisClusterFactory,
+            mockRedissonClient);
     backplane.start("startTime/test:0000");
 
     final String opName = "op";
@@ -188,7 +206,12 @@ public class RedisShardBackplaneTest {
     when(mockJedisClusterFactory.get()).thenReturn(jedisCluster);
     backplane =
         new RedisShardBackplane(
-            config, "complete-operation-test", (o) -> o, (o) -> o, mockJedisClusterFactory);
+            config,
+            "complete-operation-test",
+            (o) -> o,
+            (o) -> o,
+            mockJedisClusterFactory,
+            mockRedissonClient);
     backplane.start("startTime/test:0000");
 
     final String opName = "op";
@@ -212,7 +235,12 @@ public class RedisShardBackplaneTest {
     when(mockJedisClusterFactory.get()).thenReturn(jedisCluster);
     backplane =
         new RedisShardBackplane(
-            config, "delete-operation-test", (o) -> o, (o) -> o, mockJedisClusterFactory);
+            config,
+            "delete-operation-test",
+            (o) -> o,
+            (o) -> o,
+            mockJedisClusterFactory,
+            mockRedissonClient);
     backplane.start("startTime/test:0000");
 
     final String opName = "op";
@@ -238,7 +266,12 @@ public class RedisShardBackplaneTest {
     when(mockJedisClusterFactory.get()).thenReturn(jedisCluster);
     backplane =
         new RedisShardBackplane(
-            config, "invocation-blacklist-test", o -> o, o -> o, mockJedisClusterFactory);
+            config,
+            "invocation-blacklist-test",
+            o -> o,
+            o -> o,
+            mockJedisClusterFactory,
+            mockRedissonClient);
     backplane.start("startTime/test:0000");
 
     final String opName = "op";

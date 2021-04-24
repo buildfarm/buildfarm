@@ -164,8 +164,14 @@ public class RedisShardBackplane implements Backplane {
       String source,
       Function<Operation, Operation> onPublish,
       Function<Operation, Operation> onComplete)
-      throws ConfigurationException {
-    this(config, source, onPublish, onComplete, JedisClusterFactory.create(config));
+      throws ConfigurationException, IOException {
+    this(
+        config,
+        source,
+        onPublish,
+        onComplete,
+        JedisClusterFactory.create(config),
+        createRedissonClient(config));
   }
 
   public RedisShardBackplane(
@@ -173,12 +179,14 @@ public class RedisShardBackplane implements Backplane {
       String source,
       Function<Operation, Operation> onPublish,
       Function<Operation, Operation> onComplete,
-      Supplier<JedisCluster> jedisClusterFactory) {
+      Supplier<JedisCluster> jedisClusterFactory,
+      RedissonClient redissonClient) {
     this.config = config;
     this.source = source;
     this.onPublish = onPublish;
     this.onComplete = onComplete;
     this.jedisClusterFactory = jedisClusterFactory;
+    this.redissonClient = redissonClient;
   }
 
   @Override
@@ -510,6 +518,7 @@ public class RedisShardBackplane implements Backplane {
     // We wish to avoid various synchronous and error handling issues that could occur when using
     // multiple clients.
     client = new RedisClient(jedisClusterFactory.get());
+    // redissonClient = createRedissonClient(config);
 
     // Create containers that make up the backplane
     casWorkerMap = createCasWorkerMap(redissonClient, config);
@@ -534,7 +543,6 @@ public class RedisShardBackplane implements Backplane {
   static CasWorkerMap createCasWorkerMap(RedissonClient client, RedisShardBackplaneConfig config)
       throws IOException {
     if (config.getCacheCas()) {
-      client = createRedissonClient(config);
       return new RedissonCasWorkerMap(client, config.getCasPrefix(), config.getCasExpire());
     } else {
       return new JedisCasWorkerMap(config.getCasPrefix(), config.getCasExpire());
