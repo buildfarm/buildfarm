@@ -270,7 +270,7 @@ public class RedisShardBackplaneTest {
 
     // mock jedis
     JedisCluster jedisCluster = mock(JedisCluster.class);
-    String invocationBlacklistKey = "" + toolInvocationId;
+    String invocationBlacklistKey = toolInvocationId.toString();
     when(jedisCluster.exists(invocationBlacklistKey)).thenReturn(true);
     when(mockJedisClusterFactory.get()).thenReturn(jedisCluster);
 
