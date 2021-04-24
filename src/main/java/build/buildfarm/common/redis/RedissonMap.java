@@ -14,6 +14,8 @@
 
 package build.buildfarm.common.redis;
 
+import java.util.concurrent.TimeUnit;
+import java.util.stream.StreamSupport;
 import org.redisson.api.RMapCache;
 import org.redisson.api.RedissonClient;
 
@@ -23,7 +25,10 @@ import org.redisson.api.RedissonClient;
  * @details A redis map is an implementation of a map data structure which internally uses redisson
  *     to store and distribute the data. Its important to know that the lifetime of the map persists
  *     before and after the map data structure is created (since it exists in redis). Therefore, two
- *     redis maps with the same name, would in fact be the same underlying redis map.
+ *     redis maps with the same name, would in fact be the same underlying redis map. This provides
+ *     a simple interface for String-to-String maps. You may want to use the Redisson containers
+ *     directly instead of through this limited API. This container exists for transitional purposes
+ *     between jedis and redisson.
  */
 public class RedissonMap {
 
@@ -44,44 +49,36 @@ public class RedissonMap {
     this.cacheMap = client.getMapCache(name);
   }
 
-  // /**
-  //  * @brief Set key to hold the string value and set key to timeout after a given number of
-  // seconds.
-  //  * @details If the key already exists, then the value is replaced.
-  //  * @param jedis Jedis cluster client.
-  //  * @param key The name of the key.
-  //  * @param value The value for the key.
-  //  * @param timeout_s Timeout to expire the entry. (units: seconds (s))
-  //  */
-  // public void insert(JedisCluster jedis, String key, String value, int timeout_s) {
-  //   jedis.setex(createKeyName(key), timeout_s, value);
-  // }
+  /**
+   * @brief Set key to hold the string value and set key to timeout after a given number of seconds.
+   * @details If the key already exists, then the value is replaced.
+   * @param key The name of the key.
+   * @param value The value for the key.
+   * @param timeout_s Timeout to expire the entry. (units: seconds (s))
+   */
+  public void insert(String key, String value, int timeout_s) {
+    cacheMap.put(key, value, timeout_s, TimeUnit.SECONDS);
+  }
 
-  // /**
-  //  * @brief Remove a key from the map.
-  //  * @details Deletes the key/value pair.
-  //  * @param jedis Jedis cluster client.
-  //  * @param key The name of the key.
-  //  * @note Overloaded.
-  //  */
-  // public void remove(JedisCluster jedis, String key) {
-  //   jedis.del(createKeyName(key));
-  // }
+  /**
+   * @brief Remove a key from the map.
+   * @details Deletes the key/value pair.
+   * @param key The name of the key.
+   * @note Overloaded.
+   */
+  public void remove(String key) {
+    cacheMap.remove(key);
+  }
 
-  // /**
-  //  * @brief Remove multiple keys from the map.
-  //  * @details Done via pipeline.
-  //  * @param jedis Jedis cluster client.
-  //  * @param keys The name of the keys.
-  //  * @note Overloaded.
-  //  */
-  // public void remove(JedisCluster jedis, Iterable<String> keys) {
-  //   JedisClusterPipeline p = jedis.pipelined();
-  //   for (String key : keys) {
-  //     p.del(createKeyName(key));
-  //   }
-  //   p.sync();
-  // }
+  /**
+   * @brief Remove multiple keys from the map.
+   * @details Done via pipeline.
+   * @param keys The name of the keys.
+   * @note Overloaded.
+   */
+  public void remove(Iterable<String> keys) {
+    cacheMap.fastRemove(StreamSupport.stream(keys.spliterator(), false).toArray(String[]::new));
+  }
 
   // /**
   //  * @brief Get the value of the key.
@@ -118,14 +115,4 @@ public class RedissonMap {
   //   return ScanCount.get(jedis, name + ":*", 1000);
   // }
 
-  // /**
-  //  * @brief Create the key name used in redis.
-  //  * @details The key name is made more unique by leveraging the map's name.
-  //  * @param keyName The name of the key.
-  //  * @return The key name to use in redis.
-  //  * @note Suggested return identifier: redisKeyName.
-  //  */
-  // private String createKeyName(String keyName) {
-  //   return name + ":" + keyName;
-  // }
 }

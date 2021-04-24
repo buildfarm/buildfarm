@@ -99,7 +99,6 @@ import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
-import org.redisson.config.ClusterServersConfig;
 import org.redisson.config.Config;
 import redis.clients.jedis.JedisCluster;
 import redis.clients.jedis.JedisClusterPipeline;
@@ -550,15 +549,26 @@ public class RedisShardBackplane implements Backplane {
 
   static RedissonClient createRedissonClient(RedisShardBackplaneConfig config) {
 
-    Config redissonConfig = new Config();
+    RedissonClient client = null;
 
-    ClusterServersConfig finalConfig =
-        redissonConfig
-            .useClusterServers()
-            .addNodeAddress(config.getRedisUri())
-            .setCheckSlotsCoverage(false);
+    // cluster configuration
+    Config clusterConfig = new Config();
+    clusterConfig
+        .useClusterServers()
+        .addNodeAddress(config.getRedisUri())
+        .setCheckSlotsCoverage(false);
 
-    RedissonClient client = Redisson.create(redissonConfig);
+    // single configuration
+    Config nodeConfig = new Config();
+    nodeConfig.useSingleServer().setAddress(config.getRedisUri());
+
+    // try to build a cluster configuration.
+    // if cluster is not enabled, fallback to single server.
+    try {
+      client = Redisson.create(clusterConfig);
+    } catch (Exception e) {
+      client = Redisson.create(nodeConfig);
+    }
 
     return client;
   }
