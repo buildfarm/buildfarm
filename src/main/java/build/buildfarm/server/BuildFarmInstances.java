@@ -23,7 +23,6 @@ import build.buildfarm.instance.shard.ShardInstance;
 import build.buildfarm.v1test.InstanceConfig;
 import io.grpc.Status;
 import io.grpc.StatusException;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,7 +42,7 @@ public class BuildFarmInstances implements Instances {
       List<InstanceConfig> instanceConfigs,
       String defaultInstanceName,
       Runnable onStop)
-      throws InterruptedException, ConfigurationException, IOException {
+      throws InterruptedException, ConfigurationException {
     instances = new HashMap<String, Instance>();
     createInstances(session, instanceConfigs, onStop);
     if (!defaultInstanceName.isEmpty()) {
@@ -117,7 +116,7 @@ public class BuildFarmInstances implements Instances {
 
   private void createInstances(
       String session, List<InstanceConfig> instanceConfigs, Runnable onStop)
-      throws InterruptedException, ConfigurationException, IOException {
+      throws InterruptedException, ConfigurationException {
     for (InstanceConfig instanceConfig : instanceConfigs) {
       String name = instanceConfig.getName();
       HashFunction hashFunction = getValidHashFunction(instanceConfig);
