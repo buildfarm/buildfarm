@@ -605,7 +605,7 @@ public class RedisShardBackplane implements Backplane {
       provisionedQueues.add(defaultQueue);
     }
 
-    return new OperationQueue(provisionedQueues.build());
+    return new OperationQueue(provisionedQueues.build(), config.getMaxQueueDepth());
   }
 
   static List<String> getQueueHashes(RedisClient client, String queueName) throws IOException {
@@ -1415,13 +1415,12 @@ public class RedisShardBackplane implements Backplane {
 
   @Override
   public boolean canQueue() throws IOException {
-    return client.call(jedis -> prequeue.canQueue(jedis));
+    return client.call(jedis -> operationQueue.canQueue(jedis));
   }
 
   @Override
   public boolean canPrequeue() throws IOException {
-    int maxPreQueueDepth = config.getMaxPreQueueDepth();
-    return maxPreQueueDepth < 0 || client.call(jedis -> prequeue.size(jedis)) < maxPreQueueDepth;
+    return client.call(jedis -> prequeue.canQueue(jedis));
   }
 
   @Override
