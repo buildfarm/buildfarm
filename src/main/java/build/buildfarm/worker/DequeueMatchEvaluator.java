@@ -16,6 +16,7 @@ package build.buildfarm.worker;
 
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Platform;
+import build.buildfarm.common.ExecutionProperties;
 import build.buildfarm.v1test.QueueEntry;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.SetMultimap;
@@ -37,20 +38,6 @@ import com.google.common.collect.SetMultimap;
  *     settings provided allow varying amount of leniency when evaluating the platform properties.
  */
 public class DequeueMatchEvaluator {
-
-  /**
-   * @field EXEC_PROPERTY_MIN_CORES
-   * @brief The exec_property and platform property name for setting min cores.
-   * @details This is decided between client and server.
-   */
-  private static final String EXEC_PROPERTY_MIN_CORES = "min-cores";
-
-  /**
-   * @field EXEC_PROPERTY_MAX_CORES
-   * @brief The exec_property and platform property name for setting max cores.
-   * @details This is decided between client and server.
-   */
-  private static final String EXEC_PROPERTY_MAX_CORES = "max-cores";
 
   /**
    * @field WORKER_PLATFORM_CORES_PROPERTY
@@ -160,7 +147,7 @@ public class DequeueMatchEvaluator {
       SetMultimap<String, String> workerProvisions,
       Platform.Property property) {
     // validate min cores
-    if (property.getName().equals(EXEC_PROPERTY_MIN_CORES)) {
+    if (property.getName().equals(ExecutionProperties.MIN_CORES)) {
       if (!workerProvisions.containsKey(WORKER_PLATFORM_CORES_PROPERTY)) {
         return false;
       }
@@ -173,7 +160,7 @@ public class DequeueMatchEvaluator {
     }
 
     // validate max cores
-    if (property.getName().equals(EXEC_PROPERTY_MAX_CORES)) {
+    if (property.getName().equals(ExecutionProperties.MAX_CORES)) {
       return true;
     }
 

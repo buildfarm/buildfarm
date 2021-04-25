@@ -62,6 +62,7 @@ import build.buildfarm.instance.server.OperationsMap;
 import build.buildfarm.instance.server.WatchFuture;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.ActionCacheConfig;
+import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.FilesystemACConfig;
 import build.buildfarm.v1test.GetClientStartTimeResult;
@@ -69,7 +70,6 @@ import build.buildfarm.v1test.GrpcACConfig;
 import build.buildfarm.v1test.MemoryInstanceConfig;
 import build.buildfarm.v1test.OperationIteratorToken;
 import build.buildfarm.v1test.OperationQueueStatus;
-import build.buildfarm.v1test.OperationsStatus;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.Tree;
@@ -496,6 +496,7 @@ public class MemoryInstance extends AbstractServerInstance {
     return null;
   }
 
+  @SuppressWarnings({"ProtoBuilderReturnValueIgnored", "ReturnValueIgnored"})
   private Action getActionForTimeoutMonitor(
       Operation operation, com.google.rpc.Status.Builder status) throws InterruptedException {
     Digest actionDigest = expectActionDigest(operation);
@@ -885,8 +886,8 @@ public class MemoryInstance extends AbstractServerInstance {
   }
 
   @Override
-  public OperationsStatus operationsStatus() {
-    OperationsStatus.Builder status = OperationsStatus.newBuilder();
+  public BackplaneStatus backplaneStatus() {
+    BackplaneStatus.Builder status = BackplaneStatus.newBuilder();
     OperationQueueStatus.Builder queueStatus = status.getOperationQueueBuilder();
     long totalSize = 0;
     for (WorkerQueue queue : queuedOperations) {
