@@ -93,9 +93,9 @@ First of all you need Redis installed:
 * macOS: `brew install redis`
 * Debian / Ubuntu: `sudo apt-get update && sudo apt-get install redis-server redis-tools`
 
-Then  you need seven terminal panes for this, six for [a minimal Redis
-cluster](https://redis.io/topics/cluster-tutorial#creating-and-using-a-redis-cluster)
-and one for Buildfarm.
+Then you need eight terminal panes for this. Six for [a minimal Redis
+cluster](https://redis.io/topics/cluster-tutorial#creating-and-using-a-redis-cluster),
+one for the Buildfarm server and one for a Buildfarm worker.
 
 * `./examples/development-redis-cluster.sh 0`
 * `./examples/development-redis-cluster.sh 1`
@@ -110,6 +110,12 @@ and one for Buildfarm.
 Your Redis cluster is now up, and you can now start your Buildfarm server talking to it:
 ```sh
 bazel run //src/main/java/build/buildfarm:buildfarm-server $PWD/examples/shard-server.config.example
+```
+
+And your Buildfarm worker:
+```sh
+mkdir /tmp/worker
+bazel run //src/main/java/build/buildfarm:buildfarm-shard-worker $PWD/examples/shard-worker.config.example
 ```
 
 ### Setting up intelliJ
