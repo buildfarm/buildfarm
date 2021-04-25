@@ -145,7 +145,7 @@ public class ResourceDecider {
    * @param property The property to store.
    */
   private static void storeMinMem(ResourceLimits limits, Property property) {
-    limits.mem.min = Integer.parseInt(property.getValue());
+    limits.mem.min = Long.parseLong(property.getValue());
   }
 
   /**
@@ -155,7 +155,7 @@ public class ResourceDecider {
    * @param property The property to store.
    */
   private static void storeMaxMem(ResourceLimits limits, Property property) {
-    limits.mem.max = Integer.parseInt(property.getValue());
+    limits.mem.max = Long.parseLong(property.getValue());
   }
 
   /**
