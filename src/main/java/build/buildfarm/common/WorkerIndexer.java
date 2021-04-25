@@ -14,7 +14,6 @@
 
 package build.buildfarm.common;
 
-import java.util.ArrayList;
 import java.util.List;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisCluster;
@@ -68,36 +67,20 @@ public class WorkerIndexer {
       JedisCluster cluster, Jedis node, CasIndexSettings settings, CasIndexResults results) {
     // iterate over all CAS entries via scanning
     // and remove worker from the CAS keys.
-    String cursor = "0";
-    do {
-      List<String> casKeys = scanCas(node, cursor, settings);
-      removeWorkerFromCasKeys(cluster, casKeys, settings.hostName, results);
-
-    } while (!cursor.equals("0"));
-  }
-
-  /**
-   * @brief Scan the cas to obtain CAS keys.
-   * @details Scanning is done incrementally via a cursor.
-   * @param node A node of the cluster.
-   * @param cursor Scan cursor.
-   * @param settings Settings on how to traverse the CAS.
-   * @return Resulting CAS keys from scanning.
-   * @note Suggested return identifier: casKeys.
-   */
-  private static List<String> scanCas(Jedis node, String cursor, CasIndexSettings settings) {
     // construct CAS query
     ScanParams params = new ScanParams();
     params.match(settings.casQuery);
     params.count(settings.scanAmount);
 
-    // perform scan iteration
-    ScanResult scanResult = node.scan(cursor, params);
-    if (scanResult != null) {
-      cursor = scanResult.getCursor();
-      return scanResult.getResult();
-    }
-    return new ArrayList<>();
+    String cursor = "0";
+    ScanResult scanResult;
+    do {
+      scanResult = node.scan(cursor, params);
+      if (scanResult != null) {
+        removeWorkerFromCasKeys(cluster, scanResult.getResult(), settings.hostName, results);
+        cursor = scanResult.getCursor();
+      }
+    } while (!cursor.equals("0"));
   }
 
   /**

@@ -59,6 +59,7 @@ import build.buildfarm.worker.RetryingMatchListener;
 import build.buildfarm.worker.WorkerContext;
 import build.buildfarm.worker.cgroup.Cpu;
 import build.buildfarm.worker.cgroup.Group;
+import build.buildfarm.worker.cgroup.Mem;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
@@ -867,9 +868,7 @@ class ShardWorkerContext implements WorkerContext {
 
   @Override
   public int commandExecutionClaims(Command command) {
-    ResourceLimits limits =
-        ResourceDecider.decideResourceLimitations(
-            command, onlyMulticoreTests, getExecuteStageWidth());
+    ResourceLimits limits = commandExecutionSettings(command);
     return limits.cpu.claimed;
   }
 
@@ -903,53 +902,101 @@ class ShardWorkerContext implements WorkerContext {
 
   IOResource limitSpecifiedExecution(
       ResourceLimits limits, String operationName, ImmutableList.Builder<String> arguments) {
-    final IOResource resource;
-    final Group group;
-    if (limits.cpu.min > 0 || limits.cpu.max > 0) {
-      String operationId = getOperationId(operationName);
-      group = operationsGroup.getChild(operationId);
-      Cpu cpu = group.getCpu();
+
+    // The decision to apply resource restrictions has already been decided within the
+    // ResourceLimits object. We apply the cgroup settings to file resources
+    // and collect group names to use on the CLI.
+    String operationId = getOperationId(operationName);
+    final Group group = operationsGroup.getChild(operationId);
+    ArrayList<IOResource> resources = new ArrayList<IOResource>();
+    ArrayList<String> usedGroups = new ArrayList<String>();
+
+    // Possibly set core restrictions.
+    if (limits.cpu.limit) {
+      applyCpuLimits(group, limits, resources);
+      usedGroups.add(group.getCpu().getName());
+    }
+
+    // Possibly set memory restrictions.
+    if (limits.mem.limit) {
+      applyMemLimits(group, limits, resources);
+      usedGroups.add(group.getMem().getName());
+    }
+
+    // Decide the CLI for running under cgroups
+    if (limitGlobalExecution || !usedGroups.isEmpty()) {
+      arguments.add(
+          "/usr/bin/cgexec", "-g", String.join(",", usedGroups) + ":" + group.getHierarchy());
+    }
+
+    // The executor expects a single IOResource.
+    // However, we may have multiple IOResources due to using multiple cgroup groups.
+    // We construct a single IOResource to account for this.
+    return combineResources(resources);
+  }
+
+  private void applyCpuLimits(Group group, ResourceLimits limits, ArrayList<IOResource> resources) {
+
+    Cpu cpu = group.getCpu();
+    try {
+      cpu.close();
+      if (limits.cpu.max > 0) {
+        /* period of 100ms */
+        cpu.setCFSPeriod(100000);
+        cpu.setCFSQuota(limits.cpu.max * 100000);
+      }
+      if (limits.cpu.min > 0) {
+        cpu.setShares(limits.cpu.min * 1024);
+      }
+    } catch (IOException e) {
+      // clear interrupt flag if set due to ClosedByInterruptException
+      boolean wasInterrupted = Thread.interrupted();
       try {
         cpu.close();
-        if (limits.cpu.max > 0) {
-          /* period of 100ms */
-          cpu.setCFSPeriod(100000);
-          cpu.setCFSQuota(limits.cpu.max * 100000);
-        }
-        if (limits.cpu.min > 0) {
-          cpu.setShares(limits.cpu.min * 1024);
-        }
-      } catch (IOException e) {
-        // clear interrupt flag if set due to ClosedByInterruptException
-        boolean wasInterrupted = Thread.interrupted();
-        try {
-          cpu.close();
-        } catch (IOException closeEx) {
-          e.addSuppressed(closeEx);
-        }
-        if (wasInterrupted) {
-          Thread.currentThread().interrupt();
-        }
-        throw new RuntimeException(e);
+      } catch (IOException closeEx) {
+        e.addSuppressed(closeEx);
       }
-      resource = cpu;
-    } else {
-      group = operationsGroup;
-      resource =
-          new IOResource() {
-            @Override
-            public void close() {}
+      if (wasInterrupted) {
+        Thread.currentThread().interrupt();
+      }
+      throw new RuntimeException(e);
+    }
+    resources.add(cpu);
+  }
 
-            @Override
-            public boolean isReferenced() {
-              // no way to isolate references to this shared group
-              return false;
-            }
-          };
+  private void applyMemLimits(Group group, ResourceLimits limits, ArrayList<IOResource> resources) {
+
+    try {
+      Mem mem = group.getMem();
+      mem.setMemoryLimit(limits.mem.claimed);
+      resources.add(mem);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     }
-    if (limitGlobalExecution || group != operationsGroup) {
-      arguments.add("/usr/bin/cgexec", "-g", group.getCpu().getName() + ":" + group.getHierarchy());
-    }
-    return resource;
+  }
+
+  private IOResource combineResources(ArrayList<IOResource> resources) {
+    return new IOResource() {
+      @Override
+      public void close() {
+        for (IOResource resource : resources) {
+          try {
+            resource.close();
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        }
+      }
+
+      @Override
+      public boolean isReferenced() {
+        for (IOResource resource : resources) {
+          if (resource.isReferenced()) {
+            return true;
+          }
+        }
+        return false;
+      }
+    };
   }
 }

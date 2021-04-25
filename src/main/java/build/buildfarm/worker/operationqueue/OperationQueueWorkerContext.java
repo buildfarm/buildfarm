@@ -69,11 +69,13 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.UserPrincipal;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
+import javax.annotation.Nullable;
 
 class OperationQueueWorkerContext implements WorkerContext {
   private static final Logger logger = Logger.getLogger(WorkerContext.class.getName());
@@ -84,6 +86,7 @@ class OperationQueueWorkerContext implements WorkerContext {
   private final Instance acInstance;
   private final ByteStreamUploader uploader;
   private final CASFileCache fileCache;
+  private final @Nullable UserPrincipal owner;
   private final Path root;
   private final Retrier retrier;
   private final ListMultimap<String, ExecutionPolicy> policies;
@@ -97,6 +100,7 @@ class OperationQueueWorkerContext implements WorkerContext {
       OperationQueueClient oq,
       ByteStreamUploader uploader,
       CASFileCache fileCache,
+      @Nullable UserPrincipal owner,
       Path root,
       Retrier retrier) {
     this.config = config;
@@ -105,6 +109,7 @@ class OperationQueueWorkerContext implements WorkerContext {
     this.oq = oq;
     this.uploader = uploader;
     this.fileCache = fileCache;
+    this.owner = owner;
     this.root = root;
     this.retrier = retrier;
     policies = ExecutionPolicies.toMultimap(config.getExecutionPoliciesList());
@@ -316,7 +321,9 @@ class OperationQueueWorkerContext implements WorkerContext {
         destroyExecDir(execDir);
       }
     }
-
+    if (owner != null) {
+      Directories.setAllOwner(execDir, owner);
+    }
     return execDir;
   }
 
@@ -406,7 +413,9 @@ class OperationQueueWorkerContext implements WorkerContext {
 
   @Override
   public ResourceLimits commandExecutionSettings(Command command) {
-    return new ResourceLimits();
+    ResourceLimits limits = new ResourceLimits();
+    limits.cpu.claimed = 1;
+    return limits;
   }
 
   private static void uploadManifest(UploadManifest manifest, ByteStreamUploader uploader)
