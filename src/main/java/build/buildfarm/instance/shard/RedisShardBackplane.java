@@ -565,7 +565,8 @@ public class RedisShardBackplane implements Backplane {
     // Construct the prequeue so that elements are balanced across all redis nodes.
     return new BalancedRedisQueue(
         config.getPreQueuedOperationsListName(),
-        getQueueHashes(client, config.getPreQueuedOperationsListName()));
+        getQueueHashes(client, config.getPreQueuedOperationsListName()),
+        config.getMaxPreQueueDepth());
   }
 
   static OperationQueue createOperationQueue(RedisClient client, RedisShardBackplaneConfig config)
@@ -1414,8 +1415,7 @@ public class RedisShardBackplane implements Backplane {
 
   @Override
   public boolean canQueue() throws IOException {
-    int maxQueueDepth = config.getMaxQueueDepth();
-    return maxQueueDepth < 0 || client.call(jedis -> operationQueue.size(jedis)) < maxQueueDepth;
+    return client.call(jedis -> prequeue.canQueue(jedis));
   }
 
   @Override
