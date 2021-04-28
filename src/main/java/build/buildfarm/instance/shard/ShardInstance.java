@@ -293,7 +293,7 @@ public class ShardInstance extends AbstractServerInstance {
         config.getMaxBlobSize(),
         config.getMaxCpu(),
         config.getMaximumActionTimeout(),
-        config.getRedisShardBackplaneConfig().getProvisionedQueues().getQueuesList(),
+        config.getRedisShardBackplaneConfig().getOperationQueue().getQueuesList(),
         onStop,
         WorkerStubs.create(digestUtil, getGrpcTimeout(config)),
         actionCacheFetchService);

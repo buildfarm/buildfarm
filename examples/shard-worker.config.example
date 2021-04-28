@@ -197,15 +197,6 @@ redis_shard_backplane_config: {
   # modification
   operation_expire: 604800 # 1 week
 
-  # The redis key used to store a list of QueueEntrys
-  # awaiting execution by workers. These are queued
-  # by an operation_queuer agent, and dequeued by a worker.
-  # Redis keyspace manipulation is used here to support multi-
-  # key commands.
-  # The string contained within {} must match that of
-  # dispatching_list_name.
-  queued_operations_list_name: "{Execution}:QueuedOperations"
-
   # A redis key prefix for operations which are being dequeued
   # from the ready-to-run queue. The key is suffixed with the
   # operation name and contains the expiration time in epoch
@@ -246,7 +237,26 @@ redis_shard_backplane_config: {
   subscribe_to_backplane: true
 
   ## Specify a queue that supports min/max cpu core specification
-  provisioned_queues: {
+  operation_queue: {
+  
+    # The redis key used to store a list of QueueEntrys
+    # awaiting execution by workers. These are queued
+    # by an operation_queuer agent, and dequeued by a worker.
+    # Redis keyspace manipulation is used here to support multi-
+    # key commands.
+    # The string contained within {} must match that of
+    # dispatching_list_name.
+    name: "{Execution}:QueuedOperations"
+  
+    # The maximum length that the ready-to-run queue is allowed
+    # to reach via queue invocations. Reaching this limit induces
+    # back-pressure on the arrival queue and is intended as a
+    # flow control mechanism for execution.
+    # Average QueuedOperation size in relation to CAS size and
+    # churn should influence safe values here.
+    max_depth: 100000
+    
+    # Specify a queue that supports min/max cpu core specification
     queues: {
       name: "cpu"
 

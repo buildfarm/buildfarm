@@ -25,6 +25,8 @@ import static org.mockito.Mockito.when;
 import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.OperationChange;
+import build.buildfarm.v1test.OperationQueueConfig;
+import build.buildfarm.v1test.PrequeueConfig;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.RedisShardBackplaneConfig;
 import build.buildfarm.v1test.WorkerChange;
@@ -102,7 +104,7 @@ public class RedisShardBackplaneTest {
             .setOperationChannelPrefix("OperationChannel")
             .setOperationExpire(10)
             .setOperationPrefix("Operation")
-            .setPreQueuedOperationsListName("{hash}PreQueuedOperations")
+            .setPrequeue(PrequeueConfig.newBuilder().setName("{hash}PreQueuedOperations").build())
             .build();
     JedisCluster jedisCluster = mock(JedisCluster.class);
     when(mockJedisClusterFactory.get()).thenReturn(jedisCluster);
@@ -123,7 +125,7 @@ public class RedisShardBackplaneTest {
             config.getOperationExpire(),
             RedisShardBackplane.operationPrinter.print(op));
     verify(jedisCluster, times(1))
-        .lpush(config.getPreQueuedOperationsListName(), JsonFormat.printer().print(executeEntry));
+        .lpush(config.getPrequeue().getName(), JsonFormat.printer().print(executeEntry));
     verifyChangePublished(jedisCluster, opName);
   }
 
@@ -153,7 +155,8 @@ public class RedisShardBackplaneTest {
         RedisShardBackplaneConfig.newBuilder()
             .setDispatchedOperationsHashName("DispatchedOperations")
             .setOperationChannelPrefix("OperationChannel")
-            .setQueuedOperationsListName("{hash}QueuedOperations")
+            .setOperationQueue(
+                OperationQueueConfig.newBuilder().setName("{hash}QueuedOperations").build())
             .build();
     JedisCluster jedisCluster = mock(JedisCluster.class);
     when(mockJedisClusterFactory.get()).thenReturn(jedisCluster);
@@ -174,7 +177,7 @@ public class RedisShardBackplaneTest {
     verify(mockJedisClusterFactory, times(1)).get();
     verify(jedisCluster, times(1)).hdel(config.getDispatchedOperationsHashName(), opName);
     verify(jedisCluster, times(1))
-        .lpush(config.getQueuedOperationsListName(), JsonFormat.printer().print(queueEntry));
+        .lpush(config.getOperationQueue().getName(), JsonFormat.printer().print(queueEntry));
     verifyChangePublished(jedisCluster, opName);
   }
 

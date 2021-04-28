@@ -564,9 +564,9 @@ public class RedisShardBackplane implements Backplane {
       throws IOException {
     // Construct the prequeue so that elements are balanced across all redis nodes.
     return new BalancedRedisQueue(
-        config.getPreQueuedOperationsListName(),
-        getQueueHashes(client, config.getPreQueuedOperationsListName()),
-        config.getMaxPreQueueDepth());
+        config.getPrequeue().getName(),
+        getQueueHashes(client, config.getPrequeue().getName()),
+        config.getPrequeue().getMaxDepth());
   }
 
   static OperationQueue createOperationQueue(RedisClient client, RedisShardBackplaneConfig config)
@@ -577,7 +577,7 @@ public class RedisShardBackplane implements Backplane {
     // Therefore, it is recommended to have a final provision queue with no actual platform
     // requirements.  This will ensure that all operations are eligible for the final queue.
     ImmutableList.Builder<ProvisionedRedisQueue> provisionedQueues = new ImmutableList.Builder<>();
-    for (ProvisionedQueue queueConfig : config.getProvisionedQueues().getQueuesList()) {
+    for (ProvisionedQueue queueConfig : config.getOperationQueue().getQueuesList()) {
       ProvisionedRedisQueue provisionedQueue =
           new ProvisionedRedisQueue(
               queueConfig.getName(),
@@ -593,19 +593,19 @@ public class RedisShardBackplane implements Backplane {
     // all operations.
     // This will ensure the expected behavior for the paradigm in which all work is put on the same
     // queue.
-    if (config.getProvisionedQueues().getQueuesList().isEmpty()) {
+    if (config.getOperationQueue().getQueuesList().isEmpty()) {
       SetMultimap defaultProvisions = LinkedHashMultimap.create();
       defaultProvisions.put(
           ProvisionedRedisQueue.WILDCARD_VALUE, ProvisionedRedisQueue.WILDCARD_VALUE);
       ProvisionedRedisQueue defaultQueue =
           new ProvisionedRedisQueue(
-              config.getQueuedOperationsListName(),
-              getQueueHashes(client, config.getQueuedOperationsListName()),
+              config.getOperationQueue().getName(),
+              getQueueHashes(client, config.getOperationQueue().getName()),
               defaultProvisions);
       provisionedQueues.add(defaultQueue);
     }
 
-    return new OperationQueue(provisionedQueues.build(), config.getMaxQueueDepth());
+    return new OperationQueue(provisionedQueues.build(), config.getOperationQueue().getMaxDepth());
   }
 
   static List<String> getQueueHashes(RedisClient client, String queueName) throws IOException {

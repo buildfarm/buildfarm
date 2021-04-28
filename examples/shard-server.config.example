@@ -112,16 +112,6 @@ instances {
       # modification
       operation_expire: 604800 # 1 week
 
-      # The redis key used to store a list of ExecuteEntrys
-      # awaiting transformation into QueueEntrys. These are queued
-      # by an instance which receives an ExecuteRequest, and
-      # dequeued by an operation_queuer agent.
-      # Redis keyspace manipulation is used here to support multi-
-      # key commands.
-      # The string contained within {} must match that of
-      # processing_list_name.
-      pre_queued_operations_list_name: "{Arrival}:PreQueuedOperations"
-
       # The redis key of a list used to ensure reliable processing of
       # arrival queue entries together with operation watch monitoring.
       # The string contained within {} must match that of
@@ -137,15 +127,6 @@ instances {
       # The delay in milliseconds used to populate processing operation
       # entries
       processing_timeout_millis: 10000
-
-      # The redis key used to store a list of QueueEntrys
-      # awaiting execution by workers. These are queued
-      # by an operation_queuer agent, and dequeued by a worker.
-      # Redis keyspace manipulation is used here to support multi-
-      # key commands.
-      # The string contained within {} must match that of
-      # dispatching_list_name.
-      queued_operations_list_name: "{Execution}:QueuedOperations"
 
       # A redis key prefix for operations which are being dequeued
       # from the ready-to-run queue. The key is suffixed with the
@@ -194,24 +175,47 @@ instances {
       # of it.
       # When in doubt, leave this enabled on servers.
       run_failsafe_operation: true
+      
+      prequeue: {
 
-      # The maximum length that the ready-to-run queue is allowed
-      # to reach via queue invocations. Reaching this limit induces
-      # back-pressure on the arrival queue and is intended as a
-      # flow control mechanism for execution.
-      # Average QueuedOperation size in relation to CAS size and
-      # churn should influence safe values here.
-      max_queue_depth: 100000
+        # The redis key used to store a list of ExecuteEntrys
+        # awaiting transformation into QueueEntrys. These are queued
+        # by an instance which receives an ExecuteRequest, and
+        # dequeued by an operation_queuer agent.
+        # Redis keyspace manipulation is used here to support multi-
+        # key commands.
+        # The string contained within {} must match that of
+        # processing_list_name.
+        name: "{Arrival}:PreQueuedOperations"
+        
+        # The maximum length that the arrival queue is allowed
+        # to reach via execute invocations. Reaching this limit results
+        # in Execute errors of RESOURCE_EXHAUSTED and is intended as a
+        # safety check for the backplane storage.
+        # Redis cluster storage size should influence safe values here.
+        max_depth: 1000000
+      }
 
-      # The maximum length that the arrival queue is allowed
-      # to reach via execute invocations. Reaching this limit results
-      # in Execute errors of RESOURCE_EXHAUSTED and is intended as a
-      # safety check for the backplane storage.
-      # Redis cluster storage size should influence safe values here.
-      max_pre_queue_depth: 1000000
-
-      # Specify a queue that supports min/max cpu core specification
-      provisioned_queues: {
+      operation_queue: {
+      
+        # The redis key used to store a list of QueueEntrys
+        # awaiting execution by workers. These are queued
+        # by an operation_queuer agent, and dequeued by a worker.
+        # Redis keyspace manipulation is used here to support multi-
+        # key commands.
+        # The string contained within {} must match that of
+        # dispatching_list_name.
+        name: "{Execution}:QueuedOperations"
+      
+        # The maximum length that the ready-to-run queue is allowed
+        # to reach via queue invocations. Reaching this limit induces
+        # back-pressure on the arrival queue and is intended as a
+        # flow control mechanism for execution.
+        # Average QueuedOperation size in relation to CAS size and
+        # churn should influence safe values here.
+        max_depth: 100000
+        
+        # Specify a queue that supports min/max cpu core specification
         queues: {
           name: "cpu"
 
