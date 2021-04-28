@@ -45,6 +45,7 @@ import com.google.rpc.Code;
 import io.grpc.Deadline;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -200,7 +201,18 @@ class Executor {
           arguments.addAll(transformWrapper(policy.getWrapper()));
         }
       }
-      arguments.addAll(command.getArgumentsList());
+
+      if (System.getProperty("os.name").contains("Win")) {
+        // Make sure that the executable path is absolute, otherwise processbuilder fails on windows
+        Iterator<String> argumentItr = command.getArgumentsList().iterator();
+        if (argumentItr.hasNext()) {
+          String exe = argumentItr.next(); // Get first element, this is the executable
+          arguments.add(workingDirectory.resolve(exe).toAbsolutePath().normalize().toString());
+          argumentItr.forEachRemaining(arg -> arguments.add(arg));
+        }
+      } else {
+        arguments.addAll(command.getArgumentsList());
+      }
 
       statusCode =
           executeCommand(

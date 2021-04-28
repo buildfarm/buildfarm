@@ -15,6 +15,7 @@
 package build.buildfarm.worker.shard;
 
 import static build.buildfarm.cas.ContentAddressableStorages.createGrpcCAS;
+import static build.buildfarm.common.io.Utils.getUser;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.lang.String.format;
@@ -92,6 +93,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -627,6 +629,17 @@ public class Worker extends LoggingMain {
         storage);
   }
 
+  private @Nullable UserPrincipal getOwner(FileSystem fileSystem) throws ConfigurationException {
+    try {
+      return getUser(config.getExecOwner(), fileSystem);
+    } catch (IOException e) {
+      ConfigurationException configException =
+          new ConfigurationException("Could not locate exec_owner");
+      configException.initCause(e);
+      throw configException;
+    }
+  }
+
   private ExecFileSystem createExecFileSystem(
       InputStreamFactory remoteInputStreamFactory,
       ExecutorService removeDirectoryService,
@@ -636,23 +649,7 @@ public class Worker extends LoggingMain {
     checkState(storage != null, "no exec fs cas specified");
     if (storage instanceof CASFileCache) {
       CASFileCache cfc = (CASFileCache) storage;
-      final @Nullable UserPrincipal owner;
-      if (!config.getExecOwner().isEmpty()) {
-        try {
-          owner =
-              cfc.getRoot()
-                  .getFileSystem()
-                  .getUserPrincipalLookupService()
-                  .lookupPrincipalByName(config.getExecOwner());
-        } catch (IOException e) {
-          ConfigurationException configException =
-              new ConfigurationException("Could not locate exec_owner");
-          configException.initCause(e);
-          throw configException;
-        }
-      } else {
-        owner = null;
-      }
+      UserPrincipal owner = getOwner(cfc.getRoot().getFileSystem());
       return createCFCExecFileSystem(removeDirectoryService, accessRecorder, cfc, owner);
     } else {
       // FIXME not the only fuse backing capacity...
