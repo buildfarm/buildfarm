@@ -60,6 +60,7 @@ import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.RedisShardBackplaneConfig;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.WorkerChange;
+import build.buildfarm.v1test.DispatchedOperationTypeStatus;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -111,6 +112,7 @@ import redis.clients.jedis.JedisClusterPipeline;
 import redis.clients.jedis.Response;
 import redis.clients.jedis.ScanParams;
 import redis.clients.jedis.ScanResult;
+import java.util.HashMap;
 
 public class RedisShardBackplane implements Backplane {
   private static final Logger logger = Logger.getLogger(RedisShardBackplane.class.getName());
@@ -1456,6 +1458,7 @@ public class RedisShardBackplane implements Backplane {
       Integer testActionAmount = 0;
       Integer unknownActionAmount = 0;
       Set<String> uniqueToolIds = Sets.newHashSet();
+      Map<String, Integer> fromQueueAmounts = new HashMap();
 
       for (DispatchedOperation operation : getDispatchedOperations()) {
         QueuedOperation queuedOperation =
@@ -1463,13 +1466,23 @@ public class RedisShardBackplane implements Backplane {
                 instance, operation.getQueueEntry().getQueuedOperationDigest());
 
         // record the action type
-        IncrementActionType(
+        incrementActionType(
             queuedOperation, buildActionAmount, testActionAmount, unknownActionAmount);
 
         // record the tool id
         uniqueToolIds.add(
             operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getToolInvocationId());
+        
+        
+        String queueName = operationQueue.getName(operation.getQueueEntry().getPlatform().getPropertiesList());
+        incrementValue(fromQueueAmounts,queueName);
+        
       }
+      
+    List<DispatchedOperationTypeStatus> fromQueueStatus = new ArrayList<>();
+    for (Map.Entry<String,Integer> entry : fromQueueAmounts.entrySet()){
+      fromQueueStatus.add(DispatchedOperationTypeStatus.newBuilder().setName(entry.getKey()).setSize(entry.getValue()).build());
+    }
 
       status =
           DispatchedOperationsStatus.newBuilder()
@@ -1477,6 +1490,8 @@ public class RedisShardBackplane implements Backplane {
               .setBuildActionAmount(buildActionAmount)
               .setTestActionAmount(testActionAmount)
               .setUnknownActionAmount(unknownActionAmount)
+              //.set
+              .setUniqueClientsAmount(uniqueToolIds.size())
               .build();
     } catch (Exception e) {
     }
@@ -1484,7 +1499,7 @@ public class RedisShardBackplane implements Backplane {
     return status;
   }
 
-  private void IncrementActionType(
+  private void incrementActionType(
       QueuedOperation queuedOperation,
       Integer buildActionAmount,
       Integer testActionAmount,
@@ -1499,6 +1514,18 @@ public class RedisShardBackplane implements Backplane {
       unknownActionAmount++;
     }
   }
+  
+    //Increment the value of any key.  Add the key with value 1 if it does not previously exist
+    private static<K> void incrementValue(Map<K, Integer> map, K key)
+    {
+        Integer count = map.get(key);
+        if (count == null) {
+            map.put(key, 1);
+        }
+        else {
+            map.put(key, count + 1);
+        }
+    }
 
   /**
    * @brief Get the queued operation based on the digest.
