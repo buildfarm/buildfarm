@@ -759,12 +759,41 @@ message OperationQueueStatus {
   int64 size = 2;
 }
 
+message DispatchedOperationTypeStatus {
+  string name = 1;
+  
+  int64 size = 2;
+}
+
+message DispatchedOperationsStatus {
+  
+  // the total number of currently dispatched operations
+  int64 size = 1;
+  
+  // how many of the current dispatched operations are 'build' related
+  int64 build_actions_amount = 2;
+  
+  // how many of the current dispatched operations are 'test' related
+  int64 test_actions_amount = 3;
+  
+  // how many of the current dispatched operations cannot be fetched and determine the type
+  int64 unknown_actions_amount = 3;
+  
+  // count dispatched operations by the queue they originated in
+  // for example, "how many cpu vs gpu operations are running?"
+  repeated DispatchedOperationTypeStatus types = 4;
+  
+  // how many unique clients are currently being served.
+  // This is based on the uniqueness of tool_id for currently dispatched operations.
+  int64 unique_clients_amount = 5;
+}
+
 message BackplaneStatus {
   QueueStatus prequeue = 1;
 
   OperationQueueStatus operation_queue = 2;
-
-  int64 dispatched_size = 3;
+  
+  DispatchedOperationsStatus dispatched_operations = 9;
 
   repeated string active_workers = 4;
   

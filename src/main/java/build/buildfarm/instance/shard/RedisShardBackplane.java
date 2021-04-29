@@ -17,6 +17,11 @@ package build.buildfarm.instance.shard;
 import static java.lang.String.format;
 import static redis.clients.jedis.ScanParams.SCAN_POINTER_START;
 
+import com.google.protobuf.ByteString;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.util.JsonFormat;
+import build.buildfarm.instance.Instance;
+import build.buildfarm.instance.Utils;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
@@ -53,9 +58,11 @@ import build.buildfarm.v1test.OperationChange;
 import build.buildfarm.v1test.ProvisionedQueue;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperationMetadata;
+import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.RedisShardBackplaneConfig;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.WorkerChange;
+import build.buildfarm.v1test.DispatchedOperationsStatus;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -1424,7 +1431,7 @@ public class RedisShardBackplane implements Backplane {
   }
 
   @Override
-  public BackplaneStatus backplaneStatus() throws IOException {
+  public BackplaneStatus backplaneStatus(Instance instance) throws IOException {
     int casLookupSize = casWorkerMap.size(client);
     return client.call(
         jedis ->
@@ -1435,9 +1442,52 @@ public class RedisShardBackplane implements Backplane {
                 .setActionCacheSize(actionCache.size(jedis))
                 .setBlockedActionsSize(blockedActions.size(jedis))
                 .setBlockedInvocationsSize(blockedInvocations.size(jedis))
-                .setDispatchedSize(jedis.hlen(config.getDispatchedOperationsHashName()))
+                .setDispatchedOperations(getDispatchedOperationsStatus(jedis,instance))
                 .addAllActiveWorkers(workerSet)
                 .build());
+  }
+  
+  private DispatchedOperationsStatus getDispatchedOperationsStatus(JedisCluster jedis, Instance instance) {
+    
+    DispatchedOperationsStatus status = DispatchedOperationsStatus.newBuilder().build();
+    try {
+      
+        for (DispatchedOperation operation: getDispatchedOperations()){
+          QueuedOperation queuedOperation = resolveQueuedOperationDiget(instance,operation.getQueueEntry().getQueuedOperationDigest());
+        }
+      
+      status = DispatchedOperationsStatus.newBuilder()
+      .setSize(jedis.hlen(config.getDispatchedOperationsHashName()))
+      .build();
+    }
+    catch (Exception e){
+    }
+    
+    return status;
+  }
+  
+  
+  /**
+   * @brief Get the queued operation based on the digest.
+   * @details Instance used to fetch the blob.
+   * @param instance An instance is used to get additional information about the queue entry.
+   * @param digest The queued operation digest.
+   * @return The queued operation from the provided digest.
+   * @note Suggested return identifier: queuedOperation.
+   */
+  private static QueuedOperation resolveQueuedOperationDiget(Instance instance, Digest digest) {
+    try {
+      ByteString blob = Utils.getBlob(instance, digest, RequestMetadata.getDefaultInstance());
+      QueuedOperation operation;
+      try {
+        operation = QueuedOperation.parseFrom(blob);
+        return operation;
+      } catch (InvalidProtocolBufferException e) {
+        return null;
+      }
+    } catch (Exception e) {
+      return null;
+    }
   }
 
   @Override

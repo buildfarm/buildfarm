@@ -167,7 +167,7 @@ public class ShardInstance extends AbstractServerInstance {
       Counter.build().name("execution_success").help("Execution success.").register();
   private static final Gauge preQueueSize =
       Gauge.build().name("pre_queue_size").help("Pre queue size.").register();
-  private static final Gauge dispatchedOperations =
+  private static final Gauge dispatchedOperationsSize =
       Gauge.build()
           .name("dispatched_operations_size")
           .help("Dispatched operations size.")
@@ -473,7 +473,7 @@ public class ShardInstance extends AbstractServerInstance {
                   TimeUnit.SECONDS.sleep(30);
                   BackplaneStatus backplaneStatus = backplaneStatus();
                   workerPoolSize.set(backplaneStatus.getActiveWorkersCount());
-                  dispatchedOperations.set(backplaneStatus.getDispatchedSize());
+                  dispatchedOperationsSize.set(backplaneStatus.getDispatchedOperations().getSize());
                   preQueueSize.set(backplaneStatus.getPrequeue().getSize());
                   updateQueueSizes(backplaneStatus.getOperationQueue().getProvisionsList());
                   casLookupSize.set(backplaneStatus.getCasLookupSize());
@@ -2246,7 +2246,7 @@ public class ShardInstance extends AbstractServerInstance {
   @Override
   public BackplaneStatus backplaneStatus() {
     try {
-      return backplane.backplaneStatus();
+      return backplane.backplaneStatus(this);
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }

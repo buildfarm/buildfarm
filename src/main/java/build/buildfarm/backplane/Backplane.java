@@ -306,7 +306,7 @@ public interface Backplane {
   boolean canPrequeue() throws IOException;
 
   @ThreadSafe
-  BackplaneStatus backplaneStatus() throws IOException;
+  BackplaneStatus backplaneStatus(Instance instance) throws IOException;
 
   @ThreadSafe
   Boolean propertiesEligibleForQueue(List<Platform.Property> provisions);
