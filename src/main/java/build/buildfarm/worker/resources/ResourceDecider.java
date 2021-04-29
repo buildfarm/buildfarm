@@ -16,8 +16,8 @@ package build.buildfarm.worker;
 
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Platform.Property;
+import build.buildfarm.common.CommandUtils;
 import build.buildfarm.common.ExecutionProperties;
-import com.google.common.collect.Iterables;
 import java.util.Map;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
@@ -59,7 +59,7 @@ public class ResourceDecider {
             });
 
     // force limits on non-test actions
-    if (onlyMulticoreTests && !commandIsTest(command)) {
+    if (onlyMulticoreTests && !CommandUtils.isTest(command)) {
       limits.cpu.min = 1;
       limits.cpu.max = 1;
     }
@@ -220,19 +220,5 @@ public class ResourceDecider {
           val = val.replace("{{limits.cpu.claimed}}", String.valueOf(limits.cpu.claimed));
           return val;
         });
-  }
-
-  /**
-   * @brief Derive if command is a test run.
-   * @details Find a reliable way to identify whether a command is a test or not.
-   * @param command The command to identify as a test command.
-   * @return Whether the command is a test.
-   * @note Suggested return identifier: exists.
-   */
-  private static boolean commandIsTest(Command command) {
-    // only tests are setting this currently - other mechanisms are unreliable
-    return Iterables.any(
-        command.getEnvironmentVariablesList(),
-        (envVar) -> envVar.getName().equals("XML_OUTPUT_FILE"));
   }
 }

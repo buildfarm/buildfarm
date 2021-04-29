@@ -17,11 +17,6 @@ package build.buildfarm.instance.shard;
 import static java.lang.String.format;
 import static redis.clients.jedis.ScanParams.SCAN_POINTER_START;
 
-import com.google.protobuf.ByteString;
-import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.protobuf.util.JsonFormat;
-import build.buildfarm.instance.Instance;
-import build.buildfarm.instance.Utils;
 import build.bazel.remote.execution.v2.ActionResult;
 import build.bazel.remote.execution.v2.Digest;
 import build.bazel.remote.execution.v2.ExecuteOperationMetadata;
@@ -31,6 +26,7 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.CasIndexSettings;
+import build.buildfarm.common.CommandUtils;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.StringVisitor;
@@ -44,6 +40,7 @@ import build.buildfarm.common.redis.RedisHashtags;
 import build.buildfarm.common.redis.RedisMap;
 import build.buildfarm.common.redis.RedisNodeHashes;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.instance.Utils;
 import build.buildfarm.instance.shard.RedisShardSubscriber.TimedWatchFuture;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.operations.FindOperationsSettings;
@@ -51,18 +48,18 @@ import build.buildfarm.operations.finder.OperationsFinder;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.DispatchedOperation;
+import build.buildfarm.v1test.DispatchedOperationsStatus;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.GetClientStartTimeResult;
 import build.buildfarm.v1test.OperationChange;
 import build.buildfarm.v1test.ProvisionedQueue;
 import build.buildfarm.v1test.QueueEntry;
-import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.QueuedOperation;
+import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.RedisShardBackplaneConfig;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.WorkerChange;
-import build.buildfarm.v1test.DispatchedOperationsStatus;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -75,6 +72,7 @@ import com.google.common.collect.SetMultimap;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
+import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.JsonFormat;
@@ -1442,31 +1440,66 @@ public class RedisShardBackplane implements Backplane {
                 .setActionCacheSize(actionCache.size(jedis))
                 .setBlockedActionsSize(blockedActions.size(jedis))
                 .setBlockedInvocationsSize(blockedInvocations.size(jedis))
-                .setDispatchedOperations(getDispatchedOperationsStatus(jedis,instance))
+                .setDispatchedOperations(getDispatchedOperationsStatus(jedis, instance))
                 .addAllActiveWorkers(workerSet)
                 .build());
   }
-  
-  private DispatchedOperationsStatus getDispatchedOperationsStatus(JedisCluster jedis, Instance instance) {
-    
+
+  private DispatchedOperationsStatus getDispatchedOperationsStatus(
+      JedisCluster jedis, Instance instance) {
+
     DispatchedOperationsStatus status = DispatchedOperationsStatus.newBuilder().build();
     try {
-      
-        for (DispatchedOperation operation: getDispatchedOperations()){
-          QueuedOperation queuedOperation = resolveQueuedOperationDiget(instance,operation.getQueueEntry().getQueuedOperationDigest());
-        }
-      
-      status = DispatchedOperationsStatus.newBuilder()
-      .setSize(jedis.hlen(config.getDispatchedOperationsHashName()))
-      .build();
+
+      // metrics related to dispatched operations
+      Integer buildActionAmount = 0;
+      Integer testActionAmount = 0;
+      Integer unknownActionAmount = 0;
+      Set<String> uniqueToolIds = Sets.newHashSet();
+
+      for (DispatchedOperation operation : getDispatchedOperations()) {
+        QueuedOperation queuedOperation =
+            resolveQueuedOperationDiget(
+                instance, operation.getQueueEntry().getQueuedOperationDigest());
+
+        // record the action type
+        IncrementActionType(
+            queuedOperation, buildActionAmount, testActionAmount, unknownActionAmount);
+
+        // record the tool id
+        uniqueToolIds.add(
+            operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getToolInvocationId());
+      }
+
+      status =
+          DispatchedOperationsStatus.newBuilder()
+              .setSize(jedis.hlen(config.getDispatchedOperationsHashName()))
+              .setBuildActionAmount(buildActionAmount)
+              .setTestActionAmount(testActionAmount)
+              .setUnknownActionAmount(unknownActionAmount)
+              .build();
+    } catch (Exception e) {
     }
-    catch (Exception e){
-    }
-    
+
     return status;
   }
-  
-  
+
+  private void IncrementActionType(
+      QueuedOperation queuedOperation,
+      Integer buildActionAmount,
+      Integer testActionAmount,
+      Integer unknownActionAmount) {
+    if (queuedOperation != null) {
+      if (CommandUtils.isTest(queuedOperation.getCommand())) {
+        testActionAmount++;
+      } else {
+        buildActionAmount++;
+      }
+    } else {
+      unknownActionAmount++;
+    }
+  }
+
   /**
    * @brief Get the queued operation based on the digest.
    * @details Instance used to fetch the blob.
