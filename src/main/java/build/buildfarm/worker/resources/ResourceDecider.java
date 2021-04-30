@@ -89,6 +89,12 @@ public class ResourceDecider {
    * @param property The property to store.
    */
   private static void evaluateProperty(ResourceLimits limits, Property property) {
+
+    // handle execution wrapper properties
+    if (property.getName().equals(ExecutionProperties.LINUX_SANDBOX)) {
+      storeLinuxSandbox(limits, property);
+    }
+
     // handle cpu properties
     if (property.getName().equals(ExecutionProperties.MIN_CORES)) {
       storeMinCores(limits, property);
@@ -121,6 +127,16 @@ public class ResourceDecider {
     } else if (property.getName().equals(ExecutionProperties.DEBUG_AFTER_EXECUTION)) {
       storeAfterExecutionDebug(limits, property);
     }
+  }
+
+  /**
+   * @brief Store the property for using bazel's linux sandbox.
+   * @details Parses and stores a boolean.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
+   */
+  private static void storeLinuxSandbox(ResourceLimits limits, Property property) {
+    limits.useLinuxSandbox = Boolean.parseBoolean(property.getValue());
   }
 
   /**
