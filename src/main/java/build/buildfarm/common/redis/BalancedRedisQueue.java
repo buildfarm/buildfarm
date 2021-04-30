@@ -56,6 +56,14 @@ public class BalancedRedisQueue {
   private final String originalHashtag;
 
   /**
+   * @field maxQueueSize
+   * @brief The maximum amount of elements that should be added to the queue.
+   * @details This is used to avoid placing too many elements onto the queue at any given time. For
+   *     infinitely sized queues, use -1.
+   */
+  private final int maxQueueSize;
+
+  /**
    * @field queues
    * @brief Internal queues used to distribute data across redis nodes.
    * @details Although these are multiple queues, the balanced redis queue treats them as one in its
@@ -82,7 +90,6 @@ public class BalancedRedisQueue {
   /**
    * @brief Constructor.
    * @details Construct a named redis queue with an established redis cluster.
-   * @param client An established redis client.
    * @param name The global name of the queue.
    * @param hashtags Hashtags to distribute queue data.
    * @note Overloaded.
@@ -90,6 +97,22 @@ public class BalancedRedisQueue {
   public BalancedRedisQueue(String name, List<String> hashtags) {
     this.originalHashtag = RedisHashtags.existingHash(name);
     this.name = RedisHashtags.unhashedName(name);
+    this.maxQueueSize = -1; // infinite size
+    createHashedQueues(this.name, hashtags);
+  }
+
+  /**
+   * @brief Constructor.
+   * @details Construct a named redis queue with an established redis cluster.
+   * @param name The global name of the queue.
+   * @param hashtags Hashtags to distribute queue data.
+   * @param maxQueueSize The maximum amount of elements that should be added to the queue.
+   * @note Overloaded.
+   */
+  public BalancedRedisQueue(String name, List<String> hashtags, int maxQueueSize) {
+    this.originalHashtag = RedisHashtags.existingHash(name);
+    this.name = RedisHashtags.unhashedName(name);
+    this.maxQueueSize = maxQueueSize;
     createHashedQueues(this.name, hashtags);
   }
 
@@ -300,6 +323,18 @@ public class BalancedRedisQueue {
       }
     }
     return true;
+  }
+
+  /**
+   * @brief Whether or not more elements can be added to the queue based on the queue's configured
+   *     max size.
+   * @details Compares the size of the queue to configured max size. Queues may be configured to be
+   *     infinite in size.
+   * @param jedis Jedis cluster client.
+   * @return Whether are not a new element can be added to the queue based on its current size.
+   */
+  public boolean canQueue(JedisCluster jedis) {
+    return maxQueueSize < 0 || size(jedis) < maxQueueSize;
   }
 
   /**
