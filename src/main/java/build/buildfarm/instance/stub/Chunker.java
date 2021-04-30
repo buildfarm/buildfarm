@@ -175,17 +175,14 @@ public final class Chunker {
     maybeInitialize();
 
     if (size == 0) {
-      data.close();
-      data = null;
+      reset();
       return emptyChunk;
     }
 
     // The cast to int is safe, because the return value is capped at chunkSize.
     int bytesToRead = (int) Math.min(bytesLeft(), chunkSize);
     if (bytesToRead == 0) {
-      chunkCache = null;
-      data.close();
-      data = null;
+      reset();
       throw new NoSuchElementException();
     }
 

@@ -397,11 +397,11 @@ public class ByteStreamUploader {
                 // If upload was completed by someone else or already present, then chunker does
                 // does not close the Filehandle. Do it here to be sure it's always closed.
                 chunker.reset();
-              } catch (IOException e1) {
+              } catch (IOException e) {
                 // This exception indicates that closing the underlying input stream failed.
                 // We don't expect this to ever happen, but don't want to swallow the exception
                 // completely.
-                logger.log(Level.WARNING, format("Chunker failed closing data source: %s", e1));
+                logger.log(Level.WARNING, "Chunker failed closing data source", e);
               }
 
               if (status.isOk() || Code.ALREADY_EXISTS.equals(status.getCode())) {
