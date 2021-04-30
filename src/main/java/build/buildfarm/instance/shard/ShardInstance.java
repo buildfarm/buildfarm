@@ -151,6 +151,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
+import build.buildfarm.v1test.LabeledCount;
 
 public class ShardInstance extends AbstractServerInstance {
   private static final Logger logger = Logger.getLogger(ShardInstance.class.getName());
@@ -217,7 +218,7 @@ public class ShardInstance extends AbstractServerInstance {
           .help("The number of dispatched operations that have been requeued.")
           .register();
   
-  
+  // Other metrics from the backplane
   private static final Gauge workerPoolSize =
       Gauge.build().name("worker_pool_size").help("Active worker pool size.").register();
   private static final Gauge queueSize =
@@ -526,6 +527,12 @@ public class ShardInstance extends AbstractServerInstance {
                   actionCacheLookupSize.set(backplaneStatus.getActionCacheSize());
                   blockedActionsSize.set(backplaneStatus.getBlockedActionsSize());
                   blockedInvocationsSize.set(backplaneStatus.getBlockedInvocationsSize());
+                  buildActionAmount.set(backplaneStatus.getDispatchedOperations().getBuildActionAmount());
+                  testActionAmount.set(backplaneStatus.getDispatchedOperations().getTestActionAmount());
+                  unknownActionAmount.set(backplaneStatus.getDispatchedOperations().getUnknownActionAmount());
+                  updateLabelCount(backplaneStatus.getDispatchedOperations().getFromQueuesList(),dispatchedOperationsFromQueue);
+                  updateLabelCount(backplaneStatus.getDispatchedOperations().getToolsList(),dispatchedOperationsTools);
+                  updateLabelCount(backplaneStatus.getDispatchedOperations().getActionMnemonicsList(),dispatchedOperationsMnemonics);
                 } catch (InterruptedException e) {
                   Thread.currentThread().interrupt();
                   break;
@@ -535,6 +542,23 @@ public class ShardInstance extends AbstractServerInstance {
               }
             },
             "Prometheus Metrics Collector");
+  }
+
+  // repeated LabeledCount target_ids = 8;
+  // repeated LabeledCount config_ids = 9;
+  // int64 unique_clients_amount = 10;
+  // int64 requeued_operations_amount = 11;
+  
+
+  // private static final Gauge dispatchedOperationsTargets =
+  // private static final Gauge dispatchedOperationsConfigs =
+  // private static final Gauge uniqueClientsAmount =
+  // private static final Gauge requeuedOperationsAmount =
+  
+  private void updateLabelCount(List<LabeledCount> list, Gauge gauge) {
+    for (LabeledCount label : list) {
+      gauge.labels(label.getName()).set(label.getSize());
+    }
   }
 
   private void updateQueueSizes(List<QueueStatus> queues) {
