@@ -924,8 +924,23 @@ class ShardWorkerContext implements WorkerContext {
     }
 
     // Possibly set network restrictions.
-    if (limits.network.blockNetwork) {
+    // This is not the ideal implementation of block-network.
+    // For now, without the linux-sandbox, we will unshare the network namespace.
+    if (limits.network.blockNetwork && !limits.useLinuxSandbox) {
       arguments.add("/usr/bin/unshare", "-n", "-r");
+    }
+
+    // Decide the CLI for running the sandbox
+    // For reference on how bazel spawns the sandbox:
+    // https://github.com/bazelbuild/bazel/blob/ddf302e2798be28bb67e32d5c2fc9c73a6a1fbf4/src/main/java/com/google/devtools/build/lib/sandbox/LinuxSandboxUtil.java#L183
+    if (limits.useLinuxSandbox) {
+      arguments.add("/app/buildfarm/linux-sandbox");
+
+      if (limits.network.blockNetwork) {
+        arguments.add("-N");
+      }
+
+      arguments.add("--");
     }
 
     // Decide the CLI for running under cgroups
