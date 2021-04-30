@@ -759,7 +759,7 @@ message OperationQueueStatus {
   int64 size = 2;
 }
 
-message DispatchedOperationTypeStatus {
+message LabeledCount {
   string name = 1;
   
   int64 size = 2;
@@ -781,11 +781,19 @@ message DispatchedOperationsStatus {
   
   // count dispatched operations by the queue they originated in
   // for example, "how many cpu vs gpu operations are running?"
-  repeated DispatchedOperationTypeStatus types = 5;
+  repeated LabeledCount from_queues = 5;
+  
+  // count dispatched operations by the tool they originated from
+  // for example, "Is anyone using a build tool or bazel version not supported by the main repo?"
+  repeated LabeledCount tools = 6;
+  
+  // count the kinds of action mnemonics occurring.
+  // for example, CppCompile or GoLink.
+  repeated LabeledCount action_mnemonics = 7;
   
   // how many unique clients are currently being served.
   // This is based on the uniqueness of tool_id for currently dispatched operations.
-  int64 unique_clients_amount = 6;
+  int64 unique_clients_amount = 8;
 }
 
 message BackplaneStatus {

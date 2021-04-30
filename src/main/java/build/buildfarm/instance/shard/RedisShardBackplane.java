@@ -48,11 +48,11 @@ import build.buildfarm.operations.finder.OperationsFinder;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.DispatchedOperation;
-import build.buildfarm.v1test.DispatchedOperationTypeStatus;
 import build.buildfarm.v1test.DispatchedOperationsStatus;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.GetClientStartTimeResult;
+import build.buildfarm.v1test.LabeledCount;
 import build.buildfarm.v1test.OperationChange;
 import build.buildfarm.v1test.ProvisionedQueue;
 import build.buildfarm.v1test.QueueEntry;
@@ -1447,6 +1447,14 @@ public class RedisShardBackplane implements Backplane {
                 .build());
   }
 
+  /**
+   * @brief Analyze the currently dispatched operations to derive statistics about the operations
+   *     workers are currently executing.
+   * @details This status message is intended to be used as metrics.
+   * @param cluster An established redis cluster.
+   * @param instance An instance is used to get additional information about the operation.
+   * @return Metrics about the currently dispatched operations.
+   */
   private DispatchedOperationsStatus getDispatchedOperationsStatus(
       JedisCluster jedis, Instance instance) {
 
@@ -1454,43 +1462,64 @@ public class RedisShardBackplane implements Backplane {
     Integer buildActionAmount = 0;
     Integer testActionAmount = 0;
     Integer unknownActionAmount = 0;
-    Set<String> uniqueToolIds = Sets.newHashSet();
+    Set<String> uniqueToolInnovationIds = Sets.newHashSet();
     Map<String, Integer> fromQueueAmounts = new HashMap();
+    Map<String, Integer> toolAmounts = new HashMap();
+    Map<String, Integer> actionMnemonics = new HashMap();
 
     // Iterate over each dispatched operation, and accumulate metrics about buildfarm's ongoing
     // executions.
     try {
       for (DispatchedOperation operation : getDispatchedOperations()) {
         QueuedOperation queuedOperation =
-            resolveQueuedOperationDiget(
+            resolveQueuedOperationDigest(
                 instance, operation.getQueueEntry().getQueuedOperationDigest());
 
         // Record the action type.
+        // This will let us know if it's a build action / test action.
         incrementActionType(
             queuedOperation, buildActionAmount, testActionAmount, unknownActionAmount);
 
-        // Record the tool id.
-        uniqueToolIds.add(
+        // Record the tool innovation id.
+        // This will let us know how many unique clients are getting work processed.
+        uniqueToolInnovationIds.add(
             operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getToolInvocationId());
 
         // Record the queue it came from.
+        // The queues often drain quickly.  This will let us identify work by the queues they
+        // originated from.
         String queueName =
             operationQueue.getName(operation.getQueueEntry().getPlatform().getPropertiesList());
         incrementValue(fromQueueAmounts, queueName);
+
+        // Record the tool that the operation came from.
+        // This will let us know if anyone is using an unexpected build tool or bazel version with
+        // buildfarm.
+        String toolName =
+            operation
+                    .getQueueEntry()
+                    .getExecuteEntry()
+                    .getRequestMetadata()
+                    .getToolDetails()
+                    .getToolName()
+                + "-"
+                + operation
+                    .getQueueEntry()
+                    .getExecuteEntry()
+                    .getRequestMetadata()
+                    .getToolDetails()
+                    .getToolVersion();
+        incrementValue(toolAmounts, toolName);
+
+        // Record the action mnemonic of the operation.
+        // This will let us know what kind of work is occurring, for example, CppCompile or GoLink.
+        String actionMnemonic =
+            operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getActionMnemonic();
+        incrementValue(actionMnemonics, actionMnemonic);
       }
 
     } catch (Exception e) {
       logger.log(Level.SEVERE, "Unable to analyze dispatched operation: ", e);
-    }
-
-    // Convert the metrics into the metric protobuf type.
-    List<DispatchedOperationTypeStatus> fromQueueStatus = new ArrayList<>();
-    for (Map.Entry<String, Integer> entry : fromQueueAmounts.entrySet()) {
-      fromQueueStatus.add(
-          DispatchedOperationTypeStatus.newBuilder()
-              .setName(entry.getKey())
-              .setSize(entry.getValue())
-              .build());
     }
 
     DispatchedOperationsStatus status =
@@ -1499,13 +1528,37 @@ public class RedisShardBackplane implements Backplane {
             .setBuildActionAmount(buildActionAmount)
             .setTestActionAmount(testActionAmount)
             .setUnknownActionAmount(unknownActionAmount)
-            .addAllTypes(fromQueueStatus)
-            .setUniqueClientsAmount(uniqueToolIds.size())
+            .addAllFromQueues(toLabeledCounts(fromQueueAmounts))
+            .addAllTools(toLabeledCounts(toolAmounts))
+            .addAllActionMnemonics(toLabeledCounts(actionMnemonics))
+            .setUniqueClientsAmount(uniqueToolInnovationIds.size())
             .build();
 
     return status;
   }
 
+  /**
+   * @brief Convert a map of string counts into a similar proto metric type.
+   * @details Certain metrics represent a list of strings with a count.
+   * @param map The map to convert.
+   * @return The metric type for counted strings.
+   */
+  private List<LabeledCount> toLabeledCounts(Map<String, Integer> map) {
+    List<LabeledCount> counts = new ArrayList<>();
+    for (Map.Entry<String, Integer> entry : map.entrySet()) {
+      counts.add(
+          LabeledCount.newBuilder().setName(entry.getKey()).setSize(entry.getValue()).build());
+    }
+    return counts;
+  }
+
+  /**
+   * @brief Increment a stat about the kind of operation.
+   * @details It is either a build/test action, or unknown in the event of missing data.
+   * @param buildActionAmount Increment if operation is a build action.
+   * @param testActionAmount Increment if operation is a test action.
+   * @param unknownActionAmount Increment if we can't determine whether the action is build or test.
+   */
   private void incrementActionType(
       QueuedOperation queuedOperation,
       Integer buildActionAmount,
@@ -1522,7 +1575,12 @@ public class RedisShardBackplane implements Backplane {
     }
   }
 
-  // Increment the value of any key.  Add the key with value 1 if it does not previously exist
+  /**
+   * @brief Increment the value of any key.
+   * @details Add the key with value 1 if it does not previously exist.
+   * @param map The map to find and increment the key in.
+   * @param key The key to increment the value of.
+   */
   private static <K> void incrementValue(Map<K, Integer> map, K key) {
     Integer count = map.get(key);
     if (count == null) {
@@ -1540,7 +1598,7 @@ public class RedisShardBackplane implements Backplane {
    * @return The queued operation from the provided digest.
    * @note Suggested return identifier: queuedOperation.
    */
-  private static QueuedOperation resolveQueuedOperationDiget(Instance instance, Digest digest) {
+  private static QueuedOperation resolveQueuedOperationDigest(Instance instance, Digest digest) {
     try {
       ByteString blob = Utils.getBlob(instance, digest, RequestMetadata.getDefaultInstance());
       QueuedOperation operation;

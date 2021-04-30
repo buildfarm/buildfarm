@@ -53,9 +53,9 @@ def archive_dependencies(third_party):
             "build_file": "%s:BUILD.remote_apis" % third_party,
             "patch_args": ["-p1"],
             "patches": ["%s/remote-apis:remote-apis.patch" % third_party],
-            "sha256": "03433a21ed97517f0fbda03c759854850336775a22dc737bab918949ceeddac9",
-            "strip_prefix": "remote-apis-f54876595da9f2c2d66c98c318d00b60fd64900b",
-            "url": "https://github.com/bazelbuild/remote-apis/archive/f54876595da9f2c2d66c98c318d00b60fd64900b.zip",
+            "sha256": "1d69f5f2f694fe93ee78a630f196047892ae51878297a89601c98964486655c6",
+            "strip_prefix": "remote-apis-6345202a036a297b22b0a0e7531ef702d05f2130",
+            "url": "https://github.com/bazelbuild/remote-apis/archive/6345202a036a297b22b0a0e7531ef702d05f2130.zip",
         },
 
         # Ideally we would use the 0.14.4 release of rules_docker,
