@@ -1462,10 +1462,13 @@ public class RedisShardBackplane implements Backplane {
     Integer buildActionAmount = 0;
     Integer testActionAmount = 0;
     Integer unknownActionAmount = 0;
+    Integer requeuedOperationsAmount = 0;
     Set<String> uniqueToolInnovationIds = Sets.newHashSet();
     Map<String, Integer> fromQueueAmounts = new HashMap();
     Map<String, Integer> toolAmounts = new HashMap();
     Map<String, Integer> actionMnemonics = new HashMap();
+    Map<String, Integer> targetIds = new HashMap();
+    Map<String, Integer> configIds = new HashMap();
 
     // Iterate over each dispatched operation, and accumulate metrics about buildfarm's ongoing
     // executions.
@@ -1516,6 +1519,21 @@ public class RedisShardBackplane implements Backplane {
         String actionMnemonic =
             operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getActionMnemonic();
         incrementValue(actionMnemonics, actionMnemonic);
+        
+        // Record the target Id that initiated the operation.
+        String targetId =
+            operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getTargetId();
+        incrementValue(targetIds, targetId);
+        
+        // Record the build configuration of the action.
+        String configId =
+            operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getConfigurationId();
+        incrementValue(configIds, configId);
+        
+        // Record whether the operation has been requeued before
+        if (operation.getQueueEntry().getRequeueAttempts() > 0){
+          requeuedOperationsAmount++;
+        }
       }
 
     } catch (Exception e) {
@@ -1528,9 +1546,12 @@ public class RedisShardBackplane implements Backplane {
             .setBuildActionAmount(buildActionAmount)
             .setTestActionAmount(testActionAmount)
             .setUnknownActionAmount(unknownActionAmount)
+            .setRequeuedOperationsAmount(requeuedOperationsAmount)
             .addAllFromQueues(toLabeledCounts(fromQueueAmounts))
             .addAllTools(toLabeledCounts(toolAmounts))
             .addAllActionMnemonics(toLabeledCounts(actionMnemonics))
+            .addAllTargetIds(toLabeledCounts(targetIds))
+            .addAllConfigIds(toLabeledCounts(configIds))
             .setUniqueClientsAmount(uniqueToolInnovationIds.size())
             .build();
 
