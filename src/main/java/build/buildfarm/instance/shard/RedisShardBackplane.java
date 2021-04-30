@@ -1519,19 +1519,19 @@ public class RedisShardBackplane implements Backplane {
         String actionMnemonic =
             operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getActionMnemonic();
         incrementValue(actionMnemonics, actionMnemonic);
-        
+
         // Record the target Id that initiated the operation.
         String targetId =
             operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getTargetId();
         incrementValue(targetIds, targetId);
-        
+
         // Record the build configuration of the action.
         String configId =
             operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getConfigurationId();
         incrementValue(configIds, configId);
-        
+
         // Record whether the operation has been requeued before
-        if (operation.getQueueEntry().getRequeueAttempts() > 0){
+        if (operation.getQueueEntry().getRequeueAttempts() > 0) {
           requeuedOperationsAmount++;
         }
       }
