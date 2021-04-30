@@ -48,6 +48,7 @@ import build.buildfarm.operations.finder.OperationsFinder;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.DispatchedOperation;
+import build.buildfarm.v1test.DispatchedOperationTypeStatus;
 import build.buildfarm.v1test.DispatchedOperationsStatus;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
@@ -60,7 +61,6 @@ import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.RedisShardBackplaneConfig;
 import build.buildfarm.v1test.ShardWorker;
 import build.buildfarm.v1test.WorkerChange;
-import build.buildfarm.v1test.DispatchedOperationTypeStatus;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
@@ -87,6 +87,7 @@ import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -112,7 +113,6 @@ import redis.clients.jedis.JedisClusterPipeline;
 import redis.clients.jedis.Response;
 import redis.clients.jedis.ScanParams;
 import redis.clients.jedis.ScanResult;
-import java.util.HashMap;
 
 public class RedisShardBackplane implements Backplane {
   private static final Logger logger = Logger.getLogger(RedisShardBackplane.class.getName());
@@ -1449,53 +1449,60 @@ public class RedisShardBackplane implements Backplane {
 
   private DispatchedOperationsStatus getDispatchedOperationsStatus(
       JedisCluster jedis, Instance instance) {
+    
+    
+    
+    // Metrics related to dispatched operations
+    Integer buildActionAmount = 0;
+    Integer testActionAmount = 0;
+    Integer unknownActionAmount = 0;
+    Set<String> uniqueToolIds = Sets.newHashSet();
+    Map<String, Integer> fromQueueAmounts = new HashMap();
 
-    DispatchedOperationsStatus status = DispatchedOperationsStatus.newBuilder().build();
+    // Iterate over each dispatched operation, and accumulate metrics about buildfarm's ongoing executions.
     try {
-
-      // metrics related to dispatched operations
-      Integer buildActionAmount = 0;
-      Integer testActionAmount = 0;
-      Integer unknownActionAmount = 0;
-      Set<String> uniqueToolIds = Sets.newHashSet();
-      Map<String, Integer> fromQueueAmounts = new HashMap();
-
       for (DispatchedOperation operation : getDispatchedOperations()) {
         QueuedOperation queuedOperation =
             resolveQueuedOperationDiget(
                 instance, operation.getQueueEntry().getQueuedOperationDigest());
 
-        // record the action type
+        // Record the action type.
         incrementActionType(
             queuedOperation, buildActionAmount, testActionAmount, unknownActionAmount);
 
-        // record the tool id
+        // Record the tool id.
         uniqueToolIds.add(
             operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getToolInvocationId());
         
-        
-        String queueName = operationQueue.getName(operation.getQueueEntry().getPlatform().getPropertiesList());
-        incrementValue(fromQueueAmounts,queueName);
-        
+        // Record the queue it came from.
+        String queueName =
+            operationQueue.getName(operation.getQueueEntry().getPlatform().getPropertiesList());
+        incrementValue(fromQueueAmounts, queueName);
       }
-      
-    List<DispatchedOperationTypeStatus> fromQueueStatus = new ArrayList<>();
-    for (Map.Entry<String,Integer> entry : fromQueueAmounts.entrySet()){
-      fromQueueStatus.add(DispatchedOperationTypeStatus.newBuilder().setName(entry.getKey()).setSize(entry.getValue()).build());
-    }
 
-      status =
-          DispatchedOperationsStatus.newBuilder()
-              .setSize(jedis.hlen(config.getDispatchedOperationsHashName()))
-              .setBuildActionAmount(buildActionAmount)
-              .setTestActionAmount(testActionAmount)
-              .setUnknownActionAmount(unknownActionAmount)
-              .setTypes(fromQueueStatus)
-              .setUniqueClientsAmount(uniqueToolIds.size())
-              .build();
     } catch (Exception e) {
+      logger.log(Level.SEVERE, "Unable to analyze dispatched operation: ", e);
     }
 
+    // Convert the metrics into the metric protobuf type.
+    List<DispatchedOperationTypeStatus> fromQueueStatus = new ArrayList<>();
+    for (Map.Entry<String, Integer> entry : fromQueueAmounts.entrySet()) {
+      fromQueueStatus.add(
+          DispatchedOperationTypeStatus.newBuilder()
+              .setName(entry.getKey())
+              .setSize(entry.getValue())
+              .build());
+      
+    DispatchedOperationsStatus  status =
+        DispatchedOperationsStatus.newBuilder()
+            .setSize(jedis.hlen(config.getDispatchedOperationsHashName()))
+            .setBuildActionAmount(buildActionAmount)
+            .setTestActionAmount(testActionAmount)
+            .setUnknownActionAmount(unknownActionAmount)
+            .addAllTypes(fromQueueStatus)
+            .setUniqueClientsAmount(uniqueToolIds.size())
+            .build();
+              
     return status;
   }
 
@@ -1514,18 +1521,16 @@ public class RedisShardBackplane implements Backplane {
       unknownActionAmount++;
     }
   }
-  
-    //Increment the value of any key.  Add the key with value 1 if it does not previously exist
-    private static<K> void incrementValue(Map<K, Integer> map, K key)
-    {
-        Integer count = map.get(key);
-        if (count == null) {
-            map.put(key, 1);
-        }
-        else {
-            map.put(key, count + 1);
-        }
+
+  // Increment the value of any key.  Add the key with value 1 if it does not previously exist
+  private static <K> void incrementValue(Map<K, Integer> map, K key) {
+    Integer count = map.get(key);
+    if (count == null) {
+      map.put(key, 1);
+    } else {
+      map.put(key, count + 1);
     }
+  }
 
   /**
    * @brief Get the queued operation based on the digest.
