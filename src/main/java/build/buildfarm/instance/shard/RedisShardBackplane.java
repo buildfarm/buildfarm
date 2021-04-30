@@ -1449,9 +1449,7 @@ public class RedisShardBackplane implements Backplane {
 
   private DispatchedOperationsStatus getDispatchedOperationsStatus(
       JedisCluster jedis, Instance instance) {
-    
-    
-    
+
     // Metrics related to dispatched operations
     Integer buildActionAmount = 0;
     Integer testActionAmount = 0;
@@ -1459,7 +1457,8 @@ public class RedisShardBackplane implements Backplane {
     Set<String> uniqueToolIds = Sets.newHashSet();
     Map<String, Integer> fromQueueAmounts = new HashMap();
 
-    // Iterate over each dispatched operation, and accumulate metrics about buildfarm's ongoing executions.
+    // Iterate over each dispatched operation, and accumulate metrics about buildfarm's ongoing
+    // executions.
     try {
       for (DispatchedOperation operation : getDispatchedOperations()) {
         QueuedOperation queuedOperation =
@@ -1473,7 +1472,7 @@ public class RedisShardBackplane implements Backplane {
         // Record the tool id.
         uniqueToolIds.add(
             operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getToolInvocationId());
-        
+
         // Record the queue it came from.
         String queueName =
             operationQueue.getName(operation.getQueueEntry().getPlatform().getPropertiesList());
@@ -1492,8 +1491,9 @@ public class RedisShardBackplane implements Backplane {
               .setName(entry.getKey())
               .setSize(entry.getValue())
               .build());
-      
-    DispatchedOperationsStatus  status =
+    }
+
+    DispatchedOperationsStatus status =
         DispatchedOperationsStatus.newBuilder()
             .setSize(jedis.hlen(config.getDispatchedOperationsHashName()))
             .setBuildActionAmount(buildActionAmount)
@@ -1502,7 +1502,7 @@ public class RedisShardBackplane implements Backplane {
             .addAllTypes(fromQueueStatus)
             .setUniqueClientsAmount(uniqueToolIds.size())
             .build();
-              
+
     return status;
   }
 
