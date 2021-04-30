@@ -1490,7 +1490,7 @@ public class RedisShardBackplane implements Backplane {
               .setBuildActionAmount(buildActionAmount)
               .setTestActionAmount(testActionAmount)
               .setUnknownActionAmount(unknownActionAmount)
-              //.set
+              .setTypes(fromQueueStatus)
               .setUniqueClientsAmount(uniqueToolIds.size())
               .build();
     } catch (Exception e) {
