@@ -35,7 +35,7 @@ public class ResourceDecider {
    * @details Platform properties from specified exec_properties are taken into account as well as
    *     global buildfarm configuration.
    * @param command The command to decide resource limitations for.
-   * @param onlyMulticoreTests Only allow ttests to be multicore.
+   * @param onlyMulticoreTests Only allow tests to be multicore.
    * @param executeStageWidth The maximum amount of cores available for the operation.
    * @return Default resource limits.
    * @note Suggested return identifier: resourceLimits.
@@ -83,6 +83,12 @@ public class ResourceDecider {
    * @param property The property to store.
    */
   private static void evaluateProperty(ResourceLimits limits, Property property) {
+
+    // handle execution wrapper properties
+    if (property.getName().equals(ExecutionProperties.LINUX_SANDBOX)) {
+      storeLinuxSandbox(limits, property);
+    }
+
     // handle cpu properties
     if (property.getName().equals(ExecutionProperties.MIN_CORES)) {
       storeMinCores(limits, property);
@@ -110,6 +116,16 @@ public class ResourceDecider {
     } else if (property.getName().equals(ExecutionProperties.DEBUG_AFTER_EXECUTION)) {
       storeAfterExecutionDebug(limits, property);
     }
+  }
+
+  /**
+   * @brief Store the property for using bazel's linux sandbox.
+   * @details Parses and stores a boolean.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
+   */
+  private static void storeLinuxSandbox(ResourceLimits limits, Property property) {
+    limits.useLinuxSandbox = Boolean.parseBoolean(property.getValue());
   }
 
   /**
