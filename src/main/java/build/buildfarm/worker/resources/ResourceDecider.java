@@ -23,12 +23,6 @@ import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
 /**
- * @field operation
- * @brief The main operation object which contains digests to the remaining data members.
- * @details Its digests are used to resolve other data members.
- */
-
-/**
  * @class ResourceDecider
  * @brief Decide the resource limitations for a given command.
  * @details Platform properties from specified exec_properties are taken into account as well as
