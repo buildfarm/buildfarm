@@ -20,8 +20,13 @@ import build.bazel.remote.execution.v2.ServerCapabilities;
 import build.bazel.semver.SemVer;
 import build.buildfarm.instance.Instance;
 import io.grpc.stub.StreamObserver;
+import io.prometheus.client.Counter;
 
 public class CapabilitiesService extends CapabilitiesGrpc.CapabilitiesImplBase {
+  // Prometheus metrics
+  private static final Counter numberOfRemoteInvocations =
+          Counter.build().name("remote_invocations").help("Number of remote invocations.").register();
+
   private final Instances instances;
 
   public CapabilitiesService(Instances instances) {
@@ -34,6 +39,7 @@ public class CapabilitiesService extends CapabilitiesGrpc.CapabilitiesImplBase {
     Instance instance;
     try {
       instance = instances.get(request.getInstanceName());
+      numberOfRemoteInvocations.inc();
     } catch (InstanceNotFoundException ex) {
       responseObserver.onError(BuildFarmInstances.toStatusException(ex));
       return;
