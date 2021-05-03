@@ -64,8 +64,17 @@ public class ResourceDecider {
       limits.cpu.max = 1;
     }
 
-    // claim core amount according to execute stage width
+    // Should we limit the cores of the action during execution? by default, no.
+    // If the action has suggested core restrictions on itself, then yes.
+    // Claim minimal core amount with regards to execute stage width.
+    limits.cpu.limit = (limits.cpu.min > 0 || limits.cpu.max > 0);
     limits.cpu.claimed = Math.min(limits.cpu.min, executeStageWidth);
+
+    // Should we limit the memory of the action during execution? by default, no.
+    // If the action has suggested memory restrictions on itself, then yes.
+    // Claim minimal memory amount based on action's suggestion.
+    limits.mem.limit = (limits.mem.min > 0 || limits.mem.max > 0);
+    limits.mem.claimed = limits.mem.min;
 
     // we choose to resolve variables after the other variable values have been decided
     resolveEnvironmentVariables(limits);
@@ -80,6 +89,12 @@ public class ResourceDecider {
    * @param property The property to store.
    */
   private static void evaluateProperty(ResourceLimits limits, Property property) {
+
+    // handle execution wrapper properties
+    if (property.getName().equals(ExecutionProperties.LINUX_SANDBOX)) {
+      storeLinuxSandbox(limits, property);
+    }
+
     // handle cpu properties
     if (property.getName().equals(ExecutionProperties.MIN_CORES)) {
       storeMinCores(limits, property);
@@ -110,6 +125,16 @@ public class ResourceDecider {
   }
 
   /**
+   * @brief Store the property for using bazel's linux sandbox.
+   * @details Parses and stores a boolean.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
+   */
+  private static void storeLinuxSandbox(ResourceLimits limits, Property property) {
+    limits.useLinuxSandbox = Boolean.parseBoolean(property.getValue());
+  }
+
+  /**
    * @brief Store the property for min cores.
    * @details Parses and stores the property.
    * @param limits Current limits to apply changes to.
@@ -136,7 +161,7 @@ public class ResourceDecider {
    * @param property The property to store.
    */
   private static void storeMinMem(ResourceLimits limits, Property property) {
-    limits.mem.min = Integer.parseInt(property.getValue());
+    limits.mem.min = Long.parseLong(property.getValue());
   }
 
   /**
@@ -146,7 +171,7 @@ public class ResourceDecider {
    * @param property The property to store.
    */
   private static void storeMaxMem(ResourceLimits limits, Property property) {
-    limits.mem.max = Integer.parseInt(property.getValue());
+    limits.mem.max = Long.parseLong(property.getValue());
   }
 
   /**
