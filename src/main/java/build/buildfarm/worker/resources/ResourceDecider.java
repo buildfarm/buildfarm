@@ -23,12 +23,6 @@ import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
 /**
- * @field operation
- * @brief The main operation object which contains digests to the remaining data members.
- * @details Its digests are used to resolve other data members.
- */
-
-/**
  * @class ResourceDecider
  * @brief Decide the resource limitations for a given command.
  * @details Platform properties from specified exec_properties are taken into account as well as
@@ -41,7 +35,7 @@ public class ResourceDecider {
    * @details Platform properties from specified exec_properties are taken into account as well as
    *     global buildfarm configuration.
    * @param command The command to decide resource limitations for.
-   * @param onlyMulticoreTests Only allow ttests to be multicore.
+   * @param onlyMulticoreTests Only allow tests to be multicore.
    * @param executeStageWidth The maximum amount of cores available for the operation.
    * @return Default resource limits.
    * @note Suggested return identifier: resourceLimits.
