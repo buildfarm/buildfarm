@@ -1,6 +1,8 @@
 ---
 buildifier: latest
 tasks:
+  
+  # Linting jobs
   format_check:
     name: "Code Format"
     platform: ubuntu1804
@@ -17,6 +19,8 @@ tasks:
     shell_commands:
     - export BUILDFARM_SKIP_COVERAGE_HOST=true
     - ./generate_coverage.sh
+    
+  # Typical unit tests that run across a variety of operation systems.
   ubuntu1604:
     name: "Unit Tests"
     build_targets:
@@ -43,8 +47,27 @@ tasks:
     - "..."
     test_targets:
     - "..."
-  integration_test:
-    name: "Integration Test"
+
+  # We want to run the unit tests again inside of a docker container.
+  # This is because test cases may behave different while in docker due to user permissions.
+  # This is more of a sanity check between a defined docker file and running tests directly on the host.
+  ubuntu1604:
+    name: "Docker Unit Tests"
     platform: ubuntu1804
     shell_commands:
+    - ./.bazelci/docker_unit_test.sh
+    
+  # Test that buildfarm can build software using the default configurations.
+  # It starts the distributed storage backend and buildfarm services.
+  # It performs a realistic build on generated cc targets.
+  integration_test:
+    name: "Integration Test (Memory)"
+    platform: ubuntu1804
+    shell_commands:
+    - ./.bazelci/integration_test.sh
+  integration_test_shard:
+    name: "Integration Test (Shard)"
+    platform: ubuntu1804
+    shell_commands:
+    - export TEST_SHARD=true
     - ./.bazelci/integration_test.sh
