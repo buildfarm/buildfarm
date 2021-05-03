@@ -135,7 +135,7 @@ public class ResourceDecider {
     int amount = Integer.parseInt(property.getValue());
     limits.cpu.min = amount;
     limits.cpu.max = amount;
-}
+  }
 
   /**
    * @brief Store the property for using bazel's linux sandbox.
