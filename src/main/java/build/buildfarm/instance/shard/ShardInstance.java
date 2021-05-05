@@ -1374,6 +1374,16 @@ public class ShardInstance extends AbstractServerInstance {
     }
   }
 
+  ExecuteOperationMetadata executeOperationMetadata(
+      ExecuteEntry executeEntry, ExecutionStage.Value stage) {
+    return ExecuteOperationMetadata.newBuilder()
+        .setActionDigest(executeEntry.getActionDigest())
+        .setStdoutStreamName(executeEntry.getStdoutStreamName())
+        .setStderrStreamName(executeEntry.getStderrStreamName())
+        .setStage(stage)
+        .build();
+  }
+
   private ListenableFuture<QueuedOperationResult> uploadQueuedOperation(
       QueuedOperation queuedOperation, ExecuteEntry executeEntry, ExecutorService service)
       throws EntryLimitException {
@@ -1382,11 +1392,7 @@ public class ShardInstance extends AbstractServerInstance {
     QueuedOperationMetadata metadata =
         QueuedOperationMetadata.newBuilder()
             .setExecuteOperationMetadata(
-                ExecuteOperationMetadata.newBuilder()
-                    .setActionDigest(executeEntry.getActionDigest())
-                    .setStdoutStreamName(executeEntry.getStdoutStreamName())
-                    .setStderrStreamName(executeEntry.getStderrStreamName())
-                    .setStage(ExecutionStage.Value.QUEUED))
+                executeOperationMetadata(executeEntry, ExecutionStage.Value.QUEUED))
             .setQueuedOperationDigest(queuedOperationDigest)
             .build();
     QueueEntry entry =
@@ -1588,11 +1594,8 @@ public class ShardInstance extends AbstractServerInstance {
                           QueuedOperationMetadata metadata =
                               QueuedOperationMetadata.newBuilder()
                                   .setExecuteOperationMetadata(
-                                      ExecuteOperationMetadata.newBuilder()
-                                          .setActionDigest(executeEntry.getActionDigest())
-                                          .setStdoutStreamName(executeEntry.getStdoutStreamName())
-                                          .setStderrStreamName(executeEntry.getStderrStreamName())
-                                          .setStage(ExecutionStage.Value.QUEUED))
+                                      executeOperationMetadata(
+                                          executeEntry, ExecutionStage.Value.QUEUED))
                                   .setQueuedOperationDigest(queueEntry.getQueuedOperationDigest())
                                   .setRequestMetadata(requestMetadata)
                                   .build();
@@ -1658,11 +1661,15 @@ public class ShardInstance extends AbstractServerInstance {
     ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
     String operationName = executeEntry.getOperationName();
     try {
+      Operation.Builder failedOperation =
+          Operation.newBuilder()
+              .setName(operationName)
+              .setDone(true)
+              .setMetadata(
+                  Any.pack(executeOperationMetadata(executeEntry, ExecutionStage.Value.COMPLETED)));
       if (backplane.isBlacklisted(executeEntry.getRequestMetadata())) {
         putOperation(
-            Operation.newBuilder()
-                .setName(operationName)
-                .setDone(true)
+            failedOperation
                 .setResponse(
                     Any.pack(denyActionResponse(executeEntry.getActionDigest(), BLOCK_LIST_ERROR)))
                 .build());
@@ -1671,9 +1678,7 @@ public class ShardInstance extends AbstractServerInstance {
         logger.log(
             Level.WARNING, "Operation " + operationName + " has been requeued too many times.");
         putOperation(
-            Operation.newBuilder()
-                .setName(operationName)
-                .setDone(true)
+            failedOperation
                 .setResponse(
                     Any.pack(
                         denyActionResponse(
