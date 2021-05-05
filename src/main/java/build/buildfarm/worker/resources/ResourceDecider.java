@@ -23,12 +23,6 @@ import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
 /**
- * @field operation
- * @brief The main operation object which contains digests to the remaining data members.
- * @details Its digests are used to resolve other data members.
- */
-
-/**
  * @class ResourceDecider
  * @brief Decide the resource limitations for a given command.
  * @details Platform properties from specified exec_properties are taken into account as well as
@@ -41,7 +35,7 @@ public class ResourceDecider {
    * @details Platform properties from specified exec_properties are taken into account as well as
    *     global buildfarm configuration.
    * @param command The command to decide resource limitations for.
-   * @param onlyMulticoreTests Only allow ttests to be multicore.
+   * @param onlyMulticoreTests Only allow tests to be multicore.
    * @param executeStageWidth The maximum amount of cores available for the operation.
    * @return Default resource limits.
    * @note Suggested return identifier: resourceLimits.
@@ -109,6 +103,11 @@ public class ResourceDecider {
       storeMaxMem(limits, property);
     }
 
+    // handle network properties
+    if (property.getName().equals(ExecutionProperties.BLOCK_NETWORK)) {
+      storeBlockNetwork(limits, property);
+    }
+
     // handle env properties
     else if (property.getName().equals(ExecutionProperties.ENV_VARS)) {
       storeEnvVars(limits, property);
@@ -172,6 +171,16 @@ public class ResourceDecider {
    */
   private static void storeMaxMem(ResourceLimits limits, Property property) {
     limits.mem.max = Long.parseLong(property.getValue());
+  }
+
+  /**
+   * @brief Store the property for blocking network.
+   * @details Parses and stores a boolean.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
+   */
+  private static void storeBlockNetwork(ResourceLimits limits, Property property) {
+    limits.network.blockNetwork = Boolean.parseBoolean(property.getValue());
   }
 
   /**
