@@ -937,12 +937,18 @@ class ShardWorkerContext implements WorkerContext {
     // For reference on how bazel spawns the sandbox:
     // https://github.com/bazelbuild/bazel/blob/ddf302e2798be28bb67e32d5c2fc9c73a6a1fbf4/src/main/java/com/google/devtools/build/lib/sandbox/LinuxSandboxUtil.java#L183
     if (limits.useLinuxSandbox) {
+
+      // Choose the sandbox which is built and deployed with the worker image.
       arguments.add("/app/buildfarm/linux-sandbox");
 
-      if (limits.network.blockNetwork) {
+      // Construct the CLI options for this binary.
+      LinuxSandboxOptions options = new LinuxSandboxOptions();
+      options.createNetns = limits.network.blockNetwork;
+
+      // Pass flags based on the sandbox CLI options.
+      if (options.createNetns) {
         arguments.add("-N");
       }
-
       arguments.add("--");
     }
 
