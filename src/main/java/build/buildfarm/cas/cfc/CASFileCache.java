@@ -330,8 +330,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
     this.directoriesIndex =
         storeFileDirsIndexInMemory
-            ? new MemoryFileDirectoriesIndex(root)
-            : new SqliteFileDirectoriesIndex(directoriesIndexUrl, root);
+            ? new MemoryFileDirectoriesIndex(entryPathStrategy)
+            : new SqliteFileDirectoriesIndex(directoriesIndexUrl, entryPathStrategy);
     header.before = header.after = header;
   }
 
