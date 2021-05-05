@@ -23,12 +23,6 @@ import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
 /**
- * @field operation
- * @brief The main operation object which contains digests to the remaining data members.
- * @details Its digests are used to resolve other data members.
- */
-
-/**
  * @class ResourceDecider
  * @brief Decide the resource limitations for a given command.
  * @details Platform properties from specified exec_properties are taken into account as well as
@@ -41,7 +35,7 @@ public class ResourceDecider {
    * @details Platform properties from specified exec_properties are taken into account as well as
    *     global buildfarm configuration.
    * @param command The command to decide resource limitations for.
-   * @param onlyMulticoreTests Only allow ttests to be multicore.
+   * @param onlyMulticoreTests Only allow tests to be multicore.
    * @param executeStageWidth The maximum amount of cores available for the operation.
    * @return Default resource limits.
    * @note Suggested return identifier: resourceLimits.
@@ -64,8 +58,17 @@ public class ResourceDecider {
       limits.cpu.max = 1;
     }
 
-    // claim core amount according to execute stage width
+    // Should we limit the cores of the action during execution? by default, no.
+    // If the action has suggested core restrictions on itself, then yes.
+    // Claim minimal core amount with regards to execute stage width.
+    limits.cpu.limit = (limits.cpu.min > 0 || limits.cpu.max > 0);
     limits.cpu.claimed = Math.min(limits.cpu.min, executeStageWidth);
+
+    // Should we limit the memory of the action during execution? by default, no.
+    // If the action has suggested memory restrictions on itself, then yes.
+    // Claim minimal memory amount based on action's suggestion.
+    limits.mem.limit = (limits.mem.min > 0 || limits.mem.max > 0);
+    limits.mem.claimed = limits.mem.min;
 
     // we choose to resolve variables after the other variable values have been decided
     resolveEnvironmentVariables(limits);
@@ -80,11 +83,19 @@ public class ResourceDecider {
    * @param property The property to store.
    */
   private static void evaluateProperty(ResourceLimits limits, Property property) {
+
+    // handle execution wrapper properties
+    if (property.getName().equals(ExecutionProperties.LINUX_SANDBOX)) {
+      storeLinuxSandbox(limits, property);
+    }
+
     // handle cpu properties
     if (property.getName().equals(ExecutionProperties.MIN_CORES)) {
       storeMinCores(limits, property);
     } else if (property.getName().equals(ExecutionProperties.MAX_CORES)) {
       storeMaxCores(limits, property);
+    } else if (property.getName().equals(ExecutionProperties.CORES)) {
+      storeCores(limits, property);
     }
 
     // handle mem properties
@@ -92,6 +103,11 @@ public class ResourceDecider {
       storeMinMem(limits, property);
     } else if (property.getName().equals(ExecutionProperties.MAX_MEM)) {
       storeMaxMem(limits, property);
+    }
+
+    // handle network properties
+    if (property.getName().equals(ExecutionProperties.BLOCK_NETWORK)) {
+      storeBlockNetwork(limits, property);
     }
 
     // handle env properties
@@ -107,6 +123,28 @@ public class ResourceDecider {
     } else if (property.getName().equals(ExecutionProperties.DEBUG_AFTER_EXECUTION)) {
       storeAfterExecutionDebug(limits, property);
     }
+  }
+
+  /**
+   * @brief Store the property for both min/max cores.
+   * @details Parses and stores the property.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
+   */
+  private static void storeCores(ResourceLimits limits, Property property) {
+    int amount = Integer.parseInt(property.getValue());
+    limits.cpu.min = amount;
+    limits.cpu.max = amount;
+  }
+
+  /**
+   * @brief Store the property for using bazel's linux sandbox.
+   * @details Parses and stores a boolean.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
+   */
+  private static void storeLinuxSandbox(ResourceLimits limits, Property property) {
+    limits.useLinuxSandbox = Boolean.parseBoolean(property.getValue());
   }
 
   /**
@@ -136,7 +174,7 @@ public class ResourceDecider {
    * @param property The property to store.
    */
   private static void storeMinMem(ResourceLimits limits, Property property) {
-    limits.mem.min = Integer.parseInt(property.getValue());
+    limits.mem.min = Long.parseLong(property.getValue());
   }
 
   /**
@@ -146,7 +184,17 @@ public class ResourceDecider {
    * @param property The property to store.
    */
   private static void storeMaxMem(ResourceLimits limits, Property property) {
-    limits.mem.max = Integer.parseInt(property.getValue());
+    limits.mem.max = Long.parseLong(property.getValue());
+  }
+
+  /**
+   * @brief Store the property for blocking network.
+   * @details Parses and stores a boolean.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
+   */
+  private static void storeBlockNetwork(ResourceLimits limits, Property property) {
+    limits.network.blockNetwork = Boolean.parseBoolean(property.getValue());
   }
 
   /**

@@ -82,6 +82,7 @@ import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.protobuf.ByteString;
 import io.grpc.Deadline;
 import io.grpc.stub.ServerCallStreamObserver;
+import io.prometheus.client.Counter;
 import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -121,6 +122,9 @@ import org.json.simple.JSONObject;
 
 public abstract class CASFileCache implements ContentAddressableStorage {
   private static final Logger logger = Logger.getLogger(CASFileCache.class.getName());
+  // Prometheus metrics
+  private static final Counter expiredKeyCounter =
+      Counter.build().name("expired_key").help("Number of key expirations.").register();
 
   protected static final String DEFAULT_DIRECTORIES_INDEX_NAME = "directories.sqlite";
   protected static final String DIRECTORIES_INDEX_NAME_MEMORY = ":memory:";
@@ -330,8 +334,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     }
     this.directoriesIndex =
         storeFileDirsIndexInMemory
-            ? new MemoryFileDirectoriesIndex(root)
-            : new SqliteFileDirectoriesIndex(directoriesIndexUrl, root);
+            ? new MemoryFileDirectoriesIndex(entryPathStrategy)
+            : new SqliteFileDirectoriesIndex(directoriesIndexUrl, entryPathStrategy);
     header.before = header.after = header;
   }
 
@@ -2497,6 +2501,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                           getKey(fileEntryKey.getDigest(), !fileEntryKey.getIsExecutable()))) {
                         return immediateFuture(null);
                       }
+                      expiredKeyCounter.inc();
                       logger.log(Level.INFO, format("expired key %s", expiredKey));
                       return immediateFuture(fileEntryKey.getDigest());
                     },
