@@ -24,6 +24,13 @@ package build.buildfarm.common;
 public class ExecutionProperties {
 
   /**
+   * @field CORES
+   * @brief The exec_property and platform property name for setting the core amount.
+   * @details This is decided between client and server. The key value is expected to be an integer.
+   */
+  public static final String CORES = "cores";
+
+  /**
    * @field MIN_CORES
    * @brief The exec_property and platform property name for setting min cores.
    * @details This is decided between client and server. The key value is expected to be an integer.

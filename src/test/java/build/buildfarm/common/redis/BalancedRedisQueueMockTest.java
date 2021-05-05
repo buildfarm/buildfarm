@@ -349,4 +349,42 @@ public class BalancedRedisQueueMockTest {
     // ASSERT
     assertThat(isEvenlyDistributed).isTrue();
   }
+
+  // Function under test: canQueue
+  // Reason for testing: infinite queues allow queuing
+  // Failure explanation: the queue is not accepting queuing when it should
+  @Test
+  public void canQueueIfiniteQueueAllowsQueuing() throws Exception {
+
+    // MOCK
+    when(redis.llen(any(String.class))).thenReturn(999L);
+
+    // ARRANGE
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of(), -1);
+
+    // ACT
+    boolean canQueue = queue.canQueue(redis);
+
+    // ASSERT
+    assertThat(canQueue).isTrue();
+  }
+
+  // Function under test: canQueue
+  // Reason for testing: Full queues do not allow queuing
+  // Failure explanation: the queue is still allowing queuing despite being full
+  @Test
+  public void canQueueFullQueueNotAllowsQueuing() throws Exception {
+
+    // MOCK
+    when(redis.llen(any(String.class))).thenReturn(123L);
+
+    // ARRANGE
+    BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of(), 123);
+
+    // ACT
+    boolean canQueue = queue.canQueue(redis);
+
+    // ASSERT
+    assertThat(canQueue).isFalse();
+  }
 }

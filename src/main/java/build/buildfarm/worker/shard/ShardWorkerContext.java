@@ -106,6 +106,8 @@ class ShardWorkerContext implements WorkerContext {
 
   private static final Counter completedOperations =
       Counter.build().name("completed_operations").help("Completed operations.").register();
+  private static final Counter operationPollerCounter =
+      Counter.build().name("operation_poller").help("Number of operations polled.").register();
 
   private final String name;
   private final Platform platform;
@@ -252,6 +254,7 @@ class ShardWorkerContext implements WorkerContext {
                 format("%s: poller: Completed Poll for %s: Failed", name, operationName));
             onFailure.run();
           } else {
+            operationPollerCounter.inc();
             logger.log(
                 Level.INFO, format("%s: poller: Completed Poll for %s: OK", name, operationName));
           }

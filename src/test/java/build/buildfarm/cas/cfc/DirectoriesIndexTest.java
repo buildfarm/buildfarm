@@ -37,25 +37,27 @@ public class DirectoriesIndexTest {
   private final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
 
   private final String jdbcIndexUrl = "jdbc:sqlite::memory:";
-  private Path root;
-  private DirectoriesIndex directoriesIndex;
+  private final EntryPathStrategy entryPathStrategy;
+  private final DirectoriesIndex directoriesIndex;
 
   protected DirectoriesIndexTest(Path root, DirectoriesIndexType type) {
+    entryPathStrategy = new HexBucketEntryPathStrategy(root, /*levels=*/ 0);
     if (type == DirectoriesIndexType.Sqlite) {
-      directoriesIndex = new SqliteFileDirectoriesIndex(jdbcIndexUrl, root);
+      directoriesIndex = new SqliteFileDirectoriesIndex(jdbcIndexUrl, entryPathStrategy);
     } else if (type == DirectoriesIndexType.HashMap) {
-      directoriesIndex = new MemoryFileDirectoriesIndex(root);
+      directoriesIndex = new MemoryFileDirectoriesIndex(entryPathStrategy);
     } else if (type == DirectoriesIndexType.SetMultimap) {
-      directoriesIndex = new MemoryDirectoriesIndex(root);
+      directoriesIndex = new MemoryDirectoriesIndex();
     } else {
       throw new IllegalArgumentException("DirectoriesIndex type is not supported.");
     }
-    this.root = root.resolve("cache");
   }
 
   @Before
   public void setUp() throws IOException {
-    Files.createDirectories(root);
+    for (Path dir : entryPathStrategy) {
+      Files.createDirectories(dir);
+    }
   }
 
   @Test
@@ -64,7 +66,7 @@ public class DirectoriesIndexTest {
     ByteString coolBlob = ByteString.copyFromUtf8("cool content");
     Digest digest = DIGEST_UTIL.compute(coolBlob);
     String dirName = "cool_dir";
-    Path path = root.resolve(dirName);
+    Path path = entryPathStrategy.getPath(dirName);
     ImmutableList.Builder<String> entriesBuilder = new ImmutableList.Builder<>();
     entriesBuilder.add(digest.getHash());
 
@@ -87,9 +89,12 @@ public class DirectoriesIndexTest {
     // insert again to test remove directory-wise
     assertThat(entries).contains(digest.getHash());
     directoriesIndex.put(directory, entries);
-    assertThat(Files.exists(directoriesIndex.path(directory))).isTrue();
-    directoriesIndex.remove(directory);
-    assertThat(Files.notExists(directoriesIndex.path(directory))).isTrue();
+    if (directoriesIndex instanceof FileDirectoriesIndex) {
+      FileDirectoriesIndex fileDirIndex = (FileDirectoriesIndex) directoriesIndex;
+      assertThat(Files.exists(fileDirIndex.path(directory))).isTrue();
+      directoriesIndex.remove(directory);
+      assertThat(Files.notExists(fileDirIndex.path(directory))).isTrue();
+    }
     for (String entry : entries) {
       Set<Digest> digests = directoriesIndex.removeEntry(entry);
       assertThat(digests).isEmpty();
