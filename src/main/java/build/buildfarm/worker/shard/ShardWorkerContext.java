@@ -107,7 +107,7 @@ class ShardWorkerContext implements WorkerContext {
   private static final Counter completedOperations =
       Counter.build().name("completed_operations").help("Completed operations.").register();
   private static final Counter operationPollerCounter =
-          Counter.build().name("operation_poller").help("Number of operations polled.").register();
+      Counter.build().name("operation_poller").help("Number of operations polled.").register();
 
   private final String name;
   private final Platform platform;

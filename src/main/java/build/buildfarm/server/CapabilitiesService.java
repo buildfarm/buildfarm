@@ -25,7 +25,7 @@ import io.prometheus.client.Counter;
 public class CapabilitiesService extends CapabilitiesGrpc.CapabilitiesImplBase {
   // Prometheus metrics
   private static final Counter numberOfRemoteInvocations =
-          Counter.build().name("remote_invocations").help("Number of remote invocations.").register();
+      Counter.build().name("remote_invocations").help("Number of remote invocations.").register();
 
   private final Instances instances;
 
