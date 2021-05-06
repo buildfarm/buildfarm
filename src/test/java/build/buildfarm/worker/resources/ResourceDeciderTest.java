@@ -82,6 +82,54 @@ public class ResourceDeciderTest {
   }
 
   // Function under test: decideResourceLimitations
+  // Reason for testing: test that claims remains 0 because of min-cores.
+  // Failure explanation: claims were not 0 as expected
+  @Test
+  public void decideResourceLimitationsEnsureClaimsOne() throws Exception {
+
+    // ARRANGE
+    Command command =
+        Command.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("min-cores").setValue("0"))
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("max-cores").setValue("0")))
+            .build();
+
+    // ACT
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, 100);
+
+    // ASSERT
+    assertThat(limits.cpu.claimed).isEqualTo(0);
+  }
+
+  // Function under test: decideResourceLimitations
+  // Reason for testing: test that claims are set to the specified minimum
+  // Failure explanation: claims were not the same as minimum
+  @Test
+  public void decideResourceLimitationsEnsureClaimsAreMin() throws Exception {
+
+    // ARRANGE
+    Command command =
+        Command.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("min-cores").setValue("3"))
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("max-cores").setValue("6")))
+            .build();
+
+    // ACT
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, 100);
+
+    // ASSERT
+    assertThat(limits.cpu.claimed).isEqualTo(3);
+  }
+
+  // Function under test: decideResourceLimitations
   // Reason for testing: test that mem constraints can be set
   // Failure explanation: mem limits were not decided as expected
   @Test

@@ -121,4 +121,14 @@ public class ExecutionProperties {
    *     they want to run in.
    */
   public static final String CHOOSE_QUEUE = "choose-queue";
+
+  /**
+   * @field LINUX_SANDBOX
+   * @brief The exec_property to inform the executor to use bazel's linux sandbox for actions.
+   * @details In order to compare builds with and without the linux sandbox its helpful to have this
+   *     property available. For example it could be set true as a global bazelrc option and this
+   *     makes it easier to dynamically try different execution models without redeploying buildfarm
+   *     with say different execution policies.
+   */
+  public static final String LINUX_SANDBOX = "linux-sandbox";
 }
