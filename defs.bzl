@@ -39,6 +39,26 @@ IO_GRPC_MODULES = [
     "services",
 ]
 
+COM_AWS_MODULES = [
+    "autoscaling",
+    "core",
+    "ec2",
+    "secretsmanager",
+    "sns",
+    "ssm",
+]
+
+ORG_SPRING_MODULES = [
+    "spring-beans",
+    "spring-core",
+    "spring-context",
+]
+
+ORG_SPRING_BOOT_MODULES = [
+    "spring-boot-autoconfigure",
+    "spring-boot",
+]
+
 def buildfarm_init(name = "buildfarm"):
     """
     Initialize the WORKSPACE for buildfarm-related targets
@@ -47,13 +67,8 @@ def buildfarm_init(name = "buildfarm"):
       name: the name of the repository
     """
     maven_install(
-        artifacts = [
-                        "com.amazonaws:aws-java-sdk-autoscaling:1.11.729",
-                        "com.amazonaws:aws-java-sdk-core:1.11.729",
-                        "com.amazonaws:aws-java-sdk-ec2:1.11.729",
-                        "com.amazonaws:aws-java-sdk-secretsmanager:1.11.729",
-                        "com.amazonaws:aws-java-sdk-sns:1.11.729",
-                        "com.amazonaws:aws-java-sdk-ssm:1.11.729",
+        artifacts = ["com.amazonaws:aws-java-sdk-%s:1.11.729" % module for module in COM_AWS_MODULES] +
+                    [
                         "com.fasterxml.jackson.core:jackson-databind:2.9.8",
                         "com.github.ben-manes.caffeine:caffeine:2.9.0",
                         "com.github.jnr:jffi:1.2.16",
@@ -93,6 +108,9 @@ def buildfarm_init(name = "buildfarm"):
                         "org.openjdk.jmh:jmh-core:1.23",
                         "org.openjdk.jmh:jmh-generator-annprocess:1.23",
                         "org.redisson:redisson:3.13.1",
+                    ] + ["org.springframework.boot:%s:2.1.3.RELEASE" % module for module in ORG_SPRING_BOOT_MODULES] +
+                    ["org.springframework:%s:4.3.14.RELEASE" % module for module in ORG_SPRING_MODULES] +
+                    [
                         "org.threeten:threetenbp:1.3.3",
                         "org.xerial:sqlite-jdbc:3.34.0",
                     ],

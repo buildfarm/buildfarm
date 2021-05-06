@@ -24,7 +24,7 @@ java_binary(
         ":configs",
     ],
     jvm_flags = ensure_accurate_metadata(),
-    main_class = "build.buildfarm.server.BuildFarmServer",
+    main_class = "build.buildfarm.server.BuildfarmServerApplication",
     visibility = ["//visibility:public"],
     runtime_deps = [
         "//src/main/java/build/buildfarm/server",

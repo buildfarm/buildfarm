@@ -14,7 +14,6 @@
 
 package build.buildfarm.server;
 
-import static build.buildfarm.common.io.Utils.formatIOError;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.util.concurrent.MoreExecutors.shutdownAndAwaitTermination;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
@@ -29,8 +28,6 @@ import build.buildfarm.metrics.log.LogMetricsPublisher;
 import build.buildfarm.metrics.prometheus.PrometheusPublisher;
 import build.buildfarm.v1test.BuildFarmServerConfig;
 import build.buildfarm.v1test.MetricsConfig;
-import com.google.devtools.common.options.OptionsParser;
-import com.google.protobuf.TextFormat;
 import io.grpc.Server;
 import io.grpc.ServerBuilder;
 import io.grpc.ServerInterceptor;
@@ -45,6 +42,7 @@ import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -53,7 +51,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.naming.ConfigurationException;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
+import org.springframework.stereotype.Component;
 
+@Component
 public class BuildFarmServer extends LoggingMain {
   // We need to keep references to the root and netty loggers to prevent them from being garbage
   // collected, which would cause us to loose their configuration.
@@ -74,15 +77,24 @@ public class BuildFarmServer extends LoggingMain {
   private boolean stopping = false;
   private final PrometheusPublisher prometheusPublisher;
 
+  @Autowired
+  BuildFarmServerOptions options;
+
+  @Autowired
+  BuildFarmServerConfig config;
+
+  @Autowired
   public BuildFarmServer(String session, BuildFarmServerConfig config)
-      throws InterruptedException, ConfigurationException {
+          throws InterruptedException, ConfigurationException, IOException {
     this(session, ServerBuilder.forPort(config.getPort()), config);
   }
 
   public BuildFarmServer(
       String session, ServerBuilder<?> serverBuilder, BuildFarmServerConfig config)
-      throws InterruptedException, ConfigurationException {
+          throws InterruptedException, ConfigurationException, IOException {
     super("BuildFarmServer");
+    System.out.println("In constructor");
+    nettyLogger.setLevel(SEVERE);
     String defaultInstanceName = config.getDefaultInstanceName();
     instances =
         new BuildFarmInstances(session, config.getInstancesList(), defaultInstanceName, this::stop);
@@ -122,17 +134,12 @@ public class BuildFarmServer extends LoggingMain {
 
     prometheusPublisher = new PrometheusPublisher();
 
-    logger.log(Level.INFO, String.format("%s initialized", session));
-  }
+    this.start(options.publicName, config.getPrometheusConfig().getPort());
+    this.blockUntilShutdown();
+    this.stop();
+    System.exit(0);
 
-  private static BuildFarmServerConfig toBuildFarmServerConfig(
-      Readable input, BuildFarmServerOptions options) throws IOException {
-    BuildFarmServerConfig.Builder builder = BuildFarmServerConfig.newBuilder();
-    TextFormat.merge(input, builder);
-    if (options.port > 0) {
-      builder.setPort(options.port);
-    }
-    return builder.build();
+    logger.log(Level.INFO, String.format("%s initialized", session));
   }
 
   private static MetricsPublisher getMetricsPublisher(MetricsConfig metricsConfig) {
@@ -196,59 +203,8 @@ public class BuildFarmServer extends LoggingMain {
     }
   }
 
-  private static void printUsage(OptionsParser parser) {
-    logger.log(Level.INFO, "Usage: CONFIG_PATH");
-    logger.log(
-        Level.INFO,
-        parser.describeOptions(Collections.emptyMap(), OptionsParser.HelpVerbosity.LONG));
-  }
+  @EventListener(ApplicationReadyEvent.class)
+  private void init() {
 
-  /** returns success or failure */
-  static boolean serverMain(String[] args) {
-    // Only log severe log messages from Netty. Otherwise it logs warnings that look like this:
-    //
-    // 170714 08:16:28.552:WT 18 [io.grpc.netty.NettyServerHandler.onStreamError] Stream Error
-    // io.netty.handler.codec.http2.Http2Exception$StreamException: Received DATA frame for an
-    // unknown stream 11369
-    nettyLogger.setLevel(SEVERE);
-
-    OptionsParser parser = OptionsParser.newOptionsParser(BuildFarmServerOptions.class);
-    parser.parseAndExitUponError(args);
-    List<String> residue = parser.getResidue();
-    if (residue.isEmpty()) {
-      printUsage(parser);
-      return false;
-    }
-
-    Path configPath = Paths.get(residue.get(0));
-    BuildFarmServerOptions options = parser.getOptions(BuildFarmServerOptions.class);
-
-    String session = "buildfarm-server";
-    if (!options.publicName.isEmpty()) {
-      session += "-" + options.publicName;
-    }
-    session += "-" + UUID.randomUUID();
-    BuildFarmServer server;
-    try (InputStream configInputStream = Files.newInputStream(configPath)) {
-      BuildFarmServerConfig config =
-          toBuildFarmServerConfig(new InputStreamReader(configInputStream), options);
-      server = new BuildFarmServer(session, config);
-      configInputStream.close();
-      server.start(options.publicName, config.getPrometheusConfig().getPort());
-      server.blockUntilShutdown();
-      server.stop();
-      return true;
-    } catch (IOException e) {
-      System.err.println("error: " + formatIOError(e));
-    } catch (ConfigurationException e) {
-      System.err.println("error: " + e.getMessage());
-    } catch (InterruptedException e) {
-      System.err.println("error: interrupted");
-    }
-    return false;
-  }
-
-  public static void main(String[] args) {
-    System.exit(serverMain(args) ? 0 : 1);
   }
 }
