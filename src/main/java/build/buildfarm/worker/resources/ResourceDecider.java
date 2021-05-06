@@ -207,16 +207,6 @@ public class ResourceDecider {
   }
 
   /**
-   * @brief Store the property for blocking network.
-   * @details Parses and stores a boolean.
-   * @param limits Current limits to apply changes to.
-   * @param property The property to store.
-   */
-  private static void storeBlockNetwork(ResourceLimits limits, Property property) {
-    limits.network.blockNetwork = Boolean.parseBoolean(property.getValue());
-  }
-
-  /**
    * @brief Store the property for env vars.
    * @details Parses the property as json.
    * @param limits Current limits to apply changes to.
