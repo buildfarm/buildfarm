@@ -496,6 +496,7 @@ public class MemoryInstance extends AbstractServerInstance {
     return null;
   }
 
+  @SuppressWarnings({"ProtoBuilderReturnValueIgnored", "ReturnValueIgnored"})
   private Action getActionForTimeoutMonitor(
       Operation operation, com.google.rpc.Status.Builder status) throws InterruptedException {
     Digest actionDigest = expectActionDigest(operation);

@@ -42,19 +42,19 @@ public class MemLimits {
    * @brief The minimum memory required.
    * @details Client can suggest this though exec_properties.
    */
-  public int min = 0;
+  public long min = 0;
 
   /**
    * @field max
    * @brief The maximum memory required.
    * @details Client can suggest this though exec_properties.
    */
-  public int max = 0;
+  public long max = 0;
 
   /**
    * @field claimed
    * @brief The amount of memory actually claimed for the action.
    * @details This will be in the range of (min,max) when limited.
    */
-  public int claimed = 0;
+  public long claimed = 0;
 }

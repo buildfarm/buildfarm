@@ -30,6 +30,14 @@ import java.util.Map;
 public class ResourceLimits {
 
   /**
+   * @field useLinuxSandbox
+   * @brief Whether to use bazel's linux sandbox as an execution wrapper.
+   * @details Other resource limits will be translated into the appropriate CLI arguments for the
+   *     sandbox.
+   */
+  public boolean useLinuxSandbox = false;
+
+  /**
    * @field cpu
    * @brief Resource limitations on CPUs.
    * @details Decides specific CPU limitations and whether to apply them for a given action.

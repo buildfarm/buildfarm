@@ -1,4 +1,5 @@
 load("@com_github_bazelbuild_buildtools//buildifier:def.bzl", "buildifier")
+load("@io_bazel_rules_docker//java:image.bzl", "java_image")
 
 buildifier(
     name = "buildifier",
@@ -37,4 +38,38 @@ cc_binary(
         "//config:windows": ["as-nobody-windows.c"],
         "//conditions:default": ["as-nobody.c"],
     }),
+)
+
+# Docker images for buildfarm components
+java_image(
+    name = "buildfarm-server",
+    base = "@amazon_corretto_java_image_base//image",
+    classpath_resources = [
+        "//src/main/java/build/buildfarm:configs",
+    ],
+    main_class = "build.buildfarm.server.BuildFarmServer",
+    tags = ["container"],
+    runtime_deps = [
+        "//src/main/java/build/buildfarm/server",
+    ],
+)
+
+java_image(
+    name = "buildfarm-shard-worker",
+    base = "@ubuntu-bionic//image",
+    classpath_resources = [
+        "//src/main/java/build/buildfarm:configs",
+    ],
+    entrypoint = [
+        "/app/buildfarm/tini",
+        "--",
+    ],
+    main_class = "build.buildfarm.worker.shard.Worker",
+    tags = ["container"],
+    runtime_deps = [
+        ":linux-sandbox.binary",
+        ":process-wrapper.binary",
+        ":tini.binary",
+        "//src/main/java/build/buildfarm/worker/shard",
+    ],
 )
