@@ -79,4 +79,14 @@ public class ResourceLimits {
    * @details This is a debugging flag and is not intended for normal execution.
    */
   public boolean debugAfterExecution = false;
+
+  /**
+   * @field debugTestsOnly
+   * @brief If the user only wants to get debug information for test actions.
+   * @details When evaluating tests, regular actions are often needed to rebuild the test target
+   *     first. This can cause the build to fail with debug information before evaluating the test
+   *     action. To make it simpler, we can request debug information for tests only and not worry
+   *     about getting debug information for regular build actions.
+   */
+  public boolean debugTestsOnly = true;
 }

@@ -103,6 +103,15 @@ public class ExecutionProperties {
   public static final String DEBUG_AFTER_EXECUTION = "debug-after-execution";
 
   /**
+   * @field DEBUG_TESTS_ONLY
+   * @brief The exec_property and platform property name for indicating whether debug information
+   *     should only be given for test actions.
+   * @details This is intended to be used interactively to debug remote executions. The key value
+   *     should be a boolean.
+   */
+  public static final String DEBUG_TESTS_ONLY = "debug-tests-only";
+
+  /**
    * @field CHOOSE_QUEUE
    * @brief The exec_property to allow directly matching with a queue.
    * @details This is to support a paradigm where actions want to specifically request the queue to

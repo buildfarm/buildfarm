@@ -15,6 +15,7 @@
 package build.buildfarm.worker;
 
 import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
 import build.bazel.remote.execution.v2.Platform.Property;
 import build.buildfarm.common.ExecutionProperties;
 import com.google.common.collect.Iterables;
@@ -56,6 +57,20 @@ public class ResourceDecider {
     if (onlyMulticoreTests && !commandIsTest(command)) {
       limits.cpu.min = 1;
       limits.cpu.max = 1;
+    }
+
+    // perform resource overrides based on test size
+    TestSizeResourceOverrides overrides = new TestSizeResourceOverrides();
+    if (overrides.enabled && commandIsTest(command)) {
+      TestSizeResourceOverride override = deduceSizeOverride(command, overrides);
+      limits.cpu.min = override.coreMin;
+      limits.cpu.max = override.coreMax;
+    }
+
+    // adjust debugging based on whether its a test
+    if (limits.debugTestsOnly && !commandIsTest(command)) {
+      limits.debugBeforeExecution = false;
+      limits.debugAfterExecution = false;
     }
 
     // Should we limit the cores of the action during execution? by default, no.
@@ -122,6 +137,8 @@ public class ResourceDecider {
       storeBeforeExecutionDebug(limits, property);
     } else if (property.getName().equals(ExecutionProperties.DEBUG_AFTER_EXECUTION)) {
       storeAfterExecutionDebug(limits, property);
+    } else if (property.getName().equals(ExecutionProperties.DEBUG_TESTS_ONLY)) {
+      storeDebugTestsOnly(limits, property);
     }
   }
 
@@ -245,6 +262,16 @@ public class ResourceDecider {
   }
 
   /**
+   * @brief Store the property for debugging tests only.
+   * @details Parses and stores a boolean.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
+   */
+  private static void storeDebugTestsOnly(ResourceLimits limits, Property property) {
+    limits.debugTestsOnly = Boolean.parseBoolean(property.getValue());
+  }
+
+  /**
    * @brief Resolve any templates found in the env variables.
    * @details This assumes the other values that will be resolving the templates have already been
    *     decided.
@@ -273,5 +300,34 @@ public class ResourceDecider {
     return Iterables.any(
         command.getEnvironmentVariablesList(),
         (envVar) -> envVar.getName().equals("XML_OUTPUT_FILE"));
+  }
+
+  /**
+   * @brief Get resource overrides by analyzing the test command for it's "test size".
+   * @details test size is defined as an environment variable.
+   * @param command The test command to derive the size of.
+   * @return The resource overrides corresponding to the command's test size.
+   * @note Suggested return identifier: overrides.
+   */
+  private static TestSizeResourceOverride deduceSizeOverride(
+      Command command, TestSizeResourceOverrides overrides) {
+    for (EnvironmentVariable envVar : command.getEnvironmentVariablesList()) {
+      if (envVar.getName().equals("TEST_SIZE")) {
+        if (envVar.getValue().equals("small")) {
+          return overrides.small;
+        }
+        if (envVar.getValue().equals("medium")) {
+          return overrides.medium;
+        }
+        if (envVar.getValue().equals("large")) {
+          return overrides.large;
+        }
+        if (envVar.getValue().equals("enormous")) {
+          return overrides.enormous;
+        }
+      }
+    }
+
+    return overrides.unknown;
   }
 }
