@@ -106,6 +106,54 @@ public class ResourceDeciderTest {
   }
 
   // Function under test: decideResourceLimitations
+  // Reason for testing: test that we limit cpu is globalLimitExecution is given.
+  // Failure explanation: expected limit flag set.
+  @Test
+  public void decideResourceLimitationsEnsureLimitGlobalSet() throws Exception {
+
+    // ARRANGE
+    Command command =
+        Command.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("min-cores").setValue("0"))
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("max-cores").setValue("0")))
+            .build();
+
+    // ACT
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, true, 100);
+
+    // ASSERT
+    assertThat(limits.cpu.limit).isTrue();
+  }
+
+  // Function under test: decideResourceLimitations
+  // Reason for testing: test that we do not limit cpu is globalLimitExecution is false.
+  // Failure explanation: Did not expect limit flag set.
+  @Test
+  public void decideResourceLimitationsEnsureNoLimitNoGlobalSet() throws Exception {
+
+    // ARRANGE
+    Command command =
+        Command.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("min-cores").setValue("0"))
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("max-cores").setValue("0")))
+            .build();
+
+    // ACT
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, false, 100);
+
+    // ASSERT
+    assertThat(limits.cpu.limit).isFalse();
+  }
+
+  // Function under test: decideResourceLimitations
   // Reason for testing: test that claims are set to the specified minimum
   // Failure explanation: claims were not the same as minimum
   @Test
