@@ -37,12 +37,16 @@ public class ResourceDecider {
    *     global buildfarm configuration.
    * @param command The command to decide resource limitations for.
    * @param onlyMulticoreTests Only allow tests to be multicore.
+   * @param limitGlobalExecution Whether cpu limiting should be explicitly performed.
    * @param executeStageWidth The maximum amount of cores available for the operation.
    * @return Default resource limits.
    * @note Suggested return identifier: resourceLimits.
    */
   public static ResourceLimits decideResourceLimitations(
-      Command command, boolean onlyMulticoreTests, int executeStageWidth) {
+      Command command,
+      boolean onlyMulticoreTests,
+      boolean limitGlobalExecution,
+      int executeStageWidth) {
     ResourceLimits limits = new ResourceLimits();
 
     command
@@ -76,7 +80,7 @@ public class ResourceDecider {
     // Should we limit the cores of the action during execution? by default, no.
     // If the action has suggested core restrictions on itself, then yes.
     // Claim minimal core amount with regards to execute stage width.
-    limits.cpu.limit = (limits.cpu.min > 0 || limits.cpu.max > 0);
+    limits.cpu.limit = (limits.cpu.min > 0 || limits.cpu.max > 0) || limitGlobalExecution;
     limits.cpu.claimed = Math.min(limits.cpu.min, executeStageWidth);
 
     // Should we limit the memory of the action during execution? by default, no.
