@@ -879,7 +879,7 @@ class ShardWorkerContext implements WorkerContext {
   public ResourceLimits commandExecutionSettings(Command command) {
     ResourceLimits limits =
         ResourceDecider.decideResourceLimitations(
-            command, onlyMulticoreTests, getExecuteStageWidth());
+            command, onlyMulticoreTests, limitGlobalExecution, getExecuteStageWidth());
     return limits;
   }
 
@@ -889,7 +889,7 @@ class ShardWorkerContext implements WorkerContext {
     if (limitExecution) {
       ResourceLimits limits =
           ResourceDecider.decideResourceLimitations(
-              command, onlyMulticoreTests, getExecuteStageWidth());
+              command, onlyMulticoreTests, limitGlobalExecution, getExecuteStageWidth());
 
       return limitSpecifiedExecution(limits, operationName, arguments);
     }
@@ -954,7 +954,7 @@ class ShardWorkerContext implements WorkerContext {
     }
 
     // Decide the CLI for running under cgroups
-    if (limitGlobalExecution || !usedGroups.isEmpty()) {
+    if (!usedGroups.isEmpty()) {
       arguments.add(
           "/usr/bin/cgexec", "-g", String.join(",", usedGroups) + ":" + group.getHierarchy());
     }
