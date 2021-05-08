@@ -49,7 +49,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, false, 100);
 
     // ASSERT
     assertThat(limits.cpu.min).isEqualTo(7);
@@ -74,7 +74,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.cpu.min).isEqualTo(1);
@@ -99,7 +99,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, false, 100);
 
     // ASSERT
     assertThat(limits.cpu.claimed).isEqualTo(0);
@@ -123,7 +123,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, false, 100);
 
     // ASSERT
     assertThat(limits.cpu.claimed).isEqualTo(3);
@@ -146,7 +146,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, false, 100);
 
     // ASSERT
     assertThat(limits.mem.min).isEqualTo(5);
@@ -164,7 +164,7 @@ public class ResourceDeciderTest {
     Command command = Command.newBuilder().build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.isEmpty()).isTrue();
@@ -186,7 +186,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.isEmpty()).isTrue();
@@ -211,7 +211,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(1);
@@ -238,7 +238,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(2);
@@ -267,7 +267,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(0);
@@ -296,7 +296,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, false, 100);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(2);
@@ -323,7 +323,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(1);
@@ -351,7 +351,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(2);
@@ -379,7 +379,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(1);
@@ -408,7 +408,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.debugBeforeExecution).isTrue();
@@ -435,7 +435,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.debugAfterExecution).isTrue();
@@ -462,7 +462,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.debugBeforeExecution).isFalse();
