@@ -744,6 +744,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       this.size = size;
     }
 
+    // available to refer to replicable stream
+    CancellableOutputStream delegate() {
+      return out;
+    }
+
     @Override
     public void write(int b) throws IOException {
       if (closed) {
@@ -785,7 +790,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     Write write =
         new Write() {
           CancellableOutputStream out = null;
-          Path path = null;
           boolean isReset = false;
           SettableFuture<Void> closedFuture = null;
           long fileCommittedSize = -1;
@@ -793,11 +797,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           @Override
           public synchronized void reset() {
             try {
+              Path path = out.getPath();
               if (out != null) {
                 out.cancel();
               } else if (path != null && Files.exists(path)) {
                 Files.delete(path);
-                path = null;
               }
             } catch (IOException e) {
               logger.log(
@@ -888,44 +892,32 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                 throw new IOException(e);
               }
             }
-            closedFuture = SettableFuture.create();
+            SettableFuture<Void> outClosedFuture = SettableFuture.create();
+            UniqueWriteOutputStream uniqueOut =
+                createUniqueWriteOutput(
+                    out,
+                    key.getDigest(),
+                    UUID.fromString(key.getIdentifier()),
+                    () -> outClosedFuture.set(null),
+                    this::isComplete,
+                    isReset);
+            commitOpenState(uniqueOut.delegate(), outClosedFuture);
+            return uniqueOut;
+          }
 
-            if (out == null) {
-              out =
-                  newOutput(
-                      key.getDigest(),
-                      UUID.fromString(key.getIdentifier()),
-                      () -> closedFuture.set(null),
-                      this::isComplete,
-                      isReset);
-            }
-            if (out == null) {
-              // duplicate output stream
-              out =
-                  new CancellableOutputStream(nullOutputStream()) {
-                    @Override
-                    public long getWritten() {
-                      return key.getDigest().getSizeBytes();
-                    }
+          private void commitOpenState(
+              CancellableOutputStream out, SettableFuture<Void> closedFuture) {
+            // transition the Write to an open state, and modify all internal state required
+            // atomically
+            // this function must. not. throw.
 
-                    @Override
-                    public void cancel() {}
-                  };
-            } else {
-              path = out.getPath();
-            }
+            this.out = out;
+            this.closedFuture = closedFuture;
             // they will likely write to this, so we can no longer assume isReset.
             // might want to subscribe to a write event on the stream
             isReset = false;
             // our cached file committed size is now invalid
             fileCommittedSize = -1;
-
-            // this stream is uniquely assigned to the consumer, can be closed,
-            // and will properly reject any subsequent write activity with an
-            // exception. It will not close the underlying stream unless we have
-            // reached our digest point (or beyond).
-            return new UniqueWriteOutputStream(
-                out, () -> closedFuture.set(null), key.getDigest().getSizeBytes());
           }
 
           @Override
@@ -935,6 +927,43 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         };
     write.getFuture().addListener(write::reset, directExecutor());
     return write;
+  }
+
+  UniqueWriteOutputStream createUniqueWriteOutput(
+      CancellableOutputStream out,
+      Digest digest,
+      UUID uuid,
+      Runnable onClosed,
+      BooleanSupplier isComplete,
+      boolean isReset)
+      throws IOException {
+    if (out == null) {
+      out = newOutput(digest, uuid, onClosed, isComplete, isReset);
+    }
+    if (out == null) {
+      // duplicate output stream
+      out =
+          new CancellableOutputStream(nullOutputStream()) {
+            @Override
+            public long getWritten() {
+              return digest.getSizeBytes();
+            }
+
+            @Override
+            public void cancel() {}
+
+            @Override
+            public Path getPath() {
+              return null;
+            }
+          };
+    }
+
+    // this stream is uniquely assigned to the consumer, can be closed,
+    // and will properly reject any subsequent write activity with an
+    // exception. It will not close the underlying stream unless we have
+    // reached our digest point (or beyond).
+    return new UniqueWriteOutputStream(out, onClosed, digest.getSizeBytes());
   }
 
   CancellableOutputStream newOutput(
