@@ -927,6 +927,12 @@ class ShardWorkerContext implements WorkerContext {
       usedGroups.add(group.getMem().getName());
     }
 
+    // Decide the CLI for running under cgroups
+    if (!usedGroups.isEmpty()) {
+      arguments.add(
+          "/usr/bin/cgexec", "-g", String.join(",", usedGroups) + ":" + group.getHierarchy());
+    }
+
     // Possibly set network restrictions.
     // This is not the ideal implementation of block-network.
     // For now, without the linux-sandbox, we will unshare the network namespace.
@@ -951,12 +957,6 @@ class ShardWorkerContext implements WorkerContext {
         arguments.add("-N");
       }
       arguments.add("--");
-    }
-
-    // Decide the CLI for running under cgroups
-    if (!usedGroups.isEmpty()) {
-      arguments.add(
-          "/usr/bin/cgexec", "-g", String.join(",", usedGroups) + ":" + group.getHierarchy());
     }
 
     // The executor expects a single IOResource.
