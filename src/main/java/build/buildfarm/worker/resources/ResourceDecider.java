@@ -63,6 +63,11 @@ public class ResourceDecider {
       limits.cpu.max = 1;
     }
 
+    if (limitGlobalExecution) {
+      limits.cpu.min = Math.max(limits.cpu.min, 1);
+      limits.cpu.max = Math.max(limits.cpu.max, 1);
+    }
+
     // perform resource overrides based on test size
     TestSizeResourceOverrides overrides = new TestSizeResourceOverrides();
     if (overrides.enabled && commandIsTest(command)) {
