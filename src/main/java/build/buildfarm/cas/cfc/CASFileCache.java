@@ -797,11 +797,8 @@ public abstract class CASFileCache implements ContentAddressableStorage {
           @Override
           public synchronized void reset() {
             try {
-              Path path = out.getPath();
               if (out != null) {
                 out.cancel();
-              } else if (path != null && Files.exists(path)) {
-                Files.delete(path);
               }
             } catch (IOException e) {
               logger.log(
