@@ -46,6 +46,14 @@ public class ResourceLimits {
   public boolean useExecutionPolicies = true;
 
   /**
+   * @field fakeUsername
+   * @brief Whether the executor should fake the username of the action process.
+   * @details This can be faked by using the "as-nobody" wrapper or fakeUsername in the
+   *     linux-sandbox.
+   */
+  public boolean fakeUsername = false;
+
+  /**
    * @field cpu
    * @brief Resource limitations on CPUs.
    * @details Decides specific CPU limitations and whether to apply them for a given action.

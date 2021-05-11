@@ -143,6 +143,10 @@ public class ResourceDecider {
       storeBlockNetwork(limits, property);
     }
 
+    if (property.getName().equals(ExecutionProperties.AS_NOBODY)) {
+      storeAsNobody(limits, property);
+    }
+
     // handle env properties
     else if (property.getName().equals(ExecutionProperties.ENV_VARS)) {
       storeEnvVars(limits, property);
@@ -230,6 +234,16 @@ public class ResourceDecider {
    */
   private static void storeBlockNetwork(ResourceLimits limits, Property property) {
     limits.network.blockNetwork = Boolean.parseBoolean(property.getValue());
+  }
+
+  /**
+   * @brief Store the property for faking username.
+   * @details Parses and stores a boolean.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
+   */
+  private static void storeAsNobody(ResourceLimits limits, Property property) {
+    limits.fakeUsername = Boolean.parseBoolean(property.getValue());
   }
 
   /**

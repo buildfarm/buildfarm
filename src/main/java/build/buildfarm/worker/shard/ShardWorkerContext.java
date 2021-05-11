@@ -954,11 +954,16 @@ class ShardWorkerContext implements WorkerContext {
       // Construct the CLI options for this binary.
       LinuxSandboxOptions options = new LinuxSandboxOptions();
       options.createNetns = limits.network.blockNetwork;
+      options.fakeUsername = limits.fakeUsername;
 
       // Pass flags based on the sandbox CLI options.
       if (options.createNetns) {
         arguments.add("-N");
       }
+      if (options.fakeUsername) {
+        arguments.add("-U");
+      }
+
       arguments.add("--");
     }
 
