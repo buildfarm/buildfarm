@@ -94,6 +94,15 @@ public class ResourceDecider {
     limits.mem.limit = (limits.mem.min > 0 || limits.mem.max > 0);
     limits.mem.claimed = limits.mem.min;
 
+    // Avoid using the existing execution policies when using the linux sandbox.
+    // Using these execution policies under the sandbox do not have the right permissions to work.
+    // For the time being, we want to experiment with dynamically choosing the sandbox-
+    // without affecting current configurations or relying on specific deployments.
+    // This will dynamically skip using the worker configured execution policies.
+    if (limits.useLinuxSandbox) {
+      limits.useExecutionPolicies = false;
+    }
+
     // we choose to resolve variables after the other variable values have been decided
     resolveEnvironmentVariables(limits);
 

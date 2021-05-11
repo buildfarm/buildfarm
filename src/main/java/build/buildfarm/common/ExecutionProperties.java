@@ -131,4 +131,26 @@ public class ExecutionProperties {
    *     with say different execution policies.
    */
   public static final String LINUX_SANDBOX = "linux-sandbox";
+
+  /**
+   * @field AS_NOBODY
+   * @brief The exec_property to inform the executor to run the action as a 'nobody' user.
+   * @details The "as nobody" functionality is supported by the bazel sandbox. This execution
+   *     property may be fulfilled through the sandbox or a standalone program. This execution
+   *     wrapper was previously used as a configured execution policy, but due to its involvement
+   *     with the sandbox, we find it better to make its usage explicit in buildfarm and easier to
+   *     test dynamically.
+   */
+  public static final String AS_NOBODY = "as-nobody";
+
+  /**
+   * @field PROCESS_WRAPPER
+   * @brief The exec_property to inform the executor to run the action with the process-wrapper.
+   * @details The "as nobody" functionality is supported by the bazel sandbox. This execution
+   *     property may be fulfilled through the sandbox or a standalone program. This execution
+   *     wrapper was previously used as a configured execution policy, but due to its involvement
+   *     with the sandbox, we find it better to make its usage explicit in buildfarm and easier to
+   *     test dynamically.
+   */
+  public static final String PROCESS_WRAPPER = "process-wrapper";
 }
