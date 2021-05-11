@@ -1438,7 +1438,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               if (basename.equals(digest.getHash() + "_" + digest.getSizeBytes() + "_dir")) {
                 Path legacyPath = path;
                 dirPath = getDirectoryPath(digest);
-                Files.move(legacyPath, dirPath);
+                if (Files.exists(dirPath)) {
+                  // destroy this directory if the destination already exists
+                  digest = null;
+                } else {
+                  Files.move(legacyPath, dirPath);
+                }
               }
               // end legacy support, drop modified dirPath
 
@@ -1452,7 +1457,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                 }
               }
             } catch (Exception e) {
-              logger.log(Level.SEVERE, "error reading file " + path.toString(), e);
+              logger.log(Level.SEVERE, "error processing directory " + path.toString(), e);
             }
           });
     }
