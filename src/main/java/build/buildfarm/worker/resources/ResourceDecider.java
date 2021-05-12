@@ -143,6 +143,7 @@ public class ResourceDecider {
       storeBlockNetwork(limits, property);
     }
 
+    // handle user properties
     if (property.getName().equals(ExecutionProperties.AS_NOBODY)) {
       storeAsNobody(limits, property);
     }
