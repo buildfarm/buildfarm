@@ -94,6 +94,15 @@ public class ResourceDecider {
     limits.mem.limit = (limits.mem.min > 0 || limits.mem.max > 0);
     limits.mem.claimed = limits.mem.min;
 
+    // Avoid using the existing execution policies when using the linux sandbox.
+    // Using these execution policies under the sandbox do not have the right permissions to work.
+    // For the time being, we want to experiment with dynamically choosing the sandbox-
+    // without affecting current configurations or relying on specific deployments.
+    // This will dynamically skip using the worker configured execution policies.
+    if (limits.useLinuxSandbox) {
+      limits.useExecutionPolicies = false;
+    }
+
     // we choose to resolve variables after the other variable values have been decided
     resolveEnvironmentVariables(limits);
 
@@ -132,6 +141,11 @@ public class ResourceDecider {
     // handle network properties
     if (property.getName().equals(ExecutionProperties.BLOCK_NETWORK)) {
       storeBlockNetwork(limits, property);
+    }
+
+    // handle user properties
+    if (property.getName().equals(ExecutionProperties.AS_NOBODY)) {
+      storeAsNobody(limits, property);
     }
 
     // handle env properties
@@ -221,6 +235,16 @@ public class ResourceDecider {
    */
   private static void storeBlockNetwork(ResourceLimits limits, Property property) {
     limits.network.blockNetwork = Boolean.parseBoolean(property.getValue());
+  }
+
+  /**
+   * @brief Store the property for faking username.
+   * @details Parses and stores a boolean.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
+   */
+  private static void storeAsNobody(ResourceLimits limits, Property property) {
+    limits.fakeUsername = Boolean.parseBoolean(property.getValue());
   }
 
   /**
