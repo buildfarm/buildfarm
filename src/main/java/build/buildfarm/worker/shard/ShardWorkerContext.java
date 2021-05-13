@@ -37,7 +37,9 @@ import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
+import build.buildfarm.common.ExecutionWrappers;
 import build.buildfarm.common.InputStreamFactory;
+import build.buildfarm.common.LinuxSandboxOptions;
 import build.buildfarm.common.Poller;
 import build.buildfarm.common.Size;
 import build.buildfarm.common.Write;
@@ -59,6 +61,7 @@ import build.buildfarm.worker.RetryingMatchListener;
 import build.buildfarm.worker.WorkerContext;
 import build.buildfarm.worker.cgroup.Cpu;
 import build.buildfarm.worker.cgroup.Group;
+import build.buildfarm.worker.cgroup.Mem;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
@@ -105,6 +108,8 @@ class ShardWorkerContext implements WorkerContext {
 
   private static final Counter completedOperations =
       Counter.build().name("completed_operations").help("Completed operations.").register();
+  private static final Counter operationPollerCounter =
+      Counter.build().name("operation_poller").help("Number of operations polled.").register();
 
   private final String name;
   private final Platform platform;
@@ -251,6 +256,7 @@ class ShardWorkerContext implements WorkerContext {
                 format("%s: poller: Completed Poll for %s: Failed", name, operationName));
             onFailure.run();
           } else {
+            operationPollerCounter.inc();
             logger.log(
                 Level.INFO, format("%s: poller: Completed Poll for %s: OK", name, operationName));
           }
@@ -874,7 +880,7 @@ class ShardWorkerContext implements WorkerContext {
   public ResourceLimits commandExecutionSettings(Command command) {
     ResourceLimits limits =
         ResourceDecider.decideResourceLimitations(
-            command, onlyMulticoreTests, getExecuteStageWidth());
+            command, onlyMulticoreTests, limitGlobalExecution, getExecuteStageWidth());
     return limits;
   }
 
@@ -884,7 +890,7 @@ class ShardWorkerContext implements WorkerContext {
     if (limitExecution) {
       ResourceLimits limits =
           ResourceDecider.decideResourceLimitations(
-              command, onlyMulticoreTests, getExecuteStageWidth());
+              command, onlyMulticoreTests, limitGlobalExecution, getExecuteStageWidth());
 
       return limitSpecifiedExecution(limits, operationName, arguments);
     }
@@ -901,53 +907,134 @@ class ShardWorkerContext implements WorkerContext {
 
   IOResource limitSpecifiedExecution(
       ResourceLimits limits, String operationName, ImmutableList.Builder<String> arguments) {
-    final IOResource resource;
-    final Group group;
-    if (limits.cpu.min > 0 || limits.cpu.max > 0) {
-      String operationId = getOperationId(operationName);
-      group = operationsGroup.getChild(operationId);
-      Cpu cpu = group.getCpu();
+
+    // The decision to apply resource restrictions has already been decided within the
+    // ResourceLimits object. We apply the cgroup settings to file resources
+    // and collect group names to use on the CLI.
+    String operationId = getOperationId(operationName);
+    final Group group = operationsGroup.getChild(operationId);
+    ArrayList<IOResource> resources = new ArrayList<IOResource>();
+    ArrayList<String> usedGroups = new ArrayList<String>();
+
+    // Possibly set core restrictions.
+    if (limits.cpu.limit) {
+      applyCpuLimits(group, limits, resources);
+      usedGroups.add(group.getCpu().getName());
+    }
+
+    // Possibly set memory restrictions.
+    if (limits.mem.limit) {
+      applyMemLimits(group, limits, resources);
+      usedGroups.add(group.getMem().getName());
+    }
+
+    // Decide the CLI for running under cgroups
+    if (!usedGroups.isEmpty()) {
+      arguments.add(
+          ExecutionWrappers.CGROUPS,
+          "-g",
+          String.join(",", usedGroups) + ":" + group.getHierarchy());
+    }
+
+    // Possibly set network restrictions.
+    // This is not the ideal implementation of block-network.
+    // For now, without the linux-sandbox, we will unshare the network namespace.
+    if (limits.network.blockNetwork && !limits.useLinuxSandbox) {
+      arguments.add(ExecutionWrappers.UNSHARE, "-n", "-r");
+    }
+
+    // Decide the CLI for running the sandbox
+    // For reference on how bazel spawns the sandbox:
+    // https://github.com/bazelbuild/bazel/blob/ddf302e2798be28bb67e32d5c2fc9c73a6a1fbf4/src/main/java/com/google/devtools/build/lib/sandbox/LinuxSandboxUtil.java#L183
+    if (limits.useLinuxSandbox) {
+
+      // Choose the sandbox which is built and deployed with the worker image.
+      arguments.add(ExecutionWrappers.LINUX_SANDBOX);
+
+      // Construct the CLI options for this binary.
+      LinuxSandboxOptions options = new LinuxSandboxOptions();
+      options.createNetns = limits.network.blockNetwork;
+      options.fakeUsername = limits.fakeUsername;
+
+      // Pass flags based on the sandbox CLI options.
+      if (options.createNetns) {
+        arguments.add("-N");
+      }
+      if (options.fakeUsername) {
+        arguments.add("-U");
+      }
+
+      arguments.add("--");
+    }
+
+    // The executor expects a single IOResource.
+    // However, we may have multiple IOResources due to using multiple cgroup groups.
+    // We construct a single IOResource to account for this.
+    return combineResources(resources);
+  }
+
+  private void applyCpuLimits(Group group, ResourceLimits limits, ArrayList<IOResource> resources) {
+
+    Cpu cpu = group.getCpu();
+    try {
+      cpu.close();
+      if (limits.cpu.max > 0) {
+        /* period of 100ms */
+        cpu.setCFSPeriod(100000);
+        cpu.setCFSQuota(limits.cpu.max * 100000);
+      }
+      if (limits.cpu.min > 0) {
+        cpu.setShares(limits.cpu.min * 1024);
+      }
+    } catch (IOException e) {
+      // clear interrupt flag if set due to ClosedByInterruptException
+      boolean wasInterrupted = Thread.interrupted();
       try {
         cpu.close();
-        if (limits.cpu.max > 0) {
-          /* period of 100ms */
-          cpu.setCFSPeriod(100000);
-          cpu.setCFSQuota(limits.cpu.max * 100000);
-        }
-        if (limits.cpu.min > 0) {
-          cpu.setShares(limits.cpu.min * 1024);
-        }
-      } catch (IOException e) {
-        // clear interrupt flag if set due to ClosedByInterruptException
-        boolean wasInterrupted = Thread.interrupted();
-        try {
-          cpu.close();
-        } catch (IOException closeEx) {
-          e.addSuppressed(closeEx);
-        }
-        if (wasInterrupted) {
-          Thread.currentThread().interrupt();
-        }
-        throw new RuntimeException(e);
+      } catch (IOException closeEx) {
+        e.addSuppressed(closeEx);
       }
-      resource = cpu;
-    } else {
-      group = operationsGroup;
-      resource =
-          new IOResource() {
-            @Override
-            public void close() {}
+      if (wasInterrupted) {
+        Thread.currentThread().interrupt();
+      }
+      throw new RuntimeException(e);
+    }
+    resources.add(cpu);
+  }
 
-            @Override
-            public boolean isReferenced() {
-              // no way to isolate references to this shared group
-              return false;
-            }
-          };
+  private void applyMemLimits(Group group, ResourceLimits limits, ArrayList<IOResource> resources) {
+
+    try {
+      Mem mem = group.getMem();
+      mem.setMemoryLimit(limits.mem.claimed);
+      resources.add(mem);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
     }
-    if (limitGlobalExecution || group != operationsGroup) {
-      arguments.add("/usr/bin/cgexec", "-g", group.getCpu().getName() + ":" + group.getHierarchy());
-    }
-    return resource;
+  }
+
+  private IOResource combineResources(ArrayList<IOResource> resources) {
+    return new IOResource() {
+      @Override
+      public void close() {
+        for (IOResource resource : resources) {
+          try {
+            resource.close();
+          } catch (IOException e) {
+            throw new RuntimeException(e);
+          }
+        }
+      }
+
+      @Override
+      public boolean isReferenced() {
+        for (IOResource resource : resources) {
+          if (resource.isReferenced()) {
+            return true;
+          }
+        }
+        return false;
+      }
+    };
   }
 }

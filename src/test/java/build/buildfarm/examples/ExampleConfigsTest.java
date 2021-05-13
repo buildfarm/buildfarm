@@ -31,6 +31,7 @@ import org.junit.runners.JUnit4;
 
 // Test that example config files can load properly
 @RunWith(JUnit4.class)
+@SuppressWarnings({"ProtoBuilderReturnValueIgnored", "ReturnValueIgnored"})
 public class ExampleConfigsTest {
 
   @Before

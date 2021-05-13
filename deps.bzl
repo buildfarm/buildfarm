@@ -20,9 +20,9 @@ def archive_dependencies(third_party):
         # Needed for "well-known protos" and @com_google_protobuf//:protoc.
         {
             "name": "com_google_protobuf",
-            "sha256": "1c744a6a1f2c901e68c5521bc275e22bdc66256eeb605c2781923365b7087e5f",
-            "strip_prefix": "protobuf-3.13.0",
-            "urls": ["https://github.com/protocolbuffers/protobuf/archive/v3.13.0.zip"],
+            "sha256": "dd513a79c7d7e45cbaeaf7655289f78fd6b806e52dbbd7018ef4e3cf5cff697a",
+            "strip_prefix": "protobuf-3.15.8",
+            "urls": ["https://github.com/protocolbuffers/protobuf/archive/v3.15.8.zip"],
         },
         {
             "name": "com_github_bazelbuild_buildtools",
@@ -34,10 +34,9 @@ def archive_dependencies(third_party):
         # Needed for @grpc_java//compiler:grpc_java_plugin.
         {
             "name": "io_grpc_grpc_java",
-            "patch_args": ["-p1"],
-            "sha256": "2705d274ce79b324f3520414202481a09640b4b14e58d3124841b3318d9b6e19",
-            "strip_prefix": "grpc-java-1.32.1",
-            "urls": ["https://github.com/grpc/grpc-java/archive/v1.32.1.zip"],
+            "sha256": "416f94c976b5f2d0625e9c64391aa10520fa05e6f618803e4b7fc85098b02078",
+            "strip_prefix": "grpc-java-1.37.0",
+            "urls": ["https://github.com/grpc/grpc-java/archive/v1.37.0.zip"],
         },
 
         # The APIs that we implement.
@@ -69,6 +68,7 @@ def archive_dependencies(third_party):
         {
             "name": "io_bazel_rules_docker",
             "patch_args": ["-p1"],
+            "patches": ["%s/io_bazel_rules_docker:entrypoint.patch" % third_party],
             "sha256": "d5609b7858246fa11e76237aa9b3e681615bdc8acf2ed29058426cf7c4cea099",
             "strip_prefix": "rules_docker-f4822f3921f0c343dd9e5ae65c760d0fb70be1b3",
             "urls": ["https://github.com/bazelbuild/rules_docker/archive/f4822f3921f0c343dd9e5ae65c760d0fb70be1b3.tar.gz"],
