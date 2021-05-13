@@ -26,23 +26,23 @@ public class Mem extends Controller {
     return "memory";
   }
 
-  public int getMemoryLimit() throws IOException {
+  public long getMemoryLimit() throws IOException {
     open();
-    return readInt("memory.limit_in_bytes");
+    return readLong("memory.limit_in_bytes");
   }
 
-  public void setMemoryLimit(int limitBytes) throws IOException {
+  public void setMemoryLimit(long limitBytes) throws IOException {
     open();
-    writeInt("memory.limit_in_bytes", limitBytes);
+    writeLong("memory.limit_in_bytes", limitBytes);
   }
 
-  public int getMemorySwapLimit() throws IOException {
+  public long getMemorySwapLimit() throws IOException {
     open();
-    return readInt("memory.memsw.limit_in_bytes");
+    return readLong("memory.memsw.limit_in_bytes");
   }
 
-  public void setMemorySwapLimit(int limitBytes) throws IOException {
+  public void setMemorySwapLimit(long limitBytes) throws IOException {
     open();
-    writeInt("memory.memsw.limit_in_bytes", limitBytes);
+    writeLong("memory.memsw.limit_in_bytes", limitBytes);
   }
 }
