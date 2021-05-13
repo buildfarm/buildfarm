@@ -49,7 +49,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, false, 100);
 
     // ASSERT
     assertThat(limits.cpu.min).isEqualTo(7);
@@ -74,7 +74,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.cpu.min).isEqualTo(1);
@@ -99,10 +99,58 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, false, 100);
 
     // ASSERT
     assertThat(limits.cpu.claimed).isEqualTo(0);
+  }
+
+  // Function under test: decideResourceLimitations
+  // Reason for testing: test that we limit cpu is globalLimitExecution is given.
+  // Failure explanation: expected limit flag set.
+  @Test
+  public void decideResourceLimitationsEnsureLimitGlobalSet() throws Exception {
+
+    // ARRANGE
+    Command command =
+        Command.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("min-cores").setValue("0"))
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("max-cores").setValue("0")))
+            .build();
+
+    // ACT
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, true, 100);
+
+    // ASSERT
+    assertThat(limits.cpu.limit).isTrue();
+  }
+
+  // Function under test: decideResourceLimitations
+  // Reason for testing: test that we do not limit cpu is globalLimitExecution is false.
+  // Failure explanation: Did not expect limit flag set.
+  @Test
+  public void decideResourceLimitationsEnsureNoLimitNoGlobalSet() throws Exception {
+
+    // ARRANGE
+    Command command =
+        Command.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("min-cores").setValue("0"))
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("max-cores").setValue("0")))
+            .build();
+
+    // ACT
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, false, 100);
+
+    // ASSERT
+    assertThat(limits.cpu.limit).isFalse();
   }
 
   // Function under test: decideResourceLimitations
@@ -123,7 +171,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, false, 100);
 
     // ASSERT
     assertThat(limits.cpu.claimed).isEqualTo(3);
@@ -146,7 +194,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, false, 100);
 
     // ASSERT
     assertThat(limits.mem.min).isEqualTo(5);
@@ -164,7 +212,7 @@ public class ResourceDeciderTest {
     Command command = Command.newBuilder().build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.isEmpty()).isTrue();
@@ -186,7 +234,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.isEmpty()).isTrue();
@@ -211,7 +259,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(1);
@@ -238,7 +286,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(2);
@@ -267,7 +315,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(0);
@@ -296,7 +344,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, false, 100);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(2);
@@ -323,7 +371,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(1);
@@ -351,7 +399,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(2);
@@ -379,7 +427,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(1);
@@ -396,6 +444,9 @@ public class ResourceDeciderTest {
     // ARRANGE
     Command command =
         Command.newBuilder()
+            .addEnvironmentVariables(
+                Command.EnvironmentVariable.newBuilder()
+                    .setName("XML_OUTPUT_FILE")) // make action look like test
             .setPlatform(
                 Platform.newBuilder()
                     .addProperties(
@@ -405,7 +456,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.debugBeforeExecution).isTrue();
@@ -420,6 +471,9 @@ public class ResourceDeciderTest {
     // ARRANGE
     Command command =
         Command.newBuilder()
+            .addEnvironmentVariables(
+                Command.EnvironmentVariable.newBuilder()
+                    .setName("XML_OUTPUT_FILE")) // make action look like test
             .setPlatform(
                 Platform.newBuilder()
                     .addProperties(
@@ -429,7 +483,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.debugAfterExecution).isTrue();
@@ -444,6 +498,9 @@ public class ResourceDeciderTest {
     // ARRANGE
     Command command =
         Command.newBuilder()
+            .addEnvironmentVariables(
+                Command.EnvironmentVariable.newBuilder()
+                    .setName("XML_OUTPUT_FILE")) // make action look like test
             .setPlatform(
                 Platform.newBuilder()
                     .addProperties(
@@ -453,7 +510,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.debugBeforeExecution).isFalse();

@@ -37,7 +37,9 @@ import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
+import build.buildfarm.common.ExecutionWrappers;
 import build.buildfarm.common.InputStreamFactory;
+import build.buildfarm.common.LinuxSandboxOptions;
 import build.buildfarm.common.Poller;
 import build.buildfarm.common.Size;
 import build.buildfarm.common.Write;
@@ -106,6 +108,8 @@ class ShardWorkerContext implements WorkerContext {
 
   private static final Counter completedOperations =
       Counter.build().name("completed_operations").help("Completed operations.").register();
+  private static final Counter operationPollerCounter =
+      Counter.build().name("operation_poller").help("Number of operations polled.").register();
 
   private final String name;
   private final Platform platform;
@@ -252,6 +256,7 @@ class ShardWorkerContext implements WorkerContext {
                 format("%s: poller: Completed Poll for %s: Failed", name, operationName));
             onFailure.run();
           } else {
+            operationPollerCounter.inc();
             logger.log(
                 Level.INFO, format("%s: poller: Completed Poll for %s: OK", name, operationName));
           }
@@ -875,7 +880,7 @@ class ShardWorkerContext implements WorkerContext {
   public ResourceLimits commandExecutionSettings(Command command) {
     ResourceLimits limits =
         ResourceDecider.decideResourceLimitations(
-            command, onlyMulticoreTests, getExecuteStageWidth());
+            command, onlyMulticoreTests, limitGlobalExecution, getExecuteStageWidth());
     return limits;
   }
 
@@ -885,7 +890,7 @@ class ShardWorkerContext implements WorkerContext {
     if (limitExecution) {
       ResourceLimits limits =
           ResourceDecider.decideResourceLimitations(
-              command, onlyMulticoreTests, getExecuteStageWidth());
+              command, onlyMulticoreTests, limitGlobalExecution, getExecuteStageWidth());
 
       return limitSpecifiedExecution(limits, operationName, arguments);
     }
@@ -923,15 +928,43 @@ class ShardWorkerContext implements WorkerContext {
       usedGroups.add(group.getMem().getName());
     }
 
-    // Possibly set network restrictions.
-    if (limits.network.blockNetwork) {
-      arguments.add("/usr/bin/unshare", "-n", "-r");
+    // Decide the CLI for running under cgroups
+    if (!usedGroups.isEmpty()) {
+      arguments.add(
+          ExecutionWrappers.CGROUPS,
+          "-g",
+          String.join(",", usedGroups) + ":" + group.getHierarchy());
     }
 
-    // Decide the CLI for running under cgroups
-    if (limitGlobalExecution || !usedGroups.isEmpty()) {
-      arguments.add(
-          "/usr/bin/cgexec", "-g", String.join(",", usedGroups) + ":" + group.getHierarchy());
+    // Possibly set network restrictions.
+    // This is not the ideal implementation of block-network.
+    // For now, without the linux-sandbox, we will unshare the network namespace.
+    if (limits.network.blockNetwork && !limits.useLinuxSandbox) {
+      arguments.add(ExecutionWrappers.UNSHARE, "-n", "-r");
+    }
+
+    // Decide the CLI for running the sandbox
+    // For reference on how bazel spawns the sandbox:
+    // https://github.com/bazelbuild/bazel/blob/ddf302e2798be28bb67e32d5c2fc9c73a6a1fbf4/src/main/java/com/google/devtools/build/lib/sandbox/LinuxSandboxUtil.java#L183
+    if (limits.useLinuxSandbox) {
+
+      // Choose the sandbox which is built and deployed with the worker image.
+      arguments.add(ExecutionWrappers.LINUX_SANDBOX);
+
+      // Construct the CLI options for this binary.
+      LinuxSandboxOptions options = new LinuxSandboxOptions();
+      options.createNetns = limits.network.blockNetwork;
+      options.fakeUsername = limits.fakeUsername;
+
+      // Pass flags based on the sandbox CLI options.
+      if (options.createNetns) {
+        arguments.add("-N");
+      }
+      if (options.fakeUsername) {
+        arguments.add("-U");
+      }
+
+      arguments.add("--");
     }
 
     // The executor expects a single IOResource.

@@ -82,6 +82,7 @@ import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.google.protobuf.ByteString;
 import io.grpc.Deadline;
 import io.grpc.stub.ServerCallStreamObserver;
+import io.prometheus.client.Counter;
 import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -121,6 +122,9 @@ import org.json.simple.JSONObject;
 
 public abstract class CASFileCache implements ContentAddressableStorage {
   private static final Logger logger = Logger.getLogger(CASFileCache.class.getName());
+  // Prometheus metrics
+  private static final Counter expiredKeyCounter =
+      Counter.build().name("expired_key").help("Number of key expirations.").register();
 
   protected static final String DEFAULT_DIRECTORIES_INDEX_NAME = "directories.sqlite";
   protected static final String DIRECTORIES_INDEX_NAME_MEMORY = ":memory:";
@@ -740,6 +744,11 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       this.size = size;
     }
 
+    // available to refer to replicable stream
+    CancellableOutputStream delegate() {
+      return out;
+    }
+
     @Override
     public void write(int b) throws IOException {
       if (closed) {
@@ -781,7 +790,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
     Write write =
         new Write() {
           CancellableOutputStream out = null;
-          Path path = null;
           boolean isReset = false;
           SettableFuture<Void> closedFuture = null;
           long fileCommittedSize = -1;
@@ -791,9 +799,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
             try {
               if (out != null) {
                 out.cancel();
-              } else if (path != null && Files.exists(path)) {
-                Files.delete(path);
-                path = null;
               }
             } catch (IOException e) {
               logger.log(
@@ -884,44 +889,32 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                 throw new IOException(e);
               }
             }
-            closedFuture = SettableFuture.create();
+            SettableFuture<Void> outClosedFuture = SettableFuture.create();
+            UniqueWriteOutputStream uniqueOut =
+                createUniqueWriteOutput(
+                    out,
+                    key.getDigest(),
+                    UUID.fromString(key.getIdentifier()),
+                    () -> outClosedFuture.set(null),
+                    this::isComplete,
+                    isReset);
+            commitOpenState(uniqueOut.delegate(), outClosedFuture);
+            return uniqueOut;
+          }
 
-            if (out == null) {
-              out =
-                  newOutput(
-                      key.getDigest(),
-                      UUID.fromString(key.getIdentifier()),
-                      () -> closedFuture.set(null),
-                      this::isComplete,
-                      isReset);
-            }
-            if (out == null) {
-              // duplicate output stream
-              out =
-                  new CancellableOutputStream(nullOutputStream()) {
-                    @Override
-                    public long getWritten() {
-                      return key.getDigest().getSizeBytes();
-                    }
+          private void commitOpenState(
+              CancellableOutputStream out, SettableFuture<Void> closedFuture) {
+            // transition the Write to an open state, and modify all internal state required
+            // atomically
+            // this function must. not. throw.
 
-                    @Override
-                    public void cancel() {}
-                  };
-            } else {
-              path = out.getPath();
-            }
+            this.out = out;
+            this.closedFuture = closedFuture;
             // they will likely write to this, so we can no longer assume isReset.
             // might want to subscribe to a write event on the stream
             isReset = false;
             // our cached file committed size is now invalid
             fileCommittedSize = -1;
-
-            // this stream is uniquely assigned to the consumer, can be closed,
-            // and will properly reject any subsequent write activity with an
-            // exception. It will not close the underlying stream unless we have
-            // reached our digest point (or beyond).
-            return new UniqueWriteOutputStream(
-                out, () -> closedFuture.set(null), key.getDigest().getSizeBytes());
           }
 
           @Override
@@ -931,6 +924,43 @@ public abstract class CASFileCache implements ContentAddressableStorage {
         };
     write.getFuture().addListener(write::reset, directExecutor());
     return write;
+  }
+
+  UniqueWriteOutputStream createUniqueWriteOutput(
+      CancellableOutputStream out,
+      Digest digest,
+      UUID uuid,
+      Runnable onClosed,
+      BooleanSupplier isComplete,
+      boolean isReset)
+      throws IOException {
+    if (out == null) {
+      out = newOutput(digest, uuid, onClosed, isComplete, isReset);
+    }
+    if (out == null) {
+      // duplicate output stream
+      out =
+          new CancellableOutputStream(nullOutputStream()) {
+            @Override
+            public long getWritten() {
+              return digest.getSizeBytes();
+            }
+
+            @Override
+            public void cancel() {}
+
+            @Override
+            public Path getPath() {
+              return null;
+            }
+          };
+    }
+
+    // this stream is uniquely assigned to the consumer, can be closed,
+    // and will properly reject any subsequent write activity with an
+    // exception. It will not close the underlying stream unless we have
+    // reached our digest point (or beyond).
+    return new UniqueWriteOutputStream(out, onClosed, digest.getSizeBytes());
   }
 
   CancellableOutputStream newOutput(
@@ -1408,7 +1438,12 @@ public abstract class CASFileCache implements ContentAddressableStorage {
               if (basename.equals(digest.getHash() + "_" + digest.getSizeBytes() + "_dir")) {
                 Path legacyPath = path;
                 dirPath = getDirectoryPath(digest);
-                Files.move(legacyPath, dirPath);
+                if (Files.exists(dirPath)) {
+                  // destroy this directory if the destination already exists
+                  digest = null;
+                } else {
+                  Files.move(legacyPath, dirPath);
+                }
               }
               // end legacy support, drop modified dirPath
 
@@ -1422,7 +1457,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                 }
               }
             } catch (Exception e) {
-              logger.log(Level.SEVERE, "error reading file " + path.toString(), e);
+              logger.log(Level.SEVERE, "error processing directory " + path.toString(), e);
             }
           });
     }
@@ -2497,6 +2532,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                           getKey(fileEntryKey.getDigest(), !fileEntryKey.getIsExecutable()))) {
                         return immediateFuture(null);
                       }
+                      expiredKeyCounter.inc();
                       logger.log(Level.INFO, format("expired key %s", expiredKey));
                       return immediateFuture(fileEntryKey.getDigest());
                     },

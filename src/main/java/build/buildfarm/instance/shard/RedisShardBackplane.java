@@ -1425,14 +1425,11 @@ public class RedisShardBackplane implements Backplane {
 
   @Override
   public BackplaneStatus backplaneStatus() throws IOException {
-    int casLookupSize = casWorkerMap.size(client);
     return client.call(
         jedis ->
             BackplaneStatus.newBuilder()
                 .setPrequeue(prequeue.status(jedis))
                 .setOperationQueue(operationQueue.status(jedis))
-                .setCasLookupSize(casLookupSize)
-                .setActionCacheSize(actionCache.size(jedis))
                 .setBlockedActionsSize(blockedActions.size(jedis))
                 .setBlockedInvocationsSize(blockedInvocations.size(jedis))
                 .setDispatchedSize(jedis.hlen(config.getDispatchedOperationsHashName()))

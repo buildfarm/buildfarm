@@ -14,6 +14,9 @@
 
 package build.buildfarm.worker;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * @class ExecutionDebugInfo
  * @brief All debug information provided by buildfarm when debugging the execution of an action.
@@ -34,6 +37,13 @@ public class ExecutionDebugInfo {
    * @details The original command of the action is often modified with execution wrappers.
    */
   public String command = "";
+
+  /**
+   * @field environment
+   * @brief The environment variables for the command.
+   * @details The environment variables are decided by both users and buildfarm.
+   */
+  public Map<String, String> environment = new HashMap<String, String>();
 
   /**
    * @field workingDirectory
