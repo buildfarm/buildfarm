@@ -114,7 +114,7 @@ public class EnrichedOperationBuilder {
             .ignoringUnknownFields();
 
     if (json == null) {
-      logger.log(Level.SEVERE, "Operation Json is empty");
+      logger.log(Level.WARNING, "Operation Json is empty");
       return null;
     }
     try {
@@ -122,7 +122,7 @@ public class EnrichedOperationBuilder {
       operationParser.merge(json, operationBuilder);
       return operationBuilder.build();
     } catch (InvalidProtocolBufferException e) {
-      logger.log(Level.SEVERE, e.getMessage());
+      logger.log(Level.WARNING, "InvalidProtocolBufferException while building an operation.", e);
       return null;
     }
   }
@@ -160,7 +160,7 @@ public class EnrichedOperationBuilder {
       }
 
     } catch (InvalidProtocolBufferException e) {
-      logger.log(Level.SEVERE, e.getMessage());
+      logger.log(Level.WARNING, "InvalidProtocolBufferException while building an operation.", e);
       metadata = null;
     }
 
@@ -183,11 +183,11 @@ public class EnrichedOperationBuilder {
         action = Action.parseFrom(blob);
         return action;
       } catch (InvalidProtocolBufferException e) {
-        logger.log(Level.SEVERE, e.getMessage());
+        logger.log(Level.WARNING, "InvalidProtocolBufferException while building an operation.", e);
         return null;
       }
     } catch (Exception e) {
-      logger.log(Level.SEVERE, e.getMessage());
+      logger.log(Level.WARNING, e.getMessage());
       return null;
     }
   }
@@ -208,11 +208,11 @@ public class EnrichedOperationBuilder {
         command = Command.parseFrom(blob);
         return command;
       } catch (InvalidProtocolBufferException e) {
-        logger.log(Level.SEVERE, e.getMessage());
+        logger.log(Level.WARNING, "InvalidProtocolBufferException while building an operation.", e);
         return null;
       }
     } catch (Exception e) {
-      logger.log(Level.SEVERE, e.getMessage());
+      logger.log(Level.WARNING, e.getMessage());
       return null;
     }
   }
