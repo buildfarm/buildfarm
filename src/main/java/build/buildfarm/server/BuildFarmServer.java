@@ -112,6 +112,7 @@ public class BuildFarmServer extends LoggingMain {
             .addService(new AdminService(config.getAdminConfig(), instances))
             .addService(new FetchService(instances))
             .addService(ProtoReflectionService.newInstance())
+            .addService(new PublishBuildEventService(config.getBuildEventConfig()))
             .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
             .intercept(headersInterceptor)
             .build();
