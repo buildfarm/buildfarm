@@ -176,10 +176,6 @@ public class ShardInstance extends AbstractServerInstance {
       Gauge.build().name("worker_pool_size").help("Active worker pool size.").register();
   private static final Gauge queueSize =
       Gauge.build().name("queue_size").labelNames("queue_name").help("Queue size.").register();
-  private static final Gauge casLookupSize =
-      Gauge.build().name("cas_lookup_size").help("CAS lookup size.").register();
-  private static final Gauge actionCacheLookupSize =
-      Gauge.build().name("action_cache_lookup_size").help("Action Cache lookup size.").register();
   private static final Gauge blockedActionsSize =
       Gauge.build().name("blocked_actions_size").help("The number of blocked actions").register();
   private static final Gauge blockedInvocationsSize =
@@ -476,8 +472,6 @@ public class ShardInstance extends AbstractServerInstance {
                   dispatchedOperations.set(backplaneStatus.getDispatchedSize());
                   preQueueSize.set(backplaneStatus.getPrequeue().getSize());
                   updateQueueSizes(backplaneStatus.getOperationQueue().getProvisionsList());
-                  casLookupSize.set(backplaneStatus.getCasLookupSize());
-                  actionCacheLookupSize.set(backplaneStatus.getActionCacheSize());
                   blockedActionsSize.set(backplaneStatus.getBlockedActionsSize());
                   blockedInvocationsSize.set(backplaneStatus.getBlockedInvocationsSize());
                 } catch (InterruptedException e) {

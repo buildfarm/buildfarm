@@ -45,6 +45,7 @@ import com.google.rpc.Code;
 import io.grpc.Deadline;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -93,9 +94,12 @@ class Executor {
     ExecuteOperationMetadata executingMetadata =
         metadata.toBuilder().setStage(ExecutionStage.Value.EXECUTING).build();
 
-    Iterable<ExecutionPolicy> policies =
-        ExecutionPolicies.forPlatform(
-            operationContext.command.getPlatform(), workerContext::getExecutionPolicies);
+    Iterable<ExecutionPolicy> policies = new ArrayList<ExecutionPolicy>();
+    if (limits.useExecutionPolicies) {
+      policies =
+          ExecutionPolicies.forPlatform(
+              operationContext.command.getPlatform(), workerContext::getExecutionPolicies);
+    }
 
     Operation operation =
         operationContext

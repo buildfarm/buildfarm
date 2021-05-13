@@ -30,6 +30,30 @@ import java.util.Map;
 public class ResourceLimits {
 
   /**
+   * @field useLinuxSandbox
+   * @brief Whether to use bazel's linux sandbox as an execution wrapper.
+   * @details Other resource limits will be translated into the appropriate CLI arguments for the
+   *     sandbox.
+   */
+  public boolean useLinuxSandbox = false;
+
+  /**
+   * @field useExecutionPolicies
+   * @brief Whether to use the worker's configured execution policies.
+   * @details Choosing a first-class execution wrapper, like the linux-sandbox, may decide to then
+   *     ignore the existing execution policies.
+   */
+  public boolean useExecutionPolicies = true;
+
+  /**
+   * @field fakeUsername
+   * @brief Whether the executor should fake the username of the action process.
+   * @details This can be faked by using the "as-nobody" wrapper or fakeUsername in the
+   *     linux-sandbox.
+   */
+  public boolean fakeUsername = false;
+
+  /**
    * @field cpu
    * @brief Resource limitations on CPUs.
    * @details Decides specific CPU limitations and whether to apply them for a given action.
@@ -42,6 +66,13 @@ public class ResourceLimits {
    * @details Decides specific memory limitations and whether to apply them for a given action.
    */
   public MemLimits mem = new MemLimits();
+
+  /**
+   * @field network
+   * @brief Resource limitations on network usage.
+   * @details Decides specific network limitations and whether to apply them for a given action.
+   */
+  public NetworkLimits network = new NetworkLimits();
 
   /**
    * @field extraEnvironmentVariables
@@ -64,4 +95,14 @@ public class ResourceLimits {
    * @details This is a debugging flag and is not intended for normal execution.
    */
   public boolean debugAfterExecution = false;
+
+  /**
+   * @field debugTestsOnly
+   * @brief If the user only wants to get debug information for test actions.
+   * @details When evaluating tests, regular actions are often needed to rebuild the test target
+   *     first. This can cause the build to fail with debug information before evaluating the test
+   *     action. To make it simpler, we can request debug information for tests only and not worry
+   *     about getting debug information for regular build actions.
+   */
+  public boolean debugTestsOnly = true;
 }
