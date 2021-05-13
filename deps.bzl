@@ -49,7 +49,6 @@ def archive_dependencies(third_party):
             "strip_prefix": "googleapis-6598bb829c9e9a534be674649ffd1b4671a821f9",
             "url": "https://github.com/googleapis/googleapis/archive/6598bb829c9e9a534be674649ffd1b4671a821f9.zip",
         },
-        
         {
             "name": "remote_apis",
             "build_file": "%s:BUILD.remote_apis" % third_party,
