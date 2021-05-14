@@ -54,6 +54,7 @@ def buildfarm_init(name = "buildfarm"):
                         "com.amazonaws:aws-java-sdk-secretsmanager:1.11.729",
                         "com.amazonaws:aws-java-sdk-sns:1.11.729",
                         "com.amazonaws:aws-java-sdk-ssm:1.11.729",
+                        "com.amazonaws:aws-java-sdk-s3:1.11.729",
                         "com.fasterxml.jackson.core:jackson-databind:2.9.8",
                         "com.github.ben-manes.caffeine:caffeine:2.9.0",
                         "com.github.jnr:jffi:1.2.16",
