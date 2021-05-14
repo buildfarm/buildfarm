@@ -18,18 +18,19 @@ import java.util.List;
 public class S3Bucket {
     
     final AmazonS3 s3;
+    final Bucket bucket;
     
     S3Bucket(String region){
         
         s3 = createS3Client(region);
+        bucket = createBucket("name",region);
     }
 
-    public Bucket createBucket(String bucket_name, String region) {
-        //final AmazonS3 s3 = createS3Client(region);
+    private Bucket createBucket(String bucket_name, String region) {
         Bucket b = null;
         if (s3.doesBucketExistV2(bucket_name)) {
             System.out.format("Bucket %s already exists.\n", bucket_name);
-            b = getBucket(bucket_name,region);
+            b = getExistingBucket(bucket_name,region);
         } else {
             try {
                 b = s3.createBucket(bucket_name);
@@ -40,8 +41,7 @@ public class S3Bucket {
         return b;
     }
     
-    private Bucket getBucket(String bucket_name, String region) {
-        //final AmazonS3 s3 = createS3Client(region);
+    private Bucket getExistingBucket(String bucket_name, String region) {
         Bucket named_bucket = null;
         List<Bucket> buckets = s3.listBuckets();
         for (Bucket b : buckets) {
