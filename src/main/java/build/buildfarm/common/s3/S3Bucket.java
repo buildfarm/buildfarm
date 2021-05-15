@@ -14,6 +14,8 @@ import java.io.IOException;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Create an Amazon S3 bucket.
@@ -23,6 +25,7 @@ import java.util.List;
  */
 public class S3Bucket {
 
+  private static final Logger logger = Logger.getLogger(S3Bucket.class.getName());
   final AmazonS3 s3;
   final Bucket bucket;
 
@@ -63,15 +66,21 @@ public class S3Bucket {
   }
 
   private AwsSecret getAwsSecret(String region, String secretName) {
+
+    // create secret manager for fetching secrets
     AWSSecretsManager client = AWSSecretsManagerClientBuilder.standard().withRegion(region).build();
+
+    // fetch secrets by name
     GetSecretValueRequest getSecretValueRequest =
         new GetSecretValueRequest().withSecretId(secretName);
     GetSecretValueResult getSecretValueResult = null;
     try {
       getSecretValueResult = client.getSecretValue(getSecretValueRequest);
     } catch (Exception e) {
-      // logger.log(Level.SEVERE, String.format("Could not get secret %s from AWS.", secretName));
+      logger.log(Level.SEVERE, String.format("Could not get secret %s from AWS.", secretName));
     }
+
+    // decode secret
     String secret = null;
     if (getSecretValueResult.getSecretString() != null) {
       secret = getSecretValueResult.getSecretString();
@@ -80,20 +89,22 @@ public class S3Bucket {
           new String(Base64.getDecoder().decode(getSecretValueResult.getSecretBinary()).array());
     }
 
-    AwsSecret secretResult = AwsSecret.newBuilder().build();
+    // extract access keys
     if (secret != null) {
       try {
         final ObjectMapper objectMapper = new ObjectMapper();
         final HashMap<String, String> secretMap = objectMapper.readValue(secret, HashMap.class);
+
         final String accessKeyId = secretMap.get("access_key");
         final String secretKey = secretMap.get("secret_key");
+        AwsSecret secretResult =
+            AwsSecret.newBuilder().setAccessKeyId(accessKeyId).setSecretKey(secretKey).build();
+        return secretResult;
       } catch (IOException e) {
-        // logger.log(Level.SEVERE, String.format("Could not parse secret %s from AWS",
-        // secretName));
+        logger.log(Level.SEVERE, String.format("Could not parse secret %s from AWS", secretName));
       }
     }
 
     return null;
   }
 }
-
