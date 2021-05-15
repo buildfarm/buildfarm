@@ -227,6 +227,24 @@ message MetricsConfig {
   }
 }
 
+message AwsSecret {
+
+  string access_key_id = 1;
+  string secret_key = 2;
+}
+
+message S3BucketConfig {
+
+  string region = 1;
+  
+  string name = 2;
+    
+  int32 client_max_connections = 3;
+
+  string secret_name = 4;
+
+}
+
 message AwsMetricsConfig {
   string operations_metrics_topic = 1;
 
