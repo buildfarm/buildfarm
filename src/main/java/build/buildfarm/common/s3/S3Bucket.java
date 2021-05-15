@@ -13,7 +13,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.util.Base64;
 import java.util.HashMap;
-import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -26,38 +25,54 @@ import java.util.logging.Logger;
 public class S3Bucket {
 
   private static final Logger logger = Logger.getLogger(S3Bucket.class.getName());
-  final AmazonS3 s3;
-  final Bucket bucket;
+  private AmazonS3 s3;
+  private Bucket bucket;
 
   S3Bucket(String region) {
 
+    loadState(region);
+  }
+
+  private void loadState(String region) {
+
+    // the S3 client for interacting with the bucket
     s3 = createS3Client(region);
+
+    // the aws bucket object
     bucket = createBucket("name", region);
   }
 
   private Bucket createBucket(String bucket_name, String region) {
-    Bucket b = null;
+
+    // If the bucket already exists, find and return it.
     if (s3.doesBucketExistV2(bucket_name)) {
-      b = getExistingBucket(bucket_name, region);
-    } else {
-      try {
-        b = s3.createBucket(bucket_name);
-      } catch (AmazonS3Exception e) {
-        System.err.println(e.getErrorMessage());
-      }
+      Bucket b = getExistingBucket(bucket_name, region);
+      return b;
     }
-    return b;
+
+    // Otherwise create the bucket.
+    try {
+      Bucket b = s3.createBucket(bucket_name);
+      return b;
+    } catch (AmazonS3Exception e) {
+      System.err.println(e.getErrorMessage());
+    }
+
+    // The bucket could not be created.
+    return null;
   }
 
   private Bucket getExistingBucket(String bucket_name, String region) {
-    Bucket named_bucket = null;
-    List<Bucket> buckets = s3.listBuckets();
-    for (Bucket b : buckets) {
+
+    // return the bucket found by name
+    for (Bucket b : s3.listBuckets()) {
       if (b.getName().equals(bucket_name)) {
-        named_bucket = b;
+        return b;
       }
     }
-    return named_bucket;
+
+    // The bucket could not be found.
+    return null;
   }
 
   private static AmazonS3 createS3Client(String region) {
