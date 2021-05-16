@@ -11,4 +11,4 @@ if [ ! -f "$LOCAL_TOOL" ] ; then
     chmod +x $LOCAL_TOOL
 fi
 
-$LOCAL_TOOL --help
+$LOCAL_TOOL //src/...
