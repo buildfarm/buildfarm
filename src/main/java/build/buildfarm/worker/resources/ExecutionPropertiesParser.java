@@ -96,6 +96,8 @@ public class ExecutionPropertiesParser {
 
     if (parser.containsKey(keyLookup)) {
       parser.get(keyLookup).accept(limits, property);
+    } else {
+      limits.unusedProperties.put(property.getName(), property.getValue());
     }
   }
 

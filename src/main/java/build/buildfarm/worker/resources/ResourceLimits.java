@@ -108,6 +108,14 @@ public class ResourceLimits {
   public boolean debugTestsOnly = true;
 
   /**
+   * @field unusedProperties
+   * @brief Exec_properties that were not used when deciding resource limits.
+   * @details Foreign platform properties may be be added to the command that are ignored when
+   *     parsing exec_properties. They are listed here for visibility.
+   */
+  public Map<String, String> unusedProperties = new HashMap<String, String>();
+
+  /**
    * @field description
    * @brief Description explaining why settings were chosen.
    * @details This can be used to debug execution behavior.
