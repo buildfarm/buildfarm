@@ -1,6 +1,5 @@
 bazel-*
 .ijwb/
-java_formatter.jar
 
 # Visual Studio Code
 /.vscode/
@@ -15,3 +14,7 @@ java_formatter.jar
 
 #Static Analysis
 /pmd
+
+#CI tools
+unused_deps
+java_formatter.jar
