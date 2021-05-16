@@ -18,9 +18,11 @@ import static build.buildfarm.common.ExecutionProperties.*;
 
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Platform.Property;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.BiConsumer;
+import java.util.stream.Collectors;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
@@ -107,6 +109,7 @@ public class ExecutionPropertiesParser {
     int amount = Integer.parseInt(property.getValue());
     limits.cpu.min = amount;
     limits.cpu.max = amount;
+    describeChange(limits.cpu.description, "cores", property.getValue(), property);
   }
 
   /**
@@ -117,6 +120,7 @@ public class ExecutionPropertiesParser {
    */
   private static void storeLinuxSandbox(ResourceLimits limits, Property property) {
     limits.useLinuxSandbox = Boolean.parseBoolean(property.getValue());
+    describeChange(limits.description, "use linux sandbox", property.getValue(), property);
   }
 
   /**
@@ -127,6 +131,7 @@ public class ExecutionPropertiesParser {
    */
   private static void storeMinCores(ResourceLimits limits, Property property) {
     limits.cpu.min = Integer.parseInt(property.getValue());
+    describeChange(limits.cpu.description, "min cores", property.getValue(), property);
   }
 
   /**
@@ -137,6 +142,7 @@ public class ExecutionPropertiesParser {
    */
   private static void storeMaxCores(ResourceLimits limits, Property property) {
     limits.cpu.max = Integer.parseInt(property.getValue());
+    describeChange(limits.cpu.description, "max cores", property.getValue(), property);
   }
 
   /**
@@ -147,6 +153,7 @@ public class ExecutionPropertiesParser {
    */
   private static void storeMinMem(ResourceLimits limits, Property property) {
     limits.mem.min = Long.parseLong(property.getValue());
+    describeChange(limits.mem.description, "min mem", property.getValue(), property);
   }
 
   /**
@@ -157,6 +164,7 @@ public class ExecutionPropertiesParser {
    */
   private static void storeMaxMem(ResourceLimits limits, Property property) {
     limits.mem.max = Long.parseLong(property.getValue());
+    describeChange(limits.mem.description, "max mem", property.getValue(), property);
   }
 
   /**
@@ -167,6 +175,7 @@ public class ExecutionPropertiesParser {
    */
   private static void storeBlockNetwork(ResourceLimits limits, Property property) {
     limits.network.blockNetwork = Boolean.parseBoolean(property.getValue());
+    describeChange(limits.network.description, "network blocking", property.getValue(), property);
   }
 
   /**
@@ -177,6 +186,7 @@ public class ExecutionPropertiesParser {
    */
   private static void storeAsNobody(ResourceLimits limits, Property property) {
     limits.fakeUsername = Boolean.parseBoolean(property.getValue());
+    describeChange(limits.description, "use fake username", property.getValue(), property);
   }
 
   /**
@@ -188,8 +198,11 @@ public class ExecutionPropertiesParser {
   private static void storeEnvVars(ResourceLimits limits, Property property) {
     try {
       JSONParser parser = new JSONParser();
-      limits.extraEnvironmentVariables = (Map<String, String>) parser.parse(property.getValue());
+      Map<String, String> map = (Map<String, String>) parser.parse(property.getValue());
+      limits.extraEnvironmentVariables = map;
+      describeChange(limits.description, "extra env vars added", toString(map), property);
     } catch (ParseException pe) {
+      limits.description.add("extra env vars could not be added due to parsing error");
     }
   }
 
@@ -204,6 +217,7 @@ public class ExecutionPropertiesParser {
     String key = keyValue[1];
     String value = property.getValue();
     limits.extraEnvironmentVariables.put(key, value);
+    describeChange(limits.description, "extra env var added", key + ":" + value, property);
   }
 
   /**
@@ -214,6 +228,7 @@ public class ExecutionPropertiesParser {
    */
   private static void storeBeforeExecutionDebug(ResourceLimits limits, Property property) {
     limits.debugBeforeExecution = Boolean.parseBoolean(property.getValue());
+    describeChange(limits.description, "debug before execution", property.getValue(), property);
   }
 
   /**
@@ -224,6 +239,7 @@ public class ExecutionPropertiesParser {
    */
   private static void storeAfterExecutionDebug(ResourceLimits limits, Property property) {
     limits.debugAfterExecution = Boolean.parseBoolean(property.getValue());
+    describeChange(limits.description, "debug after execution", property.getValue(), property);
   }
 
   /**
@@ -234,5 +250,38 @@ public class ExecutionPropertiesParser {
    */
   private static void storeDebugTestsOnly(ResourceLimits limits, Property property) {
     limits.debugTestsOnly = Boolean.parseBoolean(property.getValue());
+    describeChange(limits.description, "debug tests only", property.getValue(), property);
+  }
+
+  /**
+   * @brief Convert map to printable string.
+   * @details Uses streams.
+   * @param map Map to convert to string.
+   * @return String representation of map.
+   * @note Overloaded.
+   * @note Suggested return identifier: str.
+   */
+  private static String toString(Map<String, ?> map) {
+    String mapAsString =
+        map.keySet().stream()
+            .map(key -> key + "=" + map.get(key))
+            .collect(Collectors.joining(", ", "{", "}"));
+    return mapAsString;
+  }
+
+  /**
+   * @brief Store the description of the change made.
+   * @details Adds a debug message on the resource change.
+   * @param description The description to populate.
+   * @param name The name of the property changed.
+   * @param setValue The value the property was set to.
+   * @param property The original property.
+   */
+  private static void describeChange(
+      ArrayList<String> description, String name, String setValue, Property property) {
+    description.add(
+        String.format(
+            "%s set to %s by user given exec_property: %s:%s",
+            name, setValue, property.getName(), property.getValue()));
   }
 }

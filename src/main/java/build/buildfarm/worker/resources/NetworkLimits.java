@@ -14,6 +14,8 @@
 
 package build.buildfarm.worker;
 
+import java.util.ArrayList;
+
 /**
  * @class NetworkLimits
  * @brief Network resource limitations imposed on specific actions.
@@ -30,4 +32,11 @@ public class NetworkLimits {
    * @details Depending on the server implementation, we may skip applying network restrictions.
    */
   public boolean blockNetwork = false;
+
+  /**
+   * @field description
+   * @brief Description explaining why settings were chosen.
+   * @details This can be used to debug execution behavior.
+   */
+  public ArrayList<String> description = new ArrayList<>();
 }

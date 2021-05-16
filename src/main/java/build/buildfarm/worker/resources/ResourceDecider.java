@@ -72,11 +72,22 @@ public class ResourceDecider {
     if (onlyMulticoreTests && !commandIsTest(command)) {
       limits.cpu.min = 1;
       limits.cpu.max = 1;
+      limits.cpu.description.add(
+          "cores restricted to 1 because this is enforced on non-test actions");
     }
 
+    // avoid 0 cores when limiting
     if (limitGlobalExecution) {
-      limits.cpu.min = Math.max(limits.cpu.min, 1);
-      limits.cpu.max = Math.max(limits.cpu.max, 1);
+      if (limits.cpu.min == 0) {
+        limits.cpu.min = 1;
+        limits.cpu.description.add(
+            "min cores set to 1 as it cannot be 0 with limit global execution");
+      }
+      if (limits.cpu.max == 0) {
+        limits.cpu.max = 1;
+        limits.cpu.description.add(
+            "max cores set to 1 as it cannot be 0 with limit global execution");
+      }
     }
 
     // perform resource overrides based on test size
@@ -85,18 +96,23 @@ public class ResourceDecider {
       TestSizeResourceOverride override = deduceSizeOverride(command, overrides);
       limits.cpu.min = override.coreMin;
       limits.cpu.max = override.coreMax;
+      limits.cpu.description.add(
+          String.format(
+              "cores are overridden due to test size (min=%s / max=%s",
+              override.coreMin, override.coreMax));
     }
 
     // adjust debugging based on whether its a test
     if (limits.debugTestsOnly && !commandIsTest(command)) {
       limits.debugBeforeExecution = false;
       limits.debugAfterExecution = false;
+      limits.description.add("debugging is disabled because only tests are enabled for debugging");
     }
 
     // Should we limit the cores of the action during execution? by default, no.
     // If the action has suggested core restrictions on itself, then yes.
     // Claim minimal core amount with regards to execute stage width.
-    limits.cpu.limit = (limits.cpu.min > 0 || limits.cpu.max > 0) || limitGlobalExecution;
+    limits.cpu.limit = (limits.cpu.min > 0 || limits.cpu.max > 0);
     limits.cpu.claimed = Math.min(limits.cpu.min, executeStageWidth);
 
     // Should we limit the memory of the action during execution? by default, no.
@@ -112,6 +128,7 @@ public class ResourceDecider {
     // This will dynamically skip using the worker configured execution policies.
     if (limits.useLinuxSandbox) {
       limits.useExecutionPolicies = false;
+      limits.description.add("configured execution policies skipped because of choosing sandbox");
     }
 
     // we choose to resolve variables after the other variable values have been decided

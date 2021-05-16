@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -105,4 +106,11 @@ public class ResourceLimits {
    *     about getting debug information for regular build actions.
    */
   public boolean debugTestsOnly = true;
+
+  /**
+   * @field description
+   * @brief Description explaining why settings were chosen.
+   * @details This can be used to debug execution behavior.
+   */
+  public ArrayList<String> description = new ArrayList<>();
 }
