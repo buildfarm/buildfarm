@@ -8,6 +8,11 @@ tasks:
     platform: ubuntu1804
     shell_commands:
     - ./.bazelci/format.sh --check
+  java_unused_deps_check:
+    name: "Java Unused Dependencies"
+    platform: ubuntu1804
+    shell_commands:
+    - ./.bazelci/unused_deps.sh --check
   static_analysis_check:
     name: "Static Analysis"
     platform: ubuntu1804
