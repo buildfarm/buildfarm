@@ -8,7 +8,6 @@ java_test(
         "//src/main/java/build/buildfarm/cas",
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/instance",
-        "//src/main/java/build/buildfarm/instance/shard",
         "//src/main/java/build/buildfarm/worker",
         "//src/main/java/build/buildfarm/worker/shard",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
