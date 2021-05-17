@@ -53,7 +53,6 @@ create_buildozer_commands () {
 download_missing_tools;
 create_buildozer_commands;
 
-
 # Check whether any dependencies changes need to be made.
 # This is intended to be done by the CI.
 if [[ "$@" == "--check" ]]
@@ -68,7 +67,6 @@ then
         exit 1
     fi
 fi
-
 
 # Run all of the buildozer commands to fix the dependencies
 /tmp/buildozer_commands.sh
