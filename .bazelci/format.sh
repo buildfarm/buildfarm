@@ -1,6 +1,7 @@
 #!/bin/bash
 # Run from the root of repository.
 # This script will format all of the java source files.
+# Use the flag --check if you want the script to fail when formatting is not correct.
 
 JAVA_FORMATTER_URL=https://github.com/google/google-java-format/releases/download/google-java-format-1.7/google-java-format-1.7-all-deps.jar
 LOCAL_FORMATTER="java_formatter.jar"

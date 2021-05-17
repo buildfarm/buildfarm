@@ -1,12 +1,19 @@
 #!/bin/bash
 # Run from the root of repository.
 # This script will remove any unused java dependencies
+# Use the flag --check if you want the script to fail when the dependencies not correct.
 
 DEPS_TOOL_URL=https://github.com/bazelbuild/buildtools/releases/download/4.0.1/unused_deps-linux-amd64
 LOCAL_DEPS_TOOL="unused_deps"
 
 BUILDOZER_URL=https://github.com/bazelbuild/buildtools/releases/download/4.0.1/buildozer-linux-amd64
 LOCAL_BUILDOZER_TOOL="buildozer"
+
+# The "unused deps" tool is not perfect.  It might try to remove a
+# dependency that is needed at runtime.  If that is the case, the dependency
+# can be added to this list.  All buildozer commands referencing this dependency
+# will not be executed.
+keep_depenencies=( "//src/test/java/build/buildfarm:test_runner" )
 
  # Download the tools if we don't already have them.
 if [ ! -f "$LOCAL_DEPS_TOOL" ] ; then
@@ -20,6 +27,18 @@ if [ ! -f "$LOCAL_BUILDOZER_TOOL" ] ; then
 fi
 
 # Run the unused_deps tool to create a list of buildozer commands
+# Certain commands are removed based on a configuration to avoid runtime issues.
 $LOCAL_DEPS_TOOL //src/... > /tmp/unused_deps_results;
-grep "^buildozer" /tmp/unused_deps_results > /tmp/unused_deps_commands;
+grep "^buildozer" /tmp/unused_deps_results > /tmp/unused_deps_filtered;
+for i in "${keep_depenencies[@]}"
+do
+    escaped_keyword=$(printf '%s\n' "$i" | sed -e 's/[]\/$*.^[]/\\&/g');
+    echo $escaped_keyword
+    sed -i '/'$escaped_keyword'/d' /tmp/unused_deps_filtered;
+done
+awk '{print "./" $0}' /tmp/unused_deps_filtered > /tmp/buildozer_commands.sh
+chmod +x /tmp/buildozer_commands.sh
+
+# Run all of the buildozer commands to fix the dependencies
+/tmp/buildozer_commands.sh
 
