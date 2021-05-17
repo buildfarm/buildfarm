@@ -1,4 +1,3 @@
-
 java_library(
     name = "S3Bucket",
     srcs = glob(["S3Bucket.java"]),
@@ -6,7 +5,6 @@ java_library(
     deps = [
         "@maven//:com_amazonaws_aws_java_sdk_s3",
         "@maven//:com_amazonaws_aws_java_sdk_core",
-        
         "@maven//:com_amazonaws_aws_java_sdk_secretsmanager",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",
         #"@maven//:com_google_protobuf_protobuf_java_util",
