@@ -955,6 +955,10 @@ class ShardWorkerContext implements WorkerContext {
       LinuxSandboxOptions options = new LinuxSandboxOptions();
       options.createNetns = limits.network.blockNetwork;
       options.fakeUsername = limits.fakeUsername;
+      
+      // Bazel encodes these directly 
+      options.writableFiles.add("/dev/shm");
+      options.writableFiles.add("/tmp");
 
       // Pass flags based on the sandbox CLI options.
       if (options.createNetns) {
@@ -962,6 +966,10 @@ class ShardWorkerContext implements WorkerContext {
       }
       if (options.fakeUsername) {
         arguments.add("-U");
+      }
+      for (String writablePath : options.writableFiles) {
+        arguments.add("-w");
+        arguments.add(writablePath);
       }
 
       arguments.add("--");
