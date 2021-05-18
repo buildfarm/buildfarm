@@ -957,6 +957,7 @@ class ShardWorkerContext implements WorkerContext {
       options.fakeUsername = limits.fakeUsername;
 
       // Bazel encodes these directly
+      options.writableFiles.add(execFileSystem.root().toString());
       options.writableFiles.add("/dev/shm");
       options.writableFiles.add("/tmp");
 
