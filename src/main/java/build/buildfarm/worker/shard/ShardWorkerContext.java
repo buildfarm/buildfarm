@@ -954,9 +954,6 @@ class ShardWorkerContext implements WorkerContext {
     // https://github.com/bazelbuild/bazel/blob/ddf302e2798be28bb67e32d5c2fc9c73a6a1fbf4/src/main/java/com/google/devtools/build/lib/sandbox/LinuxSandboxUtil.java#L183
     if (limits.useLinuxSandbox) {
 
-      // Choose the sandbox which is built and deployed with the worker image.
-      arguments.add(ExecutionWrappers.LINUX_SANDBOX);
-
       // Construct the CLI options for this binary.
       LinuxSandboxOptions options = new LinuxSandboxOptions();
       options.createNetns = limits.network.blockNetwork;
@@ -971,25 +968,34 @@ class ShardWorkerContext implements WorkerContext {
       // Add other paths based on environment variables
       // TODO
 
-      // Pass flags based on the sandbox CLI options.
-      if (options.createNetns) {
-        arguments.add("-N");
-      }
-      if (options.fakeUsername) {
-        arguments.add("-U");
-      }
-      for (String writablePath : options.writableFiles) {
-        arguments.add("-w");
-        arguments.add(writablePath);
-      }
-
-      arguments.add("--");
+      addLinuxSandboxCli(arguments, options);
     }
 
     // The executor expects a single IOResource.
     // However, we may have multiple IOResources due to using multiple cgroup groups.
     // We construct a single IOResource to account for this.
     return combineResources(resources);
+  }
+
+  private void addLinuxSandboxCli(
+      ImmutableList.Builder<String> arguments, LinuxSandboxOptions options) {
+
+    // Choose the sandbox which is built and deployed with the worker image.
+    arguments.add(ExecutionWrappers.LINUX_SANDBOX);
+
+    // Pass flags based on the sandbox CLI options.
+    if (options.createNetns) {
+      arguments.add("-N");
+    }
+    if (options.fakeUsername) {
+      arguments.add("-U");
+    }
+    for (String writablePath : options.writableFiles) {
+      arguments.add("-w");
+      arguments.add(writablePath);
+    }
+
+    arguments.add("--");
   }
 
   private void applyCpuLimits(Group group, ResourceLimits limits, ArrayList<IOResource> resources) {
