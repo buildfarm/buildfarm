@@ -122,7 +122,10 @@ public interface WorkerContext {
   void destroyExecutionLimits();
 
   IOResource limitExecution(
-      String operationName, ImmutableList.Builder<String> arguments, Command command);
+      String operationName,
+      ImmutableList.Builder<String> arguments,
+      Command command,
+      Path workingDirectory);
 
   int commandExecutionClaims(Command command);
 

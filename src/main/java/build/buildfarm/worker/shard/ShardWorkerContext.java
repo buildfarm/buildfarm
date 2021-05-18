@@ -886,13 +886,16 @@ class ShardWorkerContext implements WorkerContext {
 
   @Override
   public IOResource limitExecution(
-      String operationName, ImmutableList.Builder<String> arguments, Command command) {
+      String operationName,
+      ImmutableList.Builder<String> arguments,
+      Command command,
+      Path workingDirectory) {
     if (limitExecution) {
       ResourceLimits limits =
           ResourceDecider.decideResourceLimitations(
               command, onlyMulticoreTests, limitGlobalExecution, getExecuteStageWidth());
 
-      return limitSpecifiedExecution(limits, operationName, arguments);
+      return limitSpecifiedExecution(limits, operationName, arguments, workingDirectory);
     }
     return new IOResource() {
       @Override
@@ -906,7 +909,10 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   IOResource limitSpecifiedExecution(
-      ResourceLimits limits, String operationName, ImmutableList.Builder<String> arguments) {
+      ResourceLimits limits,
+      String operationName,
+      ImmutableList.Builder<String> arguments,
+      Path workingDirectory) {
 
     // The decision to apply resource restrictions has already been decided within the
     // ResourceLimits object. We apply the cgroup settings to file resources
@@ -958,6 +964,7 @@ class ShardWorkerContext implements WorkerContext {
 
       // Bazel encodes these directly
       options.writableFiles.add(execFileSystem.root().toString());
+      options.writableFiles.add(workingDirectory.toString());
       options.writableFiles.add("/dev/shm");
       options.writableFiles.add("/tmp");
 
