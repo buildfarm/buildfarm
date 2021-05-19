@@ -968,6 +968,10 @@ class ShardWorkerContext implements WorkerContext {
 
       // Add other paths based on environment variables
       // TODO
+      // all: TEST_TMPDIR
+      // windows: TEMP
+      // windows: TMP
+      // linux: TMPDIR
 
       addLinuxSandboxCli(arguments, options);
     }
