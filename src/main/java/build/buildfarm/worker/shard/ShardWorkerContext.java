@@ -1022,7 +1022,7 @@ class ShardWorkerContext implements WorkerContext {
 
     // Both needed.  Find out why.
     arguments.add("--");
-    //arguments.add("--");
+    arguments.add("--");
   }
 
   private void applyCpuLimits(Group group, ResourceLimits limits, ArrayList<IOResource> resources) {
