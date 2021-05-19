@@ -105,4 +105,6 @@ public class ResourceLimits {
    *     about getting debug information for regular build actions.
    */
   public boolean debugTestsOnly = true;
+  
+  public String debugTarget = "";
 }

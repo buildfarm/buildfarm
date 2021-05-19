@@ -984,6 +984,8 @@ class ShardWorkerContext implements WorkerContext {
 
   private void addLinuxSandboxCli(
       ImmutableList.Builder<String> arguments, LinuxSandboxOptions options) {
+    
+    arguments.add(ExecutionWrappers.AS_NOBODY);
 
     // Choose the sandbox which is built and deployed with the worker image.
     arguments.add(ExecutionWrappers.LINUX_SANDBOX);
@@ -1003,6 +1005,9 @@ class ShardWorkerContext implements WorkerContext {
       arguments.add("-w");
       arguments.add(writablePath);
     }
+    
+    arguments.add("-w");
+    arguments.add(".");
 
     arguments.add("--");
   }

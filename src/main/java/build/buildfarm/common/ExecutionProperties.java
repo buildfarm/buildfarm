@@ -110,6 +110,14 @@ public class ExecutionProperties {
    *     should be a boolean.
    */
   public static final String DEBUG_TESTS_ONLY = "debug-tests-only";
+  
+  /**
+   * @field DEBUG_TARGET
+   * @brief The exec_property and platform property name for indicating a specific target to debug.
+   * @details This is intended to be used interactively to debug remote executions. The key value
+   *     should be a string.
+   */
+  public static final String DEBUG_TARGET = "debug-target";
 
   /**
    * @field CHOOSE_QUEUE
