@@ -1006,8 +1006,8 @@ class ShardWorkerContext implements WorkerContext {
       arguments.add(writablePath);
     }
 
-    arguments.add("-w");
-    arguments.add(".");
+    //arguments.add("-w");
+    //arguments.add(".");
 
     arguments.add("--");
   }
