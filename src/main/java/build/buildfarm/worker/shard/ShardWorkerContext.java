@@ -963,8 +963,9 @@ class ShardWorkerContext implements WorkerContext {
       // Bazel encodes these directly
       options.writableFiles.add(execFileSystem.root().toString());
       options.writableFiles.add(workingDirectory.toString());
-      options.writableFiles.add("/dev/shm");
       options.writableFiles.add("/tmp");
+      options.writableFiles.add("/dev/shm");
+      options.tmpfsDirs.add("/tmp");
 
       // Add other paths based on environment variables
       // We may need to add various working directories as writable files.
@@ -996,15 +997,14 @@ class ShardWorkerContext implements WorkerContext {
     if (options.createNetns) {
       arguments.add("-N");
     }
-    
+
     // For the time being, the linux-sandbox version of "nobody"
     // does not pair with buildfarm's implementation of exec_owner: "nnobody".
     // This will need fixed to enable using fakeUsername on the sandbox.
     // if (options.fakeUsername) {
     //   arguments.add("-U");
     // }
-    
-    
+
     if (!options.workingDir.isEmpty()) {
       arguments.add("-W");
       arguments.add(options.workingDir);
@@ -1014,6 +1014,12 @@ class ShardWorkerContext implements WorkerContext {
       arguments.add(writablePath);
     }
 
+    for (String dir : options.tmpfsDirs) {
+      arguments.add("-e");
+      arguments.add(dir);
+    }
+
+    // Both needed.  Find out why.
     arguments.add("--");
     arguments.add("--");
   }
