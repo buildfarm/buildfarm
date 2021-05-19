@@ -963,9 +963,10 @@ class ShardWorkerContext implements WorkerContext {
       // Bazel encodes these directly
       options.writableFiles.add(execFileSystem.root().toString());
       options.writableFiles.add(workingDirectory.toString());
-      options.writableFiles.add("/tmp");
+      options.writableFiles.add("/tmp/");
+      options.writableFiles.add("/");
       options.writableFiles.add("/dev/shm");
-      options.tmpfsDirs.add("/tmp");
+      options.tmpfsDirs.add("/tmp/");
 
       // Add other paths based on environment variables
       // We may need to add various working directories as writable files.
