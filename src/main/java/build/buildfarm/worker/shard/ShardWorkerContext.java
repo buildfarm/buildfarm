@@ -967,11 +967,11 @@ class ShardWorkerContext implements WorkerContext {
       options.writableFiles.add("/tmp");
 
       // Add other paths based on environment variables
-      // TODO
-      // all: TEST_TMPDIR
+      // We may need to add various working directories as writable files.
+      // all:     TEST_TMPDIR
       // windows: TEMP
       // windows: TMP
-      // linux: TMPDIR
+      // linux:   TMPDIR
 
       addLinuxSandboxCli(arguments, options);
     }
@@ -985,7 +985,9 @@ class ShardWorkerContext implements WorkerContext {
   private void addLinuxSandboxCli(
       ImmutableList.Builder<String> arguments, LinuxSandboxOptions options) {
 
-    arguments.add(ExecutionWrappers.AS_NOBODY);
+    if (options.fakeUsername) {
+      arguments.add(ExecutionWrappers.AS_NOBODY);
+    }
 
     // Choose the sandbox which is built and deployed with the worker image.
     arguments.add(ExecutionWrappers.LINUX_SANDBOX);
@@ -994,9 +996,15 @@ class ShardWorkerContext implements WorkerContext {
     if (options.createNetns) {
       arguments.add("-N");
     }
-    if (options.fakeUsername) {
-      arguments.add("-U");
-    }
+    
+    // For the time being, the linux-sandbox version of "nobody"
+    // does not pair with buildfarm's implementation of exec_owner: "nnobody".
+    // This will need fixed to enable using fakeUsername on the sandbox.
+    // if (options.fakeUsername) {
+    //   arguments.add("-U");
+    // }
+    
+    
     if (!options.workingDir.isEmpty()) {
       arguments.add("-W");
       arguments.add(options.workingDir);
@@ -1006,9 +1014,7 @@ class ShardWorkerContext implements WorkerContext {
       arguments.add(writablePath);
     }
 
-    //arguments.add("-w");
-    //arguments.add(".");
-
+    arguments.add("--");
     arguments.add("--");
   }
 
