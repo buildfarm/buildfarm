@@ -110,7 +110,7 @@ public class ExecutionProperties {
    *     should be a boolean.
    */
   public static final String DEBUG_TESTS_ONLY = "debug-tests-only";
-  
+
   /**
    * @field DEBUG_TARGET
    * @brief The exec_property and platform property name for indicating a specific target to debug.

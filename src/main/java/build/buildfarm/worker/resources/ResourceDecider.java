@@ -75,22 +75,8 @@ public class ResourceDecider {
       limits.cpu.min = override.coreMin;
       limits.cpu.max = override.coreMax;
     }
-    
-    if (!limits.debugTarget.isEmpty()) {
-      if (!commandMatchesDebugTarget(command,limits)){
-        limits.debugBeforeExecution = false;
-        limits.debugAfterExecution = false;
-      }
 
-    }
-    else {
-
-      // adjust debugging based on whether its a test
-      if (limits.debugTestsOnly && !commandIsTest(command)) {
-        limits.debugBeforeExecution = false;
-        limits.debugAfterExecution = false;
-      }
-    }
+    adjustDebugFlags(command, limits);
 
     // Should we limit the cores of the action during execution? by default, no.
     // If the action has suggested core restrictions on itself, then yes.
@@ -118,16 +104,34 @@ public class ResourceDecider {
 
     return limits;
   }
-  
-  private static boolean commandMatchesDebugTarget(Command command, ResourceLimits limits) {
-      for (String argument: command.getArgumentsList()){
-        if (argument.contains(limits.debugTarget)){
-          return true;
-        }
+
+  private static void adjustDebugFlags(Command command, ResourceLimits limits) {
+
+    if (!limits.debugTarget.isEmpty()) {
+      if (!commandMatchesDebugTarget(command, limits)) {
+        limits.debugBeforeExecution = false;
+        limits.debugAfterExecution = false;
       }
-      
-      return false;
+
+    } else {
+
+      // adjust debugging based on whether its a test
+      if (limits.debugTestsOnly && !commandIsTest(command)) {
+        limits.debugBeforeExecution = false;
+        limits.debugAfterExecution = false;
+      }
     }
+  }
+
+  private static boolean commandMatchesDebugTarget(Command command, ResourceLimits limits) {
+    for (String argument : command.getArgumentsList()) {
+      if (argument.contains(limits.debugTarget)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
 
   /**
    * @brief Evaluate a given platform property of a command and use it to adjust execution settings.
@@ -325,7 +329,7 @@ public class ResourceDecider {
   private static void storeDebugTestsOnly(ResourceLimits limits, Property property) {
     limits.debugTestsOnly = Boolean.parseBoolean(property.getValue());
   }
-  
+
   /**
    * @brief Store the property for debugging a target.
    * @details Parses and stores a String.
