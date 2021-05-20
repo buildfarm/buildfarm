@@ -1021,7 +1021,7 @@ class ShardWorkerContext implements WorkerContext {
     }
 
     // Both needed.  Find out why.
-    arguments.add("--");
+    //arguments.add("--");
     arguments.add("--");
   }
 
