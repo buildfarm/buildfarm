@@ -1,6 +1,8 @@
 load("@com_github_bazelbuild_buildtools//buildifier:def.bzl", "buildifier")
 load("@io_bazel_rules_docker//java:image.bzl", "java_image")
 
+package(default_visibility = ["//visibility:public"])
+
 buildifier(
     name = "buildifier",
 )
