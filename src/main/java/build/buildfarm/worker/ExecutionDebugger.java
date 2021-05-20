@@ -86,6 +86,7 @@ public class ExecutionDebugger {
     info.environment = processBuilder.environment();
     info.workingDirectory = processBuilder.directory().getAbsolutePath();
     info.limits = limits;
+    info.results = resultBuilder.build();
 
     // convert to json
     Gson gson = new GsonBuilder().setPrettyPrinting().create();
@@ -111,6 +112,7 @@ public class ExecutionDebugger {
     info.environment = processBuilder.environment();
     info.workingDirectory = processBuilder.directory().getAbsolutePath();
     info.limits = limits;
+    info.results = resultBuilder.build();
 
     // convert to json
     Gson gson = new GsonBuilder().setPrettyPrinting().create();

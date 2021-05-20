@@ -16,6 +16,7 @@ package build.buildfarm.worker;
 
 import java.util.HashMap;
 import java.util.Map;
+import build.bazel.remote.execution.v2.ActionResult;
 
 /**
  * @class ExecutionDebugInfo
@@ -58,4 +59,11 @@ public class ExecutionDebugInfo {
    * @details These limitations are decided by exec_properties and buildfarm configurations.
    */
   public ResourceLimits limits = new ResourceLimits();
+  
+  /**
+   * @field results
+   * @brief The results of running the action.
+   * @details These results will only be populated if you are debugging after the action ran.
+   */
+  public ActionResult results = ActionResult.newBuilder().build();
 }
