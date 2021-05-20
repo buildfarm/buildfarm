@@ -63,7 +63,7 @@ public class ExecutionDebugInfo {
   /**
    * @field results
    * @brief The results of running the action.
-   * @details These results will only be populated if you are debugging after the action ran.
+   * @details These results will only be fully populated if you are debugging after the action ran.
    */
   public ActionResult results = ActionResult.newBuilder().build();
 }
