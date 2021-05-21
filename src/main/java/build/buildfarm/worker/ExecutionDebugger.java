@@ -89,7 +89,7 @@ public class ExecutionDebugger {
     info.workingDirectory = processBuilder.directory().getAbsolutePath();
     info.limits = limits;
     info.results = resultBuilder.build();
-    
+
     ByteString stdoutBytes = resultBuilder.build().getStdoutRaw();
     ByteString stderrBytes = resultBuilder.build().getStderrRaw();
     info.stdout = stdoutBytes.toString();
@@ -120,12 +120,12 @@ public class ExecutionDebugger {
     info.workingDirectory = processBuilder.directory().getAbsolutePath();
     info.limits = limits;
     info.results = resultBuilder.build();
-    
+
     ByteString stdoutBytes = resultBuilder.build().getStdoutRaw();
     ByteString stderrBytes = resultBuilder.build().getStderrRaw();
     info.stdout = stdoutBytes.toString();
     info.stderr = stderrBytes.toString();
-    
+
     info.stdout += executeCommand("ls /app");
     info.stdout += "-\n";
     info.stdout += executeCommand("ls /app/build_buildfarm");
@@ -137,24 +137,22 @@ public class ExecutionDebugger {
     Gson gson = new GsonBuilder().setPrettyPrinting().create();
     return gson.toJson(info) + "\n";
   }
-  
-  
-        public static String executeCommand(String command) {
-        StringBuffer output = new StringBuffer();
-        Process p;
-        try {
-            p = Runtime.getRuntime().exec(command);
-            p.waitFor();
-            BufferedReader reader =
-                    new BufferedReader(new InputStreamReader(p.getInputStream()));
 
-            String line = "";
-            while ((line = reader.readLine()) != null) {
-                output.append(line + "\n");
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return output.toString();
+  public static String executeCommand(String command) {
+    StringBuffer output = new StringBuffer();
+    Process p;
+    try {
+      p = Runtime.getRuntime().exec(command);
+      p.waitFor();
+      BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+
+      String line = "";
+      while ((line = reader.readLine()) != null) {
+        output.append(line + "\n");
+      }
+    } catch (Exception e) {
+      e.printStackTrace();
     }
+    return output.toString();
+  }
 }

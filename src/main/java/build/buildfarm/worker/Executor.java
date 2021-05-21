@@ -526,12 +526,12 @@ class Executor {
           format("error getting process outputs for %s after timeout", operationName),
           e);
     }
-    
+
     // allow debugging after an execution
     if (limits.debugAfterExecution) {
       return ExecutionDebugger.performAfterExecutionDebug(processBuilder, limits, resultBuilder);
     }
-    
+
     return statusCode;
   }
 }
