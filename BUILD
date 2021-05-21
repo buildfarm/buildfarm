@@ -69,6 +69,7 @@ java_image(
     main_class = "build.buildfarm.worker.shard.Worker",
     tags = ["container"],
     runtime_deps = [
+        ":as-nobody",
         ":linux-sandbox.binary",
         ":process-wrapper.binary",
         ":tini.binary",
