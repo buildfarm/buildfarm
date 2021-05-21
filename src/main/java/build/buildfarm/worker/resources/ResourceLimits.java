@@ -106,5 +106,10 @@ public class ResourceLimits {
    */
   public boolean debugTestsOnly = true;
 
+  /**
+   * @field debugTarget
+   * @brief A specific target to debug.  Used for substring matching on actions.
+   * @details When used, only matches will preserve debug flags.
+   */
   public String debugTarget = "";
 }

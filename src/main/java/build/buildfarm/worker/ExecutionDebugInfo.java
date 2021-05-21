@@ -14,7 +14,6 @@
 
 package build.buildfarm.worker;
 
-import build.bazel.remote.execution.v2.ActionResult;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -61,12 +60,16 @@ public class ExecutionDebugInfo {
   public ResourceLimits limits = new ResourceLimits();
 
   /**
-   * @field results
-   * @brief The results of running the action.
-   * @details These results will only be fully populated if you are debugging after the action ran.
+   * @field stdout
+   * @brief The action result's stdout
+   * @details Converted from proto bytes.
    */
-  public ActionResult results = ActionResult.newBuilder().build();
-
   public String stdout = "";
+
+  /**
+   * @field stdout
+   * @brief The action result's stdout
+   * @details Converted from proto bytes.
+   */
   public String stderr = "";
 }

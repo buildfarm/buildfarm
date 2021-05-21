@@ -108,18 +108,27 @@ public class ResourceDecider {
   private static void adjustDebugFlags(Command command, ResourceLimits limits) {
 
     if (!limits.debugTarget.isEmpty()) {
-      if (!commandMatchesDebugTarget(command, limits)) {
-        limits.debugBeforeExecution = false;
-        limits.debugAfterExecution = false;
-      }
-
+      handleTargetDebug(command, limits);
     } else {
+      handleTestDebug(command, limits);
+    }
+  }
 
-      // adjust debugging based on whether its a test
-      if (limits.debugTestsOnly && !commandIsTest(command)) {
-        limits.debugBeforeExecution = false;
-        limits.debugAfterExecution = false;
-      }
+  private static void handleTargetDebug(Command command, ResourceLimits limits) {
+
+    // When debugging particular targets, disable debugging on non-matches.
+    if (!commandMatchesDebugTarget(command, limits)) {
+      limits.debugBeforeExecution = false;
+      limits.debugAfterExecution = false;
+    }
+  }
+
+  private static void handleTestDebug(Command command, ResourceLimits limits) {
+
+    // When debugging tests, disable debugging on non-tests.
+    if (limits.debugTestsOnly && !commandIsTest(command)) {
+      limits.debugBeforeExecution = false;
+      limits.debugAfterExecution = false;
     }
   }
 
