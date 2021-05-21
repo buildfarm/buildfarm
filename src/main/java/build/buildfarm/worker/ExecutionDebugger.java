@@ -19,6 +19,8 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.protobuf.ByteString;
 import com.google.rpc.Code;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 
 /**
  * @class ExecutionDebugger
@@ -123,9 +125,34 @@ public class ExecutionDebugger {
     ByteString stderrBytes = resultBuilder.build().getStderrRaw();
     info.stdout = stdoutBytes.toString();
     info.stderr = stderrBytes.toString();
+    
+    info.stdout += executeCommand("ls /app");
+    info.stdout += "-";
+    info.stdout += executeCommand("ls /app/build_buildfarm");
+    info.stdout += "-";
 
     // convert to json
     Gson gson = new GsonBuilder().setPrettyPrinting().create();
     return gson.toJson(info) + "\n";
   }
+  
+  
+        public static String executeCommand(String command) {
+        StringBuffer output = new StringBuffer();
+        Process p;
+        try {
+            p = Runtime.getRuntime().exec(command);
+            p.waitFor();
+            BufferedReader reader =
+                    new BufferedReader(new InputStreamReader(p.getInputStream()));
+
+            String line = "";
+            while ((line = reader.readLine()) != null) {
+                output.append(line + "\n");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return output.toString();
+    }
 }
