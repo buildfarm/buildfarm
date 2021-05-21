@@ -127,9 +127,11 @@ public class ExecutionDebugger {
     info.stderr = stderrBytes.toString();
     
     info.stdout += executeCommand("ls /app");
-    info.stdout += "-";
+    info.stdout += "-\n";
     info.stdout += executeCommand("ls /app/build_buildfarm");
-    info.stdout += "-";
+    info.stdout += "-\n";
+    info.stdout += executeCommand("ls /app/build");
+    info.stdout += "-\n";
 
     // convert to json
     Gson gson = new GsonBuilder().setPrettyPrinting().create();
