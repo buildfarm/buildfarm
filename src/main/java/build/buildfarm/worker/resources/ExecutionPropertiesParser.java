@@ -47,18 +47,20 @@ public class ExecutionPropertiesParser {
     // Build parser for all exec properties
     Map<String, BiConsumer<ResourceLimits, Property>> parser = new HashMap<>();
     parser.put(LINUX_SANDBOX, ExecutionPropertiesParser::storeLinuxSandbox);
+    parser.put(AS_NOBODY, ExecutionPropertiesParser::storeAsNobody);
+    parser.put(BLOCK_NETWORK, ExecutionPropertiesParser::storeBlockNetwork);
+    parser.put(TMPFS, ExecutionPropertiesParser::storeTmpFs);
     parser.put(MIN_CORES, ExecutionPropertiesParser::storeMinCores);
     parser.put(MAX_CORES, ExecutionPropertiesParser::storeMaxCores);
     parser.put(CORES, ExecutionPropertiesParser::storeCores);
     parser.put(MIN_MEM, ExecutionPropertiesParser::storeMinMem);
     parser.put(MAX_MEM, ExecutionPropertiesParser::storeMaxMem);
-    parser.put(BLOCK_NETWORK, ExecutionPropertiesParser::storeBlockNetwork);
-    parser.put(AS_NOBODY, ExecutionPropertiesParser::storeAsNobody);
     parser.put(ENV_VAR, ExecutionPropertiesParser::storeEnvVar);
     parser.put(ENV_VARS, ExecutionPropertiesParser::storeEnvVars);
     parser.put(DEBUG_BEFORE_EXECUTION, ExecutionPropertiesParser::storeBeforeExecutionDebug);
     parser.put(DEBUG_AFTER_EXECUTION, ExecutionPropertiesParser::storeAfterExecutionDebug);
     parser.put(DEBUG_TESTS_ONLY, ExecutionPropertiesParser::storeDebugTestsOnly);
+    parser.put(DEBUG_TARGET, ExecutionPropertiesParser::storeDebugTarget);
 
     ResourceLimits limits = new ResourceLimits();
     command
@@ -123,6 +125,17 @@ public class ExecutionPropertiesParser {
   private static void storeLinuxSandbox(ResourceLimits limits, Property property) {
     limits.useLinuxSandbox = Boolean.parseBoolean(property.getValue());
     describeChange(limits.description, "use linux sandbox", property.getValue(), property);
+  }
+
+  /**
+   * @brief Store the property for using tmpfs.
+   * @details Parses and stores a boolean.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
+   */
+  private static void storeTmpFs(ResourceLimits limits, Property property) {
+    limits.tmpFs = Boolean.parseBoolean(property.getValue());
+    describeChange(limits.description, "use tmps", property.getValue(), property);
   }
 
   /**
@@ -253,6 +266,17 @@ public class ExecutionPropertiesParser {
   private static void storeDebugTestsOnly(ResourceLimits limits, Property property) {
     limits.debugTestsOnly = Boolean.parseBoolean(property.getValue());
     describeChange(limits.description, "debug tests only", property.getValue(), property);
+  }
+
+  /**
+   * @brief Store the property for debugging a target.
+   * @details Parses and stores a String.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
+   */
+  private static void storeDebugTarget(ResourceLimits limits, Property property) {
+    limits.debugTarget = property.getValue();
+    describeChange(limits.description, "debug target", property.getValue(), property);
   }
 
   /**

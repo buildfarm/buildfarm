@@ -113,7 +113,7 @@ public class ResourceLimits {
    *     about getting debug information for regular build actions.
    */
   public boolean debugTestsOnly = true;
-  
+
   /**
    * @field debugTarget
    * @brief A specific target to debug. Used for substring matching on actions.
@@ -135,5 +135,4 @@ public class ResourceLimits {
    * @details This can be used to debug execution behavior.
    */
   public ArrayList<String> description = new ArrayList<>();
-
 }
