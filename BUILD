@@ -35,7 +35,7 @@ genrule(
 )
 
 cc_binary(
-    name = "as-nobody.binary",
+    name = "as-nobody",
     srcs = select({
         "//config:windows": ["as-nobody-windows.c"],
         "//conditions:default": ["as-nobody.c"],
@@ -69,6 +69,7 @@ java_image(
     main_class = "build.buildfarm.worker.shard.Worker",
     tags = ["container"],
     runtime_deps = [
+        ":as-nobody",
         ":linux-sandbox.binary",
         ":process-wrapper.binary",
         ":tini.binary",
