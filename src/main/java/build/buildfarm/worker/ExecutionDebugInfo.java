@@ -58,4 +58,18 @@ public class ExecutionDebugInfo {
    * @details These limitations are decided by exec_properties and buildfarm configurations.
    */
   public ResourceLimits limits = new ResourceLimits();
+
+  /**
+   * @field stdout
+   * @brief The action result's stdout
+   * @details Converted from proto bytes.
+   */
+  public String stdout = "";
+
+  /**
+   * @field stdout
+   * @brief The action result's stdout
+   * @details Converted from proto bytes.
+   */
+  public String stderr = "";
 }

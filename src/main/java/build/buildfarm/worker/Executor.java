@@ -199,7 +199,8 @@ class Executor {
     ImmutableList.Builder<String> arguments = ImmutableList.builder();
     Code statusCode;
     try (IOResource resource =
-        workerContext.limitExecution(operationName, arguments, operationContext.command)) {
+        workerContext.limitExecution(
+            operationName, arguments, operationContext.command, workingDirectory)) {
       for (ExecutionPolicy policy : policies) {
         if (policy.getPolicyCase() == WRAPPER) {
           arguments.addAll(transformWrapper(policy.getWrapper()));
@@ -511,11 +512,6 @@ class Executor {
     stdoutReaderThread.join();
     stderrReaderThread.join();
 
-    // allow debugging after an execution
-    if (limits.debugAfterExecution) {
-      return ExecutionDebugger.performAfterExecutionDebug(processBuilder, limits, resultBuilder);
-    }
-
     try {
       resultBuilder
           .setExitCode(exitCode)
@@ -530,6 +526,12 @@ class Executor {
           format("error getting process outputs for %s after timeout", operationName),
           e);
     }
+
+    // allow debugging after an execution
+    if (limits.debugAfterExecution) {
+      return ExecutionDebugger.performAfterExecutionDebug(processBuilder, limits, resultBuilder);
+    }
+
     return statusCode;
   }
 }

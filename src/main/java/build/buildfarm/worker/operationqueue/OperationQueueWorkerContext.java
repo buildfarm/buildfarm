@@ -394,7 +394,10 @@ class OperationQueueWorkerContext implements WorkerContext {
 
   @Override
   public IOResource limitExecution(
-      String operationName, ImmutableList.Builder<String> arguments, Command command) {
+      String operationName,
+      ImmutableList.Builder<String> arguments,
+      Command command,
+      Path workingDirectory) {
     return new IOResource() {
       @Override
       public void close() {}
