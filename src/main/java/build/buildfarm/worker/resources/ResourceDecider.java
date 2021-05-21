@@ -153,6 +153,8 @@ public class ResourceDecider {
     // handle execution wrapper properties
     if (property.getName().equals(ExecutionProperties.LINUX_SANDBOX)) {
       storeLinuxSandbox(limits, property);
+    } else if (property.getName().equals(ExecutionProperties.TMPFS)) {
+      storeTmpFs(limits, property);
     }
 
     // handle cpu properties
@@ -220,6 +222,16 @@ public class ResourceDecider {
    */
   private static void storeLinuxSandbox(ResourceLimits limits, Property property) {
     limits.useLinuxSandbox = Boolean.parseBoolean(property.getValue());
+  }
+
+  /**
+   * @brief Store the property for using tmpfs.
+   * @details Parses and stores a boolean.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
+   */
+  private static void storeTmpFs(ResourceLimits limits, Property property) {
+    limits.tmpFs = Boolean.parseBoolean(property.getValue());
   }
 
   /**

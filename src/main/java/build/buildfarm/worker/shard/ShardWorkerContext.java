@@ -974,7 +974,9 @@ class ShardWorkerContext implements WorkerContext {
       options.writableFiles.add("/tmp");
       options.writableFiles.add("/dev/shm");
 
-      // options.tmpfsDirs.add("/tmp");
+      if (limits.tmpFs) {
+        options.tmpfsDirs.add("/tmp");
+      }
 
       // Bazel looks through environment variables based on operation system to provide additional
       // write files.

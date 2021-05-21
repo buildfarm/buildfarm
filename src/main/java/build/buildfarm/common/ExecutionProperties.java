@@ -66,6 +66,13 @@ public class ExecutionProperties {
   public static final String BLOCK_NETWORK = "block-network";
 
   /**
+   * @field TMPFS
+   * @brief The exec_property and platform property name for enabling tmpfs.
+   * @details This is decided between client and server. The key value is expected to be a boolean.
+   */
+  public static final String TMPFS = "tmpfs";
+
+  /**
    * @field ENV_VARS
    * @brief The exec_property and platform property name for providing additional environment
    *     variables.

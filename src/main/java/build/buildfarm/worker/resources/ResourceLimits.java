@@ -54,6 +54,13 @@ public class ResourceLimits {
   public boolean fakeUsername = false;
 
   /**
+   * @field tmpFs
+   * @brief Whether the action should use tmpfs for the tmp directory.
+   * @details The linux-sandbox supports thie functionality through tmpfsDirs option.
+   */
+  public boolean tmpFs = false;
+
+  /**
    * @field cpu
    * @brief Resource limitations on CPUs.
    * @details Decides specific CPU limitations and whether to apply them for a given action.
@@ -108,7 +115,7 @@ public class ResourceLimits {
 
   /**
    * @field debugTarget
-   * @brief A specific target to debug.  Used for substring matching on actions.
+   * @brief A specific target to debug. Used for substring matching on actions.
    * @details When used, only matches will preserve debug flags.
    */
   public String debugTarget = "";
