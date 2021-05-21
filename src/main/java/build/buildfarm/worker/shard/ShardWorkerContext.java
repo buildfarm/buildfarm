@@ -886,13 +886,16 @@ class ShardWorkerContext implements WorkerContext {
 
   @Override
   public IOResource limitExecution(
-      String operationName, ImmutableList.Builder<String> arguments, Command command) {
+      String operationName,
+      ImmutableList.Builder<String> arguments,
+      Command command,
+      Path workingDirectory) {
     if (limitExecution) {
       ResourceLimits limits =
           ResourceDecider.decideResourceLimitations(
               command, onlyMulticoreTests, limitGlobalExecution, getExecuteStageWidth());
 
-      return limitSpecifiedExecution(limits, operationName, arguments);
+      return limitSpecifiedExecution(limits, operationName, arguments, workingDirectory);
     }
     return new IOResource() {
       @Override
@@ -906,7 +909,10 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   IOResource limitSpecifiedExecution(
-      ResourceLimits limits, String operationName, ImmutableList.Builder<String> arguments) {
+      ResourceLimits limits,
+      String operationName,
+      ImmutableList.Builder<String> arguments,
+      Path workingDirectory) {
 
     // The decision to apply resource restrictions has already been decided within the
     // ResourceLimits object. We apply the cgroup settings to file resources
@@ -948,29 +954,79 @@ class ShardWorkerContext implements WorkerContext {
     // https://github.com/bazelbuild/bazel/blob/ddf302e2798be28bb67e32d5c2fc9c73a6a1fbf4/src/main/java/com/google/devtools/build/lib/sandbox/LinuxSandboxUtil.java#L183
     if (limits.useLinuxSandbox) {
 
-      // Choose the sandbox which is built and deployed with the worker image.
-      arguments.add(ExecutionWrappers.LINUX_SANDBOX);
-
       // Construct the CLI options for this binary.
       LinuxSandboxOptions options = new LinuxSandboxOptions();
       options.createNetns = limits.network.blockNetwork;
-      options.fakeUsername = limits.fakeUsername;
+      options.workingDir = workingDirectory.toString();
 
-      // Pass flags based on the sandbox CLI options.
-      if (options.createNetns) {
-        arguments.add("-N");
-      }
-      if (options.fakeUsername) {
-        arguments.add("-U");
+      // Bazel encodes these directly
+      options.writableFiles.add(execFileSystem.root().toString());
+      options.writableFiles.add(workingDirectory.toString());
+
+      // For the time being, the linux-sandbox version of "nobody"
+      // does not pair with buildfarm's implementation of exec_owner: "nobody".
+      // This will need fixed to enable using fakeUsername with the sandbox.
+      // TODO: provide proper support for bazel sandbox's fakeUsername "-U" flag.
+      // options.fakeUsername = limits.fakeUsername;
+
+      // these were hardcoded in bazel based on a filesystem configuration typical to ours
+      // TODO: they may be incorrect for say Windows, and support will need adjusted in the future.
+      options.writableFiles.add("/tmp");
+      options.writableFiles.add("/dev/shm");
+
+      if (limits.tmpFs) {
+        options.tmpfsDirs.add("/tmp");
       }
 
-      arguments.add("--");
+      // Bazel looks through environment variables based on operation system to provide additional
+      // write files.
+      // TODO: Add other paths based on environment variables
+      // all:     TEST_TMPDIR
+      // windows: TEMP
+      // windows: TMP
+      // linux:   TMPDIR
+
+      addLinuxSandboxCli(arguments, options);
     }
 
     // The executor expects a single IOResource.
     // However, we may have multiple IOResources due to using multiple cgroup groups.
     // We construct a single IOResource to account for this.
     return combineResources(resources);
+  }
+
+  private void addLinuxSandboxCli(
+      ImmutableList.Builder<String> arguments, LinuxSandboxOptions options) {
+
+    arguments.add(ExecutionWrappers.AS_NOBODY);
+
+    // Choose the sandbox which is built and deployed with the worker image.
+    arguments.add(ExecutionWrappers.LINUX_SANDBOX);
+
+    // Pass flags based on the sandbox CLI options.
+    if (options.createNetns) {
+      arguments.add("-N");
+    }
+
+    if (options.fakeUsername) {
+      arguments.add("-U");
+    }
+
+    if (!options.workingDir.isEmpty()) {
+      arguments.add("-W");
+      arguments.add(options.workingDir);
+    }
+    for (String writablePath : options.writableFiles) {
+      arguments.add("-w");
+      arguments.add(writablePath);
+    }
+
+    for (String dir : options.tmpfsDirs) {
+      arguments.add("-e");
+      arguments.add(dir);
+    }
+
+    arguments.add("--");
   }
 
   private void applyCpuLimits(Group group, ResourceLimits limits, ArrayList<IOResource> resources) {

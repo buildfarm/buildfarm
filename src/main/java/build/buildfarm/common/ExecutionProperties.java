@@ -66,6 +66,13 @@ public class ExecutionProperties {
   public static final String BLOCK_NETWORK = "block-network";
 
   /**
+   * @field TMPFS
+   * @brief The exec_property and platform property name for enabling tmpfs.
+   * @details This is decided between client and server. The key value is expected to be a boolean.
+   */
+  public static final String TMPFS = "tmpfs";
+
+  /**
    * @field ENV_VARS
    * @brief The exec_property and platform property name for providing additional environment
    *     variables.
@@ -110,6 +117,14 @@ public class ExecutionProperties {
    *     should be a boolean.
    */
   public static final String DEBUG_TESTS_ONLY = "debug-tests-only";
+
+  /**
+   * @field DEBUG_TARGET
+   * @brief The exec_property and platform property name for indicating a specific target to debug.
+   * @details This is intended to be used interactively to debug remote executions. The key value
+   *     should be a string.
+   */
+  public static final String DEBUG_TARGET = "debug-target";
 
   /**
    * @field CHOOSE_QUEUE
