@@ -964,7 +964,7 @@ class ShardWorkerContext implements WorkerContext {
       options.writableFiles.add(execFileSystem.root().toString());
       options.writableFiles.add(workingDirectory.toString());
       options.writableFiles.add("/tmp/");
-      options.writableFiles.add("/");
+      //options.writableFiles.add("/");
       options.writableFiles.add("/dev/shm");
       //options.tmpfsDirs.add("/tmp/");
 
