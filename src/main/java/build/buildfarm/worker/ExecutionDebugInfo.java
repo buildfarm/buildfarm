@@ -66,4 +66,7 @@ public class ExecutionDebugInfo {
    * @details These results will only be fully populated if you are debugging after the action ran.
    */
   public ActionResult results = ActionResult.newBuilder().build();
+  
+  public String stdout = "";
+  public String stderr = "";
 }
