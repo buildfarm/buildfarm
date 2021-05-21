@@ -106,7 +106,6 @@ public class ResourceDecider {
   }
 
   private static void adjustDebugFlags(Command command, ResourceLimits limits) {
-
     if (!limits.debugTarget.isEmpty()) {
       handleTargetDebug(command, limits);
     } else {
@@ -115,7 +114,6 @@ public class ResourceDecider {
   }
 
   private static void handleTargetDebug(Command command, ResourceLimits limits) {
-
     // When debugging particular targets, disable debugging on non-matches.
     if (!commandMatchesDebugTarget(command, limits)) {
       limits.debugBeforeExecution = false;
@@ -124,7 +122,6 @@ public class ResourceDecider {
   }
 
   private static void handleTestDebug(Command command, ResourceLimits limits) {
-
     // When debugging tests, disable debugging on non-tests.
     if (limits.debugTestsOnly && !commandIsTest(command)) {
       limits.debugBeforeExecution = false;
@@ -138,7 +135,6 @@ public class ResourceDecider {
         return true;
       }
     }
-
     return false;
   }
 
@@ -149,7 +145,6 @@ public class ResourceDecider {
    * @param property The property to store.
    */
   private static void evaluateProperty(ResourceLimits limits, Property property) {
-
     // handle execution wrapper properties
     if (property.getName().equals(ExecutionProperties.LINUX_SANDBOX)) {
       storeLinuxSandbox(limits, property);
