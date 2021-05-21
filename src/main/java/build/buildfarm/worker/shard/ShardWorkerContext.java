@@ -957,18 +957,24 @@ class ShardWorkerContext implements WorkerContext {
       // Construct the CLI options for this binary.
       LinuxSandboxOptions options = new LinuxSandboxOptions();
       options.createNetns = limits.network.blockNetwork;
-      options.fakeUsername = limits.fakeUsername;
       options.workingDir = workingDirectory.toString();
 
       // Bazel encodes these directly
       options.writableFiles.add(execFileSystem.root().toString());
       options.writableFiles.add(workingDirectory.toString());
 
+      // For the time being, the linux-sandbox version of "nobody"
+      // does not pair with buildfarm's implementation of exec_owner: "nobody".
+      // This will need fixed to enable using fakeUsername with the sandbox.
+      // TODO: provide proper support for bazel sandbox's fakeUsername "-U" flag.
+      // options.fakeUsername = limits.fakeUsername;
+
       // these were hardcoded in bazel based on a filesystem configuration typical to ours
       // TODO: they may be incorrect for say Windows, and support will need adjusted in the future.
-      options.writableFiles.add("/tmp/");
+      options.writableFiles.add("/tmp");
       options.writableFiles.add("/dev/shm");
-      // options.tmpfsDirs.add("/tmp/");
+
+      options.tmpfsDirs.add("/tmp");
 
       // Bazel looks through environment variables based on operation system to provide additional
       // write files.
@@ -1002,12 +1008,9 @@ class ShardWorkerContext implements WorkerContext {
       arguments.add("-N");
     }
 
-    // For the time being, the linux-sandbox version of "nobody"
-    // does not pair with buildfarm's implementation of exec_owner: "nnobody".
-    // This will need fixed to enable using fakeUsername on the sandbox.
-    // if (options.fakeUsername) {
-    //   arguments.add("-U");
-    // }
+    if (options.fakeUsername) {
+      arguments.add("-U");
+    }
 
     if (!options.workingDir.isEmpty()) {
       arguments.add("-W");
