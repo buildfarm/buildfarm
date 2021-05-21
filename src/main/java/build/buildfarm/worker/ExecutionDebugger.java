@@ -90,8 +90,8 @@ public class ExecutionDebugger {
     // extract action result data
     ByteString stdoutBytes = resultBuilder.build().getStdoutRaw();
     ByteString stderrBytes = resultBuilder.build().getStderrRaw();
-    info.stdout = stdoutBytes.toString();
-    info.stderr = stderrBytes.toString();
+    info.stdout = stdoutBytes.toStringUtf8();
+    info.stderr = stderrBytes.toStringUtf8();
 
     // convert to json
     Gson gson = new GsonBuilder().setPrettyPrinting().create();
@@ -121,8 +121,8 @@ public class ExecutionDebugger {
     // extract action result data
     ByteString stdoutBytes = resultBuilder.build().getStdoutRaw();
     ByteString stderrBytes = resultBuilder.build().getStderrRaw();
-    info.stdout = stdoutBytes.toString();
-    info.stderr = stderrBytes.toString();
+    info.stdout = stdoutBytes.toStringUtf8();
+    info.stderr = stderrBytes.toStringUtf8();
 
     // convert to json
     Gson gson = new GsonBuilder().setPrettyPrinting().create();
