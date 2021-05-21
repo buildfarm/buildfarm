@@ -998,9 +998,7 @@ class ShardWorkerContext implements WorkerContext {
   private void addLinuxSandboxCli(
       ImmutableList.Builder<String> arguments, LinuxSandboxOptions options) {
 
-    if (options.fakeUsername) {
-      arguments.add(ExecutionWrappers.AS_NOBODY);
-    }
+    arguments.add(ExecutionWrappers.AS_NOBODY);
 
     // Choose the sandbox which is built and deployed with the worker image.
     arguments.add(ExecutionWrappers.LINUX_SANDBOX);
