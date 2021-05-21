@@ -1020,8 +1020,6 @@ class ShardWorkerContext implements WorkerContext {
       arguments.add(dir);
     }
 
-    // Both needed.  Find out why.
-    arguments.add("--");
     arguments.add("--");
   }
 
