@@ -87,6 +87,12 @@ public class ExecutionDebugger {
     info.workingDirectory = processBuilder.directory().getAbsolutePath();
     info.limits = limits;
 
+    // extract action result data
+    ByteString stdoutBytes = resultBuilder.build().getStdoutRaw();
+    ByteString stderrBytes = resultBuilder.build().getStderrRaw();
+    info.stdout = stdoutBytes.toStringUtf8();
+    info.stderr = stderrBytes.toStringUtf8();
+
     // convert to json
     Gson gson = new GsonBuilder().setPrettyPrinting().create();
     return gson.toJson(info) + "\n";
@@ -111,6 +117,12 @@ public class ExecutionDebugger {
     info.environment = processBuilder.environment();
     info.workingDirectory = processBuilder.directory().getAbsolutePath();
     info.limits = limits;
+
+    // extract action result data
+    ByteString stdoutBytes = resultBuilder.build().getStdoutRaw();
+    ByteString stderrBytes = resultBuilder.build().getStderrRaw();
+    info.stdout = stdoutBytes.toStringUtf8();
+    info.stderr = stderrBytes.toStringUtf8();
 
     // convert to json
     Gson gson = new GsonBuilder().setPrettyPrinting().create();

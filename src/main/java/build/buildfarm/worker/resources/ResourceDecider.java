@@ -76,11 +76,7 @@ public class ResourceDecider {
       limits.cpu.max = override.coreMax;
     }
 
-    // adjust debugging based on whether its a test
-    if (limits.debugTestsOnly && !commandIsTest(command)) {
-      limits.debugBeforeExecution = false;
-      limits.debugAfterExecution = false;
-    }
+    adjustDebugFlags(command, limits);
 
     // Should we limit the cores of the action during execution? by default, no.
     // If the action has suggested core restrictions on itself, then yes.
@@ -109,6 +105,39 @@ public class ResourceDecider {
     return limits;
   }
 
+  private static void adjustDebugFlags(Command command, ResourceLimits limits) {
+    if (!limits.debugTarget.isEmpty()) {
+      handleTargetDebug(command, limits);
+    } else {
+      handleTestDebug(command, limits);
+    }
+  }
+
+  private static void handleTargetDebug(Command command, ResourceLimits limits) {
+    // When debugging particular targets, disable debugging on non-matches.
+    if (!commandMatchesDebugTarget(command, limits)) {
+      limits.debugBeforeExecution = false;
+      limits.debugAfterExecution = false;
+    }
+  }
+
+  private static void handleTestDebug(Command command, ResourceLimits limits) {
+    // When debugging tests, disable debugging on non-tests.
+    if (limits.debugTestsOnly && !commandIsTest(command)) {
+      limits.debugBeforeExecution = false;
+      limits.debugAfterExecution = false;
+    }
+  }
+
+  private static boolean commandMatchesDebugTarget(Command command, ResourceLimits limits) {
+    for (String argument : command.getArgumentsList()) {
+      if (argument.contains(limits.debugTarget)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /**
    * @brief Evaluate a given platform property of a command and use it to adjust execution settings.
    * @details Parses the property key/value and stores them appropriately.
@@ -116,10 +145,11 @@ public class ResourceDecider {
    * @param property The property to store.
    */
   private static void evaluateProperty(ResourceLimits limits, Property property) {
-
     // handle execution wrapper properties
     if (property.getName().equals(ExecutionProperties.LINUX_SANDBOX)) {
       storeLinuxSandbox(limits, property);
+    } else if (property.getName().equals(ExecutionProperties.TMPFS)) {
+      storeTmpFs(limits, property);
     }
 
     // handle cpu properties
@@ -162,6 +192,8 @@ public class ResourceDecider {
       storeAfterExecutionDebug(limits, property);
     } else if (property.getName().equals(ExecutionProperties.DEBUG_TESTS_ONLY)) {
       storeDebugTestsOnly(limits, property);
+    } else if (property.getName().equals(ExecutionProperties.DEBUG_TARGET)) {
+      storeDebugTarget(limits, property);
     }
   }
 
@@ -185,6 +217,16 @@ public class ResourceDecider {
    */
   private static void storeLinuxSandbox(ResourceLimits limits, Property property) {
     limits.useLinuxSandbox = Boolean.parseBoolean(property.getValue());
+  }
+
+  /**
+   * @brief Store the property for using tmpfs.
+   * @details Parses and stores a boolean.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
+   */
+  private static void storeTmpFs(ResourceLimits limits, Property property) {
+    limits.tmpFs = Boolean.parseBoolean(property.getValue());
   }
 
   /**
@@ -302,6 +344,16 @@ public class ResourceDecider {
    */
   private static void storeDebugTestsOnly(ResourceLimits limits, Property property) {
     limits.debugTestsOnly = Boolean.parseBoolean(property.getValue());
+  }
+
+  /**
+   * @brief Store the property for debugging a target.
+   * @details Parses and stores a String.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
+   */
+  private static void storeDebugTarget(ResourceLimits limits, Property property) {
+    limits.debugTarget = property.getValue();
   }
 
   /**
