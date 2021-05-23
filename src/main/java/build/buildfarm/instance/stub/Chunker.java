@@ -40,7 +40,6 @@ import java.util.function.Supplier;
  * manually.
  */
 public final class Chunker {
-
   private static int defaultChunkSize = 1024 * 16;
 
   /** This method must only be called in tests! */
@@ -55,7 +54,6 @@ public final class Chunker {
 
   /** A piece of a byte[] blob. */
   public static final class Chunk {
-
     private final long offset;
     private final ByteString data;
 

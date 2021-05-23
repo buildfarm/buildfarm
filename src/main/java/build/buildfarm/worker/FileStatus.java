@@ -34,7 +34,6 @@ import java.io.IOException;
  * possible but not required.)
  */
 public interface FileStatus {
-
   /** Returns true iff this file is a regular file or {@code isSpecial()}. */
   boolean isFile();
 

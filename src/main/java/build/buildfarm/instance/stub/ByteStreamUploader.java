@@ -63,7 +63,6 @@ import javax.annotation.concurrent.GuardedBy;
  * <p>Users must call {@link #shutdown()} before exiting.
  */
 public class ByteStreamUploader {
-
   private static final Logger logger = Logger.getLogger(ByteStreamUploader.class.getName());
 
   private final String instanceName;
@@ -240,7 +239,6 @@ public class ByteStreamUploader {
   }
 
   private static class AsyncUpload {
-
     private final Channel channel;
     private final CallCredentials callCredentials;
     private final long callTimeoutSecs;
@@ -369,7 +367,6 @@ public class ByteStreamUploader {
       SettableFuture<Void> uploadResult = SettableFuture.create();
       ClientCall.Listener<WriteResponse> callListener =
           new ClientCall.Listener<WriteResponse>() {
-
             private final WriteRequest.Builder requestBuilder = WriteRequest.newBuilder();
             private volatile boolean callHalfClosed = false;
 

@@ -40,7 +40,6 @@ import redis.clients.jedis.JedisCluster;
  */
 @RunWith(JUnit4.class)
 public class BalancedRedisQueueTest {
-
   private JedisCluster redis;
 
   @Before
@@ -58,7 +57,6 @@ public class BalancedRedisQueueTest {
   // Failure explanation: the queue is throwing an exception upon construction
   @Test
   public void balancedRedisQueueCreateHashesConstructsWithoutError() throws Exception {
-
     // ACT
     BalancedRedisQueue queue = new BalancedRedisQueue("test", ImmutableList.of());
   }
@@ -68,7 +66,6 @@ public class BalancedRedisQueueTest {
   // Failure explanation: the queue is throwing an exception upon push
   @Test
   public void pushPushWithoutError() throws Exception {
-
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
     BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
@@ -82,7 +79,6 @@ public class BalancedRedisQueueTest {
   // Failure explanation: the queue is throwing an exception upon pushing different values
   @Test
   public void pushPushDifferentWithoutError() throws Exception {
-
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
     BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
@@ -97,7 +93,6 @@ public class BalancedRedisQueueTest {
   // Failure explanation: the queue is throwing an exception upon pushing the same values
   @Test
   public void pushPushSameWithoutError() throws Exception {
-
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
     BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
@@ -112,7 +107,6 @@ public class BalancedRedisQueueTest {
   // Failure explanation: the queue is throwing an exception upon pushing many values
   @Test
   public void pushPushMany() throws Exception {
-
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
     BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
@@ -128,7 +122,6 @@ public class BalancedRedisQueueTest {
   // Failure explanation: the queue size is not accurately reflecting the pushes
   @Test
   public void pushPushIncreasesSize() throws Exception {
-
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
     BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
@@ -164,7 +157,6 @@ public class BalancedRedisQueueTest {
   // empty queue
   @Test
   public void removeFromDequeueFalseOnEmpty() throws Exception {
-
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
     BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
@@ -183,7 +175,6 @@ public class BalancedRedisQueueTest {
   // deletion
   @Test
   public void removeFromDequeueFalseWhenValueIsMissing() throws Exception {
-
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
     BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
@@ -205,7 +196,6 @@ public class BalancedRedisQueueTest {
   // deletion
   @Test
   public void removeFromDequeueTrueWhenValueExists() throws Exception {
-
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
     BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
@@ -228,7 +218,6 @@ public class BalancedRedisQueueTest {
   // Failure explanation: name does not match what it should
   @Test
   public void getNameNameIsStored() throws Exception {
-
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
     BalancedRedisQueue queue = new BalancedRedisQueue("queue_name", hashtags);
@@ -245,11 +234,9 @@ public class BalancedRedisQueueTest {
   // Failure explanation: name does not match what it should
   @Test
   public void getNameNameHasHashtagRemovedFront() throws Exception {
-
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
     BalancedRedisQueue queue = new BalancedRedisQueue("{hash}queue_name", hashtags);
-
     // ACT
     String name = queue.getName();
 
@@ -262,12 +249,10 @@ public class BalancedRedisQueueTest {
   // Failure explanation: name does not match what it should
   @Test
   public void getNameNameHasHashtagColonRemovedFront() throws Exception {
-
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
     // similar to what has been seen in configuration files
     BalancedRedisQueue queue = new BalancedRedisQueue("{Execution}:QueuedOperations", hashtags);
-
     // ACT
     String name = queue.getName();
 
@@ -280,11 +265,9 @@ public class BalancedRedisQueueTest {
   // Failure explanation: name does not match what it should
   @Test
   public void getNameNameHasHashtagRemovedBack() throws Exception {
-
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
     BalancedRedisQueue queue = new BalancedRedisQueue("queue_name{hash}", hashtags);
-
     // ACT
     String name = queue.getName();
 
@@ -297,11 +280,9 @@ public class BalancedRedisQueueTest {
   // Failure explanation: name does not match what it should
   @Test
   public void getNameNameHasHashtagRemovedMiddle() throws Exception {
-
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
     BalancedRedisQueue queue = new BalancedRedisQueue("queue_{hash}name", hashtags);
-
     // ACT
     String name = queue.getName();
 
@@ -314,11 +295,9 @@ public class BalancedRedisQueueTest {
   // Failure explanation: name does not match what it should
   @Test
   public void getNameNameHasHashtagRemovedFrontBack() throws Exception {
-
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
     BalancedRedisQueue queue = new BalancedRedisQueue("{hash}queue_name{hash}", hashtags);
-
     // ACT
     String name = queue.getName();
 
@@ -331,7 +310,6 @@ public class BalancedRedisQueueTest {
   // Failure explanation: size is incorrectly reporting the expected queue size
   @Test
   public void sizeAdjustPushPop() throws Exception {
-
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
     BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
@@ -369,7 +347,6 @@ public class BalancedRedisQueueTest {
   // Failure explanation: we are unable to visit each element in the queue
   @Test
   public void visitCheckVisitOfEachElement() throws Exception {
-
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
     BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
@@ -409,7 +386,6 @@ public class BalancedRedisQueueTest {
   // Failure explanation: evenly distributed is not working on the empty queue
   @Test
   public void isEvenlyDistributedEmptyIsEvenlyDistributed() throws Exception {
-
     // ARRANGE
     List<String> hashtags = RedisNodeHashes.getEvenlyDistributedHashes(redis);
     BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
@@ -427,7 +403,6 @@ public class BalancedRedisQueueTest {
   // Failure explanation: queue is not evenly distributing as it should
   @Test
   public void isEvenlyDistributedFourNodesFourHundredPushesIsEven() throws Exception {
-
     // ARRANGE
     List<String> hashtags = Arrays.asList("node1", "node2", "node3", "node4");
     BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
@@ -448,7 +423,6 @@ public class BalancedRedisQueueTest {
   // Failure explanation: queue is incorrectly reporting an even distribution
   @Test
   public void isEvenlyDistributedFourNodesFourHundredOnePushesIsNotEven() throws Exception {
-
     // ARRANGE
     List<String> hashtags = Arrays.asList("node1", "node2", "node3", "node4");
     BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
@@ -469,7 +443,6 @@ public class BalancedRedisQueueTest {
   // Failure explanation: queue is incorrectly reporting an even distribution
   @Test
   public void isEvenlyDistributedSingleNodeAlwaysEvenlyDistributes() throws Exception {
-
     // ARRANGE
     List<String> hashtags = Arrays.asList("single_node");
     BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
@@ -498,7 +471,6 @@ public class BalancedRedisQueueTest {
   // Failure explanation: queue is incorrectly reporting an even distribution
   @Test
   public void isEvenlyDistributedTwoNodeExample() throws Exception {
-
     // ARRANGE
     List<String> hashtags = Arrays.asList("node_1", "node_2");
     BalancedRedisQueue queue = new BalancedRedisQueue("test", hashtags);
