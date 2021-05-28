@@ -22,7 +22,6 @@ package build.buildfarm.common;
  *     workers and the operation queue.
  */
 public class ExecutionProperties {
-
   /**
    * @field CORES
    * @brief The exec_property and platform property name for setting the core amount.

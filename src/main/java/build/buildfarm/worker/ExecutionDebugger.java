@@ -30,7 +30,6 @@ import com.google.rpc.Code;
  *     helpful in debugging buildfarm itself.
  */
 public class ExecutionDebugger {
-
   /**
    * @brief Fail the operation before executing it but provide relevant debug information to the
    *     user via a failed result.
@@ -78,7 +77,6 @@ public class ExecutionDebugger {
    */
   private static String getBeforeExecutionDebugInfo(
       ProcessBuilder processBuilder, ResourceLimits limits, ActionResult.Builder resultBuilder) {
-
     // construct debug object
     ExecutionDebugInfo info = new ExecutionDebugInfo();
     info.description = "Buildfarm debug information before execution";
@@ -109,7 +107,6 @@ public class ExecutionDebugger {
    */
   private static String getAfterExecutionDebugInfo(
       ProcessBuilder processBuilder, ResourceLimits limits, ActionResult.Builder resultBuilder) {
-
     // construct debug object
     ExecutionDebugInfo info = new ExecutionDebugInfo();
     info.description = "Buildfarm debug information after execution";

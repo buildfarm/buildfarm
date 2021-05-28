@@ -25,7 +25,6 @@ import java.util.ArrayList;
  *     doing the same.
  */
 public class NetworkLimits {
-
   /**
    * @field blockNetwork
    * @brief Whether or not to block network access.

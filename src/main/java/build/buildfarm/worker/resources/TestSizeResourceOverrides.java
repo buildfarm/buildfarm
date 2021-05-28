@@ -23,7 +23,6 @@ package build.buildfarm.worker;
  *     strategy and it can be enabled / disabled.
  */
 public class TestSizeResourceOverrides {
-
   /**
    * @field enabled
    * @brief Whether to perform resource overrides based on test size.

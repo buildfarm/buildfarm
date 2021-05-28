@@ -33,7 +33,6 @@ import redis.clients.jedis.JedisCluster;
  *     information.
  */
 public class OperationQueue {
-
   /**
    * @field maxQueueSize
    * @brief The maximum amount of elements that should be added to the queue.

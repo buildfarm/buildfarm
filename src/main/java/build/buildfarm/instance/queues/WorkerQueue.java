@@ -31,7 +31,6 @@ import java.util.List;
  * queued.
  */
 public class WorkerQueue {
-
   /* a name for the queue */
   public String name;
 

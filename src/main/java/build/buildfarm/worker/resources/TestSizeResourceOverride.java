@@ -22,7 +22,6 @@ package build.buildfarm.worker;
  *     the test size buckets which will assign good defaults.
  */
 public class TestSizeResourceOverride {
-
   /**
    * @field coreMin
    * @brief What to override the minimum core amount to.

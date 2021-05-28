@@ -25,7 +25,6 @@ import com.google.common.collect.Iterables;
  *     global buildfarm configuration.
  */
 public class ResourceDecider {
-
   /**
    * @brief Decide resource limitations for the given command.
    * @details Platform properties from specified exec_properties are taken into account as well as

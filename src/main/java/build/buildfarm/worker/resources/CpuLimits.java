@@ -30,7 +30,6 @@ import java.util.ArrayList;
  *     efficiently or opt for local execution as an alternative.
  */
 public class CpuLimits {
-
   /**
    * @field limit
    * @brief Whether or not we perform CPU core limiting on the action.
