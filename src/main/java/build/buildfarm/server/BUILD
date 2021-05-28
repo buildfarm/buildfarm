@@ -17,7 +17,6 @@ java_library(
         "//src/main/java/build/buildfarm/metrics/gcp",
         "//src/main/java/build/buildfarm/metrics/log",
         "//src/main/java/build/buildfarm/metrics/prometheus",
-        "//src/main/java/build/buildfarm/operations",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_grpc",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "@googleapis//:google_bytestream_bytestream_java_grpc",
