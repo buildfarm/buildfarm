@@ -1194,7 +1194,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   public StartupCacheResults start(
       Consumer<Digest> onStartPut, ExecutorService removeDirectoryService, boolean skipLoad)
       throws IOException, InterruptedException {
-
     // start delegate if it exists
     if (delegate != null && delegate instanceof CASFileCache) {
       CASFileCache fileCacheDelegate = (CASFileCache) delegate;
@@ -1237,7 +1236,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
   private CacheLoadResults loadCache(
       Consumer<Digest> onStartPut, ExecutorService removeDirectoryService)
       throws IOException, InterruptedException {
-
     CacheLoadResults results = new CacheLoadResults();
 
     // Phase 1: Scan
@@ -1344,7 +1342,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       ImmutableList.Builder<Path> deleteFiles,
       ImmutableMap.Builder<Object, Entry> fileKeys)
       throws IOException, InterruptedException {
-
     String basename = file.getFileName().toString();
 
     FileStatus stat = stat(file, false, fileStore);
@@ -1408,7 +1405,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
 
   private List<Path> computeDirectories(CacheScanResults cacheScanResults)
       throws IOException, InterruptedException {
-
     // create thread pool
     int nThreads = Runtime.getRuntime().availableProcessors();
     String threadNameFormat = "compute-cache-pool-%d";
@@ -2577,7 +2573,6 @@ public abstract class CASFileCache implements ContentAddressableStorage {
       AtomicBoolean requiresDischarge,
       boolean isReset)
       throws IOException, InterruptedException {
-
     if (blobSizeInBytes > maxEntrySizeInBytes) {
       throw new EntryLimitException(blobSizeInBytes, maxEntrySizeInBytes);
     }

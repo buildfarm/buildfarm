@@ -32,14 +32,12 @@ import redis.clients.jedis.JedisCluster;
  */
 @RunWith(JUnit4.class)
 public class RedisNodeHashesTest {
-
   // Function under test: getEvenlyDistributedHashes
   // Reason for testing: an established redis cluster can be used to obtain distributed hashes
   // Failure explanation: there is an error in the cluster's ability to report slot ranges or
   // convert ranges to hashtags
   @Test
   public void getEvenlyDistributedHashesCanRetrieveDistributedHashes() throws Exception {
-
     // ARRANGE
     JedisCluster redis = JedisClusterFactory.createTest();
 
@@ -56,7 +54,6 @@ public class RedisNodeHashesTest {
   // convert ranges to hashtags
   @Test
   public void getEvenlyDistributedHashesWithPrefixCanRetrieveDistributedHashes() throws Exception {
-
     // ARRANGE
     JedisCluster redis = JedisClusterFactory.createTest();
 

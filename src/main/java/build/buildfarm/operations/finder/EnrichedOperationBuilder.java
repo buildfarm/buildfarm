@@ -42,7 +42,6 @@ import redis.clients.jedis.JedisCluster;
  *     extra provided metadata.
  */
 public class EnrichedOperationBuilder {
-
   private static final Logger logger = Logger.getLogger(EnrichedOperationBuilder.class.getName());
 
   /**

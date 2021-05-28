@@ -20,7 +20,6 @@ package build.buildfarm.common;
  * @details This will remove the worker from CAS indexes, and in some cases, remove the CAS key.
  */
 public class CasIndexResults {
-
   /**
    * @field removedHosts
    * @brief The number of CAS entries the worker was removed from.

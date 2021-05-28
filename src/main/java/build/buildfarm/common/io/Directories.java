@@ -112,7 +112,6 @@ public class Directories {
     Files.walkFileTree(
         directory,
         new SimpleFileVisitor<Path>() {
-
           @Override
           public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
               throws IOException {

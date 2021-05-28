@@ -46,7 +46,6 @@ public class ThreadSafety {
   @Target(value = {ElementType.TYPE})
   @Retention(RetentionPolicy.RUNTIME)
   public @interface Immutable {}
-
   /**
    * The ThreadSafe attribute marks a class or method which can safely be used from multiple threads
    * without any need for external synchronization.
@@ -67,7 +66,6 @@ public class ThreadSafety {
   @Target(value = {ElementType.CONSTRUCTOR, ElementType.METHOD, ElementType.TYPE})
   @Retention(RetentionPolicy.SOURCE)
   public @interface ThreadSafe {}
-
   /**
    * The ThreadCompatible attribute marks a class or method that is thread-safe provided that only
    * one thread attempts to access each object at a time.
@@ -87,7 +85,6 @@ public class ThreadSafety {
   @Target(value = {ElementType.METHOD, ElementType.TYPE})
   @Retention(RetentionPolicy.SOURCE)
   public @interface ThreadCompatible {}
-
   /**
    * The ThreadHostile attribute marks a class or method that can't safely be used by multiple
    * threads, for example because it performs unsynchronized access to mutable static objects.
@@ -96,7 +93,6 @@ public class ThreadSafety {
   @Target(value = {ElementType.CONSTRUCTOR, ElementType.METHOD, ElementType.TYPE})
   @Retention(RetentionPolicy.SOURCE)
   public @interface ThreadHostile {}
-
   /**
    * The ConditionallyThreadSafe attribute marks a class that contains some methods (or nested
    * classes) which are ThreadSafe but others which are only ThreadCompatible or ThreadHostile.
@@ -108,7 +104,6 @@ public class ThreadSafety {
   @Target(value = {ElementType.METHOD, ElementType.TYPE})
   @Retention(RetentionPolicy.SOURCE)
   public @interface ConditionallyThreadSafe {}
-
   /**
    * The ConditionallyThreadCompatible attribute marks a class that contains some methods (or nested
    * classes) which are ThreadCompatible but others which are ThreadHostile.

@@ -28,7 +28,6 @@ import java.util.Map;
  *     to decide the eligibility of which workers can execute which actions.
  */
 public class ResourceLimits {
-
   /**
    * @field useLinuxSandbox
    * @brief Whether to use bazel's linux sandbox as an execution wrapper.

@@ -913,7 +913,6 @@ class ShardWorkerContext implements WorkerContext {
       String operationName,
       ImmutableList.Builder<String> arguments,
       Path workingDirectory) {
-
     // The decision to apply resource restrictions has already been decided within the
     // ResourceLimits object. We apply the cgroup settings to file resources
     // and collect group names to use on the CLI.
@@ -953,7 +952,6 @@ class ShardWorkerContext implements WorkerContext {
     // For reference on how bazel spawns the sandbox:
     // https://github.com/bazelbuild/bazel/blob/ddf302e2798be28bb67e32d5c2fc9c73a6a1fbf4/src/main/java/com/google/devtools/build/lib/sandbox/LinuxSandboxUtil.java#L183
     if (limits.useLinuxSandbox) {
-
       // Construct the CLI options for this binary.
       LinuxSandboxOptions options = new LinuxSandboxOptions();
       options.createNetns = limits.network.blockNetwork;
@@ -997,7 +995,6 @@ class ShardWorkerContext implements WorkerContext {
 
   private void addLinuxSandboxCli(
       ImmutableList.Builder<String> arguments, LinuxSandboxOptions options) {
-
     arguments.add(ExecutionWrappers.AS_NOBODY);
 
     // Choose the sandbox which is built and deployed with the worker image.
@@ -1030,7 +1027,6 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   private void applyCpuLimits(Group group, ResourceLimits limits, ArrayList<IOResource> resources) {
-
     Cpu cpu = group.getCpu();
     try {
       cpu.close();
@@ -1059,7 +1055,6 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   private void applyMemLimits(Group group, ResourceLimits limits, ArrayList<IOResource> resources) {
-
     try {
       Mem mem = group.getMem();
       mem.setMemoryLimit(limits.mem.claimed);

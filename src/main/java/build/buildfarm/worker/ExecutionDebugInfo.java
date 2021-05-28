@@ -23,7 +23,6 @@ import java.util.Map;
  * @details This information can be returned to the client as the stderr of the failed action.
  */
 public class ExecutionDebugInfo {
-
   /**
    * @field description
    * @brief A description of the data for how it was populated.

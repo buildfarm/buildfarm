@@ -37,5 +37,14 @@ then
     fi
 fi
 
+# The formatter is lax on certain whitespace decisons.
+# Therefore, we perform these adjustements before running the formatter.
+# This will make the formatting more consistent overall.
+for file in $files
+do
+	# Remove whitespace lines after starting bracket '{'
+        awk -i inplace -v n=-2 'NR==n+1 && !NF{next} /\{/ {n=NR}1' $file
+done
+
 # Fixes formatting issues
 java -jar $LOCAL_FORMATTER -i $files 

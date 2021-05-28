@@ -22,7 +22,6 @@ package build.buildfarm.common;
  *     policies in the worker configuration file.
  */
 public class ExecutionWrappers {
-
   /**
    * @field CGROUPS
    * @brief The program to use when running actions under cgroups.

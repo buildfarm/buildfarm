@@ -31,7 +31,6 @@ import redis.clients.jedis.JedisCluster;
  *     the same underlying redis queues.
  */
 public class BalancedRedisQueue {
-
   private static final int START_TIMEOUT_SECONDS = 1;
 
   private static final int MAX_TIMEOUT_SECONDS = 8;
@@ -358,7 +357,6 @@ public class BalancedRedisQueue {
     // note: we must build the balanced queues internal queue with a hashtag because it will dequeue
     // to the same redis slot.
     if (hashtags.isEmpty()) {
-
       if (!originalHashtag.isEmpty()) {
         queues.add(new RedisQueue(RedisHashtags.hashedName(name, originalHashtag)));
       } else {

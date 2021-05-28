@@ -30,13 +30,11 @@ import org.junit.runners.JUnit4;
  */
 @RunWith(JUnit4.class)
 public class ResourceDeciderTest {
-
   // Function under test: decideResourceLimitations
   // Reason for testing: test that cores can be set
   // Failure explanation: cores were not decided as expected
   @Test
   public void decideResourceLimitationsTestCoreSetting() throws Exception {
-
     // ARRANGE
     Command command =
         Command.newBuilder()
@@ -61,7 +59,6 @@ public class ResourceDeciderTest {
   // Failure explanation: cores were not decided as expected
   @Test
   public void decideResourceLimitationsTestCoreSettingSkippedOnNontest() throws Exception {
-
     // ARRANGE
     Command command =
         Command.newBuilder()
@@ -86,7 +83,6 @@ public class ResourceDeciderTest {
   // Failure explanation: claims were not 0 as expected
   @Test
   public void decideResourceLimitationsEnsureClaimsOne() throws Exception {
-
     // ARRANGE
     Command command =
         Command.newBuilder()
@@ -110,7 +106,6 @@ public class ResourceDeciderTest {
   // Failure explanation: expected limit flag set.
   @Test
   public void decideResourceLimitationsEnsureLimitGlobalSet() throws Exception {
-
     // ARRANGE
     Command command =
         Command.newBuilder()
@@ -134,7 +129,6 @@ public class ResourceDeciderTest {
   // Failure explanation: Did not expect limit flag set.
   @Test
   public void decideResourceLimitationsEnsureNoLimitNoGlobalSet() throws Exception {
-
     // ARRANGE
     Command command =
         Command.newBuilder()
@@ -158,7 +152,6 @@ public class ResourceDeciderTest {
   // Failure explanation: claims were not the same as minimum
   @Test
   public void decideResourceLimitationsEnsureClaimsAreMin() throws Exception {
-
     // ARRANGE
     Command command =
         Command.newBuilder()
@@ -182,7 +175,6 @@ public class ResourceDeciderTest {
   // Failure explanation: mem limits were not decided as expected
   @Test
   public void decideResourceLimitationsTestMemSetting() throws Exception {
-
     // ARRANGE
     Command command =
         Command.newBuilder()
@@ -207,7 +199,6 @@ public class ResourceDeciderTest {
   // Failure explanation: the parsing crashed or did not provide an empty map
   @Test
   public void decideResourceLimitationsTestDefaultEnvironmentParse() throws Exception {
-
     // ARRANGE
     Command command = Command.newBuilder().build();
 
@@ -224,7 +215,6 @@ public class ResourceDeciderTest {
   // Failure explanation: the parsing crashed or did not provide an empty map
   @Test
   public void decideResourceLimitationsTestEmptyEnvironmentParse() throws Exception {
-
     // ARRANGE
     Command command =
         Command.newBuilder()
@@ -246,7 +236,6 @@ public class ResourceDeciderTest {
   // Failure explanation: the parsing crashed or the map was not correctly populated
   @Test
   public void decideResourceLimitationsTestSingleEnvironmentParse() throws Exception {
-
     // ARRANGE
     Command command =
         Command.newBuilder()
@@ -273,7 +262,6 @@ public class ResourceDeciderTest {
   // Failure explanation: the parsing crashed or the map was not correctly populated
   @Test
   public void decideResourceLimitationsTestDoubleEnvironmentParse() throws Exception {
-
     // ARRANGE
     Command command =
         Command.newBuilder()
@@ -302,7 +290,6 @@ public class ResourceDeciderTest {
   // Failure explanation: the parsing crashed or the map was not correctly populated
   @Test
   public void decideResourceLimitationsTestMalformedEnvironmentParse() throws Exception {
-
     // ARRANGE
     Command command =
         Command.newBuilder()
@@ -326,7 +313,6 @@ public class ResourceDeciderTest {
   // Failure explanation: values were not resolved as expected
   @Test
   public void decideResourceLimitationsTestEnvironmentMustacheResolution() throws Exception {
-
     // ARRANGE
     Command command =
         Command.newBuilder()
@@ -360,7 +346,6 @@ public class ResourceDeciderTest {
   // Failure explanation: the parsing was not done correctly and the variable was somehow ignored
   @Test
   public void decideResourceLimitationsTestIndividualEnvironmentVarParse() throws Exception {
-
     // ARRANGE
     Command command =
         Command.newBuilder()
@@ -386,7 +371,6 @@ public class ResourceDeciderTest {
   // reason
   @Test
   public void decideResourceLimitationsTestTwoIndividualEnvironmentVarParse() throws Exception {
-
     // ARRANGE
     Command command =
         Command.newBuilder()
@@ -416,7 +400,6 @@ public class ResourceDeciderTest {
   // value contents are wrong
   @Test
   public void decideResourceLimitationsTestEmptyEnvironmentVarParse() throws Exception {
-
     // ARRANGE
     Command command =
         Command.newBuilder()
@@ -440,7 +423,6 @@ public class ResourceDeciderTest {
   // Failure explanation: the bool was not parsed as true like we would have expected
   @Test
   public void decideResourceLimitationsTestDebugBeforeParse() throws Exception {
-
     // ARRANGE
     Command command =
         Command.newBuilder()
@@ -467,7 +449,6 @@ public class ResourceDeciderTest {
   // Failure explanation: the bool was not parsed as true like we would have expected
   @Test
   public void decideResourceLimitationsTestDebugAfterParse() throws Exception {
-
     // ARRANGE
     Command command =
         Command.newBuilder()
@@ -494,7 +475,6 @@ public class ResourceDeciderTest {
   // Failure explanation: the value was not parsed gracefully or was somehow interpreted as true
   @Test
   public void decideResourceLimitationsTestInvalidDebugParse() throws Exception {
-
     // ARRANGE
     Command command =
         Command.newBuilder()

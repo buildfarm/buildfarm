@@ -159,7 +159,6 @@ public class AwsAdmin implements Admin {
    */
   @Override
   public void disableHostScaleInProtection(String privateDnsName) {
-
     // 1 get AutoScalingGroup and InstanceId
     Instance workerInstance = getInstanceId(privateDnsName);
     if (workerInstance == null) {

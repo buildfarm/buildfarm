@@ -177,7 +177,6 @@ public class Worker extends LoggingMain {
 
     private void insertFileToCasMember(Digest digest, Path file)
         throws IOException, InterruptedException {
-
       try (InputStream in = Files.newInputStream(file)) {
         writeToCasMember(digest, in);
       } catch (ExecutionException e) {
@@ -187,7 +186,6 @@ public class Worker extends LoggingMain {
 
     private void writeToCasMember(Digest digest, InputStream in)
         throws IOException, InterruptedException, ExecutionException {
-
       // create a write for inserting into another CAS member.
       String workerName = getRandomWorker();
       Instance casMember = workerStub(workerName);
@@ -198,7 +196,6 @@ public class Worker extends LoggingMain {
 
     private Write getCasMemberWrite(Digest digest, String workerName)
         throws IOException, InterruptedException {
-
       Instance casMember = workerStub(workerName);
 
       return casMember.getBlobWrite(
@@ -212,7 +209,6 @@ public class Worker extends LoggingMain {
 
     private void insertBlobToCasMember(Digest digest, ByteString content)
         throws IOException, InterruptedException {
-
       try (InputStream in = content.newInput()) {
         writeToCasMember(digest, in);
       } catch (ExecutionException e) {
@@ -480,7 +476,6 @@ public class Worker extends LoggingMain {
   }
 
   private static Duration getGrpcTimeout(ShardWorkerConfig config) {
-
     // return the configured
     if (config.getShardWorkerInstanceConfig().hasGrpcTimeout()) {
       Duration configured = config.getShardWorkerInstanceConfig().getGrpcTimeout();
@@ -500,7 +495,6 @@ public class Worker extends LoggingMain {
 
   private ListenableFuture<Long> streamIntoWriteFuture(InputStream in, Write write, Digest digest)
       throws IOException {
-
     SettableFuture<Long> writtenFuture = SettableFuture.create();
     int chunkSizeBytes = (int) Size.kbToBytes(128);
 
@@ -514,7 +508,6 @@ public class Worker extends LoggingMain {
             /* deadlineAfterUnits=*/ DAYS,
             () -> {
               try {
-
                 FeedbackOutputStream outStream = (FeedbackOutputStream) write;
                 while (outStream.isReady()) {
                   if (!CopyBytes(in, outStream, chunkSizeBytes)) {
@@ -775,7 +768,6 @@ public class Worker extends LoggingMain {
 
   private void onStoragePut(Digest digest) {
     try {
-
       // if the worker is a CAS member, it can send/modify blobs in the backplane.
       if (isCasShard) {
         backplane.addBlobLocation(digest, config.getPublicName());
@@ -788,7 +780,6 @@ public class Worker extends LoggingMain {
   private void onStorageExpire(Iterable<Digest> digests) {
     if (isCasShard) {
       try {
-
         // if the worker is a CAS member, it can send/modify blobs in the backplane.
         backplane.removeBlobsLocation(digests, config.getPublicName());
       } catch (IOException e) {
