@@ -41,7 +41,6 @@ public class ResourceDecider {
       boolean onlyMulticoreTests,
       boolean limitGlobalExecution,
       int executeStageWidth) {
-
     // Get all of the user suggested resource changes.
     ResourceLimits limits = ExecutionPropertiesParser.Parse(command);
 
@@ -66,7 +65,6 @@ public class ResourceDecider {
       boolean onlyMulticoreTests,
       boolean limitGlobalExecution,
       int executeStageWidth) {
-
     // force limits on non-test actions
     if (onlyMulticoreTests && !commandIsTest(command)) {
       limits.cpu.min = 1;

@@ -33,7 +33,6 @@ import org.json.simple.parser.ParseException;
  *     Buildfarm may further modify these choices based on its own configuration and constraints.
  */
 public class ExecutionPropertiesParser {
-
   /**
    * @brief Decide resource limitations for the given command.
    * @details Platform properties from specified exec_properties are taken into account when
@@ -43,7 +42,6 @@ public class ExecutionPropertiesParser {
    * @note Suggested return identifier: resourceLimits.
    */
   public static ResourceLimits Parse(Command command) {
-
     // Build parser for all exec properties
     Map<String, BiConsumer<ResourceLimits, Property>> parser = new HashMap<>();
     parser.put(LINUX_SANDBOX, ExecutionPropertiesParser::storeLinuxSandbox);
@@ -84,7 +82,6 @@ public class ExecutionPropertiesParser {
       Map<String, BiConsumer<ResourceLimits, Property>> parser,
       ResourceLimits limits,
       Property property) {
-
     // Most properties have the format "property_name => value".
     // But sometimes we need to pass both keys and values for a given property.
     // One might think to do the following:
