@@ -12,7 +12,6 @@ java_test(
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/instance/stub",
         "//src/test/java/build/buildfarm:test_runner",
-        "//src/test/java/build/buildfarm/common/grpc",
         "@googleapis//:google_bytestream_bytestream_java_grpc",
         "@googleapis//:google_bytestream_bytestream_java_proto",
         "@maven//:com_google_guava_guava",

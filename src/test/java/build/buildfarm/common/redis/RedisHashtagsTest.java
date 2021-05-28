@@ -27,13 +27,11 @@ import org.junit.runners.JUnit4;
  */
 @RunWith(JUnit4.class)
 public class RedisHashtagsTest {
-
   // Function under test: hashedName
   // Reason for testing: a hashtag can be added to a name to get a hashed key name
   // Failure explanation: the format is not as expected when adding a hashtag
   @Test
   public void hashedNameCanRetrieveDistributedHashes() throws Exception {
-
     // ASSERT
     assertThat(RedisHashtags.hashedName("x", "y")).isEqualTo("{y}x");
     assertThat(RedisHashtags.hashedName("QueuedOperations", "Execution"))
@@ -45,7 +43,6 @@ public class RedisHashtagsTest {
   // Failure explanation: the format is not as expected when removing a hashtag
   @Test
   public void unhashedNameGetTheUnhashedName() throws Exception {
-
     // ASSERT
     assertThat(RedisHashtags.unhashedName("{y}x")).isEqualTo("x");
     assertThat(RedisHashtags.unhashedName("x{y}")).isEqualTo("x");
@@ -59,7 +56,6 @@ public class RedisHashtagsTest {
   // Failure explanation: the format is not as expected when extracting the hashtag
   @Test
   public void existingHashGetTheExistingHashName() throws Exception {
-
     // ASSERT
     assertThat(RedisHashtags.existingHash("{y}x")).isEqualTo("y");
     assertThat(RedisHashtags.existingHash("x{y}")).isEqualTo("y");

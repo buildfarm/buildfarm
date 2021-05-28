@@ -405,7 +405,6 @@ public class MemoryInstance extends AbstractServerInstance {
 
   @Override
   protected void enqueueOperation(Operation operation) {
-
     try {
       queuedOperations.enqueueOperation(operation, getOperationProvisions(operation));
     } catch (InterruptedException e) {
@@ -496,6 +495,7 @@ public class MemoryInstance extends AbstractServerInstance {
     return null;
   }
 
+  @SuppressWarnings({"ProtoBuilderReturnValueIgnored", "ReturnValueIgnored"})
   private Action getActionForTimeoutMonitor(
       Operation operation, com.google.rpc.Status.Builder status) throws InterruptedException {
     Digest actionDigest = expectActionDigest(operation);
@@ -758,7 +758,6 @@ public class MemoryInstance extends AbstractServerInstance {
 
   private SetMultimap<String, String> getOperationProvisions(Operation operation)
       throws InterruptedException {
-
     ExecuteOperationMetadata metadata = expectExecuteOperationMetadata(operation);
     Preconditions.checkState(metadata != null, "metadata not found");
 
@@ -954,7 +953,6 @@ public class MemoryInstance extends AbstractServerInstance {
   @Override
   public String listOperations(
       int pageSize, String pageToken, String filter, ImmutableList.Builder<Operation> operations) {
-
     TokenizableIterator<Operation> iter = createOperationsIterator(pageToken);
     while (iter.hasNext() && pageSize != 0) {
       Operation operation = iter.next();

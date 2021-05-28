@@ -19,7 +19,6 @@ import com.google.devtools.common.options.OptionsBase;
 
 /** Command-line options definition for example server. */
 public class HttpProxyOptions extends OptionsBase {
-
   @Option(name = "help", abbrev = 'h', help = "Prints usage info.", defaultValue = "true")
   public boolean help;
 

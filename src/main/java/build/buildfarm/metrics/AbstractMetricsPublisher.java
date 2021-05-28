@@ -23,11 +23,34 @@ import com.google.longrunning.Operation;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.util.JsonFormat;
 import com.google.rpc.PreconditionFailure;
+import io.prometheus.client.Counter;
+import io.prometheus.client.Gauge;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public abstract class AbstractMetricsPublisher implements MetricsPublisher {
   private static final Logger logger = Logger.getLogger(AbstractMetricsPublisher.class.getName());
+
+  private static final Counter actionsCounter =
+      Counter.build().name("actions").help("Number of actions.").register();
+  private static final Gauge operationsInStage =
+      Gauge.build()
+          .name("operations_stage_load")
+          .labelNames("stage_name")
+          .help("Operations in stage.")
+          .register();
+  private static final Gauge operationStatus =
+      Gauge.build()
+          .name("operation_status")
+          .labelNames("status_code")
+          .help("Operation execution status.")
+          .register();
+  private static final Gauge operationsPerWorker =
+      Gauge.build()
+          .name("operation_worker")
+          .labelNames("worker_name")
+          .help("Operations per worker.")
+          .register();
 
   private final String clusterId;
 
@@ -51,6 +74,7 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
   protected OperationRequestMetadata populateRequestMetadata(
       Operation operation, RequestMetadata requestMetadata) {
     try {
+      actionsCounter.inc();
       OperationRequestMetadata operationRequestMetadata =
           OperationRequestMetadata.newBuilder()
               .setRequestMetadata(requestMetadata)
@@ -64,6 +88,22 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
                 .toBuilder()
                 .setExecuteResponse(operation.getResponse().unpack(ExecuteResponse.class))
                 .build();
+        operationStatus
+            .labels(
+                Integer.toString(
+                    operationRequestMetadata.getExecuteResponse().getStatus().getCode()))
+            .inc();
+        if (operationRequestMetadata.getExecuteResponse().hasResult()
+            && operationRequestMetadata.getExecuteResponse().getResult().hasExecutionMetadata()) {
+          operationsPerWorker
+              .labels(
+                  operationRequestMetadata
+                      .getExecuteResponse()
+                      .getResult()
+                      .getExecutionMetadata()
+                      .getWorker())
+              .inc();
+        }
       }
       if (operation.getMetadata().is(ExecuteOperationMetadata.class)) {
         operationRequestMetadata =
@@ -72,6 +112,9 @@ public abstract class AbstractMetricsPublisher implements MetricsPublisher {
                 .setExecuteOperationMetadata(
                     operation.getMetadata().unpack(ExecuteOperationMetadata.class))
                 .build();
+        operationsInStage
+            .labels(operationRequestMetadata.getExecuteOperationMetadata().getStage().name())
+            .inc();
       }
       return operationRequestMetadata;
     } catch (Exception e) {

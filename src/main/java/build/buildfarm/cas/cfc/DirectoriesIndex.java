@@ -14,49 +14,25 @@
 
 package build.buildfarm.cas.cfc;
 
-import static com.google.common.io.MoreFiles.asCharSource;
-
 import build.bazel.remote.execution.v2.Digest;
-import com.google.common.collect.ImmutableList;
 import java.io.IOException;
-import java.nio.charset.Charset;
-import java.nio.file.NoSuchFileException;
-import java.nio.file.Path;
 import java.util.Set;
 
 /**
- * Abstract class for entry/directory mappings.
+ * Interface for entry/directory mappings.
  *
  * <p>Directories should maintain non-unique entries Entries should reference unique directories.
  */
-abstract class DirectoriesIndex {
-  private static final Charset UTF_8 = Charset.forName("UTF-8");
+interface DirectoriesIndex {
+  Iterable<String> directoryEntries(Digest directory) throws IOException;
 
-  final Path root;
+  void close();
 
-  DirectoriesIndex(Path root) {
-    this.root = root;
-  }
+  Set<Digest> removeEntry(String entry) throws IOException;
 
-  Path path(Digest digest) {
-    return root.resolve(digest.getHash() + "_dir_inputs");
-  }
+  void put(Digest directory, Iterable<String> entries) throws IOException;
 
-  public Iterable<String> directoryEntries(Digest directory) throws IOException {
-    try {
-      return asCharSource(path(directory), UTF_8).readLines();
-    } catch (NoSuchFileException e) {
-      return ImmutableList.of();
-    }
-  }
+  void remove(Digest directory) throws IOException;
 
-  abstract void close();
-
-  abstract Set<Digest> removeEntry(String entry) throws IOException;
-
-  abstract void put(Digest directory, Iterable<String> entries) throws IOException;
-
-  abstract void remove(Digest directory) throws IOException;
-
-  abstract void start();
+  void start();
 }

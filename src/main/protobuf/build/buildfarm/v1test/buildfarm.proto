@@ -211,6 +211,8 @@ message BuildFarmServerConfig {
   AdminConfig admin_config = 6;
 
   PrometheusConfig prometheus_config = 7;
+  
+  BuildEventConfig build_event_config = 8;
 }
 
 message MetricsConfig {
@@ -245,6 +247,10 @@ message LogMetricsConfig {
 
 message PrometheusConfig {
   int32 port = 1;
+}
+
+message BuildEventConfig {
+  bool record_events = 1;
 }
 
 message AdminConfig {
@@ -646,6 +652,7 @@ message ShardWorkerConfig {
   AdminConfig admin_config = 35;
 
   PrometheusConfig prometheus_config = 37;
+  
 }
 
 message ShardWorker {
@@ -978,6 +985,9 @@ message WorkerConfig {
   repeated ExecutionPolicy execution_policies = 22;
   
   bool error_operation_remaining_resources = 26;
+
+  // user principal name for executions
+  string exec_owner = 29;
 }
 
 message TreeIteratorToken {

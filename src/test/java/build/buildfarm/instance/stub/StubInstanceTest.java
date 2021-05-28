@@ -302,7 +302,6 @@ public class StubInstanceTest {
           public StreamObserver<WriteRequest> write(
               StreamObserver<WriteResponse> responseObserver) {
             return new StreamObserver<WriteRequest>() {
-
               @Override
               public void onNext(WriteRequest request) {
                 if (!completed) {

@@ -31,7 +31,6 @@ import redis.clients.jedis.exceptions.JedisNoReachableClusterNodeException;
  *     used to obtain the hashtags needed to hit every node in the cluster.
  */
 public class RedisNodeHashes {
-
   /**
    * @brief Get a list of evenly distributing hashtags for the provided redis cluster.
    * @details Each hashtag will map to a slot on a different node.
@@ -44,7 +43,6 @@ public class RedisNodeHashes {
       List<List<Long>> slotRanges = getSlotRanges(jedis);
       ImmutableList.Builder hashTags = ImmutableList.builder();
       for (List<Long> slotRange : slotRanges) {
-
         // we can use any slot that is in range for the node.
         // in this case, we will use the first slot.
         hashTags.add(RedisSlotToHash.correlate(slotRange.get(0)));
@@ -69,7 +67,6 @@ public class RedisNodeHashes {
       List<List<Long>> slotRanges = getSlotRanges(jedis);
       ImmutableList.Builder hashTags = ImmutableList.builder();
       for (List<Long> slotRange : slotRanges) {
-
         // we can use any slot that is in range for the node.
         // in this case, we will use the first slot.
         hashTags.add(

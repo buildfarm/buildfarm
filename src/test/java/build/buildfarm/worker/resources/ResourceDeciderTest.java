@@ -30,13 +30,11 @@ import org.junit.runners.JUnit4;
  */
 @RunWith(JUnit4.class)
 public class ResourceDeciderTest {
-
   // Function under test: decideResourceLimitations
   // Reason for testing: test that cores can be set
   // Failure explanation: cores were not decided as expected
   @Test
   public void decideResourceLimitationsTestCoreSetting() throws Exception {
-
     // ARRANGE
     Command command =
         Command.newBuilder()
@@ -49,7 +47,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, false, 100);
 
     // ASSERT
     assertThat(limits.cpu.min).isEqualTo(7);
@@ -61,7 +59,6 @@ public class ResourceDeciderTest {
   // Failure explanation: cores were not decided as expected
   @Test
   public void decideResourceLimitationsTestCoreSettingSkippedOnNontest() throws Exception {
-
     // ARRANGE
     Command command =
         Command.newBuilder()
@@ -74,7 +71,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.cpu.min).isEqualTo(1);
@@ -82,11 +79,102 @@ public class ResourceDeciderTest {
   }
 
   // Function under test: decideResourceLimitations
+  // Reason for testing: test that claims remains 0 because of min-cores.
+  // Failure explanation: claims were not 0 as expected
+  @Test
+  public void decideResourceLimitationsEnsureClaimsOne() throws Exception {
+    // ARRANGE
+    Command command =
+        Command.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("min-cores").setValue("0"))
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("max-cores").setValue("0")))
+            .build();
+
+    // ACT
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, false, 100);
+
+    // ASSERT
+    assertThat(limits.cpu.claimed).isEqualTo(0);
+  }
+
+  // Function under test: decideResourceLimitations
+  // Reason for testing: test that we limit cpu is globalLimitExecution is given.
+  // Failure explanation: expected limit flag set.
+  @Test
+  public void decideResourceLimitationsEnsureLimitGlobalSet() throws Exception {
+    // ARRANGE
+    Command command =
+        Command.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("min-cores").setValue("0"))
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("max-cores").setValue("0")))
+            .build();
+
+    // ACT
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, true, 100);
+
+    // ASSERT
+    assertThat(limits.cpu.limit).isTrue();
+  }
+
+  // Function under test: decideResourceLimitations
+  // Reason for testing: test that we do not limit cpu is globalLimitExecution is false.
+  // Failure explanation: Did not expect limit flag set.
+  @Test
+  public void decideResourceLimitationsEnsureNoLimitNoGlobalSet() throws Exception {
+    // ARRANGE
+    Command command =
+        Command.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("min-cores").setValue("0"))
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("max-cores").setValue("0")))
+            .build();
+
+    // ACT
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, false, 100);
+
+    // ASSERT
+    assertThat(limits.cpu.limit).isFalse();
+  }
+
+  // Function under test: decideResourceLimitations
+  // Reason for testing: test that claims are set to the specified minimum
+  // Failure explanation: claims were not the same as minimum
+  @Test
+  public void decideResourceLimitationsEnsureClaimsAreMin() throws Exception {
+    // ARRANGE
+    Command command =
+        Command.newBuilder()
+            .setPlatform(
+                Platform.newBuilder()
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("min-cores").setValue("3"))
+                    .addProperties(
+                        Platform.Property.newBuilder().setName("max-cores").setValue("6")))
+            .build();
+
+    // ACT
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, false, 100);
+
+    // ASSERT
+    assertThat(limits.cpu.claimed).isEqualTo(3);
+  }
+
+  // Function under test: decideResourceLimitations
   // Reason for testing: test that mem constraints can be set
   // Failure explanation: mem limits were not decided as expected
   @Test
   public void decideResourceLimitationsTestMemSetting() throws Exception {
-
     // ARRANGE
     Command command =
         Command.newBuilder()
@@ -98,7 +186,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, false, 100);
 
     // ASSERT
     assertThat(limits.mem.min).isEqualTo(5);
@@ -111,12 +199,11 @@ public class ResourceDeciderTest {
   // Failure explanation: the parsing crashed or did not provide an empty map
   @Test
   public void decideResourceLimitationsTestDefaultEnvironmentParse() throws Exception {
-
     // ARRANGE
     Command command = Command.newBuilder().build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.isEmpty()).isTrue();
@@ -128,7 +215,6 @@ public class ResourceDeciderTest {
   // Failure explanation: the parsing crashed or did not provide an empty map
   @Test
   public void decideResourceLimitationsTestEmptyEnvironmentParse() throws Exception {
-
     // ARRANGE
     Command command =
         Command.newBuilder()
@@ -138,7 +224,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.isEmpty()).isTrue();
@@ -150,7 +236,6 @@ public class ResourceDeciderTest {
   // Failure explanation: the parsing crashed or the map was not correctly populated
   @Test
   public void decideResourceLimitationsTestSingleEnvironmentParse() throws Exception {
-
     // ARRANGE
     Command command =
         Command.newBuilder()
@@ -163,7 +248,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(1);
@@ -177,7 +262,6 @@ public class ResourceDeciderTest {
   // Failure explanation: the parsing crashed or the map was not correctly populated
   @Test
   public void decideResourceLimitationsTestDoubleEnvironmentParse() throws Exception {
-
     // ARRANGE
     Command command =
         Command.newBuilder()
@@ -190,7 +274,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(2);
@@ -206,7 +290,6 @@ public class ResourceDeciderTest {
   // Failure explanation: the parsing crashed or the map was not correctly populated
   @Test
   public void decideResourceLimitationsTestMalformedEnvironmentParse() throws Exception {
-
     // ARRANGE
     Command command =
         Command.newBuilder()
@@ -219,7 +302,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(0);
@@ -230,7 +313,6 @@ public class ResourceDeciderTest {
   // Failure explanation: values were not resolved as expected
   @Test
   public void decideResourceLimitationsTestEnvironmentMustacheResolution() throws Exception {
-
     // ARRANGE
     Command command =
         Command.newBuilder()
@@ -248,7 +330,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, false, false, 100);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(2);
@@ -264,7 +346,6 @@ public class ResourceDeciderTest {
   // Failure explanation: the parsing was not done correctly and the variable was somehow ignored
   @Test
   public void decideResourceLimitationsTestIndividualEnvironmentVarParse() throws Exception {
-
     // ARRANGE
     Command command =
         Command.newBuilder()
@@ -275,7 +356,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(1);
@@ -290,7 +371,6 @@ public class ResourceDeciderTest {
   // reason
   @Test
   public void decideResourceLimitationsTestTwoIndividualEnvironmentVarParse() throws Exception {
-
     // ARRANGE
     Command command =
         Command.newBuilder()
@@ -303,7 +383,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(2);
@@ -320,7 +400,6 @@ public class ResourceDeciderTest {
   // value contents are wrong
   @Test
   public void decideResourceLimitationsTestEmptyEnvironmentVarParse() throws Exception {
-
     // ARRANGE
     Command command =
         Command.newBuilder()
@@ -331,7 +410,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.extraEnvironmentVariables.size()).isEqualTo(1);
@@ -344,10 +423,12 @@ public class ResourceDeciderTest {
   // Failure explanation: the bool was not parsed as true like we would have expected
   @Test
   public void decideResourceLimitationsTestDebugBeforeParse() throws Exception {
-
     // ARRANGE
     Command command =
         Command.newBuilder()
+            .addEnvironmentVariables(
+                Command.EnvironmentVariable.newBuilder()
+                    .setName("XML_OUTPUT_FILE")) // make action look like test
             .setPlatform(
                 Platform.newBuilder()
                     .addProperties(
@@ -357,7 +438,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.debugBeforeExecution).isTrue();
@@ -368,10 +449,12 @@ public class ResourceDeciderTest {
   // Failure explanation: the bool was not parsed as true like we would have expected
   @Test
   public void decideResourceLimitationsTestDebugAfterParse() throws Exception {
-
     // ARRANGE
     Command command =
         Command.newBuilder()
+            .addEnvironmentVariables(
+                Command.EnvironmentVariable.newBuilder()
+                    .setName("XML_OUTPUT_FILE")) // make action look like test
             .setPlatform(
                 Platform.newBuilder()
                     .addProperties(
@@ -381,7 +464,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.debugAfterExecution).isTrue();
@@ -392,10 +475,12 @@ public class ResourceDeciderTest {
   // Failure explanation: the value was not parsed gracefully or was somehow interpreted as true
   @Test
   public void decideResourceLimitationsTestInvalidDebugParse() throws Exception {
-
     // ARRANGE
     Command command =
         Command.newBuilder()
+            .addEnvironmentVariables(
+                Command.EnvironmentVariable.newBuilder()
+                    .setName("XML_OUTPUT_FILE")) // make action look like test
             .setPlatform(
                 Platform.newBuilder()
                     .addProperties(
@@ -405,7 +490,7 @@ public class ResourceDeciderTest {
             .build();
 
     // ACT
-    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, 100);
+    ResourceLimits limits = ResourceDecider.decideResourceLimitations(command, true, false, 100);
 
     // ASSERT
     assertThat(limits.debugBeforeExecution).isFalse();

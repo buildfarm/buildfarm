@@ -63,7 +63,6 @@ class DirectoriesTest {
 
   @Test
   public void changePermissionsForDelete() throws IOException {
-
     // establish directory tree
     Path tree = root.resolve("tree2");
     Files.createDirectory(tree);
@@ -100,7 +99,6 @@ class DirectoriesTest {
 
     @Test
     public void checkWriteDisabled() throws IOException {
-
       // establish directory tree
       Path tree = root.resolve("tree3");
       Files.createDirectory(tree);
@@ -120,8 +118,13 @@ class DirectoriesTest {
       Directories.disableAllWriteAccess(tree);
 
       // check that write conditions have changed
-      assertThat(Files.isWritable(tree)).isFalse();
-      assertThat(Files.isWritable(subdir)).isFalse();
+      // If the unit tests were run as root,
+      // Java's isWritable will show true despite the correct permissions being set.
+      // This can be seen when running unit tests in docker, or directly with sudo.
+      if (!System.getProperty("user.name").equals("root")) {
+        assertThat(Files.isWritable(tree)).isFalse();
+        assertThat(Files.isWritable(subdir)).isFalse();
+      }
     }
   }
 

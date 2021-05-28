@@ -25,7 +25,6 @@ import java.util.concurrent.TimeUnit;
  * @details Contains converters between different time data types.
  */
 public class Time {
-
   /**
    * @brief Convert a protobuf duration to a grpc deadline.
    * @details Deadline will have nanosecond precision.
