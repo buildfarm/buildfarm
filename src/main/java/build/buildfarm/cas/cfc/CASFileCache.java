@@ -2226,7 +2226,7 @@ public abstract class CASFileCache implements ContentAddressableStorage {
                     Level.SEVERE,
                     "error during directory removal after fetch failure of " + path,
                     removeException);
-                e.addSuppressed(e);
+                e.addSuppressed(removeException);
               }
               return immediateFailedFuture(e);
             },
