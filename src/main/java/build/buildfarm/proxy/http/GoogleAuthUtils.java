@@ -36,7 +36,6 @@ import javax.annotation.Nullable;
 
 /** Utility methods for using {@link AuthAndTLSOptions} with Google Cloud. */
 public final class GoogleAuthUtils {
-
   /**
    * Create a new gRPC {@link ManagedChannel}.
    *

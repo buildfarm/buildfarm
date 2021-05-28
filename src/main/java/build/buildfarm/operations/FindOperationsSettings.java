@@ -21,7 +21,6 @@ package build.buildfarm.operations;
  *     who spawned the operation).
  */
 public class FindOperationsSettings {
-
   /**
    * @field filterPredicate
    * @brief The search query used to find particular operations.

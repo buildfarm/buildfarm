@@ -38,7 +38,6 @@ import org.json.simple.parser.ParseException;
  *     important metadata resolved.
  */
 public class EnrichedOperation {
-
   /**
    * @field operation
    * @brief The main operation object which contains digests to the remaining data members.

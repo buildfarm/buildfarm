@@ -29,7 +29,6 @@ import java.util.List;
     Each queue is tagged with the required provisions which affects the operations and workers involved with the queue.
 */
 public class WorkerQueues implements Iterable<WorkerQueue> {
-
   /*
     The specific queues whose provision requirements are considered when queuing an operation.
     The queues are evaluated in the order that they are listed.
@@ -63,9 +62,7 @@ public class WorkerQueues implements Iterable<WorkerQueue> {
   */
   public WorkerQueue MatchEligibleQueue(SetMultimap<String, String> provisions)
       throws InterruptedException {
-
     for (WorkerQueue queue : specificQueues) {
-
       /*
         Accept the queue if all of its provision requirements are met by the given provisions.
         If no queue is eligible based on the provisions return the last queue for now.
@@ -79,7 +76,6 @@ public class WorkerQueues implements Iterable<WorkerQueue> {
   }
 
   public boolean enqueueOperation(Operation operation, SetMultimap<String, String> provisions) {
-
     // if the user gives null provisions, assume an empty set
     if (provisions == null) {
       provisions = HashMultimap.create();
@@ -95,7 +91,6 @@ public class WorkerQueues implements Iterable<WorkerQueue> {
   }
 
   public boolean AddWorker(SetMultimap<String, String> provisions, MatchListener listener) {
-
     try {
       WorkerQueue queue = MatchEligibleQueue(provisions);
       queue.workers.add(new Worker(provisions, listener));
@@ -119,7 +114,6 @@ public class WorkerQueues implements Iterable<WorkerQueue> {
     Removes all instances of an existing listener from any of the queues
   */
   public void removeWorker(MatchListener listener) {
-
     for (WorkerQueue queue : specificQueues) {
       removeWorkerFromQueue(queue, listener);
     }

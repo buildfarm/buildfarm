@@ -542,7 +542,6 @@ public class RedisShardBackplane implements Backplane {
   }
 
   static RedissonClient createRedissonClient(RedisShardBackplaneConfig config) throws IOException {
-
     Config redissonConfig = new Config();
 
     ClusterServersConfig finalConfig =
@@ -750,7 +749,6 @@ public class RedisShardBackplane implements Backplane {
   // scale-down service. The algorithm in which the backplane chooses these workers can be made more
   // sophisticated in the future. But for now, we'll give back n random workers.
   public List<String> suggestedWorkersToScaleDown(int numWorkers) throws IOException {
-
     // get all workers
     List<String> allWorkers = new ArrayList<String>();
     allWorkers.addAll(getWorkers());
@@ -868,7 +866,6 @@ public class RedisShardBackplane implements Backplane {
 
   @Override
   public void removeActionResults(Iterable<ActionKey> actionKeys) throws IOException {
-
     // convert action keys to strings
     List<String> keyNames = new ArrayList<String>();
     actionKeys.forEach(
@@ -1141,7 +1138,6 @@ public class RedisShardBackplane implements Backplane {
   }
 
   private ExecuteEntry deprequeueOperation(JedisCluster jedis) throws InterruptedException {
-
     String executeEntryJson = prequeue.dequeue(jedis);
     if (executeEntryJson == null) {
       return null;
@@ -1179,7 +1175,6 @@ public class RedisShardBackplane implements Backplane {
 
   private QueueEntry dispatchOperation(JedisCluster jedis, List<Platform.Property> provisions)
       throws InterruptedException {
-
     String queueEntryJson = operationQueue.dequeue(jedis, provisions);
     if (queueEntryJson == null) {
       return null;

@@ -219,7 +219,6 @@ public class ShardInstance extends AbstractServerInstance {
   private Thread prometheusMetricsThread;
 
   private static Duration getGrpcTimeout(ShardInstanceConfig config) {
-
     // return the configured
     if (config.hasGrpcTimeout()) {
       Duration configured = config.getGrpcTimeout();
@@ -1229,7 +1228,6 @@ public class ShardInstance extends AbstractServerInstance {
 
   ListenableFuture<Command> expectCommand(
       Digest commandBlobDigest, Executor executor, RequestMetadata requestMetadata) {
-
     BiFunction<Digest, Executor, CompletableFuture<Command>> getCallback =
         new BiFunction<Digest, Executor, CompletableFuture<Command>>() {
           @Override
@@ -1247,7 +1245,6 @@ public class ShardInstance extends AbstractServerInstance {
 
   ListenableFuture<Action> expectAction(
       Digest actionBlobDigest, Executor executor, RequestMetadata requestMetadata) {
-
     BiFunction<Digest, Executor, CompletableFuture<Action>> getCallback =
         new BiFunction<Digest, Executor, CompletableFuture<Action>>() {
           @Override

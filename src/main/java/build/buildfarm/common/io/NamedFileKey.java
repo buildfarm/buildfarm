@@ -15,7 +15,6 @@
 package build.buildfarm.common.io;
 
 public class NamedFileKey {
-
   private final String name;
   private final FileStatus fileStatus;
   private final Object fileKey;

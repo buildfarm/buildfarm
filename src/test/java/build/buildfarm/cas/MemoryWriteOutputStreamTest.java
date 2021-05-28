@@ -32,7 +32,6 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class MemoryWriteOutputStreamTest {
-
   private static final DigestUtil DIGEST_UTIL = new DigestUtil(HashFunction.SHA256);
 
   @Test

@@ -36,7 +36,6 @@ import redis.clients.jedis.ScanResult;
  * @details A factory for creating a jedis cluster instance.
  */
 public class JedisClusterFactory {
-
   /**
    * @brief Create a jedis cluster instance.
    * @details Use proto configuration to connect to a redis cluster server and provide a jedis

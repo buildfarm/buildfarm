@@ -24,7 +24,6 @@ import java.util.ArrayList;
  *     https://github.com/bazelbuild/bazel/blob/e8a6db03d2f279910297d2ac2657ca3202241711/src/main/tools/linux-sandbox-options.h.
  */
 public class LinuxSandboxOptions {
-
   /**
    * @field workingDir
    * @brief Working directory.
