@@ -34,7 +34,6 @@ import redis.clients.jedis.ScanResult;
  *     caller has or wants to filter on.
  */
 public class OperationsFinder {
-
   /**
    * @brief Finds operations based on search settings.
    * @details Operations can be found based on different search queries depending on the context a

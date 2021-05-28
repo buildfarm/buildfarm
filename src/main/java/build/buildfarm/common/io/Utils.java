@@ -14,6 +14,7 @@
 
 package build.buildfarm.common.io;
 
+import com.google.common.base.Strings;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -23,6 +24,7 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.nio.file.DirectoryStream;
 import java.nio.file.FileStore;
+import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.NoSuchFileException;
@@ -30,6 +32,7 @@ import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.nio.file.attribute.DosFileAttributes;
 import java.nio.file.attribute.PosixFileAttributes;
+import java.nio.file.attribute.UserPrincipal;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -462,5 +465,14 @@ public class Utils {
         interrupted = true;
       }
     }
+  }
+
+  public static @Nullable UserPrincipal getUser(String userName, FileSystem fileSystem)
+      throws IOException {
+    final @Nullable UserPrincipal user;
+    if (Strings.isNullOrEmpty(userName)) {
+      return null;
+    }
+    return fileSystem.getUserPrincipalLookupService().lookupPrincipalByName(userName);
   }
 }

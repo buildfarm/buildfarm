@@ -176,10 +176,6 @@ public class ShardInstance extends AbstractServerInstance {
       Gauge.build().name("worker_pool_size").help("Active worker pool size.").register();
   private static final Gauge queueSize =
       Gauge.build().name("queue_size").labelNames("queue_name").help("Queue size.").register();
-  private static final Gauge casLookupSize =
-      Gauge.build().name("cas_lookup_size").help("CAS lookup size.").register();
-  private static final Gauge actionCacheLookupSize =
-      Gauge.build().name("action_cache_lookup_size").help("Action Cache lookup size.").register();
   private static final Gauge blockedActionsSize =
       Gauge.build().name("blocked_actions_size").help("The number of blocked actions").register();
   private static final Gauge blockedInvocationsSize =
@@ -223,7 +219,6 @@ public class ShardInstance extends AbstractServerInstance {
   private Thread prometheusMetricsThread;
 
   private static Duration getGrpcTimeout(ShardInstanceConfig config) {
-
     // return the configured
     if (config.hasGrpcTimeout()) {
       Duration configured = config.getGrpcTimeout();
@@ -476,8 +471,6 @@ public class ShardInstance extends AbstractServerInstance {
                   dispatchedOperations.set(backplaneStatus.getDispatchedSize());
                   preQueueSize.set(backplaneStatus.getPrequeue().getSize());
                   updateQueueSizes(backplaneStatus.getOperationQueue().getProvisionsList());
-                  casLookupSize.set(backplaneStatus.getCasLookupSize());
-                  actionCacheLookupSize.set(backplaneStatus.getActionCacheSize());
                   blockedActionsSize.set(backplaneStatus.getBlockedActionsSize());
                   blockedInvocationsSize.set(backplaneStatus.getBlockedInvocationsSize());
                 } catch (InterruptedException e) {
@@ -1235,7 +1228,6 @@ public class ShardInstance extends AbstractServerInstance {
 
   ListenableFuture<Command> expectCommand(
       Digest commandBlobDigest, Executor executor, RequestMetadata requestMetadata) {
-
     BiFunction<Digest, Executor, CompletableFuture<Command>> getCallback =
         new BiFunction<Digest, Executor, CompletableFuture<Command>>() {
           @Override
@@ -1253,7 +1245,6 @@ public class ShardInstance extends AbstractServerInstance {
 
   ListenableFuture<Action> expectAction(
       Digest actionBlobDigest, Executor executor, RequestMetadata requestMetadata) {
-
     BiFunction<Digest, Executor, CompletableFuture<Action>> getCallback =
         new BiFunction<Digest, Executor, CompletableFuture<Action>>() {
           @Override
@@ -1371,6 +1362,16 @@ public class ShardInstance extends AbstractServerInstance {
     }
   }
 
+  ExecuteOperationMetadata executeOperationMetadata(
+      ExecuteEntry executeEntry, ExecutionStage.Value stage) {
+    return ExecuteOperationMetadata.newBuilder()
+        .setActionDigest(executeEntry.getActionDigest())
+        .setStdoutStreamName(executeEntry.getStdoutStreamName())
+        .setStderrStreamName(executeEntry.getStderrStreamName())
+        .setStage(stage)
+        .build();
+  }
+
   private ListenableFuture<QueuedOperationResult> uploadQueuedOperation(
       QueuedOperation queuedOperation, ExecuteEntry executeEntry, ExecutorService service)
       throws EntryLimitException {
@@ -1379,11 +1380,7 @@ public class ShardInstance extends AbstractServerInstance {
     QueuedOperationMetadata metadata =
         QueuedOperationMetadata.newBuilder()
             .setExecuteOperationMetadata(
-                ExecuteOperationMetadata.newBuilder()
-                    .setActionDigest(executeEntry.getActionDigest())
-                    .setStdoutStreamName(executeEntry.getStdoutStreamName())
-                    .setStderrStreamName(executeEntry.getStderrStreamName())
-                    .setStage(ExecutionStage.Value.QUEUED))
+                executeOperationMetadata(executeEntry, ExecutionStage.Value.QUEUED))
             .setQueuedOperationDigest(queuedOperationDigest)
             .build();
     QueueEntry entry =
@@ -1585,11 +1582,8 @@ public class ShardInstance extends AbstractServerInstance {
                           QueuedOperationMetadata metadata =
                               QueuedOperationMetadata.newBuilder()
                                   .setExecuteOperationMetadata(
-                                      ExecuteOperationMetadata.newBuilder()
-                                          .setActionDigest(executeEntry.getActionDigest())
-                                          .setStdoutStreamName(executeEntry.getStdoutStreamName())
-                                          .setStderrStreamName(executeEntry.getStderrStreamName())
-                                          .setStage(ExecutionStage.Value.QUEUED))
+                                      executeOperationMetadata(
+                                          executeEntry, ExecutionStage.Value.QUEUED))
                                   .setQueuedOperationDigest(queueEntry.getQueuedOperationDigest())
                                   .setRequestMetadata(requestMetadata)
                                   .build();
@@ -1655,11 +1649,15 @@ public class ShardInstance extends AbstractServerInstance {
     ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
     String operationName = executeEntry.getOperationName();
     try {
+      Operation.Builder failedOperation =
+          Operation.newBuilder()
+              .setName(operationName)
+              .setDone(true)
+              .setMetadata(
+                  Any.pack(executeOperationMetadata(executeEntry, ExecutionStage.Value.COMPLETED)));
       if (backplane.isBlacklisted(executeEntry.getRequestMetadata())) {
         putOperation(
-            Operation.newBuilder()
-                .setName(operationName)
-                .setDone(true)
+            failedOperation
                 .setResponse(
                     Any.pack(denyActionResponse(executeEntry.getActionDigest(), BLOCK_LIST_ERROR)))
                 .build());
@@ -1668,9 +1666,7 @@ public class ShardInstance extends AbstractServerInstance {
         logger.log(
             Level.WARNING, "Operation " + operationName + " has been requeued too many times.");
         putOperation(
-            Operation.newBuilder()
-                .setName(operationName)
-                .setDone(true)
+            failedOperation
                 .setResponse(
                     Any.pack(
                         denyActionResponse(

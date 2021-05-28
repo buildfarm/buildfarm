@@ -20,7 +20,6 @@ package build.buildfarm.common;
  * @details Contains converters between different time units.
  */
 public class Size {
-
   /**
    * @brief Kb to bytes.
    * @details Kb to bytes.

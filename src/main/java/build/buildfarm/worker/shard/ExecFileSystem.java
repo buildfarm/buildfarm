@@ -32,6 +32,8 @@ interface ExecFileSystem extends InputStreamFactory {
 
   void stop();
 
+  Path root();
+
   ContentAddressableStorage getStorage();
 
   Path createExecDir(

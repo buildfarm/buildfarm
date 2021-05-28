@@ -23,7 +23,6 @@ import java.util.Map;
  * @details This will only observe operations; not affect their state.
  */
 public class FindOperationsResults {
-
   /**
    * @field operations
    * @brief All of the operations found based on the search query.

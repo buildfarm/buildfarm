@@ -9,10 +9,8 @@ java_library(
     ),
     visibility = ["//visibility:public"],
     deps = [
-        "//src/main/java/build/buildfarm/common",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_proto",
-        "@googleapis//:google_bytestream_bytestream_java_grpc",
         "@googleapis//:google_bytestream_bytestream_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
         "@googleapis//:google_rpc_error_details_java_proto",

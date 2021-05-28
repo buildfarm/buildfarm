@@ -16,6 +16,7 @@ package build.buildfarm.worker;
 
 import build.bazel.remote.execution.v2.ActionResult;
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.protobuf.ByteString;
 import com.google.rpc.Code;
 
@@ -29,7 +30,6 @@ import com.google.rpc.Code;
  *     helpful in debugging buildfarm itself.
  */
 public class ExecutionDebugger {
-
   /**
    * @brief Fail the operation before executing it but provide relevant debug information to the
    *     user via a failed result.
@@ -77,11 +77,23 @@ public class ExecutionDebugger {
    */
   private static String getBeforeExecutionDebugInfo(
       ProcessBuilder processBuilder, ResourceLimits limits, ActionResult.Builder resultBuilder) {
-    String message = "Buildfarm debug information before execution:\n";
-    Gson gson = new Gson();
-    message += String.join(" ", processBuilder.command()) + "\n";
-    message += gson.toJson(limits);
-    return message;
+    // construct debug object
+    ExecutionDebugInfo info = new ExecutionDebugInfo();
+    info.description = "Buildfarm debug information before execution";
+    info.command = String.join(" ", processBuilder.command());
+    info.environment = processBuilder.environment();
+    info.workingDirectory = processBuilder.directory().getAbsolutePath();
+    info.limits = limits;
+
+    // extract action result data
+    ByteString stdoutBytes = resultBuilder.build().getStdoutRaw();
+    ByteString stderrBytes = resultBuilder.build().getStderrRaw();
+    info.stdout = stdoutBytes.toStringUtf8();
+    info.stderr = stderrBytes.toStringUtf8();
+
+    // convert to json
+    Gson gson = new GsonBuilder().setPrettyPrinting().create();
+    return gson.toJson(info) + "\n";
   }
 
   /**
@@ -95,10 +107,22 @@ public class ExecutionDebugger {
    */
   private static String getAfterExecutionDebugInfo(
       ProcessBuilder processBuilder, ResourceLimits limits, ActionResult.Builder resultBuilder) {
-    String message = "Buildfarm debug information after execution:\n";
-    Gson gson = new Gson();
-    message += String.join(" ", processBuilder.command()) + "\n";
-    message += gson.toJson(limits);
-    return message;
+    // construct debug object
+    ExecutionDebugInfo info = new ExecutionDebugInfo();
+    info.description = "Buildfarm debug information after execution";
+    info.command = String.join(" ", processBuilder.command());
+    info.environment = processBuilder.environment();
+    info.workingDirectory = processBuilder.directory().getAbsolutePath();
+    info.limits = limits;
+
+    // extract action result data
+    ByteString stdoutBytes = resultBuilder.build().getStdoutRaw();
+    ByteString stderrBytes = resultBuilder.build().getStderrRaw();
+    info.stdout = stdoutBytes.toStringUtf8();
+    info.stderr = stderrBytes.toStringUtf8();
+
+    // convert to json
+    Gson gson = new GsonBuilder().setPrettyPrinting().create();
+    return gson.toJson(info) + "\n";
   }
 }

@@ -42,7 +42,6 @@ import java.util.stream.Collectors;
  *     queues.
  */
 public class ProvisionedRedisQueue {
-
   /**
    * @field WILDCARD_VALUE
    * @brief Wildcard value.

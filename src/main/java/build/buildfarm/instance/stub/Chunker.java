@@ -40,7 +40,6 @@ import java.util.function.Supplier;
  * manually.
  */
 public final class Chunker {
-
   private static int defaultChunkSize = 1024 * 16;
 
   /** This method must only be called in tests! */
@@ -55,7 +54,6 @@ public final class Chunker {
 
   /** A piece of a byte[] blob. */
   public static final class Chunk {
-
     private final long offset;
     private final ByteString data;
 
@@ -175,15 +173,14 @@ public final class Chunker {
     maybeInitialize();
 
     if (size == 0) {
-      data = null;
+      reset();
       return emptyChunk;
     }
 
     // The cast to int is safe, because the return value is capped at chunkSize.
     int bytesToRead = (int) Math.min(bytesLeft(), chunkSize);
     if (bytesToRead == 0) {
-      chunkCache = null;
-      data = null;
+      reset();
       throw new NoSuchElementException();
     }
 

@@ -41,7 +41,6 @@ import java.util.Set;
 
 /** Utility methods to work with {@link Digest}. */
 public class DigestUtil {
-
   /** Type of hash function to use for digesting blobs. */
   // The underlying HashFunctions are immutable and thread safe.
   @SuppressWarnings("ImmutableEnumChecker")

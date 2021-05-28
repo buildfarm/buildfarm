@@ -542,7 +542,6 @@ public class RedisShardBackplane implements Backplane {
   }
 
   static RedissonClient createRedissonClient(RedisShardBackplaneConfig config) throws IOException {
-
     Config redissonConfig = new Config();
 
     ClusterServersConfig finalConfig =
@@ -565,7 +564,8 @@ public class RedisShardBackplane implements Backplane {
     // Construct the prequeue so that elements are balanced across all redis nodes.
     return new BalancedRedisQueue(
         config.getPreQueuedOperationsListName(),
-        getQueueHashes(client, config.getPreQueuedOperationsListName()));
+        getQueueHashes(client, config.getPreQueuedOperationsListName()),
+        config.getMaxPreQueueDepth());
   }
 
   static OperationQueue createOperationQueue(RedisClient client, RedisShardBackplaneConfig config)
@@ -604,7 +604,7 @@ public class RedisShardBackplane implements Backplane {
       provisionedQueues.add(defaultQueue);
     }
 
-    return new OperationQueue(provisionedQueues.build());
+    return new OperationQueue(provisionedQueues.build(), config.getMaxQueueDepth());
   }
 
   static List<String> getQueueHashes(RedisClient client, String queueName) throws IOException {
@@ -749,7 +749,6 @@ public class RedisShardBackplane implements Backplane {
   // scale-down service. The algorithm in which the backplane chooses these workers can be made more
   // sophisticated in the future. But for now, we'll give back n random workers.
   public List<String> suggestedWorkersToScaleDown(int numWorkers) throws IOException {
-
     // get all workers
     List<String> allWorkers = new ArrayList<String>();
     allWorkers.addAll(getWorkers());
@@ -867,7 +866,6 @@ public class RedisShardBackplane implements Backplane {
 
   @Override
   public void removeActionResults(Iterable<ActionKey> actionKeys) throws IOException {
-
     // convert action keys to strings
     List<String> keyNames = new ArrayList<String>();
     actionKeys.forEach(
@@ -1140,7 +1138,6 @@ public class RedisShardBackplane implements Backplane {
   }
 
   private ExecuteEntry deprequeueOperation(JedisCluster jedis) throws InterruptedException {
-
     String executeEntryJson = prequeue.dequeue(jedis);
     if (executeEntryJson == null) {
       return null;
@@ -1178,7 +1175,6 @@ public class RedisShardBackplane implements Backplane {
 
   private QueueEntry dispatchOperation(JedisCluster jedis, List<Platform.Property> provisions)
       throws InterruptedException {
-
     String queueEntryJson = operationQueue.dequeue(jedis, provisions);
     if (queueEntryJson == null) {
       return null;
@@ -1414,26 +1410,21 @@ public class RedisShardBackplane implements Backplane {
 
   @Override
   public boolean canQueue() throws IOException {
-    int maxQueueDepth = config.getMaxQueueDepth();
-    return maxQueueDepth < 0 || client.call(jedis -> operationQueue.size(jedis)) < maxQueueDepth;
+    return client.call(jedis -> operationQueue.canQueue(jedis));
   }
 
   @Override
   public boolean canPrequeue() throws IOException {
-    int maxPreQueueDepth = config.getMaxPreQueueDepth();
-    return maxPreQueueDepth < 0 || client.call(jedis -> prequeue.size(jedis)) < maxPreQueueDepth;
+    return client.call(jedis -> prequeue.canQueue(jedis));
   }
 
   @Override
   public BackplaneStatus backplaneStatus() throws IOException {
-    int casLookupSize = casWorkerMap.size(client);
     return client.call(
         jedis ->
             BackplaneStatus.newBuilder()
                 .setPrequeue(prequeue.status(jedis))
                 .setOperationQueue(operationQueue.status(jedis))
-                .setCasLookupSize(casLookupSize)
-                .setActionCacheSize(actionCache.size(jedis))
                 .setBlockedActionsSize(blockedActions.size(jedis))
                 .setBlockedInvocationsSize(blockedInvocations.size(jedis))
                 .setDispatchedSize(jedis.hlen(config.getDispatchedOperationsHashName()))

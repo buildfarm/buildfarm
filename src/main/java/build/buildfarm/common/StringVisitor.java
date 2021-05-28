@@ -20,7 +20,6 @@ package build.buildfarm.common;
  * @details Used to visit strings in a generic context.
  */
 public abstract class StringVisitor {
-
   /**
    * @brief The visit interface to be implemented.
    * @details Inherited classes but implement visit.

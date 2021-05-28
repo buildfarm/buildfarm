@@ -45,6 +45,8 @@ import com.google.rpc.Code;
 import io.grpc.Deadline;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -92,9 +94,12 @@ class Executor {
     ExecuteOperationMetadata executingMetadata =
         metadata.toBuilder().setStage(ExecutionStage.Value.EXECUTING).build();
 
-    Iterable<ExecutionPolicy> policies =
-        ExecutionPolicies.forPlatform(
-            operationContext.command.getPlatform(), workerContext::getExecutionPolicies);
+    Iterable<ExecutionPolicy> policies = new ArrayList<ExecutionPolicy>();
+    if (limits.useExecutionPolicies) {
+      policies =
+          ExecutionPolicies.forPlatform(
+              operationContext.command.getPlatform(), workerContext::getExecutionPolicies);
+    }
 
     Operation operation =
         operationContext
@@ -194,13 +199,25 @@ class Executor {
     ImmutableList.Builder<String> arguments = ImmutableList.builder();
     Code statusCode;
     try (IOResource resource =
-        workerContext.limitExecution(operationName, arguments, operationContext.command)) {
+        workerContext.limitExecution(
+            operationName, arguments, operationContext.command, workingDirectory)) {
       for (ExecutionPolicy policy : policies) {
         if (policy.getPolicyCase() == WRAPPER) {
           arguments.addAll(transformWrapper(policy.getWrapper()));
         }
       }
-      arguments.addAll(command.getArgumentsList());
+
+      if (System.getProperty("os.name").contains("Win")) {
+        // Make sure that the executable path is absolute, otherwise processbuilder fails on windows
+        Iterator<String> argumentItr = command.getArgumentsList().iterator();
+        if (argumentItr.hasNext()) {
+          String exe = argumentItr.next(); // Get first element, this is the executable
+          arguments.add(workingDirectory.resolve(exe).toAbsolutePath().normalize().toString());
+          argumentItr.forEachRemaining(arg -> arguments.add(arg));
+        }
+      } else {
+        arguments.addAll(command.getArgumentsList());
+      }
 
       statusCode =
           executeCommand(
@@ -495,11 +512,6 @@ class Executor {
     stdoutReaderThread.join();
     stderrReaderThread.join();
 
-    // allow debugging after an execution
-    if (limits.debugAfterExecution) {
-      return ExecutionDebugger.performAfterExecutionDebug(processBuilder, limits, resultBuilder);
-    }
-
     try {
       resultBuilder
           .setExitCode(exitCode)
@@ -514,6 +526,12 @@ class Executor {
           format("error getting process outputs for %s after timeout", operationName),
           e);
     }
+
+    // allow debugging after an execution
+    if (limits.debugAfterExecution) {
+      return ExecutionDebugger.performAfterExecutionDebug(processBuilder, limits, resultBuilder);
+    }
+
     return statusCode;
   }
 }

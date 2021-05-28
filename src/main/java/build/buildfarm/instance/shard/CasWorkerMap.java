@@ -21,7 +21,6 @@ import java.util.Map;
 import java.util.Set;
 
 public interface CasWorkerMap {
-
   /**
    * @brief Adjust blob mappings based on worker changes.
    * @details Adjustments are made based on added and removed workers. Expirations are refreshed.
