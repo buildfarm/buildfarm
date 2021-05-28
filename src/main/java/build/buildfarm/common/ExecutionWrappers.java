@@ -42,7 +42,7 @@ public class ExecutionWrappers {
    * @brief The program to use when running actions under bazel's sandbox.
    * @details This program is expected to be packaged with the worker image.
    */
-  public static final String LINUX_SANDBOX = "/app/buildfarm/linux-sandbox";
+  public static final String LINUX_SANDBOX = "/app/build_buildfarm/linux-sandbox";
 
   /**
    * @field AS_NOBODY
@@ -50,12 +50,12 @@ public class ExecutionWrappers {
    * @details This program is expected to be packaged with the worker image. The linux-sandbox is
    *     also capable of doing what this standalone programs does and may be chosen instead.
    */
-  public static final String AS_NOBODY = "/app/buildfarm/as-nobody";
+  public static final String AS_NOBODY = "/app/build_buildfarm/as-nobody";
 
   /**
    * @field PROCESS_WRAPPER
    * @brief The program to use when running actions under bazel's process-wrapper
    * @details This program is expected to be packaged with the worker image.
    */
-  public static final String PROCESS_WRAPPER = "/app/buildfarm/process-wrapper";
+  public static final String PROCESS_WRAPPER = "/app/build_buildfarm/process-wrapper";
 }
