@@ -15,6 +15,7 @@
 package build.buildfarm.worker;
 
 import build.bazel.remote.execution.v2.Command;
+import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
 import build.bazel.remote.execution.v2.Platform.Property;
 import build.buildfarm.common.CommandUtils;
 import build.buildfarm.common.ExecutionProperties;
@@ -68,7 +69,7 @@ public class ResourceDecider {
 
     // perform resource overrides based on test size
     TestSizeResourceOverrides overrides = new TestSizeResourceOverrides();
-    if (overrides.enabled && commandIsTest(command)) {
+    if (overrides.enabled && CommandUtils.isTest(command)) {
       TestSizeResourceOverride override = deduceSizeOverride(command, overrides);
       limits.cpu.min = override.coreMin;
       limits.cpu.max = override.coreMax;
@@ -121,7 +122,7 @@ public class ResourceDecider {
 
   private static void handleTestDebug(Command command, ResourceLimits limits) {
     // When debugging tests, disable debugging on non-tests.
-    if (limits.debugTestsOnly && !commandIsTest(command)) {
+    if (limits.debugTestsOnly && !CommandUtils.isTest(command)) {
       limits.debugBeforeExecution = false;
       limits.debugAfterExecution = false;
     }
@@ -369,5 +370,34 @@ public class ResourceDecider {
           val = val.replace("{{limits.cpu.claimed}}", String.valueOf(limits.cpu.claimed));
           return val;
         });
+  }
+
+  /**
+   * @brief Get resource overrides by analyzing the test command for it's "test size".
+   * @details test size is defined as an environment variable.
+   * @param command The test command to derive the size of.
+   * @return The resource overrides corresponding to the command's test size.
+   * @note Suggested return identifier: overrides.
+   */
+  private static TestSizeResourceOverride deduceSizeOverride(
+      Command command, TestSizeResourceOverrides overrides) {
+    for (EnvironmentVariable envVar : command.getEnvironmentVariablesList()) {
+      if (envVar.getName().equals("TEST_SIZE")) {
+        if (envVar.getValue().equals("small")) {
+          return overrides.small;
+        }
+        if (envVar.getValue().equals("medium")) {
+          return overrides.medium;
+        }
+        if (envVar.getValue().equals("large")) {
+          return overrides.large;
+        }
+        if (envVar.getValue().equals("enormous")) {
+          return overrides.enormous;
+        }
+      }
+    }
+
+    return overrides.unknown;
   }
 }
