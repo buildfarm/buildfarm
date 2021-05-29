@@ -1461,6 +1461,7 @@ public class RedisShardBackplane implements Backplane {
     Set<String> uniqueToolInvocationIds = Sets.newHashSet();
     Map<String, Integer> fromQueueAmounts = new HashMap();
     Map<String, Integer> toolAmounts = new HashMap();
+    Map<String, Integer> commandTools = new HashMap();
     Map<String, Integer> actionMnemonics = new HashMap();
     Map<String, Integer> targetIds = new HashMap();
     Map<String, Integer> configIds = new HashMap();
@@ -1473,34 +1474,23 @@ public class RedisShardBackplane implements Backplane {
             resolveQueuedOperationDigest(
                 instance, operation.getQueueEntry().getQueuedOperationDigest());
 
-        // Record the queue it came from.
-        // The queues often drain quickly.  This will let us identify work by the queues they
-        // originated from.
-        String queueName =
-            operationQueue.getName(operation.getQueueEntry().getPlatform().getPropertiesList());
-        incrementValue(fromQueueAmounts, queueName);
+        // 1. Information about the client / caller.
 
-        // Record the action type.
-        // This will let us know if it's a build action / test action.
-        // This is generally useful for knowing if buildfarm has been saturated with test work due
-        // clients using --runs_per_test.
-        incrementActionType(queuedOperation, actionAmounts);
-
-        // Record the tool invocation id.
+        // Record unique tool invocation ids (ex. d6d7bfbc-c61e-4cdd-abaf-d3ea779335bf)
         // This will let us know how many unique clients are getting work processed.
         // This correlates to the number of individuals using buildfarm.
         // We will probably be able to get a similar number from the incoming build event streams.
         // However, users will have the ability to disable BES on the client side.
-        // They cannot disable the fact that their actions are tagged with the invocation id.
-        // Therefore, this may be a more reliable metric of active users.
+        // They cannot disable the fact that their actions are tagged with their invocation id.
+        // Therefore, this may be a more reliable metric for "active users".
         uniqueToolInvocationIds.add(
             operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getToolInvocationId());
 
-        // Record the tool that the operation came from.
+        // Record the tool that the operation came from (ex. bazel-4.0.0, pants-v2).
         // This will let us know if anyone is using an unexpected build tool or bazel version with
         // buildfarm.  In the past, we've speculated that mixing bazel version with buildfarm might
         // result in stability issues.
-        // Now we'll be able to match any issues which when unexpected tools were used.
+        // Now we'll be able to match any issues with when unexpected build tools were used.
         String toolName =
             operation
                     .getQueueEntry()
@@ -1517,15 +1507,6 @@ public class RedisShardBackplane implements Backplane {
                     .getToolVersion();
         incrementValue(toolAmounts, toolName);
 
-        // Record the action mnemonic of the operation.
-        // This will let us know what kind of work is occurring, for example, CppCompile or GoLink.
-        // Although we know the mnemonic characteristics by statically analyzing the repo,
-        // we don't know what kind of actions dominate buildfarm's compute time.
-        // Note: This metadata is not populated by bazel until 4.1.0
-        String actionMnemonic =
-            operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getActionMnemonic();
-        incrementValue(actionMnemonics, actionMnemonic);
-
         // Record the target Id that initiated the operation.
         // Note: This metadata is not populated by bazel until 4.1.0
         String targetId =
@@ -1538,10 +1519,43 @@ public class RedisShardBackplane implements Backplane {
             operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getConfigurationId();
         incrementValue(configIds, configId);
 
+        // 2. Information about where the worker fetched the operation.
+
+        // Record the queue where the operation came from (ex. cpu, gpu).
+        // Queues often drain quickly.  This will let us identify the on-going work by the queues
+        // where originated from.
+        // We can correlate queue spikes with the the saturation they cause to dispatched
+        // operations.
+        String queueName =
+            operationQueue.getName(operation.getQueueEntry().getPlatform().getPropertiesList());
+        incrementValue(fromQueueAmounts, queueName);
+
         // Record whether the operation has been requeued before
         if (operation.getQueueEntry().getRequeueAttempts() > 0) {
           requeuedOperationsAmount++;
         }
+
+        // 3. Information about the operation.
+
+        // Record the action type (ex. build, test).
+        // Generally speaking, there are "build" actions and "test" actions.
+        // This is useful for knowing if buildfarm has been saturated with test work due
+        // clients using --runs_per_test.  It is also relevant to distinguish actions this way
+        // because long-running actions are often tests.
+        incrementActionType(queuedOperation, actionAmounts);
+
+        // Record the action mnemonic of the operation (ex. CppCompile, GoLink).
+        // This will let us know what kind of work is occurring.
+        // Although we know the mnemonic characteristics by statically analyzing the repo,
+        // we don't know what kind of actions dominate buildfarm's compute under typical load.
+        // This let us know what toolchains and rules are used most heavily and perhaps how to
+        // optimize for them.
+        // Note: This metadata is not populated by bazel until 4.1.0
+        String actionMnemonic =
+            operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getActionMnemonic();
+        incrementValue(actionMnemonics, actionMnemonic);
+
+        List<String> arguments = queuedOperation.getCommand().getArgumentsList();
       }
 
     } catch (Exception e) {
