@@ -140,6 +140,12 @@ public class RedisShardBackplane implements Backplane {
                   .add(PreconditionFailure.getDescriptor())
                   .build());
 
+  private class ActionAmounts {
+    Integer build = 0;
+    Integer test = 0;
+    Integer unknown = 0;
+  }
+
   private final RedisShardBackplaneConfig config;
   private final String source; // used in operation change publication
   private final Function<Operation, Operation> onPublish;
@@ -1450,11 +1456,9 @@ public class RedisShardBackplane implements Backplane {
   private DispatchedOperationsStatus getDispatchedOperationsStatus(
       JedisCluster jedis, Instance instance) {
     // Metrics related to dispatched operations
-    Integer buildActionAmount = 0;
-    Integer testActionAmount = 0;
-    Integer unknownActionAmount = 0;
+    ActionAmounts actionAmounts = new ActionAmounts();
     Integer requeuedOperationsAmount = 0;
-    Set<String> uniqueToolInnovationIds = Sets.newHashSet();
+    Set<String> uniqueToolInvocationIds = Sets.newHashSet();
     Map<String, Integer> fromQueueAmounts = new HashMap();
     Map<String, Integer> toolAmounts = new HashMap();
     Map<String, Integer> actionMnemonics = new HashMap();
@@ -1469,16 +1473,6 @@ public class RedisShardBackplane implements Backplane {
             resolveQueuedOperationDigest(
                 instance, operation.getQueueEntry().getQueuedOperationDigest());
 
-        // Record the action type.
-        // This will let us know if it's a build action / test action.
-        incrementActionType(
-            queuedOperation, buildActionAmount, testActionAmount, unknownActionAmount);
-
-        // Record the tool innovation id.
-        // This will let us know how many unique clients are getting work processed.
-        uniqueToolInnovationIds.add(
-            operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getToolInvocationId());
-
         // Record the queue it came from.
         // The queues often drain quickly.  This will let us identify work by the queues they
         // originated from.
@@ -1486,9 +1480,27 @@ public class RedisShardBackplane implements Backplane {
             operationQueue.getName(operation.getQueueEntry().getPlatform().getPropertiesList());
         incrementValue(fromQueueAmounts, queueName);
 
+        // Record the action type.
+        // This will let us know if it's a build action / test action.
+        // This is generally useful for knowing if buildfarm has been saturated with test work due
+        // clients using --runs_per_test.
+        incrementActionType(queuedOperation, actionAmounts);
+
+        // Record the tool invocation id.
+        // This will let us know how many unique clients are getting work processed.
+        // This correlates to the number of individuals using buildfarm.
+        // We will probably be able to get a similar number from the incoming build event streams.
+        // However, users will have the ability to disable BES on the client side.
+        // They cannot disable the fact that their actions are tagged with the invocation id.
+        // Therefore, this may be a more reliable metric of active users.
+        uniqueToolInvocationIds.add(
+            operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getToolInvocationId());
+
         // Record the tool that the operation came from.
         // This will let us know if anyone is using an unexpected build tool or bazel version with
-        // buildfarm.
+        // buildfarm.  In the past, we've speculated that mixing bazel version with buildfarm might
+        // result in stability issues.
+        // Now we'll be able to match any issues which when unexpected tools were used.
         String toolName =
             operation
                     .getQueueEntry()
@@ -1507,16 +1519,21 @@ public class RedisShardBackplane implements Backplane {
 
         // Record the action mnemonic of the operation.
         // This will let us know what kind of work is occurring, for example, CppCompile or GoLink.
+        // Although we know the mnemonic characteristics by statically analyzing the repo,
+        // we don't know what kind of actions dominate buildfarm's compute time.
+        // Note: This metadata is not populated by bazel until 4.1.0
         String actionMnemonic =
             operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getActionMnemonic();
         incrementValue(actionMnemonics, actionMnemonic);
 
         // Record the target Id that initiated the operation.
+        // Note: This metadata is not populated by bazel until 4.1.0
         String targetId =
             operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getTargetId();
         incrementValue(targetIds, targetId);
 
         // Record the build configuration of the action.
+        // Note: This metadata is not populated by bazel until 4.1.0
         String configId =
             operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getConfigurationId();
         incrementValue(configIds, configId);
@@ -1534,16 +1551,16 @@ public class RedisShardBackplane implements Backplane {
     DispatchedOperationsStatus status =
         DispatchedOperationsStatus.newBuilder()
             .setSize(jedis.hlen(config.getDispatchedOperationsHashName()))
-            .setBuildActionAmount(buildActionAmount)
-            .setTestActionAmount(testActionAmount)
-            .setUnknownActionAmount(unknownActionAmount)
+            .setBuildActionAmount(actionAmounts.build)
+            .setTestActionAmount(actionAmounts.test)
+            .setUnknownActionAmount(actionAmounts.unknown)
             .setRequeuedOperationsAmount(requeuedOperationsAmount)
             .addAllFromQueues(toLabeledCounts(fromQueueAmounts))
             .addAllTools(toLabeledCounts(toolAmounts))
             .addAllActionMnemonics(toLabeledCounts(actionMnemonics))
             .addAllTargetIds(toLabeledCounts(targetIds))
             .addAllConfigIds(toLabeledCounts(configIds))
-            .setUniqueClientsAmount(uniqueToolInnovationIds.size())
+            .setUniqueClientsAmount(uniqueToolInvocationIds.size())
             .build();
 
     return status;
@@ -1567,23 +1584,18 @@ public class RedisShardBackplane implements Backplane {
   /**
    * @brief Increment a stat about the kind of operation.
    * @details It is either a build/test action, or unknown in the event of missing data.
-   * @param buildActionAmount Increment if operation is a build action.
-   * @param testActionAmount Increment if operation is a test action.
-   * @param unknownActionAmount Increment if we can't determine whether the action is build or test.
+   * @param queuedOperation The operation to analyze.
+   * @param actionAmounts The counts for the types of operation (build, test, unknown)
    */
-  private void incrementActionType(
-      QueuedOperation queuedOperation,
-      Integer buildActionAmount,
-      Integer testActionAmount,
-      Integer unknownActionAmount) {
+  private void incrementActionType(QueuedOperation queuedOperation, ActionAmounts actionAmounts) {
     if (queuedOperation != null) {
       if (CommandUtils.isTest(queuedOperation.getCommand())) {
-        testActionAmount++;
+        actionAmounts.test++;
       } else {
-        buildActionAmount++;
+        actionAmounts.build++;
       }
     } else {
-      unknownActionAmount++;
+      actionAmounts.unknown++;
     }
   }
 
