@@ -23,7 +23,6 @@ java_test(
     deps = [
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/common/redis",
-        "//src/main/java/build/buildfarm/instance/shard",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "//src/test/java/build/buildfarm:test_runner",
         "//third_party/jedis",

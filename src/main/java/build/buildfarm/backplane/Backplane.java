@@ -41,7 +41,6 @@ import java.util.Map;
 import java.util.Set;
 
 public interface Backplane {
-
   final class ActionCacheScanResult {
     public final String token;
     public final Iterable<Map.Entry<ActionKey, ActionResult>> entries;

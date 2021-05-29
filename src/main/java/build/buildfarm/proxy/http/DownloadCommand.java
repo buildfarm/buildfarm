@@ -20,7 +20,6 @@ import java.net.URI;
 
 /** Object sent through the channel pipeline to start a download. */
 final class DownloadCommand {
-
   private final URI uri;
   private final boolean casDownload;
   private final String hash;

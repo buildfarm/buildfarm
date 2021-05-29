@@ -42,7 +42,6 @@ class ShardActionCache implements ReadThroughActionCache {
 
     AsyncCacheLoader<ActionKey, ActionResult> loader =
         new AsyncCacheLoader<ActionKey, ActionResult>() {
-
           @Override
           public CompletableFuture<ActionResult> asyncLoad(ActionKey actionKey, Executor executor) {
             return toCompletableFuture(

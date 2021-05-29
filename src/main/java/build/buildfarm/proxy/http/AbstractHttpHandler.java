@@ -34,7 +34,6 @@ import java.util.Map;
 /** Common functionality shared by concrete classes. */
 abstract class AbstractHttpHandler<T extends HttpObject> extends SimpleChannelInboundHandler<T>
     implements ChannelOutboundHandler {
-
   private final Credentials credentials;
 
   public AbstractHttpHandler(Credentials credentials) {

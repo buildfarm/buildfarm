@@ -21,7 +21,6 @@ package build.buildfarm.worker;
  *     different worker.
  */
 public class DequeueMatchSettings {
-
   /**
    * @field acceptEverything
    * @brief Whether or not the worker should accept everything it gets off the queue.

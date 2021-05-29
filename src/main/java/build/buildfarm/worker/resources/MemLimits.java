@@ -28,7 +28,6 @@ package build.buildfarm.worker;
  *     local execution as an alternative.
  */
 public class MemLimits {
-
   /**
    * @field limit
    * @brief Whether or not we perform memory limiting on the action.

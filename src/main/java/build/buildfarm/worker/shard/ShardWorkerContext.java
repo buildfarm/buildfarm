@@ -37,7 +37,9 @@ import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.EntryLimitException;
+import build.buildfarm.common.ExecutionWrappers;
 import build.buildfarm.common.InputStreamFactory;
+import build.buildfarm.common.LinuxSandboxOptions;
 import build.buildfarm.common.Poller;
 import build.buildfarm.common.Size;
 import build.buildfarm.common.Write;
@@ -106,6 +108,8 @@ class ShardWorkerContext implements WorkerContext {
 
   private static final Counter completedOperations =
       Counter.build().name("completed_operations").help("Completed operations.").register();
+  private static final Counter operationPollerCounter =
+      Counter.build().name("operation_poller").help("Number of operations polled.").register();
 
   private final String name;
   private final Platform platform;
@@ -252,6 +256,7 @@ class ShardWorkerContext implements WorkerContext {
                 format("%s: poller: Completed Poll for %s: Failed", name, operationName));
             onFailure.run();
           } else {
+            operationPollerCounter.inc();
             logger.log(
                 Level.INFO, format("%s: poller: Completed Poll for %s: OK", name, operationName));
           }
@@ -875,19 +880,22 @@ class ShardWorkerContext implements WorkerContext {
   public ResourceLimits commandExecutionSettings(Command command) {
     ResourceLimits limits =
         ResourceDecider.decideResourceLimitations(
-            command, onlyMulticoreTests, getExecuteStageWidth());
+            command, onlyMulticoreTests, limitGlobalExecution, getExecuteStageWidth());
     return limits;
   }
 
   @Override
   public IOResource limitExecution(
-      String operationName, ImmutableList.Builder<String> arguments, Command command) {
+      String operationName,
+      ImmutableList.Builder<String> arguments,
+      Command command,
+      Path workingDirectory) {
     if (limitExecution) {
       ResourceLimits limits =
           ResourceDecider.decideResourceLimitations(
-              command, onlyMulticoreTests, getExecuteStageWidth());
+              command, onlyMulticoreTests, limitGlobalExecution, getExecuteStageWidth());
 
-      return limitSpecifiedExecution(limits, operationName, arguments);
+      return limitSpecifiedExecution(limits, operationName, arguments, workingDirectory);
     }
     return new IOResource() {
       @Override
@@ -901,8 +909,10 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   IOResource limitSpecifiedExecution(
-      ResourceLimits limits, String operationName, ImmutableList.Builder<String> arguments) {
-
+      ResourceLimits limits,
+      String operationName,
+      ImmutableList.Builder<String> arguments,
+      Path workingDirectory) {
     // The decision to apply resource restrictions has already been decided within the
     // ResourceLimits object. We apply the cgroup settings to file resources
     // and collect group names to use on the CLI.
@@ -923,15 +933,58 @@ class ShardWorkerContext implements WorkerContext {
       usedGroups.add(group.getMem().getName());
     }
 
-    // Possibly set network restrictions.
-    if (limits.network.blockNetwork) {
-      arguments.add("/usr/bin/unshare", "-n", "-r");
+    // Decide the CLI for running under cgroups
+    if (!usedGroups.isEmpty()) {
+      arguments.add(
+          ExecutionWrappers.CGROUPS,
+          "-g",
+          String.join(",", usedGroups) + ":" + group.getHierarchy());
     }
 
-    // Decide the CLI for running under cgroups
-    if (limitGlobalExecution || !usedGroups.isEmpty()) {
-      arguments.add(
-          "/usr/bin/cgexec", "-g", String.join(",", usedGroups) + ":" + group.getHierarchy());
+    // Possibly set network restrictions.
+    // This is not the ideal implementation of block-network.
+    // For now, without the linux-sandbox, we will unshare the network namespace.
+    if (limits.network.blockNetwork && !limits.useLinuxSandbox) {
+      arguments.add(ExecutionWrappers.UNSHARE, "-n", "-r");
+    }
+
+    // Decide the CLI for running the sandbox
+    // For reference on how bazel spawns the sandbox:
+    // https://github.com/bazelbuild/bazel/blob/ddf302e2798be28bb67e32d5c2fc9c73a6a1fbf4/src/main/java/com/google/devtools/build/lib/sandbox/LinuxSandboxUtil.java#L183
+    if (limits.useLinuxSandbox) {
+      // Construct the CLI options for this binary.
+      LinuxSandboxOptions options = new LinuxSandboxOptions();
+      options.createNetns = limits.network.blockNetwork;
+      options.workingDir = workingDirectory.toString();
+
+      // Bazel encodes these directly
+      options.writableFiles.add(execFileSystem.root().toString());
+      options.writableFiles.add(workingDirectory.toString());
+
+      // For the time being, the linux-sandbox version of "nobody"
+      // does not pair with buildfarm's implementation of exec_owner: "nobody".
+      // This will need fixed to enable using fakeUsername with the sandbox.
+      // TODO: provide proper support for bazel sandbox's fakeUsername "-U" flag.
+      // options.fakeUsername = limits.fakeUsername;
+
+      // these were hardcoded in bazel based on a filesystem configuration typical to ours
+      // TODO: they may be incorrect for say Windows, and support will need adjusted in the future.
+      options.writableFiles.add("/tmp");
+      options.writableFiles.add("/dev/shm");
+
+      if (limits.tmpFs) {
+        options.tmpfsDirs.add("/tmp");
+      }
+
+      // Bazel looks through environment variables based on operation system to provide additional
+      // write files.
+      // TODO: Add other paths based on environment variables
+      // all:     TEST_TMPDIR
+      // windows: TEMP
+      // windows: TMP
+      // linux:   TMPDIR
+
+      addLinuxSandboxCli(arguments, options);
     }
 
     // The executor expects a single IOResource.
@@ -940,8 +993,40 @@ class ShardWorkerContext implements WorkerContext {
     return combineResources(resources);
   }
 
-  private void applyCpuLimits(Group group, ResourceLimits limits, ArrayList<IOResource> resources) {
+  private void addLinuxSandboxCli(
+      ImmutableList.Builder<String> arguments, LinuxSandboxOptions options) {
+    arguments.add(ExecutionWrappers.AS_NOBODY);
 
+    // Choose the sandbox which is built and deployed with the worker image.
+    arguments.add(ExecutionWrappers.LINUX_SANDBOX);
+
+    // Pass flags based on the sandbox CLI options.
+    if (options.createNetns) {
+      arguments.add("-N");
+    }
+
+    if (options.fakeUsername) {
+      arguments.add("-U");
+    }
+
+    if (!options.workingDir.isEmpty()) {
+      arguments.add("-W");
+      arguments.add(options.workingDir);
+    }
+    for (String writablePath : options.writableFiles) {
+      arguments.add("-w");
+      arguments.add(writablePath);
+    }
+
+    for (String dir : options.tmpfsDirs) {
+      arguments.add("-e");
+      arguments.add(dir);
+    }
+
+    arguments.add("--");
+  }
+
+  private void applyCpuLimits(Group group, ResourceLimits limits, ArrayList<IOResource> resources) {
     Cpu cpu = group.getCpu();
     try {
       cpu.close();
@@ -970,7 +1055,6 @@ class ShardWorkerContext implements WorkerContext {
   }
 
   private void applyMemLimits(Group group, ResourceLimits limits, ArrayList<IOResource> resources) {
-
     try {
       Mem mem = group.getMem();
       mem.setMemoryLimit(limits.mem.claimed);

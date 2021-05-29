@@ -43,9 +43,11 @@ def archive_dependencies(third_party):
         {
             "name": "googleapis",
             "build_file": "%s:BUILD.googleapis" % third_party,
-            "sha256": "7b6ea252f0b8fb5cd722f45feb83e115b689909bbb6a393a873b6cbad4ceae1d",
-            "strip_prefix": "googleapis-143084a2624b6591ee1f9d23e7f5241856642f4d",
-            "url": "https://github.com/googleapis/googleapis/archive/143084a2624b6591ee1f9d23e7f5241856642f4d.zip",
+            "patch_cmds": ["find google -name 'BUILD.bazel' -type f -delete"],
+            "patch_cmds_win": ["Remove-Item google -Recurse -Include *.bazel"],
+            "sha256": "745cb3c2e538e33a07e2e467a15228ccbecadc1337239f6740d57a74d9cdef81",
+            "strip_prefix": "googleapis-6598bb829c9e9a534be674649ffd1b4671a821f9",
+            "url": "https://github.com/googleapis/googleapis/archive/6598bb829c9e9a534be674649ffd1b4671a821f9.zip",
         },
         {
             "name": "remote_apis",

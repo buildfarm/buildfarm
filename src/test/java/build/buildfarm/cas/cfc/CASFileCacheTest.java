@@ -277,7 +277,6 @@ class CASFileCacheTest {
 
   @Test
   public void startEmptyCas() throws IOException, InterruptedException {
-
     // start the file cache with no files.
     // the cache should start without any initial files in the cache.
     StartupCacheResults results = fileCache.start(false);
@@ -292,7 +291,6 @@ class CASFileCacheTest {
 
   @Test
   public void startCasAssumeDirectory() throws IOException, InterruptedException {
-
     // create a "_dir" file on the root
     Path path = root.resolve("foobar_dir");
     ByteString blob = ByteString.copyFromUtf8("content");

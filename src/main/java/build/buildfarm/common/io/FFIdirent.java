@@ -17,7 +17,6 @@ package build.buildfarm.common.io;
 import jnr.ffi.Struct;
 
 public class FFIdirent extends Struct {
-
   private static final int MAX_NAME_LEN = 255;
 
   public FFIdirent(jnr.ffi.Runtime runtime) {

@@ -14,13 +14,15 @@
 
 package build.buildfarm.worker;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * @class ExecutionDebugInfo
  * @brief All debug information provided by buildfarm when debugging the execution of an action.
  * @details This information can be returned to the client as the stderr of the failed action.
  */
 public class ExecutionDebugInfo {
-
   /**
    * @field description
    * @brief A description of the data for how it was populated.
@@ -36,6 +38,13 @@ public class ExecutionDebugInfo {
   public String command = "";
 
   /**
+   * @field environment
+   * @brief The environment variables for the command.
+   * @details The environment variables are decided by both users and buildfarm.
+   */
+  public Map<String, String> environment = new HashMap<String, String>();
+
+  /**
    * @field workingDirectory
    * @brief The working directory when running the action.
    * @details This correlates the command field.
@@ -48,4 +57,18 @@ public class ExecutionDebugInfo {
    * @details These limitations are decided by exec_properties and buildfarm configurations.
    */
   public ResourceLimits limits = new ResourceLimits();
+
+  /**
+   * @field stdout
+   * @brief The action result's stdout
+   * @details Converted from proto bytes.
+   */
+  public String stdout = "";
+
+  /**
+   * @field stdout
+   * @brief The action result's stdout
+   * @details Converted from proto bytes.
+   */
+  public String stderr = "";
 }

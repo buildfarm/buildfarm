@@ -25,10 +25,8 @@ import org.junit.runners.JUnit4;
 
 @RunWith(JUnit4.class)
 public class WorkerQueuesTest {
-
   @Test
   public void noConfig_zeroQueues() {
-
     // Arrange
     WorkerQueues queues = new WorkerQueues();
 
@@ -38,7 +36,6 @@ public class WorkerQueuesTest {
 
   @Test
   public void noConfig_emptyProvisionNotEnqueued() {
-
     // Arrange
     WorkerQueues queues = new WorkerQueues();
 
@@ -53,7 +50,6 @@ public class WorkerQueuesTest {
 
   @Test
   public void noConfig_nullProvisionNotEnqueued() {
-
     // Arrange
     WorkerQueues queues = new WorkerQueues();
 
@@ -68,7 +64,6 @@ public class WorkerQueuesTest {
 
   @Test
   public void noConfig_invalidProvisionNotEnqueued() {
-
     // Arrange
     WorkerQueues queues = new WorkerQueues();
 
@@ -84,7 +79,6 @@ public class WorkerQueuesTest {
 
   @Test
   public void cpuGpuConfig_twoQueues() {
-
     // Arrange
     WorkerQueues queues = WorkerQueueConfigurations.gpuAndFallback();
 
@@ -96,7 +90,6 @@ public class WorkerQueuesTest {
 
   @Test
   public void cpuGpuConfig_emptyProvisionEnqueued() {
-
     // Arrange
     WorkerQueues queues = WorkerQueueConfigurations.gpuAndFallback();
 
@@ -113,7 +106,6 @@ public class WorkerQueuesTest {
 
   @Test
   public void cpuGpuConfig_nullProvisionEnqueued() {
-
     // Arrange
     WorkerQueues queues = WorkerQueueConfigurations.gpuAndFallback();
 
@@ -130,7 +122,6 @@ public class WorkerQueuesTest {
 
   @Test
   public void cpuGpuConfig_invalidProvisionEnqueued() {
-
     // Arrange
     WorkerQueues queues = WorkerQueueConfigurations.gpuAndFallback();
 
@@ -148,7 +139,6 @@ public class WorkerQueuesTest {
 
   @Test
   public void cpuGpuConfig_validGpuProvisionEnqueued() {
-
     // Arrange
     WorkerQueues queues = WorkerQueueConfigurations.gpuAndFallback();
 
@@ -166,7 +156,6 @@ public class WorkerQueuesTest {
 
   @Test
   public void gpuConfig_emptyProvisionNotEnqueued() {
-
     // Arrange
     WorkerQueues queues = WorkerQueueConfigurations.gpu();
 
@@ -182,7 +171,6 @@ public class WorkerQueuesTest {
 
   @Test
   public void gpuConfig_validProvisionEnqueued() {
-
     // Arrange
     WorkerQueues queues = WorkerQueueConfigurations.gpu();
 
@@ -199,7 +187,6 @@ public class WorkerQueuesTest {
 
   @Test
   public void gpuConfig_validProvisionsEnqueued() {
-
     // Arrange
     WorkerQueues queues = WorkerQueueConfigurations.gpu();
 
@@ -218,7 +205,6 @@ public class WorkerQueuesTest {
 
   @Test
   public void gpuConfig_unvalidProvisionNotEnqueued() {
-
     // Arrange
     WorkerQueues queues = WorkerQueueConfigurations.gpu();
 

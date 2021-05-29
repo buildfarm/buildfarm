@@ -23,7 +23,6 @@ import java.util.regex.Pattern;
  * @details Simple parsers for extracting out / adding hashtags to redis keys.
  */
 public class RedisHashtags {
-
   /**
    * @brief Append the hashtag value to the base queue name.
    * @details Creates a valid queue name for one of the entire queues.
@@ -62,7 +61,6 @@ public class RedisHashtags {
 
     // hashtag found
     if (matcher.find()) {
-
       // extract from matcher
       String hashtag = matcher.group(0);
 

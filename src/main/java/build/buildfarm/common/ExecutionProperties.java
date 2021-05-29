@@ -22,6 +22,12 @@ package build.buildfarm.common;
  *     workers and the operation queue.
  */
 public class ExecutionProperties {
+  /**
+   * @field CORES
+   * @brief The exec_property and platform property name for setting the core amount.
+   * @details This is decided between client and server. The key value is expected to be an integer.
+   */
+  public static final String CORES = "cores";
 
   /**
    * @field MIN_CORES
@@ -57,6 +63,13 @@ public class ExecutionProperties {
    * @details This is decided between client and server. The key value is expected to be a boolean.
    */
   public static final String BLOCK_NETWORK = "block-network";
+
+  /**
+   * @field TMPFS
+   * @brief The exec_property and platform property name for enabling tmpfs.
+   * @details This is decided between client and server. The key value is expected to be a boolean.
+   */
+  public static final String TMPFS = "tmpfs";
 
   /**
    * @field ENV_VARS
@@ -96,6 +109,23 @@ public class ExecutionProperties {
   public static final String DEBUG_AFTER_EXECUTION = "debug-after-execution";
 
   /**
+   * @field DEBUG_TESTS_ONLY
+   * @brief The exec_property and platform property name for indicating whether debug information
+   *     should only be given for test actions.
+   * @details This is intended to be used interactively to debug remote executions. The key value
+   *     should be a boolean.
+   */
+  public static final String DEBUG_TESTS_ONLY = "debug-tests-only";
+
+  /**
+   * @field DEBUG_TARGET
+   * @brief The exec_property and platform property name for indicating a specific target to debug.
+   * @details This is intended to be used interactively to debug remote executions. The key value
+   *     should be a string.
+   */
+  public static final String DEBUG_TARGET = "debug-target";
+
+  /**
    * @field CHOOSE_QUEUE
    * @brief The exec_property to allow directly matching with a queue.
    * @details This is to support a paradigm where actions want to specifically request the queue to
@@ -115,4 +145,26 @@ public class ExecutionProperties {
    *     with say different execution policies.
    */
   public static final String LINUX_SANDBOX = "linux-sandbox";
+
+  /**
+   * @field AS_NOBODY
+   * @brief The exec_property to inform the executor to run the action as a 'nobody' user.
+   * @details The "as nobody" functionality is supported by the bazel sandbox. This execution
+   *     property may be fulfilled through the sandbox or a standalone program. This execution
+   *     wrapper was previously used as a configured execution policy, but due to its involvement
+   *     with the sandbox, we find it better to make its usage explicit in buildfarm and easier to
+   *     test dynamically.
+   */
+  public static final String AS_NOBODY = "as-nobody";
+
+  /**
+   * @field PROCESS_WRAPPER
+   * @brief The exec_property to inform the executor to run the action with the process-wrapper.
+   * @details The "as nobody" functionality is supported by the bazel sandbox. This execution
+   *     property may be fulfilled through the sandbox or a standalone program. This execution
+   *     wrapper was previously used as a configured execution policy, but due to its involvement
+   *     with the sandbox, we find it better to make its usage explicit in buildfarm and easier to
+   *     test dynamically.
+   */
+  public static final String PROCESS_WRAPPER = "process-wrapper";
 }
