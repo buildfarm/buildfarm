@@ -1449,7 +1449,6 @@ public class RedisShardBackplane implements Backplane {
    */
   private DispatchedOperationsStatus getDispatchedOperationsStatus(
       JedisCluster jedis, Instance instance) {
-
     // Metrics related to dispatched operations
     Integer buildActionAmount = 0;
     Integer testActionAmount = 0;

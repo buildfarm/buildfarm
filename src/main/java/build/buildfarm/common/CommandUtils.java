@@ -23,7 +23,6 @@ import com.google.common.collect.Iterables;
  * @details These utilities are used to derive information from REAPI's command type.
  */
 public class CommandUtils {
-
   /**
    * @brief Derive if command is a test run.
    * @details Find a reliable way to identify whether a command is a test or not.

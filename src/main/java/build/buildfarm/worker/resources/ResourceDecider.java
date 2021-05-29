@@ -15,7 +15,6 @@
 package build.buildfarm.worker;
 
 import build.bazel.remote.execution.v2.Command;
-import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
 import build.bazel.remote.execution.v2.Platform.Property;
 import build.buildfarm.common.CommandUtils;
 import build.buildfarm.common.ExecutionProperties;
