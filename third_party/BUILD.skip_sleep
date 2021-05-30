@@ -1,0 +1,49 @@
+package(default_visibility = ["//visibility:public"])
+
+cc_binary(
+    name = "skip_sleep",
+    srcs = ["tardis.c"],
+    data = [":skip_sleep_preload"],
+    includes = ["."],
+    deps = [":skip_sleep_preload"],
+)
+
+# cc_library(
+#     name = "skip_sleep_preload",
+#     srcs = ["novdso.c"],
+#     includes = ["."],
+# )
+
+cc_binary(
+    name = "skip_sleep_preload",
+    srcs = ["novdso.c"],
+    includes = ["."],
+    linkshared = 1,
+)
+
+
+# filegroup(
+#   name = "mylib",
+#   #srcs = ["@skip_sleep//:libskip_sleep_preload.so"],
+#   data = ["@skip_sleep//:skip_sleep_preload.so"],
+# )
+
+# cc_binary(
+#     name = "skip_sleep_preload",
+#     srcs = ["novdso.c"],
+#     includes = ["."],
+#     linkstatic = 0,
+# )
+
+# cc_binary(
+#     name = "skip_sleep_preload",
+#     srcs = ["novdso.c"],
+#     includes = ["."],
+#     linkstatic = 0,
+# )
+
+# cc_import(
+#   name = "skip_sleep_preload",
+#   hdrs = ["novdso.c"],
+#   shared_library = "skip_sleep_preload.so",
+# )
