@@ -220,7 +220,7 @@ class Executor {
       }
 
       if (limits.time.timeShift != 0) {
-        arguments.add("\"");
+        arguments.add("'");
       }
 
       statusCode =

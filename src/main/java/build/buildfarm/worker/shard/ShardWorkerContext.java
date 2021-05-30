@@ -998,7 +998,7 @@ class ShardWorkerContext implements WorkerContext {
       if (limits.time.timeShift != 0) {
         arguments.add("/bin/bash");
         arguments.add("-c");
-        arguments.add("\"");
+        arguments.add("'");
         arguments.add("sleep " + String.valueOf(limits.time.timeShift) + "; ");
       }
     }
