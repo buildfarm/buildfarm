@@ -233,6 +233,13 @@ public class ShardInstance extends AbstractServerInstance {
           .help("Dispatched operations by config.")
           .register();
 
+  private static final Gauge dispatchedOperationsPlatformProperties =
+      Gauge.build()
+          .name("dispatched_operations_platform_properties")
+          .labelNames("config")
+          .help("Dispatched operations by platform properties.")
+          .register();
+
   private static final Gauge uniqueClientsAmount =
       Gauge.build()
           .name("dispatched_operations_clients_being_served")
@@ -571,6 +578,9 @@ public class ShardInstance extends AbstractServerInstance {
                   updateLabelCount(
                       backplaneStatus.getDispatchedOperations().getConfigIdsList(),
                       dispatchedOperationsConfigs);
+                  updateLabelCount(
+                      backplaneStatus.getDispatchedOperations().getPlatformPropertiesList(),
+                      dispatchedOperationsPlatformProperties);
                   uniqueClientsAmount.set(
                       backplaneStatus.getDispatchedOperations().getUniqueClientsAmount());
                   requeuedOperationsAmount.set(

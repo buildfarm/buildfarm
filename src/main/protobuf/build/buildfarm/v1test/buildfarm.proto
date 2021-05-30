@@ -808,13 +808,16 @@ message DispatchedOperationsStatus {
   // count the unique configurations being used
   repeated LabeledCount config_ids = 10;
   
+  // platform properties used by the dispatched operations
+  repeated LabeledCount platform_properties = 11;
+  
   // how many unique clients are currently being served.
   // This is based on the uniqueness of tool_id for currently dispatched operations.
-  int64 unique_clients_amount = 11;
+  int64 unique_clients_amount = 12;
   
   // how many of the dispatched operations have been requeued.
   // many requeued operations could be a sign of a problem.
-  int64 requeued_operations_amount = 12;
+  int64 requeued_operations_amount = 13;
 }
 
 message BackplaneStatus {

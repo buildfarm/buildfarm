@@ -1465,6 +1465,7 @@ public class RedisShardBackplane implements Backplane {
     Map<String, Integer> actionMnemonics = new HashMap();
     Map<String, Integer> targetIds = new HashMap();
     Map<String, Integer> configIds = new HashMap();
+    Map<String, Integer> platformProperties = new HashMap();
 
     // Iterate over each dispatched operation, and accumulate metrics about buildfarm's ongoing
     // executions.
@@ -1564,6 +1565,15 @@ public class RedisShardBackplane implements Backplane {
         if (!arguments.isEmpty()) {
           incrementValue(commandTools, arguments.get(0));
         }
+
+        // Record platform properties being used on dispatched operations.
+        // How we run actions can be influenced by users through platform properties.
+        // Detecting issues through an influx of specific platform properties can help diagnose.
+        // For example, we may see many dispatched operations using a high amount of cores.
+        for (Platform.Property property :
+            queuedOperation.getCommand().getPlatform().getPropertiesList()) {
+          incrementValue(platformProperties, property.getName() + "=" + property.getValue());
+        }
       }
 
     } catch (Exception e) {
@@ -1583,6 +1593,7 @@ public class RedisShardBackplane implements Backplane {
             .addAllCommandTools(toLabeledCounts(commandTools))
             .addAllTargetIds(toLabeledCounts(targetIds))
             .addAllConfigIds(toLabeledCounts(configIds))
+            .addAllPlatformProperties(toLabeledCounts(platformProperties))
             .setUniqueClientsAmount(uniqueToolInvocationIds.size())
             .build();
 
