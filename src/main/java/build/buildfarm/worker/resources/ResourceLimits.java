@@ -82,6 +82,13 @@ public class ResourceLimits {
   public NetworkLimits network = new NetworkLimits();
 
   /**
+   * @field time
+   * @brief Resource limitations on time usage.
+   * @details Decides specific time limitations and whether to apply them for a given action.
+   */
+  public TimeLimits time = new TimeLimits();
+
+  /**
    * @field extraEnvironmentVariables
    * @brief Decides whether we should add extra environment variables when executing an operation.
    * @details These variables are added to the end of the existing environment variables in the

@@ -987,6 +987,22 @@ class ShardWorkerContext implements WorkerContext {
       addLinuxSandboxCli(arguments, options);
     }
 
+    if (limits.time.skipSleep) {
+      arguments.add(ExecutionWrappers.SKIP_SLEEP);
+
+      // we set these values very high because we want sleep calls to return immediately.
+      arguments.add("90000000"); // delay factor
+      arguments.add("90000000"); // time factor
+      arguments.add(ExecutionWrappers.SKIP_SLEEP_PRELOAD);
+
+      if (limits.time.timeShift != 0) {
+        arguments.add("/bin/bash");
+        arguments.add("-c");
+        arguments.add("\"");
+        arguments.add("sleep " + String.valueOf(limits.time.timeShift) + "; ");
+      }
+    }
+
     // The executor expects a single IOResource.
     // However, we may have multiple IOResources due to using multiple cgroup groups.
     // We construct a single IOResource to account for this.
