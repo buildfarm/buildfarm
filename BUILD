@@ -54,6 +54,11 @@ genrule(
     cmd = "cp $< $@;",
 )
 
+sh_binary(
+    name = "delay",
+    srcs = ["delay.sh"],
+)
+
 # Docker images for buildfarm components
 java_image(
     name = "buildfarm-server",

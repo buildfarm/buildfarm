@@ -71,4 +71,11 @@ public class ExecutionWrappers {
    * @details The shared object needs passed to the program which will LD_PRELOAD it.
    */
   public static final String SKIP_SLEEP_PRELOAD = "/app/build_buildfarm/skip_sleep_preload.so";
+
+  /**
+   * @field DELAY
+   * @brief The program to used to timeshift actions when running under skip_sleep.
+   * @details This program is expected to be packaged with the worker image.
+   */
+  public static final String DELAY = "/app/build_buildfarm/delay.sh";
 }

@@ -219,10 +219,6 @@ class Executor {
         arguments.addAll(command.getArgumentsList());
       }
 
-      if (limits.time.timeShift != 0) {
-        arguments.add("'");
-      }
-
       statusCode =
           executeCommand(
               operationName,

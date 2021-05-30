@@ -996,10 +996,8 @@ class ShardWorkerContext implements WorkerContext {
       arguments.add(ExecutionWrappers.SKIP_SLEEP_PRELOAD);
 
       if (limits.time.timeShift != 0) {
-        arguments.add("/bin/bash");
-        arguments.add("-c");
-        arguments.add("'");
-        arguments.add("sleep " + String.valueOf(limits.time.timeShift) + "; ");
+        arguments.add(ExecutionWrappers.DELAY);
+        arguments.add(String.valueOf(limits.time.timeShift));
       }
     }
 
