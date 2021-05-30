@@ -14,6 +14,8 @@
 
 package build.buildfarm.worker;
 
+import java.util.ArrayList;
+
 /**
  * @class CpuLimits
  * @brief CPU resource limitations imposed on specific actions.
@@ -56,4 +58,11 @@ public class CpuLimits {
    * @details This will be in the range of (min,max) when limited.
    */
   public int claimed = 0;
+
+  /**
+   * @field description
+   * @brief Description explaining why settings were chosen.
+   * @details This can be used to debug execution behavior.
+   */
+  public ArrayList<String> description = new ArrayList<>();
 }
