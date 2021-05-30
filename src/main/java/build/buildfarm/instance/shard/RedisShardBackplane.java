@@ -1555,7 +1555,15 @@ public class RedisShardBackplane implements Backplane {
             operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getActionMnemonic();
         incrementValue(actionMnemonics, actionMnemonic);
 
+        // Record the programs being run (ex. clang, bash).
+        // Not all actions have mnemonics, and some mnemonics are used for multiple program
+        // invocations.
+        // This help us identify what toolchains are running and how it correlates to existing
+        // operation information.
         List<String> arguments = queuedOperation.getCommand().getArgumentsList();
+        if (!arguments.isEmpty()) {
+          incrementValue(commandTools, arguments.get(0));
+        }
       }
 
     } catch (Exception e) {
@@ -1572,6 +1580,7 @@ public class RedisShardBackplane implements Backplane {
             .addAllFromQueues(toLabeledCounts(fromQueueAmounts))
             .addAllTools(toLabeledCounts(toolAmounts))
             .addAllActionMnemonics(toLabeledCounts(actionMnemonics))
+            .addAllCommandTools(toLabeledCounts(commandTools))
             .addAllTargetIds(toLabeledCounts(targetIds))
             .addAllConfigIds(toLabeledCounts(configIds))
             .setUniqueClientsAmount(uniqueToolInvocationIds.size())

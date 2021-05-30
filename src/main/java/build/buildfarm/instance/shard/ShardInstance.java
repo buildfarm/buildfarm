@@ -212,6 +212,13 @@ public class ShardInstance extends AbstractServerInstance {
           .help("Dispatched operations by action mnemonic.")
           .register();
 
+  private static final Gauge dispatchedOperationsCommandTools =
+      Gauge.build()
+          .name("dispatched_operations_command_tools")
+          .labelNames("tool")
+          .help("Dispatched operations by command tools.")
+          .register();
+
   private static final Gauge dispatchedOperationsTargets =
       Gauge.build()
           .name("dispatched_operations_targets_amount")
@@ -555,6 +562,9 @@ public class ShardInstance extends AbstractServerInstance {
                   updateLabelCount(
                       backplaneStatus.getDispatchedOperations().getActionMnemonicsList(),
                       dispatchedOperationsMnemonics);
+                  updateLabelCount(
+                      backplaneStatus.getDispatchedOperations().getCommandToolsList(),
+                      dispatchedOperationsCommandTools);
                   updateLabelCount(
                       backplaneStatus.getDispatchedOperations().getTargetIdsList(),
                       dispatchedOperationsTargets);
