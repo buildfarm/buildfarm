@@ -87,9 +87,9 @@ def archive_dependencies(third_party):
         {
             "name": "skip_sleep",
             "build_file": "%s:BUILD.skip_sleep" % third_party,
-            "sha256": "2aa4ad853556689fae50c65720c8190b34a4cc6d5ff07ebc651943041f1d1237",
-            "strip_prefix": "TARDIS-b1cfe3ee9bcfc2dbed993ef7c8d57d9df2f0f682",
-            "url": "https://github.com/Unilang/TARDIS/archive/b1cfe3ee9bcfc2dbed993ef7c8d57d9df2f0f682.zip",
+            "sha256": "e5f4e7b0c84954b17fc17deb30397f0ae42bf08196878750aafc95e8d8b54e39",
+            "strip_prefix": "TARDIS-667871a5c113b7e145da868a7090876183c142d8",
+            "url": "https://github.com/Unilang/TARDIS/archive/667871a5c113b7e145da868a7090876183c142d8.zip",
         },
     ]
 
