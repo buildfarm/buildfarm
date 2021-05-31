@@ -82,7 +82,7 @@ def archive_dependencies(third_party):
             "patch_args": ["-p1"],
             "patches": ["%s/bazel:bazel_visibility.patch" % third_party],
         },
-        
+
         # Optional execution wrappers
         {
             "name": "skip_sleep",

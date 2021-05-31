@@ -41,12 +41,14 @@ cc_binary(
         "//conditions:default": ["as-nobody.c"],
     }),
 )
+
 genrule(
     name = "skip_sleep.binary",
-    srcs = ["@skip_sleep//:skip_sleep"],
+    srcs = ["@skip_sleep"],
     outs = ["skip_sleep"],
     cmd = "cp $< $@;",
 )
+
 genrule(
     name = "skip_sleep.preload",
     srcs = ["@skip_sleep//:skip_sleep_preload"],
