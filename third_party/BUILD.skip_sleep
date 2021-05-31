@@ -14,7 +14,7 @@ cc_binary(
 cc_binary(
     name = "skip_sleep_preload",
     srcs = select({
-        "//config:windows": [novdso-windows.c],
+        "//config:windows": ["novdso-windows.c"],
         "//conditions:default": ["novdso.c"],
     }),
     includes = ["."],
