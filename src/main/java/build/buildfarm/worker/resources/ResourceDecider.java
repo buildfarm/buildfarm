@@ -17,6 +17,12 @@ package build.buildfarm.worker;
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
 import build.buildfarm.common.CommandUtils;
+import build.bazel.remote.execution.v2.Platform.Property;
+import build.buildfarm.common.CommandUtils;
+import build.buildfarm.common.ExecutionProperties;
+import java.util.Map;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
 
 /**
  * @class ResourceDecider
