@@ -16,7 +16,6 @@ package build.buildfarm.worker;
 
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
-import com.google.common.collect.Iterables;
 import build.buildfarm.common.CommandUtils;
 
 /**
