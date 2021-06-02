@@ -84,11 +84,12 @@ public class ExecutionProperties {
    * @field ENV_VAR
    * @brief The exec_property and platform property prefix name for providing an additional
    *     environment variable.
-   * @details This is decided between client and server. The colon is intentional as it is used as a
-   *     prefix key. The remaining part of the key is the env variable name, the value is the value
-   *     of the env variable.
+   * @details This is decided between client and server. A colon is expected as a prefix key. The
+   *     remaining part of the key is the env variable name, the value is the value of the env
+   *     variable. example: exec_properties = {"env-var:FOO": "BAR"} We do not need to include the
+   *     colon in the property name. The parser handles this detection.
    */
-  public static final String ENV_VAR = "env-var:";
+  public static final String ENV_VAR = "env-var";
 
   /**
    * @field DEBUG_BEFORE_EXECUTION
