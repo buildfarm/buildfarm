@@ -14,6 +14,8 @@
 
 package build.buildfarm.worker;
 
+import java.util.ArrayList;
+
 /**
  * @class MemLimits
  * @brief Memory resource limitations imposed on specific actions.
@@ -56,4 +58,11 @@ public class MemLimits {
    * @details This will be in the range of (min,max) when limited.
    */
   public long claimed = 0;
+
+  /**
+   * @field description
+   * @brief Description explaining why settings were chosen.
+   * @details This can be used to debug execution behavior.
+   */
+  public ArrayList<String> description = new ArrayList<>();
 }
