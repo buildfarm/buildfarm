@@ -532,7 +532,7 @@ class Executor {
     // allow debugging after an execution
     if (limits.debugAfterExecution) {
       // Obtain execution statistics recorded while the action executed.
-      // currently we can only source this data when using the sandbox.
+      // Currently we can only source this data when using the sandbox.
       ExecutionStatistics executionStatistics = ExecutionStatistics.newBuilder().build();
       if (limits.useLinuxSandbox) {
         executionStatistics =
