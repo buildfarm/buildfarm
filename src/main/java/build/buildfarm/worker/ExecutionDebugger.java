@@ -15,6 +15,7 @@
 package build.buildfarm.worker;
 
 import build.bazel.remote.execution.v2.ActionResult;
+import com.google.devtools.build.lib.shell.Protos.ExecutionStatistics;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.protobuf.ByteString;
@@ -54,13 +55,18 @@ public class ExecutionDebugger {
    * @details This allows users to see relevant debug information related to the executor.
    * @param processBuilder Information about the constructed process.
    * @param limits The resource limitations of an execution.
+   * @param executionStatistics Resource usage information about the executed action.
    * @param resultBuilder Used to report back debug information.
    * @return Return code for the debugged execution.
    * @note Suggested return identifier: code.
    */
   public static Code performAfterExecutionDebug(
-      ProcessBuilder processBuilder, ResourceLimits limits, ActionResult.Builder resultBuilder) {
-    String message = getAfterExecutionDebugInfo(processBuilder, limits, resultBuilder);
+      ProcessBuilder processBuilder,
+      ResourceLimits limits,
+      ExecutionStatistics executionStatistics,
+      ActionResult.Builder resultBuilder) {
+    String message =
+        getAfterExecutionDebugInfo(processBuilder, limits, executionStatistics, resultBuilder);
     resultBuilder.setStderrRaw(ByteString.copyFromUtf8(message));
     resultBuilder.setExitCode(-1);
     return Code.OK;
@@ -101,12 +107,16 @@ public class ExecutionDebugger {
    * @details This be sent back to the user via the stderr of their execution.
    * @param processBuilder Information about the constructed process.
    * @param limits The resource limitations of an execution.
+   * @param executionStatistics Resource usage information about the executed action.
    * @param resultBuilder Used to report back debug information.
    * @return The debug information to show the user.
    * @note Suggested return identifier: debugMessage.
    */
   private static String getAfterExecutionDebugInfo(
-      ProcessBuilder processBuilder, ResourceLimits limits, ActionResult.Builder resultBuilder) {
+      ProcessBuilder processBuilder,
+      ResourceLimits limits,
+      ExecutionStatistics executionStatistics,
+      ActionResult.Builder resultBuilder) {
     // construct debug object
     ExecutionDebugInfo info = new ExecutionDebugInfo();
     info.description = "Buildfarm debug information after execution";

@@ -28,5 +28,6 @@ java_library(
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
         "@maven//:io_prometheus_simpleclient",
+        "@bazel//src/main/protobuf:execution_statistics_java_proto",
     ],
 )

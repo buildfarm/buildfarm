@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker;
 
+import com.google.devtools.build.lib.shell.Protos.ExecutionStatistics;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -57,6 +58,14 @@ public class ExecutionDebugInfo {
    * @details These limitations are decided by exec_properties and buildfarm configurations.
    */
   public ResourceLimits limits = new ResourceLimits();
+
+  /**
+   * @field executionStatistics
+   * @brief The resource usage statistics from running the action.
+   * @details These statistics are calculated through POSIX getrusage()- a feature available to
+   *     bazel's linux sandbox.
+   */
+  public ExecutionStatistics executionStatistics = ExecutionStatistics.newBuilder().build();
 
   /**
    * @field stdout
