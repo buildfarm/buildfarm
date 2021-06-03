@@ -952,6 +952,19 @@ class ShardWorkerContext implements WorkerContext {
     // For reference on how bazel spawns the sandbox:
     // https://github.com/bazelbuild/bazel/blob/ddf302e2798be28bb67e32d5c2fc9c73a6a1fbf4/src/main/java/com/google/devtools/build/lib/sandbox/LinuxSandboxUtil.java#L183
     if (limits.useLinuxSandbox) {
+
+      LinuxSandboxOptions options = decideLinuxSandboxOptions(limits,workingDirectory);
+      addLinuxSandboxCli(arguments, options);
+    }
+
+    // The executor expects a single IOResource.
+    // However, we may have multiple IOResources due to using multiple cgroup groups.
+    // We construct a single IOResource to account for this.
+    return combineResources(resources);
+  }
+  
+  private LinuxSandboxOptions decideLinuxSandboxOptions(ResourceLimits limits, Path workingDirectory) {
+    
       // Construct the CLI options for this binary.
       LinuxSandboxOptions options = new LinuxSandboxOptions();
       options.createNetns = limits.network.blockNetwork;
@@ -983,14 +996,8 @@ class ShardWorkerContext implements WorkerContext {
       // windows: TEMP
       // windows: TMP
       // linux:   TMPDIR
-
-      addLinuxSandboxCli(arguments, options);
-    }
-
-    // The executor expects a single IOResource.
-    // However, we may have multiple IOResources due to using multiple cgroup groups.
-    // We construct a single IOResource to account for this.
-    return combineResources(resources);
+      
+      return options;
   }
 
   private void addLinuxSandboxCli(
@@ -1012,6 +1019,10 @@ class ShardWorkerContext implements WorkerContext {
     if (!options.workingDir.isEmpty()) {
       arguments.add("-W");
       arguments.add(options.workingDir);
+    }
+    if (!options.statsPath.isEmpty()) {
+      arguments.add("-S");
+      arguments.add(options.statsPath);
     }
     for (String writablePath : options.writableFiles) {
       arguments.add("-w");
