@@ -124,7 +124,7 @@ public class ExecutionDebugger {
     info.environment = processBuilder.environment();
     info.workingDirectory = processBuilder.directory().getAbsolutePath();
     info.limits = limits;
-    info.executionStatistics = executionStatistics;
+    info.executionStatistics = executionStatistics.getResourceUsage();
 
     // extract action result data
     ByteString stdoutBytes = resultBuilder.build().getStdoutRaw();

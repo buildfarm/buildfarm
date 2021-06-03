@@ -15,6 +15,7 @@
 package build.buildfarm.worker;
 
 import com.google.devtools.build.lib.shell.Protos.ExecutionStatistics;
+import com.google.devtools.build.lib.shell.Protos.ResourceUsage;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -65,7 +66,7 @@ public class ExecutionDebugInfo {
    * @details These statistics are calculated through POSIX getrusage()- a feature available to
    *     bazel's linux sandbox.
    */
-  public ExecutionStatistics executionStatistics = ExecutionStatistics.newBuilder().build();
+  public ResourceUsage executionStatistics = ResourceUsage.newBuilder().build();
 
   /**
    * @field stdout
