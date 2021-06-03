@@ -14,7 +14,6 @@
 
 package build.buildfarm.worker;
 
-import com.google.devtools.build.lib.shell.Protos.ExecutionStatistics;
 import com.google.devtools.build.lib.shell.Protos.ResourceUsage;
 import java.util.HashMap;
 import java.util.Map;
