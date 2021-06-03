@@ -8,6 +8,7 @@ java_library(
         "//src/main/java/build/buildfarm/instance/stub",
         "//src/main/java/build/buildfarm/worker/resources",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
+        "@bazel//src/main/protobuf:execution_statistics_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
         "@googleapis//:google_rpc_error_details_java_proto",
         "@maven//:com_github_jnr_jffi_native",
@@ -28,6 +29,5 @@ java_library(
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
         "@maven//:io_prometheus_simpleclient",
-        "@bazel//src/main/protobuf:execution_statistics_java_proto",
     ],
 )
