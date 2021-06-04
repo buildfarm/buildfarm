@@ -298,6 +298,7 @@ public class ShardInstance extends AbstractServerInstance {
   private boolean stopping = false;
   private boolean stopped = true;
   private Thread prometheusMetricsThread;
+  private boolean useDenyList = true;
 
   private static Duration getGrpcTimeout(ShardInstanceConfig config) {
     // return the configured
@@ -370,6 +371,7 @@ public class ShardInstance extends AbstractServerInstance {
         config.getMaxCpu(),
         config.getMaximumActionTimeout(),
         config.getRedisShardBackplaneConfig().getProvisionedQueues().getQueuesList(),
+        config.getUseDenyList(),
         onStop,
         WorkerStubs.create(digestUtil, getGrpcTimeout(config)),
         actionCacheFetchService);
@@ -387,6 +389,7 @@ public class ShardInstance extends AbstractServerInstance {
       int maxCpu,
       Duration maxActionTimeout,
       List<ProvisionedQueue> queues,
+      boolean useDenyList,
       Runnable onStop,
       com.google.common.cache.LoadingCache<String, Instance> workerStubs,
       ListeningExecutorService actionCacheFetchService)
@@ -406,6 +409,7 @@ public class ShardInstance extends AbstractServerInstance {
     this.maxBlobSize = maxBlobSize;
     this.maxCpu = maxCpu;
     this.maxActionTimeout = maxActionTimeout;
+    this.useDenyList = useDenyList;
     this.actionCacheFetchService = actionCacheFetchService;
     backplane.setOnUnsubscribe(this::stop);
 
@@ -696,7 +700,7 @@ public class ShardInstance extends AbstractServerInstance {
   public ListenableFuture<Iterable<Digest>> findMissingBlobs(
       Iterable<Digest> blobDigests, RequestMetadata requestMetadata) {
     try {
-      if (backplane.isBlacklisted(requestMetadata)) {
+      if (isInDenyList(requestMetadata)) {
         // hacks for bazel where findMissingBlobs retry exhaustion throws RuntimeException
         // TODO change this back to a transient when #10663 is landed
         return immediateFuture(ImmutableList.of());
@@ -1154,7 +1158,7 @@ public class ShardInstance extends AbstractServerInstance {
   public Write getBlobWrite(Digest digest, UUID uuid, RequestMetadata requestMetadata)
       throws EntryLimitException {
     try {
-      if (backplane.isBlacklisted(requestMetadata)) {
+      if (isInDenyList(requestMetadata)) {
         throw Status.UNAVAILABLE.withDescription(BLOCK_LIST_ERROR).asRuntimeException();
       }
     } catch (IOException e) {
@@ -1773,7 +1777,7 @@ public class ShardInstance extends AbstractServerInstance {
               .setDone(true)
               .setMetadata(
                   Any.pack(executeOperationMetadata(executeEntry, ExecutionStage.Value.COMPLETED)));
-      if (backplane.isBlacklisted(executeEntry.getRequestMetadata())) {
+      if (isInDenyList(executeEntry.getRequestMetadata())) {
         putOperation(
             failedOperation
                 .setResponse(
@@ -1935,7 +1939,7 @@ public class ShardInstance extends AbstractServerInstance {
         return immediateFailedFuture(e);
       }
 
-      if (backplane.isBlacklisted(requestMetadata)) {
+      if (isInDenyList(requestMetadata)) {
         watcher.observe(
             operation
                 .toBuilder()
@@ -2562,5 +2566,12 @@ public class ShardInstance extends AbstractServerInstance {
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }
+  }
+
+  private boolean isInDenyList(RequestMetadata requestMetadata) throws IOException {
+    if (!useDenyList) {
+      return false;
+    }
+    return backplane.isBlacklisted(requestMetadata);
   }
 }
