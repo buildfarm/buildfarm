@@ -4,18 +4,25 @@
 # Bazel coverage does not work properly if the package name does not match the file layout.
 
 # Print an error such that it will surface in the context of buildkite
-print_error () {
+print_error() {
     >&2 echo "$1"
     if [ -v BUILDKITE ] ; then
         buildkite-agent annotate "$1" --style 'error' --context 'ctx-error'
     fi
 }
 
-extract_package_name () {
+extract_package_name_from_source() {
         local file=$1
         local package_name=`sed -n '/^package /p' $file | head -n 1`
         package_name=${package_name:8}
         package_name=${package_name::-1}
+        echo $package_name
+}
+derive_package_name_from_file() {
+        local package_name=$1
+        package_name=${package_name#"src/main/java/"}
+        package_name=${package_name#"src/test/java/"}
+        package_name="${package_name%/*}"
         echo $package_name
 }
 
@@ -24,11 +31,12 @@ files=$(find src/* -type f -name "*.java")
 
 for file in $files
 do
-        current_package_name=$(extract_package_name $file)
+        current_package_name=$(extract_package_name_from_source $file)
+        expected_package_name=$(derive_package_name_from_file $file)
 	if [ -z "$current_package_name" ]
 	then
-	      echo "\$var is empty" $current_package_name
+	      echo "\$var is empty" $expected_package_name
 	else
-	      echo "\$var is NOT empty" $current_package_name
+	      echo "\$var is NOT empty" $expected_package_name
 	fi
 done
