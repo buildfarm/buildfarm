@@ -30,8 +30,11 @@ COVERAGE=$EXPECTED_TEST_LOGS/coverage
 
 # Perform bazel coverage
 "${bazel}" coverage $target --test_tag_filters=$DEFAULT_TEST_TAG_FILTERS
+
+# Collect all of the trace files.
+# Some trace files may be empty which we will skip over since they fail genhtml
 mkdir -p $COVERAGE
-traces=$(find $EXPECTED_TEST_LOGS/ -name coverage.dat | sed "s|^|$PWD/|")
+traces=$(find $EXPECTED_TEST_LOGS/ ! -size 0 -name coverage.dat | sed "s|^|$PWD/|")
 rm -fr $COVERAGE/*
 ln -s $PWD/src $COVERAGE/src
 cd $COVERAGE
@@ -42,7 +45,7 @@ if [ "${BUILDFARM_SKIP_COVERAGE_HOST:-false}" = false ]; then
     genhtml -f $traces
 
     command -v python >/dev/null 2>&1 || { echo >&2 'python could not be found, so the coverage report cannot be locally hosted.'; exit 1; }
-    python -m http.server
+    python -m SimpleHTTPServer 8080
 else
     echo "Skipped coverage hosting."
 fi
