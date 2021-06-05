@@ -18,6 +18,8 @@ import static com.google.common.truth.Truth.assertThat;
 
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Platform;
+import build.buildfarm.worker.resources.ResourceDecider;
+import build.buildfarm.worker.resources.ResourceLimits;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
