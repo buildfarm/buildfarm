@@ -7,7 +7,7 @@
 print_error() {
     >&2 echo "$1"
     if [ -v BUILDKITE ] ; then
-        buildkite-agent annotate --append "$1\n" --style 'error' --context 'ctx-error'
+        buildkite-agent annotate "$1" --style 'error' --context 'ctx-error'  --append
     fi
 }
 
