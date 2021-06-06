@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # Run on specifc test targets via: ./generate_coverage.sh <target>
 # Script can be run without <target> to get coverage on all tests.
 
