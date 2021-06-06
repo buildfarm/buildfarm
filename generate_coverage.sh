@@ -14,6 +14,8 @@ DEFAULT_TEST_TARGET="//src/test/...:all"
 DEFAULT_TEST_TAG_FILTERS="-redis"
 DEFAULT_BAZEL_WRAPPER=bazel
 EXPECTED_TEST_LOGS=bazel-testlogs
+COMBINE_REPORT=false
+COMBINED_REPORT="bazel-out/_coverage/_coverage_report.dat"
 
 # store the targets to get test coverage on.
 # if no targets are specified we assume all tests.
@@ -26,18 +28,28 @@ fi
 # decide how to spawn bazel
 # we will use the script in the repo as apposed to bazelisk
 bazel=$DEFAULT_BAZEL_WRAPPER
-COVERAGE=$EXPECTED_TEST_LOGS/coverage
+coverage_dir=$EXPECTED_TEST_LOGS/coverage
 
 # Perform bazel coverage
-"${bazel}" coverage $target --test_tag_filters=$DEFAULT_TEST_TAG_FILTERS
+if [ $COMBINE_REPORT  = true ] ; then
+    "${bazel}" coverage $target --test_tag_filters=$DEFAULT_TEST_TAG_FILTERS
+else
+    "${bazel}" coverage $target --combined_report=lcov --test_tag_filters=$DEFAULT_TEST_TAG_FILTERS
+fi
 
 # Collect all of the trace files.
 # Some trace files may be empty which we will skip over since they fail genhtml
-mkdir -p $COVERAGE
-traces=$(find $EXPECTED_TEST_LOGS/ ! -size 0 -name coverage.dat | sed "s|^|$PWD/|")
-rm -fr $COVERAGE/*
-ln -s $PWD/src $COVERAGE/src
-cd $COVERAGE
+if [ $COMBINE_REPORT  = true ] ; then
+    traces=$PWD/$COMBINED_REPORT
+else
+    traces=$(find $EXPECTED_TEST_LOGS/ ! -size 0 -name coverage.dat | sed "s|^|$PWD/|")
+fi
+
+# Establish directory for hosting code coverage
+mkdir -p $coverage_dir
+rm -fr $coverage_dir/*
+ln -s $PWD/src $coverage_dir/src
+cd $coverage_dir
 
 # After running coverage, convert the results to HTML and host it locally
 if [ "${BUILDFARM_SKIP_COVERAGE_HOST:-false}" = false ]; then
