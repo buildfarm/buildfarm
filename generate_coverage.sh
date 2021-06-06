@@ -18,7 +18,7 @@ set -e
 
 # This decides how bazel should generate the code coverage files
 # Combining coverage files automatically will create a specific coverage report.
-COMBINE_REPORT=false
+COMBINE_REPORT=true
 
 GATING_LINE_PERCENTAGE="50";
 GATING_FUNC_PERCENTAGE="50";
@@ -93,9 +93,9 @@ gate_lcov_results() {
 
 generate_coverage_files() {
     if [ $COMBINE_REPORT  = true ] ; then
-        "${bazel}" coverage $target --test_tag_filters=$DEFAULT_TEST_TAG_FILTERS
-    else
         "${bazel}" coverage $target --combined_report=lcov --test_tag_filters=$DEFAULT_TEST_TAG_FILTERS
+    else
+        "${bazel}" coverage $target --test_tag_filters=$DEFAULT_TEST_TAG_FILTERS
     fi
 }
 
