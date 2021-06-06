@@ -69,7 +69,7 @@ gate_lcov_results() {
     
     # get lcov results
     download_lcov
-    lcov_results=`$LCOV_TOOL --summary $traces`
+    lcov_results=`$LCOV_TOOL --summary $traces 2>&1`
     
     echo "sdfs"
     echo $lcov_results
