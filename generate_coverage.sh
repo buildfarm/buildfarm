@@ -69,6 +69,8 @@ gate_lcov_results() {
     
     # get lcov results
     download_lcov
+    ls bazel-out
+    ls _coverage
     lcov_results=`$LCOV_TOOL --summary $traces`
     
     # extract our percentage numbers
