@@ -18,7 +18,7 @@ set -e
 
 # This decides how bazel should generate the code coverage files
 # Combining coverage files automatically will create a specific coverage report.
-COMBINE_REPORT=true
+COMBINE_REPORT=false
 
 GATING_LINE_PERCENTAGE="50";
 GATING_FUNC_PERCENTAGE="50";
@@ -69,9 +69,6 @@ gate_lcov_results() {
     
     # get lcov results
     download_lcov
-    ls
-    ls bazel-out
-    ls _coverage
     lcov_results=`$LCOV_TOOL --summary $traces`
     
     # extract our percentage numbers
