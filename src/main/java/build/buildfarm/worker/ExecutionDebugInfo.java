@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker;
 
+import build.buildfarm.worker.resources.ResourceLimits;
 import java.util.HashMap;
 import java.util.Map;
 
