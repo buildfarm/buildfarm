@@ -45,7 +45,6 @@ import java.util.function.Function;
 
 public class ContentAddressableStorageService
     extends ContentAddressableStorageGrpc.ContentAddressableStorageImplBase {
-
   private final SimpleBlobStore simpleBlobStore;
   private final int treeDefaultPageSize;
   private final int treeMaxPageSize;

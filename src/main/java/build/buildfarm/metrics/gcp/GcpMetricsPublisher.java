@@ -18,7 +18,6 @@ import build.buildfarm.metrics.AbstractMetricsPublisher;
 import build.buildfarm.v1test.MetricsConfig;
 
 public class GcpMetricsPublisher extends AbstractMetricsPublisher {
-
   public GcpMetricsPublisher(MetricsConfig metricsConfig) {
     super(metricsConfig.getClusterId());
   }

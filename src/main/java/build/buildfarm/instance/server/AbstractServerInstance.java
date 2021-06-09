@@ -81,6 +81,7 @@ import build.buildfarm.v1test.Tree;
 import build.buildfarm.v1test.WorkerListMessage;
 import build.buildfarm.v1test.WorkerProfileMessage;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -126,7 +127,6 @@ import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
-import com.google.common.base.Preconditions;
 
 public abstract class AbstractServerInstance implements Instance {
   private static final Logger logger = Logger.getLogger(AbstractServerInstance.class.getName());
@@ -684,9 +684,9 @@ public abstract class AbstractServerInstance implements Instance {
           onInputDirectory);
     }
   }
-  
+
   private static boolean isValidFilename(String fileName) {
-    //for now, assume all filenames are valid
+    // for now, assume all filenames are valid
     return true;
   }
 
@@ -719,11 +719,9 @@ public abstract class AbstractServerInstance implements Instance {
             .setSubject("/" + directoryPath + ": " + lastFileName + " > " + fileName)
             .setDescription(DIRECTORY_NOT_SORTED);
       }
-      //FIXME serverside validity check? regex?
-      Preconditions.checkState(
-          isValidFilename(fileName),
-          INVALID_FILE_NAME);
-      
+      // FIXME serverside validity check? regex?
+      Preconditions.checkState(isValidFilename(fileName), INVALID_FILE_NAME);
+
       lastFileName = fileName;
       entryNames.add(fileName);
 
