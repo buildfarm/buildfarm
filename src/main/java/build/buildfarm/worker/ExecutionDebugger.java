@@ -15,8 +15,8 @@
 package build.buildfarm.worker;
 
 import build.bazel.remote.execution.v2.ActionResult;
-import com.google.devtools.build.lib.shell.Protos.ExecutionStatistics;
 import build.buildfarm.worker.resources.ResourceLimits;
+import com.google.devtools.build.lib.shell.Protos.ExecutionStatistics;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.protobuf.ByteString;
