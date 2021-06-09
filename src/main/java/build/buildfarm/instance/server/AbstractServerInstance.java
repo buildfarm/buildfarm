@@ -126,6 +126,7 @@ import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nullable;
+import com.google.common.base.Preconditions;
 
 public abstract class AbstractServerInstance implements Instance {
   private static final Logger logger = Logger.getLogger(AbstractServerInstance.class.getName());
@@ -683,6 +684,11 @@ public abstract class AbstractServerInstance implements Instance {
           onInputDirectory);
     }
   }
+  
+  private static boolean isValidFilename(String fileName) {
+    //for now, assume all filenames are valid
+    return true;
+  }
 
   @VisibleForTesting
   public static void validateActionInputDirectory(
@@ -713,11 +719,11 @@ public abstract class AbstractServerInstance implements Instance {
             .setSubject("/" + directoryPath + ": " + lastFileName + " > " + fileName)
             .setDescription(DIRECTORY_NOT_SORTED);
       }
-      /* FIXME serverside validity check? regex?
+      //FIXME serverside validity check? regex?
       Preconditions.checkState(
           isValidFilename(fileName),
           INVALID_FILE_NAME);
-      */
+      
       lastFileName = fileName;
       entryNames.add(fileName);
 
