@@ -14,6 +14,7 @@
 
 package build.buildfarm.worker;
 
+import build.buildfarm.worker.resources.ResourceLimits;
 import com.google.common.collect.Sets;
 import io.prometheus.client.Gauge;
 import io.prometheus.client.Summary;

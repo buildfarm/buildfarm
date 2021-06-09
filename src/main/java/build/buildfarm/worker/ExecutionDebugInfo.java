@@ -15,6 +15,7 @@
 package build.buildfarm.worker;
 
 import com.google.devtools.build.lib.shell.Protos.ResourceUsage;
+import build.buildfarm.worker.resources.ResourceLimits;
 import java.util.HashMap;
 import java.util.Map;
 

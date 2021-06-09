@@ -19,3 +19,4 @@ bazel-*
 unused_deps
 buildozer
 java_formatter.jar
+lcov
