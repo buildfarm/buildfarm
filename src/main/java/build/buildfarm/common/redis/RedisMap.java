@@ -27,7 +27,6 @@ import redis.clients.jedis.JedisClusterPipeline;
  *     redis maps with the same name, would in fact be the same underlying redis map.
  */
 public class RedisMap {
-
   /**
    * @field name
    * @brief The unique name of the map.

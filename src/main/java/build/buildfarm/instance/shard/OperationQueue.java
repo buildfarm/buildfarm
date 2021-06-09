@@ -33,6 +33,13 @@ import redis.clients.jedis.JedisCluster;
  *     information.
  */
 public class OperationQueue {
+  /**
+   * @field maxQueueSize
+   * @brief The maximum amount of elements that should be added to the queue.
+   * @details This is used to avoid placing too many elements onto the queue at any given time. For
+   *     infinitely sized queues, use -1.
+   */
+  private final int maxQueueSize;
 
   /**
    * @field queues
@@ -48,6 +55,18 @@ public class OperationQueue {
    */
   public OperationQueue(List<ProvisionedRedisQueue> queues) {
     this.queues = queues;
+    this.maxQueueSize = -1; // infinite size
+  }
+
+  /**
+   * @brief Constructor.
+   * @details Construct the operation queue with various provisioned redis queues.
+   * @param queues Provisioned queues.
+   * @param maxQueueSize The maximum amount of elements that should be added to the queue.
+   */
+  public OperationQueue(List<ProvisionedRedisQueue> queues, int maxQueueSize) {
+    this.queues = queues;
+    this.maxQueueSize = maxQueueSize;
   }
 
   /**
@@ -130,6 +149,18 @@ public class OperationQueue {
   }
 
   /**
+   * @brief Get internal queue name.
+   * @details Get the name of the internal queue based on the platform properties.
+   * @param provisions Provisions used to select an eligible queue.
+   * @return The name of the queue.
+   * @note Suggested return identifier: name.
+   */
+  public String getName(List<Platform.Property> provisions) {
+    BalancedRedisQueue queue = chooseEligibleQueue(provisions);
+    return queue.getName();
+  }
+
+  /**
    * @brief Push a value onto the queue.
    * @details Adds the value into one of the internal backend redis queues.
    * @param jedis Jedis cluster client.
@@ -207,6 +238,18 @@ public class OperationQueue {
       }
     }
     return false;
+  }
+
+  /**
+   * @brief Whether or not more elements can be added to the queue based on the queue's configured
+   *     max size.
+   * @details Compares the size of the queue to configured max size. Queues may be configured to be
+   *     infinite in size.
+   * @param jedis Jedis cluster client.
+   * @return Whether are not a new element can be added to the queue based on its current size.
+   */
+  public boolean canQueue(JedisCluster jedis) {
+    return maxQueueSize < 0 || size(jedis) < maxQueueSize;
   }
 
   /**

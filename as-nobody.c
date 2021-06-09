@@ -24,7 +24,7 @@ main(int argc, char *argv[])
     perror("setreuid");
     return EXIT_FAILURE;
   }
-  execvp(argv[1], argv);
+  execvp(argv[1], argv + 1);
   perror("execvp");
   return EXIT_FAILURE;
 }

@@ -146,7 +146,6 @@ public final class HttpBlobStore implements SimpleBlobStore {
       int remoteMaxConnections,
       @Nullable final Credentials creds)
       throws ConfigurationException, URISyntaxException, SSLException {
-
     if (KQueue.isAvailable()) {
       return new HttpBlobStore(
           KQueueEventLoopGroup::new,

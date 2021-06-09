@@ -31,7 +31,6 @@ import redis.clients.jedis.JedisClusterPipeline;
  *     set(worker1,worker2)}.
  */
 public class JedisCasWorkerMap implements CasWorkerMap {
-
   /**
    * @field name
    * @brief The unique name of the map.
@@ -205,7 +204,6 @@ public class JedisCasWorkerMap implements CasWorkerMap {
     client.run(
         jedis -> {
           for (Digest blobDigest : blobDigests) {
-
             String key = redisCasKey(blobDigest);
             Set<String> workers = jedis.smembers(key);
 

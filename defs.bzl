@@ -70,7 +70,7 @@ def buildfarm_init(name = "buildfarm"):
                         "com.google.errorprone:error_prone_annotations:2.2.0",
                         "com.google.errorprone:error_prone_core:0.92",
                         "com.google.guava:failureaccess:1.0.1",
-                        "com.google.guava:guava:28.2-jre",
+                        "com.google.guava:guava:30.1.1-jre",
                         "com.google.j2objc:j2objc-annotations:1.1",
                         "com.google.jimfs:jimfs:1.1",
                         "com.google.protobuf:protobuf-java-util:3.10.0",
@@ -79,7 +79,7 @@ def buildfarm_init(name = "buildfarm"):
                         "com.googlecode.json-simple:json-simple:1.1.1",
                         "com.jayway.jsonpath:json-path:2.4.0",
                     ] + ["io.netty:netty-%s:4.1.38.Final" % module for module in IO_NETTY_MODULES] +
-                    ["io.grpc:grpc-%s:1.26.0" % module for module in IO_GRPC_MODULES] +
+                    ["io.grpc:grpc-%s:1.37.0" % module for module in IO_GRPC_MODULES] +
                     [
                         "io.prometheus:simpleclient:0.10.0",
                         "io.prometheus:simpleclient_hotspot:0.10.0",
@@ -87,14 +87,16 @@ def buildfarm_init(name = "buildfarm"):
                         "junit:junit:4.12",
                         "net.javacrumbs.future-converter:future-converter-java8-guava:1.2.0",
                         "org.apache.commons:commons-pool2:2.9.0",
+                        "org.apache.tomcat:annotations-api:6.0.53",
                         "org.checkerframework:checker-qual:2.5.2",
                         "org.mockito:mockito-core:2.25.0",
                         "org.openjdk.jmh:jmh-core:1.23",
                         "org.openjdk.jmh:jmh-generator-annprocess:1.23",
                         "org.redisson:redisson:3.13.1",
                         "org.threeten:threetenbp:1.3.3",
-                        "org.xerial:sqlite-jdbc:3.31.1",
+                        "org.xerial:sqlite-jdbc:3.34.0",
                     ],
+        generate_compat_repositories = True,
         repositories = [
             "https://repo.maven.apache.org/maven2",
             "https://jcenter.bintray.com",

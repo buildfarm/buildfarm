@@ -33,7 +33,6 @@ import org.redisson.api.RedissonClient;
  *     set(worker1,worker2)}.
  */
 public class RedissonCasWorkerMap implements CasWorkerMap {
-
   /**
    * @field keyExpiration_s
    * @brief When keys will expire automatically.
@@ -188,7 +187,6 @@ public class RedissonCasWorkerMap implements CasWorkerMap {
       throws IOException {
     ImmutableMap.Builder<Digest, Set<String>> blobDigestsWorkers = new ImmutableMap.Builder<>();
     for (Digest blobDigest : blobDigests) {
-
       String key = cacheMapCasKey(blobDigest);
       Set<String> workers = cacheMap.get(key).readAll();
 
