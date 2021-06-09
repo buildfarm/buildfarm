@@ -37,7 +37,6 @@ import java.util.concurrent.TimeUnit;
 
 /** Utility methods for the instance package. * */
 public class Utils {
-
   private Utils() {}
 
   public static ByteString getBlob(

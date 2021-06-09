@@ -29,6 +29,7 @@ import build.buildfarm.v1test.CASInsertionPolicy;
 import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.QueueEntry;
 import build.buildfarm.v1test.QueuedOperation;
+import build.buildfarm.worker.resources.ResourceLimits;
 import com.google.common.collect.ImmutableList;
 import com.google.longrunning.Operation;
 import com.google.protobuf.Duration;
@@ -122,7 +123,10 @@ public interface WorkerContext {
   void destroyExecutionLimits();
 
   IOResource limitExecution(
-      String operationName, ImmutableList.Builder<String> arguments, Command command);
+      String operationName,
+      ImmutableList.Builder<String> arguments,
+      Command command,
+      Path workingDirectory);
 
   int commandExecutionClaims(Command command);
 

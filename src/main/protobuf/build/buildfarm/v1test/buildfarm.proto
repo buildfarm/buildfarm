@@ -211,6 +211,8 @@ message BuildFarmServerConfig {
   AdminConfig admin_config = 6;
 
   PrometheusConfig prometheus_config = 7;
+  
+  BuildEventConfig build_event_config = 8;
 }
 
 message MetricsConfig {
@@ -245,6 +247,10 @@ message LogMetricsConfig {
 
 message PrometheusConfig {
   int32 port = 1;
+}
+
+message BuildEventConfig {
+  bool record_events = 1;
 }
 
 message AdminConfig {
@@ -646,6 +652,7 @@ message ShardWorkerConfig {
   AdminConfig admin_config = 35;
 
   PrometheusConfig prometheus_config = 37;
+  
 }
 
 message ShardWorker {
@@ -759,12 +766,66 @@ message OperationQueueStatus {
   int64 size = 2;
 }
 
+message LabeledCount {
+  string name = 1;
+  
+  int64 size = 2;
+}
+
+message DispatchedOperationsStatus {
+  
+  // the total number of currently dispatched operations
+  int64 size = 1;
+  
+  // how many of the current dispatched operations are 'build' related
+  int64 build_action_amount = 2;
+  
+  // how many of the current dispatched operations are 'test' related
+  int64 test_action_amount = 3;
+  
+  // how many of the current dispatched operations cannot be fetched and determine the type
+  int64 unknown_action_amount = 4;
+  
+  // count dispatched operations by the queue they originated in
+  // for example, "how many cpu vs gpu operations are running?"
+  repeated LabeledCount from_queues = 5;
+  
+  // count dispatched operations by the tool they originated from
+  // for example, "Is anyone using a build tool or bazel version not supported by the main repo?"
+  repeated LabeledCount tools = 6;
+  
+  // count the kinds of action mnemonics occurring.
+  // for example, CppCompile or GoLink.
+  repeated LabeledCount action_mnemonics = 7;
+
+  // count the program names being run for the command
+  // for example, clang, bash.
+  repeated LabeledCount command_tools = 8;
+  
+  // count the unique targets being resolved
+  repeated LabeledCount target_ids = 9;
+  
+  // count the unique configurations being used
+  repeated LabeledCount config_ids = 10;
+  
+  // platform properties used by the dispatched operations
+  repeated LabeledCount platform_properties = 11;
+  
+  // how many unique clients are currently being served.
+  // This is based on the uniqueness of tool_id for currently dispatched operations.
+  int64 unique_clients_amount = 12;
+  
+  // how many of the dispatched operations have been requeued.
+  // many requeued operations could be a sign of a problem.
+  int64 requeued_operations_amount = 13;
+}
+
 message BackplaneStatus {
   QueueStatus prequeue = 1;
 
   OperationQueueStatus operation_queue = 2;
-
-  int64 dispatched_size = 3;
+  
+  DispatchedOperationsStatus dispatched_operations = 9;
 
   repeated string active_workers = 4;
   

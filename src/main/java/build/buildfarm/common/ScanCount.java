@@ -29,7 +29,6 @@ import redis.clients.jedis.ScanResult;
  *     filter non duplicates.
  */
 public class ScanCount {
-
   /**
    * @brief Run a scan and count the results.
    * @details This is intended to get the size of certain conceptual containers made of many
@@ -68,7 +67,6 @@ public class ScanCount {
    */
   private static void addKeys(
       JedisCluster cluster, Jedis node, Set<String> keys, String query, int scanCount) {
-
     // construct query
     ScanParams params = new ScanParams();
     params.match(query);

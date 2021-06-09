@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker;
+package build.buildfarm.worker.resources;
+
+import java.util.ArrayList;
 
 /**
  * @class CpuLimits
@@ -28,33 +30,39 @@ package build.buildfarm.worker;
  *     efficiently or opt for local execution as an alternative.
  */
 public class CpuLimits {
-
   /**
    * @field limit
    * @brief Whether or not we perform CPU core limiting on the action.
    * @details Depending on the server implementation, we may skip applying any restrictions to core
    *     usage.
    */
-  public boolean limit = true;
+  public boolean limit = false;
 
   /**
    * @field min
    * @brief The minimum CPU cores required.
    * @details Client can suggest this though exec_properties.
    */
-  public int min = 1;
+  public int min = 0;
 
   /**
    * @field max
    * @brief The maximum CPU cores required.
    * @details Client can suggest this though exec_properties.
    */
-  public int max = 1;
+  public int max = 0;
 
   /**
    * @field claimed
    * @brief The amount of cores actually claimed for the action.
    * @details This will be in the range of (min,max) when limited.
    */
-  public int claimed = 1;
+  public int claimed = 0;
+
+  /**
+   * @field description
+   * @brief Description explaining why settings were chosen.
+   * @details This can be used to debug execution behavior.
+   */
+  public ArrayList<String> description = new ArrayList<>();
 }

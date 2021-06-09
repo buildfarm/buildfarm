@@ -38,6 +38,7 @@ import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.ExecutionPolicy;
 import build.buildfarm.v1test.ExecutionWrapper;
 import build.buildfarm.worker.WorkerContext.IOResource;
+import build.buildfarm.worker.resources.ResourceLimits;
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
 import com.google.longrunning.Operation;
@@ -50,6 +51,7 @@ import com.google.rpc.Code;
 import io.grpc.Deadline;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -98,9 +100,12 @@ class Executor {
     ExecuteOperationMetadata executingMetadata =
         metadata.toBuilder().setStage(ExecutionStage.Value.EXECUTING).build();
 
-    Iterable<ExecutionPolicy> policies =
-        ExecutionPolicies.forPlatform(
-            operationContext.command.getPlatform(), workerContext::getExecutionPolicies);
+    Iterable<ExecutionPolicy> policies = new ArrayList<ExecutionPolicy>();
+    if (limits.useExecutionPolicies) {
+      policies =
+          ExecutionPolicies.forPlatform(
+              operationContext.command.getPlatform(), workerContext::getExecutionPolicies);
+    }
 
     Operation operation =
         operationContext
@@ -211,7 +216,8 @@ class Executor {
     ImmutableList.Builder<String> arguments = ImmutableList.builder();
     Code statusCode;
     try (IOResource resource =
-        workerContext.limitExecution(operationName, arguments, operationContext.command)) {
+        workerContext.limitExecution(
+            operationName, arguments, operationContext.command, workingDirectory)) {
       for (ExecutionPolicy policy : policies) {
         if (policy.getPolicyCase() == WRAPPER) {
           arguments.addAll(transformWrapper(policy.getWrapper()));
@@ -519,11 +525,6 @@ class Executor {
     stdoutReaderThread.join();
     stderrReaderThread.join();
 
-    // allow debugging after an execution
-    if (limits.debugAfterExecution) {
-      return ExecutionDebugger.performAfterExecutionDebug(processBuilder, limits, resultBuilder);
-    }
-
     try {
       resultBuilder
           .setExitCode(exitCode)
@@ -538,6 +539,12 @@ class Executor {
           format("error getting process outputs for %s after timeout", operationName),
           e);
     }
+
+    // allow debugging after an execution
+    if (limits.debugAfterExecution) {
+      return ExecutionDebugger.performAfterExecutionDebug(processBuilder, limits, resultBuilder);
+    }
+
     return statusCode;
   }
 }

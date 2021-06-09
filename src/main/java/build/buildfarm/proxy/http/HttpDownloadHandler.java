@@ -39,7 +39,6 @@ import java.io.OutputStream;
 
 /** ChannelHandler for downloads. */
 final class HttpDownloadHandler extends AbstractHttpHandler<HttpObject> {
-
   private OutputStream out;
   private boolean keepAlive = HttpVersion.HTTP_1_1.isKeepAliveDefault();
   private boolean downloadSucceeded;

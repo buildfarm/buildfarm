@@ -28,7 +28,6 @@ import redis.clients.jedis.JedisCluster;
  *     queue.
  */
 public class RedisQueue {
-
   /**
    * @field name
    * @brief The unique name of the queue.

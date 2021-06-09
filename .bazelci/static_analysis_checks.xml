@@ -85,7 +85,6 @@
     <exclude name="ForLoopsMustUseBraces"/>
     <exclude name="FormalParameterNamingConventions"/>
     <exclude name="GenericsNaming"/>
-    <exclude name="IdenticalCatchBranches"/>
     <exclude name="IfElseStmtsMustUseBraces"/>
     <exclude name="IfStmtsMustUseBraces"/>
     <exclude name="LinguisticNaming"/>

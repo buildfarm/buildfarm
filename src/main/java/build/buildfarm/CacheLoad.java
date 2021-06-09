@@ -64,7 +64,6 @@ class CacheLoad {
     A closer calculation for ample "max size" could be calculated with "du -hs --apparent-size".
   */
   public static void main(String[] args) throws Exception {
-
     Path root = Paths.get(args[0]);
     CASFileCache fileCache =
         new LocalCASFileCache(

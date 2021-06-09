@@ -27,7 +27,6 @@ import redis.clients.jedis.ScanResult;
  *     that they can no longer obtain CAS data from the missing worker.
  */
 public class WorkerIndexer {
-
   /**
    * @brief Handle the reindexing the CAS entries based on a departing worker.
    * @details This is intended to be called by a service endpoint as part of gracefully shutting

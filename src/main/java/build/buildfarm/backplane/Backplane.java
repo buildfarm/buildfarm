@@ -41,7 +41,6 @@ import java.util.Map;
 import java.util.Set;
 
 public interface Backplane {
-
   final class ActionCacheScanResult {
     public final String token;
     public final Iterable<Map.Entry<ActionKey, ActionResult>> entries;
@@ -306,7 +305,7 @@ public interface Backplane {
   boolean canPrequeue() throws IOException;
 
   @ThreadSafe
-  BackplaneStatus backplaneStatus() throws IOException;
+  BackplaneStatus backplaneStatus(Instance instance) throws IOException;
 
   @ThreadSafe
   Boolean propertiesEligibleForQueue(List<Platform.Property> provisions);
