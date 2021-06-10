@@ -89,6 +89,8 @@ public class Directories {
     String tmpFilename = filename + ".tmp." + suffix;
     Path tmpPath = path.resolveSibling(tmpFilename);
     try {
+      // MacOS does not permit renames unless the directory is permissioned appropriately
+      makeWritable(path, true);
       // rename must be synchronous to call
       Files.move(path, tmpPath);
     } catch (IOException e) {
@@ -110,7 +112,6 @@ public class Directories {
     Files.walkFileTree(
         directory,
         new SimpleFileVisitor<Path>() {
-
           @Override
           public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
               throws IOException {

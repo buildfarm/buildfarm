@@ -15,6 +15,7 @@
 package build.buildfarm.worker.operationqueue;
 
 import static build.buildfarm.common.io.Utils.formatIOError;
+import static build.buildfarm.common.io.Utils.getUser;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static com.google.common.util.concurrent.MoreExecutors.listeningDecorator;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
@@ -64,9 +65,11 @@ import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.attribute.UserPrincipal;
 import java.util.Collections;
 import java.util.List;
 import java.util.logging.Logger;
+import javax.annotation.Nullable;
 import javax.naming.ConfigurationException;
 
 public class Worker extends LoggingMain {
@@ -78,6 +81,7 @@ public class Worker extends LoggingMain {
   private final WorkerConfig config;
   private final Path root;
   private final CASFileCache fileCache;
+  private final @Nullable UserPrincipal execOwner;
   private Pipeline pipeline;
 
   private static final ListeningScheduledExecutorService retryScheduler =
@@ -199,6 +203,18 @@ public class Worker extends LoggingMain {
             casInstance.getDigestUtil(),
             newDirectExecutorService(),
             directExecutor());
+    execOwner = getOwner(fileSystem);
+  }
+
+  private @Nullable UserPrincipal getOwner(FileSystem fileSystem) throws ConfigurationException {
+    try {
+      return getUser(config.getExecOwner(), fileSystem);
+    } catch (IOException e) {
+      ConfigurationException configException =
+          new ConfigurationException("Could not locate exec_owner");
+      configException.initCause(e);
+      throw configException;
+    }
   }
 
   public void start() throws InterruptedException {
@@ -217,7 +233,7 @@ public class Worker extends LoggingMain {
     Instance acInstance = newStubInstance(config.getActionCache(), casInstance.getDigestUtil());
     WorkerContext context =
         new OperationQueueWorkerContext(
-            config, casInstance, acInstance, oq, uploader, fileCache, root, retrier);
+            config, casInstance, acInstance, oq, uploader, fileCache, execOwner, root, retrier);
 
     PipelineStage completeStage =
         new PutOperationStage((operation) -> oq.deactivate(operation.getName()));

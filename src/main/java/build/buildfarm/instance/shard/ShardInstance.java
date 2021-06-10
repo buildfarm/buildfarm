@@ -40,6 +40,8 @@ import static java.util.concurrent.TimeUnit.MICROSECONDS;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.logging.Level.INFO;
+import static net.javacrumbs.futureconverter.java8guava.FutureConverter.toCompletableFuture;
+import static net.javacrumbs.futureconverter.java8guava.FutureConverter.toListenableFuture;
 
 import build.bazel.remote.execution.v2.Action;
 import build.bazel.remote.execution.v2.ActionResult;
@@ -67,9 +69,6 @@ import build.buildfarm.common.TreeIterator;
 import build.buildfarm.common.TreeIterator.DirectoryEntry;
 import build.buildfarm.common.Watcher;
 import build.buildfarm.common.Write;
-import build.buildfarm.common.cache.Cache;
-import build.buildfarm.common.cache.CacheBuilder;
-import build.buildfarm.common.cache.CacheLoader.InvalidCacheLoadException;
 import build.buildfarm.common.grpc.UniformDelegateServerCallStreamObserver;
 import build.buildfarm.instance.Instance;
 import build.buildfarm.instance.MatchListener;
@@ -78,6 +77,7 @@ import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.GetClientStartTimeResult;
+import build.buildfarm.v1test.LabeledCount;
 import build.buildfarm.v1test.OperationIteratorToken;
 import build.buildfarm.v1test.ProfiledQueuedOperationMetadata;
 import build.buildfarm.v1test.ProvisionedQueue;
@@ -87,6 +87,9 @@ import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.ShardInstanceConfig;
 import build.buildfarm.v1test.Tree;
+import com.github.benmanes.caffeine.cache.AsyncCache;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Stopwatch;
 import com.google.common.base.Throwables;
@@ -134,7 +137,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
@@ -142,6 +145,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.logging.Level;
@@ -164,19 +168,95 @@ public class ShardInstance extends AbstractServerInstance {
       Counter.build().name("execution_success").help("Execution success.").register();
   private static final Gauge preQueueSize =
       Gauge.build().name("pre_queue_size").help("Pre queue size.").register();
-  private static final Gauge dispatchedOperations =
+
+  // Metrics about the dispatched operations
+  private static final Gauge dispatchedOperationsSize =
       Gauge.build()
           .name("dispatched_operations_size")
           .help("Dispatched operations size.")
           .register();
+  private static final Gauge buildActionAmount =
+      Gauge.build()
+          .name("dispatched_operations_build_amount")
+          .help("Dispatched operations build amount.")
+          .register();
+  private static final Gauge testActionAmount =
+      Gauge.build()
+          .name("dispatched_operations_test_amount")
+          .help("Dispatched operations test amount.")
+          .register();
+  private static final Gauge unknownActionAmount =
+      Gauge.build()
+          .name("dispatched_operations_unknown_amount")
+          .help("Dispatched operations unknown amount.")
+          .register();
+
+  private static final Gauge dispatchedOperationsFromQueue =
+      Gauge.build()
+          .name("dispatched_operations_from_queue_amount")
+          .labelNames("queue_name")
+          .help("Dispatched operations by origin queue.")
+          .register();
+
+  private static final Gauge dispatchedOperationsTools =
+      Gauge.build()
+          .name("dispatched_operations_tools_amount")
+          .labelNames("tool_name")
+          .help("Dispatched operations by tool name.")
+          .register();
+
+  private static final Gauge dispatchedOperationsMnemonics =
+      Gauge.build()
+          .name("dispatched_operations_mnemonics_amount")
+          .labelNames("mnemonic")
+          .help("Dispatched operations by action mnemonic.")
+          .register();
+
+  private static final Gauge dispatchedOperationsCommandTools =
+      Gauge.build()
+          .name("dispatched_operations_command_tools")
+          .labelNames("tool")
+          .help("Dispatched operations by command tools.")
+          .register();
+
+  private static final Gauge dispatchedOperationsTargets =
+      Gauge.build()
+          .name("dispatched_operations_targets_amount")
+          .labelNames("target")
+          .help("Dispatched operations by target.")
+          .register();
+
+  private static final Gauge dispatchedOperationsConfigs =
+      Gauge.build()
+          .name("dispatched_operations_config_amount")
+          .labelNames("config")
+          .help("Dispatched operations by config.")
+          .register();
+
+  private static final Gauge dispatchedOperationsPlatformProperties =
+      Gauge.build()
+          .name("dispatched_operations_platform_properties")
+          .labelNames("config")
+          .help("Dispatched operations by platform properties.")
+          .register();
+
+  private static final Gauge uniqueClientsAmount =
+      Gauge.build()
+          .name("dispatched_operations_clients_being_served")
+          .help("The number of clients currently being served.")
+          .register();
+
+  private static final Gauge requeuedOperationsAmount =
+      Gauge.build()
+          .name("dispatched_operations_requeued_operations_amount")
+          .help("The number of dispatched operations that have been requeued.")
+          .register();
+
+  // Other metrics from the backplane
   private static final Gauge workerPoolSize =
       Gauge.build().name("worker_pool_size").help("Active worker pool size.").register();
   private static final Gauge queueSize =
       Gauge.build().name("queue_size").labelNames("queue_name").help("Queue size.").register();
-  private static final Gauge casLookupSize =
-      Gauge.build().name("cas_lookup_size").help("CAS lookup size.").register();
-  private static final Gauge actionCacheLookupSize =
-      Gauge.build().name("action_cache_lookup_size").help("Action Cache lookup size.").register();
   private static final Gauge blockedActionsSize =
       Gauge.build().name("blocked_actions_size").help("The number of blocked actions").register();
   private static final Gauge blockedInvocationsSize =
@@ -193,15 +273,14 @@ public class ShardInstance extends AbstractServerInstance {
   private final com.google.common.cache.LoadingCache<String, Instance> workerStubs;
   private final Thread dispatchedMonitor;
   private final Duration maxActionTimeout;
-  private final Cache<Digest, Directory> directoryCache =
-      CacheBuilder.newBuilder().maximumSize(64 * 1024).build();
-  private final Cache<Digest, Command> commandCache =
-      CacheBuilder.newBuilder().maximumSize(64 * 1024).build();
-  private final Cache<Digest, Action> actionCache =
-      CacheBuilder.newBuilder().maximumSize(64 * 1024).build();
-  private final com.google.common.cache.Cache<RequestMetadata, Boolean>
-      recentCacheServedExecutions =
-          com.google.common.cache.CacheBuilder.newBuilder().maximumSize(64 * 1024).build();
+  private final AsyncCache<Digest, Directory> directoryCache =
+      Caffeine.newBuilder().newBuilder().maximumSize(64 * 1024).buildAsync();
+  private final AsyncCache<Digest, Command> commandCache =
+      Caffeine.newBuilder().newBuilder().maximumSize(64 * 1024).buildAsync();
+  private final AsyncCache<Digest, Action> actionCache =
+      Caffeine.newBuilder().newBuilder().maximumSize(64 * 1024).buildAsync();
+  private final Cache<RequestMetadata, Boolean> recentCacheServedExecutions =
+      Caffeine.newBuilder().newBuilder().maximumSize(64 * 1024).build();
 
   private final Random rand = new Random();
   private final Writes writes = new Writes(this::writeInstanceSupplier);
@@ -221,7 +300,6 @@ public class ShardInstance extends AbstractServerInstance {
   private Thread prometheusMetricsThread;
 
   private static Duration getGrpcTimeout(ShardInstanceConfig config) {
-
     // return the configured
     if (config.hasGrpcTimeout()) {
       Duration configured = config.getGrpcTimeout();
@@ -471,13 +549,42 @@ public class ShardInstance extends AbstractServerInstance {
                   TimeUnit.SECONDS.sleep(30);
                   BackplaneStatus backplaneStatus = backplaneStatus();
                   workerPoolSize.set(backplaneStatus.getActiveWorkersCount());
-                  dispatchedOperations.set(backplaneStatus.getDispatchedSize());
+                  dispatchedOperationsSize.set(backplaneStatus.getDispatchedOperations().getSize());
                   preQueueSize.set(backplaneStatus.getPrequeue().getSize());
                   updateQueueSizes(backplaneStatus.getOperationQueue().getProvisionsList());
-                  casLookupSize.set(backplaneStatus.getCasLookupSize());
-                  actionCacheLookupSize.set(backplaneStatus.getActionCacheSize());
                   blockedActionsSize.set(backplaneStatus.getBlockedActionsSize());
                   blockedInvocationsSize.set(backplaneStatus.getBlockedInvocationsSize());
+                  buildActionAmount.set(
+                      backplaneStatus.getDispatchedOperations().getBuildActionAmount());
+                  testActionAmount.set(
+                      backplaneStatus.getDispatchedOperations().getTestActionAmount());
+                  unknownActionAmount.set(
+                      backplaneStatus.getDispatchedOperations().getUnknownActionAmount());
+                  updateLabelCount(
+                      backplaneStatus.getDispatchedOperations().getFromQueuesList(),
+                      dispatchedOperationsFromQueue);
+                  updateLabelCount(
+                      backplaneStatus.getDispatchedOperations().getToolsList(),
+                      dispatchedOperationsTools);
+                  updateLabelCount(
+                      backplaneStatus.getDispatchedOperations().getActionMnemonicsList(),
+                      dispatchedOperationsMnemonics);
+                  updateLabelCount(
+                      backplaneStatus.getDispatchedOperations().getCommandToolsList(),
+                      dispatchedOperationsCommandTools);
+                  updateLabelCount(
+                      backplaneStatus.getDispatchedOperations().getTargetIdsList(),
+                      dispatchedOperationsTargets);
+                  updateLabelCount(
+                      backplaneStatus.getDispatchedOperations().getConfigIdsList(),
+                      dispatchedOperationsConfigs);
+                  updateLabelCount(
+                      backplaneStatus.getDispatchedOperations().getPlatformPropertiesList(),
+                      dispatchedOperationsPlatformProperties);
+                  uniqueClientsAmount.set(
+                      backplaneStatus.getDispatchedOperations().getUniqueClientsAmount());
+                  requeuedOperationsAmount.set(
+                      backplaneStatus.getDispatchedOperations().getRequeuedOperationsAmount());
                 } catch (InterruptedException e) {
                   Thread.currentThread().interrupt();
                   break;
@@ -487,6 +594,12 @@ public class ShardInstance extends AbstractServerInstance {
               }
             },
             "Prometheus Metrics Collector");
+  }
+
+  private void updateLabelCount(List<LabeledCount> list, Gauge gauge) {
+    for (LabeledCount label : list) {
+      gauge.labels(label.getName()).set(label.getSize());
+    }
   }
 
   private void updateQueueSizes(List<QueueStatus> queues) {
@@ -1191,30 +1304,26 @@ public class ShardInstance extends AbstractServerInstance {
     if (directoryBlobDigest.getSizeBytes() == 0) {
       return immediateFuture(Directory.getDefaultInstance());
     }
-    Supplier<ListenableFuture<Directory>> fetcher =
-        () ->
-            notFoundNull(
-                expect(directoryBlobDigest, Directory.parser(), executor, requestMetadata));
-    // is there a better interface to use for the cache with these nice futures?
-    return catching(
-        directoryCache.get(
-            directoryBlobDigest,
-            new Callable<ListenableFuture<? extends Directory>>() {
-              @Override
-              public ListenableFuture<Directory> call() {
-                logger.log(
-                    Level.FINE,
-                    format(
-                        "transformQueuedOperation(%s): fetching directory %s",
-                        reason, DigestUtil.toString(directoryBlobDigest)));
-                return fetcher.get();
-              }
-            }),
-        InvalidCacheLoadException.class,
-        (e) -> {
-          return null;
-        },
-        directExecutor());
+
+    BiFunction<Digest, Executor, CompletableFuture<Directory>> getCallback =
+        new BiFunction<Digest, Executor, CompletableFuture<Directory>>() {
+          @Override
+          public CompletableFuture<Directory> apply(Digest digest, Executor executor) {
+            logger.log(
+                Level.FINE,
+                format(
+                    "transformQueuedOperation(%s): fetching directory %s",
+                    reason, DigestUtil.toString(directoryBlobDigest)));
+
+            Supplier<ListenableFuture<Directory>> fetcher =
+                () ->
+                    notFoundNull(
+                        expect(directoryBlobDigest, Directory.parser(), executor, requestMetadata));
+            return toCompletableFuture(fetcher.get());
+          }
+        };
+
+    return toListenableFuture(directoryCache.get(directoryBlobDigest, getCallback));
   }
 
   @Override
@@ -1237,42 +1346,36 @@ public class ShardInstance extends AbstractServerInstance {
 
   ListenableFuture<Command> expectCommand(
       Digest commandBlobDigest, Executor executor, RequestMetadata requestMetadata) {
-    Supplier<ListenableFuture<Command>> fetcher =
-        () -> notFoundNull(expect(commandBlobDigest, Command.parser(), executor, requestMetadata));
-    return catching(
-        commandCache.get(
-            commandBlobDigest,
-            new Callable<ListenableFuture<? extends Command>>() {
-              @Override
-              public ListenableFuture<Command> call() {
-                return fetcher.get();
-              }
-            }),
-        InvalidCacheLoadException.class,
-        (e) -> {
-          return null;
-        },
-        directExecutor());
+    BiFunction<Digest, Executor, CompletableFuture<Command>> getCallback =
+        new BiFunction<Digest, Executor, CompletableFuture<Command>>() {
+          @Override
+          public CompletableFuture<Command> apply(Digest digest, Executor executor) {
+            Supplier<ListenableFuture<Command>> fetcher =
+                () ->
+                    notFoundNull(
+                        expect(commandBlobDigest, Command.parser(), executor, requestMetadata));
+            return toCompletableFuture(fetcher.get());
+          }
+        };
+
+    return toListenableFuture(commandCache.get(commandBlobDigest, getCallback));
   }
 
   ListenableFuture<Action> expectAction(
       Digest actionBlobDigest, Executor executor, RequestMetadata requestMetadata) {
-    Supplier<ListenableFuture<Action>> fetcher =
-        () -> notFoundNull(expect(actionBlobDigest, Action.parser(), executor, requestMetadata));
-    return catching(
-        actionCache.get(
-            actionBlobDigest,
-            new Callable<ListenableFuture<? extends Action>>() {
-              @Override
-              public ListenableFuture<Action> call() {
-                return fetcher.get();
-              }
-            }),
-        InvalidCacheLoadException.class,
-        (e) -> {
-          return null;
-        },
-        directExecutor());
+    BiFunction<Digest, Executor, CompletableFuture<Action>> getCallback =
+        new BiFunction<Digest, Executor, CompletableFuture<Action>>() {
+          @Override
+          public CompletableFuture<Action> apply(Digest digest, Executor executor) {
+            Supplier<ListenableFuture<Action>> fetcher =
+                () ->
+                    notFoundNull(
+                        expect(actionBlobDigest, Action.parser(), executor, requestMetadata));
+            return toCompletableFuture(fetcher.get());
+          }
+        };
+
+    return toListenableFuture(actionCache.get(actionBlobDigest, getCallback));
   }
 
   private void removeMalfunctioningWorker(String worker, Throwable t, String context) {
@@ -1377,6 +1480,16 @@ public class ShardInstance extends AbstractServerInstance {
     }
   }
 
+  ExecuteOperationMetadata executeOperationMetadata(
+      ExecuteEntry executeEntry, ExecutionStage.Value stage) {
+    return ExecuteOperationMetadata.newBuilder()
+        .setActionDigest(executeEntry.getActionDigest())
+        .setStdoutStreamName(executeEntry.getStdoutStreamName())
+        .setStderrStreamName(executeEntry.getStderrStreamName())
+        .setStage(stage)
+        .build();
+  }
+
   private ListenableFuture<QueuedOperationResult> uploadQueuedOperation(
       QueuedOperation queuedOperation, ExecuteEntry executeEntry, ExecutorService service)
       throws EntryLimitException {
@@ -1385,11 +1498,7 @@ public class ShardInstance extends AbstractServerInstance {
     QueuedOperationMetadata metadata =
         QueuedOperationMetadata.newBuilder()
             .setExecuteOperationMetadata(
-                ExecuteOperationMetadata.newBuilder()
-                    .setActionDigest(executeEntry.getActionDigest())
-                    .setStdoutStreamName(executeEntry.getStdoutStreamName())
-                    .setStderrStreamName(executeEntry.getStderrStreamName())
-                    .setStage(ExecutionStage.Value.QUEUED))
+                executeOperationMetadata(executeEntry, ExecutionStage.Value.QUEUED))
             .setQueuedOperationDigest(queuedOperationDigest)
             .build();
     QueueEntry entry =
@@ -1591,11 +1700,8 @@ public class ShardInstance extends AbstractServerInstance {
                           QueuedOperationMetadata metadata =
                               QueuedOperationMetadata.newBuilder()
                                   .setExecuteOperationMetadata(
-                                      ExecuteOperationMetadata.newBuilder()
-                                          .setActionDigest(executeEntry.getActionDigest())
-                                          .setStdoutStreamName(executeEntry.getStdoutStreamName())
-                                          .setStderrStreamName(executeEntry.getStderrStreamName())
-                                          .setStage(ExecutionStage.Value.QUEUED))
+                                      executeOperationMetadata(
+                                          executeEntry, ExecutionStage.Value.QUEUED))
                                   .setQueuedOperationDigest(queueEntry.getQueuedOperationDigest())
                                   .setRequestMetadata(requestMetadata)
                                   .build();
@@ -1661,11 +1767,15 @@ public class ShardInstance extends AbstractServerInstance {
     ExecuteEntry executeEntry = queueEntry.getExecuteEntry();
     String operationName = executeEntry.getOperationName();
     try {
+      Operation.Builder failedOperation =
+          Operation.newBuilder()
+              .setName(operationName)
+              .setDone(true)
+              .setMetadata(
+                  Any.pack(executeOperationMetadata(executeEntry, ExecutionStage.Value.COMPLETED)));
       if (backplane.isBlacklisted(executeEntry.getRequestMetadata())) {
         putOperation(
-            Operation.newBuilder()
-                .setName(operationName)
-                .setDone(true)
+            failedOperation
                 .setResponse(
                     Any.pack(denyActionResponse(executeEntry.getActionDigest(), BLOCK_LIST_ERROR)))
                 .build());
@@ -1674,9 +1784,7 @@ public class ShardInstance extends AbstractServerInstance {
         logger.log(
             Level.WARNING, "Operation " + operationName + " has been requeued too many times.");
         putOperation(
-            Operation.newBuilder()
-                .setName(operationName)
-                .setDone(true)
+            failedOperation
                 .setResponse(
                     Any.pack(
                         denyActionResponse(
@@ -2247,7 +2355,7 @@ public class ShardInstance extends AbstractServerInstance {
   @Override
   public BackplaneStatus backplaneStatus() {
     try {
-      return backplane.backplaneStatus();
+      return backplane.backplaneStatus(this);
     } catch (IOException e) {
       throw Status.fromThrowable(e).asRuntimeException();
     }

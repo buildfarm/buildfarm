@@ -165,7 +165,6 @@ java_binary(
     deps = [
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/instance/stub",
-        "//src/main/java/build/buildfarm/worker",
         "@googleapis//:google_bytestream_bytestream_java_grpc",
         "@googleapis//:google_bytestream_bytestream_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
@@ -330,7 +329,6 @@ java_binary(
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/instance",
         "//src/main/java/build/buildfarm/instance/stub",
-        "//src/main/java/build/buildfarm/operations",
         "@googleapis//:google_longrunning_operations_java_proto",
         "@googleapis//:google_rpc_code_java_proto",
         "@maven//:com_google_guava_guava",

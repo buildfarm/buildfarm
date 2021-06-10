@@ -15,6 +15,7 @@
 package build.buildfarm.worker.shard;
 
 import static build.buildfarm.cas.ContentAddressableStorages.createGrpcCAS;
+import static build.buildfarm.common.io.Utils.getUser;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.lang.String.format;
@@ -92,6 +93,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -175,7 +177,6 @@ public class Worker extends LoggingMain {
 
     private void insertFileToCasMember(Digest digest, Path file)
         throws IOException, InterruptedException {
-
       try (InputStream in = Files.newInputStream(file)) {
         writeToCasMember(digest, in);
       } catch (ExecutionException e) {
@@ -185,7 +186,6 @@ public class Worker extends LoggingMain {
 
     private void writeToCasMember(Digest digest, InputStream in)
         throws IOException, InterruptedException, ExecutionException {
-
       // create a write for inserting into another CAS member.
       String workerName = getRandomWorker();
       Instance casMember = workerStub(workerName);
@@ -196,7 +196,6 @@ public class Worker extends LoggingMain {
 
     private Write getCasMemberWrite(Digest digest, String workerName)
         throws IOException, InterruptedException {
-
       Instance casMember = workerStub(workerName);
 
       return casMember.getBlobWrite(
@@ -210,7 +209,6 @@ public class Worker extends LoggingMain {
 
     private void insertBlobToCasMember(Digest digest, ByteString content)
         throws IOException, InterruptedException {
-
       try (InputStream in = content.newInput()) {
         writeToCasMember(digest, in);
       } catch (ExecutionException e) {
@@ -478,7 +476,6 @@ public class Worker extends LoggingMain {
   }
 
   private static Duration getGrpcTimeout(ShardWorkerConfig config) {
-
     // return the configured
     if (config.getShardWorkerInstanceConfig().hasGrpcTimeout()) {
       Duration configured = config.getShardWorkerInstanceConfig().getGrpcTimeout();
@@ -498,7 +495,6 @@ public class Worker extends LoggingMain {
 
   private ListenableFuture<Long> streamIntoWriteFuture(InputStream in, Write write, Digest digest)
       throws IOException {
-
     SettableFuture<Long> writtenFuture = SettableFuture.create();
     int chunkSizeBytes = (int) Size.kbToBytes(128);
 
@@ -512,7 +508,6 @@ public class Worker extends LoggingMain {
             /* deadlineAfterUnits=*/ DAYS,
             () -> {
               try {
-
                 FeedbackOutputStream outStream = (FeedbackOutputStream) write;
                 while (outStream.isReady()) {
                   if (!CopyBytes(in, outStream, chunkSizeBytes)) {
@@ -627,6 +622,17 @@ public class Worker extends LoggingMain {
         storage);
   }
 
+  private @Nullable UserPrincipal getOwner(FileSystem fileSystem) throws ConfigurationException {
+    try {
+      return getUser(config.getExecOwner(), fileSystem);
+    } catch (IOException e) {
+      ConfigurationException configException =
+          new ConfigurationException("Could not locate exec_owner");
+      configException.initCause(e);
+      throw configException;
+    }
+  }
+
   private ExecFileSystem createExecFileSystem(
       InputStreamFactory remoteInputStreamFactory,
       ExecutorService removeDirectoryService,
@@ -636,23 +642,7 @@ public class Worker extends LoggingMain {
     checkState(storage != null, "no exec fs cas specified");
     if (storage instanceof CASFileCache) {
       CASFileCache cfc = (CASFileCache) storage;
-      final @Nullable UserPrincipal owner;
-      if (!config.getExecOwner().isEmpty()) {
-        try {
-          owner =
-              cfc.getRoot()
-                  .getFileSystem()
-                  .getUserPrincipalLookupService()
-                  .lookupPrincipalByName(config.getExecOwner());
-        } catch (IOException e) {
-          ConfigurationException configException =
-              new ConfigurationException("Could not locate exec_owner");
-          configException.initCause(e);
-          throw configException;
-        }
-      } else {
-        owner = null;
-      }
+      UserPrincipal owner = getOwner(cfc.getRoot().getFileSystem());
       return createCFCExecFileSystem(removeDirectoryService, accessRecorder, cfc, owner);
     } else {
       // FIXME not the only fuse backing capacity...
@@ -778,7 +768,6 @@ public class Worker extends LoggingMain {
 
   private void onStoragePut(Digest digest) {
     try {
-
       // if the worker is a CAS member, it can send/modify blobs in the backplane.
       if (isCasShard) {
         backplane.addBlobLocation(digest, config.getPublicName());
@@ -791,7 +780,6 @@ public class Worker extends LoggingMain {
   private void onStorageExpire(Iterable<Digest> digests) {
     if (isCasShard) {
       try {
-
         // if the worker is a CAS member, it can send/modify blobs in the backplane.
         backplane.removeBlobsLocation(digests, config.getPublicName());
       } catch (IOException e) {

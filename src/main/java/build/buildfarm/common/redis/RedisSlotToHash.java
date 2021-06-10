@@ -34,7 +34,6 @@ import redis.clients.jedis.util.JedisClusterCRC16;
  *     return that slot number.
  */
 public class RedisSlotToHash {
-
   /**
    * @brief Convert slot number into string that hashes to slot.
    * @details A short alphanumeric string will be given which when hashed by redis's crc16 algorithm

@@ -35,7 +35,6 @@ import java.io.IOException;
 
 /** ChannelHandler for uploads. */
 final class HttpUploadHandler extends AbstractHttpHandler<FullHttpResponse> {
-
   public HttpUploadHandler(Credentials credentials) {
     super(credentials);
   }

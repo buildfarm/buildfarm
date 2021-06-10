@@ -68,8 +68,9 @@ class WorkerProfile {
    */
   private static String workerStringTransformation(String worker) {
     StringBuilder sb = new StringBuilder();
-    sb.append(worker.split("\\.")[0].substring("ip-".length()).replaceAll("-", "."));
-    sb.append(":").append(worker.split(":")[1]);
+    sb.append(worker.split("\\.")[0].substring("ip-".length()).replaceAll("-", "."))
+        .append(':')
+        .append(worker.split(":")[1]);
     return sb.toString();
   }
 

@@ -42,7 +42,6 @@ import java.util.stream.Collectors;
  *     queues.
  */
 public class ProvisionedRedisQueue {
-
   /**
    * @field WILDCARD_VALUE
    * @brief Wildcard value.
@@ -270,7 +269,7 @@ public class ProvisionedRedisQueue {
    * @note Suggested return identifier: explanation.
    */
   private static String toString(EligibilityResult result) {
-    String explanation = new String();
+    String explanation = "";
     if (result.isEligible) {
       explanation += "The properties are eligible for the " + result.queueName + " queue.\n";
     } else {

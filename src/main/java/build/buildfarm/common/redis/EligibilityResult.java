@@ -22,7 +22,6 @@ import com.google.common.collect.SetMultimap;
  * @details Useful for visibility and debugging into the queue selection algorithm.
  */
 public class EligibilityResult {
-
   /**
    * @field queueName
    * @brief The name of the queue the eligibility was tested on.

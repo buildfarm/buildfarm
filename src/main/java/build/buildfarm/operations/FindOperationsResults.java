@@ -23,7 +23,6 @@ import java.util.Map;
  * @details This will only observe operations; not affect their state.
  */
 public class FindOperationsResults {
-
   /**
    * @field operations
    * @brief All of the operations found based on the search query.
@@ -40,8 +39,9 @@ public class FindOperationsResults {
    */
   public String toMessage() {
     StringBuilder message = new StringBuilder();
-    message.append(String.format("results: %d\n", operations.size()));
-    message.append(String.join("\n", operations.keySet()));
+    message
+        .append(String.format("results: %d\n", operations.size()))
+        .append(String.join("\n", operations.keySet()));
     return message.toString();
   }
 }

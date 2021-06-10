@@ -20,7 +20,6 @@ package build.buildfarm.common;
  * @details This will remove the worker from CAS indexes, and in some cases, remove the CAS key.
  */
 public class CasIndexResults {
-
   /**
    * @field removedHosts
    * @brief The number of CAS entries the worker was removed from.
@@ -50,12 +49,13 @@ public class CasIndexResults {
    */
   public String toMessage() {
     StringBuilder message = new StringBuilder();
-    message.append(String.format("Total keys re-indexed: %d. ", totalKeys));
-    message.append(String.format("Worker references removed: %d. ", removedHosts));
-    message.append(String.format("CAS keys deleted: %d. ", removedKeys));
-    message.append(
-        String.format(
-            "CAS lost: %.2f%%.", totalKeys == 0 ? 0 : (removedKeys / (float) totalKeys) * 100));
+    message
+        .append(String.format("Total keys re-indexed: %d. ", totalKeys))
+        .append(String.format("Worker references removed: %d. ", removedHosts))
+        .append(String.format("CAS keys deleted: %d. ", removedKeys))
+        .append(
+            String.format(
+                "CAS lost: %.2f%%.", totalKeys == 0 ? 0 : (removedKeys / (float) totalKeys) * 100));
     return message.toString();
   }
 }

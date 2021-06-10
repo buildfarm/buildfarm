@@ -34,7 +34,6 @@ import java.util.Map;
 /** Common functionality shared by concrete classes. */
 abstract class AbstractHttpHandler<T extends HttpObject> extends SimpleChannelInboundHandler<T>
     implements ChannelOutboundHandler {
-
   private final Credentials credentials;
 
   public AbstractHttpHandler(Credentials credentials) {
@@ -83,10 +82,9 @@ abstract class AbstractHttpHandler<T extends HttpObject> extends SimpleChannelIn
     StringBuilder builder = new StringBuilder();
     builder.append(uri.getPath());
     if (!uri.getPath().endsWith("/")) {
-      builder.append("/");
+      builder.append('/');
     }
-    builder.append(isCas ? "cas/" : "ac/");
-    builder.append(hash);
+    builder.append(isCas ? "cas/" : "ac/").append(hash);
     return builder.toString();
   }
 
