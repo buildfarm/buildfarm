@@ -1432,6 +1432,7 @@ public class RedisShardBackplane implements Backplane {
 
   @Override
   public BackplaneStatus backplaneStatus(Instance instance) throws IOException {
+    Set<String> workers = getWorkers();
     return client.call(
         jedis ->
             BackplaneStatus.newBuilder()
@@ -1440,7 +1441,7 @@ public class RedisShardBackplane implements Backplane {
                 .setBlockedActionsSize(blockedActions.size(jedis))
                 .setBlockedInvocationsSize(blockedInvocations.size(jedis))
                 .setDispatchedOperations(getDispatchedOperationsStatus(jedis, instance))
-                .addAllActiveWorkers(workerSet)
+                .addAllActiveWorkers(workers)
                 .build());
   }
 
