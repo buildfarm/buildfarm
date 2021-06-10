@@ -18,10 +18,8 @@ java_test(
     ],
     test_class = "build.buildfarm.AllTests",
     deps = [
-        "//src/main/java/build/buildfarm/cas",
         "//src/main/java/build/buildfarm/common",
         "//src/main/java/build/buildfarm/instance",
-        "//src/main/java/build/buildfarm/instance/stub",
         "//src/main/java/build/buildfarm/worker",
         "//src/main/java/build/buildfarm/worker/resources",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",

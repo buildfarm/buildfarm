@@ -20,7 +20,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
 abstract class SuperscalarPipelineStage extends PipelineStage {
-
   protected final int width;
   protected final BlockingQueue claims;
   private volatile boolean catastrophic = false;

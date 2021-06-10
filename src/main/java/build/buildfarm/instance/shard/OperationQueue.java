@@ -33,7 +33,6 @@ import redis.clients.jedis.JedisCluster;
  *     information.
  */
 public class OperationQueue {
-
   /**
    * @field maxQueueSize
    * @brief The maximum amount of elements that should be added to the queue.
@@ -147,6 +146,18 @@ public class OperationQueue {
   public String getDequeueName(List<Platform.Property> provisions) {
     BalancedRedisQueue queue = chooseEligibleQueue(provisions);
     return queue.getDequeueName();
+  }
+
+  /**
+   * @brief Get internal queue name.
+   * @details Get the name of the internal queue based on the platform properties.
+   * @param provisions Provisions used to select an eligible queue.
+   * @return The name of the queue.
+   * @note Suggested return identifier: name.
+   */
+  public String getName(List<Platform.Property> provisions) {
+    BalancedRedisQueue queue = chooseEligibleQueue(provisions);
+    return queue.getName();
   }
 
   /**

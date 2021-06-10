@@ -38,7 +38,6 @@ import com.google.common.collect.SetMultimap;
  *     settings provided allow varying amount of leniency when evaluating the platform properties.
  */
 public class DequeueMatchEvaluator {
-
   /**
    * @field WORKER_PLATFORM_CORES_PROPERTY
    * @brief A platform property decided and assigned to a worker.

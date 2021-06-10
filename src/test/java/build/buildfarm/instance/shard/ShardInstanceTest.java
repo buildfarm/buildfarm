@@ -966,7 +966,6 @@ public class ShardInstanceTest {
 
   @Test
   public void cacheReturnsNullWhenMissing() throws Exception {
-
     // create cache
     AsyncCache<String, String> cache =
         Caffeine.newBuilder().newBuilder().maximumSize(64).buildAsync();

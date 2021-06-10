@@ -112,6 +112,7 @@ public class BuildFarmServer extends LoggingMain {
             .addService(new AdminService(config.getAdminConfig(), instances))
             .addService(new FetchService(instances))
             .addService(ProtoReflectionService.newInstance())
+            .addService(new PublishBuildEventService(config.getBuildEventConfig()))
             .intercept(TransmitStatusRuntimeExceptionInterceptor.instance())
             .intercept(headersInterceptor)
             .build();
@@ -230,14 +231,11 @@ public class BuildFarmServer extends LoggingMain {
     try (InputStream configInputStream = Files.newInputStream(configPath)) {
       BuildFarmServerConfig config =
           toBuildFarmServerConfig(new InputStreamReader(configInputStream), options);
-      // Start Prometheus web server
-      PrometheusPublisher.startHttpServer(config.getPrometheusConfig().getPort());
       server = new BuildFarmServer(session, config);
       configInputStream.close();
       server.start(options.publicName, config.getPrometheusConfig().getPort());
       server.blockUntilShutdown();
       server.stop();
-      PrometheusPublisher.stopHttpServer();
       return true;
     } catch (IOException e) {
       System.err.println("error: " + formatIOError(e));

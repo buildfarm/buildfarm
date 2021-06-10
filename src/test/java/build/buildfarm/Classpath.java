@@ -25,7 +25,6 @@ import java.util.Set;
  * JUnit 3 and 4 test suites.
  */
 public final class Classpath {
-
   /** Base exception for any classpath related errors. */
   public static final class ClassPathException extends Exception {
     public ClassPathException(String format, Object... args) {

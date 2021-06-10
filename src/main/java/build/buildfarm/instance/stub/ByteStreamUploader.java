@@ -63,7 +63,6 @@ import javax.annotation.concurrent.GuardedBy;
  * <p>Users must call {@link #shutdown()} before exiting.
  */
 public class ByteStreamUploader {
-
   private static final Logger logger = Logger.getLogger(ByteStreamUploader.class.getName());
 
   private final String instanceName;
@@ -240,7 +239,6 @@ public class ByteStreamUploader {
   }
 
   private static class AsyncUpload {
-
     private final Channel channel;
     private final CallCredentials callCredentials;
     private final long callTimeoutSecs;
@@ -369,7 +367,6 @@ public class ByteStreamUploader {
       SettableFuture<Void> uploadResult = SettableFuture.create();
       ClientCall.Listener<WriteResponse> callListener =
           new ClientCall.Listener<WriteResponse>() {
-
             private final WriteRequest.Builder requestBuilder = WriteRequest.newBuilder();
             private volatile boolean callHalfClosed = false;
 
@@ -393,6 +390,17 @@ public class ByteStreamUploader {
 
             @Override
             public void onClose(Status status, Metadata trailers) {
+              try {
+                // If upload was completed by someone else or already present, then chunker does
+                // does not close the Filehandle. Do it here to be sure it's always closed.
+                chunker.reset();
+              } catch (IOException e) {
+                // This exception indicates that closing the underlying input stream failed.
+                // We don't expect this to ever happen, but don't want to swallow the exception
+                // completely.
+                logger.log(Level.WARNING, "Chunker failed closing data source", e);
+              }
+
               if (status.isOk() || Code.ALREADY_EXISTS.equals(status.getCode())) {
                 uploadResult.set(null);
               } else {

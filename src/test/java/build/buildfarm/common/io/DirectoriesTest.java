@@ -63,7 +63,6 @@ class DirectoriesTest {
 
   @Test
   public void changePermissionsForDelete() throws IOException {
-
     // establish directory tree
     Path tree = root.resolve("tree2");
     Files.createDirectory(tree);
@@ -100,7 +99,6 @@ class DirectoriesTest {
 
     @Test
     public void checkWriteDisabled() throws IOException {
-
       // establish directory tree
       Path tree = root.resolve("tree3");
       Files.createDirectory(tree);

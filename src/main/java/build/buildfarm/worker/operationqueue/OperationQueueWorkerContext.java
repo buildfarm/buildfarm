@@ -49,9 +49,9 @@ import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.WorkerConfig;
 import build.buildfarm.worker.ExecutionPolicies;
 import build.buildfarm.worker.OutputDirectory;
-import build.buildfarm.worker.ResourceLimits;
 import build.buildfarm.worker.UploadManifest;
 import build.buildfarm.worker.WorkerContext;
+import build.buildfarm.worker.resources.ResourceLimits;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
@@ -394,7 +394,10 @@ class OperationQueueWorkerContext implements WorkerContext {
 
   @Override
   public IOResource limitExecution(
-      String operationName, ImmutableList.Builder<String> arguments, Command command) {
+      String operationName,
+      ImmutableList.Builder<String> arguments,
+      Command command,
+      Path workingDirectory) {
     return new IOResource() {
       @Override
       public void close() {}

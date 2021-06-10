@@ -23,7 +23,6 @@ import java.util.Set;
  * @details These provisions are filtered by wildcards and used by the provisioned redis queue.
  */
 public class FilteredProvisions {
-
   /**
    * @field wildcard
    * @brief The wildcard provisions of the queue.
