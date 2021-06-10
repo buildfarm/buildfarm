@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker;
+package build.buildfarm.worker.resources;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -118,4 +119,19 @@ public class ResourceLimits {
    * @details When used, only matches will preserve debug flags.
    */
   public String debugTarget = "";
+
+  /**
+   * @field unusedProperties
+   * @brief Exec_properties that were not used when deciding resource limits.
+   * @details Foreign platform properties may be be added to the command that are ignored when
+   *     parsing exec_properties. They are listed here for visibility.
+   */
+  public Map<String, String> unusedProperties = new HashMap<String, String>();
+
+  /**
+   * @field description
+   * @brief Description explaining why settings were chosen.
+   * @details This can be used to debug execution behavior.
+   */
+  public ArrayList<String> description = new ArrayList<>();
 }

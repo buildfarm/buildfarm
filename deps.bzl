@@ -34,9 +34,9 @@ def archive_dependencies(third_party):
         # Needed for @grpc_java//compiler:grpc_java_plugin.
         {
             "name": "io_grpc_grpc_java",
-            "sha256": "416f94c976b5f2d0625e9c64391aa10520fa05e6f618803e4b7fc85098b02078",
-            "strip_prefix": "grpc-java-1.37.0",
-            "urls": ["https://github.com/grpc/grpc-java/archive/v1.37.0.zip"],
+            "sha256": "2c6d5606abfd221e156ae9f6b52719e015751b98c642b78ab65d0accdf6e7efe",
+            "strip_prefix": "grpc-java-1.38.0",
+            "urls": ["https://github.com/grpc/grpc-java/archive/v1.38.0.zip"],
         },
 
         # The APIs that we implement.
@@ -54,9 +54,9 @@ def archive_dependencies(third_party):
             "build_file": "%s:BUILD.remote_apis" % third_party,
             "patch_args": ["-p1"],
             "patches": ["%s/remote-apis:remote-apis.patch" % third_party],
-            "sha256": "03433a21ed97517f0fbda03c759854850336775a22dc737bab918949ceeddac9",
-            "strip_prefix": "remote-apis-f54876595da9f2c2d66c98c318d00b60fd64900b",
-            "url": "https://github.com/bazelbuild/remote-apis/archive/f54876595da9f2c2d66c98c318d00b60fd64900b.zip",
+            "sha256": "1d69f5f2f694fe93ee78a630f196047892ae51878297a89601c98964486655c6",
+            "strip_prefix": "remote-apis-6345202a036a297b22b0a0e7531ef702d05f2130",
+            "url": "https://github.com/bazelbuild/remote-apis/archive/6345202a036a297b22b0a0e7531ef702d05f2130.zip",
         },
 
         # Ideally we would use the 0.14.4 release of rules_docker,

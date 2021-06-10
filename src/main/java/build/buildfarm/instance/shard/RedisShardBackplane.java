@@ -26,6 +26,7 @@ import build.bazel.remote.execution.v2.RequestMetadata;
 import build.buildfarm.backplane.Backplane;
 import build.buildfarm.common.CasIndexResults;
 import build.buildfarm.common.CasIndexSettings;
+import build.buildfarm.common.CommandUtils;
 import build.buildfarm.common.DigestUtil;
 import build.buildfarm.common.DigestUtil.ActionKey;
 import build.buildfarm.common.StringVisitor;
@@ -39,6 +40,7 @@ import build.buildfarm.common.redis.RedisHashtags;
 import build.buildfarm.common.redis.RedisMap;
 import build.buildfarm.common.redis.RedisNodeHashes;
 import build.buildfarm.instance.Instance;
+import build.buildfarm.instance.Utils;
 import build.buildfarm.instance.shard.RedisShardSubscriber.TimedWatchFuture;
 import build.buildfarm.operations.FindOperationsResults;
 import build.buildfarm.operations.FindOperationsSettings;
@@ -46,12 +48,15 @@ import build.buildfarm.operations.finder.OperationsFinder;
 import build.buildfarm.v1test.BackplaneStatus;
 import build.buildfarm.v1test.CompletedOperationMetadata;
 import build.buildfarm.v1test.DispatchedOperation;
+import build.buildfarm.v1test.DispatchedOperationsStatus;
 import build.buildfarm.v1test.ExecuteEntry;
 import build.buildfarm.v1test.ExecutingOperationMetadata;
 import build.buildfarm.v1test.GetClientStartTimeResult;
+import build.buildfarm.v1test.LabeledCount;
 import build.buildfarm.v1test.OperationChange;
 import build.buildfarm.v1test.ProvisionedQueue;
 import build.buildfarm.v1test.QueueEntry;
+import build.buildfarm.v1test.QueuedOperation;
 import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.v1test.RedisShardBackplaneConfig;
 import build.buildfarm.v1test.ShardWorker;
@@ -68,6 +73,7 @@ import com.google.common.collect.SetMultimap;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.longrunning.Operation;
+import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Timestamp;
 import com.google.protobuf.util.JsonFormat;
@@ -81,6 +87,7 @@ import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -132,6 +139,12 @@ public class RedisShardBackplane implements Backplane {
                   .add(QueuedOperationMetadata.getDescriptor())
                   .add(PreconditionFailure.getDescriptor())
                   .build());
+
+  private class ActionAmounts {
+    Integer build = 0;
+    Integer test = 0;
+    Integer unknown = 0;
+  }
 
   private final RedisShardBackplaneConfig config;
   private final String source; // used in operation change publication
@@ -1419,7 +1432,8 @@ public class RedisShardBackplane implements Backplane {
   }
 
   @Override
-  public BackplaneStatus backplaneStatus() throws IOException {
+  public BackplaneStatus backplaneStatus(Instance instance) throws IOException {
+    Set<String> workers = getWorkers();
     return client.call(
         jedis ->
             BackplaneStatus.newBuilder()
@@ -1427,9 +1441,235 @@ public class RedisShardBackplane implements Backplane {
                 .setOperationQueue(operationQueue.status(jedis))
                 .setBlockedActionsSize(blockedActions.size(jedis))
                 .setBlockedInvocationsSize(blockedInvocations.size(jedis))
-                .setDispatchedSize(jedis.hlen(config.getDispatchedOperationsHashName()))
-                .addAllActiveWorkers(workerSet)
+                .setDispatchedOperations(getDispatchedOperationsStatus(jedis, instance))
+                .addAllActiveWorkers(workers)
                 .build());
+  }
+
+  /**
+   * @brief Analyze the currently dispatched operations to derive statistics about the operations
+   *     workers are currently executing.
+   * @details This status message is intended to be used as metrics.
+   * @param cluster An established redis cluster.
+   * @param instance An instance is used to get additional information about the operation.
+   * @return Metrics about the currently dispatched operations.
+   */
+  private DispatchedOperationsStatus getDispatchedOperationsStatus(
+      JedisCluster jedis, Instance instance) {
+    // Metrics related to dispatched operations
+    ActionAmounts actionAmounts = new ActionAmounts();
+    Integer requeuedOperationsAmount = 0;
+    Set<String> uniqueToolInvocationIds = Sets.newHashSet();
+    Map<String, Integer> fromQueueAmounts = new HashMap();
+    Map<String, Integer> toolAmounts = new HashMap();
+    Map<String, Integer> commandTools = new HashMap();
+    Map<String, Integer> actionMnemonics = new HashMap();
+    Map<String, Integer> targetIds = new HashMap();
+    Map<String, Integer> configIds = new HashMap();
+    Map<String, Integer> platformProperties = new HashMap();
+
+    // Iterate over each dispatched operation, and accumulate metrics about buildfarm's ongoing
+    // executions.
+    try {
+      for (DispatchedOperation operation : getDispatchedOperations()) {
+        QueuedOperation queuedOperation =
+            resolveQueuedOperationDigest(
+                instance, operation.getQueueEntry().getQueuedOperationDigest());
+
+        // 1. Information about the client / caller.
+
+        // Record unique tool invocation ids (ex. d6d7bfbc-c61e-4cdd-abaf-d3ea779335bf)
+        // This will let us know how many unique clients are getting work processed.
+        // This correlates to the number of individuals using buildfarm.
+        // We will probably be able to get a similar number from the incoming build event streams.
+        // However, users will have the ability to disable BES on the client side.
+        // They cannot disable the fact that their actions are tagged with their invocation id.
+        // Therefore, this may be a more reliable metric for "active users".
+        uniqueToolInvocationIds.add(
+            operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getToolInvocationId());
+
+        // Record the tool that the operation came from (ex. bazel-4.0.0, pants-v2).
+        // This will let us know if anyone is using an unexpected build tool or bazel version with
+        // buildfarm.  In the past, we've speculated that mixing bazel version with buildfarm might
+        // result in stability issues.
+        // Now we'll be able to match any issues with when unexpected build tools were used.
+        String toolName =
+            operation
+                    .getQueueEntry()
+                    .getExecuteEntry()
+                    .getRequestMetadata()
+                    .getToolDetails()
+                    .getToolName()
+                + "-"
+                + operation
+                    .getQueueEntry()
+                    .getExecuteEntry()
+                    .getRequestMetadata()
+                    .getToolDetails()
+                    .getToolVersion();
+        incrementValue(toolAmounts, toolName);
+
+        // Record the target Id that initiated the operation.
+        // Note: This metadata is not populated by bazel until 4.1.0
+        String targetId =
+            operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getTargetId();
+        incrementValue(targetIds, targetId);
+
+        // Record the build configuration of the action.
+        // Note: This metadata is not populated by bazel until 4.1.0
+        String configId =
+            operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getConfigurationId();
+        incrementValue(configIds, configId);
+
+        // 2. Information about where the worker fetched the operation.
+
+        // Record the queue where the operation came from (ex. cpu, gpu).
+        // Queues often drain quickly.  This will let us identify the on-going work by the queues
+        // where originated from.
+        // We can correlate queue spikes with the the saturation they cause to dispatched
+        // operations.
+        String queueName =
+            operationQueue.getName(operation.getQueueEntry().getPlatform().getPropertiesList());
+        incrementValue(fromQueueAmounts, queueName);
+
+        // Record whether the operation has been requeued before
+        if (operation.getQueueEntry().getRequeueAttempts() > 0) {
+          requeuedOperationsAmount++;
+        }
+
+        // 3. Information about the operation.
+
+        // Record the action type (ex. build, test).
+        // Generally speaking, there are "build" actions and "test" actions.
+        // This is useful for knowing if buildfarm has been saturated with test work due
+        // clients using --runs_per_test.  It is also relevant to distinguish actions this way
+        // because long-running actions are often tests.
+        incrementActionType(queuedOperation, actionAmounts);
+
+        // Record the action mnemonic of the operation (ex. CppCompile, GoLink).
+        // This will let us know what kind of work is occurring.
+        // Although we know the mnemonic characteristics by statically analyzing the repo,
+        // we don't know what kind of actions dominate buildfarm's compute under typical load.
+        // This let us know what toolchains and rules are used most heavily and perhaps how to
+        // optimize for them.
+        // Note: This metadata is not populated by bazel until 4.1.0
+        String actionMnemonic =
+            operation.getQueueEntry().getExecuteEntry().getRequestMetadata().getActionMnemonic();
+        incrementValue(actionMnemonics, actionMnemonic);
+
+        // Record the programs being run (ex. clang, bash).
+        // Not all actions have mnemonics, and some mnemonics are used for multiple program
+        // invocations.
+        // This help us identify what toolchains are running and how it correlates to existing
+        // operation information.
+        List<String> arguments = queuedOperation.getCommand().getArgumentsList();
+        if (!arguments.isEmpty()) {
+          incrementValue(commandTools, arguments.get(0));
+        }
+
+        // Record platform properties being used on dispatched operations.
+        // How we run actions can be influenced by users through platform properties.
+        // Detecting issues through an influx of specific platform properties can help diagnose.
+        // For example, we may see many dispatched operations using a high amount of cores.
+        for (Platform.Property property :
+            queuedOperation.getCommand().getPlatform().getPropertiesList()) {
+          incrementValue(platformProperties, property.getName() + "=" + property.getValue());
+        }
+      }
+
+    } catch (Exception e) {
+      logger.log(Level.SEVERE, "Unable to analyze dispatched operation: ", e);
+    }
+
+    DispatchedOperationsStatus status =
+        DispatchedOperationsStatus.newBuilder()
+            .setSize(jedis.hlen(config.getDispatchedOperationsHashName()))
+            .setBuildActionAmount(actionAmounts.build)
+            .setTestActionAmount(actionAmounts.test)
+            .setUnknownActionAmount(actionAmounts.unknown)
+            .setRequeuedOperationsAmount(requeuedOperationsAmount)
+            .addAllFromQueues(toLabeledCounts(fromQueueAmounts))
+            .addAllTools(toLabeledCounts(toolAmounts))
+            .addAllActionMnemonics(toLabeledCounts(actionMnemonics))
+            .addAllCommandTools(toLabeledCounts(commandTools))
+            .addAllTargetIds(toLabeledCounts(targetIds))
+            .addAllConfigIds(toLabeledCounts(configIds))
+            .addAllPlatformProperties(toLabeledCounts(platformProperties))
+            .setUniqueClientsAmount(uniqueToolInvocationIds.size())
+            .build();
+
+    return status;
+  }
+
+  /**
+   * @brief Convert a map of string counts into a similar proto metric type.
+   * @details Certain metrics represent a list of strings with a count.
+   * @param map The map to convert.
+   * @return The metric type for counted strings.
+   */
+  private List<LabeledCount> toLabeledCounts(Map<String, Integer> map) {
+    List<LabeledCount> counts = new ArrayList<>();
+    for (Map.Entry<String, Integer> entry : map.entrySet()) {
+      counts.add(
+          LabeledCount.newBuilder().setName(entry.getKey()).setSize(entry.getValue()).build());
+    }
+    return counts;
+  }
+
+  /**
+   * @brief Increment a stat about the kind of operation.
+   * @details It is either a build/test action, or unknown in the event of missing data.
+   * @param queuedOperation The operation to analyze.
+   * @param actionAmounts The counts for the types of operation (build, test, unknown)
+   */
+  private void incrementActionType(QueuedOperation queuedOperation, ActionAmounts actionAmounts) {
+    if (queuedOperation != null) {
+      if (CommandUtils.isTest(queuedOperation.getCommand())) {
+        actionAmounts.test++;
+      } else {
+        actionAmounts.build++;
+      }
+    } else {
+      actionAmounts.unknown++;
+    }
+  }
+
+  /**
+   * @brief Increment the value of any key.
+   * @details Add the key with value 1 if it does not previously exist.
+   * @param map The map to find and increment the key in.
+   * @param key The key to increment the value of.
+   */
+  private static <K> void incrementValue(Map<K, Integer> map, K key) {
+    Integer count = map.get(key);
+    if (count == null) {
+      map.put(key, 1);
+    } else {
+      map.put(key, count + 1);
+    }
+  }
+
+  /**
+   * @brief Get the queued operation based on the digest.
+   * @details Instance used to fetch the blob.
+   * @param instance An instance is used to get additional information about the queue entry.
+   * @param digest The queued operation digest.
+   * @return The queued operation from the provided digest.
+   * @note Suggested return identifier: queuedOperation.
+   */
+  private static QueuedOperation resolveQueuedOperationDigest(Instance instance, Digest digest) {
+    try {
+      ByteString blob = Utils.getBlob(instance, digest, RequestMetadata.getDefaultInstance());
+      QueuedOperation operation;
+      try {
+        operation = QueuedOperation.parseFrom(blob);
+        return operation;
+      } catch (InvalidProtocolBufferException e) {
+        return null;
+      }
+    } catch (Exception e) {
+      return null;
+    }
   }
 
   @Override

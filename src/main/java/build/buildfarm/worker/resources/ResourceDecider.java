@@ -12,16 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package build.buildfarm.worker;
+package build.buildfarm.worker.resources;
 
 import build.bazel.remote.execution.v2.Command;
 import build.bazel.remote.execution.v2.Command.EnvironmentVariable;
-import build.bazel.remote.execution.v2.Platform.Property;
-import build.buildfarm.common.ExecutionProperties;
-import com.google.common.collect.Iterables;
-import java.util.Map;
-import org.json.simple.parser.JSONParser;
-import org.json.simple.parser.ParseException;
+import build.buildfarm.common.CommandUtils;
 
 /**
  * @class ResourceDecider
@@ -46,33 +41,62 @@ public class ResourceDecider {
       boolean onlyMulticoreTests,
       boolean limitGlobalExecution,
       int executeStageWidth) {
-    ResourceLimits limits = new ResourceLimits();
+    // Get all of the user suggested resource changes.
+    ResourceLimits limits = ExecutionPropertiesParser.Parse(command);
 
-    command
-        .getPlatform()
-        .getPropertiesList()
-        .forEach(
-            (property) -> {
-              evaluateProperty(limits, property);
-            });
+    // Further modify the resource limits based on user selection and buildfarm constraints.
+    adjustLimits(limits, command, onlyMulticoreTests, limitGlobalExecution, executeStageWidth);
 
+    return limits;
+  }
+
+  /**
+   * @brief Modify limits based on buildfarm constraints.
+   * @details Existing limits configuration and buildfarm configuration are taken into account.
+   * @param limits Existing limits chosen by the user's exec_properties.
+   * @param command The command to decide resource limitations for.
+   * @param onlyMulticoreTests Only allow tests to be multicore.
+   * @param limitGlobalExecution Whether cpu limiting should be explicitly performed.
+   * @param executeStageWidth The maximum amount of cores available for the operation.
+   */
+  public static void adjustLimits(
+      ResourceLimits limits,
+      Command command,
+      boolean onlyMulticoreTests,
+      boolean limitGlobalExecution,
+      int executeStageWidth) {
     // force limits on non-test actions
-    if (onlyMulticoreTests && !commandIsTest(command)) {
+    if (onlyMulticoreTests && !CommandUtils.isTest(command)) {
       limits.cpu.min = 1;
       limits.cpu.max = 1;
+      limits.cpu.description.add(
+          "cores restricted to 1 because this is enforced on non-test actions");
     }
 
+    // avoid 0 cores when limiting
     if (limitGlobalExecution) {
-      limits.cpu.min = Math.max(limits.cpu.min, 1);
-      limits.cpu.max = Math.max(limits.cpu.max, 1);
+      if (limits.cpu.min == 0) {
+        limits.cpu.min = 1;
+        limits.cpu.description.add(
+            "min cores set to 1 as it cannot be 0 with limit global execution");
+      }
+      if (limits.cpu.max == 0) {
+        limits.cpu.max = 1;
+        limits.cpu.description.add(
+            "max cores set to 1 as it cannot be 0 with limit global execution");
+      }
     }
 
     // perform resource overrides based on test size
     TestSizeResourceOverrides overrides = new TestSizeResourceOverrides();
-    if (overrides.enabled && commandIsTest(command)) {
+    if (overrides.enabled && CommandUtils.isTest(command)) {
       TestSizeResourceOverride override = deduceSizeOverride(command, overrides);
       limits.cpu.min = override.coreMin;
       limits.cpu.max = override.coreMax;
+      limits.cpu.description.add(
+          String.format(
+              "cores are overridden due to test size (min=%s / max=%s",
+              override.coreMin, override.coreMax));
     }
 
     adjustDebugFlags(command, limits);
@@ -80,7 +104,7 @@ public class ResourceDecider {
     // Should we limit the cores of the action during execution? by default, no.
     // If the action has suggested core restrictions on itself, then yes.
     // Claim minimal core amount with regards to execute stage width.
-    limits.cpu.limit = (limits.cpu.min > 0 || limits.cpu.max > 0) || limitGlobalExecution;
+    limits.cpu.limit = (limits.cpu.min > 0 || limits.cpu.max > 0);
     limits.cpu.claimed = Math.min(limits.cpu.min, executeStageWidth);
 
     // Should we limit the memory of the action during execution? by default, no.
@@ -96,12 +120,11 @@ public class ResourceDecider {
     // This will dynamically skip using the worker configured execution policies.
     if (limits.useLinuxSandbox) {
       limits.useExecutionPolicies = false;
+      limits.description.add("configured execution policies skipped because of choosing sandbox");
     }
 
     // we choose to resolve variables after the other variable values have been decided
     resolveEnvironmentVariables(limits);
-
-    return limits;
   }
 
   private static void adjustDebugFlags(Command command, ResourceLimits limits) {
@@ -117,14 +140,16 @@ public class ResourceDecider {
     if (!commandMatchesDebugTarget(command, limits)) {
       limits.debugBeforeExecution = false;
       limits.debugAfterExecution = false;
+      limits.description.add("debugging is disabled because target is not matched");
     }
   }
 
   private static void handleTestDebug(Command command, ResourceLimits limits) {
     // When debugging tests, disable debugging on non-tests.
-    if (limits.debugTestsOnly && !commandIsTest(command)) {
+    if (limits.debugTestsOnly && !CommandUtils.isTest(command)) {
       limits.debugBeforeExecution = false;
       limits.debugAfterExecution = false;
+      limits.description.add("debugging is disabled because only tests are enabled for debugging");
     }
   }
 
@@ -135,224 +160,6 @@ public class ResourceDecider {
       }
     }
     return false;
-  }
-
-  /**
-   * @brief Evaluate a given platform property of a command and use it to adjust execution settings.
-   * @details Parses the property key/value and stores them appropriately.
-   * @param limits Current limits to apply changes to.
-   * @param property The property to store.
-   */
-  private static void evaluateProperty(ResourceLimits limits, Property property) {
-    // handle execution wrapper properties
-    if (property.getName().equals(ExecutionProperties.LINUX_SANDBOX)) {
-      storeLinuxSandbox(limits, property);
-    } else if (property.getName().equals(ExecutionProperties.TMPFS)) {
-      storeTmpFs(limits, property);
-    }
-
-    // handle cpu properties
-    if (property.getName().equals(ExecutionProperties.MIN_CORES)) {
-      storeMinCores(limits, property);
-    } else if (property.getName().equals(ExecutionProperties.MAX_CORES)) {
-      storeMaxCores(limits, property);
-    } else if (property.getName().equals(ExecutionProperties.CORES)) {
-      storeCores(limits, property);
-    }
-
-    // handle mem properties
-    if (property.getName().equals(ExecutionProperties.MIN_MEM)) {
-      storeMinMem(limits, property);
-    } else if (property.getName().equals(ExecutionProperties.MAX_MEM)) {
-      storeMaxMem(limits, property);
-    }
-
-    // handle network properties
-    if (property.getName().equals(ExecutionProperties.BLOCK_NETWORK)) {
-      storeBlockNetwork(limits, property);
-    }
-
-    // handle user properties
-    if (property.getName().equals(ExecutionProperties.AS_NOBODY)) {
-      storeAsNobody(limits, property);
-    }
-
-    // handle env properties
-    else if (property.getName().equals(ExecutionProperties.ENV_VARS)) {
-      storeEnvVars(limits, property);
-    } else if (property.getName().startsWith(ExecutionProperties.ENV_VAR)) {
-      storeEnvVar(limits, property);
-    }
-
-    // handle debug properties
-    else if (property.getName().equals(ExecutionProperties.DEBUG_BEFORE_EXECUTION)) {
-      storeBeforeExecutionDebug(limits, property);
-    } else if (property.getName().equals(ExecutionProperties.DEBUG_AFTER_EXECUTION)) {
-      storeAfterExecutionDebug(limits, property);
-    } else if (property.getName().equals(ExecutionProperties.DEBUG_TESTS_ONLY)) {
-      storeDebugTestsOnly(limits, property);
-    } else if (property.getName().equals(ExecutionProperties.DEBUG_TARGET)) {
-      storeDebugTarget(limits, property);
-    }
-  }
-
-  /**
-   * @brief Store the property for both min/max cores.
-   * @details Parses and stores the property.
-   * @param limits Current limits to apply changes to.
-   * @param property The property to store.
-   */
-  private static void storeCores(ResourceLimits limits, Property property) {
-    int amount = Integer.parseInt(property.getValue());
-    limits.cpu.min = amount;
-    limits.cpu.max = amount;
-  }
-
-  /**
-   * @brief Store the property for using bazel's linux sandbox.
-   * @details Parses and stores a boolean.
-   * @param limits Current limits to apply changes to.
-   * @param property The property to store.
-   */
-  private static void storeLinuxSandbox(ResourceLimits limits, Property property) {
-    limits.useLinuxSandbox = Boolean.parseBoolean(property.getValue());
-  }
-
-  /**
-   * @brief Store the property for using tmpfs.
-   * @details Parses and stores a boolean.
-   * @param limits Current limits to apply changes to.
-   * @param property The property to store.
-   */
-  private static void storeTmpFs(ResourceLimits limits, Property property) {
-    limits.tmpFs = Boolean.parseBoolean(property.getValue());
-  }
-
-  /**
-   * @brief Store the property for min cores.
-   * @details Parses and stores the property.
-   * @param limits Current limits to apply changes to.
-   * @param property The property to store.
-   */
-  private static void storeMinCores(ResourceLimits limits, Property property) {
-    limits.cpu.min = Integer.parseInt(property.getValue());
-  }
-
-  /**
-   * @brief Store the property for max cores.
-   * @details Parses and stores the property.
-   * @param limits Current limits to apply changes to.
-   * @param property The property to store.
-   */
-  private static void storeMaxCores(ResourceLimits limits, Property property) {
-    limits.cpu.max = Integer.parseInt(property.getValue());
-  }
-
-  /**
-   * @brief Store the property for min mem.
-   * @details Parses and stores the property.
-   * @param limits Current limits to apply changes to.
-   * @param property The property to store.
-   */
-  private static void storeMinMem(ResourceLimits limits, Property property) {
-    limits.mem.min = Long.parseLong(property.getValue());
-  }
-
-  /**
-   * @brief Store the property for max mem.
-   * @details Parses and stores the property.
-   * @param limits Current limits to apply changes to.
-   * @param property The property to store.
-   */
-  private static void storeMaxMem(ResourceLimits limits, Property property) {
-    limits.mem.max = Long.parseLong(property.getValue());
-  }
-
-  /**
-   * @brief Store the property for blocking network.
-   * @details Parses and stores a boolean.
-   * @param limits Current limits to apply changes to.
-   * @param property The property to store.
-   */
-  private static void storeBlockNetwork(ResourceLimits limits, Property property) {
-    limits.network.blockNetwork = Boolean.parseBoolean(property.getValue());
-  }
-
-  /**
-   * @brief Store the property for faking username.
-   * @details Parses and stores a boolean.
-   * @param limits Current limits to apply changes to.
-   * @param property The property to store.
-   */
-  private static void storeAsNobody(ResourceLimits limits, Property property) {
-    limits.fakeUsername = Boolean.parseBoolean(property.getValue());
-  }
-
-  /**
-   * @brief Store the property for env vars.
-   * @details Parses the property as json.
-   * @param limits Current limits to apply changes to.
-   * @param property The property to store.
-   */
-  private static void storeEnvVars(ResourceLimits limits, Property property) {
-    try {
-      JSONParser parser = new JSONParser();
-      limits.extraEnvironmentVariables = (Map<String, String>) parser.parse(property.getValue());
-    } catch (ParseException pe) {
-    }
-  }
-
-  /**
-   * @brief Store the property for an env var.
-   * @details Parses the property key name for the env var name.
-   * @param limits Current limits to apply changes to.
-   * @param property The property to store.
-   */
-  private static void storeEnvVar(ResourceLimits limits, Property property) {
-    String keyValue[] = property.getName().split(":", 2);
-    String key = keyValue[1];
-    String value = property.getValue();
-    limits.extraEnvironmentVariables.put(key, value);
-  }
-
-  /**
-   * @brief Store the property for debugging before an execution.
-   * @details Parses and stores a boolean.
-   * @param limits Current limits to apply changes to.
-   * @param property The property to store.
-   */
-  private static void storeBeforeExecutionDebug(ResourceLimits limits, Property property) {
-    limits.debugBeforeExecution = Boolean.parseBoolean(property.getValue());
-  }
-
-  /**
-   * @brief Store the property for debugging after an execution.
-   * @details Parses and stores a boolean.
-   * @param limits Current limits to apply changes to.
-   * @param property The property to store.
-   */
-  private static void storeAfterExecutionDebug(ResourceLimits limits, Property property) {
-    limits.debugAfterExecution = Boolean.parseBoolean(property.getValue());
-  }
-
-  /**
-   * @brief Store the property for debugging tests only.
-   * @details Parses and stores a boolean.
-   * @param limits Current limits to apply changes to.
-   * @param property The property to store.
-   */
-  private static void storeDebugTestsOnly(ResourceLimits limits, Property property) {
-    limits.debugTestsOnly = Boolean.parseBoolean(property.getValue());
-  }
-
-  /**
-   * @brief Store the property for debugging a target.
-   * @details Parses and stores a String.
-   * @param limits Current limits to apply changes to.
-   * @param property The property to store.
-   */
-  private static void storeDebugTarget(ResourceLimits limits, Property property) {
-    limits.debugTarget = property.getValue();
   }
 
   /**
@@ -370,20 +177,6 @@ public class ResourceDecider {
           val = val.replace("{{limits.cpu.claimed}}", String.valueOf(limits.cpu.claimed));
           return val;
         });
-  }
-
-  /**
-   * @brief Derive if command is a test run.
-   * @details Find a reliable way to identify whether a command is a test or not.
-   * @param command The command to identify as a test command.
-   * @return Whether the command is a test.
-   * @note Suggested return identifier: exists.
-   */
-  private static boolean commandIsTest(Command command) {
-    // only tests are setting this currently - other mechanisms are unreliable
-    return Iterables.any(
-        command.getEnvironmentVariablesList(),
-        (envVar) -> envVar.getName().equals("XML_OUTPUT_FILE"));
   }
 
   /**
