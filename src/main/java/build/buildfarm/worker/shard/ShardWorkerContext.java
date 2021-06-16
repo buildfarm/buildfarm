@@ -55,13 +55,13 @@ import build.buildfarm.v1test.QueuedOperationMetadata;
 import build.buildfarm.worker.DequeueMatchEvaluator;
 import build.buildfarm.worker.DequeueMatchSettings;
 import build.buildfarm.worker.ExecutionPolicies;
-import build.buildfarm.worker.ResourceDecider;
-import build.buildfarm.worker.ResourceLimits;
 import build.buildfarm.worker.RetryingMatchListener;
 import build.buildfarm.worker.WorkerContext;
 import build.buildfarm.worker.cgroup.Cpu;
 import build.buildfarm.worker.cgroup.Group;
 import build.buildfarm.worker.cgroup.Mem;
+import build.buildfarm.worker.resources.ResourceDecider;
+import build.buildfarm.worker.resources.ResourceLimits;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
@@ -952,38 +952,7 @@ class ShardWorkerContext implements WorkerContext {
     // For reference on how bazel spawns the sandbox:
     // https://github.com/bazelbuild/bazel/blob/ddf302e2798be28bb67e32d5c2fc9c73a6a1fbf4/src/main/java/com/google/devtools/build/lib/sandbox/LinuxSandboxUtil.java#L183
     if (limits.useLinuxSandbox) {
-      // Construct the CLI options for this binary.
-      LinuxSandboxOptions options = new LinuxSandboxOptions();
-      options.createNetns = limits.network.blockNetwork;
-      options.workingDir = workingDirectory.toString();
-
-      // Bazel encodes these directly
-      options.writableFiles.add(execFileSystem.root().toString());
-      options.writableFiles.add(workingDirectory.toString());
-
-      // For the time being, the linux-sandbox version of "nobody"
-      // does not pair with buildfarm's implementation of exec_owner: "nobody".
-      // This will need fixed to enable using fakeUsername with the sandbox.
-      // TODO: provide proper support for bazel sandbox's fakeUsername "-U" flag.
-      // options.fakeUsername = limits.fakeUsername;
-
-      // these were hardcoded in bazel based on a filesystem configuration typical to ours
-      // TODO: they may be incorrect for say Windows, and support will need adjusted in the future.
-      options.writableFiles.add("/tmp");
-      options.writableFiles.add("/dev/shm");
-
-      if (limits.tmpFs) {
-        options.tmpfsDirs.add("/tmp");
-      }
-
-      // Bazel looks through environment variables based on operation system to provide additional
-      // write files.
-      // TODO: Add other paths based on environment variables
-      // all:     TEST_TMPDIR
-      // windows: TEMP
-      // windows: TMP
-      // linux:   TMPDIR
-
+      LinuxSandboxOptions options = decideLinuxSandboxOptions(limits, workingDirectory);
       addLinuxSandboxCli(arguments, options);
     }
 
@@ -1007,6 +976,47 @@ class ShardWorkerContext implements WorkerContext {
     return combineResources(resources);
   }
 
+  private LinuxSandboxOptions decideLinuxSandboxOptions(
+      ResourceLimits limits, Path workingDirectory) {
+    // Construct the CLI options for this binary.
+    LinuxSandboxOptions options = new LinuxSandboxOptions();
+    options.createNetns = limits.network.blockNetwork;
+    options.workingDir = workingDirectory.toString();
+
+    // Bazel encodes these directly
+    options.writableFiles.add(execFileSystem.root().toString());
+    options.writableFiles.add(workingDirectory.toString());
+
+    // For the time being, the linux-sandbox version of "nobody"
+    // does not pair with buildfarm's implementation of exec_owner: "nobody".
+    // This will need fixed to enable using fakeUsername with the sandbox.
+    // TODO: provide proper support for bazel sandbox's fakeUsername "-U" flag.
+    // options.fakeUsername = limits.fakeUsername;
+
+    // these were hardcoded in bazel based on a filesystem configuration typical to ours
+    // TODO: they may be incorrect for say Windows, and support will need adjusted in the future.
+    options.writableFiles.add("/tmp");
+    options.writableFiles.add("/dev/shm");
+
+    if (limits.tmpFs) {
+      options.tmpfsDirs.add("/tmp");
+    }
+
+    if (limits.debugAfterExecution) {
+      options.statsPath = workingDirectory.resolve("action_execution_statistics").toString();
+    }
+
+    // Bazel looks through environment variables based on operation system to provide additional
+    // write files.
+    // TODO: Add other paths based on environment variables
+    // all:     TEST_TMPDIR
+    // windows: TEMP
+    // windows: TMP
+    // linux:   TMPDIR
+
+    return options;
+  }
+
   private void addLinuxSandboxCli(
       ImmutableList.Builder<String> arguments, LinuxSandboxOptions options) {
     arguments.add(ExecutionWrappers.AS_NOBODY);
@@ -1026,6 +1036,10 @@ class ShardWorkerContext implements WorkerContext {
     if (!options.workingDir.isEmpty()) {
       arguments.add("-W");
       arguments.add(options.workingDir);
+    }
+    if (!options.statsPath.isEmpty()) {
+      arguments.add("-S");
+      arguments.add(options.statsPath);
     }
     for (String writablePath : options.writableFiles) {
       arguments.add("-w");

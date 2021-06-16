@@ -11,8 +11,19 @@ buildifier(
 # For their availability on a worker, they should be provided to a java_image as a "runtime_dep".
 # The relevant configuration for workers is the "execution policy".
 # That is where these binaries can be used and stacked.
+# Buildfarm may also choose different execution wrappers dynamically based on exec_properties.
 # Be aware that the process-wrapper and linux-sandbox come from bazel itself.
 # Therefore, users may want to ensure that the same bazel version is sourced here as is used locally.
+filegroup(
+    name = "execution_wrappers",
+    data = [
+        ":as-nobody",
+        ":linux-sandbox.binary",
+        ":process-wrapper.binary",
+        ":tini.binary",
+    ],
+)
+
 genrule(
     name = "process-wrapper.binary",
     srcs = ["@bazel//src/main/tools:process-wrapper"],
