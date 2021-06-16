@@ -15,7 +15,10 @@
 package build.buildfarm.worker;
 
 import build.bazel.remote.execution.v2.ActionResult;
+import build.buildfarm.worker.resources.ResourceLimits;
+import com.google.devtools.build.lib.shell.Protos.ExecutionStatistics;
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.protobuf.ByteString;
 import com.google.rpc.Code;
 
@@ -29,7 +32,6 @@ import com.google.rpc.Code;
  *     helpful in debugging buildfarm itself.
  */
 public class ExecutionDebugger {
-
   /**
    * @brief Fail the operation before executing it but provide relevant debug information to the
    *     user via a failed result.
@@ -54,13 +56,18 @@ public class ExecutionDebugger {
    * @details This allows users to see relevant debug information related to the executor.
    * @param processBuilder Information about the constructed process.
    * @param limits The resource limitations of an execution.
+   * @param executionStatistics Resource usage information about the executed action.
    * @param resultBuilder Used to report back debug information.
    * @return Return code for the debugged execution.
    * @note Suggested return identifier: code.
    */
   public static Code performAfterExecutionDebug(
-      ProcessBuilder processBuilder, ResourceLimits limits, ActionResult.Builder resultBuilder) {
-    String message = getAfterExecutionDebugInfo(processBuilder, limits, resultBuilder);
+      ProcessBuilder processBuilder,
+      ResourceLimits limits,
+      ExecutionStatistics executionStatistics,
+      ActionResult.Builder resultBuilder) {
+    String message =
+        getAfterExecutionDebugInfo(processBuilder, limits, executionStatistics, resultBuilder);
     resultBuilder.setStderrRaw(ByteString.copyFromUtf8(message));
     resultBuilder.setExitCode(-1);
     return Code.OK;
@@ -77,11 +84,23 @@ public class ExecutionDebugger {
    */
   private static String getBeforeExecutionDebugInfo(
       ProcessBuilder processBuilder, ResourceLimits limits, ActionResult.Builder resultBuilder) {
-    String message = "Buildfarm debug information before execution:\n";
-    Gson gson = new Gson();
-    message += String.join(" ", processBuilder.command()) + "\n";
-    message += gson.toJson(limits);
-    return message;
+    // construct debug object
+    ExecutionDebugInfo info = new ExecutionDebugInfo();
+    info.description = "Buildfarm debug information before execution";
+    info.command = String.join(" ", processBuilder.command());
+    info.environment = processBuilder.environment();
+    info.workingDirectory = processBuilder.directory().getAbsolutePath();
+    info.limits = limits;
+
+    // extract action result data
+    ByteString stdoutBytes = resultBuilder.build().getStdoutRaw();
+    ByteString stderrBytes = resultBuilder.build().getStderrRaw();
+    info.stdout = stdoutBytes.toStringUtf8();
+    info.stderr = stderrBytes.toStringUtf8();
+
+    // convert to json
+    Gson gson = new GsonBuilder().setPrettyPrinting().create();
+    return gson.toJson(info) + "\n";
   }
 
   /**
@@ -89,16 +108,33 @@ public class ExecutionDebugger {
    * @details This be sent back to the user via the stderr of their execution.
    * @param processBuilder Information about the constructed process.
    * @param limits The resource limitations of an execution.
+   * @param executionStatistics Resource usage information about the executed action.
    * @param resultBuilder Used to report back debug information.
    * @return The debug information to show the user.
    * @note Suggested return identifier: debugMessage.
    */
   private static String getAfterExecutionDebugInfo(
-      ProcessBuilder processBuilder, ResourceLimits limits, ActionResult.Builder resultBuilder) {
-    String message = "Buildfarm debug information after execution:\n";
-    Gson gson = new Gson();
-    message += String.join(" ", processBuilder.command()) + "\n";
-    message += gson.toJson(limits);
-    return message;
+      ProcessBuilder processBuilder,
+      ResourceLimits limits,
+      ExecutionStatistics executionStatistics,
+      ActionResult.Builder resultBuilder) {
+    // construct debug object
+    ExecutionDebugInfo info = new ExecutionDebugInfo();
+    info.description = "Buildfarm debug information after execution";
+    info.command = String.join(" ", processBuilder.command());
+    info.environment = processBuilder.environment();
+    info.workingDirectory = processBuilder.directory().getAbsolutePath();
+    info.limits = limits;
+    info.executionStatistics = executionStatistics.getResourceUsage();
+
+    // extract action result data
+    ByteString stdoutBytes = resultBuilder.build().getStdoutRaw();
+    ByteString stderrBytes = resultBuilder.build().getStderrRaw();
+    info.stdout = stdoutBytes.toStringUtf8();
+    info.stderr = stderrBytes.toStringUtf8();
+
+    // convert to json
+    Gson gson = new GsonBuilder().setPrettyPrinting().create();
+    return gson.toJson(info) + "\n";
   }
 }

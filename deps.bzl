@@ -20,9 +20,9 @@ def archive_dependencies(third_party):
         # Needed for "well-known protos" and @com_google_protobuf//:protoc.
         {
             "name": "com_google_protobuf",
-            "sha256": "1c744a6a1f2c901e68c5521bc275e22bdc66256eeb605c2781923365b7087e5f",
-            "strip_prefix": "protobuf-3.13.0",
-            "urls": ["https://github.com/protocolbuffers/protobuf/archive/v3.13.0.zip"],
+            "sha256": "dd513a79c7d7e45cbaeaf7655289f78fd6b806e52dbbd7018ef4e3cf5cff697a",
+            "strip_prefix": "protobuf-3.15.8",
+            "urls": ["https://github.com/protocolbuffers/protobuf/archive/v3.15.8.zip"],
         },
         {
             "name": "com_github_bazelbuild_buildtools",
@@ -34,28 +34,29 @@ def archive_dependencies(third_party):
         # Needed for @grpc_java//compiler:grpc_java_plugin.
         {
             "name": "io_grpc_grpc_java",
-            "patch_args": ["-p1"],
-            "sha256": "2705d274ce79b324f3520414202481a09640b4b14e58d3124841b3318d9b6e19",
-            "strip_prefix": "grpc-java-1.32.1",
-            "urls": ["https://github.com/grpc/grpc-java/archive/v1.32.1.zip"],
+            "sha256": "2c6d5606abfd221e156ae9f6b52719e015751b98c642b78ab65d0accdf6e7efe",
+            "strip_prefix": "grpc-java-1.38.0",
+            "urls": ["https://github.com/grpc/grpc-java/archive/v1.38.0.zip"],
         },
 
         # The APIs that we implement.
         {
             "name": "googleapis",
             "build_file": "%s:BUILD.googleapis" % third_party,
-            "sha256": "7b6ea252f0b8fb5cd722f45feb83e115b689909bbb6a393a873b6cbad4ceae1d",
-            "strip_prefix": "googleapis-143084a2624b6591ee1f9d23e7f5241856642f4d",
-            "url": "https://github.com/googleapis/googleapis/archive/143084a2624b6591ee1f9d23e7f5241856642f4d.zip",
+            "patch_cmds": ["find google -name 'BUILD.bazel' -type f -delete"],
+            "patch_cmds_win": ["Remove-Item google -Recurse -Include *.bazel"],
+            "sha256": "745cb3c2e538e33a07e2e467a15228ccbecadc1337239f6740d57a74d9cdef81",
+            "strip_prefix": "googleapis-6598bb829c9e9a534be674649ffd1b4671a821f9",
+            "url": "https://github.com/googleapis/googleapis/archive/6598bb829c9e9a534be674649ffd1b4671a821f9.zip",
         },
         {
             "name": "remote_apis",
             "build_file": "%s:BUILD.remote_apis" % third_party,
             "patch_args": ["-p1"],
             "patches": ["%s/remote-apis:remote-apis.patch" % third_party],
-            "sha256": "03433a21ed97517f0fbda03c759854850336775a22dc737bab918949ceeddac9",
-            "strip_prefix": "remote-apis-f54876595da9f2c2d66c98c318d00b60fd64900b",
-            "url": "https://github.com/bazelbuild/remote-apis/archive/f54876595da9f2c2d66c98c318d00b60fd64900b.zip",
+            "sha256": "1d69f5f2f694fe93ee78a630f196047892ae51878297a89601c98964486655c6",
+            "strip_prefix": "remote-apis-6345202a036a297b22b0a0e7531ef702d05f2130",
+            "url": "https://github.com/bazelbuild/remote-apis/archive/6345202a036a297b22b0a0e7531ef702d05f2130.zip",
         },
 
         # Ideally we would use the 0.14.4 release of rules_docker,
@@ -66,6 +67,7 @@ def archive_dependencies(third_party):
         {
             "name": "io_bazel_rules_docker",
             "patch_args": ["-p1"],
+            "patches": ["%s/io_bazel_rules_docker:entrypoint.patch" % third_party],
             "sha256": "d5609b7858246fa11e76237aa9b3e681615bdc8acf2ed29058426cf7c4cea099",
             "strip_prefix": "rules_docker-f4822f3921f0c343dd9e5ae65c760d0fb70be1b3",
             "urls": ["https://github.com/bazelbuild/rules_docker/archive/f4822f3921f0c343dd9e5ae65c760d0fb70be1b3.tar.gz"],

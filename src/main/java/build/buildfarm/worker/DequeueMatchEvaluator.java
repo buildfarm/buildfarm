@@ -38,15 +38,6 @@ import com.google.common.collect.SetMultimap;
  *     settings provided allow varying amount of leniency when evaluating the platform properties.
  */
 public class DequeueMatchEvaluator {
-
-  /**
-   * @field WORKER_PLATFORM_CORES_PROPERTY
-   * @brief A platform property decided and assigned to a worker.
-   * @details This often correlates to execute width of the workers (the max amount of cores it is
-   *     willing to give an operation).
-   */
-  private static final String WORKER_PLATFORM_CORES_PROPERTY = "cores";
-
   /**
    * @brief Decide whether the worker should keep the operation or put it back on the queue.
    * @details Compares the platform properties of the worker to the operation's platform properties.
@@ -148,14 +139,14 @@ public class DequeueMatchEvaluator {
       Platform.Property property) {
     // validate min cores
     if (property.getName().equals(ExecutionProperties.MIN_CORES)) {
-      if (!workerProvisions.containsKey(WORKER_PLATFORM_CORES_PROPERTY)) {
+      if (!workerProvisions.containsKey(ExecutionProperties.CORES)) {
         return false;
       }
 
       int coresRequested = Integer.parseInt(property.getValue());
       int possibleCores =
           Integer.parseInt(
-              Iterables.getOnlyElement(workerProvisions.get(WORKER_PLATFORM_CORES_PROPERTY)));
+              Iterables.getOnlyElement(workerProvisions.get(ExecutionProperties.CORES)));
       return possibleCores >= coresRequested;
     }
 

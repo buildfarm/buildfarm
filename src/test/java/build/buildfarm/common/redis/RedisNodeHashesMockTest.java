@@ -38,14 +38,12 @@ import redis.clients.jedis.JedisPool;
  */
 @RunWith(JUnit4.class)
 public class RedisNodeHashesMockTest {
-
   // Function under test: getEvenlyDistributedHashes
   // Reason for testing: an established redis cluster can be used to obtain distributed hashes
   // Failure explanation: there is an error in the cluster's ability to report slot ranges or
   // convert ranges to hashtags
   @Test
   public void getEvenlyDistributedHashesCanRetrieveDistributedHashes() throws Exception {
-
     // ARRANGE
     Jedis node = mock(Jedis.class);
     when(node.clusterSlots()).thenReturn(Arrays.asList(Arrays.asList(0L, 100L)));
@@ -74,7 +72,6 @@ public class RedisNodeHashesMockTest {
   // Failure explanation: the fallback behavior does not result in successful completion of call
   @Test
   public void getEvenlyDistributedHashesCannotRetrieveDistributedHashes() throws Exception {
-
     // ARRANGE
     JedisCluster redis = mock(JedisCluster.class);
 
@@ -90,7 +87,6 @@ public class RedisNodeHashesMockTest {
   // Failure explanation: the object cannot be constructed
   @Test
   public void getEvenlyDistributedHashesCanConstruct() throws Exception {
-
     RedisNodeHashes converter = new RedisNodeHashes();
   }
 
@@ -101,7 +97,6 @@ public class RedisNodeHashesMockTest {
   // convert ranges to hashtags
   @Test
   public void getEvenlyDistributedHashesWithPrefixExpectedPrefixHashes() throws Exception {
-
     // ARRANGE
     Jedis node = mock(Jedis.class);
     when(node.clusterSlots())

@@ -11,4 +11,4 @@ docker run -d --name buildfarm-redis -p 6379:6379 redis:5.0.9
 docker build -t buildfarm .
 
 # Start the servies and do a test build
-docker run --network host buildfarm buildfarm/.bazelci/test_buildfarm_container.sh
+docker run --network host --env TEST_SHARD=$TEST_SHARD buildfarm buildfarm/.bazelci/test_buildfarm_container.sh

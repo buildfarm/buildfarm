@@ -145,6 +145,11 @@ class CFCExecFileSystem implements ExecFileSystem {
   }
 
   @Override
+  public Path root() {
+    return root;
+  }
+
+  @Override
   public ContentAddressableStorage getStorage() {
     return fileCache;
   }

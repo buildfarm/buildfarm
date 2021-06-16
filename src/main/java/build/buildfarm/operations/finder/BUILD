@@ -6,14 +6,7 @@ java_library(
     ],
     visibility = ["//visibility:public"],
     deps = [
-        "//src/main/java/build/buildfarm/ac",
-        "//src/main/java/build/buildfarm/common",
-        "//src/main/java/build/buildfarm/common/grpc",
-        "//src/main/java/build/buildfarm/common/redis",
         "//src/main/java/build/buildfarm/instance",
-        "//src/main/java/build/buildfarm/instance/queues",
-        "//src/main/java/build/buildfarm/instance/server",
-        "//src/main/java/build/buildfarm/instance/stub",
         "//src/main/java/build/buildfarm/operations",
         "//src/main/protobuf:build_buildfarm_v1test_buildfarm_java_proto",
         "//third_party/jedis",
@@ -31,7 +24,6 @@ java_library(
         "@maven//:io_grpc_grpc_protobuf",
         "@maven//:io_grpc_grpc_stub",
         "@maven//:org_apache_commons_commons_pool2",
-        "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_grpc",
         "@remote_apis//:build_bazel_remote_execution_v2_remote_execution_java_proto",
     ],
 )

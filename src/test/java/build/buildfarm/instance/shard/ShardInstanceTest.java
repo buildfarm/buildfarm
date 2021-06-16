@@ -146,6 +146,7 @@ public class ShardInstanceTest {
             /* maxCpu=*/ 1,
             /* maxActionTimeout=*/ Duration.getDefaultInstance(),
             new ArrayList<>(),
+            /* useDenyList=*/ true,
             mockOnStop,
             CacheBuilder.newBuilder().build(mockInstanceLoader),
             /* actionCacheFetchService=*/ listeningDecorator(newSingleThreadExecutor()));
@@ -966,7 +967,6 @@ public class ShardInstanceTest {
 
   @Test
   public void cacheReturnsNullWhenMissing() throws Exception {
-
     // create cache
     AsyncCache<String, String> cache =
         Caffeine.newBuilder().newBuilder().maximumSize(64).buildAsync();

@@ -67,7 +67,6 @@ public class Retrier {
    * calling isRetriable and nextDelayMillis manually (see ByteStreamUploader example).
    */
   public interface Backoff {
-
     /** Indicates that no more retries should be made for use in {@link #nextDelayMillis()}. */
     long STOP = -1L;
 
@@ -288,7 +287,6 @@ public class Retrier {
   }
 
   public static class ProgressiveBackoff implements Backoff {
-
     private final Supplier<Backoff> backoffSupplier;
     private Backoff currentBackoff = null;
     private int retries = 0;
