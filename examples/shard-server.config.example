@@ -51,7 +51,7 @@ instances {
     max_blob_size: 4294967296
     
     # Whether the instance should consult a denylist when looking up actions & invocations.
-    # For cache-only systems, users may want to disable this check.
+    # For cache-only systems users may want to disable this check.
     use_deny_list: True
 
     # A backplane specification hosted with redis cluster
