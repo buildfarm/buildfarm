@@ -952,38 +952,7 @@ class ShardWorkerContext implements WorkerContext {
     // For reference on how bazel spawns the sandbox:
     // https://github.com/bazelbuild/bazel/blob/ddf302e2798be28bb67e32d5c2fc9c73a6a1fbf4/src/main/java/com/google/devtools/build/lib/sandbox/LinuxSandboxUtil.java#L183
     if (limits.useLinuxSandbox) {
-      // Construct the CLI options for this binary.
-      LinuxSandboxOptions options = new LinuxSandboxOptions();
-      options.createNetns = limits.network.blockNetwork;
-      options.workingDir = workingDirectory.toString();
-
-      // Bazel encodes these directly
-      options.writableFiles.add(execFileSystem.root().toString());
-      options.writableFiles.add(workingDirectory.toString());
-
-      // For the time being, the linux-sandbox version of "nobody"
-      // does not pair with buildfarm's implementation of exec_owner: "nobody".
-      // This will need fixed to enable using fakeUsername with the sandbox.
-      // TODO: provide proper support for bazel sandbox's fakeUsername "-U" flag.
-      // options.fakeUsername = limits.fakeUsername;
-
-      // these were hardcoded in bazel based on a filesystem configuration typical to ours
-      // TODO: they may be incorrect for say Windows, and support will need adjusted in the future.
-      options.writableFiles.add("/tmp");
-      options.writableFiles.add("/dev/shm");
-
-      if (limits.tmpFs) {
-        options.tmpfsDirs.add("/tmp");
-      }
-
-      // Bazel looks through environment variables based on operation system to provide additional
-      // write files.
-      // TODO: Add other paths based on environment variables
-      // all:     TEST_TMPDIR
-      // windows: TEMP
-      // windows: TMP
-      // linux:   TMPDIR
-
+      LinuxSandboxOptions options = decideLinuxSandboxOptions(limits, workingDirectory);
       addLinuxSandboxCli(arguments, options);
     }
 
@@ -991,6 +960,47 @@ class ShardWorkerContext implements WorkerContext {
     // However, we may have multiple IOResources due to using multiple cgroup groups.
     // We construct a single IOResource to account for this.
     return combineResources(resources);
+  }
+
+  private LinuxSandboxOptions decideLinuxSandboxOptions(
+      ResourceLimits limits, Path workingDirectory) {
+    // Construct the CLI options for this binary.
+    LinuxSandboxOptions options = new LinuxSandboxOptions();
+    options.createNetns = limits.network.blockNetwork;
+    options.workingDir = workingDirectory.toString();
+
+    // Bazel encodes these directly
+    options.writableFiles.add(execFileSystem.root().toString());
+    options.writableFiles.add(workingDirectory.toString());
+
+    // For the time being, the linux-sandbox version of "nobody"
+    // does not pair with buildfarm's implementation of exec_owner: "nobody".
+    // This will need fixed to enable using fakeUsername with the sandbox.
+    // TODO: provide proper support for bazel sandbox's fakeUsername "-U" flag.
+    // options.fakeUsername = limits.fakeUsername;
+
+    // these were hardcoded in bazel based on a filesystem configuration typical to ours
+    // TODO: they may be incorrect for say Windows, and support will need adjusted in the future.
+    options.writableFiles.add("/tmp");
+    options.writableFiles.add("/dev/shm");
+
+    if (limits.tmpFs) {
+      options.tmpfsDirs.add("/tmp");
+    }
+
+    if (limits.debugAfterExecution) {
+      options.statsPath = workingDirectory.resolve("action_execution_statistics").toString();
+    }
+
+    // Bazel looks through environment variables based on operation system to provide additional
+    // write files.
+    // TODO: Add other paths based on environment variables
+    // all:     TEST_TMPDIR
+    // windows: TEMP
+    // windows: TMP
+    // linux:   TMPDIR
+
+    return options;
   }
 
   private void addLinuxSandboxCli(
@@ -1012,6 +1022,10 @@ class ShardWorkerContext implements WorkerContext {
     if (!options.workingDir.isEmpty()) {
       arguments.add("-W");
       arguments.add(options.workingDir);
+    }
+    if (!options.statsPath.isEmpty()) {
+      arguments.add("-S");
+      arguments.add(options.statsPath);
     }
     for (String writablePath : options.writableFiles) {
       arguments.add("-w");
