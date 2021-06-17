@@ -67,6 +67,7 @@ genrule(
     cmd = "cp $< $@;",
 )
 
+# The delay wrapper is only intended to be used with the "skip_sleep" wrapper.
 sh_binary(
     name = "delay",
     srcs = ["delay.sh"],
