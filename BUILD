@@ -18,12 +18,12 @@ filegroup(
     name = "execution_wrappers",
     data = [
         ":as-nobody",
+        ":delay",
         ":linux-sandbox.binary",
         ":process-wrapper.binary",
-        ":tini.binary",
         ":skip_sleep.binary",
         ":skip_sleep.preload",
-        ":delay",
+        ":tini.binary",
     ],
 )
 
