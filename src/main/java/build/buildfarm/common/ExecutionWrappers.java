@@ -75,8 +75,8 @@ public class ExecutionWrappers {
   /**
    * @field DELAY
    * @brief The program to used to timeshift actions when running under skip_sleep.
-   * @details This program is expected to be packaged with the worker image. This wrapper is only
-   *     intended to be used with skip_sleep.
+   * @details This program is expected to be packaged with the worker image. Warning: This wrapper
+   *     is only intended to be used with skip_sleep.
    */
   public static final String DELAY = "/app/build_buildfarm/delay.sh";
 }
