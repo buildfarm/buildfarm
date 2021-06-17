@@ -21,6 +21,9 @@ filegroup(
         ":linux-sandbox.binary",
         ":process-wrapper.binary",
         ":tini.binary",
+        ":skip_sleep.binary",
+        ":skip_sleep.preload",
+        ":delay",
     ],
 )
 
