@@ -38,6 +38,7 @@ import io.grpc.health.v1.HealthCheckResponse.ServingStatus;
 import io.grpc.protobuf.services.ProtoReflectionService;
 import io.grpc.services.HealthStatusManager;
 import io.grpc.util.TransmitStatusRuntimeExceptionInterceptor;
+import io.prometheus.client.Counter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -60,6 +61,12 @@ public class BuildFarmServer extends LoggingMain {
   private static final java.util.logging.Logger nettyLogger =
       java.util.logging.Logger.getLogger("io.grpc.netty");
   private static final Logger logger = Logger.getLogger(BuildFarmServer.class.getName());
+  private static final Counter healthCheckMetric =
+      Counter.build()
+          .name("health_check")
+          .labelNames("lifecycle")
+          .help("Service health check.")
+          .register();
 
   private final ScheduledExecutorService keepaliveScheduler = newSingleThreadScheduledExecutor();
   private final ActionCacheRequestCounter actionCacheRequestCounter;
@@ -151,6 +158,7 @@ public class BuildFarmServer extends LoggingMain {
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.SERVING);
     prometheusPublisher.startHttpServer(prometheusPort);
+    healthCheckMetric.labels("start").inc();
   }
 
   @Override
@@ -170,6 +178,7 @@ public class BuildFarmServer extends LoggingMain {
     healthStatusManager.setStatus(
         HealthStatusManager.SERVICE_NAME_ALL_SERVICES, ServingStatus.NOT_SERVING);
     prometheusPublisher.stopHttpServer();
+    healthCheckMetric.labels("stop").inc();
     try {
       if (server != null) {
         server.shutdown();
