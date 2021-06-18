@@ -122,6 +122,7 @@ import io.grpc.protobuf.StatusProto;
 import io.grpc.stub.ServerCallStreamObserver;
 import io.prometheus.client.Counter;
 import io.prometheus.client.Gauge;
+import io.prometheus.client.Summary;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -264,6 +265,8 @@ public class ShardInstance extends AbstractServerInstance {
           .name("blocked_invocations_size")
           .help("The number of blocked invocations")
           .register();
+  private static final Summary ioMetric =
+      Summary.build().name("io_bytes_read").help("I/O (bytes)").register();
 
   private final Runnable onStop;
   private final long maxBlobSize;
@@ -877,6 +880,7 @@ public class ShardInstance extends AbstractServerInstance {
               public void onNext(ByteString nextChunk) {
                 blobObserver.onNext(nextChunk);
                 received += nextChunk.size();
+                ioMetric.observe(received);
               }
 
               @Override
