@@ -25,7 +25,6 @@ public abstract class LoggingMain {
   }
 
   protected LoggingMain(String applicationName) {
-    System.out.println("In super Constructor");
     Runtime.getRuntime().addShutdownHook(new ShutdownThread(applicationName));
   }
 }
