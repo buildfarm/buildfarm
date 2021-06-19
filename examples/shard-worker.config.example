@@ -5,9 +5,16 @@ port: 8981
 # by all shard cluster servers
 public_name: "localhost:8981"
 
-# This determines whether the worker is a shard of the cas.
-# When not a shard, it will upload into the Sharded CAS
-omit_from_cas: false
+
+capabilities {
+  # This determines whether the worker is a shard of the cas.
+  # When not a shard, it will upload execution outputs.
+  cas: false
+  
+  # This determines whether the shard instance will participate in the execution pool.
+  # Workers that don't execute may be used for storage only.
+  execution: false
+}
 
 # the digest function for this worker, required
 # to match out of band between the client and server
