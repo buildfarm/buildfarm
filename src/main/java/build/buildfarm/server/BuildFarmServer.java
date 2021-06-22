@@ -45,7 +45,6 @@ import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -69,7 +68,6 @@ public class BuildFarmServer extends LoggingMain {
           .register();
 
   private final ScheduledExecutorService keepaliveScheduler = newSingleThreadScheduledExecutor();
-  private final ActionCacheRequestCounter actionCacheRequestCounter;
   private final Instances instances;
   private final HealthStatusManager healthStatusManager;
   private final Server server;
@@ -90,15 +88,13 @@ public class BuildFarmServer extends LoggingMain {
         new BuildFarmInstances(session, config.getInstancesList(), defaultInstanceName, this::stop);
 
     healthStatusManager = new HealthStatusManager();
-    actionCacheRequestCounter =
-        new ActionCacheRequestCounter(ActionCacheService.logger, Duration.ofSeconds(10));
 
     ServerInterceptor headersInterceptor = new ServerHeadersInterceptor();
 
     server =
         serverBuilder
             .addService(healthStatusManager.getHealthService())
-            .addService(new ActionCacheService(instances, actionCacheRequestCounter::increment))
+            .addService(new ActionCacheService(instances))
             .addService(new CapabilitiesService(instances))
             .addService(
                 new ContentAddressableStorageService(
@@ -152,7 +148,6 @@ public class BuildFarmServer extends LoggingMain {
 
   public synchronized void start(String publicName, int prometheusPort) throws IOException {
     checkState(!stopping, "must not call start after stop");
-    actionCacheRequestCounter.start();
     instances.start(publicName);
     server.start();
     healthStatusManager.setStatus(
@@ -192,9 +187,6 @@ public class BuildFarmServer extends LoggingMain {
     }
     if (!shutdownAndAwaitTermination(keepaliveScheduler, 10, TimeUnit.SECONDS)) {
       logger.log(Level.WARNING, "could not shut down keepalive scheduler");
-    }
-    if (!actionCacheRequestCounter.stop()) {
-      logger.log(Level.WARNING, "count not shut down action cache request counter");
     }
   }
 
