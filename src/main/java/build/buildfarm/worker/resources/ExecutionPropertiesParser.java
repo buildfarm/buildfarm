@@ -55,6 +55,8 @@ public class ExecutionPropertiesParser {
     parser.put(MAX_MEM, ExecutionPropertiesParser::storeMaxMem);
     parser.put(ENV_VAR, ExecutionPropertiesParser::storeEnvVar);
     parser.put(ENV_VARS, ExecutionPropertiesParser::storeEnvVars);
+    parser.put(SKIP_SLEEP, ExecutionPropertiesParser::storeSkipSleep);
+    parser.put(TIME_SHIFT, ExecutionPropertiesParser::storeTimeShift);
     parser.put(DEBUG_BEFORE_EXECUTION, ExecutionPropertiesParser::storeBeforeExecutionDebug);
     parser.put(DEBUG_AFTER_EXECUTION, ExecutionPropertiesParser::storeAfterExecutionDebug);
     parser.put(DEBUG_TESTS_ONLY, ExecutionPropertiesParser::storeDebugTestsOnly);
@@ -230,6 +232,28 @@ public class ExecutionPropertiesParser {
     String value = property.getValue();
     limits.extraEnvironmentVariables.put(key, value);
     describeChange(limits.description, "extra env var added", key + ":" + value, property);
+  }
+
+  /**
+   * @brief Store the property for skipping sleeps.
+   * @details Parses and stores a boolean.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
+   */
+  private static void storeSkipSleep(ResourceLimits limits, Property property) {
+    limits.time.skipSleep = Boolean.parseBoolean(property.getValue());
+    describeChange(limits.time.description, "skip sleep", property.getValue(), property);
+  }
+
+  /**
+   * @brief Store the property for shifting time.
+   * @details Parses and stores the property.
+   * @param limits Current limits to apply changes to.
+   * @param property The property to store.
+   */
+  private static void storeTimeShift(ResourceLimits limits, Property property) {
+    limits.time.timeShift = Integer.parseInt(property.getValue());
+    describeChange(limits.time.description, "time shift", property.getValue(), property);
   }
 
   /**

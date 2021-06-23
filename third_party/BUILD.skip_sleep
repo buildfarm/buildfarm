@@ -1,0 +1,22 @@
+package(default_visibility = ["//visibility:public"])
+
+cc_binary(
+    name = "skip_sleep",
+    srcs = select({
+        "@//config:windows": ["tardis-windows.c"],
+        "@//conditions:default": ["tardis.c"],
+    }),
+    data = [":skip_sleep_preload"],
+    includes = ["."],
+    deps = [":skip_sleep_preload"],
+)
+
+cc_binary(
+    name = "skip_sleep_preload",
+    srcs = select({
+        "@//config:windows": ["novdso-windows.c"],
+        "@//conditions:default": ["novdso.c"],
+    }),
+    includes = ["."],
+    linkshared = 1,
+)

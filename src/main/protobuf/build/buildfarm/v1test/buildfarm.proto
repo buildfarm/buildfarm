@@ -539,6 +539,9 @@ message ShardInstanceConfig {
   
   // default timeouts on grpc requests made by instances
   google.protobuf.Duration grpc_timeout = 8;
+  
+  // Whether the instance should consult a denylist when looking up actions & invocations.
+  bool use_deny_list = 10;
 }
 
 message ShardWorkerInstanceConfig {

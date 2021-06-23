@@ -43,7 +43,9 @@ fi
 for file in $files
 do
 	# Remove whitespace lines after starting bracket '{'
-        awk -i inplace -v n=-2 'NR==n+1 && !NF{next} /\{/ {n=NR}1' $file
+	# Ignore any issues if this does not succeed.
+	# The CI doesn't gate on this adjustment.
+        awk -i inplace -v n=-2 'NR==n+1 && !NF{next} /\{/ {n=NR}1' $file > /dev/null 2>&1
 done
 
 # Fixes formatting issues

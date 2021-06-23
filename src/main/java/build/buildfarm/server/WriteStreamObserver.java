@@ -40,6 +40,7 @@ import io.grpc.Context;
 import io.grpc.Context.CancellableContext;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
+import io.prometheus.client.Summary;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -50,6 +51,8 @@ import javax.annotation.concurrent.GuardedBy;
 
 class WriteStreamObserver implements StreamObserver<WriteRequest> {
   private static final Logger logger = Logger.getLogger(WriteStreamObserver.class.getName());
+  private static final Summary ioMetric =
+      Summary.build().name("io_bytes_write").help("I/O (bytes)").register();
 
   private final Instances instances;
   private final long deadlineAfter;
@@ -377,6 +380,7 @@ class WriteStreamObserver implements StreamObserver<WriteRequest> {
     try {
       data.writeTo(getOutput());
       requestNextIfReady();
+      ioMetric.observe(data.size());
     } catch (EntryLimitException e) {
       throw e;
     } catch (IOException e) {

@@ -18,8 +18,11 @@ filegroup(
     name = "execution_wrappers",
     data = [
         ":as-nobody",
+        ":delay",
         ":linux-sandbox.binary",
         ":process-wrapper.binary",
+        ":skip_sleep.binary",
+        ":skip_sleep.preload",
         ":tini.binary",
     ],
 )
@@ -51,6 +54,26 @@ cc_binary(
         "//config:windows": ["as-nobody-windows.c"],
         "//conditions:default": ["as-nobody.c"],
     }),
+)
+
+genrule(
+    name = "skip_sleep.binary",
+    srcs = ["@skip_sleep"],
+    outs = ["skip_sleep"],
+    cmd = "cp $< $@;",
+)
+
+genrule(
+    name = "skip_sleep.preload",
+    srcs = ["@skip_sleep//:skip_sleep_preload"],
+    outs = ["skip_sleep_preload.so"],
+    cmd = "cp $< $@;",
+)
+
+# The delay wrapper is only intended to be used with the "skip_sleep" wrapper.
+sh_binary(
+    name = "delay",
+    srcs = ["delay.sh"],
 )
 
 # Docker images for buildfarm components
