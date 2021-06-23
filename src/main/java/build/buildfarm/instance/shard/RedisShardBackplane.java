@@ -1222,8 +1222,7 @@ public class RedisShardBackplane implements Backplane {
       logger.log(Level.SEVERE, "error parsing queue entry", e);
       return null;
     }
-    QueueEntry queueEntry =
-        queueEntryBuilder.setRequeueAttempts(queueEntryBuilder.getRequeueAttempts() + 1).build();
+    QueueEntry queueEntry = queueEntryBuilder.build();
 
     String operationName = queueEntry.getExecuteEntry().getOperationName();
     Operation operation = keepaliveOperation(operationName);
@@ -1255,7 +1254,11 @@ public class RedisShardBackplane implements Backplane {
                 operationName, operationQueue.getDequeueName()));
       }
       dispatchedOperations.remove(jedis, operationName);
-      return queueEntry;
+
+      // Return an entry so that if it needs re-queued, it will have the correct "requeue attempts".
+      QueueEntry entryForRequeue =
+          queueEntryBuilder.setRequeueAttempts(queueEntryBuilder.getRequeueAttempts() + 1).build();
+      return entryForRequeue;
     }
     return null;
   }
