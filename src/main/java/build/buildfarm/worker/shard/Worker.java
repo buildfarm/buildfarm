@@ -346,7 +346,7 @@ public class Worker extends LoggingMain {
       throws ConfigurationException {
     super("BuildFarmShardWorker");
     this.config = config;
-    isCasShard = !config.getOmitFromCas();
+    isCasShard = config.getCapabilities().getCas();
     String identifier = "buildfarm-worker-" + config.getPublicName() + "-" + session;
     root = getValidRoot(config);
     if (config.getPublicName().isEmpty()) {
