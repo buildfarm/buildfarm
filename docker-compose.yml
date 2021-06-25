@@ -1,0 +1,42 @@
+version: "3"
+services:
+  service:
+    container_name: bazel-buildfarm-service
+    # restart: always
+    # image: openjdk:8u292-jdk-buster
+    build:
+      context: .
+      dockerfile: bazel-buildfarm.Dockerfile
+    image: bazel-buildfarm
+    ports: 
+      - 8980:8980
+    working_dir: /buildfarm
+    entrypoint: ["./bazelw","run","//src/main/java/build/buildfarm:buildfarm-server","/buildfarm/examples/server.config.example"]
+    networks:
+      buildfarm_net:
+        aliases:
+          - service
+  worker:
+    container_name: bazel-buildfarm-worker
+    # restart: always
+    # image: openjdk:8u292-jdk-buster
+    build:
+      context: .
+      dockerfile: bazel-buildfarm.Dockerfile
+    image: bazel-buildfarm
+    #volumes:
+    #  - ./examples/worker.docker.config.example:/buildfarm/examples/worker.docker.config.example
+    working_dir: /buildfarm
+    entrypoint: ["./bazelw","run","//src/main/java/build/buildfarm:buildfarm-operationqueue-worker","/buildfarm/examples/worker.docker.config.example"]
+    depends_on: 
+      - service
+    networks:
+      buildfarm_net:
+        aliases:
+          - worker
+
+networks:
+   buildfarm_net:
+     #ipam:
+     #   config:
+     #   - subnet: 172.18.0.0/16

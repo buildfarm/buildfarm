@@ -1,0 +1,182 @@
+# the digest function for this worker, required
+# to match out of band between the client and server
+# since resource names must be determined on the client
+# for a valid upload
+digest_function: SHA256
+
+# the endpoint used to execute operations
+operation_queue: {
+  target: "service:8980"
+
+  # the instance domain that this worker will execute work in
+  # all requests will be tagged with this instance name
+  instance_name: "default_memory_instance"
+
+  # the deadline in seconds for requests (default or <= 0 is unlimited)
+  deadline_after_seconds: 60
+}
+
+# the endpoint used for cas interactions
+content_addressable_storage: {
+  target: "service:8980"
+
+  # the instance domain that this worker will make resource requests in
+  # all requests will be tagged with this instance name
+  instance_name: "default_memory_instance"
+
+  # the deadline in seconds for requests (default or <= 0 is unlimited)
+  deadline_after_seconds: 60
+}
+
+# the endpoint used for action cache interactions
+action_cache: {
+  target: "service:8980"
+
+  # the instance domain that this worker will make resource requests in
+  # all requests will be tagged with this instance name
+  instance_name: "default_memory_instance"
+
+  # the deadline in seconds for requests (default or <= 0 is unlimited)
+  deadline_after_seconds: 60
+}
+
+# all content for the operations will be stored under this path
+root: "/tmp/worker"
+
+# the local cache location relative to the 'root', or absolute
+cas_cache_directory: "cache"
+
+# limit for contents of files retained
+# from CAS in the cache
+cas_cache_max_size_bytes: 2147483648 # 2 * 1024 * 1024 * 1024
+
+# limit for content size of files retained
+# from CAS in the cache
+cas_cache_max_entry_size_bytes: 2147483648 # 2 * 1024 * 1024 * 1024
+
+# whether the file directories bidirectional mapping should be stored in memory (HashMap) or
+# in sqlite
+# cas_cache_file_directories_index_in_memory: true
+
+# create entry files in a directory for each leveled leading byte of the hash
+# the default, unspecified value is 0, to create all digests in the cas path itself
+# for each level > 0, a directory is created for all byte representations, 00-ff, with
+# as many sublevels as requested.
+#
+# This can provide a performance benefit for file access and manipulation for filesystems
+# which have problems with directories with many (e.g. millions) of files in them.
+# The CFC creates these directories upfront, resulting in a delay while each is verified or
+# created. Be cautious with large values, as the subdivision is 256^n
+#
+cas_cache_hex_bucket_levels: 0
+
+# total size in bytes of inline content for action results
+# output files, stdout, and stderr content, in that order
+# will be inlined if their cumulative size does not exceed this limit.
+inline_content_limit: 1048567 # 1024 * 1024
+
+# whether the stdout of running processes should be streamed
+stream_stdout: true
+
+# whether to insert stdout into the CAS, can be:
+#   ALWAYS_INSERT: stdout is always inserted into the CAS
+#   INSERT_ABOVE_LIMIT: stdout is inserted into the CAS when it exceeds the inline limit above
+stdout_cas_policy: ALWAYS_INSERT
+
+# whether the stderr of running processes should be streamed
+stream_stderr: true
+
+# whether to insert stderr into the CAS, can be:
+#   ALWAYS_INSERT: stderr is always inserted into the CAS
+#   INSERT_ABOVE_LIMIT: stderr is inserted into the CAS when it exceeds the inline limit above
+stderr_cas_policy: ALWAYS_INSERT
+
+# whether to insert output files into the CAS, can be:
+#   ALWAYS_INSERT: output files are always inserted into the CAS
+#   INSERT_ABOVE_LIMIT: output files are inserted into the CAS when it exceeds the inline limit above
+file_cas_policy: ALWAYS_INSERT
+
+# ContentAddressableStorage#getTree per-page directory count
+# value of '0' means let the server decide
+tree_page_size: 0
+
+# the period between poll operations at any stage
+operation_poll_period: {
+  seconds: 1
+  nanos: 0
+}
+
+# key/value set of definining capabilities of this worker
+# all execute requests must match perfectly with workers which
+# provide capabilities
+# so an action with a required platform: { arch: "x86_64" } must
+# match with a worker with at least { arch: "x86_64" } here
+platform: {
+  # commented out here for illustrative purposes, a default empty
+  # 'platform' is a sufficient starting point without specifying
+  # any platform requirements on the actions' side
+  ###
+  # properties: {
+  #   name: "key_name"
+  #   value: "value_string"
+  # }
+}
+
+# this platform is applied to any executed command to fill in
+# default values for any fields that are not populated on match
+default_platform: {
+  ###
+  # properties: {
+  #   name: "cores"
+  #   value: "1"
+  # }
+}
+
+# the number of concurrently available slots in the execute phase
+execute_stage_width: 1
+
+# the number of concurrently available slots in the input fetch phase
+input_fetch_stage_width: 1
+
+# Use an input directory creation strategy which creates a single
+# directory tree at the highest level of the input tree containing
+# no output paths of any kind, and symlinks that directory into an
+# action's execroot, potentially saving large amounts of time
+# spent manufacturing the same read-only input hierarchy over
+# multiple actions' executions.
+link_input_directories: true
+
+# an imposed action-key-invariant timeout used in the unspecified timeout case
+default_action_timeout: {
+  seconds: 600
+  nanos: 0
+}
+
+# a limit on the action timeout specified in the action, above which
+# the operation will report a failed result immediately
+maximum_action_timeout: {
+  seconds: 3600
+  nanos: 0
+}
+
+# execution policies are automatically added to the advertised
+# platform for a worker
+# prefix command executions with this path
+# arguments are repeated here in order, with '<field>' substituted
+# with a value from the Platform properties list with a matching
+# name. Wrappers with substitutions without matching properties
+# are discarded and not applied to the executed command
+#execution_policies: {
+#  name: "test"
+#  wrapper: {
+#    path: "/path/to/execution/wrapper"
+#    arguments: "-c"
+#    arguments: "<cores>"
+#  }
+#}
+
+# Create exec trees containing directories that are owned by
+# this user
+# The default (empty) value does not change the owner
+#exec_owner: "nobody"
+exec_owner: ""
